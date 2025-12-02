@@ -239,20 +239,102 @@ Deno.serve(async (req) => {
 
     console.log('Starting Adversus sync...')
 
-    // Parse request body for date range
+    // Parse request body for date range or debug action
     let startDate: string | null = null
     let endDate: string | null = null
+    let debugAction: string | null = null
+    let debugCampaignId: number | null = null
     
     try {
       const body = await req.json()
       startDate = body.startDate
       endDate = body.endDate
+      debugAction = body.action
+      debugCampaignId = body.campaignId
     } catch {
       // Use default date range (last 30 days)
       const now = new Date()
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
       startDate = thirtyDaysAgo.toISOString()
       endDate = now.toISOString()
+    }
+
+    // Debug action: fetch Adversus products
+    if (debugAction === 'fetch-products') {
+      console.log('Debug: Fetching Adversus products...')
+      const productsResponse = await fetch(`${baseUrl}/products?pageSize=100`, {
+        headers: {
+          'Authorization': `Basic ${authHeader}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (productsResponse.ok) {
+        const productsData = await productsResponse.json()
+        console.log('Adversus products:', JSON.stringify(productsData, null, 2))
+        return new Response(
+          JSON.stringify({ products: productsData }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } else {
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch products', status: productsResponse.status }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    // Debug action: fetch sales for a campaign
+    if (debugAction === 'fetch-sales') {
+      console.log(`Debug: Fetching Adversus sales...`)
+      // Try different filter approaches
+      let url = `${baseUrl}/sales?pageSize=20`
+      if (debugCampaignId) {
+        // Try with campaignId filter
+        url = `${baseUrl}/sales?pageSize=20`
+      }
+      
+      const salesResponse = await fetch(url, {
+        headers: {
+          'Authorization': `Basic ${authHeader}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      const responseText = await salesResponse.text()
+      console.log(`Sales response status: ${salesResponse.status}, body: ${responseText.slice(0, 2000)}`)
+      
+      if (salesResponse.ok) {
+        const salesData = JSON.parse(responseText)
+        return new Response(
+          JSON.stringify({ sales: salesData }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } else {
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch sales', status: salesResponse.status, body: responseText }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    // Debug action: fetch specific campaign details
+    if (debugAction === 'fetch-campaign' && debugCampaignId) {
+      console.log(`Debug: Fetching Adversus campaign ${debugCampaignId}...`)
+      const campaignResponse = await fetch(`${baseUrl}/campaigns/${debugCampaignId}`, {
+        headers: {
+          'Authorization': `Basic ${authHeader}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      const responseText = await campaignResponse.text()
+      console.log(`Campaign response: ${responseText}`)
+      
+      return new Response(
+        JSON.stringify({ campaign: JSON.parse(responseText) }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     console.log(`Syncing data from ${startDate} to ${endDate}`)
