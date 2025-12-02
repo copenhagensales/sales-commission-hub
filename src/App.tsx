@@ -11,6 +11,10 @@ import Sales from "./pages/Sales";
 import Payroll from "./pages/Payroll";
 import Wallboard from "./pages/Wallboard";
 import Settings from "./pages/Settings";
+import LiquidityOverview from "./pages/LiquidityOverview";
+import LiquidityCustomers from "./pages/LiquidityCustomers";
+import LiquidityExpenses from "./pages/LiquidityExpenses";
+import LiquidityScenarios from "./pages/LiquidityScenarios";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -66,6 +70,10 @@ const App = () => (
           <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
           <Route path="/wallboard" element={<Wallboard />} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/liquidity" element={<ProtectedRoute><LiquidityOverview /></ProtectedRoute>} />
+          <Route path="/liquidity/customers" element={<ProtectedRoute><LiquidityCustomers /></ProtectedRoute>} />
+          <Route path="/liquidity/expenses" element={<ProtectedRoute><LiquidityExpenses /></ProtectedRoute>} />
+          <Route path="/liquidity/scenarios" element={<ProtectedRoute><LiquidityScenarios /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
