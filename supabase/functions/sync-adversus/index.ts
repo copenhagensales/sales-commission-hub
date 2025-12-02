@@ -47,7 +47,14 @@ interface Product {
   commission_value: number
 }
 
-// Campaign name to product code prefix mapping
+interface CampaignMapping {
+  id: string
+  adversus_campaign_id: string
+  adversus_campaign_name: string
+  product_id: string | null
+}
+
+// Campaign name to product code prefix mapping (fallback for auto-matching)
 const CAMPAIGN_TO_PRODUCT_PREFIX: Record<string, string> = {
   'aka': 'AKA',
   'ase': 'ASE',
@@ -104,7 +111,6 @@ function findMatchingProduct(
   
   // Try to find a more specific match based on outcome/product name
   if (outcomeLower) {
-    // Normalize the outcome name for matching
     const outcomeWords = outcomeLower
       .replace(/[^a-zæøå0-9\s]/g, ' ')
       .split(/\s+/)
@@ -217,6 +223,19 @@ Deno.serve(async (req) => {
     
     console.log(`Loaded ${products?.length || 0} active products for matching`)
 
+    // Load existing campaign mappings
+    const { data: existingMappings } = await supabase
+      .from('campaign_product_mappings')
+      .select('*')
+    
+    const campaignMappingsByAdversusId = new Map<string, CampaignMapping>()
+    if (existingMappings) {
+      for (const mapping of existingMappings) {
+        campaignMappingsByAdversusId.set(mapping.adversus_campaign_id, mapping as CampaignMapping)
+      }
+    }
+    console.log(`Loaded ${existingMappings?.length || 0} existing campaign mappings`)
+
     // Step 1: Fetch campaigns from Adversus
     console.log('Fetching campaigns from Adversus...')
     const campaignsResponse = await fetch(`${baseUrl}/campaigns`, {
@@ -235,6 +254,35 @@ Deno.serve(async (req) => {
       for (const campaign of campaigns) {
         campaignMap.set(campaign.id, campaign)
         console.log(`Campaign ${campaign.id}: ${campaign.name}`)
+        
+        // Upsert campaign mapping if not exists
+        if (!campaignMappingsByAdversusId.has(String(campaign.id))) {
+          const { error: mappingError } = await supabase
+            .from('campaign_product_mappings')
+            .upsert({
+              adversus_campaign_id: String(campaign.id),
+              adversus_campaign_name: campaign.name,
+              product_id: null
+            }, {
+              onConflict: 'adversus_campaign_id'
+            })
+          
+          if (mappingError) {
+            console.warn(`Failed to create mapping for campaign ${campaign.id}:`, mappingError)
+          }
+        }
+      }
+      
+      // Reload mappings after potential inserts
+      const { data: updatedMappings } = await supabase
+        .from('campaign_product_mappings')
+        .select('*')
+      
+      if (updatedMappings) {
+        campaignMappingsByAdversusId.clear()
+        for (const mapping of updatedMappings) {
+          campaignMappingsByAdversusId.set(mapping.adversus_campaign_id, mapping as CampaignMapping)
+        }
       }
     } else {
       console.warn('Could not fetch campaigns from Adversus')
@@ -374,11 +422,21 @@ Deno.serve(async (req) => {
           continue
         }
 
-        // Find matching product based on campaign and outcome
+        // Find matching product - first check manual mapping, then auto-match
         const campaign = campaignMap.get(session.campaignId)
         let matchedProduct: Product | null = null
         
-        if (campaign && products) {
+        // Check for manual mapping first
+        const manualMapping = campaignMappingsByAdversusId.get(String(session.campaignId))
+        if (manualMapping?.product_id && products) {
+          matchedProduct = products.find(p => p.id === manualMapping.product_id) as Product || null
+          if (matchedProduct) {
+            console.log(`Using manual mapping for campaign ${campaign?.name}: ${matchedProduct.name}`)
+          }
+        }
+        
+        // Fall back to auto-matching if no manual mapping
+        if (!matchedProduct && campaign && products) {
           matchedProduct = findMatchingProduct(campaign.name, session.outcome, products as Product[])
         }
         

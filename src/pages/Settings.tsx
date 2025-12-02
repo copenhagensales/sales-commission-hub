@@ -12,19 +12,38 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { Edit2, Loader2, Plus, RefreshCw, Save, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
-import { useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Edit2, Loader2, Plus, RefreshCw, Save, Trash2, CheckCircle2, AlertCircle, Link2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-// Mock data
-const mockProducts = [
-  { id: "1", name: "Premium Abonnement", code: "PREM", commissionType: "fixed", commissionValue: 500, clawbackDays: 30, isActive: true },
-  { id: "2", name: "Standard Abonnement", code: "STD", commissionType: "fixed", commissionValue: 250, clawbackDays: 30, isActive: true },
-  { id: "3", name: "Basis Abonnement", code: "BAS", commissionType: "percentage", commissionValue: 15, clawbackDays: 14, isActive: true },
-];
+interface Product {
+  id: string;
+  code: string;
+  name: string;
+  commission_type: string;
+  commission_value: number;
+  clawback_window_days: number;
+  is_active: boolean;
+}
+
+interface CampaignMapping {
+  id: string;
+  adversus_campaign_id: string;
+  adversus_campaign_name: string;
+  product_id: string | null;
+}
 
 export default function Settings() {
+  const queryClient = useQueryClient();
   const [vacationPayPercentage, setVacationPayPercentage] = useState("12.5");
   const [defaultClawbackDays, setDefaultClawbackDays] = useState("30");
   const [isSyncing, setIsSyncing] = useState(false);
@@ -32,9 +51,55 @@ export default function Settings() {
     success: boolean;
     summary?: {
       agents: { created: number; updated: number };
-      sessions: { processed: number; salesCreated: number; salesUpdated: number };
+      sessions: { processed: number; salesCreated: number; salesUpdated: number; unmatchedSales?: number };
+      campaigns?: { total: number };
+      productMatches?: Record<string, number>;
     };
   } | null>(null);
+
+  // Fetch products
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('name');
+      if (error) throw error;
+      return data as Product[];
+    }
+  });
+
+  // Fetch campaign mappings
+  const { data: campaignMappings = [], refetch: refetchMappings } = useQuery({
+    queryKey: ['campaign-mappings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('campaign_product_mappings')
+        .select('*')
+        .order('adversus_campaign_name');
+      if (error) throw error;
+      return data as CampaignMapping[];
+    }
+  });
+
+  // Update campaign mapping mutation
+  const updateMappingMutation = useMutation({
+    mutationFn: async ({ id, product_id }: { id: string; product_id: string | null }) => {
+      const { error } = await supabase
+        .from('campaign_product_mappings')
+        .update({ product_id })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign-mappings'] });
+      toast.success('Kampagne-mapping opdateret');
+    },
+    onError: (error) => {
+      toast.error('Kunne ikke opdatere mapping: ' + error.message);
+    }
+  });
 
   const handleAdversusSync = async () => {
     setIsSyncing(true);
@@ -56,6 +121,10 @@ export default function Settings() {
       }
 
       setLastSyncResult(data);
+      
+      // Refetch campaign mappings after sync
+      refetchMappings();
+      
       toast.success(
         `Synkronisering fuldført! ${data.summary.agents.created} nye agenter, ${data.summary.sessions.salesCreated} nye salg`
       );
@@ -66,6 +135,19 @@ export default function Settings() {
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  const handleMappingChange = (mappingId: string, productId: string) => {
+    updateMappingMutation.mutate({ 
+      id: mappingId, 
+      product_id: productId === 'none' ? null : productId 
+    });
+  };
+
+  const getProductName = (productId: string | null) => {
+    if (!productId) return 'Ingen (bruger auto-match)';
+    const product = products.find(p => p.id === productId);
+    return product ? `${product.name} (${product.code})` : 'Ukendt';
   };
 
   return (
@@ -84,7 +166,9 @@ export default function Settings() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-xl font-semibold text-foreground">Produkter</h2>
-              <p className="text-sm text-muted-foreground">Administrer produkter og provisionsregler</p>
+              <p className="text-sm text-muted-foreground">
+                {products.length} produkter konfigureret
+              </p>
             </div>
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
@@ -92,45 +176,119 @@ export default function Settings() {
             </Button>
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-muted-foreground">Navn</TableHead>
-                <TableHead className="text-muted-foreground">Kode</TableHead>
-                <TableHead className="text-muted-foreground">Provision</TableHead>
-                <TableHead className="text-muted-foreground">Clawback</TableHead>
-                <TableHead className="text-muted-foreground">Aktiv</TableHead>
-                <TableHead className="text-muted-foreground text-right">Handlinger</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mockProducts.map((product) => (
-                <TableRow key={product.id} className="border-border">
-                  <TableCell className="font-medium text-foreground">{product.name}</TableCell>
-                  <TableCell className="text-muted-foreground font-mono">{product.code}</TableCell>
-                  <TableCell className="text-foreground">
-                    {product.commissionType === "fixed" 
-                      ? `${product.commissionValue} kr` 
-                      : `${product.commissionValue}%`}
-                  </TableCell>
-                  <TableCell className="text-foreground">{product.clawbackDays} dage</TableCell>
-                  <TableCell>
-                    <Switch checked={product.isActive} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon">
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="text-danger hover:text-danger">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          <div className="max-h-96 overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-muted-foreground">Navn</TableHead>
+                  <TableHead className="text-muted-foreground">Kode</TableHead>
+                  <TableHead className="text-muted-foreground">Provision</TableHead>
+                  <TableHead className="text-muted-foreground">Clawback</TableHead>
+                  <TableHead className="text-muted-foreground">Aktiv</TableHead>
+                  <TableHead className="text-muted-foreground text-right">Handlinger</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {products.slice(0, 20).map((product) => (
+                  <TableRow key={product.id} className="border-border">
+                    <TableCell className="font-medium text-foreground">{product.name}</TableCell>
+                    <TableCell className="text-muted-foreground font-mono text-xs">{product.code}</TableCell>
+                    <TableCell className="text-foreground">
+                      {product.commission_type === "fixed" 
+                        ? `${product.commission_value} kr` 
+                        : `${product.commission_value}%`}
+                    </TableCell>
+                    <TableCell className="text-foreground">{product.clawback_window_days} dage</TableCell>
+                    <TableCell>
+                      <Switch checked={product.is_active} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="icon">
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-danger hover:text-danger">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          {products.length > 20 && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Viser 20 af {products.length} produkter
+            </p>
+          )}
+        </section>
+
+        {/* Campaign Mapping Section */}
+        <section className="rounded-xl border border-border bg-card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                <Link2 className="h-5 w-5" />
+                Kampagne-Produkt Mapping
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Tilknyt Adversus kampagner til specifikke produkter. Kør sync for at opdatere kampagnelisten.
+              </p>
+            </div>
+          </div>
+
+          {campaignMappings.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Link2 className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p>Ingen kampagner fundet.</p>
+              <p className="text-sm">Kør en synkronisering for at hente kampagner fra Adversus.</p>
+            </div>
+          ) : (
+            <div className="max-h-96 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="text-muted-foreground">Adversus Kampagne</TableHead>
+                    <TableHead className="text-muted-foreground">Kampagne ID</TableHead>
+                    <TableHead className="text-muted-foreground w-[300px]">Tilknyttet Produkt</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {campaignMappings.map((mapping) => (
+                    <TableRow key={mapping.id} className="border-border">
+                      <TableCell className="font-medium text-foreground">
+                        {mapping.adversus_campaign_name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground font-mono text-xs">
+                        {mapping.adversus_campaign_id}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={mapping.product_id || 'none'}
+                          onValueChange={(value) => handleMappingChange(mapping.id, value)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Vælg produkt..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              <span className="text-muted-foreground">Ingen (bruger auto-match)</span>
+                            </SelectItem>
+                            {products.filter(p => p.is_active).map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name} ({product.code}) - {product.commission_value} kr
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </section>
 
         {/* General Settings */}
@@ -223,21 +381,39 @@ export default function Settings() {
             </Button>
 
             {lastSyncResult && (
-              <div className={`rounded-lg p-4 ${
+              <div className={`rounded-lg p-4 flex-1 ${
                 lastSyncResult.success 
                   ? 'bg-success/10 border border-success/20' 
                   : 'bg-danger/10 border border-danger/20'
               }`}>
                 {lastSyncResult.success && lastSyncResult.summary ? (
                   <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-success mt-0.5" />
+                    <CheckCircle2 className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
                     <div className="text-sm">
                       <p className="font-medium text-foreground">Synkronisering fuldført</p>
                       <ul className="mt-1 space-y-0.5 text-muted-foreground">
                         <li>Agenter: {lastSyncResult.summary.agents.created} oprettet, {lastSyncResult.summary.agents.updated} opdateret</li>
                         <li>Sessions: {lastSyncResult.summary.sessions.processed} behandlet</li>
                         <li>Salg: {lastSyncResult.summary.sessions.salesCreated} oprettet, {lastSyncResult.summary.sessions.salesUpdated} opdateret</li>
+                        {lastSyncResult.summary.sessions.unmatchedSales !== undefined && lastSyncResult.summary.sessions.unmatchedSales > 0 && (
+                          <li className="text-warning">Umatched: {lastSyncResult.summary.sessions.unmatchedSales} salg uden produkt</li>
+                        )}
+                        {lastSyncResult.summary.campaigns && (
+                          <li>Kampagner: {lastSyncResult.summary.campaigns.total} fundet</li>
+                        )}
                       </ul>
+                      {lastSyncResult.summary.productMatches && Object.keys(lastSyncResult.summary.productMatches).length > 0 && (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                            Vis produkt-statistik
+                          </summary>
+                          <ul className="mt-1 pl-4 text-xs">
+                            {Object.entries(lastSyncResult.summary.productMatches).map(([code, count]) => (
+                              <li key={code}>{code}: {count} salg</li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
                     </div>
                   </div>
                 ) : (
