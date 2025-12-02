@@ -22,7 +22,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { AlertTriangle, ChevronLeft, ChevronRight, Download, Filter, Loader2, Search } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, ChevronLeft, ChevronRight, Download, Filter, Loader2, Search } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,6 +45,7 @@ export default function Sales() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortByProduct, setSortByProduct] = useState<'asc' | 'desc' | null>(null);
 
   // Fetch total count for pagination
   const { data: totalCount } = useQuery({
@@ -65,7 +66,7 @@ export default function Sales() {
   });
 
   const { data: sales, isLoading } = useQuery({
-    queryKey: ['sales-with-details', currentPage, statusFilter],
+    queryKey: ['sales-with-details', currentPage, statusFilter, sortByProduct],
     queryFn: async () => {
       const from = (currentPage - 1) * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
@@ -80,11 +81,17 @@ export default function Sales() {
           agent:agents!sales_agent_id_fkey(id, name),
           product:products!sales_product_id_fkey(id, name, commission_value, clawback_window_days)
         `)
-        .order('sale_date', { ascending: false })
         .range(from, to);
       
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter as SaleStatus);
+      }
+      
+      // Apply sorting - default to sale_date desc if no product sort
+      if (sortByProduct) {
+        query = query.order('product_id', { ascending: sortByProduct === 'asc' });
+      } else {
+        query = query.order('sale_date', { ascending: false });
       }
       
       const { data, error } = await query;
@@ -191,7 +198,18 @@ export default function Sales() {
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground">Dato</TableHead>
                   <TableHead className="text-muted-foreground">Agent</TableHead>
-                  <TableHead className="text-muted-foreground">Produkt</TableHead>
+                  <TableHead 
+                    className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                    onClick={() => {
+                      setSortByProduct(prev => prev === null ? 'asc' : prev === 'asc' ? 'desc' : null);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      Produkt
+                      <ArrowUpDown className={`h-4 w-4 ${sortByProduct ? 'text-primary' : ''}`} />
+                    </div>
+                  </TableHead>
                   <TableHead className="text-muted-foreground">Beløb</TableHead>
                   <TableHead className="text-muted-foreground">Provision</TableHead>
                   <TableHead className="text-muted-foreground">Status</TableHead>
