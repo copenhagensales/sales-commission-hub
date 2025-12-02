@@ -14,7 +14,6 @@ interface AdversusSession {
   endTime: string
   status: string
   sessionSeconds: number
-  outcome?: string
   cdr?: {
     destination: string
     startTime: string
@@ -33,6 +32,14 @@ interface AdversusUser {
   active: boolean
 }
 
+interface ResultField {
+  id: number
+  type: string
+  name?: string
+  active: boolean
+  options?: Array<{ id: number; value: string }>
+}
+
 interface AdversusCampaign {
   id: number
   name?: string
@@ -40,6 +47,14 @@ interface AdversusCampaign {
     name?: string
     active?: boolean
   }
+  resultFields?: ResultField[]
+}
+
+interface AdversusLead {
+  id: number
+  campaignId: number
+  status: string
+  resultData?: Array<{ id: number; value: string }>
 }
 
 interface Product {
@@ -249,7 +264,7 @@ Deno.serve(async (req) => {
     }
     console.log(`Loaded ${existingMappings?.length || 0} existing campaign mappings`)
 
-    // Step 1: Fetch campaigns from Adversus
+    // Step 1: Fetch campaigns from Adversus (including resultFields)
     console.log('Fetching campaigns from Adversus...')
     const campaignsResponse = await fetch(`${baseUrl}/campaigns`, {
       headers: {
@@ -259,9 +274,11 @@ Deno.serve(async (req) => {
     })
 
     const campaignMap = new Map<number, AdversusCampaign>()
+    const campaignResultFieldsMap = new Map<number, ResultField[]>()
+    
     if (campaignsResponse.ok) {
       const campaignsData = await campaignsResponse.json()
-      console.log('Campaigns API response structure:', JSON.stringify(campaignsData).slice(0, 500))
+      console.log('Campaigns API response structure:', JSON.stringify(campaignsData).slice(0, 1000))
       const campaigns: AdversusCampaign[] = campaignsData.campaigns || campaignsData || []
       console.log(`Found ${campaigns.length} campaigns in Adversus`)
       
@@ -274,13 +291,21 @@ Deno.serve(async (req) => {
           continue
         }
         
-        // Store the resolved name for later use
+        // Store the resolved name and resultFields for later use
         const resolvedCampaign = { ...campaign, name: campaignName }
         campaignMap.set(campaign.id, resolvedCampaign)
-        console.log(`Campaign ${campaign.id}: ${campaignName}`)
+        
+        // Store result fields for outcome extraction
+        if (campaign.resultFields && campaign.resultFields.length > 0) {
+          campaignResultFieldsMap.set(campaign.id, campaign.resultFields)
+          console.log(`Campaign ${campaign.id} (${campaignName}) has ${campaign.resultFields.length} result fields:`)
+          for (const field of campaign.resultFields) {
+            console.log(`  - Field ${field.id}: ${field.name || field.type} (type: ${field.type})`)
+          }
+        }
       }
     } else {
-      console.warn('Could not fetch campaigns from Adversus')
+      console.warn('Could not fetch campaigns from Adversus:', await campaignsResponse.text())
     }
 
     // Step 2: Sync users/agents from Adversus
@@ -354,6 +379,7 @@ Deno.serve(async (req) => {
     let salesUpdated = 0
     let unmatchedSales = 0
     let newMappingsCreated = 0
+    let leadsFetched = 0
     const productMatchStats: Record<string, number> = {}
     const outcomeStats: Record<string, number> = {}
 
@@ -367,6 +393,90 @@ Deno.serve(async (req) => {
 
     // Track which campaign+outcome combinations we've already created in this sync
     const createdMappingsThisSync = new Set<string>()
+    
+    // Cache for lead data to avoid duplicate fetches
+    const leadCache = new Map<number, AdversusLead | null>()
+
+    // Helper function to fetch lead data
+    async function fetchLead(leadId: number): Promise<AdversusLead | null> {
+      if (leadCache.has(leadId)) {
+        return leadCache.get(leadId) || null
+      }
+      
+      try {
+        const leadResponse = await fetch(`${baseUrl}/leads/${leadId}`, {
+          headers: {
+            'Authorization': `Basic ${authHeader}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (leadResponse.ok) {
+          const leadData = await leadResponse.json()
+          // Handle both direct object and array response
+          const lead = Array.isArray(leadData) ? leadData[0] : leadData
+          leadCache.set(leadId, lead)
+          leadsFetched++
+          return lead
+        } else {
+          console.warn(`Could not fetch lead ${leadId}: ${leadResponse.status}`)
+          leadCache.set(leadId, null)
+          return null
+        }
+      } catch (err) {
+        console.warn(`Error fetching lead ${leadId}:`, err)
+        leadCache.set(leadId, null)
+        return null
+      }
+    }
+
+    // Helper function to extract outcome from lead resultData
+    function extractOutcome(lead: AdversusLead | null, campaignId: number): string | null {
+      if (!lead || !lead.resultData || lead.resultData.length === 0) {
+        return null
+      }
+      
+      const resultFields = campaignResultFieldsMap.get(campaignId)
+      if (!resultFields) {
+        // No result fields defined, try to use first non-empty resultData value
+        for (const rd of lead.resultData) {
+          if (rd.value && rd.value.trim()) {
+            return rd.value.trim()
+          }
+        }
+        return null
+      }
+      
+      // Look for the outcome field - typically a "select" type field
+      // Or look for fields that contain outcome keywords
+      for (const field of resultFields) {
+        const resultValue = lead.resultData.find(rd => rd.id === field.id)
+        if (resultValue && resultValue.value && resultValue.value.trim()) {
+          const value = resultValue.value.trim()
+          // Prioritize fields that look like outcomes
+          const fieldNameLower = (field.name || '').toLowerCase()
+          if (field.type === 'select' || 
+              fieldNameLower.includes('afslut') || 
+              fieldNameLower.includes('outcome') ||
+              fieldNameLower.includes('resultat')) {
+            console.log(`Found outcome from field "${field.name}": ${value}`)
+            return value
+          }
+        }
+      }
+      
+      // Fallback: return first non-empty select field value
+      for (const field of resultFields) {
+        if (field.type === 'select') {
+          const resultValue = lead.resultData.find(rd => rd.id === field.id)
+          if (resultValue && resultValue.value && resultValue.value.trim()) {
+            return resultValue.value.trim()
+          }
+        }
+      }
+      
+      return null
+    }
 
     while (true) {
       const sessionsUrl = `${baseUrl}/sessions?filters=${encodeURIComponent(filters)}&page=${page}&pageSize=${pageSize}&sortProperty=startTime&sortDirection=DESC`
@@ -385,7 +495,6 @@ Deno.serve(async (req) => {
       }
 
       const sessionsData = await sessionsResponse.json()
-      console.log('Sessions response type:', typeof sessionsData, Array.isArray(sessionsData))
       
       // Handle both array response and object with sessions property
       let sessions: AdversusSession[] = []
@@ -410,8 +519,11 @@ Deno.serve(async (req) => {
         // Only process "success" sessions as sales
         if (session.status !== 'success') continue
 
+        // Fetch lead data to get outcome
+        const lead = await fetchLead(session.leadId)
+        const outcome = extractOutcome(lead, session.campaignId)
+        
         // Track outcome statistics
-        const outcome = session.outcome || null
         if (outcome) {
           outcomeStats[outcome] = (outcomeStats[outcome] || 0) + 1
         }
@@ -470,7 +582,7 @@ Deno.serve(async (req) => {
         
         // Fall back to auto-matching if no manual mapping
         if (!matchedProduct && campaign && products) {
-          matchedProduct = findMatchingProduct(campaign.name, session.outcome, products as Product[])
+          matchedProduct = findMatchingProduct(campaign.name, outcome || undefined, products as Product[])
         }
         
         // Use fallback if no match found
@@ -551,6 +663,7 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Sessions processed: ${totalSessions} total, ${salesCreated} sales created, ${salesUpdated} updated, ${unmatchedSales} unmatched`)
+    console.log(`Leads fetched: ${leadsFetched}`)
     console.log('Product match stats:', JSON.stringify(productMatchStats))
     console.log('Outcome stats:', JSON.stringify(outcomeStats))
 
@@ -561,6 +674,7 @@ Deno.serve(async (req) => {
         sessions: { processed: totalSessions, salesCreated, salesUpdated, unmatchedSales },
         campaigns: { total: campaignMap.size },
         mappings: { created: newMappingsCreated },
+        leads: { fetched: leadsFetched },
         productMatches: productMatchStats,
         outcomeStats,
         dateRange: { startDate, endDate }
