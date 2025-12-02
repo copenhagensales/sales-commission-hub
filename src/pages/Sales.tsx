@@ -22,29 +22,74 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { AlertTriangle, Download, Filter, Search } from "lucide-react";
+import { AlertTriangle, Download, Filter, Loader2, Search } from "lucide-react";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { differenceInDays } from "date-fns";
 
-// Mock data
-const mockSales = [
-  { id: "1", date: "2024-12-02", agent: "Anders Jensen", product: "Premium Abonnement", amount: 599, status: "active" as const, commission: 500, daysInClawback: null },
-  { id: "2", date: "2024-12-02", agent: "Maria Nielsen", product: "Standard Abonnement", amount: 299, status: "pending" as const, commission: 250, daysInClawback: 5 },
-  { id: "3", date: "2024-12-01", agent: "Peter Hansen", product: "Premium Abonnement", amount: 599, status: "pending" as const, commission: 500, daysInClawback: 12 },
-  { id: "4", date: "2024-12-01", agent: "Sofia Andersen", product: "Basis Abonnement", amount: 149, status: "cancelled" as const, commission: 0, daysInClawback: null },
-  { id: "5", date: "2024-11-30", agent: "Lars Pedersen", product: "Premium Abonnement", amount: 599, status: "clawbacked" as const, commission: -500, daysInClawback: null },
-  { id: "6", date: "2024-11-29", agent: "Anders Jensen", product: "Standard Abonnement", amount: 299, status: "active" as const, commission: 250, daysInClawback: null },
-];
+type SaleStatus = "pending" | "active" | "cancelled" | "clawbacked";
+
+interface SaleWithDetails {
+  id: string;
+  sale_date: string | null;
+  sale_amount: number | null;
+  status: SaleStatus | null;
+  agent: { id: string; name: string } | null;
+  product: { id: string; name: string; commission_value: number | null; clawback_window_days: number | null } | null;
+}
 
 export default function Sales() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const filteredSales = mockSales.filter(sale => {
-    const matchesSearch = sale.agent.toLowerCase().includes(search.toLowerCase()) ||
-      sale.product.toLowerCase().includes(search.toLowerCase());
+  const { data: sales, isLoading } = useQuery({
+    queryKey: ['sales-with-details'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sales')
+        .select(`
+          id,
+          sale_date,
+          sale_amount,
+          status,
+          agent:agents!sales_agent_id_fkey(id, name),
+          product:products!sales_product_id_fkey(id, name, commission_value, clawback_window_days)
+        `)
+        .order('sale_date', { ascending: false })
+        .limit(100);
+      
+      if (error) throw error;
+      return data as unknown as SaleWithDetails[];
+    }
+  });
+
+  const filteredSales = (sales || []).filter(sale => {
+    const agentName = sale.agent?.name || '';
+    const productName = sale.product?.name || '';
+    const matchesSearch = agentName.toLowerCase().includes(search.toLowerCase()) ||
+      productName.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || sale.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const calculateDaysInClawback = (sale: SaleWithDetails) => {
+    if (!sale.sale_date || !sale.product?.clawback_window_days) return null;
+    if (sale.status !== 'pending' && sale.status !== 'active') return null;
+    
+    const saleDate = new Date(sale.sale_date);
+    const daysSinceSale = differenceInDays(new Date(), saleDate);
+    const daysRemaining = sale.product.clawback_window_days - daysSinceSale;
+    
+    return daysRemaining > 0 ? daysRemaining : null;
+  };
+
+  const getCommissionDisplay = (sale: SaleWithDetails) => {
+    const commissionValue = sale.product?.commission_value || 0;
+    if (sale.status === 'clawbacked') return -commissionValue;
+    if (sale.status === 'cancelled') return 0;
+    return commissionValue;
+  };
 
   return (
     <MainLayout>
@@ -91,61 +136,77 @@ export default function Sales() {
 
         {/* Table */}
         <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-muted-foreground">Dato</TableHead>
-                <TableHead className="text-muted-foreground">Agent</TableHead>
-                <TableHead className="text-muted-foreground">Produkt</TableHead>
-                <TableHead className="text-muted-foreground">Beløb</TableHead>
-                <TableHead className="text-muted-foreground">Provision</TableHead>
-                <TableHead className="text-muted-foreground">Status</TableHead>
-                <TableHead className="text-muted-foreground">Risiko</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredSales.map((sale) => (
-                <TableRow 
-                  key={sale.id} 
-                  className="border-border cursor-pointer hover:bg-muted/50"
-                >
-                  <TableCell className="text-foreground">
-                    {new Date(sale.date).toLocaleDateString("da-DK")}
-                  </TableCell>
-                  <TableCell className="text-foreground font-medium">
-                    {sale.agent}
-                  </TableCell>
-                  <TableCell className="text-foreground">
-                    {sale.product}
-                  </TableCell>
-                  <TableCell className="text-foreground">
-                    {sale.amount.toLocaleString("da-DK")} kr
-                  </TableCell>
-                  <TableCell className={sale.commission >= 0 ? "text-success font-semibold" : "text-danger font-semibold"}>
-                    {sale.commission >= 0 ? "+" : ""}{sale.commission.toLocaleString("da-DK")} kr
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={sale.status} />
-                  </TableCell>
-                  <TableCell>
-                    {sale.daysInClawback !== null && (
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <div className="flex items-center gap-1 text-warning">
-                            <AlertTriangle className="h-4 w-4" />
-                            <span className="text-sm">{sale.daysInClawback}d</span>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{sale.daysInClawback} dage tilbage i clawback-vinduet</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                  </TableCell>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredSales.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <p>Ingen salg fundet</p>
+              <p className="text-sm">Kør en sync fra Settings for at hente salgsdata</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-muted-foreground">Dato</TableHead>
+                  <TableHead className="text-muted-foreground">Agent</TableHead>
+                  <TableHead className="text-muted-foreground">Produkt</TableHead>
+                  <TableHead className="text-muted-foreground">Beløb</TableHead>
+                  <TableHead className="text-muted-foreground">Provision</TableHead>
+                  <TableHead className="text-muted-foreground">Status</TableHead>
+                  <TableHead className="text-muted-foreground">Risiko</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredSales.map((sale) => {
+                  const commission = getCommissionDisplay(sale);
+                  const daysInClawback = calculateDaysInClawback(sale);
+                  
+                  return (
+                    <TableRow 
+                      key={sale.id} 
+                      className="border-border cursor-pointer hover:bg-muted/50"
+                    >
+                      <TableCell className="text-foreground">
+                        {sale.sale_date ? new Date(sale.sale_date).toLocaleDateString("da-DK") : '-'}
+                      </TableCell>
+                      <TableCell className="text-foreground font-medium">
+                        {sale.agent?.name || 'Ukendt'}
+                      </TableCell>
+                      <TableCell className="text-foreground">
+                        {sale.product?.name || 'Ukendt produkt'}
+                      </TableCell>
+                      <TableCell className="text-foreground">
+                        {(sale.sale_amount || 0).toLocaleString("da-DK")} kr
+                      </TableCell>
+                      <TableCell className={commission >= 0 ? "text-success font-semibold" : "text-danger font-semibold"}>
+                        {commission >= 0 ? "+" : ""}{commission.toLocaleString("da-DK")} kr
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={sale.status || 'pending'} />
+                      </TableCell>
+                      <TableCell>
+                        {daysInClawback !== null && (
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <div className="flex items-center gap-1 text-warning">
+                                <AlertTriangle className="h-4 w-4" />
+                                <span className="text-sm">{daysInClawback}d</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{daysInClawback} dage tilbage i clawback-vinduet</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
         </div>
       </div>
     </MainLayout>
