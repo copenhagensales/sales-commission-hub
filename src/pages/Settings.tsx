@@ -12,8 +12,10 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { Edit2, Plus, Save, Trash2 } from "lucide-react";
+import { Edit2, Loader2, Plus, RefreshCw, Save, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 // Mock data
 const mockProducts = [
@@ -25,6 +27,46 @@ const mockProducts = [
 export default function Settings() {
   const [vacationPayPercentage, setVacationPayPercentage] = useState("12.5");
   const [defaultClawbackDays, setDefaultClawbackDays] = useState("30");
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState<{
+    success: boolean;
+    summary?: {
+      agents: { created: number; updated: number };
+      sessions: { processed: number; salesCreated: number; salesUpdated: number };
+    };
+  } | null>(null);
+
+  const handleAdversusSync = async () => {
+    setIsSyncing(true);
+    setLastSyncResult(null);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-adversus', {
+        body: {
+          startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          endDate: new Date().toISOString()
+        }
+      });
+
+      if (error) {
+        console.error('Sync error:', error);
+        toast.error('Synkronisering fejlede: ' + error.message);
+        setLastSyncResult({ success: false });
+        return;
+      }
+
+      setLastSyncResult(data);
+      toast.success(
+        `Synkronisering fuldført! ${data.summary.agents.created} nye agenter, ${data.summary.sessions.salesCreated} nye salg`
+      );
+    } catch (err) {
+      console.error('Sync error:', err);
+      toast.error('Synkronisering fejlede');
+      setLastSyncResult({ success: false });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   return (
     <MainLayout>
@@ -136,7 +178,7 @@ export default function Settings() {
         <section className="rounded-xl border border-border bg-card p-6">
           <h2 className="text-xl font-semibold text-foreground mb-2">Adversus Integration</h2>
           <p className="text-sm text-muted-foreground mb-6">
-            Konfigurer forbindelsen til Adversus API
+            Synkroniser salgsdata og agenter fra Adversus
           </p>
 
           <div className="grid gap-6 md:grid-cols-2 max-w-2xl">
@@ -145,31 +187,72 @@ export default function Settings() {
               <Input
                 id="api-url"
                 type="text"
-                placeholder="https://api.adversus.io/v1"
+                value="https://api.adversus.io/v1"
                 disabled
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="api-key">API Nøgle</Label>
-              <Input
-                id="api-key"
-                type="password"
-                value="••••••••••••••••"
-                disabled
-              />
-              <p className="text-xs text-muted-foreground">
-                Kontakt administrator for at ændre API-nøglen
-              </p>
+              <Label htmlFor="api-status">API Status</Label>
+              <div className="flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-background">
+                <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
+                <span className="text-sm text-foreground">Konfigureret</span>
+              </div>
             </div>
           </div>
 
-          <div className="mt-6 rounded-lg bg-muted/50 p-4">
-            <p className="text-sm text-muted-foreground">
-              <strong className="text-foreground">Status:</strong> Ikke konfigureret. 
-              API-nøglen skal tilføjes som en miljøvariabel for at aktivere synkronisering.
-            </p>
+          <Separator className="my-6" />
+
+          <div className="flex items-start gap-6">
+            <Button 
+              onClick={handleAdversusSync} 
+              disabled={isSyncing}
+              className="gap-2"
+            >
+              {isSyncing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Synkroniserer...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Synkroniser nu
+                </>
+              )}
+            </Button>
+
+            {lastSyncResult && (
+              <div className={`rounded-lg p-4 ${
+                lastSyncResult.success 
+                  ? 'bg-success/10 border border-success/20' 
+                  : 'bg-danger/10 border border-danger/20'
+              }`}>
+                {lastSyncResult.success && lastSyncResult.summary ? (
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-success mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-foreground">Synkronisering fuldført</p>
+                      <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                        <li>Agenter: {lastSyncResult.summary.agents.created} oprettet, {lastSyncResult.summary.agents.updated} opdateret</li>
+                        <li>Sessions: {lastSyncResult.summary.sessions.processed} behandlet</li>
+                        <li>Salg: {lastSyncResult.summary.sessions.salesCreated} oprettet, {lastSyncResult.summary.sessions.salesUpdated} opdateret</li>
+                      </ul>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="h-5 w-5 text-danger" />
+                    <p className="text-sm text-foreground">Synkronisering fejlede</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+
+          <p className="text-xs text-muted-foreground mt-4">
+            Synkroniseringen henter de seneste 30 dages data fra Adversus
+          </p>
         </section>
       </div>
     </MainLayout>
