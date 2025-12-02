@@ -551,6 +551,19 @@ Deno.serve(async (req) => {
       totalSessions += sessions.length
       console.log(`Processing page ${page} with ${sessions.length} sessions`)
 
+      // Positive outcome keywords to filter by
+      const POSITIVE_OUTCOMES = [
+        'ja tak', 'succes', 'success', 'sale', 'salg', 'solgt', 'booket', 
+        'booking', 'aftale', 'ja', 'yes', 'accept', 'godkendt', 'ok',
+        'bestilt', 'købt', 'abonnement', 'gennemført', 'done', 'completed'
+      ]
+      
+      function isPositiveOutcome(outcome: string | null): boolean {
+        if (!outcome) return false
+        const outcomeLower = outcome.toLowerCase()
+        return POSITIVE_OUTCOMES.some(positive => outcomeLower.includes(positive))
+      }
+
       for (const session of sessions) {
         // Only process "success" sessions as sales
         if (session.status !== 'success') continue
@@ -562,6 +575,11 @@ Deno.serve(async (req) => {
         // Track outcome statistics
         if (outcome) {
           outcomeStats[outcome] = (outcomeStats[outcome] || 0) + 1
+        }
+        
+        // Skip if outcome is not positive (e.g. "Ja tak", "Succes", etc.)
+        if (!isPositiveOutcome(outcome)) {
+          continue
         }
 
         // Find the agent by Adversus user ID
