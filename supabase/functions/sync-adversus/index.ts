@@ -368,9 +368,13 @@ Deno.serve(async (req) => {
     // Step 3: Fetch sessions (calls) from Adversus
     console.log('Fetching sessions from Adversus...')
     
+    // Only fetch successful sessions to reduce data and API calls
     const filters = JSON.stringify({
-      startTime: { $gt: startDate, $lt: endDate }
+      startTime: { $gt: startDate, $lt: endDate },
+      status: 'success'
     })
+    
+    console.log('Filters:', filters)
     
     let page = 1
     const pageSize = 100
