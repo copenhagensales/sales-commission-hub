@@ -95,6 +95,41 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_product_mappings: {
+        Row: {
+          adversus_campaign_id: string
+          adversus_campaign_name: string
+          created_at: string
+          id: string
+          product_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          adversus_campaign_id: string
+          adversus_campaign_name: string
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          adversus_campaign_id?: string
+          adversus_campaign_name?: string
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_product_mappings_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_transactions: {
         Row: {
           agent_id: string
