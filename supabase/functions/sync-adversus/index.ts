@@ -398,7 +398,7 @@ Deno.serve(async (req) => {
     const leadCache = new Map<number, AdversusLead | null>()
 
     // Helper function to fetch lead data
-    async function fetchLead(leadId: number): Promise<AdversusLead | null> {
+    async function fetchLead(leadId: number, campaignId?: number): Promise<AdversusLead | null> {
       if (leadCache.has(leadId)) {
         return leadCache.get(leadId) || null
       }
@@ -414,12 +414,13 @@ Deno.serve(async (req) => {
         if (leadResponse.ok) {
           const leadData = await leadResponse.json()
           // Handle both direct object and array response
-          const lead = Array.isArray(leadData) ? leadData[0] : leadData
+          const lead = Array.isArray(leadData) ? leadData[0] : (leadData.leads ? leadData.leads[0] : leadData)
           
-          // Detailed logging for first 5 leads to understand structure
-          if (leadsFetched < 5) {
-            console.log(`=== LEAD ${leadId} FULL STRUCTURE ===`)
-            console.log(JSON.stringify(lead, null, 2))
+          // Log Codan campaign leads (105575) or first 3 leads
+          const isCodan = campaignId === 105575
+          if (isCodan || leadsFetched < 3) {
+            console.log(`=== LEAD ${leadId} (Campaign: ${campaignId}${isCodan ? ' CODAN' : ''}) ===`)
+            console.log('resultData:', JSON.stringify(lead?.resultData || [], null, 2))
             console.log(`=== END LEAD ${leadId} ===`)
           }
           
@@ -513,7 +514,7 @@ Deno.serve(async (req) => {
         if (session.status !== 'success') continue
 
         // Fetch lead data to get outcome
-        const lead = await fetchLead(session.leadId)
+        const lead = await fetchLead(session.leadId, session.campaignId)
         const outcome = extractOutcome(lead, session.campaignId)
         
         // Track outcome statistics
