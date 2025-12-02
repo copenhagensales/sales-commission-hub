@@ -169,11 +169,25 @@ Deno.serve(async (req) => {
       })
 
       if (!sessionsResponse.ok) {
-        console.error('Failed to fetch sessions:', sessionsResponse.status)
+        const errorText = await sessionsResponse.text()
+        console.error('Failed to fetch sessions:', sessionsResponse.status, errorText)
         break
       }
 
-      const sessions: AdversusSession[] = await sessionsResponse.json()
+      const sessionsData = await sessionsResponse.json()
+      console.log('Sessions response type:', typeof sessionsData, Array.isArray(sessionsData))
+      
+      // Handle both array response and object with sessions property
+      let sessions: AdversusSession[] = []
+      if (Array.isArray(sessionsData)) {
+        sessions = sessionsData
+      } else if (sessionsData && typeof sessionsData === 'object') {
+        // Could be { sessions: [...] } or { data: [...] } or paginated response
+        sessions = sessionsData.sessions || sessionsData.data || []
+        if (sessionsData.meta) {
+          console.log('Sessions meta:', JSON.stringify(sessionsData.meta))
+        }
+      }
       
       if (!sessions || sessions.length === 0) {
         console.log('No more sessions to process')
