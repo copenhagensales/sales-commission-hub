@@ -101,14 +101,14 @@ export default function Settings() {
     }
   });
 
-  const handleAdversusSync = async () => {
+  const handleAdversusSync = async (hours: number = 30 * 24) => {
     setIsSyncing(true);
     setLastSyncResult(null);
     
     try {
       const { data, error } = await supabase.functions.invoke('sync-adversus', {
         body: {
-          startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          startDate: new Date(Date.now() - hours * 60 * 60 * 1000).toISOString(),
           endDate: new Date().toISOString()
         }
       });
@@ -361,24 +361,37 @@ export default function Settings() {
 
           <Separator className="my-6" />
 
-          <div className="flex items-start gap-6">
-            <Button 
-              onClick={handleAdversusSync} 
-              disabled={isSyncing}
-              className="gap-2"
-            >
-              {isSyncing ? (
-                <>
+          <div className="flex items-start gap-6 flex-wrap">
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => handleAdversusSync(12)} 
+                disabled={isSyncing}
+                variant="outline"
+                className="gap-2"
+              >
+                {isSyncing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Synkroniserer...
-                </>
-              ) : (
-                <>
+                ) : (
                   <RefreshCw className="h-4 w-4" />
-                  Synkroniser nu
-                </>
-              )}
-            </Button>
+                )}
+                Sidste 12 timer
+              </Button>
+              <Button 
+                onClick={() => handleAdversusSync(24)} 
+                disabled={isSyncing}
+                variant="outline"
+                className="gap-2"
+              >
+                Sidste 24 timer
+              </Button>
+              <Button 
+                onClick={() => handleAdversusSync(30 * 24)} 
+                disabled={isSyncing}
+                className="gap-2"
+              >
+                Sidste 30 dage
+              </Button>
+            </div>
 
             {lastSyncResult && (
               <div className={`rounded-lg p-4 flex-1 ${
