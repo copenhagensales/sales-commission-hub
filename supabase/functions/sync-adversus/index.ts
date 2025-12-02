@@ -434,6 +434,61 @@ Deno.serve(async (req) => {
     
     // Cache for lead data to avoid duplicate fetches
     const leadCache = new Map<number, AdversusLead | null>()
+    
+    // Cache for Adversus sales data by leadId
+    const salesCache = new Map<number, { productTitles: string[], totalPrice: number } | null>()
+
+    // Helper function to fetch sales for a lead from Adversus /sales endpoint
+    async function fetchSalesForLead(leadId: number): Promise<{ productTitles: string[], totalPrice: number } | null> {
+      if (salesCache.has(leadId)) {
+        return salesCache.get(leadId) || null
+      }
+      
+      await delay(200)
+      
+      try {
+        // Fetch sales filtered by leadId
+        const salesResponse = await fetch(`${baseUrl}/sales?filters=${encodeURIComponent(JSON.stringify({ leadid: { $eq: leadId } }))}`, {
+          headers: {
+            'Authorization': `Basic ${authHeader}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (salesResponse.ok) {
+          const salesData = await salesResponse.json()
+          const sales = Array.isArray(salesData) ? salesData : (salesData.sales || [])
+          
+          if (sales.length > 0) {
+            // Get the most recent sale
+            const sale = sales[0]
+            const productTitles: string[] = []
+            
+            // Extract product titles from sale lines
+            if (sale.lines && Array.isArray(sale.lines)) {
+              for (const line of sale.lines) {
+                if (line.title) {
+                  productTitles.push(line.title)
+                }
+              }
+            }
+            
+            console.log(`✓ Found Adversus sale for lead ${leadId}: ${productTitles.join(', ')}`)
+            
+            const result = { productTitles, totalPrice: sale.totalNetPrice || sale.totalPrice || 0 }
+            salesCache.set(leadId, result)
+            return result
+          }
+        }
+        
+        salesCache.set(leadId, null)
+        return null
+      } catch (err) {
+        console.warn(`Error fetching sales for lead ${leadId}:`, err)
+        salesCache.set(leadId, null)
+        return null
+      }
+    }
 
     // Helper function to fetch lead data
     async function fetchLead(leadId: number, campaignId?: number): Promise<AdversusLead | null> {
@@ -673,7 +728,17 @@ Deno.serve(async (req) => {
 
         // Fetch lead data to get outcome/product info
         const lead = await fetchLead(session.leadId, session.campaignId)
-        const outcome = extractOutcome(lead, session.campaignId)
+        
+        // Try to get product info from Adversus /sales endpoint first
+        const salesData = await fetchSalesForLead(session.leadId)
+        
+        // Use sales product titles as outcome if available, otherwise fall back to lead resultData
+        let outcome: string | null = null
+        if (salesData && salesData.productTitles.length > 0) {
+          outcome = salesData.productTitles.join(', ')
+        } else {
+          outcome = extractOutcome(lead, session.campaignId)
+        }
         
         // Track outcome statistics (for debugging)
         if (outcome) {
