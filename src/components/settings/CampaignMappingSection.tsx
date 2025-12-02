@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Link2, ChevronLeft, ChevronRight, Sparkles, Check } from "lucide-react";
+import { Link2, ChevronLeft, ChevronRight, Sparkles, Check, Zap } from "lucide-react";
 
 interface Product {
   id: string;
@@ -31,6 +31,7 @@ interface CampaignMapping {
   id: string;
   adversus_campaign_id: string;
   adversus_campaign_name: string;
+  adversus_outcome: string | null;
   product_id: string | null;
 }
 
@@ -38,6 +39,7 @@ interface Props {
   campaignMappings: CampaignMapping[];
   products: Product[];
   onMappingChange: (mappingId: string, productId: string) => void;
+  onBulkApprove?: (mappings: { id: string; productId: string }[]) => void;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -64,16 +66,19 @@ function calculateSimilarity(str1: string, str2: string): number {
   return matchCount / Math.max(words1.length, 1);
 }
 
-function findSuggestedProduct(campaignName: string, products: Product[]): { product: Product; confidence: number } | null {
+function findSuggestedProduct(campaignName: string, outcome: string | null, products: Product[]): { product: Product; confidence: number } | null {
   let bestMatch: { product: Product; confidence: number } | null = null;
+  
+  // Combine campaign name and outcome for matching
+  const searchString = outcome ? `${campaignName} ${outcome}` : campaignName;
   
   for (const product of products) {
     if (!product.is_active) continue;
     
     // Check name similarity
-    const nameSim = calculateSimilarity(campaignName, product.name);
+    const nameSim = calculateSimilarity(searchString, product.name);
     // Check code similarity
-    const codeSim = calculateSimilarity(campaignName, product.code);
+    const codeSim = calculateSimilarity(searchString, product.code);
     
     const confidence = Math.max(nameSim, codeSim);
     
@@ -85,7 +90,22 @@ function findSuggestedProduct(campaignName: string, products: Product[]): { prod
   return bestMatch;
 }
 
-export function CampaignMappingSection({ campaignMappings, products, onMappingChange }: Props) {
+// Group mappings by campaign
+function groupByCampaign(mappings: CampaignMapping[]) {
+  const groups = new Map<string, CampaignMapping[]>();
+  
+  for (const mapping of mappings) {
+    const key = mapping.adversus_campaign_id;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key)!.push(mapping);
+  }
+  
+  return groups;
+}
+
+export function CampaignMappingSection({ campaignMappings, products, onMappingChange, onBulkApprove }: Props) {
   const [currentPage, setCurrentPage] = useState(1);
   const [showOnlyUnmapped, setShowOnlyUnmapped] = useState(false);
 
@@ -93,11 +113,11 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
   const mappingsWithSuggestions = useMemo(() => {
     return campaignMappings.map(mapping => ({
       ...mapping,
-      suggestion: !mapping.product_id ? findSuggestedProduct(mapping.adversus_campaign_name, products) : null
+      suggestion: !mapping.product_id ? findSuggestedProduct(mapping.adversus_campaign_name, mapping.adversus_outcome, products) : null
     }));
   }, [campaignMappings, products]);
 
-  // Filter and group
+  // Filter
   const filteredMappings = useMemo(() => {
     let filtered = mappingsWithSuggestions;
     if (showOnlyUnmapped) {
@@ -106,31 +126,37 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
     return filtered;
   }, [mappingsWithSuggestions, showOnlyUnmapped]);
 
-  // Split into mapped and unmapped
-  const mappedCampaigns = filteredMappings.filter(m => m.product_id);
-  const unmappedCampaigns = filteredMappings.filter(m => !m.product_id);
+  // Group by campaign for display
+  const groupedMappings = useMemo(() => groupByCampaign(filteredMappings), [filteredMappings]);
+  const campaignIds = Array.from(groupedMappings.keys());
   
-  // Sort unmapped: suggestions first
-  const sortedUnmapped = [...unmappedCampaigns].sort((a, b) => {
-    if (a.suggestion && !b.suggestion) return -1;
-    if (!a.suggestion && b.suggestion) return 1;
-    if (a.suggestion && b.suggestion) return b.suggestion.confidence - a.suggestion.confidence;
-    return 0;
-  });
-
-  const totalPages = Math.ceil(filteredMappings.length / ITEMS_PER_PAGE);
+  // Pagination by campaign groups
+  const totalPages = Math.ceil(campaignIds.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedCampaignIds = campaignIds.slice(startIndex, endIndex);
 
-  // Combine: unmapped first (with suggestions at top), then mapped
-  const displayOrder = [...sortedUnmapped, ...mappedCampaigns];
-  const paginatedMappings = displayOrder.slice(startIndex, endIndex);
+  // Stats
+  const mappedCount = campaignMappings.filter(m => m.product_id).length;
+  const unmappedCount = campaignMappings.filter(m => !m.product_id).length;
+  const withSuggestions = mappingsWithSuggestions.filter(m => !m.product_id && m.suggestion && m.suggestion.confidence >= 0.8);
 
   const stats = {
     total: campaignMappings.length,
-    mapped: mappedCampaigns.length,
-    unmapped: unmappedCampaigns.length,
-    withSuggestions: sortedUnmapped.filter(m => m.suggestion && m.suggestion.confidence >= 0.8).length
+    campaigns: new Set(campaignMappings.map(m => m.adversus_campaign_id)).size,
+    mapped: mappedCount,
+    unmapped: unmappedCount,
+    withSuggestions: withSuggestions.length
+  };
+
+  const handleBulkApprove = () => {
+    if (onBulkApprove && withSuggestions.length > 0) {
+      const mappingsToApprove = withSuggestions.map(m => ({
+        id: m.id,
+        productId: m.suggestion!.product.id
+      }));
+      onBulkApprove(mappingsToApprove);
+    }
   };
 
   if (campaignMappings.length === 0) {
@@ -147,9 +173,12 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
     <div className="space-y-4">
       {/* Stats Bar */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Badge variant="outline" className="gap-1.5">
-            <span className="font-normal text-muted-foreground">Total:</span> {stats.total}
+            <span className="font-normal text-muted-foreground">Kampagner:</span> {stats.campaigns}
+          </Badge>
+          <Badge variant="outline" className="gap-1.5">
+            <span className="font-normal text-muted-foreground">Kombinationer:</span> {stats.total}
           </Badge>
           <Badge variant="outline" className="gap-1.5 border-success/30 bg-success/5">
             <Check className="h-3 w-3 text-success" />
@@ -166,142 +195,147 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
           )}
         </div>
         
-        <Button
-          variant={showOnlyUnmapped ? "secondary" : "outline"}
-          size="sm"
-          onClick={() => {
-            setShowOnlyUnmapped(!showOnlyUnmapped);
-            setCurrentPage(1);
-          }}
-        >
-          {showOnlyUnmapped ? "Vis alle" : "Vis kun umappede"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {stats.withSuggestions > 0 && onBulkApprove && (
+            <Button
+              size="sm"
+              onClick={handleBulkApprove}
+              className="gap-2"
+            >
+              <Zap className="h-4 w-4" />
+              Godkend alle forslag ({stats.withSuggestions})
+            </Button>
+          )}
+          <Button
+            variant={showOnlyUnmapped ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => {
+              setShowOnlyUnmapped(!showOnlyUnmapped);
+              setCurrentPage(1);
+            }}
+          >
+            {showOnlyUnmapped ? "Vis alle" : "Vis kun umappede"}
+          </Button>
+        </div>
       </div>
 
-      {/* Unmapped with Suggestions Section */}
-      {!showOnlyUnmapped && stats.withSuggestions > 0 && currentPage === 1 && (
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <h3 className="font-medium text-foreground">Foreslåede mappings</h3>
-            <span className="text-xs text-muted-foreground">
-              (baseret på navnesammenligning)
-            </span>
-          </div>
-          <div className="space-y-2">
-            {sortedUnmapped
-              .filter(m => m.suggestion && m.suggestion.confidence >= 0.8)
-              .slice(0, 5)
-              .map(mapping => (
-                <div 
-                  key={mapping.id}
-                  className="flex items-center justify-between gap-4 p-3 rounded-md bg-background border border-border"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground truncate">
-                      {mapping.adversus_campaign_name}
-                    </p>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      ID: {mapping.adversus_campaign_id}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">→</span>
-                    <Badge variant="secondary" className="gap-1">
-                      <Sparkles className="h-3 w-3" />
-                      {mapping.suggestion!.product.name}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      onClick={() => onMappingChange(mapping.id, mapping.suggestion!.product.id)}
-                    >
-                      Godkend
-                    </Button>
-                  </div>
+      {/* Campaigns grouped with outcomes */}
+      <div className="space-y-4">
+        {paginatedCampaignIds.map(campaignId => {
+          const mappings = groupedMappings.get(campaignId)!;
+          const campaignName = mappings[0].adversus_campaign_name;
+          const hasMultipleOutcomes = mappings.length > 1 || mappings.some(m => m.adversus_outcome);
+          
+          return (
+            <div key={campaignId} className="rounded-lg border border-border overflow-hidden">
+              {/* Campaign Header */}
+              <div className="px-4 py-3 bg-muted/30 border-b border-border flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h3 className="font-medium text-foreground">{campaignName}</h3>
+                  <span className="text-xs text-muted-foreground font-mono">ID: {campaignId}</span>
                 </div>
-              ))}
-          </div>
-        </div>
-      )}
-
-      {/* Main Table */}
-      <div className="rounded-lg border border-border overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-border hover:bg-transparent bg-muted/30">
-              <TableHead className="text-muted-foreground">Kampagne</TableHead>
-              <TableHead className="text-muted-foreground w-24">ID</TableHead>
-              <TableHead className="text-muted-foreground w-[280px]">Produkt</TableHead>
-              <TableHead className="text-muted-foreground w-24">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedMappings.map((mapping) => (
-              <TableRow key={mapping.id} className="border-border">
-                <TableCell>
-                  <p className="font-medium text-foreground">
-                    {mapping.adversus_campaign_name}
-                  </p>
-                </TableCell>
-                <TableCell className="text-muted-foreground font-mono text-xs">
-                  {mapping.adversus_campaign_id}
-                </TableCell>
-                <TableCell>
-                  <Select
-                    value={mapping.product_id || 'none'}
-                    onValueChange={(value) => onMappingChange(mapping.id, value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Vælg produkt..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">
-                        <span className="text-muted-foreground">Ikke mappet</span>
-                      </SelectItem>
-                      {mapping.suggestion && (
-                        <SelectItem value={mapping.suggestion.product.id}>
-                          <span className="flex items-center gap-2">
-                            <Sparkles className="h-3 w-3 text-primary" />
-                            {mapping.suggestion.product.name} (foreslået)
-                          </span>
-                        </SelectItem>
-                      )}
-                      {products.filter(p => p.is_active && p.id !== mapping.suggestion?.product.id).map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name} ({product.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell>
-                  {mapping.product_id ? (
-                    <Badge variant="outline" className="border-success/30 bg-success/10 text-success">
-                      <Check className="h-3 w-3 mr-1" />
-                      Mappet
-                    </Badge>
-                  ) : mapping.suggestion ? (
-                    <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-                      <Sparkles className="h-3 w-3 mr-1" />
-                      Forslag
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
-                      Mangler
-                    </Badge>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                {hasMultipleOutcomes && (
+                  <Badge variant="outline" className="text-xs">
+                    {mappings.length} afslutningskode{mappings.length !== 1 ? 'r' : ''}
+                  </Badge>
+                )}
+              </div>
+              
+              {/* Outcomes/Mappings */}
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="text-muted-foreground">Afslutningskode</TableHead>
+                    <TableHead className="text-muted-foreground w-[300px]">Produkt</TableHead>
+                    <TableHead className="text-muted-foreground w-24">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {mappings.map((mapping) => {
+                    const mappingWithSuggestion = mappingsWithSuggestions.find(m => m.id === mapping.id);
+                    const suggestion = mappingWithSuggestion?.suggestion;
+                    
+                    return (
+                      <TableRow key={mapping.id} className="border-border">
+                        <TableCell>
+                          {mapping.adversus_outcome ? (
+                            <span className="font-medium text-foreground">{mapping.adversus_outcome}</span>
+                          ) : (
+                            <span className="text-muted-foreground italic">(ingen afslutningskode)</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={mapping.product_id || 'none'}
+                              onValueChange={(value) => onMappingChange(mapping.id, value)}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Vælg produkt..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">
+                                  <span className="text-muted-foreground">Ikke mappet</span>
+                                </SelectItem>
+                                {suggestion && (
+                                  <SelectItem value={suggestion.product.id}>
+                                    <span className="flex items-center gap-2">
+                                      <Sparkles className="h-3 w-3 text-primary" />
+                                      {suggestion.product.name} (foreslået)
+                                    </span>
+                                  </SelectItem>
+                                )}
+                                {products.filter(p => p.is_active && p.id !== suggestion?.product.id).map((product) => (
+                                  <SelectItem key={product.id} value={product.id}>
+                                    {product.name} ({product.code})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {suggestion && suggestion.confidence >= 0.8 && !mapping.product_id && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="shrink-0"
+                                onClick={() => onMappingChange(mapping.id, suggestion.product.id)}
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {mapping.product_id ? (
+                            <Badge variant="outline" className="border-success/30 bg-success/10 text-success">
+                              <Check className="h-3 w-3 mr-1" />
+                              Mappet
+                            </Badge>
+                          ) : suggestion ? (
+                            <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+                              <Sparkles className="h-3 w-3 mr-1" />
+                              Forslag
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
+                              Mangler
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          );
+        })}
       </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
           <p className="text-sm text-muted-foreground">
-            Viser {startIndex + 1}-{Math.min(endIndex, filteredMappings.length)} af {filteredMappings.length} kampagner
+            Viser {startIndex + 1}-{Math.min(endIndex, campaignIds.length)} af {campaignIds.length} kampagner
           </p>
           <div className="flex items-center gap-2">
             <Button

@@ -54,6 +54,7 @@ interface CampaignMapping {
   id: string
   adversus_campaign_id: string
   adversus_campaign_name: string
+  adversus_outcome: string | null
   product_id: string | null
 }
 
@@ -148,6 +149,9 @@ function findMatchingProduct(
       if (outcomeLower.includes('fiber') && productNameLower.includes('fiber')) score += 10
       if (outcomeLower.includes('5g') && productNameLower.includes('5g')) score += 10
       if (outcomeLower.includes('omstilling') && productNameLower.includes('omstilling')) score += 10
+      if (outcomeLower.includes('fysisk') && productNameLower.includes('fysisk')) score += 10
+      if (outcomeLower.includes('online') && productNameLower.includes('online')) score += 10
+      if (outcomeLower.includes('telefon') && productNameLower.includes('telefon')) score += 10
       
       // Check for percentage tilskud matching
       const tilskudMatch = outcomeLower.match(/(\d+)%\s*tilskud/)
@@ -235,10 +239,12 @@ Deno.serve(async (req) => {
       .from('campaign_product_mappings')
       .select('*')
     
-    const campaignMappingsByAdversusId = new Map<string, CampaignMapping>()
+    // Key: "campaignId|outcome" (outcome can be empty string for null)
+    const campaignMappingsByKey = new Map<string, CampaignMapping>()
     if (existingMappings) {
       for (const mapping of existingMappings) {
-        campaignMappingsByAdversusId.set(mapping.adversus_campaign_id, mapping as CampaignMapping)
+        const key = `${mapping.adversus_campaign_id}|${mapping.adversus_outcome || ''}`
+        campaignMappingsByKey.set(key, mapping as CampaignMapping)
       }
     }
     console.log(`Loaded ${existingMappings?.length || 0} existing campaign mappings`)
@@ -272,35 +278,6 @@ Deno.serve(async (req) => {
         const resolvedCampaign = { ...campaign, name: campaignName }
         campaignMap.set(campaign.id, resolvedCampaign)
         console.log(`Campaign ${campaign.id}: ${campaignName}`)
-        
-        // Upsert campaign mapping if not exists
-        if (!campaignMappingsByAdversusId.has(String(campaign.id))) {
-          const { error: mappingError } = await supabase
-            .from('campaign_product_mappings')
-            .upsert({
-              adversus_campaign_id: String(campaign.id),
-              adversus_campaign_name: campaignName,
-              product_id: null
-            }, {
-              onConflict: 'adversus_campaign_id'
-            })
-          
-          if (mappingError) {
-            console.warn(`Failed to create mapping for campaign ${campaign.id}:`, mappingError)
-          }
-        }
-      }
-      
-      // Reload mappings after potential inserts
-      const { data: updatedMappings } = await supabase
-        .from('campaign_product_mappings')
-        .select('*')
-      
-      if (updatedMappings) {
-        campaignMappingsByAdversusId.clear()
-        for (const mapping of updatedMappings) {
-          campaignMappingsByAdversusId.set(mapping.adversus_campaign_id, mapping as CampaignMapping)
-        }
       }
     } else {
       console.warn('Could not fetch campaigns from Adversus')
@@ -376,7 +353,9 @@ Deno.serve(async (req) => {
     let salesCreated = 0
     let salesUpdated = 0
     let unmatchedSales = 0
+    let newMappingsCreated = 0
     const productMatchStats: Record<string, number> = {}
+    const outcomeStats: Record<string, number> = {}
 
     // Get fallback product
     const { data: fallbackProduct } = await supabase
@@ -385,6 +364,9 @@ Deno.serve(async (req) => {
       .eq('is_active', true)
       .limit(1)
       .maybeSingle()
+
+    // Track which campaign+outcome combinations we've already created in this sync
+    const createdMappingsThisSync = new Set<string>()
 
     while (true) {
       const sessionsUrl = `${baseUrl}/sessions?filters=${encodeURIComponent(filters)}&page=${page}&pageSize=${pageSize}&sortProperty=startTime&sortDirection=DESC`
@@ -428,6 +410,12 @@ Deno.serve(async (req) => {
         // Only process "success" sessions as sales
         if (session.status !== 'success') continue
 
+        // Track outcome statistics
+        const outcome = session.outcome || null
+        if (outcome) {
+          outcomeStats[outcome] = (outcomeStats[outcome] || 0) + 1
+        }
+
         // Find the agent by Adversus user ID
         const { data: agent } = await supabase
           .from('agents')
@@ -440,16 +428,43 @@ Deno.serve(async (req) => {
           continue
         }
 
-        // Find matching product - first check manual mapping, then auto-match
         const campaign = campaignMap.get(session.campaignId)
+        const campaignName = campaign?.name || `Unknown Campaign ${session.campaignId}`
+        
+        // Create campaign+outcome mapping if it doesn't exist
+        const mappingKey = `${session.campaignId}|${outcome || ''}`
+        if (!campaignMappingsByKey.has(mappingKey) && !createdMappingsThisSync.has(mappingKey)) {
+          const { data: newMapping, error: mappingError } = await supabase
+            .from('campaign_product_mappings')
+            .insert({
+              adversus_campaign_id: String(session.campaignId),
+              adversus_campaign_name: campaignName,
+              adversus_outcome: outcome,
+              product_id: null
+            })
+            .select()
+            .maybeSingle()
+          
+          if (mappingError) {
+            // Might be duplicate, try to fetch it
+            console.warn(`Failed to create mapping for ${mappingKey}:`, mappingError.message)
+          } else if (newMapping) {
+            campaignMappingsByKey.set(mappingKey, newMapping as CampaignMapping)
+            newMappingsCreated++
+            console.log(`Created new mapping: ${campaignName} + ${outcome || '(no outcome)'}`)
+          }
+          createdMappingsThisSync.add(mappingKey)
+        }
+
+        // Find matching product - first check manual mapping, then auto-match
         let matchedProduct: Product | null = null
         
-        // Check for manual mapping first
-        const manualMapping = campaignMappingsByAdversusId.get(String(session.campaignId))
+        // Check for manual mapping first (exact campaign+outcome match)
+        const manualMapping = campaignMappingsByKey.get(mappingKey)
         if (manualMapping?.product_id && products) {
           matchedProduct = products.find(p => p.id === manualMapping.product_id) as Product || null
           if (matchedProduct) {
-            console.log(`Using manual mapping for campaign ${campaign?.name}: ${matchedProduct.name}`)
+            console.log(`Using manual mapping for ${campaignName} + ${outcome || '(no outcome)'}: ${matchedProduct.name}`)
           }
         }
         
@@ -462,7 +477,7 @@ Deno.serve(async (req) => {
         const productToUse = matchedProduct || (fallbackProduct as Product | null)
         
         if (!productToUse) {
-          console.warn(`No product found for session ${session.id}, campaign: ${campaign?.name}`)
+          console.warn(`No product found for session ${session.id}, campaign: ${campaignName}, outcome: ${outcome}`)
           unmatchedSales++
           continue
         }
@@ -537,6 +552,7 @@ Deno.serve(async (req) => {
 
     console.log(`Sessions processed: ${totalSessions} total, ${salesCreated} sales created, ${salesUpdated} updated, ${unmatchedSales} unmatched`)
     console.log('Product match stats:', JSON.stringify(productMatchStats))
+    console.log('Outcome stats:', JSON.stringify(outcomeStats))
 
     const result = {
       success: true,
@@ -544,7 +560,9 @@ Deno.serve(async (req) => {
         agents: { created: agentsCreated, updated: agentsUpdated },
         sessions: { processed: totalSessions, salesCreated, salesUpdated, unmatchedSales },
         campaigns: { total: campaignMap.size },
+        mappings: { created: newMappingsCreated },
         productMatches: productMatchStats,
+        outcomeStats,
         dateRange: { startDate, endDate }
       }
     }
