@@ -322,6 +322,7 @@ export type Database = {
           customer_phone: string | null
           effective_date: string | null
           id: string
+          outcome: string | null
           product_id: string
           sale_amount: number | null
           sale_date: string | null
@@ -338,6 +339,7 @@ export type Database = {
           customer_phone?: string | null
           effective_date?: string | null
           id?: string
+          outcome?: string | null
           product_id: string
           sale_amount?: number | null
           sale_date?: string | null
@@ -354,6 +356,7 @@ export type Database = {
           customer_phone?: string | null
           effective_date?: string | null
           id?: string
+          outcome?: string | null
           product_id?: string
           sale_amount?: number | null
           sale_date?: string | null
