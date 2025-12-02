@@ -1,6 +1,8 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { TopAgentsTable } from "@/components/dashboard/TopAgentsTable";
+import { RevenueChart } from "@/components/dashboard/RevenueChart";
+import { SickLeaveChart } from "@/components/dashboard/SickLeaveChart";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -10,8 +12,7 @@ import {
   DollarSign,
   Thermometer,
   Palmtree,
-  PiggyBank,
-  Activity
+  PiggyBank
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
@@ -405,6 +406,12 @@ export default function Dashboard() {
               {stats.sickDaysThisMonth.toFixed(1)} dage × gns. dagløn
             </p>
           </div>
+        </div>
+
+        {/* Charts Row */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <RevenueChart />
+          <SickLeaveChart />
         </div>
 
         {/* Performance & Details Row */}
