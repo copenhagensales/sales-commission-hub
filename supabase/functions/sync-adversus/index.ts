@@ -668,21 +668,19 @@ Deno.serve(async (req) => {
 
       for (const session of sessions) {
         // Only process "success" sessions as sales
+        // Note: session.status === 'success' from Adversus already means it's a completed sale
         if (session.status !== 'success') continue
 
-        // Fetch lead data to get outcome
+        // Fetch lead data to get outcome/product info
         const lead = await fetchLead(session.leadId, session.campaignId)
         const outcome = extractOutcome(lead, session.campaignId)
         
-        // Track outcome statistics
+        // Track outcome statistics (for debugging)
         if (outcome) {
           outcomeStats[outcome] = (outcomeStats[outcome] || 0) + 1
         }
         
-        // Skip if outcome is not positive (e.g. "Ja tak", "Succes", etc.)
-        if (!isPositiveOutcome(outcome)) {
-          continue
-        }
+        // Note: We no longer skip based on positive outcome - session.status='success' is enough
 
         // Find the agent by Adversus user ID
         const { data: agent } = await supabase
