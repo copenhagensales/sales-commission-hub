@@ -35,6 +35,7 @@ interface SyncSummary {
   sessions: { processed: number; salesCreated: number; salesUpdated: number; unmatchedSales?: number };
   campaigns?: { total: number };
   productMatches?: Record<string, number>;
+  outcomeStats?: Record<string, number>;
 }
 
 export default function Settings() {
@@ -156,7 +157,8 @@ export default function Settings() {
       agents: { created: 0, updated: 0 },
       sessions: { processed: 0, salesCreated: 0, salesUpdated: 0, unmatchedSales: 0 },
       campaigns: { total: 0 },
-      productMatches: {}
+      productMatches: {},
+      outcomeStats: {}
     };
     
     try {
@@ -199,6 +201,13 @@ export default function Settings() {
           if (data.summary.productMatches) {
             for (const [code, count] of Object.entries(data.summary.productMatches)) {
               combinedSummary.productMatches![code] = (combinedSummary.productMatches![code] || 0) + (count as number);
+            }
+          }
+          
+          // Merge outcome stats
+          if (data.summary.outcomeStats) {
+            for (const [outcome, count] of Object.entries(data.summary.outcomeStats)) {
+              combinedSummary.outcomeStats![outcome] = (combinedSummary.outcomeStats![outcome] || 0) + (count as number);
             }
           }
         }
@@ -444,6 +453,23 @@ export default function Settings() {
                             {Object.entries(lastSyncResult.summary.productMatches).map(([code, count]) => (
                               <li key={code}>{code}: {count} salg</li>
                             ))}
+                          </ul>
+                        </details>
+                      )}
+                      {lastSyncResult.summary.outcomeStats && Object.keys(lastSyncResult.summary.outcomeStats).length > 0 && (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                            Vis outcome-statistik ({Object.keys(lastSyncResult.summary.outcomeStats).length} unikke outcomes)
+                          </summary>
+                          <ul className="mt-1 pl-4 text-xs max-h-48 overflow-y-auto">
+                            {Object.entries(lastSyncResult.summary.outcomeStats)
+                              .sort(([, a], [, b]) => (b as number) - (a as number))
+                              .map(([outcome, count]) => (
+                                <li key={outcome} className="flex justify-between gap-2">
+                                  <span className="truncate">{outcome}</span>
+                                  <span className="text-muted-foreground">{count}</span>
+                                </li>
+                              ))}
                           </ul>
                         </details>
                       )}
