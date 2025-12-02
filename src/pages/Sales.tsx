@@ -36,7 +36,7 @@ interface SaleWithDetails {
   sale_amount: number | null;
   status: SaleStatus | null;
   agent: { id: string; name: string } | null;
-  product: { id: string; name: string; commission_value: number | null; clawback_window_days: number | null } | null;
+  product: { id: string; name: string; commission_value: number | null; clawback_window_days: number | null; revenue_amount: number | null } | null;
 }
 
 const PAGE_SIZE = 50;
@@ -79,7 +79,7 @@ export default function Sales() {
           sale_amount,
           status,
           agent:agents!sales_agent_id_fkey(id, name),
-          product:products!sales_product_id_fkey(id, name, commission_value, clawback_window_days)
+          product:products!sales_product_id_fkey(id, name, commission_value, clawback_window_days, revenue_amount)
         `)
         .range(from, to);
       
@@ -210,7 +210,7 @@ export default function Sales() {
                       <ArrowUpDown className={`h-4 w-4 ${sortByProduct ? 'text-primary' : ''}`} />
                     </div>
                   </TableHead>
-                  <TableHead className="text-muted-foreground">Beløb</TableHead>
+                  <TableHead className="text-muted-foreground">Omsætning</TableHead>
                   <TableHead className="text-muted-foreground">Provision</TableHead>
                   <TableHead className="text-muted-foreground">Status</TableHead>
                   <TableHead className="text-muted-foreground">Risiko</TableHead>
@@ -236,7 +236,7 @@ export default function Sales() {
                         {sale.product?.name || 'Ukendt produkt'}
                       </TableCell>
                       <TableCell className="text-foreground">
-                        {(sale.sale_amount || 0).toLocaleString("da-DK")} kr
+                        {(sale.product?.revenue_amount || sale.sale_amount || 0).toLocaleString("da-DK")} kr
                       </TableCell>
                       <TableCell className={commission >= 0 ? "text-success font-semibold" : "text-danger font-semibold"}>
                         {commission >= 0 ? "+" : ""}{commission.toLocaleString("da-DK")} kr

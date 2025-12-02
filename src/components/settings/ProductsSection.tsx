@@ -27,6 +27,7 @@ interface Product {
   commission_value: number;
   clawback_window_days: number;
   is_active: boolean;
+  revenue_amount?: number;
 }
 
 interface Props {
@@ -207,6 +208,7 @@ export function ProductsSection({ products }: Props) {
               <TableHead className="text-muted-foreground">Produkt</TableHead>
               <TableHead className="text-muted-foreground w-24">Kode</TableHead>
               <TableHead className="text-muted-foreground w-28">Kampagne</TableHead>
+              <TableHead className="text-muted-foreground w-28">Omsætning</TableHead>
               <TableHead className="text-muted-foreground w-32">Provision</TableHead>
               <TableHead className="text-muted-foreground w-28">Clawback</TableHead>
               <TableHead className="text-muted-foreground w-20">Status</TableHead>
@@ -237,6 +239,9 @@ export function ProductsSection({ products }: Props) {
                     >
                       {campaignName}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-foreground">
+                    {product.revenue_amount ? `${product.revenue_amount.toLocaleString('da-DK')} kr` : '-'}
                   </TableCell>
                   <TableCell className="text-foreground">
                     <Badge variant="secondary">

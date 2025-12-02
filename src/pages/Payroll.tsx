@@ -21,7 +21,7 @@ interface PayrollRunWithDetails {
   period_end: string;
   status: "draft" | "approved" | "exported";
   created_at: string;
-  payroll_lines: { total_payout: number | null }[];
+  payroll_lines: { total_payout: number | null; commission_amount: number | null }[];
 }
 
 // Helper to calculate the current payroll period (15th to 14th)
@@ -57,13 +57,43 @@ export default function Payroll() {
           period_end,
           status,
           created_at,
-          payroll_lines(total_payout)
+          payroll_lines(total_payout, commission_amount)
         `)
         .order('period_start', { ascending: false });
       
       if (error) throw error;
       return data as unknown as PayrollRunWithDetails[];
     }
+  });
+
+  // Fetch total revenue for the current draft period based on sales
+  const { data: revenueData } = useQuery({
+    queryKey: ['payroll-revenue', payrollRuns?.[0]?.period_start, payrollRuns?.[0]?.period_end],
+    queryFn: async () => {
+      if (!payrollRuns?.[0]) return { total: 0, count: 0 };
+      
+      const draft = payrollRuns.find(r => r.status === 'draft');
+      if (!draft) return { total: 0, count: 0 };
+      
+      const { data, error } = await supabase
+        .from('sales')
+        .select(`
+          id,
+          product:products!sales_product_id_fkey(revenue_amount)
+        `)
+        .gte('sale_date', draft.period_start)
+        .lt('sale_date', draft.period_end);
+      
+      if (error) throw error;
+      
+      const total = (data || []).reduce((sum, sale) => {
+        const revenue = (sale.product as any)?.revenue_amount || 0;
+        return sum + revenue;
+      }, 0);
+      
+      return { total, count: data?.length || 0 };
+    },
+    enabled: !!payrollRuns
   });
 
   const { data: activeAgentCount } = useQuery({
@@ -129,7 +159,7 @@ export default function Payroll() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <div className="rounded-xl border border-border bg-card p-6">
             <p className="text-sm text-muted-foreground">Aktuel periode</p>
             <p className="mt-1 text-2xl font-bold text-foreground capitalize">
@@ -140,7 +170,16 @@ export default function Payroll() {
             </p>
           </div>
           <div className="rounded-xl border border-border bg-card p-6">
-            <p className="text-sm text-muted-foreground">Total lønsum (kladde)</p>
+            <p className="text-sm text-muted-foreground">Total omsætning (kladde)</p>
+            <p className="mt-1 text-2xl font-bold text-foreground">
+              {(revenueData?.total || 0).toLocaleString("da-DK")} kr
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {revenueData?.count || 0} salg i perioden
+            </p>
+          </div>
+          <div className="rounded-xl border border-border bg-card p-6">
+            <p className="text-sm text-muted-foreground">Total provision (kladde)</p>
             <p className="mt-1 text-2xl font-bold text-foreground">
               {latestDraftTotal.toLocaleString("da-DK")} kr
             </p>
