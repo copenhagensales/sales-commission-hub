@@ -37,6 +37,7 @@ interface SaleWithDetails {
   status: SaleStatus | null;
   campaign_name: string | null;
   customer_phone: string | null;
+  outcome: string | null;
   agent: { id: string; name: string } | null;
   product: { id: string; name: string; commission_value: number | null; clawback_window_days: number | null; revenue_amount: number | null } | null;
 }
@@ -82,6 +83,7 @@ export default function Sales() {
           status,
           campaign_name,
           customer_phone,
+          outcome,
           agent:agents!sales_agent_id_fkey(id, name),
           product:products!sales_product_id_fkey(id, name, commission_value, clawback_window_days, revenue_amount)
         `)
@@ -112,10 +114,12 @@ export default function Sales() {
     const productName = sale.product?.name || '';
     const campaignName = sale.campaign_name || '';
     const customerPhone = sale.customer_phone || '';
+    const outcome = sale.outcome || '';
     return agentName.toLowerCase().includes(searchLower) ||
       productName.toLowerCase().includes(searchLower) ||
       campaignName.toLowerCase().includes(searchLower) ||
-      customerPhone.includes(search); // Phone search without lowercase
+      customerPhone.includes(search) ||
+      outcome.toLowerCase().includes(searchLower);
   });
 
   const totalPages = Math.ceil((totalCount || 0) / PAGE_SIZE);
@@ -209,6 +213,7 @@ export default function Sales() {
                   <TableHead className="text-muted-foreground">Agent</TableHead>
                   <TableHead className="text-muted-foreground">Kunde</TableHead>
                   <TableHead className="text-muted-foreground">Kampagne</TableHead>
+                  <TableHead className="text-muted-foreground">Afslutningskode</TableHead>
                   <TableHead 
                     className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
                     onClick={() => {
@@ -255,6 +260,13 @@ export default function Sales() {
                       <TableCell className="text-foreground">
                         {sale.campaign_name ? (
                           <span className="text-sm">{sale.campaign_name}</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-foreground">
+                        {sale.outcome ? (
+                          <span className="text-sm font-medium text-primary">{sale.outcome}</span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}

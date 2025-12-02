@@ -707,7 +707,8 @@ Deno.serve(async (req) => {
           effective_date: session.endTime,
           status: 'active' as const,
           campaign_name: campaignName,
-          customer_phone: customerPhone
+          customer_phone: customerPhone,
+          outcome: outcome
         }
 
         // Check if sale already exists
