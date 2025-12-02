@@ -69,25 +69,84 @@ export default function LiquidityOverview() {
         .from('liquidity_settings')
         .select('*');
 
+      // Fetch actual commission data from last month for realistic salary estimate
+      const lastMonthStart = new Date();
+      lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+      lastMonthStart.setDate(1);
+      const lastMonthEnd = new Date();
+      lastMonthEnd.setDate(0); // Last day of previous month
+      
+      const { data: commissionData } = await supabase
+        .from('commission_transactions')
+        .select('amount, type')
+        .gte('created_at', lastMonthStart.toISOString())
+        .lte('created_at', lastMonthEnd.toISOString());
+
+      // Calculate monthly commission costs
+      let monthlyCommission = 0;
+      commissionData?.forEach(ct => {
+        if (ct.type === 'earn') {
+          monthlyCommission += ct.amount || 0;
+        } else if (ct.type === 'clawback') {
+          monthlyCommission -= Math.abs(ct.amount || 0);
+        }
+      });
+
+      // Get monthly revenue from last month's sales
+      const { data: salesData } = await supabase
+        .from('sales')
+        .select(`
+          products!sales_product_id_fkey(revenue_amount)
+        `)
+        .gte('sale_date', lastMonthStart.toISOString())
+        .lte('sale_date', lastMonthEnd.toISOString())
+        .in('status', ['active', 'pending']);
+
+      let monthlyRevenue = 0;
+      salesData?.forEach(sale => {
+        const product = sale.products as any;
+        if (product?.revenue_amount) {
+          monthlyRevenue += product.revenue_amount;
+        }
+      });
+
       if (customersData) setCustomers(customersData);
       if (expensesData) setExpenses(expensesData as LiquidityExpense[]);
       
-      if (settingsData) {
-        const general = settingsData.find(s => s.setting_key === 'general')?.setting_value as any;
-        const vat = settingsData.find(s => s.setting_key === 'vat')?.setting_value as any;
-        const salary = settingsData.find(s => s.setting_key === 'salary')?.setting_value as any;
-        
-        setSettings(prev => ({
-          ...prev,
-          startingBalance: general?.starting_balance ?? prev.startingBalance,
-          startingDate: general?.starting_date ? new Date(general.starting_date) : new Date(),
-          forecastMonths: general?.forecast_months ?? 6,
-          vatRate: vat?.rate ?? 25,
-          vatPaymentDay: vat?.payment_day ?? 10,
-          totalMonthlySalary: salary?.total_monthly ?? 0,
-          vacationPayPercent: salary?.vacation_pay_percent ?? 12.5,
-          salaryPaymentDay: salary?.payment_day ?? 15,
-        }));
+      // Build settings with real data
+      const general = settingsData?.find(s => s.setting_key === 'general')?.setting_value as any;
+      const vat = settingsData?.find(s => s.setting_key === 'vat')?.setting_value as any;
+      const salary = settingsData?.find(s => s.setting_key === 'salary')?.setting_value as any;
+      
+      // Use real commission data if salary not configured, use realistic starting balance
+      const configuredSalary = salary?.total_monthly || 0;
+      const calculatedSalary = configuredSalary > 0 ? configuredSalary : monthlyCommission;
+      const startingBalance = general?.starting_balance || 100000; // Default 100k if not configured
+      
+      setSettings(prev => ({
+        ...prev,
+        startingBalance: startingBalance,
+        startingDate: general?.starting_date ? new Date(general.starting_date) : new Date(),
+        forecastMonths: general?.forecast_months ?? 6,
+        vatRate: vat?.rate ?? 25,
+        vatPaymentDay: vat?.payment_day ?? 10,
+        totalMonthlySalary: calculatedSalary,
+        vacationPayPercent: salary?.vacation_pay_percent ?? 12.5,
+        salaryPaymentDay: salary?.payment_day ?? 15,
+      }));
+
+      // Auto-create customer based on monthly revenue if no customers exist
+      if ((!customersData || customersData.length === 0) && monthlyRevenue > 0) {
+        setCustomers([{
+          id: 'auto-revenue',
+          name: 'Omsætning (beregnet)',
+          monthly_invoice_amount: monthlyRevenue,
+          payment_terms_days: 25,
+          invoice_day: 0,
+          pays_on_time: true,
+          average_delay_days: 0,
+          is_active: true,
+        }]);
       }
     } catch (error) {
       console.error('Error fetching liquidity data:', error);
