@@ -472,19 +472,39 @@ Deno.serve(async (req) => {
       return null
     }
 
+    // Helper to delay between requests to avoid rate limiting
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+    
     while (true) {
       const sessionsUrl = `${baseUrl}/sessions?filters=${encodeURIComponent(filters)}&page=${page}&pageSize=${pageSize}&sortProperty=startTime&sortDirection=DESC`
       
-      const sessionsResponse = await fetch(sessionsUrl, {
-        headers: {
-          'Authorization': `Basic ${authHeader}`,
-          'Content-Type': 'application/json'
+      let sessionsResponse: Response | null = null
+      let retries = 0
+      const maxRetries = 3
+      
+      while (retries < maxRetries) {
+        sessionsResponse = await fetch(sessionsUrl, {
+          headers: {
+            'Authorization': `Basic ${authHeader}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (sessionsResponse.status === 429) {
+          // Rate limited - wait and retry with exponential backoff
+          const waitTime = Math.pow(2, retries) * 2000 // 2s, 4s, 8s
+          console.log(`Rate limited on page ${page}, waiting ${waitTime}ms before retry ${retries + 1}/${maxRetries}`)
+          await delay(waitTime)
+          retries++
+          continue
         }
-      })
+        
+        break
+      }
 
-      if (!sessionsResponse.ok) {
-        const errorText = await sessionsResponse.text()
-        console.error('Failed to fetch sessions:', sessionsResponse.status, errorText)
+      if (!sessionsResponse || !sessionsResponse.ok) {
+        const errorText = sessionsResponse ? await sessionsResponse.text() : 'No response'
+        console.error('Failed to fetch sessions:', sessionsResponse?.status, errorText)
         break
       }
 
@@ -654,6 +674,9 @@ Deno.serve(async (req) => {
         break
       }
       page++
+      
+      // Add delay between pages to avoid rate limiting
+      await delay(500) // 500ms between pages
     }
 
     console.log(`Sessions processed: ${totalSessions} total, ${salesCreated} sales created, ${salesUpdated} updated, ${unmatchedSales} unmatched`)
