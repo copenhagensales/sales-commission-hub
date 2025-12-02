@@ -6,12 +6,9 @@ import { SickLeaveChart } from "@/components/dashboard/SickLeaveChart";
 import { 
   TrendingUp, 
   TrendingDown, 
-  Wallet, 
   RefreshCw, 
   Loader2, 
   DollarSign,
-  Thermometer,
-  Palmtree,
   PiggyBank
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,7 +17,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface DashboardStats {
-  // Economic KPIs
+  // Daily KPIs
+  revenueToday: number;
+  netMarginToday: number;
+  
+  // Monthly KPIs
   revenue: number;
   commissionCosts: number;
   vacationPayCosts: number;
@@ -57,6 +58,8 @@ export default function Dashboard() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
+    revenueToday: 0,
+    netMarginToday: 0,
     revenue: 0,
     commissionCosts: 0,
     vacationPayCosts: 0,
@@ -134,6 +137,16 @@ export default function Dashboard() {
         }
       });
 
+      // Calculate today's revenue
+      const todaysSales = activeSales.filter(s => s.sale_date && new Date(s.sale_date) >= new Date(startOfToday));
+      let revenueToday = 0;
+      todaysSales.forEach(sale => {
+        const product = sale.products as any;
+        if (product?.revenue_amount) {
+          revenueToday += product.revenue_amount;
+        }
+      });
+
       // Fetch commission transactions
       const { data: commissionData, error: commissionError } = await supabase
         .from('commission_transactions')
@@ -197,6 +210,14 @@ export default function Dashboard() {
       // Calculate net margin
       const netMargin = revenue - commissionCosts - vacationPayCosts - sickPayCosts;
 
+      // Calculate today's commission costs (rough estimate based on today's sales)
+      const todaysCommissionCosts = todaysSales.reduce((sum, sale) => {
+        const product = sale.products as any;
+        return sum + (product?.commission_value || 0);
+      }, 0);
+      const todaysVacationPay = todaysCommissionCosts * vacationPayRate;
+      const netMarginToday = revenueToday - todaysCommissionCosts - todaysVacationPay;
+
       // Calculate pending commission
       const pendingSales = salesData?.filter(s => s.status === 'pending') || [];
       const pendingCommissions = commissionData?.filter(ct => 
@@ -205,6 +226,8 @@ export default function Dashboard() {
       const pendingCommission = pendingCommissions.reduce((sum, ct) => sum + (ct.amount || 0), 0);
 
       setStats({
+        revenueToday,
+        netMarginToday,
         revenue,
         commissionCosts,
         vacationPayCosts,
@@ -329,34 +352,35 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        {/* Top KPIs - Economic Overview */}
+        {/* Top KPIs - Daily & Monthly Overview */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <KPICard
-            title="Omsætning"
+            title="Omsætning (dag)"
+            value={formatCurrency(stats.revenueToday)}
+            icon={DollarSign}
+            variant="success"
+            subtitle="I dag"
+          />
+          <KPICard
+            title="Netto margin (dag)"
+            value={formatCurrency(stats.netMarginToday)}
+            icon={stats.netMarginToday >= 0 ? TrendingUp : TrendingDown}
+            variant={stats.netMarginToday >= 0 ? "success" : "danger"}
+            subtitle="I dag"
+          />
+          <KPICard
+            title="Omsætning (md)"
             value={formatCurrency(stats.revenue)}
             icon={DollarSign}
             variant="success"
             subtitle={currentMonth}
           />
           <KPICard
-            title="Netto margin"
+            title="Netto margin (md)"
             value={formatCurrency(stats.netMargin)}
             icon={stats.netMargin >= 0 ? TrendingUp : TrendingDown}
             variant={stats.netMargin >= 0 ? "success" : "danger"}
-            subtitle="Efter alle udgifter"
-          />
-          <KPICard
-            title="Salgsomkostninger"
-            value={formatCurrency(stats.commissionCosts + stats.vacationPayCosts)}
-            icon={Wallet}
-            subtitle="Provision + feriepenge"
-          />
-          <KPICard
-            title="Sygeprocent"
-            value={formatPercent(stats.sickPercentage)}
-            icon={Thermometer}
-            variant={stats.sickPercentage > 5 ? "danger" : stats.sickPercentage > 3 ? "warning" : "success"}
-            subtitle={`${stats.sickDaysThisMonth.toFixed(1)} sygedage`}
+            subtitle={currentMonth}
           />
         </div>
 
