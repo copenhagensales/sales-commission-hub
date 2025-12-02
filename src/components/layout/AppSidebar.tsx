@@ -5,13 +5,13 @@ import {
   Wallet, 
   Settings,
   Tv,
-  LogOut,
-  TrendingUp
+  LogOut
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import cphSalesLogo from "@/assets/cph-sales-logo.png";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -41,11 +41,8 @@ export function AppSidebar() {
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar">
       <div className="flex h-full flex-col">
         {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <TrendingUp className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="text-lg font-semibold text-foreground">PayTrack</span>
+        <div className="flex h-16 items-center border-b border-sidebar-border px-4">
+          <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto" />
         </div>
 
         {/* Navigation */}
