@@ -18,6 +18,10 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Edit2, Plus, Trash2, Package, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { EditProductDialog } from "./EditProductDialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Product {
   id: string;
@@ -63,6 +67,31 @@ export function ProductsSection({ products }: Props) {
   const [currentPage, setCurrentPage] = useState(1);
   const [showOnlyActive, setShowOnlyActive] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase
+        .from("products")
+        .update({ is_active })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast.success("Status opdateret");
+    },
+    onError: () => {
+      toast.error("Kunne ikke opdatere status");
+    },
+  });
+
+  const handleEditClick = (product: Product) => {
+    setEditingProduct(product);
+    setEditDialogOpen(true);
+  };
 
   // Get unique campaigns from products
   const campaigns = useMemo(() => {
@@ -254,11 +283,21 @@ export function ProductsSection({ products }: Props) {
                     {product.clawback_window_days} dage
                   </TableCell>
                   <TableCell>
-                    <Switch checked={product.is_active} />
+                    <Switch 
+                      checked={product.is_active} 
+                      onCheckedChange={(checked) => 
+                        toggleActiveMutation.mutate({ id: product.id, is_active: checked })
+                      }
+                    />
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => handleEditClick(product)}
+                      >
                         <Edit2 className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
@@ -326,6 +365,12 @@ export function ProductsSection({ products }: Props) {
           </div>
         </div>
       )}
+
+      <EditProductDialog
+        product={editingProduct}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+      />
     </div>
   );
 }
