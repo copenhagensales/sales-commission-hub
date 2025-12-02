@@ -178,6 +178,108 @@ export type Database = {
           },
         ]
       }
+      liquidity_customers: {
+        Row: {
+          average_delay_days: number | null
+          created_at: string | null
+          id: string
+          invoice_day: number | null
+          is_active: boolean | null
+          monthly_invoice_amount: number
+          name: string
+          payment_terms_days: number
+          pays_on_time: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          average_delay_days?: number | null
+          created_at?: string | null
+          id?: string
+          invoice_day?: number | null
+          is_active?: boolean | null
+          monthly_invoice_amount?: number
+          name: string
+          payment_terms_days?: number
+          pays_on_time?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          average_delay_days?: number | null
+          created_at?: string | null
+          id?: string
+          invoice_day?: number | null
+          is_active?: boolean | null
+          monthly_invoice_amount?: number
+          name?: string
+          payment_terms_days?: number
+          pays_on_time?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      liquidity_expenses: {
+        Row: {
+          amount: number
+          created_at: string | null
+          expense_type: string
+          id: string
+          is_active: boolean | null
+          is_vat_deductible: boolean | null
+          name: string
+          one_time_date: string | null
+          payment_day: number | null
+          recurrence: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string | null
+          expense_type: string
+          id?: string
+          is_active?: boolean | null
+          is_vat_deductible?: boolean | null
+          name: string
+          one_time_date?: string | null
+          payment_day?: number | null
+          recurrence?: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          expense_type?: string
+          id?: string
+          is_active?: boolean | null
+          is_vat_deductible?: boolean | null
+          name?: string
+          one_time_date?: string | null
+          payment_day?: number | null
+          recurrence?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      liquidity_settings: {
+        Row: {
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          setting_key: string
+          setting_value?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       payroll_lines: {
         Row: {
           agent_id: string

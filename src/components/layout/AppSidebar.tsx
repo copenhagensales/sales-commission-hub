@@ -5,7 +5,10 @@ import {
   Wallet, 
   Settings,
   Tv,
-  LogOut
+  LogOut,
+  TrendingUp,
+  Receipt,
+  GitBranch
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -18,6 +21,10 @@ const navigation = [
   { name: "Agenter", href: "/agents", icon: Users },
   { name: "Salg", href: "/sales", icon: ShoppingCart },
   { name: "Lønkørsler", href: "/payroll", icon: Wallet },
+  { name: "Likviditet", href: "/liquidity", icon: TrendingUp },
+  { name: "Kunder", href: "/liquidity/customers", icon: Receipt },
+  { name: "Omkostninger", href: "/liquidity/expenses", icon: Wallet },
+  { name: "Scenarier", href: "/liquidity/scenarios", icon: GitBranch },
   { name: "Wallboard", href: "/wallboard", icon: Tv },
   { name: "Indstillinger", href: "/settings", icon: Settings },
 ];
