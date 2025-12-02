@@ -360,54 +360,6 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Cost Breakdown Row */}
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="rounded-xl border border-border bg-card p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Wallet className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Provision</p>
-                <p className="text-2xl font-bold text-foreground">{formatCurrency(stats.commissionCosts)}</p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Netto efter {stats.clawbackedSalesCount} clawbacks ({formatPercent(stats.clawbackRate)} rate)
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-border bg-card p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-10 w-10 rounded-lg bg-success/10 flex items-center justify-center">
-                <Palmtree className="h-5 w-5 text-success" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Feriepenge</p>
-                <p className="text-2xl font-bold text-foreground">{formatCurrency(stats.vacationPayCosts)}</p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              12.5% af provision
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-border bg-card p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-10 w-10 rounded-lg bg-warning/10 flex items-center justify-center">
-                <Thermometer className="h-5 w-5 text-warning" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Sygeløn</p>
-                <p className="text-2xl font-bold text-foreground">{formatCurrency(stats.sickPayCosts)}</p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              {stats.sickDaysThisMonth.toFixed(1)} dage × gns. dagløn
-            </p>
-          </div>
-        </div>
-
         {/* Charts Row */}
         <div className="grid gap-6 lg:grid-cols-2">
           <RevenueChart />
