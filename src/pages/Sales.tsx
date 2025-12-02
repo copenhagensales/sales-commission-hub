@@ -28,7 +28,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertTriangle, ArrowUpDown, Calendar, ChevronLeft, ChevronRight, DollarSign, Download, Filter, Loader2, Package, Phone, Search, User } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Calendar, ChevronLeft, ChevronRight, DollarSign, Download, Filter, Loader2, Package, Phone, RefreshCw, Search, User } from "lucide-react";
+import { toast } from "sonner";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,6 +57,27 @@ export default function Sales() {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortByProduct, setSortByProduct] = useState<'asc' | 'desc' | null>(null);
   const [selectedSale, setSelectedSale] = useState<SaleWithDetails | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-adversus', {
+        body: { syncDays: 7 }
+      });
+      
+      if (error) throw error;
+      
+      toast.success(`Sync fuldført: ${data.salesCreated || 0} nye salg`);
+      // Refetch sales data
+      window.location.reload();
+    } catch (err) {
+      console.error('Sync error:', err);
+      toast.error('Sync fejlede. Prøv igen.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Fetch total count for pagination
   const { data: totalCount } = useQuery({
@@ -169,10 +191,21 @@ export default function Sales() {
               )}
             </p>
           </div>
-          <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            Eksportér
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleSync} 
+              disabled={isSyncing}
+              variant="outline"
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              {isSyncing ? 'Synkroniserer...' : 'Sync Adversus'}
+            </Button>
+            <Button variant="outline" className="gap-2">
+              <Download className="h-4 w-4" />
+              Eksportér
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
