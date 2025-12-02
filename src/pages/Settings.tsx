@@ -3,27 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Edit2, Loader2, Plus, RefreshCw, Save, Trash2, CheckCircle2, AlertCircle, Link2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Loader2, RefreshCw, Save, CheckCircle2, AlertCircle, Link2, Package } from "lucide-react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ProductsSection } from "@/components/settings/ProductsSection";
+import { CampaignMappingSection } from "@/components/settings/CampaignMappingSection";
 
 interface Product {
   id: string;
@@ -144,12 +130,6 @@ export default function Settings() {
     });
   };
 
-  const getProductName = (productId: string | null) => {
-    if (!productId) return 'Ingen (bruger auto-match)';
-    const product = products.find(p => p.id === productId);
-    return product ? `${product.name} (${product.code})` : 'Ukendt';
-  };
-
   return (
     <MainLayout>
       <div className="space-y-8 animate-fade-in">
@@ -157,138 +137,44 @@ export default function Settings() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Indstillinger</h1>
           <p className="mt-1 text-muted-foreground">
-            Administrer produkter, provisionsregler og systemindstillinger
+            Administrer produkter, kampagne-mappings og systemindstillinger
           </p>
         </div>
 
         {/* Products Section */}
         <section className="rounded-xl border border-border bg-card p-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Package className="h-5 w-5 text-primary" />
+            </div>
             <div>
               <h2 className="text-xl font-semibold text-foreground">Produkter</h2>
               <p className="text-sm text-muted-foreground">
-                {products.length} produkter konfigureret
+                Administrer dine produkter og provisionsindstillinger
               </p>
             </div>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Tilføj produkt
-            </Button>
           </div>
-
-          <div className="max-h-96 overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground">Navn</TableHead>
-                  <TableHead className="text-muted-foreground">Kode</TableHead>
-                  <TableHead className="text-muted-foreground">Provision</TableHead>
-                  <TableHead className="text-muted-foreground">Clawback</TableHead>
-                  <TableHead className="text-muted-foreground">Aktiv</TableHead>
-                  <TableHead className="text-muted-foreground text-right">Handlinger</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {products.slice(0, 20).map((product) => (
-                  <TableRow key={product.id} className="border-border">
-                    <TableCell className="font-medium text-foreground">{product.name}</TableCell>
-                    <TableCell className="text-muted-foreground font-mono text-xs">{product.code}</TableCell>
-                    <TableCell className="text-foreground">
-                      {product.commission_type === "fixed" 
-                        ? `${product.commission_value} kr` 
-                        : `${product.commission_value}%`}
-                    </TableCell>
-                    <TableCell className="text-foreground">{product.clawback_window_days} dage</TableCell>
-                    <TableCell>
-                      <Switch checked={product.is_active} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon">
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-danger hover:text-danger">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          {products.length > 20 && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Viser 20 af {products.length} produkter
-            </p>
-          )}
+          <ProductsSection products={products} />
         </section>
 
         {/* Campaign Mapping Section */}
         <section className="rounded-xl border border-border bg-card p-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Link2 className="h-5 w-5 text-primary" />
+            </div>
             <div>
-              <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                <Link2 className="h-5 w-5" />
-                Kampagne-Produkt Mapping
-              </h2>
+              <h2 className="text-xl font-semibold text-foreground">Kampagne-Produkt Mapping</h2>
               <p className="text-sm text-muted-foreground">
-                Tilknyt Adversus kampagner til specifikke produkter. Kør sync for at opdatere kampagnelisten.
+                Tilknyt Adversus kampagner til produkter for automatisk provisions-beregning
               </p>
             </div>
           </div>
-
-          {campaignMappings.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Link2 className="h-10 w-10 mx-auto mb-3 opacity-50" />
-              <p>Ingen kampagner fundet.</p>
-              <p className="text-sm">Kør en synkronisering for at hente kampagner fra Adversus.</p>
-            </div>
-          ) : (
-            <div className="max-h-96 overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border hover:bg-transparent">
-                    <TableHead className="text-muted-foreground">Adversus Kampagne</TableHead>
-                    <TableHead className="text-muted-foreground">Kampagne ID</TableHead>
-                    <TableHead className="text-muted-foreground w-[300px]">Tilknyttet Produkt</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {campaignMappings.map((mapping) => (
-                    <TableRow key={mapping.id} className="border-border">
-                      <TableCell className="font-medium text-foreground">
-                        {mapping.adversus_campaign_name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">
-                        {mapping.adversus_campaign_id}
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={mapping.product_id || 'none'}
-                          onValueChange={(value) => handleMappingChange(mapping.id, value)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Vælg produkt..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">
-                              <span className="text-muted-foreground">Ingen (bruger auto-match)</span>
-                            </SelectItem>
-                            {products.filter(p => p.is_active).map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name} ({product.code}) - {product.commission_value} kr
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          <CampaignMappingSection 
+            campaignMappings={campaignMappings}
+            products={products}
+            onMappingChange={handleMappingChange}
+          />
         </section>
 
         {/* General Settings */}
@@ -397,7 +283,7 @@ export default function Settings() {
               <div className={`rounded-lg p-4 flex-1 ${
                 lastSyncResult.success 
                   ? 'bg-success/10 border border-success/20' 
-                  : 'bg-danger/10 border border-danger/20'
+                  : 'bg-destructive/10 border border-destructive/20'
               }`}>
                 {lastSyncResult.success && lastSyncResult.summary ? (
                   <div className="flex items-start gap-3">
@@ -431,17 +317,13 @@ export default function Settings() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
-                    <AlertCircle className="h-5 w-5 text-danger" />
+                    <AlertCircle className="h-5 w-5 text-destructive" />
                     <p className="text-sm text-foreground">Synkronisering fejlede</p>
                   </div>
                 )}
               </div>
             )}
           </div>
-
-          <p className="text-xs text-muted-foreground mt-4">
-            Synkroniseringen henter de seneste 30 dages data fra Adversus
-          </p>
         </section>
       </div>
     </MainLayout>
