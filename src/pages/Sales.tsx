@@ -22,7 +22,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { AlertTriangle, Download, Filter, Loader2, Search } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, Filter, Loader2, Search } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,14 +39,38 @@ interface SaleWithDetails {
   product: { id: string; name: string; commission_value: number | null; clawback_window_days: number | null } | null;
 }
 
+const PAGE_SIZE = 50;
+
 export default function Sales() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Fetch total count for pagination
+  const { data: totalCount } = useQuery({
+    queryKey: ['sales-count', statusFilter],
+    queryFn: async () => {
+      let query = supabase
+        .from('sales')
+        .select('id', { count: 'exact', head: true });
+      
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter as SaleStatus);
+      }
+      
+      const { count, error } = await query;
+      if (error) throw error;
+      return count || 0;
+    }
+  });
 
   const { data: sales, isLoading } = useQuery({
-    queryKey: ['sales-with-details'],
+    queryKey: ['sales-with-details', currentPage, statusFilter],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const from = (currentPage - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      
+      let query = supabase
         .from('sales')
         .select(`
           id,
@@ -57,21 +81,28 @@ export default function Sales() {
           product:products!sales_product_id_fkey(id, name, commission_value, clawback_window_days)
         `)
         .order('sale_date', { ascending: false })
-        .limit(100);
+        .range(from, to);
       
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter as SaleStatus);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as unknown as SaleWithDetails[];
     }
   });
 
+  // Client-side search filtering
   const filteredSales = (sales || []).filter(sale => {
+    if (!search) return true;
     const agentName = sale.agent?.name || '';
     const productName = sale.product?.name || '';
-    const matchesSearch = agentName.toLowerCase().includes(search.toLowerCase()) ||
+    return agentName.toLowerCase().includes(search.toLowerCase()) ||
       productName.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "all" || sale.status === statusFilter;
-    return matchesSearch && matchesStatus;
   });
+
+  const totalPages = Math.ceil((totalCount || 0) / PAGE_SIZE);
 
   const calculateDaysInClawback = (sale: SaleWithDetails) => {
     if (!sale.sale_date || !sale.product?.clawback_window_days) return null;
@@ -91,6 +122,12 @@ export default function Sales() {
     return commissionValue;
   };
 
+  // Reset to page 1 when filter changes
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    setCurrentPage(1);
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6 animate-fade-in">
@@ -100,6 +137,9 @@ export default function Sales() {
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Salg</h1>
             <p className="mt-1 text-muted-foreground">
               Oversigt over alle salg og deres status
+              {totalCount !== undefined && totalCount > 0 && (
+                <span className="ml-2">({totalCount.toLocaleString('da-DK')} total)</span>
+              )}
             </p>
           </div>
           <Button variant="outline" className="gap-2">
@@ -119,7 +159,7 @@ export default function Sales() {
               className="pl-10"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
             <SelectTrigger className="w-[180px]">
               <Filter className="mr-2 h-4 w-4" />
               <SelectValue placeholder="Status" />
@@ -208,6 +248,62 @@ export default function Sales() {
             </Table>
           )}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Viser {((currentPage - 1) * PAGE_SIZE) + 1} - {Math.min(currentPage * PAGE_SIZE, totalCount || 0)} af {totalCount?.toLocaleString('da-DK')} salg
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Forrige
+              </Button>
+              <div className="flex items-center gap-1">
+                {/* Show page numbers */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      className="w-8 h-8 p-0"
+                      onClick={() => setCurrentPage(pageNum)}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Næste
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </MainLayout>
   );
