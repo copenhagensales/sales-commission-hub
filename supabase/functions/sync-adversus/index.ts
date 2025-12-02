@@ -75,10 +75,14 @@ const CAMPAIGN_TO_PRODUCT_PREFIX: Record<string, string> = {
 }
 
 function findMatchingProduct(
-  campaignName: string,
+  campaignName: string | undefined | null,
   outcomeName: string | undefined,
   products: Product[]
 ): Product | null {
+  if (!campaignName) {
+    console.log('No campaign name provided for matching')
+    return null
+  }
   const campaignLower = campaignName.toLowerCase()
   const outcomeLower = outcomeName?.toLowerCase() || ''
   
@@ -252,6 +256,12 @@ Deno.serve(async (req) => {
       console.log(`Found ${campaigns.length} campaigns in Adversus`)
       
       for (const campaign of campaigns) {
+        // Skip campaigns without a name
+        if (!campaign.name) {
+          console.log(`Skipping campaign ${campaign.id} - no name`)
+          continue
+        }
+        
         campaignMap.set(campaign.id, campaign)
         console.log(`Campaign ${campaign.id}: ${campaign.name}`)
         
