@@ -14,6 +14,7 @@ interface AdversusSession {
   endTime: string
   status: string
   sessionSeconds: number
+  outcome?: string
   cdr?: {
     destination: string
     startTime: string
@@ -30,6 +31,138 @@ interface AdversusUser {
   displayName: string
   email: string
   active: boolean
+}
+
+interface AdversusCampaign {
+  id: number
+  name: string
+  active: boolean
+}
+
+interface Product {
+  id: string
+  code: string
+  name: string
+  commission_type: string
+  commission_value: number
+}
+
+// Campaign name to product code prefix mapping
+const CAMPAIGN_TO_PRODUCT_PREFIX: Record<string, string> = {
+  'aka': 'AKA',
+  'ase': 'ASE',
+  'business danmark': 'BD',
+  'codan': 'CODAN',
+  'eesy & hiper fm': 'EESY-FM',
+  'eesy hiper': 'EESY-FM',
+  'eesy tm': 'EESY-TM',
+  'eesy marked': 'EESY-MM',
+  'eesy messer': 'EESY-MM',
+  'finansforbundet': 'FF',
+  'min a-kasse': 'MAK',
+  'relatel': 'REL',
+  'tdc erhverv': 'TDCE',
+  'tdc ren provi': 'TDC',
+  'tryg': 'TRYG',
+  'yousee': 'YS',
+}
+
+function findMatchingProduct(
+  campaignName: string,
+  outcomeName: string | undefined,
+  products: Product[]
+): Product | null {
+  const campaignLower = campaignName.toLowerCase()
+  const outcomeLower = outcomeName?.toLowerCase() || ''
+  
+  // Find the product prefix based on campaign name
+  let productPrefix: string | null = null
+  for (const [keyword, prefix] of Object.entries(CAMPAIGN_TO_PRODUCT_PREFIX)) {
+    if (campaignLower.includes(keyword)) {
+      productPrefix = prefix
+      break
+    }
+  }
+  
+  if (!productPrefix) {
+    console.log(`No product prefix found for campaign: ${campaignName}`)
+    return null
+  }
+  
+  // Filter products by prefix
+  const matchingProducts = products.filter(p => p.code.startsWith(productPrefix!))
+  
+  if (matchingProducts.length === 0) {
+    console.log(`No products found with prefix: ${productPrefix}`)
+    return null
+  }
+  
+  // If only one product matches the prefix, use it
+  if (matchingProducts.length === 1) {
+    return matchingProducts[0]
+  }
+  
+  // Try to find a more specific match based on outcome/product name
+  if (outcomeLower) {
+    // Normalize the outcome name for matching
+    const outcomeWords = outcomeLower
+      .replace(/[^a-zæøå0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 2)
+    
+    let bestMatch: Product | null = null
+    let bestScore = 0
+    
+    for (const product of matchingProducts) {
+      const productNameLower = product.name.toLowerCase()
+      let score = 0
+      
+      for (const word of outcomeWords) {
+        if (productNameLower.includes(word)) {
+          score += word.length
+        }
+      }
+      
+      // Check for specific keywords
+      if (outcomeLower.includes('stud') && productNameLower.includes('stud')) score += 10
+      if (outcomeLower.includes('erhverv') && productNameLower.includes('erhverv')) score += 10
+      if (outcomeLower.includes('nuuday') && productNameLower.includes('nuuday')) score += 10
+      if (outcomeLower.includes('straks') && productNameLower.includes('straks')) score += 10
+      if (outcomeLower.includes('lead') && productNameLower.includes('lead')) score += 10
+      if (outcomeLower.includes('winback') && productNameLower.includes('winback')) score += 10
+      if (outcomeLower.includes('booket') && productNameLower.includes('booket')) score += 10
+      if (outcomeLower.includes('mbb') && productNameLower.includes('mbb')) score += 10
+      if (outcomeLower.includes('fiber') && productNameLower.includes('fiber')) score += 10
+      if (outcomeLower.includes('5g') && productNameLower.includes('5g')) score += 10
+      if (outcomeLower.includes('omstilling') && productNameLower.includes('omstilling')) score += 10
+      
+      // Check for percentage tilskud matching
+      const tilskudMatch = outcomeLower.match(/(\d+)%\s*tilskud/)
+      if (tilskudMatch && productNameLower.includes(`${tilskudMatch[1]}% tilskud`)) {
+        score += 15
+      }
+      
+      // Check for GB matching
+      const gbMatch = outcomeLower.match(/(\d+)\s*gb/i)
+      if (gbMatch && productNameLower.includes(`${gbMatch[1]}gb`)) {
+        score += 15
+      }
+      
+      if (score > bestScore) {
+        bestScore = score
+        bestMatch = product
+      }
+    }
+    
+    if (bestMatch && bestScore > 5) {
+      console.log(`Matched outcome "${outcomeName}" to product "${bestMatch.name}" (score: ${bestScore})`)
+      return bestMatch
+    }
+  }
+  
+  // Return the first matching product as fallback
+  console.log(`Using first product with prefix ${productPrefix}: ${matchingProducts[0].name}`)
+  return matchingProducts[0]
 }
 
 Deno.serve(async (req) => {
@@ -76,7 +209,38 @@ Deno.serve(async (req) => {
 
     console.log(`Syncing data from ${startDate} to ${endDate}`)
 
-    // Step 1: Sync users/agents from Adversus
+    // Load all active products for matching
+    const { data: products } = await supabase
+      .from('products')
+      .select('id, code, name, commission_type, commission_value')
+      .eq('is_active', true)
+    
+    console.log(`Loaded ${products?.length || 0} active products for matching`)
+
+    // Step 1: Fetch campaigns from Adversus
+    console.log('Fetching campaigns from Adversus...')
+    const campaignsResponse = await fetch(`${baseUrl}/campaigns`, {
+      headers: {
+        'Authorization': `Basic ${authHeader}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    const campaignMap = new Map<number, AdversusCampaign>()
+    if (campaignsResponse.ok) {
+      const campaignsData = await campaignsResponse.json()
+      const campaigns: AdversusCampaign[] = campaignsData.campaigns || campaignsData || []
+      console.log(`Found ${campaigns.length} campaigns in Adversus`)
+      
+      for (const campaign of campaigns) {
+        campaignMap.set(campaign.id, campaign)
+        console.log(`Campaign ${campaign.id}: ${campaign.name}`)
+      }
+    } else {
+      console.warn('Could not fetch campaigns from Adversus')
+    }
+
+    // Step 2: Sync users/agents from Adversus
     console.log('Fetching users from Adversus...')
     const usersResponse = await fetch(`${baseUrl}/users`, {
       headers: {
@@ -133,7 +297,7 @@ Deno.serve(async (req) => {
 
     console.log(`Agents synced: ${agentsCreated} created, ${agentsUpdated} updated`)
 
-    // Step 2: Fetch sessions (calls) from Adversus
+    // Step 3: Fetch sessions (calls) from Adversus
     console.log('Fetching sessions from Adversus...')
     
     const filters = JSON.stringify({
@@ -145,18 +309,16 @@ Deno.serve(async (req) => {
     let totalSessions = 0
     let salesCreated = 0
     let salesUpdated = 0
+    let unmatchedSales = 0
+    const productMatchStats: Record<string, number> = {}
 
-    // Get default product for sales
-    const { data: defaultProduct } = await supabase
+    // Get fallback product
+    const { data: fallbackProduct } = await supabase
       .from('products')
-      .select('id')
+      .select('id, code, name, commission_type, commission_value')
       .eq('is_active', true)
       .limit(1)
       .maybeSingle()
-
-    if (!defaultProduct) {
-      console.warn('No active product found. Please create a product first.')
-    }
 
     while (true) {
       const sessionsUrl = `${baseUrl}/sessions?filters=${encodeURIComponent(filters)}&page=${page}&pageSize=${pageSize}&sortProperty=startTime&sortDirection=DESC`
@@ -182,7 +344,6 @@ Deno.serve(async (req) => {
       if (Array.isArray(sessionsData)) {
         sessions = sessionsData
       } else if (sessionsData && typeof sessionsData === 'object') {
-        // Could be { sessions: [...] } or { data: [...] } or paginated response
         sessions = sessionsData.sessions || sessionsData.data || []
         if (sessionsData.meta) {
           console.log('Sessions meta:', JSON.stringify(sessionsData.meta))
@@ -213,9 +374,30 @@ Deno.serve(async (req) => {
           continue
         }
 
+        // Find matching product based on campaign and outcome
+        const campaign = campaignMap.get(session.campaignId)
+        let matchedProduct: Product | null = null
+        
+        if (campaign && products) {
+          matchedProduct = findMatchingProduct(campaign.name, session.outcome, products as Product[])
+        }
+        
+        // Use fallback if no match found
+        const productToUse = matchedProduct || (fallbackProduct as Product | null)
+        
+        if (!productToUse) {
+          console.warn(`No product found for session ${session.id}, campaign: ${campaign?.name}`)
+          unmatchedSales++
+          continue
+        }
+
+        // Track product match statistics
+        const productKey = productToUse.code
+        productMatchStats[productKey] = (productMatchStats[productKey] || 0) + 1
+
         const saleData = {
           agent_id: agent.id,
-          product_id: defaultProduct?.id,
+          product_id: productToUse.id,
           adversus_call_id: String(session.id),
           customer_id: String(session.leadId),
           sale_date: session.startTime,
@@ -251,28 +433,20 @@ Deno.serve(async (req) => {
           }
 
           // Create commission transaction for the sale
-          if (defaultProduct && newSale) {
-            const { data: product } = await supabase
-              .from('products')
-              .select('commission_type, commission_value')
-              .eq('id', defaultProduct.id)
-              .single()
+          if (newSale) {
+            const commissionAmount = productToUse.commission_type === 'fixed' 
+              ? productToUse.commission_value 
+              : (newSale.sale_amount || 0) * (productToUse.commission_value || 0) / 100
 
-            if (product) {
-              const commissionAmount = product.commission_type === 'fixed' 
-                ? product.commission_value 
-                : (newSale.sale_amount || 0) * (product.commission_value || 0) / 100
-
-              await supabase
-                .from('commission_transactions')
-                .insert({
-                  sale_id: newSale.id,
-                  agent_id: agent.id,
-                  type: 'earn',
-                  amount: commissionAmount,
-                  reason: 'Initial commission for sale'
-                })
-            }
+            await supabase
+              .from('commission_transactions')
+              .insert({
+                sale_id: newSale.id,
+                agent_id: agent.id,
+                type: 'earn',
+                amount: commissionAmount,
+                reason: `Commission for ${productToUse.name}`
+              })
           }
 
           salesCreated++
@@ -285,13 +459,16 @@ Deno.serve(async (req) => {
       page++
     }
 
-    console.log(`Sessions processed: ${totalSessions} total, ${salesCreated} sales created, ${salesUpdated} updated`)
+    console.log(`Sessions processed: ${totalSessions} total, ${salesCreated} sales created, ${salesUpdated} updated, ${unmatchedSales} unmatched`)
+    console.log('Product match stats:', JSON.stringify(productMatchStats))
 
     const result = {
       success: true,
       summary: {
         agents: { created: agentsCreated, updated: agentsUpdated },
-        sessions: { processed: totalSessions, salesCreated, salesUpdated },
+        sessions: { processed: totalSessions, salesCreated, salesUpdated, unmatchedSales },
+        campaigns: { total: campaignMap.size },
+        productMatches: productMatchStats,
         dateRange: { startDate, endDate }
       }
     }
