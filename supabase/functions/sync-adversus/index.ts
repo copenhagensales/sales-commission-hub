@@ -54,6 +54,12 @@ interface AdversusLead {
   id: number
   campaignId: number
   status: string
+  // Outcome/result fields - could contain product selection
+  result?: string
+  outcome?: string
+  closingCode?: string
+  product?: string
+  selectedProduct?: string
   resultData?: Array<{ id: number; value: string; label?: string }>
   // Contact data fields
   phoneNumbers?: string[]
@@ -451,12 +457,23 @@ Deno.serve(async (req) => {
           // Handle both direct object and array response
           const lead = Array.isArray(leadData) ? leadData[0] : (leadData.leads ? leadData.leads[0] : leadData)
           
-          // Log Codan campaign leads (105575) or first 3 leads
-          const isCodan = campaignId === 105575
-          if (isCodan || leadsFetched < 3) {
-            console.log(`=== LEAD ${leadId} (Campaign: ${campaignId}${isCodan ? ' CODAN' : ''}) ===`)
+          // Log first 5 leads with ALL fields to find product selection
+          if (leadsFetched < 5) {
+            console.log(`=== FULL LEAD DATA ${leadId} (Campaign: ${campaignId}) ===`)
+            console.log('Lead keys:', Object.keys(lead || {}))
+            console.log('status:', lead?.status)
+            console.log('result:', lead?.result)
+            console.log('outcome:', lead?.outcome)
+            console.log('closingCode:', lead?.closingCode)
+            console.log('product:', lead?.product)
+            // Log any field that might contain product info
+            for (const key of Object.keys(lead || {})) {
+              if (key !== 'resultData' && key !== 'contactData') {
+                console.log(`  ${key}:`, JSON.stringify(lead[key]))
+              }
+            }
             console.log('resultData:', JSON.stringify(lead?.resultData || [], null, 2))
-            console.log(`=== END LEAD ${leadId} ===`)
+            console.log(`=== END FULL LEAD ${leadId} ===`)
           }
           
           leadCache.set(leadId, lead)
@@ -476,7 +493,29 @@ Deno.serve(async (req) => {
 
     // Helper function to extract outcome from lead resultData
     function extractOutcome(lead: AdversusLead | null, campaignId: number): string | null {
-      if (!lead || !lead.resultData || lead.resultData.length === 0) {
+      if (!lead) {
+        return null
+      }
+      
+      // Priority 0: Check direct fields on lead object (e.g., from success dropdown)
+      if (lead.result && typeof lead.result === 'string' && lead.result.trim()) {
+        console.log(`✓ Found outcome from lead.result: ${lead.result}`)
+        return lead.result.trim()
+      }
+      if (lead.outcome && typeof lead.outcome === 'string' && lead.outcome.trim()) {
+        console.log(`✓ Found outcome from lead.outcome: ${lead.outcome}`)
+        return lead.outcome.trim()
+      }
+      if (lead.closingCode && typeof lead.closingCode === 'string' && lead.closingCode.trim()) {
+        console.log(`✓ Found outcome from lead.closingCode: ${lead.closingCode}`)
+        return lead.closingCode.trim()
+      }
+      if (lead.product && typeof lead.product === 'string' && lead.product.trim()) {
+        console.log(`✓ Found outcome from lead.product: ${lead.product}`)
+        return lead.product.trim()
+      }
+      
+      if (!lead.resultData || lead.resultData.length === 0) {
         return null
       }
       
