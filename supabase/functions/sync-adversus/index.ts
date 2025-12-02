@@ -54,7 +54,7 @@ interface AdversusLead {
   id: number
   campaignId: number
   status: string
-  resultData?: Array<{ id: number; value: string }>
+  resultData?: Array<{ id: number; value: string; label?: string }>
 }
 
 interface Product {
@@ -444,41 +444,26 @@ Deno.serve(async (req) => {
         return null
       }
       
-      const resultFields = campaignResultFieldsMap.get(campaignId)
-      if (!resultFields) {
-        // No result fields defined, try to use first non-empty resultData value
-        for (const rd of lead.resultData) {
+      // First, look for field labeled "Produkter" - this is where outcome/afslutningskode is stored
+      for (const rd of lead.resultData) {
+        const labelLower = (rd.label || '').toLowerCase()
+        if (labelLower === 'produkter' || labelLower === 'produkt' || labelLower.includes('afslutning')) {
           if (rd.value && rd.value.trim()) {
+            console.log(`Found outcome from "${rd.label}": ${rd.value.trim()}`)
             return rd.value.trim()
           }
         }
-        return null
       }
       
-      // Look for the outcome field - typically a "select" type field
-      // Or look for fields that contain outcome keywords
-      for (const field of resultFields) {
-        const resultValue = lead.resultData.find(rd => rd.id === field.id)
-        if (resultValue && resultValue.value && resultValue.value.trim()) {
-          const value = resultValue.value.trim()
-          // Prioritize fields that look like outcomes
-          const fieldNameLower = (field.name || '').toLowerCase()
-          if (field.type === 'select' || 
-              fieldNameLower.includes('afslut') || 
-              fieldNameLower.includes('outcome') ||
-              fieldNameLower.includes('resultat')) {
-            console.log(`Found outcome from field "${field.name}": ${value}`)
-            return value
-          }
-        }
-      }
-      
-      // Fallback: return first non-empty select field value
-      for (const field of resultFields) {
-        if (field.type === 'select') {
-          const resultValue = lead.resultData.find(rd => rd.id === field.id)
-          if (resultValue && resultValue.value && resultValue.value.trim()) {
-            return resultValue.value.trim()
+      // Fallback: look for other outcome-like fields
+      for (const rd of lead.resultData) {
+        const labelLower = (rd.label || '').toLowerCase()
+        if (labelLower.includes('outcome') || 
+            labelLower.includes('resultat') ||
+            labelLower.includes('type')) {
+          if (rd.value && rd.value.trim()) {
+            console.log(`Found outcome from "${rd.label}": ${rd.value.trim()}`)
+            return rd.value.trim()
           }
         }
       }
