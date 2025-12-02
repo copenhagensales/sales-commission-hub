@@ -99,6 +99,7 @@ export type Database = {
         Row: {
           adversus_campaign_id: string
           adversus_campaign_name: string
+          adversus_outcome: string | null
           created_at: string
           id: string
           product_id: string | null
@@ -107,6 +108,7 @@ export type Database = {
         Insert: {
           adversus_campaign_id: string
           adversus_campaign_name: string
+          adversus_outcome?: string | null
           created_at?: string
           id?: string
           product_id?: string | null
@@ -115,6 +117,7 @@ export type Database = {
         Update: {
           adversus_campaign_id?: string
           adversus_campaign_name?: string
+          adversus_outcome?: string | null
           created_at?: string
           id?: string
           product_id?: string | null

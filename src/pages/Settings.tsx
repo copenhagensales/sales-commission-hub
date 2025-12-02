@@ -25,6 +25,7 @@ interface CampaignMapping {
   id: string;
   adversus_campaign_id: string;
   adversus_campaign_name: string;
+  adversus_outcome: string | null;
   product_id: string | null;
 }
 
@@ -130,6 +131,17 @@ export default function Settings() {
     });
   };
 
+  const handleBulkApprove = async (mappings: { id: string; productId: string }[]) => {
+    for (const mapping of mappings) {
+      await supabase
+        .from('campaign_product_mappings')
+        .update({ product_id: mapping.productId })
+        .eq('id', mapping.id);
+    }
+    queryClient.invalidateQueries({ queryKey: ['campaign-mappings'] });
+    toast.success(`${mappings.length} mappings godkendt`);
+  };
+
   return (
     <MainLayout>
       <div className="space-y-8 animate-fade-in">
@@ -174,6 +186,7 @@ export default function Settings() {
             campaignMappings={campaignMappings}
             products={products}
             onMappingChange={handleMappingChange}
+            onBulkApprove={handleBulkApprove}
           />
         </section>
 
