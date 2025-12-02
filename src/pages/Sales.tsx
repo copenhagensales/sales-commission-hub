@@ -22,7 +22,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { AlertTriangle, ArrowUpDown, ChevronLeft, ChevronRight, Download, Filter, Loader2, Search } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, ChevronLeft, ChevronRight, Download, Filter, Loader2, Phone, Search } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +35,8 @@ interface SaleWithDetails {
   sale_date: string | null;
   sale_amount: number | null;
   status: SaleStatus | null;
+  campaign_name: string | null;
+  customer_phone: string | null;
   agent: { id: string; name: string } | null;
   product: { id: string; name: string; commission_value: number | null; clawback_window_days: number | null; revenue_amount: number | null } | null;
 }
@@ -78,6 +80,8 @@ export default function Sales() {
           sale_date,
           sale_amount,
           status,
+          campaign_name,
+          customer_phone,
           agent:agents!sales_agent_id_fkey(id, name),
           product:products!sales_product_id_fkey(id, name, commission_value, clawback_window_days, revenue_amount)
         `)
@@ -103,10 +107,15 @@ export default function Sales() {
   // Client-side search filtering
   const filteredSales = (sales || []).filter(sale => {
     if (!search) return true;
+    const searchLower = search.toLowerCase();
     const agentName = sale.agent?.name || '';
     const productName = sale.product?.name || '';
-    return agentName.toLowerCase().includes(search.toLowerCase()) ||
-      productName.toLowerCase().includes(search.toLowerCase());
+    const campaignName = sale.campaign_name || '';
+    const customerPhone = sale.customer_phone || '';
+    return agentName.toLowerCase().includes(searchLower) ||
+      productName.toLowerCase().includes(searchLower) ||
+      campaignName.toLowerCase().includes(searchLower) ||
+      customerPhone.includes(search); // Phone search without lowercase
   });
 
   const totalPages = Math.ceil((totalCount || 0) / PAGE_SIZE);
@@ -160,7 +169,7 @@ export default function Sales() {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Søg efter agent eller produkt..."
+              placeholder="Søg efter agent, produkt, kampagne eller telefon..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-10"
@@ -198,6 +207,8 @@ export default function Sales() {
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground">Dato</TableHead>
                   <TableHead className="text-muted-foreground">Agent</TableHead>
+                  <TableHead className="text-muted-foreground">Kunde</TableHead>
+                  <TableHead className="text-muted-foreground">Kampagne</TableHead>
                   <TableHead 
                     className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
                     onClick={() => {
@@ -210,7 +221,6 @@ export default function Sales() {
                       <ArrowUpDown className={`h-4 w-4 ${sortByProduct ? 'text-primary' : ''}`} />
                     </div>
                   </TableHead>
-                  <TableHead className="text-muted-foreground">Omsætning</TableHead>
                   <TableHead className="text-muted-foreground">Provision</TableHead>
                   <TableHead className="text-muted-foreground">Status</TableHead>
                   <TableHead className="text-muted-foreground">Risiko</TableHead>
@@ -233,10 +243,24 @@ export default function Sales() {
                         {sale.agent?.name || 'Ukendt'}
                       </TableCell>
                       <TableCell className="text-foreground">
-                        {sale.product?.name || 'Ukendt produkt'}
+                        {sale.customer_phone ? (
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="font-mono text-sm">{sale.customer_phone}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-foreground">
-                        {(sale.product?.revenue_amount || sale.sale_amount || 0).toLocaleString("da-DK")} kr
+                        {sale.campaign_name ? (
+                          <span className="text-sm">{sale.campaign_name}</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-foreground">
+                        {sale.product?.name || 'Ukendt produkt'}
                       </TableCell>
                       <TableCell className={commission >= 0 ? "text-success font-semibold" : "text-danger font-semibold"}>
                         {commission >= 0 ? "+" : ""}{commission.toLocaleString("da-DK")} kr
