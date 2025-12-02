@@ -252,8 +252,14 @@ Deno.serve(async (req) => {
     const campaignMap = new Map<number, AdversusCampaign>()
     if (campaignsResponse.ok) {
       const campaignsData = await campaignsResponse.json()
+      console.log('Campaigns API response structure:', JSON.stringify(campaignsData).slice(0, 500))
       const campaigns: AdversusCampaign[] = campaignsData.campaigns || campaignsData || []
       console.log(`Found ${campaigns.length} campaigns in Adversus`)
+      
+      // Log first campaign object structure to understand the API
+      if (campaigns.length > 0) {
+        console.log('First campaign object:', JSON.stringify(campaigns[0]))
+      }
       
       for (const campaign of campaigns) {
         // Skip campaigns without a name
