@@ -415,6 +415,14 @@ Deno.serve(async (req) => {
           const leadData = await leadResponse.json()
           // Handle both direct object and array response
           const lead = Array.isArray(leadData) ? leadData[0] : leadData
+          
+          // Detailed logging for first 5 leads to understand structure
+          if (leadsFetched < 5) {
+            console.log(`=== LEAD ${leadId} FULL STRUCTURE ===`)
+            console.log(JSON.stringify(lead, null, 2))
+            console.log(`=== END LEAD ${leadId} ===`)
+          }
+          
           leadCache.set(leadId, lead)
           leadsFetched++
           return lead
