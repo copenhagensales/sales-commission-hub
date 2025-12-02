@@ -15,6 +15,7 @@ import { Loader2, Search, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { AgentDetailDrawer } from "@/components/agents/AgentDetailDrawer";
 
 interface Agent {
   id: string;
@@ -23,6 +24,7 @@ interface Agent {
   base_salary_monthly: number;
   is_active: boolean;
   external_adversus_id: string | null;
+  employment_type?: string | null;
 }
 
 interface AgentWithStats extends Agent {
@@ -32,6 +34,8 @@ interface AgentWithStats extends Agent {
 
 export default function Agents() {
   const [search, setSearch] = useState("");
+  const [selectedAgent, setSelectedAgent] = useState<AgentWithStats | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   
   // Fetch agents from database
   const { data: agents = [], isLoading } = useQuery({
@@ -145,6 +149,10 @@ export default function Agents() {
                     <TableRow 
                       key={agent.id} 
                       className="border-border cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        setSelectedAgent(agent);
+                        setDrawerOpen(true);
+                      }}
                     >
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -178,6 +186,12 @@ export default function Agents() {
             </Table>
           )}
         </div>
+
+        <AgentDetailDrawer 
+          agent={selectedAgent} 
+          open={drawerOpen} 
+          onOpenChange={setDrawerOpen} 
+        />
       </div>
     </MainLayout>
   );
