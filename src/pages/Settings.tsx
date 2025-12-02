@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import { Loader2, RefreshCw, Save, CheckCircle2, AlertCircle, Link2, Package } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,19 +30,26 @@ interface CampaignMapping {
   product_id: string | null;
 }
 
+interface SyncSummary {
+  agents: { created: number; updated: number };
+  sessions: { processed: number; salesCreated: number; salesUpdated: number; unmatchedSales?: number };
+  campaigns?: { total: number };
+  productMatches?: Record<string, number>;
+}
+
 export default function Settings() {
   const queryClient = useQueryClient();
   const [vacationPayPercentage, setVacationPayPercentage] = useState("12.5");
   const [defaultClawbackDays, setDefaultClawbackDays] = useState("30");
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{
+    current: number;
+    total: number;
+    currentPeriod: string;
+  } | null>(null);
   const [lastSyncResult, setLastSyncResult] = useState<{
     success: boolean;
-    summary?: {
-      agents: { created: number; updated: number };
-      sessions: { processed: number; salesCreated: number; salesUpdated: number; unmatchedSales?: number };
-      campaigns?: { total: number };
-      productMatches?: Record<string, number>;
-    };
+    summary?: SyncSummary;
   } | null>(null);
 
   // Fetch products
@@ -88,9 +96,11 @@ export default function Settings() {
     }
   });
 
-  const handleAdversusSync = async (hours: number = 30 * 24) => {
+  // Simple sync for short periods
+  const handleAdversusSync = async (hours: number) => {
     setIsSyncing(true);
     setLastSyncResult(null);
+    setSyncProgress(null);
     
     try {
       const { data, error } = await supabase.functions.invoke('sync-adversus', {
@@ -108,8 +118,6 @@ export default function Settings() {
       }
 
       setLastSyncResult(data);
-      
-      // Refetch campaign mappings after sync
       refetchMappings();
       
       toast.success(
@@ -121,6 +129,101 @@ export default function Settings() {
       setLastSyncResult({ success: false });
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  // Chunked sync for longer periods (30 days in 7-day chunks)
+  const handleChunkedSync = async (totalDays: number, chunkDays: number = 7) => {
+    setIsSyncing(true);
+    setLastSyncResult(null);
+    
+    const now = new Date();
+    const chunks: { startDate: Date; endDate: Date }[] = [];
+    
+    // Create chunks from oldest to newest
+    for (let i = totalDays; i > 0; i -= chunkDays) {
+      const daysBack = i;
+      const daysEnd = Math.max(i - chunkDays, 0);
+      
+      chunks.push({
+        startDate: new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000),
+        endDate: new Date(now.getTime() - daysEnd * 24 * 60 * 60 * 1000)
+      });
+    }
+    
+    const totalChunks = chunks.length;
+    const combinedSummary: SyncSummary = {
+      agents: { created: 0, updated: 0 },
+      sessions: { processed: 0, salesCreated: 0, salesUpdated: 0, unmatchedSales: 0 },
+      campaigns: { total: 0 },
+      productMatches: {}
+    };
+    
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const periodLabel = `${chunk.startDate.toLocaleDateString('da-DK')} - ${chunk.endDate.toLocaleDateString('da-DK')}`;
+        
+        setSyncProgress({
+          current: i + 1,
+          total: totalChunks,
+          currentPeriod: periodLabel
+        });
+        
+        console.log(`Syncing chunk ${i + 1}/${totalChunks}: ${periodLabel}`);
+        
+        const { data, error } = await supabase.functions.invoke('sync-adversus', {
+          body: {
+            startDate: chunk.startDate.toISOString(),
+            endDate: chunk.endDate.toISOString()
+          }
+        });
+        
+        if (error) {
+          console.error(`Chunk ${i + 1} sync error:`, error);
+          toast.error(`Fejl i periode ${periodLabel}: ${error.message}`);
+          continue; // Continue with next chunk instead of aborting
+        }
+        
+        // Aggregate results
+        if (data?.summary) {
+          combinedSummary.agents.created += data.summary.agents?.created || 0;
+          combinedSummary.agents.updated += data.summary.agents?.updated || 0;
+          combinedSummary.sessions.processed += data.summary.sessions?.processed || 0;
+          combinedSummary.sessions.salesCreated += data.summary.sessions?.salesCreated || 0;
+          combinedSummary.sessions.salesUpdated += data.summary.sessions?.salesUpdated || 0;
+          combinedSummary.sessions.unmatchedSales = (combinedSummary.sessions.unmatchedSales || 0) + (data.summary.sessions?.unmatchedSales || 0);
+          combinedSummary.campaigns!.total = data.summary.campaigns?.total || combinedSummary.campaigns!.total;
+          
+          // Merge product matches
+          if (data.summary.productMatches) {
+            for (const [code, count] of Object.entries(data.summary.productMatches)) {
+              combinedSummary.productMatches![code] = (combinedSummary.productMatches![code] || 0) + (count as number);
+            }
+          }
+        }
+        
+        toast.success(`Periode ${i + 1}/${totalChunks} fuldført: ${data?.summary?.sessions?.salesCreated || 0} salg`);
+        
+        // Wait between chunks to avoid rate limits
+        if (i < chunks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+      }
+      
+      setLastSyncResult({ success: true, summary: combinedSummary });
+      refetchMappings();
+      
+      toast.success(
+        `Komplet synkronisering fuldført! ${combinedSummary.sessions.salesCreated} nye salg fra ${totalDays} dage`
+      );
+    } catch (err) {
+      console.error('Chunked sync error:', err);
+      toast.error('Synkronisering fejlede');
+      setLastSyncResult({ success: false });
+    } finally {
+      setIsSyncing(false);
+      setSyncProgress(null);
     }
   };
 
@@ -260,8 +363,8 @@ export default function Settings() {
 
           <Separator className="my-6" />
 
-          <div className="flex items-start gap-6 flex-wrap">
-            <div className="flex gap-2">
+          <div className="space-y-4">
+            <div className="flex items-start gap-2 flex-wrap">
               <Button 
                 onClick={() => handleAdversusSync(12)} 
                 disabled={isSyncing}
@@ -284,16 +387,34 @@ export default function Settings() {
                 Sidste 24 timer
               </Button>
               <Button 
-                onClick={() => handleAdversusSync(30 * 24)} 
+                onClick={() => handleChunkedSync(30, 7)} 
                 disabled={isSyncing}
                 className="gap-2"
               >
-                Sidste 30 dage
+                Sidste 30 dage (i bidder)
               </Button>
             </div>
 
-            {lastSyncResult && (
-              <div className={`rounded-lg p-4 flex-1 ${
+            {/* Progress indicator */}
+            {syncProgress && (
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Synkroniserer periode {syncProgress.current} af {syncProgress.total}
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {Math.round((syncProgress.current / syncProgress.total) * 100)}%
+                  </span>
+                </div>
+                <Progress value={(syncProgress.current / syncProgress.total) * 100} />
+                <p className="text-xs text-muted-foreground">
+                  Nuværende periode: {syncProgress.currentPeriod}
+                </p>
+              </div>
+            )}
+
+            {lastSyncResult && !syncProgress && (
+              <div className={`rounded-lg p-4 ${
                 lastSyncResult.success 
                   ? 'bg-success/10 border border-success/20' 
                   : 'bg-destructive/10 border border-destructive/20'
