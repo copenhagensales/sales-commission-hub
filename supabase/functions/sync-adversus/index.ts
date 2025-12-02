@@ -480,25 +480,43 @@ Deno.serve(async (req) => {
         return null
       }
       
-      // First, look for field labeled "Produkter" - this is where outcome/afslutningskode is stored
+      // Log ALL resultData fields for debugging
+      console.log(`=== ALL RESULTDATA FIELDS FOR LEAD (Campaign: ${campaignId}) ===`)
+      for (const rd of lead.resultData) {
+        console.log(`  Field "${rd.label}" (id: ${rd.id}): "${rd.value}"`)
+      }
+      console.log(`=== END RESULTDATA ===`)
+      
+      // Priority 1: Look for field labeled "Produkter" - this contains the closing code/product
       for (const rd of lead.resultData) {
         const labelLower = (rd.label || '').toLowerCase()
         if (labelLower === 'produkter' || labelLower === 'produkt' || labelLower.includes('afslutning')) {
           if (rd.value && rd.value.trim()) {
-            console.log(`Found outcome from "${rd.label}": ${rd.value.trim()}`)
+            console.log(`✓ Found outcome from "${rd.label}": ${rd.value.trim()}`)
             return rd.value.trim()
           }
         }
       }
       
-      // Fallback: look for other outcome-like fields
+      // Priority 2: Look for "Succes" fields (like "FF Succes:", "Succes:", etc.)
+      for (const rd of lead.resultData) {
+        const labelLower = (rd.label || '').toLowerCase()
+        if (labelLower.includes('succes') && !labelLower.includes('note')) {
+          if (rd.value && rd.value.trim()) {
+            console.log(`✓ Found outcome from succes field "${rd.label}": ${rd.value.trim()}`)
+            return rd.value.trim()
+          }
+        }
+      }
+      
+      // Priority 3: Look for other outcome-like fields
       for (const rd of lead.resultData) {
         const labelLower = (rd.label || '').toLowerCase()
         if (labelLower.includes('outcome') || 
             labelLower.includes('resultat') ||
-            labelLower.includes('type')) {
+            labelLower.includes('udfald')) {
           if (rd.value && rd.value.trim()) {
-            console.log(`Found outcome from "${rd.label}": ${rd.value.trim()}`)
+            console.log(`✓ Found outcome from "${rd.label}": ${rd.value.trim()}`)
             return rd.value.trim()
           }
         }
