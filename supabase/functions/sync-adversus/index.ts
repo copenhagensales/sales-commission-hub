@@ -403,6 +403,9 @@ Deno.serve(async (req) => {
         return leadCache.get(leadId) || null
       }
       
+      // Add small delay before fetching lead to avoid rate limits
+      await delay(200)
+      
       try {
         const leadResponse = await fetch(`${baseUrl}/leads/${leadId}`, {
           headers: {
@@ -492,7 +495,7 @@ Deno.serve(async (req) => {
         
         if (sessionsResponse.status === 429) {
           // Rate limited - wait and retry with exponential backoff
-          const waitTime = Math.pow(2, retries) * 2000 // 2s, 4s, 8s
+          const waitTime = Math.pow(2, retries) * 5000 // 5s, 10s, 20s
           console.log(`Rate limited on page ${page}, waiting ${waitTime}ms before retry ${retries + 1}/${maxRetries}`)
           await delay(waitTime)
           retries++
@@ -675,8 +678,8 @@ Deno.serve(async (req) => {
       }
       page++
       
-      // Add delay between pages to avoid rate limiting
-      await delay(500) // 500ms between pages
+      // Add delay between pages to avoid rate limiting (1.5s to stay under per-minute limits)
+      await delay(1500)
     }
 
     console.log(`Sessions processed: ${totalSessions} total, ${salesCreated} sales created, ${salesUpdated} updated, ${unmatchedSales} unmatched`)
