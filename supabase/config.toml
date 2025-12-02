@@ -1,4 +1,4 @@
 project_id = "jwlimmeijpfmaksvmuru"
 
 [functions.sync-adversus]
-verify_jwt = true
+verify_jwt = false
