@@ -308,62 +308,80 @@ Deno.serve(async (req) => {
       console.warn('Could not fetch campaigns from Adversus:', await campaignsResponse.text())
     }
 
-    // Step 2: Sync users/agents from Adversus
-    console.log('Fetching users from Adversus...')
-    const usersResponse = await fetch(`${baseUrl}/users`, {
-      headers: {
-        'Authorization': `Basic ${authHeader}`,
-        'Content-Type': 'application/json'
-      }
-    })
+    // Helper to delay between requests to avoid rate limiting
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-    if (!usersResponse.ok) {
-      const errorText = await usersResponse.text()
-      console.error('Failed to fetch users:', usersResponse.status, errorText)
-      return new Response(
-        JSON.stringify({ error: `Failed to fetch users: ${usersResponse.status}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Step 2: Sync users/agents from Adversus (with retry logic)
+    console.log('Fetching users from Adversus...')
+    
+    let usersResponse: Response | null = null
+    let userRetries = 0
+    const maxUserRetries = 3
+    let usersRateLimited = false
+    
+    while (userRetries < maxUserRetries) {
+      usersResponse = await fetch(`${baseUrl}/users`, {
+        headers: {
+          'Authorization': `Basic ${authHeader}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (usersResponse.status === 429) {
+        userRetries++
+        const waitTime = userRetries * 5000 // 5s, 10s, 15s
+        console.warn(`Rate limited on users fetch, waiting ${waitTime}ms before retry ${userRetries}/${maxUserRetries}`)
+        await delay(waitTime)
+      } else {
+        break
+      }
     }
 
-    const usersData = await usersResponse.json()
-    const users: AdversusUser[] = usersData.users || usersData
-    console.log(`Found ${users.length} users in Adversus`)
-
-    // Upsert agents
     let agentsCreated = 0
     let agentsUpdated = 0
     
-    for (const user of users) {
-      const agentData = {
-        external_adversus_id: String(user.id),
-        name: user.name || user.displayName,
-        email: user.email || `agent-${user.id}@adversus.local`,
-        is_active: user.active
-      }
+    if (!usersResponse || !usersResponse.ok) {
+      const errorText = usersResponse ? await usersResponse.text() : 'No response'
+      console.warn('Could not fetch users from Adversus, continuing with existing agents:', usersResponse?.status, errorText)
+      usersRateLimited = true
+      // Continue with existing agents instead of failing
+    } else {
+      const usersData = await usersResponse.json()
+      const users: AdversusUser[] = usersData.users || usersData
+      console.log(`Found ${users.length} users in Adversus`)
 
-      // Check if agent exists
-      const { data: existingAgent } = await supabase
-        .from('agents')
-        .select('id')
-        .eq('external_adversus_id', String(user.id))
-        .maybeSingle()
+      // Upsert agents
+      for (const user of users) {
+        const agentData = {
+          external_adversus_id: String(user.id),
+          name: user.name || user.displayName,
+          email: user.email || `agent-${user.id}@adversus.local`,
+          is_active: user.active
+        }
 
-      if (existingAgent) {
-        await supabase
+        // Check if agent exists
+        const { data: existingAgent } = await supabase
           .from('agents')
-          .update(agentData)
-          .eq('id', existingAgent.id)
-        agentsUpdated++
-      } else {
-        await supabase
-          .from('agents')
-          .insert(agentData)
-        agentsCreated++
+          .select('id')
+          .eq('external_adversus_id', String(user.id))
+          .maybeSingle()
+
+        if (existingAgent) {
+          await supabase
+            .from('agents')
+            .update(agentData)
+            .eq('id', existingAgent.id)
+          agentsUpdated++
+        } else {
+          await supabase
+            .from('agents')
+            .insert(agentData)
+          agentsCreated++
+        }
       }
     }
 
-    console.log(`Agents synced: ${agentsCreated} created, ${agentsUpdated} updated`)
+    console.log(`Agents synced: ${agentsCreated} created, ${agentsUpdated} updated${usersRateLimited ? ' (rate limited, using existing)' : ''}`)
 
     // Step 3: Fetch sessions (calls) from Adversus
     console.log('Fetching sessions from Adversus...')
@@ -479,9 +497,6 @@ Deno.serve(async (req) => {
       return null
     }
 
-    // Helper to delay between requests to avoid rate limiting
-    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-    
     while (true) {
       const sessionsUrl = `${baseUrl}/sessions?filters=${encodeURIComponent(filters)}&page=${page}&pageSize=${pageSize}&sortProperty=startTime&sortDirection=DESC`
       
