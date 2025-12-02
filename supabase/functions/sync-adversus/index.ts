@@ -55,6 +55,16 @@ interface AdversusLead {
   campaignId: number
   status: string
   resultData?: Array<{ id: number; value: string; label?: string }>
+  // Contact data fields
+  phoneNumbers?: string[]
+  phone?: string
+  mobile?: string
+  contactData?: {
+    phone?: string
+    mobile?: string
+    phoneNumbers?: string[]
+    [key: string]: unknown
+  }
 }
 
 interface Product {
@@ -497,6 +507,41 @@ Deno.serve(async (req) => {
       return null
     }
 
+    // Helper function to extract phone number from lead data
+    function extractPhoneNumber(lead: AdversusLead | null): string | null {
+      if (!lead) return null
+      
+      // Check common phone fields
+      if (lead.phoneNumbers && lead.phoneNumbers.length > 0) {
+        return lead.phoneNumbers[0]
+      }
+      if (lead.phone) return lead.phone
+      if (lead.mobile) return lead.mobile
+      
+      // Check contactData object
+      if (lead.contactData) {
+        if (lead.contactData.phoneNumbers && Array.isArray(lead.contactData.phoneNumbers) && lead.contactData.phoneNumbers.length > 0) {
+          return lead.contactData.phoneNumbers[0]
+        }
+        if (lead.contactData.phone) return lead.contactData.phone
+        if (lead.contactData.mobile) return lead.contactData.mobile
+      }
+      
+      // Check resultData for phone fields
+      if (lead.resultData) {
+        for (const rd of lead.resultData) {
+          const labelLower = (rd.label || '').toLowerCase()
+          if (labelLower.includes('telefon') || labelLower.includes('phone') || labelLower.includes('mobil') || labelLower.includes('tlf')) {
+            if (rd.value && rd.value.trim()) {
+              return rd.value.trim()
+            }
+          }
+        }
+      }
+      
+      return null
+    }
+
     while (true) {
       const sessionsUrl = `${baseUrl}/sessions?filters=${encodeURIComponent(filters)}&page=${page}&pageSize=${pageSize}&sortProperty=startTime&sortDirection=DESC`
       
@@ -596,6 +641,7 @@ Deno.serve(async (req) => {
 
         const campaign = campaignMap.get(session.campaignId)
         const campaignName = campaign?.name || `Unknown Campaign ${session.campaignId}`
+        const customerPhone = extractPhoneNumber(lead)
         
         // Create campaign+outcome mapping if it doesn't exist
         const mappingKey = `${session.campaignId}|${outcome || ''}`
@@ -659,7 +705,9 @@ Deno.serve(async (req) => {
           customer_id: String(session.leadId),
           sale_date: session.startTime,
           effective_date: session.endTime,
-          status: 'active' as const
+          status: 'active' as const,
+          campaign_name: campaignName,
+          customer_phone: customerPhone
         }
 
         // Check if sale already exists

@@ -315,9 +315,11 @@ export type Database = {
         Row: {
           adversus_call_id: string | null
           agent_id: string
+          campaign_name: string | null
           cancellation_date: string | null
           created_at: string | null
           customer_id: string | null
+          customer_phone: string | null
           effective_date: string | null
           id: string
           product_id: string
@@ -329,9 +331,11 @@ export type Database = {
         Insert: {
           adversus_call_id?: string | null
           agent_id: string
+          campaign_name?: string | null
           cancellation_date?: string | null
           created_at?: string | null
           customer_id?: string | null
+          customer_phone?: string | null
           effective_date?: string | null
           id?: string
           product_id: string
@@ -343,9 +347,11 @@ export type Database = {
         Update: {
           adversus_call_id?: string | null
           agent_id?: string
+          campaign_name?: string | null
           cancellation_date?: string | null
           created_at?: string | null
           customer_id?: string | null
+          customer_phone?: string | null
           effective_date?: string | null
           id?: string
           product_id?: string
