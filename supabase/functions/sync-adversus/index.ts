@@ -35,8 +35,11 @@ interface AdversusUser {
 
 interface AdversusCampaign {
   id: number
-  name: string
-  active: boolean
+  name?: string
+  settings?: {
+    name?: string
+    active?: boolean
+  }
 }
 
 interface Product {
@@ -256,20 +259,19 @@ Deno.serve(async (req) => {
       const campaigns: AdversusCampaign[] = campaignsData.campaigns || campaignsData || []
       console.log(`Found ${campaigns.length} campaigns in Adversus`)
       
-      // Log first campaign object structure to understand the API
-      if (campaigns.length > 0) {
-        console.log('First campaign object:', JSON.stringify(campaigns[0]))
-      }
-      
       for (const campaign of campaigns) {
-        // Skip campaigns without a name
-        if (!campaign.name) {
-          console.log(`Skipping campaign ${campaign.id} - no name`)
+        // Get campaign name from settings.name (Adversus API structure)
+        const campaignName = campaign.settings?.name || campaign.name
+        
+        if (!campaignName) {
+          console.log(`Skipping campaign ${campaign.id} - no name found`)
           continue
         }
         
-        campaignMap.set(campaign.id, campaign)
-        console.log(`Campaign ${campaign.id}: ${campaign.name}`)
+        // Store the resolved name for later use
+        const resolvedCampaign = { ...campaign, name: campaignName }
+        campaignMap.set(campaign.id, resolvedCampaign)
+        console.log(`Campaign ${campaign.id}: ${campaignName}`)
         
         // Upsert campaign mapping if not exists
         if (!campaignMappingsByAdversusId.has(String(campaign.id))) {
@@ -277,7 +279,7 @@ Deno.serve(async (req) => {
             .from('campaign_product_mappings')
             .upsert({
               adversus_campaign_id: String(campaign.id),
-              adversus_campaign_name: campaign.name,
+              adversus_campaign_name: campaignName,
               product_id: null
             }, {
               onConflict: 'adversus_campaign_id'
