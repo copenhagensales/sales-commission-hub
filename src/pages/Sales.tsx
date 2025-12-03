@@ -37,6 +37,17 @@ import { differenceInDays } from "date-fns";
 
 type SaleStatus = "pending" | "active" | "cancelled" | "clawbacked";
 
+interface MappedProduct {
+  name: string;
+  commission_value: number | null;
+  commission_type: string | null;
+  revenue_amount: number | null;
+}
+
+interface CampaignMapping {
+  products: MappedProduct | null;
+}
+
 interface SaleWithDetails {
   id: string;
   sale_date: string | null;
@@ -46,7 +57,10 @@ interface SaleWithDetails {
   customer_phone: string | null;
   outcome: string | null;
   agent: { id: string; name: string } | null;
-  product: { id: string; name: string; commission_value: number | null; clawback_window_days: number | null; revenue_amount: number | null } | null;
+  product: { id: string; name: string; clawback_window_days: number | null } | null;
+  // Mapped commission/CPO from campaign_product_mappings
+  mappedCommission: number | null;
+  mappedCPO: number | null;
 }
 
 const PAGE_SIZE = 50;
@@ -162,6 +176,31 @@ export default function Sales() {
     }
   });
 
+  // Fetch campaign mappings for commission/CPO lookup
+  const { data: campaignMappings } = useQuery({
+    queryKey: ['campaign-mappings-for-sales'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('campaign_product_mappings')
+        .select(`
+          adversus_campaign_name,
+          adversus_outcome,
+          products (
+            name,
+            commission_value,
+            commission_type,
+            revenue_amount
+          )
+        `);
+      if (error) throw error;
+      return data as Array<{
+        adversus_campaign_name: string;
+        adversus_outcome: string | null;
+        products: MappedProduct | null;
+      }>;
+    }
+  });
+
   const { data: sales, isLoading } = useQuery({
     queryKey: ['sales-with-details', currentPage, statusFilter, campaignFilter, customerFilter, sortByProduct],
     queryFn: async () => {
@@ -179,7 +218,7 @@ export default function Sales() {
           customer_phone,
           outcome,
           agent:agents!sales_agent_id_fkey(id, name),
-          product:products!sales_product_id_fkey(id, name, commission_value, clawback_window_days, revenue_amount)
+          product:products!sales_product_id_fkey(id, name, clawback_window_days)
         `)
         .range(from, to);
       
@@ -199,8 +238,32 @@ export default function Sales() {
       
       const { data, error } = await query;
       if (error) throw error;
-      return data as unknown as SaleWithDetails[];
-    }
+      
+      // Map commission and CPO from campaign_product_mappings
+      const salesWithMappedValues = (data || []).map(sale => {
+        // Find matching mapping by campaign_name and outcome
+        const mapping = campaignMappings?.find(m => 
+          m.adversus_campaign_name === sale.campaign_name &&
+          (m.adversus_outcome === sale.outcome || (!m.adversus_outcome && !sale.outcome))
+        );
+        
+        // If no exact match with outcome, try finding mapping without outcome requirement
+        const fallbackMapping = !mapping ? campaignMappings?.find(m =>
+          m.adversus_campaign_name === sale.campaign_name && !m.adversus_outcome
+        ) : null;
+        
+        const finalMapping = mapping || fallbackMapping;
+        
+        return {
+          ...sale,
+          mappedCommission: finalMapping?.products?.commission_value ?? null,
+          mappedCPO: finalMapping?.products?.revenue_amount ?? null,
+        };
+      });
+      
+      return salesWithMappedValues as SaleWithDetails[];
+    },
+    enabled: !!campaignMappings // Only run after mappings are loaded
   });
 
   // Client-side search and customer filtering
@@ -239,7 +302,8 @@ export default function Sales() {
   };
 
   const getCommissionDisplay = (sale: SaleWithDetails) => {
-    const commissionValue = sale.product?.commission_value || 0;
+    // Use mapped commission from campaign_product_mappings
+    const commissionValue = sale.mappedCommission || 0;
     if (sale.status === 'clawbacked') return -commissionValue;
     if (sale.status === 'cancelled') return 0;
     return commissionValue;
@@ -589,9 +653,9 @@ export default function Sales() {
                     <span className="font-semibold text-foreground">Økonomi</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Omsætning</span>
+                    <span className="text-muted-foreground">Omsætning (CPO)</span>
                     <span className="font-semibold text-success">
-                      +{(selectedSale.product?.revenue_amount || 0).toLocaleString('da-DK')} kr
+                      +{(selectedSale.mappedCPO || 0).toLocaleString('da-DK')} kr
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
