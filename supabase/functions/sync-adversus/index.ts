@@ -248,6 +248,7 @@ Deno.serve(async (req) => {
     let endDate: string | null = null
     let debugAction: string | null = null
     let debugCampaignId: number | null = null
+    let scanDays: number = 60 // Default scan period
     
     try {
       const body = await req.json()
@@ -255,6 +256,7 @@ Deno.serve(async (req) => {
       endDate = body.endDate
       debugAction = body.action
       debugCampaignId = body.campaignId
+      scanDays = body.scanDays || 60
     } catch {
       // Use default date range (last 30 days)
       const now = new Date()
@@ -438,7 +440,7 @@ Deno.serve(async (req) => {
 
     // Debug action: scan all campaigns for products AND outcomes - creates mappings automatically
     if (debugAction === 'scan-all-products') {
-      console.log(`Debug: Scanning all campaigns for products and outcomes...`)
+      console.log(`Debug: Scanning all campaigns for products and outcomes (last ${scanDays} days)...`)
       
       // First fetch all campaigns
       const campaignsResponse = await fetch(`${baseUrl}/campaigns?pageSize=200`, {
@@ -482,8 +484,8 @@ Deno.serve(async (req) => {
       
       // 1. Get products from /sales endpoint - fetch multiple pages
       const now = new Date()
-      const startDate = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000) // 60 days
-      const filters = { created: { $gt: startDate.toISOString() } }
+      const scanStartDate = new Date(now.getTime() - scanDays * 24 * 60 * 60 * 1000)
+      const filters = { created: { $gt: scanStartDate.toISOString() } }
       const filterStr = encodeURIComponent(JSON.stringify(filters))
       
       let allSales: unknown[] = []
