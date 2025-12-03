@@ -61,29 +61,66 @@ export default function Settings() {
     summary?: SyncSummary;
   } | null>(null);
 
-  // Extract unique products from scan results
-  const uniqueProducts = useMemo(() => {
-    if (!scanResults?.campaigns) return [];
-    const productMap = new Map<string, { name: string; count: number; campaigns: string[] }>();
+  // Extract customer name from product suffix
+  const extractCustomer = (productName: string): string => {
+    const suffixes = [' - Finansforbundet', ' - TDC Erhverv', ' - Tryg', ' - Codan', ' - Business Danmark', ' - SIXT'];
+    for (const suffix of suffixes) {
+      if (productName.toLowerCase().includes(suffix.toLowerCase())) {
+        return suffix.replace(' - ', '');
+      }
+    }
+    // Fallback: extract after last " - "
+    const lastDash = productName.lastIndexOf(' - ');
+    if (lastDash !== -1) {
+      return productName.substring(lastDash + 3);
+    }
+    return 'Øvrige';
+  };
+
+  // Extract unique products from scan results, grouped by customer
+  const productsGroupedByCustomer = useMemo(() => {
+    if (!scanResults?.campaigns) return {};
+    const productMap = new Map<string, { name: string; count: number; campaigns: string[]; customer: string }>();
     
     for (const campaign of scanResults.campaigns) {
       for (const [productName, data] of Object.entries(campaign.products)) {
         const existing = productMap.get(productName);
         if (existing) {
           existing.count += data.count;
-          existing.campaigns.push(campaign.campaignName);
+          if (!existing.campaigns.includes(campaign.campaignName)) {
+            existing.campaigns.push(campaign.campaignName);
+          }
         } else {
           productMap.set(productName, { 
             name: productName, 
             count: data.count, 
-            campaigns: [campaign.campaignName] 
+            campaigns: [campaign.campaignName],
+            customer: extractCustomer(productName)
           });
         }
       }
     }
     
-    return Array.from(productMap.values()).sort((a, b) => b.count - a.count);
+    // Group by customer
+    const grouped: Record<string, typeof productMap extends Map<string, infer V> ? V[] : never> = {};
+    for (const product of productMap.values()) {
+      if (!grouped[product.customer]) {
+        grouped[product.customer] = [];
+      }
+      grouped[product.customer].push(product);
+    }
+    
+    // Sort products within each group by count
+    for (const customer of Object.keys(grouped)) {
+      grouped[customer].sort((a, b) => b.count - a.count);
+    }
+    
+    return grouped;
   }, [scanResults]);
+
+  const uniqueProducts = useMemo(() => {
+    return Object.values(productsGroupedByCustomer).flat();
+  }, [productsGroupedByCustomer]);
 
   const handleScanProducts = async () => {
     setIsScanning(true);
@@ -516,12 +553,12 @@ export default function Settings() {
               </Button>
             </div>
 
-            {/* Scan results - Unique products for creation */}
+            {/* Scan results - Products grouped by customer */}
             {scanResults && uniqueProducts.length > 0 && (
               <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-foreground">
-                    Fundet {uniqueProducts.length} unikke produkter
+                    Fundet {uniqueProducts.length} produkter i {Object.keys(productsGroupedByCustomer).length} kunder
                   </p>
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={selectAllProducts}>
@@ -533,23 +570,32 @@ export default function Settings() {
                   </div>
                 </div>
                 
-                <div className="max-h-64 overflow-auto space-y-2">
-                  {uniqueProducts.map((product) => (
-                    <div 
-                      key={product.name} 
-                      className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 cursor-pointer"
-                      onClick={() => toggleProductSelection(product.name)}
-                    >
-                      <Checkbox 
-                        checked={selectedProducts.has(product.name)}
-                        onCheckedChange={() => toggleProductSelection(product.name)}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {product.count} salg • {product.campaigns.slice(0, 2).join(', ')}
-                          {product.campaigns.length > 2 && ` +${product.campaigns.length - 2} mere`}
-                        </p>
+                <div className="max-h-96 overflow-auto space-y-4">
+                  {Object.entries(productsGroupedByCustomer)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([customer, products]) => (
+                    <div key={customer} className="border border-border/50 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-sm text-foreground">{customer}</h4>
+                        <span className="text-xs text-muted-foreground">{products.length} produkter</span>
+                      </div>
+                      <div className="space-y-1">
+                        {products.map((product) => (
+                          <div 
+                            key={product.name} 
+                            className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 cursor-pointer"
+                            onClick={() => toggleProductSelection(product.name)}
+                          >
+                            <Checkbox 
+                              checked={selectedProducts.has(product.name)}
+                              onCheckedChange={() => toggleProductSelection(product.name)}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm truncate">{product.name.replace(` - ${customer}`, '')}</p>
+                              <p className="text-xs text-muted-foreground">{product.count} salg</p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))}
@@ -569,7 +615,7 @@ export default function Settings() {
                     ) : (
                       <Plus className="h-4 w-4" />
                     )}
-                    Opret valgte produkter
+                    Opret valgte produkter (0 kr provision)
                   </Button>
                 </div>
               </div>
