@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, RefreshCw, Send, Database } from "lucide-react";
+import { Settings as SettingsIcon, RefreshCw, Send, Database, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -12,6 +12,7 @@ export default function Settings() {
   const [loading, setLoading] = useState<string | null>(null);
   const [campaignFilter, setCampaignFilter] = useState("TDC");
   const [salesDays, setSalesDays] = useState(7);
+  const [syncDays, setSyncDays] = useState(30);
   const [results, setResults] = useState<any>(null);
 
   const testFetchCampaigns = async () => {
@@ -41,6 +42,22 @@ export default function Settings() {
       toast.success(`Fandt ${data.total} salg`);
     } catch (err: any) {
       toast.error(err.message || "Fejl ved hentning af salg");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const syncSalesToDb = async () => {
+    setLoading("sync");
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-adversus", {
+        body: { action: "sync-sales-to-db", days: syncDays },
+      });
+      if (error) throw error;
+      setResults({ type: "sync", data });
+      toast.success(data.message || `Synced ${data.created} sales`);
+    } catch (err: any) {
+      toast.error(err.message || "Sync fejlede");
     } finally {
       setLoading(null);
     }
@@ -140,9 +157,9 @@ export default function Settings() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <RefreshCw className="h-5 w-5" />
-                Hent Salg
+                Hent Salg (kun visning)
               </CardTitle>
-              <CardDescription>Hent seneste salg fra Adversus</CardDescription>
+              <CardDescription>Se seneste salg fra Adversus</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -156,9 +173,36 @@ export default function Settings() {
                   max={90}
                 />
               </div>
-              <Button onClick={testFetchSales} disabled={loading === "sales"} className="w-full">
+              <Button onClick={testFetchSales} disabled={loading === "sales"} className="w-full" variant="outline">
                 {loading === "sales" && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-                Hent Salg
+                Hent Salg (vis kun)
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-green-500/50 bg-green-500/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Download className="h-5 w-5 text-green-600" />
+                Sync Salg til Database
+              </CardTitle>
+              <CardDescription>Hent salg fra Adversus og gem i databasen</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="syncDays">Antal dage tilbage</Label>
+                <Input
+                  id="syncDays"
+                  type="number"
+                  value={syncDays}
+                  onChange={(e) => setSyncDays(Number(e.target.value))}
+                  min={1}
+                  max={90}
+                />
+              </div>
+              <Button onClick={syncSalesToDb} disabled={loading === "sync"} className="w-full bg-green-600 hover:bg-green-700">
+                {loading === "sync" && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+                Sync til Database
               </Button>
             </CardContent>
           </Card>
