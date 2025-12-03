@@ -490,6 +490,7 @@ export default function CommissionCPO() {
                                   product_id: value 
                                 })
                               }
+                              outcomeHint={mapping.adversus_outcome}
                             />
                           </TableCell>
                           <TableCell>
