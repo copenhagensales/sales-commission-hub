@@ -334,17 +334,23 @@ export default function CommissionCPO() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Adversus Kampagne ID</TableHead>
                         <TableHead>Outcome / Produkt</TableHead>
                         <TableHead>Kunde</TableHead>
                         <TableHead>Provision</TableHead>
                         <TableHead>CPO (Omsætning)</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead className="w-[50px]"></TableHead>
+                        <TableHead className="w-[80px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {mappings.map((mapping) => (
                         <TableRow key={mapping.id}>
+                          <TableCell>
+                            <code className="text-xs bg-muted px-2 py-1 rounded">
+                              {mapping.adversus_campaign_id}
+                            </code>
+                          </TableCell>
                           <TableCell>
                             <div className="space-y-1">
                               {mapping.adversus_outcome && (
