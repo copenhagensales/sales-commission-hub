@@ -449,8 +449,10 @@ Deno.serve(async (req) => {
       })
       
       if (!campaignsResponse.ok) {
+        const errorBody = await campaignsResponse.text()
+        console.error(`Failed to fetch campaigns: ${campaignsResponse.status} - ${errorBody}`)
         return new Response(
-          JSON.stringify({ error: 'Failed to fetch campaigns' }),
+          JSON.stringify({ error: 'Failed to fetch campaigns', status: campaignsResponse.status, details: errorBody }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
