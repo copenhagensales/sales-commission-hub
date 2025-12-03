@@ -20,8 +20,19 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Link2, ChevronDown, ChevronRight, Sparkles, Check, Zap, Building2 } from "lucide-react";
+import { Link2, ChevronDown, ChevronRight, Sparkles, Check, Zap, Building2, Trash2, MoveRight } from "lucide-react";
 
 interface Product {
   id: string;
@@ -45,11 +56,18 @@ interface Props {
   products: Product[];
   onMappingChange: (mappingId: string, productId: string) => void;
   onBulkApprove?: (mappings: { id: string; productId: string }[]) => void;
+  onDeleteMapping?: (mappingId: string) => void;
+  onBulkDelete?: (mappingIds: string[]) => void;
 }
+
+// Customer keywords for extraction and reassignment
+const CUSTOMER_KEYWORDS = [
+  'Codan', 'Finansforbundet', 'TDC', 'Tryg', 'Business Danmark', 
+  'Eesy', 'Hiper', 'Relatel', 'YouSee', 'AKA', 'ASE', 'Min A-kasse', 'SIXT', 'Øvrige'
+];
 
 // Extract customer name from campaign name or outcome
 function extractCustomerName(campaignName: string, outcome: string | null): string {
-  // Check outcome first for " - Customer" pattern
   if (outcome) {
     const outcomeMatch = outcome.match(/\s-\s([^-]+)$/);
     if (outcomeMatch) {
@@ -57,21 +75,14 @@ function extractCustomerName(campaignName: string, outcome: string | null): stri
     }
   }
   
-  // Common customer keywords to look for in campaign name
-  const customerKeywords = [
-    'Codan', 'Finansforbundet', 'TDC', 'Tryg', 'Business Danmark', 
-    'Eesy', 'Hiper', 'Relatel', 'YouSee', 'AKA', 'ASE', 'Min A-kasse', 'SIXT'
-  ];
-  
   const nameLower = campaignName.toLowerCase();
   
-  for (const keyword of customerKeywords) {
+  for (const keyword of CUSTOMER_KEYWORDS) {
     if (nameLower.includes(keyword.toLowerCase())) {
       return keyword;
     }
   }
   
-  // Try to extract from " - " or " – " pattern in campaign name
   const dashMatch = campaignName.match(/^([^-–]+)/);
   if (dashMatch && dashMatch[1].trim().length > 2) {
     return dashMatch[1].trim();
@@ -80,7 +91,6 @@ function extractCustomerName(campaignName: string, outcome: string | null): stri
   return 'Øvrige';
 }
 
-// Function to calculate similarity between two strings (simple)
 function calculateSimilarity(str1: string, str2: string): number {
   const s1 = str1.toLowerCase().replace(/[^a-z0-9æøå]/g, '');
   const s2 = str2.toLowerCase().replace(/[^a-z0-9æøå]/g, '');
@@ -127,18 +137,29 @@ interface MappingWithMeta extends CampaignMapping {
   customerName: string;
 }
 
-export function CampaignMappingSection({ campaignMappings, products, onMappingChange, onBulkApprove }: Props) {
+export function CampaignMappingSection({ 
+  campaignMappings, 
+  products, 
+  onMappingChange, 
+  onBulkApprove,
+  onDeleteMapping,
+  onBulkDelete
+}: Props) {
   const [showOnlyUnmapped, setShowOnlyUnmapped] = useState(false);
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set());
+  const [customerOverrides, setCustomerOverrides] = useState<Map<string, string>>(new Map());
 
   // Add suggestions and customer name to mappings
   const mappingsWithMeta = useMemo(() => {
-    return campaignMappings.map(mapping => ({
-      ...mapping,
-      suggestion: !mapping.product_id ? findSuggestedProduct(mapping.adversus_campaign_name, mapping.adversus_outcome, products) : null,
-      customerName: extractCustomerName(mapping.adversus_campaign_name, mapping.adversus_outcome)
-    }));
-  }, [campaignMappings, products]);
+    return campaignMappings.map(mapping => {
+      const override = customerOverrides.get(mapping.adversus_campaign_id);
+      return {
+        ...mapping,
+        suggestion: !mapping.product_id ? findSuggestedProduct(mapping.adversus_campaign_name, mapping.adversus_outcome, products) : null,
+        customerName: override || extractCustomerName(mapping.adversus_campaign_name, mapping.adversus_outcome)
+      };
+    });
+  }, [campaignMappings, products, customerOverrides]);
 
   // Filter
   const filteredMappings = useMemo(() => {
@@ -207,12 +228,27 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
     setExpandedCustomers(newExpanded);
   };
 
-  const expandAll = () => {
-    setExpandedCustomers(new Set(customerNames));
+  const expandAll = () => setExpandedCustomers(new Set(customerNames));
+  const collapseAll = () => setExpandedCustomers(new Set());
+
+  const moveCampaignToCustomer = (campaignId: string, newCustomer: string) => {
+    setCustomerOverrides(prev => {
+      const next = new Map(prev);
+      if (newCustomer === '') {
+        next.delete(campaignId);
+      } else {
+        next.set(campaignId, newCustomer);
+      }
+      return next;
+    });
   };
 
-  const collapseAll = () => {
-    setExpandedCustomers(new Set());
+  const handleDeleteCampaign = (campaignId: string) => {
+    if (!onBulkDelete) return;
+    const mappingIds = campaignMappings
+      .filter(m => m.adversus_campaign_id === campaignId)
+      .map(m => m.id);
+    onBulkDelete(mappingIds);
   };
 
   if (campaignMappings.length === 0) {
@@ -254,29 +290,13 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
         
         <div className="flex items-center gap-2">
           {stats.withSuggestions > 0 && onBulkApprove && (
-            <Button
-              size="sm"
-              onClick={handleBulkApprove}
-              className="gap-2"
-            >
+            <Button size="sm" onClick={handleBulkApprove} className="gap-2">
               <Zap className="h-4 w-4" />
               Godkend alle forslag ({stats.withSuggestions})
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={expandAll}
-          >
-            Udvid alle
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={collapseAll}
-          >
-            Luk alle
-          </Button>
+          <Button variant="ghost" size="sm" onClick={expandAll}>Udvid alle</Button>
+          <Button variant="ghost" size="sm" onClick={collapseAll}>Luk alle</Button>
           <Button
             variant={showOnlyUnmapped ? "secondary" : "outline"}
             size="sm"
@@ -294,7 +314,6 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
           const campaignIds = Array.from(campaignMap.keys());
           const isExpanded = expandedCustomers.has(customer);
           
-          // Stats for this customer
           const allMappings = campaignIds.flatMap(id => campaignMap.get(id)!);
           const customerMapped = allMappings.filter(m => m.product_id).length;
           const customerTotal = allMappings.length;
@@ -336,17 +355,61 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
                       
                       return (
                         <div key={campaignId} className="bg-card">
-                          {/* Campaign subheader */}
+                          {/* Campaign subheader with actions */}
                           <div className="px-4 py-2 bg-muted/20 border-b border-border/50 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium text-foreground">{campaignName}</span>
                               <span className="text-xs text-muted-foreground font-mono">ID: {campaignId}</span>
                             </div>
-                            {mappings.length > 1 && (
-                              <span className="text-xs text-muted-foreground">
-                                {mappings.length} produkter
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {/* Move to customer */}
+                              <Select
+                                value=""
+                                onValueChange={(value) => moveCampaignToCustomer(campaignId, value)}
+                              >
+                                <SelectTrigger className="h-7 w-[140px] text-xs">
+                                  <div className="flex items-center gap-1">
+                                    <MoveRight className="h-3 w-3" />
+                                    <span>Flyt til...</span>
+                                  </div>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {CUSTOMER_KEYWORDS.filter(c => c !== customer).map(c => (
+                                    <SelectItem key={c} value={c} className="text-xs">
+                                      {c}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              
+                              {/* Delete campaign */}
+                              {onBulkDelete && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive">
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Slet kampagne?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Er du sikker på at du vil slette alle {mappings.length} mappings for kampagnen "{campaignName}"?
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Annuller</AlertDialogCancel>
+                                      <AlertDialogAction 
+                                        onClick={() => handleDeleteCampaign(campaignId)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Slet
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+                            </div>
                           </div>
                           
                           {/* Mappings table */}
@@ -355,7 +418,8 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
                               <TableRow className="border-border hover:bg-transparent">
                                 <TableHead className="text-muted-foreground text-xs">Produkt/Outcome</TableHead>
                                 <TableHead className="text-muted-foreground text-xs w-[280px]">Internt produkt</TableHead>
-                                <TableHead className="text-muted-foreground text-xs w-20">Status</TableHead>
+                                <TableHead className="text-muted-foreground text-xs w-24">Status</TableHead>
+                                <TableHead className="text-muted-foreground text-xs w-10"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -363,7 +427,7 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
                                 const suggestion = mapping.suggestion;
                                 
                                 return (
-                                  <TableRow key={mapping.id} className="border-border/50">
+                                  <TableRow key={mapping.id} className="border-border/50 group">
                                     <TableCell className="py-2">
                                       {mapping.adversus_outcome ? (
                                         <span className="text-sm text-foreground">{mapping.adversus_outcome}</span>
@@ -426,6 +490,18 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
                                         <Badge variant="outline" className="text-xs border-warning/30 bg-warning/10 text-warning">
                                           Mangler
                                         </Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="py-2">
+                                      {onDeleteMapping && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                                          onClick={() => onDeleteMapping(mapping.id)}
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
                                       )}
                                     </TableCell>
                                   </TableRow>
