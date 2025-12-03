@@ -15,6 +15,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export default function Commission() {
   const queryClient = useQueryClient();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string>("all");
+
+  // Fetch clients for filter
+  const { data: clients } = useQuery({
+    queryKey: ['clients'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data;
+    }
+  });
 
   // Fetch products
   const { data: products, isLoading: loadingProducts } = useQuery({
@@ -230,8 +244,21 @@ export default function Commission() {
           {/* Products Tab */}
           <TabsContent value="products">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Master Product List</CardTitle>
+                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                  <SelectTrigger className="w-[220px]">
+                    <SelectValue placeholder="Filter by client..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border z-50">
+                    <SelectItem value="all">Alle kunder</SelectItem>
+                    {clients?.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </CardHeader>
               <CardContent>
                 {loadingProducts ? (
@@ -248,14 +275,27 @@ export default function Commission() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {products?.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                            No products imported yet. Use the Import CSV tab to add products.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        products?.map((product) => (
+                      {(() => {
+                        const filteredProducts = selectedClientId === "all" 
+                          ? products 
+                          : products?.filter(p => {
+                              const clientId = clients?.find(c => c.name === p.client_campaigns?.clients?.name)?.id;
+                              return clientId === selectedClientId;
+                            });
+                        
+                        if (!filteredProducts?.length) {
+                          return (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                                {selectedClientId === "all" 
+                                  ? "No products imported yet. Use the Import CSV tab to add products."
+                                  : "No products found for this client."}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
+                        
+                        return filteredProducts.map((product) => (
                           <TableRow key={product.id}>
                             <TableCell className="font-medium">{product.name}</TableCell>
                             <TableCell>
@@ -267,8 +307,8 @@ export default function Commission() {
                               {product.external_product_code || <span className="text-muted-foreground">—</span>}
                             </TableCell>
                           </TableRow>
-                        ))
-                      )}
+                        ));
+                      })()}
                     </TableBody>
                   </Table>
                 )}
