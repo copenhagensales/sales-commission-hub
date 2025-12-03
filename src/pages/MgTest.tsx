@@ -59,7 +59,9 @@ interface CampaignMapping {
 interface ClientCampaignRow {
   id: string;
   name: string;
+  client_id: string;
   clients: {
+    id: string;
     name: string | null;
   } | null;
 }
@@ -96,7 +98,7 @@ export default function MgTest() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_campaigns")
-        .select("id, name, clients(name)")
+        .select("id, name, client_id, clients(id, name)")
         .order("name");
 
       if (error) throw error;
@@ -271,7 +273,32 @@ export default function MgTest() {
   });
 
   const updateCampaignMapping = useMutation({
-    mutationFn: async ({ mappingId, clientCampaignId }: { mappingId: string; clientCampaignId: string | null }) => {
+    mutationFn: async ({ mappingId, clientId }: { mappingId: string; clientId: string | null }) => {
+      let clientCampaignId: string | null = null;
+
+      if (clientId) {
+        // Find eksisterende kampagne for kunden eller opret en standard-kampagne
+        const { data: campaigns, error: campaignsError } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", clientId);
+
+        if (campaignsError) throw campaignsError;
+
+        if (campaigns && campaigns.length > 0) {
+          clientCampaignId = campaigns[0].id as string;
+        } else {
+          const { data: newCampaign, error: insertError } = await supabase
+            .from("client_campaigns")
+            .insert({ client_id: clientId, name: "Standard" })
+            .select("id")
+            .single();
+
+          if (insertError) throw insertError;
+          clientCampaignId = newCampaign.id as string;
+        }
+      }
+
       const { error } = await supabase
         .from("adversus_campaign_mappings")
         .update({ client_campaign_id: clientCampaignId })
@@ -282,6 +309,7 @@ export default function MgTest() {
     onSuccess: () => {
       toast.success("Kampagnemapping gemt");
       queryClient.invalidateQueries({ queryKey: ["mg-campaign-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke gemme kampagnemapping");
@@ -535,9 +563,9 @@ export default function MgTest() {
                       </TableHeader>
                       <TableBody>
                         {campaignMappings.map((mapping) => {
-                          const selectedCampaign = clientCampaigns?.find(
-                            (c) => c.id === mapping.client_campaign_id,
-                          );
+                          const selectedClientId =
+                            clientCampaigns?.find((c) => c.id === mapping.client_campaign_id)?.client_id ??
+                            undefined;
 
                           return (
                             <TableRow key={mapping.id}>
@@ -553,21 +581,21 @@ export default function MgTest() {
                               </TableCell>
                               <TableCell>
                                 <Select
-                                  value={mapping.client_campaign_id ?? undefined}
+                                  value={selectedClientId}
                                   onValueChange={(value) =>
                                     updateCampaignMapping.mutate({
                                       mappingId: mapping.id,
-                                      clientCampaignId: value,
+                                      clientId: value,
                                     })
                                   }
                                 >
                                   <SelectTrigger className="w-full max-w-xl">
-                                    <SelectValue placeholder="Vælg intern kampagne" />
+                                    <SelectValue placeholder="Vælg kunde" />
                                   </SelectTrigger>
                                   <SelectContent className="bg-background border z-50 max-h-72">
-                                    {clientCampaigns?.map((c) => (
-                                      <SelectItem key={c.id} value={c.id} className="text-sm">
-                                        {c.clients?.name ?? "Ukendt kunde"} – {c.name}
+                                    {clients?.map((client) => (
+                                      <SelectItem key={client.id} value={client.id} className="text-sm">
+                                        {client.name}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
