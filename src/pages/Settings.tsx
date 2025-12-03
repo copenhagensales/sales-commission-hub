@@ -83,6 +83,33 @@ export default function Settings() {
           <p className="text-muted-foreground">Adversus integration & test</p>
         </div>
 
+        <Card className="border-primary/50 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5" />
+              Webhook URL (til Adversus)
+            </CardTitle>
+            <CardDescription>Kopier denne URL til Adversus webhook-konfiguration</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-muted p-3 rounded text-sm break-all">
+                https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/adversus-webhook
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText("https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/adversus-webhook");
+                  toast.success("Kopieret!");
+                }}
+              >
+                Kopier
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
