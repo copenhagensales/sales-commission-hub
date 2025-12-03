@@ -64,9 +64,31 @@ interface ClientCampaignRow {
   } | null;
 }
 
+interface ClientRow {
+  id: string;
+  name: string;
+}
+
 export default function MgTest() {
   const queryClient = useQueryClient();
   const [editValues, setEditValues] = useState<EditValues>({});
+  const [newClientName, setNewClientName] = useState("");
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
+  const [editingClientName, setEditingClientName] = useState("");
+
+  // Hent alle kunder (kundenavne)
+  const { data: clients, isLoading: loadingClients } = useQuery<ClientRow[]>({
+    queryKey: ["mg-clients"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name")
+        .order("name");
+
+      if (error) throw error;
+      return data as ClientRow[];
+    },
+  });
 
   // Hent alle interne kampagner + kunder
   const { data: clientCampaigns, isLoading: loadingClientCampaigns } = useQuery<ClientCampaignRow[]>({
@@ -266,8 +288,53 @@ export default function MgTest() {
     },
   });
 
+  // Kunder: tilføj og opdater
+  const addClientMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("Kundenavn må ikke være tomt");
+
+      const { error } = await supabase.from("clients").insert({ name: trimmed });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Kunde tilføjet");
+      setNewClientName("");
+      queryClient.invalidateQueries({ queryKey: ["mg-clients"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke tilføje kunde");
+    },
+  });
+
+  const updateClientMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("Kundenavn må ikke være tomt");
+
+      const { error } = await supabase
+        .from("clients")
+        .update({ name: trimmed })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Kundenavn opdateret");
+      setEditingClientId(null);
+      setEditingClientName("");
+      queryClient.invalidateQueries({ queryKey: ["mg-clients"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke opdatere kunde");
+    },
+  });
+
   const isLoadingProductsTab = loadingSaleItems || loadingClientCampaigns;
   const isLoadingCampaignTab = loadingCampaignMappings || loadingClientCampaigns;
+  const isLoadingCustomersTab = loadingClients;
 
   return (
     <MainLayout>
@@ -276,14 +343,15 @@ export default function MgTest() {
           <h1 className="text-3xl font-bold">MG test – Adversus mapping</h1>
           <p className="text-muted-foreground text-sm max-w-2xl">
             Her kan du mappe både produkter og kampagner fra Adversus til dine interne produkter og
-            kundekampagner.
+            kundekampagner, samt vedligeholde listen over kundenavne.
           </p>
         </header>
 
         <Tabs defaultValue="product" className="space-y-4">
           <TabsList>
             <TabsTrigger value="product">Mapping produkt</TabsTrigger>
-            <TabsTrigger value="customer">Mapping kunde</TabsTrigger>
+            <TabsTrigger value="customer">Mapping kunde / kampagne</TabsTrigger>
+            <TabsTrigger value="customers">Kundenavne</TabsTrigger>
           </TabsList>
 
           {/* Mapping produkt */}
@@ -494,6 +562,128 @@ export default function MgTest() {
                                     ))}
                                   </SelectContent>
                                 </Select>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Kundenavne */}
+          <TabsContent value="customers">
+            <Card>
+              <CardHeader>
+                <CardTitle>Kundenavne</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Vedligehold listen over jeres kundenavne. Disse navne bruges bl.a. i dropdownen "Intern kunde /
+                  kampagne".
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <form
+                  className="flex flex-col md:flex-row gap-3 items-stretch md:items-end"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!addClientMutation.isPending) {
+                      addClientMutation.mutate(newClientName);
+                    }
+                  }}
+                >
+                  <div className="flex-1 space-y-1">
+                    <label className="text-sm font-medium">Nyt kundenavn</label>
+                    <Input
+                      value={newClientName}
+                      onChange={(e) => setNewClientName(e.target.value)}
+                      placeholder="F.eks. TDC Erhverv"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="md:w-auto w-full"
+                    disabled={addClientMutation.isPending || !newClientName.trim()}
+                  >
+                    {addClientMutation.isPending ? "Tilføjer…" : "Tilføj kunde"}
+                  </Button>
+                </form>
+
+                {isLoadingCustomersTab ? (
+                  <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Henter kunder…</span>
+                  </div>
+                ) : !clients || clients.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Der er endnu ingen kunder. Tilføj den første ovenfor.
+                  </p>
+                ) : (
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Kundenavn</TableHead>
+                          <TableHead className="w-[160px] text-right">Handling</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {clients.map((client) => {
+                          const isEditing = editingClientId === client.id;
+                          return (
+                            <TableRow key={client.id}>
+                              <TableCell>
+                                {isEditing ? (
+                                  <Input
+                                    value={editingClientName}
+                                    onChange={(e) => setEditingClientName(e.target.value)}
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <span className="font-medium">{client.name}</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right space-x-2">
+                                {isEditing ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() =>
+                                        updateClientMutation.mutate({
+                                          id: client.id,
+                                          name: editingClientName,
+                                        })
+                                      }
+                                      disabled={updateClientMutation.isPending}
+                                    >
+                                      Gem
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => {
+                                        setEditingClientId(null);
+                                        setEditingClientName("");
+                                      }}
+                                    >
+                                      Annuller
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setEditingClientId(client.id);
+                                      setEditingClientName(client.name);
+                                    }}
+                                  >
+                                    Rediger
+                                  </Button>
+                                )}
                               </TableCell>
                             </TableRow>
                           );
