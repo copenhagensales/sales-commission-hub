@@ -2,3 +2,9 @@ project_id = "jwlimmeijpfmaksvmuru"
 
 [functions.sync-adversus]
 verify_jwt = false
+
+[functions.adversus-webhook]
+verify_jwt = false
+
+[functions.import-products]
+verify_jwt = false

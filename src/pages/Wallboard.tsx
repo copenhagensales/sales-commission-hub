@@ -32,63 +32,62 @@ export default function Wallboard() {
     const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
 
-    // Fetch sales with product and agent info
+    // Fetch sales with items
     const { data: salesData } = await supabase
       .from('sales')
       .select(`
         id,
-        sale_date,
-        status,
-        agent_id,
-        agents!sales_agent_id_fkey(id, name),
-        products!sales_product_id_fkey(revenue_amount)
+        sale_datetime,
+        agent_name,
+        sale_items (
+          mapped_commission,
+          mapped_revenue
+        )
       `)
-      .gte('sale_date', startOfMonth)
-      .in('status', ['active', 'pending']);
+      .gte('sale_datetime', startOfMonth);
 
     if (!salesData) return;
 
     // Calculate stats
-    const todaysSales = salesData.filter(s => s.sale_date && new Date(s.sale_date) >= new Date(startOfToday));
+    const todaysSales = salesData.filter(s => s.sale_datetime && new Date(s.sale_datetime) >= new Date(startOfToday));
     
     let revenueToday = 0;
     todaysSales.forEach(sale => {
-      const product = sale.products as any;
-      if (product?.revenue_amount) {
-        revenueToday += product.revenue_amount;
-      }
+      sale.sale_items?.forEach((item: any) => {
+        revenueToday += Number(item.mapped_revenue) || 0;
+      });
     });
 
     let revenueThisMonth = 0;
     salesData.forEach(sale => {
-      const product = sale.products as any;
-      if (product?.revenue_amount) {
-        revenueThisMonth += product.revenue_amount;
-      }
+      sale.sale_items?.forEach((item: any) => {
+        revenueThisMonth += Number(item.mapped_revenue) || 0;
+      });
     });
 
     // Get unique active agents today
-    const activeAgentIds = new Set(todaysSales.map(s => s.agent_id));
+    const activeAgentNames = new Set(todaysSales.map(s => s.agent_name).filter(Boolean));
 
     setStats({
       salesToday: todaysSales.length,
       revenueToday,
       salesThisMonth: salesData.length,
       revenueThisMonth,
-      activeAgents: activeAgentIds.size,
+      activeAgents: activeAgentNames.size,
     });
 
     // Calculate top agents for today
     const agentSalesMap = new Map<string, { name: string; sales: number; revenue: number }>();
     
     todaysSales.forEach(sale => {
-      const agent = sale.agents as any;
-      const product = sale.products as any;
-      if (agent?.name) {
-        const existing = agentSalesMap.get(agent.id) || { name: agent.name, sales: 0, revenue: 0 };
+      const agentName = sale.agent_name;
+      if (agentName) {
+        const existing = agentSalesMap.get(agentName) || { name: agentName, sales: 0, revenue: 0 };
         existing.sales += 1;
-        existing.revenue += product?.revenue_amount || 0;
-        agentSalesMap.set(agent.id, existing);
+        sale.sale_items?.forEach((item: any) => {
+          existing.revenue += Number(item.mapped_revenue) || 0;
+        });
+        agentSalesMap.set(agentName, existing);
       }
     });
 
@@ -99,54 +98,32 @@ export default function Wallboard() {
     setTopAgents(sortedAgents);
   };
 
-  // Update time every second
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTime(new Date());
-    }, 1000);
+    const interval = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Initial fetch
   useEffect(() => {
     fetchData();
   }, []);
 
-  // Auto-refresh every 30 seconds
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchData();
-    }, 30000);
+    const interval = setInterval(() => fetchData(), 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // Real-time subscription for new sales
   useEffect(() => {
     const channel = supabase
       .channel('wallboard-sales')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'sales'
-        },
-        () => {
-          fetchData();
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sales' }, () => fetchData())
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const formatCurrency = (value: number) => value.toLocaleString('da-DK');
 
   return (
     <div className="min-h-screen bg-background p-8">
-      {/* Header */}
       <header className="mb-8 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
@@ -164,11 +141,10 @@ export default function Wallboard() {
         </div>
       </header>
 
-      {/* Main Stats Grid */}
       <div className="grid gap-6 lg:grid-cols-4 mb-8">
-        <div className="rounded-2xl bg-gradient-to-br from-success/20 to-success/5 border border-success/20 p-8 text-center">
-          <ShoppingCart className="mx-auto h-12 w-12 text-success mb-4" />
-          <p className="text-7xl font-bold text-success mb-2">{stats.salesToday}</p>
+        <div className="rounded-2xl bg-gradient-to-br from-green-500/20 to-green-500/5 border border-green-500/20 p-8 text-center">
+          <ShoppingCart className="mx-auto h-12 w-12 text-green-500 mb-4" />
+          <p className="text-7xl font-bold text-green-500 mb-2">{stats.salesToday}</p>
           <p className="text-xl text-muted-foreground">Salg i dag</p>
         </div>
 
@@ -178,9 +154,9 @@ export default function Wallboard() {
           <p className="text-xl text-muted-foreground">Omsætning i dag</p>
         </div>
 
-        <div className="rounded-2xl bg-gradient-to-br from-warning/20 to-warning/5 border border-warning/20 p-8 text-center">
-          <TrendingUp className="mx-auto h-12 w-12 text-warning mb-4" />
-          <p className="text-5xl font-bold text-warning mb-2">{formatCurrency(stats.revenueThisMonth)}</p>
+        <div className="rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-500/5 border border-amber-500/20 p-8 text-center">
+          <TrendingUp className="mx-auto h-12 w-12 text-amber-500 mb-4" />
+          <p className="text-5xl font-bold text-amber-500 mb-2">{formatCurrency(stats.revenueThisMonth)}</p>
           <p className="text-xl text-muted-foreground">Omsætning md.</p>
         </div>
 
@@ -191,10 +167,9 @@ export default function Wallboard() {
         </div>
       </div>
 
-      {/* Top Performers */}
       <div className="rounded-2xl border border-border bg-card p-8">
         <h2 className="mb-6 text-2xl font-bold text-foreground flex items-center gap-3">
-          <Trophy className="h-8 w-8 text-warning" />
+          <Trophy className="h-8 w-8 text-amber-500" />
           Dagens Top 3
         </h2>
         {topAgents.length === 0 ? (
@@ -206,19 +181,17 @@ export default function Wallboard() {
                 key={agent.name}
                 className={`rounded-xl p-6 text-center ${
                   index === 0 
-                    ? "bg-gradient-to-br from-warning/20 to-warning/5 border-2 border-warning/30" 
+                    ? "bg-gradient-to-br from-amber-500/20 to-amber-500/5 border-2 border-amber-500/30" 
                     : "bg-muted/30 border border-border"
                 }`}
               >
                 <div className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full text-3xl font-bold ${
-                  index === 0 
-                    ? "bg-warning text-warning-foreground" 
-                    : "bg-muted text-muted-foreground"
+                  index === 0 ? "bg-amber-500 text-white" : "bg-muted text-muted-foreground"
                 }`}>
                   {index + 1}
                 </div>
                 <p className="text-2xl font-bold text-foreground">{agent.name}</p>
-                <p className="mt-2 text-4xl font-bold text-success">{agent.sales}</p>
+                <p className="mt-2 text-4xl font-bold text-green-500">{agent.sales}</p>
                 <p className="text-muted-foreground">salg</p>
                 <p className="mt-1 text-lg text-primary font-semibold">{formatCurrency(agent.revenue)} kr</p>
               </div>
@@ -227,12 +200,11 @@ export default function Wallboard() {
         )}
       </div>
 
-      {/* Footer with auto-refresh indicator */}
       <footer className="mt-8 text-center text-sm text-muted-foreground">
         <div className="flex items-center justify-center gap-2">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
           </span>
           Live-opdatering aktiv
         </div>
