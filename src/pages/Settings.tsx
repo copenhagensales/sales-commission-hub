@@ -43,6 +43,8 @@ export default function Settings() {
   const [vacationPayPercentage, setVacationPayPercentage] = useState("12.5");
   const [defaultClawbackDays, setDefaultClawbackDays] = useState("30");
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResults, setScanResults] = useState<{campaigns: {campaignId: number; campaignName: string; products: Record<string, number>}[]} | null>(null);
   const [syncProgress, setSyncProgress] = useState<{
     current: number;
     total: number;
@@ -52,6 +54,24 @@ export default function Settings() {
     success: boolean;
     summary?: SyncSummary;
   } | null>(null);
+
+  const handleScanProducts = async () => {
+    setIsScanning(true);
+    setScanResults(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-adversus', {
+        body: { debugAction: 'scan-all-products' }
+      });
+      if (error) throw error;
+      setScanResults(data);
+      toast.success(`Fundet ${data.campaigns?.length || 0} kampagner med produkter`);
+    } catch (err) {
+      console.error('Scan error:', err);
+      toast.error('Scan fejlede');
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   // Fetch products
   const { data: products = [] } = useQuery({
@@ -376,7 +396,7 @@ export default function Settings() {
             <div className="flex items-start gap-2 flex-wrap">
               <Button 
                 onClick={() => handleAdversusSync(12)} 
-                disabled={isSyncing}
+                disabled={isSyncing || isScanning}
                 variant="outline"
                 className="gap-2"
               >
@@ -389,7 +409,7 @@ export default function Settings() {
               </Button>
               <Button 
                 onClick={() => handleAdversusSync(24)} 
-                disabled={isSyncing}
+                disabled={isSyncing || isScanning}
                 variant="outline"
                 className="gap-2"
               >
@@ -397,12 +417,38 @@ export default function Settings() {
               </Button>
               <Button 
                 onClick={() => handleChunkedSync(30, 7)} 
-                disabled={isSyncing}
+                disabled={isSyncing || isScanning}
                 className="gap-2"
               >
                 Sidste 30 dage (i bidder)
               </Button>
+              <Button 
+                onClick={handleScanProducts} 
+                disabled={isSyncing || isScanning}
+                variant="secondary"
+                className="gap-2"
+              >
+                {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Package className="h-4 w-4" />}
+                Scan produkter fra sales
+              </Button>
             </div>
+
+            {/* Scan results */}
+            {scanResults && scanResults.campaigns && (
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3 max-h-96 overflow-auto">
+                <p className="font-medium text-foreground">Produkter fundet i {scanResults.campaigns.length} kampagner:</p>
+                {scanResults.campaigns.map((c) => (
+                  <div key={c.campaignId} className="text-sm border-b border-border pb-2">
+                    <p className="font-medium">{c.campaignName}</p>
+                    <ul className="pl-4 text-muted-foreground">
+                      {Object.entries(c.products).map(([product, count]) => (
+                        <li key={product}>{product}: {count} salg</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Progress indicator */}
             {syncProgress && (
