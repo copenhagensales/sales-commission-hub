@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts_map: {
+        Row: {
+          account_number: string
+          category: string
+          type: string
+        }
+        Insert: {
+          account_number: string
+          category: string
+          type: string
+        }
+        Update: {
+          account_number?: string
+          category?: string
+          type?: string
+        }
+        Relationships: []
+      }
       adversus_campaign_mappings: {
         Row: {
           adversus_campaign_id: string
@@ -213,6 +231,45 @@ export type Database = {
         }
         Relationships: []
       }
+      fixed_costs: {
+        Row: {
+          active: boolean | null
+          amount: number
+          category: string
+          created_at: string | null
+          end_date: string | null
+          frequency: string
+          id: number
+          notes: string | null
+          start_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          amount: number
+          category: string
+          created_at?: string | null
+          end_date?: string | null
+          frequency: string
+          id?: number
+          notes?: string | null
+          start_date: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          amount?: number
+          category?: string
+          created_at?: string | null
+          end_date?: string | null
+          frequency?: string
+          id?: number
+          notes?: string | null
+          start_date?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           client_campaign_id: string | null
@@ -367,6 +424,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sync_state: {
+        Row: {
+          id: number
+          last_entry_date: string | null
+          last_sync_at: string | null
+        }
+        Insert: {
+          id?: number
+          last_entry_date?: string | null
+          last_sync_at?: string | null
+        }
+        Update: {
+          id?: number
+          last_entry_date?: string | null
+          last_sync_at?: string | null
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          account_number: string
+          amount: number
+          category: string | null
+          created_at: string | null
+          date: string
+          id: number
+          source_id: string | null
+          text: string | null
+          type: string
+          updated_at: string | null
+          voucher_id: string | null
+        }
+        Insert: {
+          account_number: string
+          amount: number
+          category?: string | null
+          created_at?: string | null
+          date: string
+          id?: number
+          source_id?: string | null
+          text?: string | null
+          type: string
+          updated_at?: string | null
+          voucher_id?: string | null
+        }
+        Update: {
+          account_number?: string
+          amount?: number
+          category?: string | null
+          created_at?: string | null
+          date?: string
+          id?: number
+          source_id?: string | null
+          text?: string | null
+          type?: string
+          updated_at?: string | null
+          voucher_id?: string | null
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
