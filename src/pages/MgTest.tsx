@@ -21,6 +21,14 @@ interface WebhookSaleItem {
     commission_dkk: number | null;
     revenue_dkk: number | null;
   } | null;
+  sales: {
+    client_campaigns: {
+      name: string | null;
+      clients: {
+        name: string | null;
+      } | null;
+    } | null;
+  } | null;
 }
 
 interface AggregatedProduct {
@@ -33,6 +41,7 @@ interface AggregatedProduct {
     commission_dkk: number | null;
     revenue_dkk: number | null;
   } | null;
+  campaignLabel: string;
 }
 
 interface EditEntry {
@@ -46,7 +55,7 @@ export default function MgTest() {
   const queryClient = useQueryClient();
   const [editValues, setEditValues] = useState<EditValues>({});
 
-  // Hent alle produkter direkte fra webhook-data (sale_items)
+  // Hent alle produkter direkte fra webhook-data (sale_items) inkl. kampagne
   const {
     data: saleItems,
     isLoading: loadingSaleItems,
@@ -57,7 +66,7 @@ export default function MgTest() {
       const { data, error } = await supabase
         .from("sale_items")
         .select(
-          "id, adversus_external_id, adversus_product_title, product_id, products(id, name, commission_dkk, revenue_dkk)"
+          "id, adversus_external_id, adversus_product_title, product_id, products(id, name, commission_dkk, revenue_dkk), sales(client_campaigns(name, clients(name)))"
         )
         .not("adversus_product_title", "is", null);
 
@@ -70,10 +79,16 @@ export default function MgTest() {
     const map = new Map<string, AggregatedProduct>();
 
     saleItems?.forEach((item) => {
-      const key = item.adversus_external_id || item.adversus_product_title || item.id;
-      if (!map.has(key)) {
-        map.set(key, {
-          key,
+      const campaignName = item.sales?.client_campaigns?.name || "Ukendt kampagne";
+      const clientName = item.sales?.client_campaigns?.clients?.name || "Ukendt kunde";
+      const campaignLabel = `${clientName} – ${campaignName}`;
+
+      const productKey = item.adversus_external_id || item.adversus_product_title || item.id;
+      const fullKey = `${campaignLabel}::${productKey}`;
+
+      if (!map.has(fullKey)) {
+        map.set(fullKey, {
+          key: fullKey,
           adversus_external_id: item.adversus_external_id,
           adversus_product_title: item.adversus_product_title,
           product: item.products
@@ -84,16 +99,30 @@ export default function MgTest() {
                 revenue_dkk: item.products.revenue_dkk,
               }
             : null,
+          campaignLabel,
         });
       }
     });
 
     return Array.from(map.values()).sort((a, b) => {
-      const aTitle = a.adversus_product_title || "";
-      const bTitle = b.adversus_product_title || "";
-      return aTitle.localeCompare(bTitle, "da");
+      const campA = a.campaignLabel;
+      const campB = b.campaignLabel;
+      if (campA !== campB) return campA.localeCompare(campB, "da");
+      const titleA = a.adversus_product_title || "";
+      const titleB = b.adversus_product_title || "";
+      return titleA.localeCompare(titleB, "da");
     });
   }, [saleItems]);
+
+  const productsByCampaign = useMemo(() => {
+    const groups = new Map<string, AggregatedProduct[]>();
+    aggregatedProducts.forEach((row) => {
+      const list = groups.get(row.campaignLabel) || [];
+      list.push(row);
+      groups.set(row.campaignLabel, list);
+    });
+    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], "da"));
+  }, [aggregatedProducts]);
 
   const upsertProductValues = useMutation({
     mutationFn: async (params: { row: AggregatedProduct; provision: number; cpo: number }) => {
@@ -167,8 +196,7 @@ export default function MgTest() {
 
     const provisionRaw =
       current.provision ?? (row.product?.commission_dkk != null ? String(row.product.commission_dkk) : "0");
-    const cpoRaw =
-      current.cpo ?? (row.product?.revenue_dkk != null ? String(row.product.revenue_dkk) : "0");
+    const cpoRaw = current.cpo ?? (row.product?.revenue_dkk != null ? String(row.product.revenue_dkk) : "0");
 
     const provision = parseFloat(provisionRaw.replace(",", ".")) || 0;
     const cpo = parseFloat(cpoRaw.replace(",", ".")) || 0;
@@ -184,128 +212,139 @@ export default function MgTest() {
         <header className="space-y-2">
           <h1 className="text-3xl font-bold">MG test – Adversus produktmapping</h1>
           <p className="text-muted-foreground text-sm max-w-2xl">
-            Her ser du alle produkter, vi har modtaget via Adversus-webhook (baseret på salg). Udfyld CPO og
-            provision for hvert produkt, så de kan bruges i kommissionsberegninger.
+            Her ser du alle produkter, vi har modtaget via Adversus-webhook (baseret på salg), opdelt på
+            kampagner. Udfyld CPO og provision for hvert produkt, så de kan bruges i kommissionsberegninger.
           </p>
         </header>
 
         <section className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
-              <div>
-                <CardTitle>Produkter fra Adversus-webhook (fra salg)</CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Alle unikke produktnavne er hentet fra webhook-salg under fanen "Salg".
-                </p>
-              </div>
-              <Badge variant="outline">
-                {aggregatedProducts.length} produkter fundet
-              </Badge>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>Henter produkter…</span>
-                </div>
-              ) : isError ? (
+          {isLoading ? (
+            <Card>
+              <CardContent className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>Henter produkter…</span>
+              </CardContent>
+            </Card>
+          ) : isError ? (
+            <Card>
+              <CardContent className="py-6">
                 <p className="text-sm text-destructive">
                   Der opstod en fejl ved hentning af produkter. Prøv at genindlæse siden.
                 </p>
-              ) : aggregatedProducts.length === 0 ? (
+              </CardContent>
+            </Card>
+          ) : productsByCampaign.length === 0 ? (
+            <Card>
+              <CardContent className="py-6">
                 <p className="text-sm text-muted-foreground">
                   Der er endnu ikke modtaget nogen produkter via webhook. Når de første leads kommer ind, vil
                   de dukke op her.
                 </p>
-              ) : (
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[30%]">Adversus produktnavn</TableHead>
-                        <TableHead className="w-[20%]">External ID</TableHead>
-                        <TableHead className="w-[15%]">Provision (DKK)</TableHead>
-                        <TableHead className="w-[15%]">CPO / omsætning (DKK)</TableHead>
-                        <TableHead className="w-[20%] text-right">Handling</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {aggregatedProducts.map((row) => {
-                        const current = editValues[row.key];
+              </CardContent>
+            </Card>
+          ) : (
+            productsByCampaign.map(([campaignLabel, rows]) => (
+              <Card key={campaignLabel} className="border-muted">
+                <CardHeader className="flex flex-row items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-base font-semibold">{campaignLabel}</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {rows.length} unikke produkter fra denne kampagne.
+                    </p>
+                  </div>
+                  <Badge variant="outline">{rows.length} produkter</Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[30%]">Adversus produktnavn</TableHead>
+                          <TableHead className="w-[20%]">External ID</TableHead>
+                          <TableHead className="w-[15%]">Provision (DKK)</TableHead>
+                          <TableHead className="w-[15%]">CPO / omsætning (DKK)</TableHead>
+                          <TableHead className="w-[20%] text-right">Handling</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rows.map((row) => {
+                          const current = editValues[row.key];
 
-                        return (
-                          <TableRow key={row.key}>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span className="font-medium">
-                                  {row.adversus_product_title || "(ingen titel)"}
-                                </span>
-                                {row.product && (
-                                  <span className="text-xs text-muted-foreground">
-                                    Internt produkt: {row.product.name}
+                          return (
+                            <TableRow key={row.key}>
+                              <TableCell>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">
+                                    {row.adversus_product_title || "(ingen titel)"}
                                   </span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <span className="text-xs font-mono text-muted-foreground">
-                                {row.adversus_external_id || "(mangler)"}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                className="h-9"
-                                value={
-                                  current?.provision ??
-                                  (row.product?.commission_dkk !== null &&
-                                  row.product?.commission_dkk !== undefined
-                                    ? String(row.product.commission_dkk)
-                                    : "")
-                                }
-                                onChange={(e) => handleChange(row.key, "provision", e.target.value)}
-                                placeholder="0,00"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                className="h-9"
-                                value={
-                                  current?.cpo ??
-                                  (row.product?.revenue_dkk !== null && row.product?.revenue_dkk !== undefined
-                                    ? String(row.product.revenue_dkk)
-                                    : "")
-                                }
-                                onChange={(e) => handleChange(row.key, "cpo", e.target.value)}
-                                placeholder="0,00"
-                              />
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                onClick={() => handleSave(row)}
-                                disabled={upsertProductValues.isPending}
-                              >
-                                {upsertProductValues.isPending ? (
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                ) : (
-                                  <Save className="h-4 w-4 mr-2" />
-                                )}
-                                Gem
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                                  {row.product && (
+                                    <span className="text-xs text-muted-foreground">
+                                      Internt produkt: {row.product.name}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-xs font-mono text-muted-foreground">
+                                  {row.adversus_external_id || "(mangler)"}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  className="h-9"
+                                  value={
+                                    current?.provision ??
+                                    (row.product?.commission_dkk !== null &&
+                                    row.product?.commission_dkk !== undefined
+                                      ? String(row.product.commission_dkk)
+                                      : "")
+                                  }
+                                  onChange={(e) => handleChange(row.key, "provision", e.target.value)}
+                                  placeholder="0,00"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  className="h-9"
+                                  value={
+                                    current?.cpo ??
+                                    (row.product?.revenue_dkk !== null &&
+                                    row.product?.revenue_dkk !== undefined
+                                      ? String(row.product.revenue_dkk)
+                                      : "")
+                                  }
+                                  onChange={(e) => handleChange(row.key, "cpo", e.target.value)}
+                                  placeholder="0,00"
+                                />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSave(row)}
+                                  disabled={upsertProductValues.isPending}
+                                >
+                                  {upsertProductValues.isPending ? (
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                  ) : (
+                                    <Save className="h-4 w-4 mr-2" />
+                                  )}
+                                  Gem
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </section>
       </div>
     </MainLayout>
