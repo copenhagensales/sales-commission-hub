@@ -13,6 +13,7 @@ const navigation = [
   { name: "Lønkørsler", href: "/payroll", icon: Wallet },
   { name: "Wallboard", href: "/wallboard", icon: Tv },
   { name: "MG test", href: "/mg-test", icon: Percent },
+  { name: "KM test", href: "/km-test", icon: Percent },
   { name: "Indstillinger", href: "/settings", icon: Settings },
 ];
 

@@ -13,6 +13,7 @@ import Wallboard from "./pages/Wallboard";
 import Settings from "./pages/Settings";
 import Commission from "./pages/Commission";
 import MgTest from "./pages/MgTest";
+import KmTest from "./pages/KmTest";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -69,6 +70,7 @@ const App = () => (
           <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
           <Route path="/wallboard" element={<Wallboard />} />
           <Route path="/mg-test" element={<ProtectedRoute><MgTest /></ProtectedRoute>} />
+          <Route path="/km-test" element={<ProtectedRoute><KmTest /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
