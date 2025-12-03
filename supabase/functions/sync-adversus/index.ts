@@ -492,6 +492,19 @@ Deno.serve(async (req) => {
           
           console.log(`Debug: Found ${sales.length} sales from /sales endpoint`)
           
+          // Log first sale structure for debugging
+          if (sales.length > 0) {
+            console.log(`=== FIRST SALE STRUCTURE ===`)
+            console.log(JSON.stringify(sales[0], null, 2))
+            console.log(`=== END FIRST SALE ===`)
+            
+            if (sales[0].lines && sales[0].lines.length > 0) {
+              console.log(`=== FIRST LINE STRUCTURE ===`)
+              console.log(JSON.stringify(sales[0].lines[0], null, 2))
+              console.log(`=== END FIRST LINE ===`)
+            }
+          }
+          
           for (const sale of sales) {
             const campaignId = sale.campaignId || sale.campaign
             const campaignName = campaignLookup[campaignId] || `Unknown (${campaignId})`
@@ -503,8 +516,14 @@ Deno.serve(async (req) => {
             if (sale.lines) {
               for (const line of sale.lines) {
                 const title = line.title || 'Unknown'
-                // Extract commission from salesCommission or unitPrice field
-                const commission = line.salesCommission ?? line.unitPrice ?? line.price ?? null
+                // Log all line fields to find the commission field
+                if (!campaignResults[campaignId].products[title]) {
+                  console.log(`Line fields for "${title}": ${JSON.stringify(Object.keys(line))}`)
+                  console.log(`Line data: ${JSON.stringify(line)}`)
+                }
+                
+                // Extract commission - check multiple possible field names
+                const commission = line.salesCommission ?? line.agentCommission ?? line.commission ?? line.unitPrice ?? line.price ?? null
                 
                 if (!campaignResults[campaignId].products[title]) {
                   campaignResults[campaignId].products[title] = { count: 0, commission: commission }
