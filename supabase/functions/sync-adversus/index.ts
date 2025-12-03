@@ -30,6 +30,10 @@ interface AdversusUser {
   displayName: string
   email: string
   active: boolean
+  role?: string
+  accessLevel?: string
+  isAgent?: boolean
+  isManager?: boolean
 }
 
 interface ResultField {
@@ -444,9 +448,29 @@ Deno.serve(async (req) => {
       usersRateLimited = true
       // Continue with existing agents instead of failing
     } else {
-      const usersData = await usersResponse.json()
-      const users: AdversusUser[] = usersData.users || usersData
-      console.log(`Found ${users.length} users in Adversus`)
+    const usersData = await usersResponse.json()
+      const allUsers: AdversusUser[] = usersData.users || usersData
+      console.log(`Found ${allUsers.length} total users in Adversus`)
+      
+      // Filter to only include agents (exclude managers)
+      // Adversus roles: typically 'agent', 'manager', 'admin', etc.
+      const users = allUsers.filter(user => {
+        const role = (user.role || '').toLowerCase()
+        const accessLevel = (user.accessLevel || '').toLowerCase()
+        
+        // Exclude if explicitly marked as manager or admin
+        const isManager = role.includes('manager') || role.includes('admin') || 
+                         accessLevel.includes('manager') || accessLevel.includes('admin') ||
+                         user.isManager === true
+        
+        if (isManager) {
+          console.log(`Skipping manager: ${user.name} (role: ${user.role}, accessLevel: ${user.accessLevel})`)
+          return false
+        }
+        return true
+      })
+      
+      console.log(`Filtered to ${users.length} agents (excluded ${allUsers.length - users.length} managers)`)
 
       // Upsert agents
       for (const user of users) {
@@ -479,7 +503,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Agents synced: ${agentsCreated} created, ${agentsUpdated} updated${usersRateLimited ? ' (rate limited, using existing)' : ''}`)
+    console.log(`Agents synced: ${agentsCreated} created, ${agentsUpdated} updated (managers excluded)${usersRateLimited ? ' (rate limited, using existing)' : ''}`)
 
     // Step 3: Fetch sessions (calls) from Adversus
     console.log('Fetching sessions from Adversus...')
