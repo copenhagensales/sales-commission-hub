@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, RefreshCw, Save, CheckCircle2, AlertCircle, Link2, Package } from "lucide-react";
-import { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, RefreshCw, Save, CheckCircle2, AlertCircle, Link2, Package, Plus } from "lucide-react";
+import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -44,6 +45,8 @@ export default function Settings() {
   const [defaultClawbackDays, setDefaultClawbackDays] = useState("30");
   const [isSyncing, setIsSyncing] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [isCreatingProducts, setIsCreatingProducts] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [scanResults, setScanResults] = useState<{
     campaigns: {campaignId: number; campaignName: string; products: Record<string, {count: number; commission?: number}>; outcomes: Record<string, number>}[]
     allCampaigns?: {id: number; name: string}[]
@@ -58,9 +61,34 @@ export default function Settings() {
     summary?: SyncSummary;
   } | null>(null);
 
+  // Extract unique products from scan results
+  const uniqueProducts = useMemo(() => {
+    if (!scanResults?.campaigns) return [];
+    const productMap = new Map<string, { name: string; count: number; campaigns: string[] }>();
+    
+    for (const campaign of scanResults.campaigns) {
+      for (const [productName, data] of Object.entries(campaign.products)) {
+        const existing = productMap.get(productName);
+        if (existing) {
+          existing.count += data.count;
+          existing.campaigns.push(campaign.campaignName);
+        } else {
+          productMap.set(productName, { 
+            name: productName, 
+            count: data.count, 
+            campaigns: [campaign.campaignName] 
+          });
+        }
+      }
+    }
+    
+    return Array.from(productMap.values()).sort((a, b) => b.count - a.count);
+  }, [scanResults]);
+
   const handleScanProducts = async () => {
     setIsScanning(true);
     setScanResults(null);
+    setSelectedProducts(new Set());
     try {
       const { data, error } = await supabase.functions.invoke('sync-adversus', {
         body: { action: 'scan-all-products' }
@@ -74,6 +102,58 @@ export default function Settings() {
     } finally {
       setIsScanning(false);
     }
+  };
+
+  const handleCreateSelectedProducts = async () => {
+    if (selectedProducts.size === 0) {
+      toast.error('Vælg mindst ét produkt');
+      return;
+    }
+    
+    setIsCreatingProducts(true);
+    try {
+      const productsToCreate = Array.from(selectedProducts).map(name => ({
+        name,
+        code: name.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 20).toUpperCase(),
+        commission_type: 'fixed' as const,
+        commission_value: 500, // Default commission
+        clawback_window_days: 30,
+        is_active: true,
+        revenue_amount: 0
+      }));
+      
+      const { error } = await supabase.from('products').insert(productsToCreate);
+      if (error) throw error;
+      
+      toast.success(`${productsToCreate.length} produkter oprettet`);
+      setSelectedProducts(new Set());
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    } catch (err) {
+      console.error('Create error:', err);
+      toast.error('Fejl ved oprettelse af produkter');
+    } finally {
+      setIsCreatingProducts(false);
+    }
+  };
+
+  const toggleProductSelection = (productName: string) => {
+    setSelectedProducts(prev => {
+      const next = new Set(prev);
+      if (next.has(productName)) {
+        next.delete(productName);
+      } else {
+        next.add(productName);
+      }
+      return next;
+    });
+  };
+
+  const selectAllProducts = () => {
+    setSelectedProducts(new Set(uniqueProducts.map(p => p.name)));
+  };
+
+  const deselectAllProducts = () => {
+    setSelectedProducts(new Set());
   };
 
   // Fetch products
@@ -436,53 +516,93 @@ export default function Settings() {
               </Button>
             </div>
 
-            {/* Scan results */}
-            {scanResults && scanResults.campaigns && (
-              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3 max-h-96 overflow-auto">
-                <p className="font-medium text-foreground">Fundet data i {scanResults.campaigns.length} kampagner:</p>
-                {scanResults.campaigns.map((c) => (
-                  <div key={c.campaignId} className="text-sm border-b border-border pb-2">
-                    <p className="font-medium">{c.campaignName} <span className="text-muted-foreground text-xs">({c.campaignId})</span></p>
-                    {Object.keys(c.products).length > 0 && (
-                      <div className="mt-1">
-                        <p className="text-xs text-muted-foreground font-medium">Produkter (fra /sales):</p>
-                        <ul className="pl-4 text-muted-foreground">
-                          {Object.entries(c.products).map(([product, data]) => (
-                            <li key={product} className="text-green-600">
-                              {product}: {data.count} salg
-                              {data.commission !== undefined && data.commission !== null && (
-                                <span className="ml-2 text-amber-500 font-medium">
-                                  (Provision: {data.commission} kr)
-                                </span>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {Object.keys(c.outcomes || {}).length > 0 && (
-                      <div className="mt-1">
-                        <p className="text-xs text-muted-foreground font-medium">Outcomes (fra sessions):</p>
-                        <ul className="pl-4 text-muted-foreground">
-                          {Object.entries(c.outcomes).map(([outcome, count]) => (
-                            <li key={outcome} className="text-blue-600">{outcome}: {count} salg</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+            {/* Scan results - Unique products for creation */}
+            {scanResults && uniqueProducts.length > 0 && (
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-foreground">
+                    Fundet {uniqueProducts.length} unikke produkter
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={selectAllProducts}>
+                      Vælg alle
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={deselectAllProducts}>
+                      Fravælg alle
+                    </Button>
                   </div>
-                ))}
-                {scanResults.allCampaigns && (
-                  <details className="mt-4">
-                    <summary className="cursor-pointer text-xs text-muted-foreground">Alle {scanResults.allCampaigns.length} kampagner</summary>
-                    <ul className="pl-4 text-xs text-muted-foreground mt-1">
-                      {scanResults.allCampaigns.map(c => (
-                        <li key={c.id}>{c.name} ({c.id})</li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
+                </div>
+                
+                <div className="max-h-64 overflow-auto space-y-2">
+                  {uniqueProducts.map((product) => (
+                    <div 
+                      key={product.name} 
+                      className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 cursor-pointer"
+                      onClick={() => toggleProductSelection(product.name)}
+                    >
+                      <Checkbox 
+                        checked={selectedProducts.has(product.name)}
+                        onCheckedChange={() => toggleProductSelection(product.name)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {product.count} salg • {product.campaigns.slice(0, 2).join(', ')}
+                          {product.campaigns.length > 2 && ` +${product.campaigns.length - 2} mere`}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <p className="text-sm text-muted-foreground">
+                    {selectedProducts.size} produkter valgt
+                  </p>
+                  <Button 
+                    onClick={handleCreateSelectedProducts}
+                    disabled={selectedProducts.size === 0 || isCreatingProducts}
+                    className="gap-2"
+                  >
+                    {isCreatingProducts ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                    Opret valgte produkter
+                  </Button>
+                </div>
               </div>
+            )}
+
+            {/* Campaign details (collapsed) */}
+            {scanResults && scanResults.campaigns && (
+              <details className="rounded-lg border border-border bg-muted/30 p-4">
+                <summary className="cursor-pointer font-medium text-foreground">
+                  Detaljer: {scanResults.campaigns.length} kampagner med data
+                </summary>
+                <div className="mt-3 space-y-3 max-h-64 overflow-auto">
+                  {scanResults.campaigns.map((c) => (
+                    <div key={c.campaignId} className="text-sm border-b border-border pb-2">
+                      <p className="font-medium">{c.campaignName} <span className="text-muted-foreground text-xs">({c.campaignId})</span></p>
+                      {Object.keys(c.products).length > 0 && (
+                        <ul className="pl-4 text-muted-foreground text-xs mt-1">
+                          {Object.entries(c.products).map(([product, data]) => (
+                            <li key={product} className="text-green-600">{product}: {data.count}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {Object.keys(c.outcomes || {}).length > 0 && (
+                        <ul className="pl-4 text-muted-foreground text-xs mt-1">
+                          {Object.entries(c.outcomes).map(([outcome, count]) => (
+                            <li key={outcome} className="text-blue-600">{outcome}: {count}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </details>
             )}
 
             {/* Progress indicator */}
