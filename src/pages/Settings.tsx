@@ -424,6 +424,34 @@ export default function Settings() {
     });
   };
 
+  const handleDeleteMapping = async (mappingId: string) => {
+    try {
+      const { error } = await supabase
+        .from('campaign_product_mappings')
+        .delete()
+        .eq('id', mappingId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['campaign-mappings'] });
+      toast.success('Mapping slettet');
+    } catch (err) {
+      toast.error('Kunne ikke slette mapping');
+    }
+  };
+
+  const handleBulkDelete = async (mappingIds: string[]) => {
+    try {
+      const { error } = await supabase
+        .from('campaign_product_mappings')
+        .delete()
+        .in('id', mappingIds);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['campaign-mappings'] });
+      toast.success(`${mappingIds.length} mappings slettet`);
+    } catch (err) {
+      toast.error('Kunne ikke slette mappings');
+    }
+  };
+
   const handleBulkApprove = async (mappings: { id: string; productId: string }[]) => {
     for (const mapping of mappings) {
       await supabase
@@ -480,6 +508,8 @@ export default function Settings() {
             products={products}
             onMappingChange={handleMappingChange}
             onBulkApprove={handleBulkApprove}
+            onDeleteMapping={handleDeleteMapping}
+            onBulkDelete={handleBulkDelete}
           />
         </section>
 
