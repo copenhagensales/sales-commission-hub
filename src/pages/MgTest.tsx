@@ -288,7 +288,7 @@ export default function MgTest() {
     },
   });
 
-  // Kunder: tilføj og opdater
+  // Kunder: tilføj, opdater og slet
   const addClientMutation = useMutation({
     mutationFn: async (name: string) => {
       const trimmed = name.trim();
@@ -329,6 +329,21 @@ export default function MgTest() {
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke opdatere kunde");
+    },
+  });
+
+  const deleteClientMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("clients").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Kunde slettet");
+      queryClient.invalidateQueries({ queryKey: ["mg-clients"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke slette kunde (tjek om kunden bruges i kampagner)");
     },
   });
 
@@ -626,7 +641,7 @@ export default function MgTest() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Kundenavn</TableHead>
-                          <TableHead className="w-[160px] text-right">Handling</TableHead>
+                          <TableHead className="w-[200px] text-right">Handling</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -673,16 +688,26 @@ export default function MgTest() {
                                     </Button>
                                   </>
                                 ) : (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setEditingClientId(client.id);
-                                      setEditingClientName(client.name);
-                                    }}
-                                  >
-                                    Rediger
-                                  </Button>
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        setEditingClientId(client.id);
+                                        setEditingClientName(client.name);
+                                      }}
+                                    >
+                                      Rediger
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => deleteClientMutation.mutate(client.id)}
+                                      disabled={deleteClientMutation.isPending}
+                                    >
+                                      Slet
+                                    </Button>
+                                  </>
                                 )}
                               </TableCell>
                             </TableRow>
