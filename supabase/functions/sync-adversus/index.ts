@@ -315,6 +315,58 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Debug action: fetch all campaigns and filter by name
+    if (debugAction === 'fetch-campaigns') {
+      let filterName = ''
+      try {
+        const body = await req.clone().json()
+        filterName = body.filter || ''
+      } catch {}
+      
+      console.log(`Debug: Fetching Adversus campaigns... filter: ${filterName}`)
+      
+      const campaignsResponse = await fetch(`${baseUrl}/campaigns`, {
+        headers: {
+          'Authorization': `Basic ${authHeader}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (campaignsResponse.ok) {
+        const campaignsData = await campaignsResponse.json()
+        const allCampaigns = campaignsData.campaigns || campaignsData || []
+        
+        // Filter campaigns by name if filter provided
+        let filteredCampaigns = allCampaigns
+        if (filterName) {
+          const filterLower = filterName.toLowerCase()
+          filteredCampaigns = allCampaigns.filter((c: any) => {
+            const name = c.settings?.name || c.name || ''
+            return name.toLowerCase().includes(filterLower)
+          })
+        }
+        
+        // Map to cleaner format with resultFields
+        const campaigns = filteredCampaigns.map((c: any) => ({
+          id: c.id,
+          name: c.settings?.name || c.name,
+          active: c.settings?.active,
+          resultFields: c.resultFields || []
+        }))
+        
+        console.log(`Found ${campaigns.length} campaigns matching "${filterName}"`)
+        return new Response(
+          JSON.stringify({ campaigns, total: campaigns.length }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } else {
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch campaigns', status: campaignsResponse.status }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
     // Debug action: fetch sales for a campaign
     if (debugAction === 'fetch-sales') {
       console.log(`Debug: Fetching Adversus sales...`)
