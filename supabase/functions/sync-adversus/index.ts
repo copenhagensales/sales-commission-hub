@@ -876,40 +876,59 @@ Deno.serve(async (req) => {
       await delay(200)
       
       try {
-        // Fetch sales filtered by leadId
-        const salesResponse = await fetch(`${baseUrl}/sales?filters=${encodeURIComponent(JSON.stringify({ leadid: { $eq: leadId } }))}`, {
-          headers: {
-            'Authorization': `Basic ${authHeader}`,
-            'Content-Type': 'application/json'
-          }
-        })
+        // Try multiple filter formats for leadId (Adversus API can be inconsistent)
+        const filterFormats = [
+          { leadid: { $eq: leadId } },
+          { lead: { $eq: leadId } },
+          { leadId: { $eq: leadId } }
+        ]
         
-        if (salesResponse.ok) {
-          const salesData = await salesResponse.json()
-          const sales = Array.isArray(salesData) ? salesData : (salesData.sales || [])
+        for (const filter of filterFormats) {
+          const salesResponse = await fetch(`${baseUrl}/sales?filters=${encodeURIComponent(JSON.stringify(filter))}`, {
+            headers: {
+              'Authorization': `Basic ${authHeader}`,
+              'Content-Type': 'application/json'
+            }
+          })
           
-          if (sales.length > 0) {
-            // Get the most recent sale
-            const sale = sales[0]
-            const productTitles: string[] = []
+          if (salesResponse.ok) {
+            const salesData = await salesResponse.json()
+            const sales = Array.isArray(salesData) ? salesData : (salesData.sales || [])
             
-            // Extract product titles from sale lines
-            if (sale.lines && Array.isArray(sale.lines)) {
-              for (const line of sale.lines) {
-                if (line.title) {
-                  productTitles.push(line.title)
+            if (sales.length > 0) {
+              // Get the most recent sale
+              const sale = sales[0]
+              const productTitles: string[] = []
+              
+              // Extract product titles from sale lines
+              if (sale.lines && Array.isArray(sale.lines)) {
+                for (const line of sale.lines) {
+                  if (line.title) {
+                    productTitles.push(line.title)
+                  }
                 }
               }
+              
+              // Also check for product field directly on sale
+              if (sale.product && typeof sale.product === 'string') {
+                productTitles.push(sale.product)
+              }
+              if (sale.productName) {
+                productTitles.push(sale.productName)
+              }
+              
+              if (productTitles.length > 0) {
+                console.log(`✓ Found Adversus sale for lead ${leadId}: ${productTitles.join(', ')}`)
+                const result = { productTitles, totalPrice: sale.totalNetPrice || sale.totalPrice || 0 }
+                salesCache.set(leadId, result)
+                return result
+              }
             }
-            
-            console.log(`✓ Found Adversus sale for lead ${leadId}: ${productTitles.join(', ')}`)
-            
-            const result = { productTitles, totalPrice: sale.totalNetPrice || sale.totalPrice || 0 }
-            salesCache.set(leadId, result)
-            return result
           }
         }
         
+        // Log when no sales found for debugging
+        console.log(`⚠ No Adversus sales found for lead ${leadId}`)
         salesCache.set(leadId, null)
         return null
       } catch (err) {
@@ -998,49 +1017,81 @@ Deno.serve(async (req) => {
         console.log(`✓ Found outcome from lead.product: ${lead.product}`)
         return lead.product.trim()
       }
-      
-      if (!lead.resultData || lead.resultData.length === 0) {
-        return null
+      if (lead.selectedProduct && typeof lead.selectedProduct === 'string' && lead.selectedProduct.trim()) {
+        console.log(`✓ Found outcome from lead.selectedProduct: ${lead.selectedProduct}`)
+        return lead.selectedProduct.trim()
       }
       
-      // Log ALL resultData fields for debugging
-      console.log(`=== ALL RESULTDATA FIELDS FOR LEAD (Campaign: ${campaignId}) ===`)
-      for (const rd of lead.resultData) {
-        console.log(`  Field "${rd.label}" (id: ${rd.id}): "${rd.value}"`)
-      }
-      console.log(`=== END RESULTDATA ===`)
-      
-      // Priority 1: Look for field labeled "Produkter" - this contains the closing code/product
-      for (const rd of lead.resultData) {
-        const labelLower = (rd.label || '').toLowerCase()
-        if (labelLower === 'produkter' || labelLower === 'produkt' || labelLower.includes('afslutning')) {
-          if (rd.value && rd.value.trim()) {
-            console.log(`✓ Found outcome from "${rd.label}": ${rd.value.trim()}`)
-            return rd.value.trim()
+      // Check any field on lead that might contain product/outcome info
+      const leadAny = lead as unknown as Record<string, unknown>
+      for (const key of Object.keys(leadAny)) {
+        const val = leadAny[key]
+        if (typeof val === 'string' && val.trim()) {
+          const keyLower = key.toLowerCase()
+          if (keyLower.includes('product') || keyLower.includes('outcome') || 
+              keyLower.includes('result') || keyLower.includes('closing')) {
+            console.log(`✓ Found outcome from lead.${key}: ${val}`)
+            return val.trim()
           }
         }
       }
       
-      // Priority 2: Look for "Succes" fields (like "FF Succes:", "Succes:", etc.)
-      for (const rd of lead.resultData) {
-        const labelLower = (rd.label || '').toLowerCase()
-        if (labelLower.includes('succes') && !labelLower.includes('note')) {
-          if (rd.value && rd.value.trim()) {
-            console.log(`✓ Found outcome from succes field "${rd.label}": ${rd.value.trim()}`)
+      // Log ALL resultData fields for debugging (only for first few leads)
+      if (lead.resultData && lead.resultData.length > 0) {
+        console.log(`=== ALL RESULTDATA FIELDS FOR LEAD (Campaign: ${campaignId}) ===`)
+        for (const rd of lead.resultData) {
+          console.log(`  Field "${rd.label}" (id: ${rd.id}): "${rd.value}"`)
+        }
+        console.log(`=== END RESULTDATA ===`)
+        
+        // Priority 1: Look for field labeled "Produkter" - this contains the closing code/product
+        for (const rd of lead.resultData) {
+          const labelLower = (rd.label || '').toLowerCase()
+          if (labelLower === 'produkter' || labelLower === 'produkt' || 
+              labelLower.includes('afslutning') || labelLower.includes('mødetype') ||
+              labelLower.includes('meeting') || labelLower.includes('booking')) {
+            if (rd.value && rd.value.trim()) {
+              console.log(`✓ Found outcome from "${rd.label}": ${rd.value.trim()}`)
+              return rd.value.trim()
+            }
+          }
+        }
+        
+        // Priority 2: Look for "Succes" fields (like "FF Succes:", "Succes:", etc.)
+        for (const rd of lead.resultData) {
+          const labelLower = (rd.label || '').toLowerCase()
+          if (labelLower.includes('succes') && !labelLower.includes('note')) {
+            if (rd.value && rd.value.trim()) {
+              console.log(`✓ Found outcome from succes field "${rd.label}": ${rd.value.trim()}`)
+              return rd.value.trim()
+            }
+          }
+        }
+        
+        // Priority 3: Look for fields containing product-like values
+        for (const rd of lead.resultData) {
+          const valueLower = (rd.value || '').toLowerCase()
+          // Check if value looks like a product name (contains keywords)
+          if (valueLower.includes('fysisk') || valueLower.includes('telefon') || 
+              valueLower.includes('video') || valueLower.includes('online') ||
+              valueLower.includes('mobil') || valueLower.includes('fiber') ||
+              valueLower.includes('5g') || valueLower.includes('omstilling')) {
+            console.log(`✓ Found outcome from value match "${rd.label}": ${rd.value.trim()}`)
             return rd.value.trim()
           }
         }
-      }
-      
-      // Priority 3: Look for other outcome-like fields
-      for (const rd of lead.resultData) {
-        const labelLower = (rd.label || '').toLowerCase()
-        if (labelLower.includes('outcome') || 
-            labelLower.includes('resultat') ||
-            labelLower.includes('udfald')) {
-          if (rd.value && rd.value.trim()) {
-            console.log(`✓ Found outcome from "${rd.label}": ${rd.value.trim()}`)
-            return rd.value.trim()
+        
+        // Priority 4: Look for other outcome-like fields
+        for (const rd of lead.resultData) {
+          const labelLower = (rd.label || '').toLowerCase()
+          if (labelLower.includes('outcome') || 
+              labelLower.includes('resultat') ||
+              labelLower.includes('udfald') ||
+              labelLower.includes('type')) {
+            if (rd.value && rd.value.trim()) {
+              console.log(`✓ Found outcome from "${rd.label}": ${rd.value.trim()}`)
+              return rd.value.trim()
+            }
           }
         }
       }
