@@ -90,6 +90,24 @@ export default function Commission() {
     return adversusMappings?.filter(m => m.product_id === productId) || [];
   };
 
+  // Update adversus mapping mutation
+  const updateAdversusMappingMutation = useMutation({
+    mutationFn: async ({ mappingId, productId }: { mappingId: string; productId: string | null }) => {
+      const { error } = await supabase
+        .from('adversus_product_mappings')
+        .update({ product_id: productId })
+        .eq('id', mappingId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Adversus mapping opdateret');
+      queryClient.invalidateQueries({ queryKey: ['adversus-product-mappings'] });
+    },
+    onError: (error) => {
+      toast.error(`Fejl: ${error.message}`);
+    }
+  });
+
   // Update product mutation
   const updateProductMutation = useMutation({
     mutationFn: async ({ productId, field, value }: { productId: string; field: string; value: string | number }) => {
@@ -525,21 +543,33 @@ export default function Commission() {
                               {product.client_campaigns?.clients?.name} / {product.client_campaigns?.name}
                             </TableCell>
                             <TableCell>
-                              {(() => {
-                                const mappings = getAdversusMappingsForProduct(product.id);
-                                if (mappings.length === 0) {
-                                  return <span className="text-muted-foreground text-sm">-</span>;
-                                }
-                                return (
-                                  <div className="flex flex-wrap gap-1">
-                                    {mappings.map((m) => (
-                                      <Badge key={m.id} variant="secondary" className="text-xs">
-                                        {m.adversus_product_title || m.adversus_external_id || 'Mapped'}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                );
-                              })()}
+                              <div className="flex flex-col gap-1">
+                                {/* Show existing mappings */}
+                                {getAdversusMappingsForProduct(product.id).map((m) => (
+                                  <Badge key={m.id} variant="secondary" className="text-xs w-fit">
+                                    {m.adversus_product_title || m.adversus_external_id || 'Mapped'}
+                                  </Badge>
+                                ))}
+                                {/* Dropdown to add mapping */}
+                                <Select
+                                  onValueChange={(mappingId) => {
+                                    updateAdversusMappingMutation.mutate({ mappingId, productId: product.id });
+                                  }}
+                                >
+                                  <SelectTrigger className="h-7 w-[200px] text-xs">
+                                    <SelectValue placeholder="Tilføj mapping..." />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-background border z-50">
+                                    {adversusMappings
+                                      ?.filter(m => m.product_id !== product.id)
+                                      .map((mapping) => (
+                                        <SelectItem key={mapping.id} value={mapping.id} className="text-xs">
+                                          {mapping.adversus_product_title || mapping.adversus_external_id}
+                                        </SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
                               {editingCell?.productId === product.id && editingCell?.field === 'commission_dkk' ? (
