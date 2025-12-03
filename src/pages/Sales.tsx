@@ -394,7 +394,14 @@ export default function Sales() {
                       onClick={() => setSelectedSale(sale)}
                     >
                       <TableCell className="text-foreground">
-                        {sale.sale_date ? new Date(sale.sale_date).toLocaleDateString("da-DK") : '-'}
+                        {sale.sale_date ? (
+                          <div className="flex flex-col">
+                            <span>{new Date(sale.sale_date).toLocaleDateString("da-DK")}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(sale.sale_date).toLocaleTimeString("da-DK", { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        ) : '-'}
                       </TableCell>
                       <TableCell className="text-foreground font-medium">
                         {sale.agent?.name || 'Ukendt'}
