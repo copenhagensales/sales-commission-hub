@@ -122,13 +122,13 @@ export default function Settings() {
     return Object.values(productsGroupedByCustomer).flat();
   }, [productsGroupedByCustomer]);
 
-  const handleScanProducts = async () => {
+  const handleScanProducts = async (days: number = 60) => {
     setIsScanning(true);
     setScanResults(null);
     setSelectedProducts(new Set());
     try {
       const { data, error } = await supabase.functions.invoke('sync-adversus', {
-        body: { action: 'scan-all-products' }
+        body: { action: 'scan-all-products', scanDays: days }
       });
       if (error) throw error;
       setScanResults(data);
@@ -584,13 +584,22 @@ export default function Settings() {
                 Sidste 30 dage (i bidder)
               </Button>
               <Button 
-                onClick={handleScanProducts} 
+                onClick={() => handleScanProducts(7)} 
                 disabled={isSyncing || isScanning}
                 variant="secondary"
                 className="gap-2"
               >
                 {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Package className="h-4 w-4" />}
-                Scan produkter fra sales
+                Scan denne uge
+              </Button>
+              <Button 
+                onClick={() => handleScanProducts(60)} 
+                disabled={isSyncing || isScanning}
+                variant="outline"
+                className="gap-2"
+              >
+                {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Package className="h-4 w-4" />}
+                Scan 60 dage
               </Button>
             </div>
 
