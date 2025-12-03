@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -11,9 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Pencil } from "lucide-react";
+import { Plus, Trash2, Pencil, Check, ChevronsUpDown } from "lucide-react";
 import { EditableCell } from "@/components/commission/EditableCell";
+import { cn } from "@/lib/utils";
 
 interface CampaignMapping {
   id: string;
@@ -60,6 +63,8 @@ export default function CommissionCPO() {
     product_id: "",
     liquidity_customer_id: "",
   });
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
 
   const { data: campaigns, isLoading } = useQuery({
     queryKey: ["campaign-mappings-with-products"],
@@ -98,6 +103,44 @@ export default function CommissionCPO() {
       return data as Product[];
     },
   });
+
+  // Auto-suggest product based on outcome
+  const suggestProductFromOutcome = (outcome: string): string | null => {
+    if (!outcome || !products) return null;
+    const outcomeLower = outcome.toLowerCase();
+    
+    // Find product that matches outcome text
+    const matchingProduct = products.find(p => {
+      const productNameLower = p.name.toLowerCase();
+      // Check if outcome contains product name or vice versa
+      return outcomeLower.includes(productNameLower) || 
+             productNameLower.includes(outcomeLower) ||
+             // Check for partial matches
+             outcomeLower.split(/[\s-]+/).some(word => 
+               word.length > 2 && productNameLower.includes(word)
+             );
+    });
+    
+    return matchingProduct?.id || null;
+  };
+
+  // Auto-set product when outcome changes
+  useEffect(() => {
+    if (newMapping.adversus_outcome && !newMapping.product_id) {
+      const suggestedProductId = suggestProductFromOutcome(newMapping.adversus_outcome);
+      if (suggestedProductId) {
+        setNewMapping(prev => ({ ...prev, product_id: suggestedProductId }));
+      }
+    }
+  }, [newMapping.adversus_outcome, products]);
+
+  // Filter products based on search
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    if (!productSearch) return products;
+    const searchLower = productSearch.toLowerCase();
+    return products.filter(p => p.name.toLowerCase().includes(searchLower));
+  }, [products, productSearch]);
 
   const { data: customers } = useQuery({
     queryKey: ["liquidity-customers"],
@@ -304,21 +347,59 @@ export default function CommissionCPO() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="product">Produkt</Label>
-                  <Select
-                    value={newMapping.product_id}
-                    onValueChange={(value) => setNewMapping({ ...newMapping, product_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Vælg produkt" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {products?.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={productSearchOpen}
+                        className="w-full justify-between"
+                      >
+                        {newMapping.product_id
+                          ? products?.find(p => p.id === newMapping.product_id)?.name
+                          : "Vælg produkt..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0 z-50" align="start">
+                      <Command>
+                        <CommandInput 
+                          placeholder="Søg efter produkt..." 
+                          value={productSearch}
+                          onValueChange={setProductSearch}
+                        />
+                        <CommandList>
+                          <CommandEmpty>Ingen produkter fundet.</CommandEmpty>
+                          <CommandGroup>
+                            {filteredProducts.map((product) => (
+                              <CommandItem
+                                key={product.id}
+                                value={product.name}
+                                onSelect={() => {
+                                  setNewMapping({ ...newMapping, product_id: product.id });
+                                  setProductSearchOpen(false);
+                                  setProductSearch("");
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    newMapping.product_id === product.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {product.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {newMapping.adversus_outcome && newMapping.product_id && (
+                    <p className="text-xs text-muted-foreground">
+                      Foreslået baseret på outcome
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="customer">Kunde (valgfrit)</Label>
