@@ -8,3 +8,12 @@ verify_jwt = false
 
 [functions.import-products]
 verify_jwt = false
+
+[functions.economic-webhook]
+verify_jwt = false
+
+[functions.sync-economic]
+verify_jwt = false
+
+[functions.finance-summary]
+verify_jwt = false
