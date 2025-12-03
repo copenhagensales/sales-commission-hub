@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, RefreshCw, AlertTriangle, CheckCircle, Package, Link2 } from "lucide-react";
+import { Upload, RefreshCw, AlertTriangle, CheckCircle, Package, Link2, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 type EditingCell = {
   productId: string;
@@ -23,6 +25,8 @@ export default function Commission() {
   const [selectedClientId, setSelectedClientId] = useState<string>("all");
   const [editingCell, setEditingCell] = useState<EditingCell>(null);
   const [editValue, setEditValue] = useState<string>("");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newProduct, setNewProduct] = useState({ name: "", commission_dkk: "", revenue_dkk: "", client_campaign_id: "" });
 
   // Fetch clients for filter
   const { data: clients } = useQuery({
@@ -31,6 +35,19 @@ export default function Commission() {
       const { data, error } = await supabase
         .from('clients')
         .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch campaigns for add product dialog
+  const { data: campaigns } = useQuery({
+    queryKey: ['campaigns'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('client_campaigns')
+        .select('id, name, clients(name)')
         .order('name');
       if (error) throw error;
       return data;
@@ -75,6 +92,43 @@ export default function Commission() {
     }
   });
 
+  // Add product mutation
+  const addProductMutation = useMutation({
+    mutationFn: async (product: { name: string; commission_dkk: number; revenue_dkk: number; client_campaign_id: string }) => {
+      const { error } = await supabase
+        .from('products')
+        .insert(product);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Produkt tilføjet');
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      setIsAddDialogOpen(false);
+      setNewProduct({ name: "", commission_dkk: "", revenue_dkk: "", client_campaign_id: "" });
+    },
+    onError: (error) => {
+      toast.error(`Fejl: ${error.message}`);
+    }
+  });
+
+  // Delete product mutation
+  const deleteProductMutation = useMutation({
+    mutationFn: async (productId: string) => {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Produkt slettet');
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+    onError: (error) => {
+      toast.error(`Fejl ved sletning: ${error.message}`);
+    }
+  });
+
   const startEditing = (productId: string, field: 'name' | 'commission_dkk' | 'revenue_dkk', currentValue: string | number) => {
     setEditingCell({ productId, field });
     setEditValue(String(currentValue));
@@ -94,6 +148,19 @@ export default function Commission() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') saveEdit();
     if (e.key === 'Escape') cancelEdit();
+  };
+
+  const handleAddProduct = () => {
+    if (!newProduct.name || !newProduct.client_campaign_id) {
+      toast.error('Udfyld navn og vælg kampagne');
+      return;
+    }
+    addProductMutation.mutate({
+      name: newProduct.name,
+      commission_dkk: parseFloat(newProduct.commission_dkk) || 0,
+      revenue_dkk: parseFloat(newProduct.revenue_dkk) || 0,
+      client_campaign_id: newProduct.client_campaign_id,
+    });
   };
 
   // Fetch unmapped sale items
@@ -293,19 +360,85 @@ export default function Commission() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Master Product List</CardTitle>
-                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <SelectTrigger className="w-[220px]">
-                    <SelectValue placeholder="Filter by client..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background border z-50">
-                    <SelectItem value="all">Alle kunder</SelectItem>
-                    {clients?.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Tilføj produkt
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-background">
+                      <DialogHeader>
+                        <DialogTitle>Tilføj nyt produkt</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Produkt navn</Label>
+                          <Input
+                            value={newProduct.name}
+                            onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                            placeholder="Produktnavn..."
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Client / Campaign</Label>
+                          <Select
+                            value={newProduct.client_campaign_id}
+                            onValueChange={(value) => setNewProduct({ ...newProduct, client_campaign_id: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Vælg kampagne..." />
+                            </SelectTrigger>
+                            <SelectContent className="bg-background border z-50">
+                              {campaigns?.map((campaign) => (
+                                <SelectItem key={campaign.id} value={campaign.id}>
+                                  {campaign.clients?.name} / {campaign.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Commission (DKK)</Label>
+                            <Input
+                              type="number"
+                              value={newProduct.commission_dkk}
+                              onChange={(e) => setNewProduct({ ...newProduct, commission_dkk: e.target.value })}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Revenue (DKK)</Label>
+                            <Input
+                              type="number"
+                              value={newProduct.revenue_dkk}
+                              onChange={(e) => setNewProduct({ ...newProduct, revenue_dkk: e.target.value })}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                        <Button onClick={handleAddProduct} disabled={addProductMutation.isPending} className="w-full">
+                          {addProductMutation.isPending ? "Tilføjer..." : "Tilføj produkt"}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                    <SelectTrigger className="w-[220px]">
+                      <SelectValue placeholder="Filter by client..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border z-50">
+                      <SelectItem value="all">Alle kunder</SelectItem>
+                      {clients?.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardHeader>
               <CardContent>
                 {loadingProducts ? (
@@ -318,7 +451,7 @@ export default function Commission() {
                         <TableHead>Client / Campaign</TableHead>
                         <TableHead className="text-right">Commission (DKK)</TableHead>
                         <TableHead className="text-right">Revenue (DKK)</TableHead>
-                        <TableHead>External Code</TableHead>
+                        <TableHead className="w-[60px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -414,7 +547,14 @@ export default function Commission() {
                               )}
                             </TableCell>
                             <TableCell>
-                              {product.external_product_code || <span className="text-muted-foreground">—</span>}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => deleteProductMutation.mutate(product.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ));
