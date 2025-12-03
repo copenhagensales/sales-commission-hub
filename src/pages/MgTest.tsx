@@ -538,9 +538,6 @@ export default function MgTest() {
                           const selectedCampaign = clientCampaigns?.find(
                             (c) => c.id === mapping.client_campaign_id,
                           );
-                          const selectedLabel = selectedCampaign
-                            ? `${selectedCampaign.clients?.name ?? "Ukendt kunde"} – ${selectedCampaign.name}`
-                            : "Vælg intern kampagne";
 
                           return (
                             <TableRow key={mapping.id}>
@@ -565,9 +562,7 @@ export default function MgTest() {
                                   }
                                 >
                                   <SelectTrigger className="w-full max-w-xl">
-                                    <SelectValue placeholder="Vælg intern kampagne">
-                                      {selectedLabel}
-                                    </SelectValue>
+                                    <SelectValue placeholder="Vælg intern kampagne" />
                                   </SelectTrigger>
                                   <SelectContent className="bg-background border z-50 max-h-72">
                                     {clientCampaigns?.map((c) => (
