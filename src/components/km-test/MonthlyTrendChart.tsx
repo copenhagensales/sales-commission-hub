@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from "recharts";
-import { summaryData, monthlyAverage } from "@/data/financialData";
+import { summaryData, totalFixedCosts } from "@/data/financialData";
 
 export function MonthlyTrendChart() {
   const formatCurrency = (value: number) => {
@@ -12,48 +12,43 @@ export function MonthlyTrendChart() {
     }).format(value);
   };
 
-  // Simuleret månedlig data baseret på YTD gennemsnit
-  // I virkeligheden ville vi have faktiske månedstal
   const months = ["Jan", "Feb", "Mar", "Apr", "Maj", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"];
+  
+  // Månedlige gennemsnit (ekskl. løn)
+  const monthlyRevenue = summaryData.revenue / summaryData.months;
+  const monthlyFixedCosts = totalFixedCosts / summaryData.months;
+  const monthlyDirectCosts = summaryData.directCosts / summaryData.months;
   
   // Kumulativ udvikling over året
   const chartData = months.map((month, index) => {
     const monthNum = index + 1;
     const isActual = monthNum <= summaryData.months;
     
-    // Kumulativ omsætning og resultat
-    const cumulativeRevenue = isActual 
-      ? (summaryData.revenue / summaryData.months) * monthNum
-      : null;
-    const cumulativeResult = isActual
-      ? (summaryData.resultBeforeTax / summaryData.months) * monthNum
-      : null;
-    const cumulativeCosts = isActual
-      ? ((summaryData.revenue - summaryData.resultBeforeTax) / summaryData.months) * monthNum
-      : null;
-    
-    // Forecast for resterende måneder
-    const forecastRevenue = !isActual 
-      ? (summaryData.revenue / summaryData.months) * monthNum
-      : null;
-    const forecastResult = !isActual
-      ? (summaryData.resultBeforeTax / summaryData.months) * monthNum
-      : null;
-    
-    return {
-      month,
-      omsætning: cumulativeRevenue,
-      resultat: cumulativeResult,
-      omkostninger: cumulativeCosts,
-      forecastOmsætning: forecastRevenue,
-      forecastResultat: forecastResult,
-    };
+    if (isActual) {
+      return {
+        month,
+        omsætning: monthlyRevenue * monthNum,
+        fasteOmk: monthlyFixedCosts * monthNum,
+        direkteOmk: monthlyDirectCosts * monthNum,
+        forecastOmsætning: null,
+        forecastFasteOmk: null,
+      };
+    } else {
+      return {
+        month,
+        omsætning: null,
+        fasteOmk: null,
+        direkteOmk: null,
+        forecastOmsætning: monthlyRevenue * monthNum,
+        forecastFasteOmk: monthlyFixedCosts * monthNum,
+      };
+    }
   });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Kumulativ udvikling 2025</CardTitle>
+        <CardTitle className="text-lg">Kumulativ udvikling 2025 (ekskl. løn)</CardTitle>
         <p className="text-sm text-muted-foreground">
           Faktisk (Jan-Nov) og forecast (Dec) baseret på gennemsnit
         </p>
@@ -85,19 +80,19 @@ export function MonthlyTrendChart() {
               />
               <Line 
                 type="monotone" 
-                dataKey="resultat" 
-                stroke="#22c55e" 
+                dataKey="fasteOmk" 
+                stroke="#ef4444" 
                 strokeWidth={2}
-                name="Resultat"
+                name="Faste omk."
                 dot={{ r: 4 }}
                 connectNulls={false}
               />
               <Line 
                 type="monotone" 
-                dataKey="omkostninger" 
-                stroke="#ef4444" 
+                dataKey="direkteOmk" 
+                stroke="#f59e0b" 
                 strokeWidth={2}
-                name="Omkostninger"
+                name="Direkte omk."
                 dot={{ r: 4 }}
                 connectNulls={false}
               />
@@ -115,11 +110,11 @@ export function MonthlyTrendChart() {
               />
               <Line 
                 type="monotone" 
-                dataKey="forecastResultat" 
-                stroke="#22c55e" 
+                dataKey="forecastFasteOmk" 
+                stroke="#ef4444" 
                 strokeWidth={2}
                 strokeDasharray="5 5"
-                name="Forecast resultat"
+                name="Forecast faste omk."
                 dot={{ r: 4 }}
                 connectNulls={false}
               />
