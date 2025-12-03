@@ -12,6 +12,7 @@ const navigation = [
   { name: "Provision og CPO", href: "/commission-cpo", icon: Percent },
   { name: "Lønkørsler", href: "/payroll", icon: Wallet },
   { name: "Wallboard", href: "/wallboard", icon: Tv },
+  { name: "MG test", href: "/mg-test", icon: Percent },
   { name: "Indstillinger", href: "/settings", icon: Settings },
 ];
 
