@@ -265,27 +265,54 @@ Deno.serve(async (req) => {
 
     // Debug action: fetch Adversus products
     if (debugAction === 'fetch-products') {
-      console.log('Debug: Fetching Adversus products...')
-      const productsResponse = await fetch(`${baseUrl}/products?pageSize=100`, {
-        headers: {
-          'Authorization': `Basic ${authHeader}`,
-          'Content-Type': 'application/json'
+      let searchFilter = ''
+      try {
+        const body = await req.clone().json()
+        if (body.filter) {
+          searchFilter = `&filters=${encodeURIComponent(JSON.stringify({ title: { $c: body.filter } }))}`
         }
-      })
+      } catch {}
       
-      if (productsResponse.ok) {
-        const productsData = await productsResponse.json()
-        console.log('Adversus products:', JSON.stringify(productsData, null, 2))
-        return new Response(
-          JSON.stringify({ products: productsData }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      } else {
-        return new Response(
-          JSON.stringify({ error: 'Failed to fetch products', status: productsResponse.status }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+      console.log(`Debug: Fetching Adversus products... filter: ${searchFilter}`)
+      
+      // Fetch multiple pages to get all products
+      let allProducts: unknown[] = []
+      let page = 1
+      const pageSize = 100
+      
+      while (page <= 10) { // Max 10 pages = 1000 products
+        const url = `${baseUrl}/products?pageSize=${pageSize}&page=${page}${searchFilter}`
+        console.log(`Fetching page ${page}: ${url}`)
+        
+        const productsResponse = await fetch(url, {
+          headers: {
+            'Authorization': `Basic ${authHeader}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (productsResponse.ok) {
+          const productsData = await productsResponse.json()
+          const products = Array.isArray(productsData) ? productsData : (productsData.products || [])
+          
+          if (products.length === 0) break
+          
+          allProducts = [...allProducts, ...products]
+          console.log(`Page ${page}: Got ${products.length} products, total: ${allProducts.length}`)
+          
+          if (products.length < pageSize) break // Last page
+          page++
+        } else {
+          console.error(`Failed to fetch page ${page}:`, await productsResponse.text())
+          break
+        }
       }
+      
+      console.log(`Total Adversus products fetched: ${allProducts.length}`)
+      return new Response(
+        JSON.stringify({ products: allProducts, total: allProducts.length }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Debug action: fetch sales for a campaign
