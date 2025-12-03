@@ -1,16 +1,4 @@
-import { 
-  LayoutDashboard, 
-  Users, 
-  ShoppingCart, 
-  Wallet, 
-  Settings,
-  Tv,
-  LogOut,
-  TrendingUp,
-  Receipt,
-  GitBranch,
-  Percent
-} from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,10 +11,6 @@ const navigation = [
   { name: "Salg", href: "/sales", icon: ShoppingCart },
   { name: "Provision og CPO", href: "/commission-cpo", icon: Percent },
   { name: "Lønkørsler", href: "/payroll", icon: Wallet },
-  { name: "Likviditet", href: "/liquidity", icon: TrendingUp },
-  { name: "Kunder", href: "/liquidity/customers", icon: Receipt },
-  { name: "Omkostninger", href: "/liquidity/expenses", icon: Wallet },
-  { name: "Scenarier", href: "/liquidity/scenarios", icon: GitBranch },
   { name: "Wallboard", href: "/wallboard", icon: Tv },
   { name: "Indstillinger", href: "/settings", icon: Settings },
 ];
@@ -38,37 +22,26 @@ export function AppSidebar() {
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
-      toast({
-        title: "Fejl ved logout",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Fejl ved logout", description: error.message, variant: "destructive" });
     }
   };
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar">
       <div className="flex h-full flex-col">
-        {/* Logo */}
         <div className="flex h-20 items-center justify-center border-b border-sidebar-border px-6">
           <img src={cphSalesLogo} alt="CPH Sales" className="h-14 w-auto object-contain" />
         </div>
-
-        {/* Navigation */}
         <nav className="flex-1 space-y-1 p-4">
           {navigation.map((item) => {
-            const isActive = location.pathname === item.href || 
-              (item.href !== "/" && location.pathname.startsWith(item.href));
-            
+            const isActive = location.pathname === item.href;
             return (
               <NavLink
                 key={item.name}
                 to={item.href}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                  isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                  isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                 )}
               >
                 <item.icon className="h-5 w-5" />
@@ -77,13 +50,8 @@ export function AppSidebar() {
             );
           })}
         </nav>
-
-        {/* Logout */}
         <div className="border-t border-sidebar-border p-4">
-          <button
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-          >
+          <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50">
             <LogOut className="h-5 w-5" />
             Log ud
           </button>
