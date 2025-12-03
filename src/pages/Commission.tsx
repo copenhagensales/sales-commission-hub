@@ -54,6 +54,18 @@ export default function Commission() {
     }
   });
 
+  // Fetch adversus product mappings
+  const { data: adversusMappings } = useQuery({
+    queryKey: ['adversus-product-mappings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('adversus_product_mappings')
+        .select('*');
+      if (error) throw error;
+      return data;
+    }
+  });
+
   // Fetch products
   const { data: products, isLoading: loadingProducts } = useQuery({
     queryKey: ['products'],
@@ -72,6 +84,11 @@ export default function Commission() {
       return data;
     }
   });
+
+  // Helper to get adversus mappings for a product
+  const getAdversusMappingsForProduct = (productId: string) => {
+    return adversusMappings?.filter(m => m.product_id === productId) || [];
+  };
 
   // Update product mutation
   const updateProductMutation = useMutation({
@@ -449,6 +466,7 @@ export default function Commission() {
                       <TableRow>
                         <TableHead>Product Name</TableHead>
                         <TableHead>Client / Campaign</TableHead>
+                        <TableHead>Adversus Mapping</TableHead>
                         <TableHead className="text-right">Commission (DKK)</TableHead>
                         <TableHead className="text-right">Revenue (DKK)</TableHead>
                         <TableHead className="w-[60px]"></TableHead>
@@ -473,7 +491,7 @@ export default function Commission() {
                         if (!sortedProducts?.length) {
                           return (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                                 {selectedClientId === "all" 
                                   ? "No products imported yet. Use the Import CSV tab to add products."
                                   : "No products found for this client."}
@@ -505,6 +523,23 @@ export default function Commission() {
                             </TableCell>
                             <TableCell>
                               {product.client_campaigns?.clients?.name} / {product.client_campaigns?.name}
+                            </TableCell>
+                            <TableCell>
+                              {(() => {
+                                const mappings = getAdversusMappingsForProduct(product.id);
+                                if (mappings.length === 0) {
+                                  return <span className="text-muted-foreground text-sm">-</span>;
+                                }
+                                return (
+                                  <div className="flex flex-wrap gap-1">
+                                    {mappings.map((m) => (
+                                      <Badge key={m.id} variant="secondary" className="text-xs">
+                                        {m.adversus_product_title || m.adversus_external_id || 'Mapped'}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
                             </TableCell>
                             <TableCell className="text-right">
                               {editingCell?.productId === product.id && editingCell?.field === 'commission_dkk' ? (
