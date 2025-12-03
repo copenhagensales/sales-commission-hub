@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Pencil } from "lucide-react";
+import { EditableCell } from "@/components/commission/EditableCell";
 
 interface CampaignMapping {
   id: string;
@@ -199,6 +200,29 @@ export default function CommissionCPO() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["campaign-mappings-with-products"] });
       toast({ title: "Produkt opdateret" });
+    },
+    onError: (error) => {
+      toast({ title: "Fejl ved opdatering", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateProductValuesMutation = useMutation({
+    mutationFn: async ({ productId, commission_value, revenue_amount }: { productId: string; commission_value?: number; revenue_amount?: number }) => {
+      const updates: Record<string, number> = {};
+      if (commission_value !== undefined) updates.commission_value = commission_value;
+      if (revenue_amount !== undefined) updates.revenue_amount = revenue_amount;
+      
+      const { error } = await supabase
+        .from("products")
+        .update(updates)
+        .eq("id", productId);
+
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["campaign-mappings-with-products"] });
+      await queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast({ title: "Værdi opdateret" });
     },
     onError: (error) => {
       toast({ title: "Fejl ved opdatering", description: error.message, variant: "destructive" });
@@ -401,13 +425,35 @@ export default function CommissionCPO() {
                             {mapping.liquidity_customers?.name || "-"}
                           </TableCell>
                           <TableCell>
-                            {mapping.products?.commission_type === "percentage" 
-                              ? `${mapping.products.commission_value}%`
-                              : formatCurrency(mapping.products?.commission_value)
-                            }
+                            {mapping.product_id ? (
+                              <EditableCell
+                                value={mapping.products?.commission_value}
+                                onSave={(value) => updateProductValuesMutation.mutate({ 
+                                  productId: mapping.product_id!, 
+                                  commission_value: value 
+                                })}
+                                formatDisplay={(val) => mapping.products?.commission_type === "percentage" 
+                                  ? `${val || 0}%`
+                                  : formatCurrency(val)
+                                }
+                              />
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                           <TableCell>
-                            {formatCurrency(mapping.products?.revenue_amount)}
+                            {mapping.product_id ? (
+                              <EditableCell
+                                value={mapping.products?.revenue_amount}
+                                onSave={(value) => updateProductValuesMutation.mutate({ 
+                                  productId: mapping.product_id!, 
+                                  revenue_amount: value 
+                                })}
+                                formatDisplay={formatCurrency}
+                              />
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
