@@ -63,7 +63,7 @@ export default function Settings() {
     setScanResults(null);
     try {
       const { data, error } = await supabase.functions.invoke('sync-adversus', {
-        body: { debugAction: 'scan-all-products' }
+        body: { action: 'scan-all-products' }
       });
       if (error) throw error;
       setScanResults(data);
