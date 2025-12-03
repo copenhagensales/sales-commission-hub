@@ -330,7 +330,14 @@ export default function Commission() {
                               return clientId === selectedClientId;
                             });
                         
-                        if (!filteredProducts?.length) {
+                        // Sort alphabetically by client name
+                        const sortedProducts = [...(filteredProducts || [])].sort((a, b) => {
+                          const clientA = a.client_campaigns?.clients?.name || '';
+                          const clientB = b.client_campaigns?.clients?.name || '';
+                          return clientA.localeCompare(clientB, 'da');
+                        });
+                        
+                        if (!sortedProducts?.length) {
                           return (
                             <TableRow>
                               <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
@@ -342,7 +349,7 @@ export default function Commission() {
                           );
                         }
                         
-                        return filteredProducts.map((product) => (
+                        return sortedProducts.map((product) => (
                           <TableRow key={product.id}>
                             <TableCell className="font-medium">
                               {editingCell?.productId === product.id && editingCell?.field === 'name' ? (
