@@ -477,19 +477,32 @@ export default function MgTest() {
       }
     });
 
-    // Fordel kampagner i grupper efter gemt kunde-tilknytning
+    // Fordel kampagner i grupper efter gemt kunde-tilknytning eller udledt kundenavn
     campaignMappings?.forEach((mapping) => {
       const existingClientId =
         clientCampaigns?.find((c) => c.id === mapping.client_campaign_id)?.client_id ?? null;
-      const groupKey = existingClientId ?? "unmapped";
+
+      let clientId = existingClientId;
+
+      // Hvis der ikke er gemt kunde, forsøg at udlede kunden fra kampagnenavnet
+      if (!clientId) {
+        const parsedClient = parseClientFromTitle(mapping.adversus_campaign_name, clients);
+        if (parsedClient) {
+          clientId = parsedClient.id;
+        }
+      }
+
+      const groupKey = clientId ?? "unmapped";
       const existing = groups.get(groupKey);
 
       if (existing) {
         existing.rows.push(mapping);
       } else {
         groups.set(groupKey, {
-          clientId: existingClientId,
-          clientLabel: existingClientId ? "Ukendt kunde" : "Manglende mapping",
+          clientId,
+          clientLabel: clientId
+            ? clients?.find((c) => c.id === clientId)?.name ?? "Ukendt kunde"
+            : "Manglende mapping",
           rows: [mapping],
         });
       }
@@ -957,80 +970,136 @@ export default function MgTest() {
                     oprettes de automatisk her.
                   </p>
                 ) : (
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[30%]">Adversus kampagnenavn</TableHead>
-                          <TableHead className="w-[20%]">Adversus campaignId</TableHead>
-                          <TableHead className="w-[50%]">Intern kunde / kampagne</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {campaignMappings.map((mapping) => {
-                          const existingClientId =
-                            clientCampaigns?.find((c) => c.id === mapping.client_campaign_id)?.client_id ?? null;
-                          const selectedClientId =
-                            campaignSelections[mapping.id] !== undefined
-                              ? campaignSelections[mapping.id]
-                              : existingClientId;
+                  campaignsByClient.map((group) => {
+                    const groupKey = group.clientId ?? "unmapped";
+                    const isOpen = openCampaignGroups[groupKey] ?? true;
 
-                          return (
-                            <TableRow key={mapping.id}>
-                              <TableCell>
-                                <span className="font-medium">
-                                  {mapping.adversus_campaign_name || "(ingen navn)"}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <span className="text-xs font-mono text-muted-foreground">
-                                  {mapping.adversus_campaign_id}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-col gap-2 max-w-xl">
-                                  <Select
-                                    value={selectedClientId ?? undefined}
-                                    onValueChange={(value) =>
-                                      setCampaignSelections((prev) => ({
-                                        ...prev,
-                                        [mapping.id]: value,
-                                      }))
-                                    }
-                                  >
-                                    <SelectTrigger className="w-full">
-                                      <SelectValue placeholder="Vælg kunde" />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-background border z-50 max-h-72">
-                                      {clients?.map((client) => (
-                                        <SelectItem key={client.id} value={client.id} className="text-sm">
-                                          {client.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <div className="flex justify-end">
-                                    <Button
-                                      size="sm"
-                                      onClick={() =>
-                                        updateCampaignMapping.mutate({
-                                          mappingId: mapping.id,
-                                          clientId: selectedClientId,
-                                        })
-                                      }
-                                      disabled={updateCampaignMapping.isPending || selectedClientId === existingClientId}
-                                    >
-                                      Gem
-                                    </Button>
-                                  </div>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
+                    return (
+                      <div key={groupKey} className="border-b last:border-b-0 py-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <h3 className="text-sm font-semibold">{group.clientLabel}</h3>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {group.clientLabel === "Manglende mapping"
+                                ? "Kampagner uden valgt kunde. Vælg kunde og gem for at flytte kampagnen til den rette kundegruppe."
+                                : `${group.rows.length} kampagner til denne kunde.`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">
+                              {group.rows.length} {group.rows.length === 1 ? "kampagne" : "kampagner"}
+                            </Badge>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="hover-scale"
+                              onClick={() =>
+                                setOpenCampaignGroups((prev) => ({
+                                  ...prev,
+                                  [groupKey]: !isOpen,
+                                }))
+                              }
+                              aria-label={isOpen ? "Fold gruppe sammen" : "Fold gruppe ud"}
+                            >
+                              <ChevronDown
+                                className={`h-4 w-4 transition-transform ${
+                                  isOpen ? "rotate-0" : "-rotate-90"
+                                }`}
+                              />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {isOpen && (
+                          <div className="rounded-md border overflow-x-auto mt-4">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-[30%]">Adversus kampagnenavn</TableHead>
+                                  <TableHead className="w-[20%]">Adversus campaignId</TableHead>
+                                  <TableHead className="w-[50%]">Intern kunde / kampagne</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {group.rows.map((mapping) => {
+                                  const existingClientId =
+                                    clientCampaigns?.find((c) => c.id === mapping.client_campaign_id)?.client_id ??
+                                    null;
+                                  const selectionFromState =
+                                    campaignSelections[mapping.id] !== undefined
+                                      ? campaignSelections[mapping.id]
+                                      : null;
+                                  const parsedClient =
+                                    !existingClientId && !selectionFromState
+                                      ? parseClientFromTitle(mapping.adversus_campaign_name, clients)
+                                      : null;
+                                  const selectedClientId =
+                                    selectionFromState ?? existingClientId ?? (parsedClient ? parsedClient.id : null);
+
+                                  return (
+                                    <TableRow key={mapping.id}>
+                                      <TableCell>
+                                        <span className="font-medium">
+                                          {mapping.adversus_campaign_name || "(ingen navn)"}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell>
+                                        <span className="text-xs font-mono text-muted-foreground">
+                                          {mapping.adversus_campaign_id}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex flex-col gap-2 max-w-xl">
+                                          <Select
+                                            value={selectedClientId ?? undefined}
+                                            onValueChange={(value) =>
+                                              setCampaignSelections((prev) => ({
+                                                ...prev,
+                                                [mapping.id]: value,
+                                              }))
+                                            }
+                                          >
+                                            <SelectTrigger className="w-full">
+                                              <SelectValue placeholder="Vælg kunde" />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-background border z-50 max-h-72">
+                                              {clients?.map((client) => (
+                                                <SelectItem key={client.id} value={client.id} className="text-sm">
+                                                  {client.name}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                          <div className="flex justify-end">
+                                            <Button
+                                              size="sm"
+                                              onClick={() =>
+                                                updateCampaignMapping.mutate({
+                                                  mappingId: mapping.id,
+                                                  clientId: selectedClientId,
+                                                })
+                                              }
+                                              disabled={
+                                                updateCampaignMapping.isPending ||
+                                                selectedClientId === existingClientId
+                                              }
+                                            >
+                                              Gem
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </CardContent>
             </Card>
