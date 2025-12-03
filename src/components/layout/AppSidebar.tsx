@@ -10,6 +10,7 @@ const navigation = [
   { name: "Agenter", href: "/agents", icon: Users },
   { name: "Salg", href: "/sales", icon: ShoppingCart },
   { name: "Codan", href: "/codan", icon: Shield },
+  { name: "TDC Erhverv", href: "/tdc-erhverv", icon: Building2 },
   { name: "Provision og CPO", href: "/commission-cpo", icon: Percent },
   { name: "Lønkørsler", href: "/payroll", icon: Wallet },
   { name: "Wallboard", href: "/wallboard", icon: Tv },
