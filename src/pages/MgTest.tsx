@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 interface WebhookSaleItem {
@@ -82,6 +82,8 @@ export default function MgTest() {
   const [campaignSelections, setCampaignSelections] = useState<Record<string, string | null>>({});
   const [productClientSelections, setProductClientSelections] = useState<Record<string, string | null>>({});
   const [productClientDrafts, setProductClientDrafts] = useState<Record<string, string | null>>({});
+  const [openProductGroups, setOpenProductGroups] = useState<Record<string, boolean>>({});
+  const [openCampaignGroups, setOpenCampaignGroups] = useState<Record<string, boolean>>({});
 
   // Hent alle kunder (kundenavne)
   const { data: clients, isLoading: loadingClients } = useQuery<ClientRow[]>({
@@ -685,180 +687,208 @@ export default function MgTest() {
                 </CardContent>
               </Card>
             ) : (
-              productsByCampaign.map((group) => (
-                <Card key={group.campaignId ?? "unmapped"} className="border-muted">
-                  <CardHeader className="flex flex-row items-center justify-between gap-4">
-                    <div>
-                      <CardTitle className="text-base font-semibold">{group.campaignLabel}</CardTitle>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {group.campaignLabel === "Manglende mapping"
-                          ? "Produkter uden valgt kunde. Vælg kunde og gem for at flytte produktet til den rette kundegruppe."
-                          : `${group.rows.length} unikke produkter til denne kunde.`}
-                      </p>
-                    </div>
-                    <Badge variant="outline">
-                      {group.rows.length} {group.rows.length === 1 ? "produkt" : "produkter"}
-                    </Badge>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="rounded-md border overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[28%]">Adversus produktnavn</TableHead>
-                            <TableHead className="w-[18%]">External ID</TableHead>
-                            <TableHead className="w-[22%]">Kunde</TableHead>
-                            <TableHead className="w-[14%]">Provision (DKK)</TableHead>
-                            <TableHead className="w-[14%]">CPO / omsætning (DKK)</TableHead>
-                            <TableHead className="w-[14%] text-right">Handling</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {group.rows.map((row) => {
-                            const current = editValues[row.key];
-                            const productId = row.product?.id ?? null;
-                            const existingClientCampaignId = row.product?.client_campaign_id ?? null;
-                            const existingClientId =
-                              existingClientCampaignId
-                                ? clientCampaigns?.find((c) => c.id === existingClientCampaignId)?.client_id ?? null
-                                : null;
-                            const selectionFromProduct =
-                              productId && productClientSelections[productId] !== undefined
-                                ? productClientSelections[productId]
-                                : null;
-                            const draftClientId = productClientDrafts[row.key] ?? null;
-                            const selectedClientId = selectionFromProduct ?? draftClientId ?? existingClientId;
+              productsByCampaign.map((group) => {
+                const groupKey = group.campaignId ?? "unmapped";
+                const isOpen = openProductGroups[groupKey] ?? true;
 
-                            return (
-                              <TableRow key={row.key}>
-                                <TableCell>
-                                  <div className="flex flex-col">
-                                    <span className="font-medium">
-                                      {row.adversus_product_title || "(ingen titel)"}
-                                    </span>
-                                    {row.product && (
-                                      <span className="text-xs text-muted-foreground">
-                                        Internt produkt: {row.product.name}
-                                      </span>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-xs font-mono text-muted-foreground">
-                                    {row.adversus_external_id || "(mangler)"}
-                                  </span>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex flex-col gap-2 max-w-xs">
-                                    <Select
-                                      value={selectedClientId ?? undefined}
-                                      onValueChange={(value) => {
-                                        if (productId) {
-                                          setProductClientSelections((prev) => ({
-                                            ...prev,
-                                            [productId]: value,
-                                          }));
-                                        }
-                                        setProductClientDrafts((prev) => ({
-                                          ...prev,
-                                          [row.key]: value,
-                                        }));
-                                      }}
-                                    >
-                                      <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Vælg kunde" />
-                                      </SelectTrigger>
-                                      <SelectContent className="bg-background border z-50 max-h-72">
-                                        {clients?.map((client) => (
-                                          <SelectItem key={client.id} value={client.id} className="text-sm">
-                                            {client.name}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    {row.product ? (
-                                      <div className="flex justify-end">
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() =>
-                                            productId &&
-                                            updateProductClient.mutate({
-                                              productId,
-                                              clientId: selectedClientId,
-                                            })
-                                          }
-                                          disabled={
-                                            !productId ||
-                                            updateProductClient.isPending ||
-                                            selectedClientId === existingClientId
-                                          }
-                                        >
-                                          Gem kunde
-                                        </Button>
-                                      </div>
-                                    ) : (
-                                      <span className="text-xs text-muted-foreground">
-                                        Gem provision / CPO først for at oprette produktet
-                                      </span>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="text"
-                                    inputMode="decimal"
-                                    className="h-9"
-                                    value={
-                                      current?.provision ??
-                                      (row.product?.commission_dkk !== null &&
-                                      row.product?.commission_dkk !== undefined
-                                        ? String(row.product.commission_dkk)
-                                        : "")
-                                    }
-                                    onChange={(e) => handleChange(row.key, "provision", e.target.value)}
-                                    placeholder="0,00"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="text"
-                                    inputMode="decimal"
-                                    className="h-9"
-                                    value={
-                                      current?.cpo ??
-                                      (row.product?.revenue_dkk !== null &&
-                                      row.product?.revenue_dkk !== undefined
-                                        ? String(row.product.revenue_dkk)
-                                        : "")
-                                    }
-                                    onChange={(e) => handleChange(row.key, "cpo", e.target.value)}
-                                    placeholder="0,00"
-                                  />
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleSave(row)}
-                                    disabled={upsertProductValues.isPending}
-                                  >
-                                    {upsertProductValues.isPending ? (
-                                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                    ) : (
-                                      <Save className="h-4 w-4 mr-2" />
-                                    )}
-                                    Gem
-                                  </Button>
-                                </TableCell>
+                return (
+                  <Card key={groupKey} className="border-muted animate-fade-in">
+                    <CardHeader className="flex flex-row items-center justify-between gap-4">
+                      <div>
+                        <CardTitle className="text-base font-semibold">{group.campaignLabel}</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {group.campaignLabel === "Manglende mapping"
+                            ? "Produkter uden valgt kunde. Vælg kunde og gem for at flytte produktet til den rette kundegruppe."
+                            : `${group.rows.length} unikke produkter til denne kunde.`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">
+                          {group.rows.length} {group.rows.length === 1 ? "produkt" : "produkter"}
+                        </Badge>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="hover-scale"
+                          onClick={() =>
+                            setOpenProductGroups((prev) => ({
+                              ...prev,
+                              [groupKey]: !isOpen,
+                            }))
+                          }
+                          aria-label={isOpen ? "Fold gruppe sammen" : "Fold gruppe ud"}
+                        >
+                          <ChevronDown
+                            className={`h-4 w-4 transition-transform ${
+                              isOpen ? "rotate-0" : "-rotate-90"
+                            }`}
+                          />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    {isOpen && (
+                      <CardContent>
+                        <div className="rounded-md border overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[28%]">Adversus produktnavn</TableHead>
+                                <TableHead className="w-[18%]">External ID</TableHead>
+                                <TableHead className="w-[22%]">Kunde</TableHead>
+                                <TableHead className="w-[14%]">Provision (DKK)</TableHead>
+                                <TableHead className="w-[14%]">CPO / omsætning (DKK)</TableHead>
+                                <TableHead className="w-[14%] text-right">Handling</TableHead>
                               </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+                            </TableHeader>
+                            <TableBody>
+                              {group.rows.map((row) => {
+                                const current = editValues[row.key];
+                                const productId = row.product?.id ?? null;
+                                const existingClientCampaignId = row.product?.client_campaign_id ?? null;
+                                const existingClientId =
+                                  existingClientCampaignId
+                                    ? clientCampaigns?.find((c) => c.id === existingClientCampaignId)?.client_id ?? null
+                                    : null;
+                                const selectionFromProduct =
+                                  productId && productClientSelections[productId] !== undefined
+                                    ? productClientSelections[productId]
+                                    : null;
+                                const draftClientId = productClientDrafts[row.key] ?? null;
+                                const selectedClientId = selectionFromProduct ?? draftClientId ?? existingClientId;
+
+                                return (
+                                  <TableRow key={row.key}>
+                                    <TableCell>
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">
+                                          {row.adversus_product_title || "(ingen titel)"}
+                                        </span>
+                                        {row.product && (
+                                          <span className="text-xs text-muted-foreground">
+                                            Internt produkt: {row.product.name}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <span className="text-xs font-mono text-muted-foreground">
+                                        {row.adversus_external_id || "(mangler)"}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex flex-col gap-2 max-w-xs">
+                                        <Select
+                                          value={selectedClientId ?? undefined}
+                                          onValueChange={(value) => {
+                                            if (productId) {
+                                              setProductClientSelections((prev) => ({
+                                                ...prev,
+                                                [productId]: value,
+                                              }));
+                                            }
+                                            setProductClientDrafts((prev) => ({
+                                              ...prev,
+                                              [row.key]: value,
+                                            }));
+                                          }}
+                                        >
+                                          <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Vælg kunde" />
+                                          </SelectTrigger>
+                                          <SelectContent className="bg-background border z-50 max-h-72">
+                                            {clients?.map((client) => (
+                                              <SelectItem key={client.id} value={client.id} className="text-sm">
+                                                {client.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        {row.product ? (
+                                          <div className="flex justify-end">
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() =>
+                                                productId &&
+                                                updateProductClient.mutate({
+                                                  productId,
+                                                  clientId: selectedClientId,
+                                                })
+                                              }
+                                              disabled={
+                                                !productId ||
+                                                updateProductClient.isPending ||
+                                                selectedClientId === existingClientId
+                                              }
+                                            >
+                                              Gem kunde
+                                            </Button>
+                                          </div>
+                                        ) : (
+                                          <span className="text-xs text-muted-foreground">
+                                            Gem provision / CPO først for at oprette produktet
+                                          </span>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        className="h-9"
+                                        value={
+                                          current?.provision ??
+                                          (row.product?.commission_dkk !== null &&
+                                          row.product?.commission_dkk !== undefined
+                                            ? String(row.product.commission_dkk)
+                                            : "")
+                                        }
+                                        onChange={(e) => handleChange(row.key, "provision", e.target.value)}
+                                        placeholder="0,00"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        className="h-9"
+                                        value={
+                                          current?.cpo ??
+                                          (row.product?.revenue_dkk !== null &&
+                                          row.product?.revenue_dkk !== undefined
+                                            ? String(row.product.revenue_dkk)
+                                            : "")
+                                        }
+                                        onChange={(e) => handleChange(row.key, "cpo", e.target.value)}
+                                        placeholder="0,00"
+                                      />
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleSave(row)}
+                                        disabled={upsertProductValues.isPending}
+                                      >
+                                        {upsertProductValues.isPending ? (
+                                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                        ) : (
+                                          <Save className="h-4 w-4 mr-2" />
+                                        )}
+                                        Gem
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                );
+              })
             )}
           </TabsContent>
 
