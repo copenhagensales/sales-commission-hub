@@ -1,10 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { Plus, Trash2 } from "lucide-react";
 
 interface CampaignMapping {
   id: string;
@@ -25,7 +33,31 @@ interface CampaignMapping {
   } | null;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  commission_value: number | null;
+  commission_type: string | null;
+  revenue_amount: number | null;
+}
+
+interface Customer {
+  id: string;
+  name: string;
+}
+
 export default function CommissionCPO() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newMapping, setNewMapping] = useState({
+    adversus_campaign_id: "",
+    adversus_campaign_name: "",
+    adversus_outcome: "",
+    product_id: "",
+    liquidity_customer_id: "",
+  });
+
   const { data: campaigns, isLoading } = useQuery({
     queryKey: ["campaign-mappings-with-products"],
     queryFn: async () => {
@@ -47,6 +79,83 @@ export default function CommissionCPO() {
 
       if (error) throw error;
       return data as CampaignMapping[];
+    },
+  });
+
+  const { data: products } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, commission_value, commission_type, revenue_amount")
+        .eq("is_active", true)
+        .order("name");
+
+      if (error) throw error;
+      return data as Product[];
+    },
+  });
+
+  const { data: customers } = useQuery({
+    queryKey: ["liquidity-customers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("liquidity_customers")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+
+      if (error) throw error;
+      return data as Customer[];
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("campaign_product_mappings")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaign-mappings-with-products"] });
+      toast({ title: "Mapping slettet" });
+    },
+    onError: (error) => {
+      toast({ title: "Fejl ved sletning", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("campaign_product_mappings")
+        .insert({
+          adversus_campaign_id: newMapping.adversus_campaign_id,
+          adversus_campaign_name: newMapping.adversus_campaign_name,
+          adversus_outcome: newMapping.adversus_outcome || null,
+          product_id: newMapping.product_id || null,
+          liquidity_customer_id: newMapping.liquidity_customer_id || null,
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaign-mappings-with-products"] });
+      toast({ title: "Mapping tilføjet" });
+      setIsAddDialogOpen(false);
+      setNewMapping({
+        adversus_campaign_id: "",
+        adversus_campaign_name: "",
+        adversus_outcome: "",
+        product_id: "",
+        liquidity_customer_id: "",
+      });
+    },
+    onError: (error) => {
+      toast({ title: "Fejl ved tilføjelse", description: error.message, variant: "destructive" });
     },
   });
 
@@ -72,11 +181,98 @@ export default function CommissionCPO() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Provision og CPO</h1>
-          <p className="text-muted-foreground">
-            Oversigt over alle kampagner og deres provisions- og CPO-indstillinger
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Provision og CPO</h1>
+            <p className="text-muted-foreground">
+              Oversigt over alle kampagner og deres provisions- og CPO-indstillinger
+            </p>
+          </div>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Tilføj mapping
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Tilføj ny kampagne-mapping</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="campaign_id">Kampagne ID</Label>
+                  <Input
+                    id="campaign_id"
+                    value={newMapping.adversus_campaign_id}
+                    onChange={(e) => setNewMapping({ ...newMapping, adversus_campaign_id: e.target.value })}
+                    placeholder="F.eks. 12345"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="campaign_name">Kampagne navn</Label>
+                  <Input
+                    id="campaign_name"
+                    value={newMapping.adversus_campaign_name}
+                    onChange={(e) => setNewMapping({ ...newMapping, adversus_campaign_name: e.target.value })}
+                    placeholder="F.eks. TDC Erhverv"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="outcome">Outcome (valgfrit)</Label>
+                  <Input
+                    id="outcome"
+                    value={newMapping.adversus_outcome}
+                    onChange={(e) => setNewMapping({ ...newMapping, adversus_outcome: e.target.value })}
+                    placeholder="F.eks. Sale"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="product">Produkt</Label>
+                  <Select
+                    value={newMapping.product_id}
+                    onValueChange={(value) => setNewMapping({ ...newMapping, product_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vælg produkt" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {products?.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>
+                          {product.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customer">Kunde (valgfrit)</Label>
+                  <Select
+                    value={newMapping.liquidity_customer_id}
+                    onValueChange={(value) => setNewMapping({ ...newMapping, liquidity_customer_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vælg kunde" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers?.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button 
+                  onClick={() => addMutation.mutate()} 
+                  disabled={!newMapping.adversus_campaign_id || !newMapping.adversus_campaign_name || addMutation.isPending}
+                  className="w-full"
+                >
+                  {addMutation.isPending ? "Tilføjer..." : "Tilføj"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {isLoading ? (
@@ -110,6 +306,7 @@ export default function CommissionCPO() {
                         <TableHead>Provision</TableHead>
                         <TableHead>CPO (Omsætning)</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -149,6 +346,16 @@ export default function CommissionCPO() {
                                 Mangler produkt
                               </Badge>
                             )}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deleteMutation.mutate(mapping.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
