@@ -98,6 +98,23 @@ export function ProductsSection({ products }: Props) {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast.success("Produkt slettet");
+    },
+    onError: () => {
+      toast.error("Kunne ikke slette produkt");
+    },
+  });
+
   const handleEditClick = (product: Product) => {
     setEditingProduct(product);
     setEditDialogOpen(true);
@@ -304,7 +321,12 @@ export function ProductsSection({ products }: Props) {
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => deleteMutation.mutate(product.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
