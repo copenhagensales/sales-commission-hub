@@ -23,7 +23,7 @@ serve(async (req) => {
     const { error } = await supabase
       .from('economic_events')
       .insert({
-        event_type: payload.eventType || 'unknown',
+        event_type: payload.eventType || payload.type || 'unknown',
         payload: payload,
         processed: false
       });
@@ -34,6 +34,32 @@ serve(async (req) => {
     }
 
     console.log('Successfully stored e-conomic webhook event');
+
+    // Trigger sync in background
+    try {
+      const syncResponse = await fetch(`${supabaseUrl}/functions/v1/sync-economic`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+      });
+      
+      if (syncResponse.ok) {
+        console.log('Sync triggered successfully');
+        
+        // Mark event as processed
+        await supabase
+          .from('economic_events')
+          .update({ processed: true })
+          .eq('payload', payload);
+      } else {
+        console.error('Sync trigger failed:', await syncResponse.text());
+      }
+    } catch (syncError) {
+      console.error('Error triggering sync:', syncError);
+      // Don't fail the webhook just because sync failed
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
