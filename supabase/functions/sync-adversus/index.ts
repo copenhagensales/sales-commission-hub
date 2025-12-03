@@ -438,6 +438,206 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ACTION: Sync sales to database
+    if (debugAction === 'sync-sales-to-db') {
+      let filterDays = 30
+      try {
+        const body = await req.clone().json()
+        filterDays = body.days || 30
+      } catch {}
+      
+      console.log(`Syncing sales to database (last ${filterDays} days)...`)
+      
+      // Fetch campaigns first for lookup
+      const campaignsResponse = await fetch(`${baseUrl}/campaigns?pageSize=200`, {
+        headers: { 'Authorization': `Basic ${authHeader}`, 'Content-Type': 'application/json' }
+      })
+      const campaignsData = await campaignsResponse.json()
+      const campaigns = Array.isArray(campaignsData) ? campaignsData : (campaignsData.campaigns || [])
+      const campaignLookup: Record<number, string> = {}
+      for (const c of campaigns) {
+        campaignLookup[c.id] = c.settings?.name || c.name || `Campaign ${c.id}`
+      }
+
+      // Fetch users for agent lookup
+      const usersResponse = await fetch(`${baseUrl}/users?pageSize=200`, {
+        headers: { 'Authorization': `Basic ${authHeader}`, 'Content-Type': 'application/json' }
+      })
+      const usersData = await usersResponse.json()
+      const users = Array.isArray(usersData) ? usersData : (usersData.users || [])
+      const userLookup: Record<number, { name: string; email: string }> = {}
+      for (const u of users) {
+        userLookup[u.id] = { name: u.displayName || u.name || `User ${u.id}`, email: u.email || '' }
+      }
+
+      // Fetch sales
+      const now = new Date()
+      const startDateSync = new Date(now.getTime() - filterDays * 24 * 60 * 60 * 1000)
+      const filtersSync = { created: { $gt: startDateSync.toISOString() } }
+      const filterStrSync = encodeURIComponent(JSON.stringify(filtersSync))
+      
+      let allSalesSync: any[] = []
+      let pageSync = 1
+      while (pageSync <= 20) {
+        const salesResponseSync = await fetch(`${baseUrl}/sales?pageSize=100&page=${pageSync}&filters=${filterStrSync}`, {
+          headers: { 'Authorization': `Basic ${authHeader}`, 'Content-Type': 'application/json' }
+        })
+        if (!salesResponseSync.ok) break
+        const salesDataSync = await salesResponseSync.json()
+        const salesSync = Array.isArray(salesDataSync) ? salesDataSync : (salesDataSync.sales || [])
+        if (salesSync.length === 0) break
+        allSalesSync = [...allSalesSync, ...salesSync]
+        if (salesSync.length < 100) break
+        pageSync++
+        await new Promise(r => setTimeout(r, 300))
+      }
+
+      console.log(`Fetched ${allSalesSync.length} sales from Adversus`)
+
+      // Get existing external_ids to avoid duplicates
+      const { data: existingEvents } = await supabase
+        .from('adversus_events')
+        .select('external_id')
+      const existingIds = new Set((existingEvents || []).map(e => e.external_id))
+
+      // Get products for matching
+      const { data: productsData } = await supabase
+        .from('products')
+        .select('id, name, commission_dkk, revenue_dkk')
+      const productsByName: Record<string, { id: string; commission_dkk: number; revenue_dkk: number }> = {}
+      for (const p of productsData || []) {
+        productsByName[p.name.toLowerCase()] = p
+      }
+
+      let created = 0, skipped = 0, errors = 0
+
+      for (const sale of allSalesSync) {
+        const externalId = String(sale.id)
+        
+        if (existingIds.has(externalId)) {
+          skipped++
+          continue
+        }
+
+        try {
+          const campaignName = campaignLookup[sale.campaignId] || `Campaign ${sale.campaignId}`
+          const user = userLookup[sale.ownedBy] || userLookup[sale.createdBy] || { name: 'Unknown', email: '' }
+          
+          const payload = {
+            type: 'sale',
+            event_time: sale.closedTime || sale.createdTime,
+            payload: {
+              result_id: sale.id,
+              campaign: { id: String(sale.campaignId), name: campaignName },
+              user: { id: String(sale.ownedBy || sale.createdBy), name: user.name, email: user.email },
+              lead: { id: sale.leadId, phone: '', company: '' },
+              products: (sale.lines || []).map((line: { productId: number; title: string; quantity: number; unitPrice: number }) => ({
+                id: line.productId,
+                externalId: String(line.productId),
+                title: line.title,
+                quantity: line.quantity || 1,
+                unitPrice: line.unitPrice || 0
+              }))
+            }
+          }
+
+          const { data: eventData, error: eventError } = await supabase
+            .from('adversus_events')
+            .insert({
+              external_id: externalId,
+              event_type: 'sale',
+              payload,
+              processed: false,
+              received_at: new Date().toISOString()
+            })
+            .select()
+            .single()
+
+          if (eventError) throw eventError
+
+          const { data: campaignMapping } = await supabase
+            .from('adversus_campaign_mappings')
+            .select('client_campaign_id')
+            .eq('adversus_campaign_id', String(sale.campaignId))
+            .maybeSingle()
+
+          if (!campaignMapping) {
+            await supabase
+              .from('adversus_campaign_mappings')
+              .upsert({
+                adversus_campaign_id: String(sale.campaignId),
+                adversus_campaign_name: campaignName,
+                client_campaign_id: null
+              }, { onConflict: 'adversus_campaign_id' })
+          }
+
+          const { data: saleData, error: saleError } = await supabase
+            .from('sales')
+            .insert({
+              adversus_event_id: eventData.id,
+              client_campaign_id: campaignMapping?.client_campaign_id || null,
+              agent_name: user.name,
+              agent_external_id: String(sale.ownedBy || sale.createdBy),
+              customer_company: '',
+              customer_phone: '',
+              sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString()
+            })
+            .select()
+            .single()
+
+          if (saleError) throw saleError
+
+          const saleItems = []
+          for (const line of sale.lines || []) {
+            const matchedProduct = productsByName[line.title?.toLowerCase()]
+            const commission = matchedProduct?.commission_dkk || 0
+            const revenue = matchedProduct?.revenue_dkk || 0
+            const quantity = line.quantity || 1
+
+            saleItems.push({
+              sale_id: saleData.id,
+              product_id: matchedProduct?.id || null,
+              adversus_external_id: String(line.productId),
+              adversus_product_title: line.title,
+              quantity,
+              unit_price: line.unitPrice || 0,
+              mapped_commission: commission * quantity,
+              mapped_revenue: revenue * quantity,
+              needs_mapping: !matchedProduct,
+              raw_data: line
+            })
+          }
+
+          if (saleItems.length > 0) {
+            await supabase.from('sale_items').insert(saleItems)
+          }
+
+          await supabase
+            .from('adversus_events')
+            .update({ processed: true })
+            .eq('id', eventData.id)
+
+          created++
+          existingIds.add(externalId)
+        } catch (err) {
+          console.error(`Error syncing sale ${externalId}:`, err)
+          errors++
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          fetched: allSalesSync.length,
+          created,
+          skipped,
+          errors,
+          message: `Synced ${created} new sales, skipped ${skipped} existing, ${errors} errors`
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Debug action: scan all campaigns for products AND outcomes - creates mappings automatically
     if (debugAction === 'scan-all-products') {
       console.log(`Debug: Scanning all campaigns for products and outcomes (last ${scanDays} days)...`)
