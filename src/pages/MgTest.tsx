@@ -135,14 +135,18 @@ export default function MgTest() {
     const map = new Map<string, AggregatedProduct>();
 
     saleItems?.forEach((item) => {
-      const campaignId = item.sales?.client_campaign_id || null;
-      const campaign = clientCampaigns?.find((c) => c.id === campaignId) || null;
-      const campaignLabel = campaign
-        ? `${campaign.clients?.name ?? "Ukendt kunde"} – ${campaign.name}`
-        : "Ukendt kampagne";
+      const productCampaignId = item.products?.client_campaign_id ?? null;
+      const saleCampaignId = item.sales?.client_campaign_id ?? null;
+      const campaignId = productCampaignId ?? saleCampaignId ?? null;
+
+      const campaign = campaignId ? clientCampaigns?.find((c) => c.id === campaignId) || null : null;
+      const clientId = campaign?.client_id ?? null;
+      const clientName = clientId
+        ? clients?.find((client) => client.id === clientId)?.name ?? "Ukendt kunde"
+        : null;
 
       const productKey = item.adversus_external_id || item.adversus_product_title || item.id;
-      const fullKey = `${campaignId ?? "no-campaign"}::${productKey}`;
+      const fullKey = `${clientId ?? "no-client"}::${productKey}`;
 
       if (!map.has(fullKey)) {
         map.set(fullKey, {
@@ -158,8 +162,8 @@ export default function MgTest() {
                 client_campaign_id: item.products.client_campaign_id,
               }
             : null,
-          campaignId,
-          campaignLabel,
+          campaignId: clientId,
+          campaignLabel: clientName ?? "Ingen kunde valgt",
         });
       }
     });
@@ -172,7 +176,7 @@ export default function MgTest() {
       const titleB = b.adversus_product_title || "";
       return titleA.localeCompare(titleB, "da");
     });
-  }, [saleItems, clientCampaigns]);
+  }, [saleItems, clientCampaigns, clients]);
 
   const productsByCampaign = useMemo(() => {
     const groups = new Map<
@@ -180,25 +184,54 @@ export default function MgTest() {
       { campaignId: string | null; campaignLabel: string; rows: AggregatedProduct[] }
     >();
 
+    // Første gruppe: Manglende mapping (ingen kunde valgt)
+    groups.set("unmapped", {
+      campaignId: "unmapped",
+      campaignLabel: "Manglende mapping",
+      rows: [],
+    });
+
+    // Én gruppe pr. kendt kunde fra "Kundenavne"-fanen
+    clients?.forEach((client) => {
+      if (!groups.has(client.id)) {
+        groups.set(client.id, {
+          campaignId: client.id,
+          campaignLabel: client.name,
+          rows: [],
+        });
+      }
+    });
+
+    // Fordel produkter i grupper
     aggregatedProducts.forEach((row) => {
-      const key = row.campaignId ?? "no-campaign";
-      const existing = groups.get(key);
+      const clientId = row.campaignId; // her bruger vi campaignId som kunde-id
+      const groupKey = clientId ?? "unmapped";
+      const existing = groups.get(groupKey);
 
       if (existing) {
         existing.rows.push(row);
       } else {
-        groups.set(key, {
-          campaignId: row.campaignId,
-          campaignLabel: row.campaignLabel,
+        groups.set(groupKey, {
+          campaignId: clientId,
+          campaignLabel: clientId ? row.campaignLabel : "Manglende mapping",
           rows: [row],
         });
       }
     });
 
-    return Array.from(groups.values()).sort((a, b) =>
-      a.campaignLabel.localeCompare(b.campaignLabel, "da"),
-    );
-  }, [aggregatedProducts]);
+    const result = Array.from(groups.values());
+
+    // Sortér så "Manglende mapping" altid står først, derefter kunder alfabetisk
+    return result.sort((a, b) => {
+      const aIsUnmapped = a.campaignLabel === "Manglende mapping";
+      const bIsUnmapped = b.campaignLabel === "Manglende mapping";
+
+      if (aIsUnmapped && !bIsUnmapped) return -1;
+      if (!aIsUnmapped && bIsUnmapped) return 1;
+
+      return a.campaignLabel.localeCompare(b.campaignLabel, "da");
+    });
+  }, [aggregatedProducts, clients]);
 
   const upsertProductValues = useMutation({
     mutationFn: async (params: {
@@ -578,16 +611,19 @@ export default function MgTest() {
               </Card>
             ) : (
               productsByCampaign.map((group) => (
-                <Card key={group.campaignId ?? "no-campaign"} className="border-muted">
+                <Card key={group.campaignId ?? "unmapped"} className="border-muted">
                   <CardHeader className="flex flex-row items-center justify-between gap-4">
                     <div>
                       <CardTitle className="text-base font-semibold">{group.campaignLabel}</CardTitle>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Kampagne ID: {group.campaignId ?? "Ukendt"} · {group.rows.length} unikke produkter fra denne
-                        kampagne.
+                        {group.campaignLabel === "Manglende mapping"
+                          ? "Produkter uden valgt kunde. Vælg kunde og gem for at flytte produktet til den rette kundegruppe."
+                          : `${group.rows.length} unikke produkter til denne kunde.`}
                       </p>
                     </div>
-                    <Badge variant="outline">{group.rows.length} produkter</Badge>
+                    <Badge variant="outline">
+                      {group.rows.length} {group.rows.length === 1 ? "produkt" : "produkter"}
+                    </Badge>
                   </CardHeader>
                   <CardContent>
                     <div className="rounded-md border overflow-x-auto">
