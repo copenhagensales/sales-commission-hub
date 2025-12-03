@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -10,18 +10,29 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
-interface AdversusProductMapping {
+interface WebhookSaleItem {
   id: string;
   adversus_external_id: string | null;
   adversus_product_title: string | null;
   product_id: string | null;
+  products: {
+    id: string;
+    name: string;
+    commission_dkk: number | null;
+    revenue_dkk: number | null;
+  } | null;
 }
 
-interface Product {
-  id: string;
-  name: string;
-  commission_dkk: number | null;
-  revenue_dkk: number | null;
+interface AggregatedProduct {
+  key: string;
+  adversus_external_id: string | null;
+  adversus_product_title: string | null;
+  product: {
+    id: string;
+    name: string;
+    commission_dkk: number | null;
+    revenue_dkk: number | null;
+  } | null;
 }
 
 interface EditEntry {
@@ -35,124 +46,137 @@ export default function MgTest() {
   const queryClient = useQueryClient();
   const [editValues, setEditValues] = useState<EditValues>({});
 
-  const { data: adversusMappings, isLoading: loadingMappings } = useQuery({
-    queryKey: ["mg-adversus-product-mappings"],
+  // Hent alle produkter direkte fra webhook-data (sale_items)
+  const {
+    data: saleItems,
+    isLoading: loadingSaleItems,
+    isError,
+  } = useQuery<WebhookSaleItem[]>({
+    queryKey: ["mg-webhook-products"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("adversus_product_mappings")
-        .select("id, adversus_external_id, adversus_product_title, product_id")
-        .order("adversus_product_title", { ascending: true });
+        .from("sale_items")
+        .select(
+          "id, adversus_external_id, adversus_product_title, product_id, products(id, name, commission_dkk, revenue_dkk)"
+        )
+        .not("adversus_product_title", "is", null);
 
       if (error) throw error;
-      return data as AdversusProductMapping[];
+      return data as WebhookSaleItem[];
     },
   });
 
-  const { data: products, isLoading: loadingProducts } = useQuery({
-    queryKey: ["mg-products"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name, commission_dkk, revenue_dkk");
+  const aggregatedProducts: AggregatedProduct[] = useMemo(() => {
+    const map = new Map<string, AggregatedProduct>();
 
-      if (error) throw error;
-      return data as Product[];
-    },
-  });
+    saleItems?.forEach((item) => {
+      const key = item.adversus_external_id || item.adversus_product_title || item.id;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          adversus_external_id: item.adversus_external_id,
+          adversus_product_title: item.adversus_product_title,
+          product: item.products
+            ? {
+                id: item.products.id,
+                name: item.products.name,
+                commission_dkk: item.products.commission_dkk,
+                revenue_dkk: item.products.revenue_dkk,
+              }
+            : null,
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => {
+      const aTitle = a.adversus_product_title || "";
+      const bTitle = b.adversus_product_title || "";
+      return aTitle.localeCompare(bTitle, "da");
+    });
+  }, [saleItems]);
 
   const upsertProductValues = useMutation({
-    mutationFn: async (params: {
-      mappingId: string;
-      productId: string | null;
-      provision: number;
-      cpo: number;
-      title: string | null;
-    }) => {
-      const { mappingId, productId, provision, cpo, title } = params;
+    mutationFn: async (params: { row: AggregatedProduct; provision: number; cpo: number }) => {
+      const { row, provision, cpo } = params;
+      let productId = row.product?.id ?? null;
 
+      // 1) Opdater eksisterende produkt eller opret et nyt
       if (productId) {
         const { error } = await supabase
           .from("products")
-          .update({
-            commission_dkk: provision,
-            revenue_dkk: cpo,
-          })
+          .update({ commission_dkk: provision, revenue_dkk: cpo })
           .eq("id", productId);
 
         if (error) throw error;
-        return { productId };
+      } else {
+        const { data: newProduct, error: insertError } = await supabase
+          .from("products")
+          .insert({
+            name: row.adversus_product_title || "Adversus produkt",
+            commission_dkk: provision,
+            revenue_dkk: cpo,
+          })
+          .select("id")
+          .single();
+
+        if (insertError) throw insertError;
+        productId = newProduct.id as string;
       }
 
-      const { data: newProduct, error: insertError } = await supabase
-        .from("products")
-        .insert({
-          name: title || "Adversus produkt",
-          commission_dkk: provision,
-          revenue_dkk: cpo,
-        })
-        .select("id")
-        .single();
+      // 2) Opret/opfdatér mapping baseret på adversus_external_id
+      if (row.adversus_external_id) {
+        const { error: mappingError } = await supabase
+          .from("adversus_product_mappings")
+          .upsert(
+            {
+              adversus_external_id: row.adversus_external_id,
+              adversus_product_title: row.adversus_product_title,
+              product_id: productId,
+            },
+            { onConflict: "adversus_external_id" }
+          );
 
-      if (insertError) throw insertError;
+        if (mappingError) throw mappingError;
+      }
 
-      const { error: mappingError } = await supabase
-        .from("adversus_product_mappings")
-        .update({ product_id: newProduct.id })
-        .eq("id", mappingId);
-
-      if (mappingError) throw mappingError;
-
-      return { productId: newProduct.id as string };
+      return { productId };
     },
     onSuccess: () => {
       toast.success("CPO og provision gemt");
-      queryClient.invalidateQueries({ queryKey: ["mg-adversus-product-mappings"] });
-      queryClient.invalidateQueries({ queryKey: ["mg-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-webhook-products"] });
+      queryClient.invalidateQueries({ queryKey: ["adversus-product-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke gemme værdier");
     },
   });
 
-  const getProductForMapping = (mapping: AdversusProductMapping) => {
-    if (!mapping.product_id || !products) return undefined;
-    return products.find((p) => p.id === mapping.product_id);
-  };
-
-  const handleChange = (
-    mappingId: string,
-    field: keyof EditEntry,
-    value: string,
-  ) => {
+  const handleChange = (key: string, field: keyof EditEntry, value: string) => {
     setEditValues((prev) => ({
       ...prev,
-      [mappingId]: {
-        provision: field === "provision" ? value : prev[mappingId]?.provision ?? "",
-        cpo: field === "cpo" ? value : prev[mappingId]?.cpo ?? "",
+      [key]: {
+        provision: field === "provision" ? value : prev[key]?.provision ?? "",
+        cpo: field === "cpo" ? value : prev[key]?.cpo ?? "",
       },
     }));
   };
 
-  const handleSave = (mapping: AdversusProductMapping) => {
-    const current: EditEntry = editValues[mapping.id] || {};
-    const product = getProductForMapping(mapping);
+  const handleSave = (row: AggregatedProduct) => {
+    const current: EditEntry = editValues[row.key] || {};
 
-    const provisionRaw = current.provision ?? (product?.commission_dkk?.toString() ?? "0");
-    const cpoRaw = current.cpo ?? (product?.revenue_dkk?.toString() ?? "0");
+    const provisionRaw =
+      current.provision ?? (row.product?.commission_dkk != null ? String(row.product.commission_dkk) : "0");
+    const cpoRaw =
+      current.cpo ?? (row.product?.revenue_dkk != null ? String(row.product.revenue_dkk) : "0");
 
     const provision = parseFloat(provisionRaw.replace(",", ".")) || 0;
     const cpo = parseFloat(cpoRaw.replace(",", ".")) || 0;
 
-    upsertProductValues.mutate({
-      mappingId: mapping.id,
-      productId: mapping.product_id,
-      provision,
-      cpo,
-      title: mapping.adversus_product_title,
-    });
+    upsertProductValues.mutate({ row, provision, cpo });
   };
 
-  const isLoading = loadingMappings || loadingProducts;
+  const isLoading = loadingSaleItems;
 
   return (
     <MainLayout>
@@ -160,8 +184,8 @@ export default function MgTest() {
         <header className="space-y-2">
           <h1 className="text-3xl font-bold">MG test – Adversus produktmapping</h1>
           <p className="text-muted-foreground text-sm max-w-2xl">
-            Her ser du alle produkter, vi har modtaget via Adversus-webhook. Udfyld CPO og provision for
-            hvert produkt, så de kan bruges i kommissionsberegninger.
+            Her ser du alle produkter, vi har modtaget via Adversus-webhook (baseret på salg). Udfyld CPO og
+            provision for hvert produkt, så de kan bruges i kommissionsberegninger.
           </p>
         </header>
 
@@ -169,13 +193,13 @@ export default function MgTest() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <div>
-                <CardTitle>Produkter fra Adversus-webhook</CardTitle>
+                <CardTitle>Produkter fra Adversus-webhook (fra salg)</CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Listen er baseret på alle produkter, der er modtaget via webhook URL&apos;en.
+                  Alle unikke produktnavne er hentet fra webhook-salg under fanen "Salg".
                 </p>
               </div>
               <Badge variant="outline">
-                {adversusMappings?.length ?? 0} produkter fundet
+                {aggregatedProducts.length} produkter fundet
               </Badge>
             </CardHeader>
             <CardContent>
@@ -184,13 +208,17 @@ export default function MgTest() {
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <span>Henter produkter…</span>
                 </div>
-              ) : !adversusMappings || adversusMappings.length === 0 ? (
+              ) : isError ? (
+                <p className="text-sm text-destructive">
+                  Der opstod en fejl ved hentning af produkter. Prøv at genindlæse siden.
+                </p>
+              ) : aggregatedProducts.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   Der er endnu ikke modtaget nogen produkter via webhook. Når de første leads kommer ind, vil
                   de dukke op her.
                 </p>
               ) : (
-                <div className="rounded-md border">
+                <div className="rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -202,27 +230,26 @@ export default function MgTest() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {adversusMappings.map((mapping) => {
-                        const product = getProductForMapping(mapping);
-                        const current = editValues[mapping.id];
+                      {aggregatedProducts.map((row) => {
+                        const current = editValues[row.key];
 
                         return (
-                          <TableRow key={mapping.id}>
+                          <TableRow key={row.key}>
                             <TableCell>
                               <div className="flex flex-col">
                                 <span className="font-medium">
-                                  {mapping.adversus_product_title || "(ingen titel)"}
+                                  {row.adversus_product_title || "(ingen titel)"}
                                 </span>
-                                {product && (
+                                {row.product && (
                                   <span className="text-xs text-muted-foreground">
-                                    Internt produkt: {product.name}
+                                    Internt produkt: {row.product.name}
                                   </span>
                                 )}
                               </div>
                             </TableCell>
                             <TableCell>
                               <span className="text-xs font-mono text-muted-foreground">
-                                {mapping.adversus_external_id || "(mangler)"}
+                                {row.adversus_external_id || "(mangler)"}
                               </span>
                             </TableCell>
                             <TableCell>
@@ -232,13 +259,12 @@ export default function MgTest() {
                                 className="h-9"
                                 value={
                                   current?.provision ??
-                                  (product?.commission_dkk !== null && product?.commission_dkk !== undefined
-                                    ? String(product.commission_dkk)
+                                  (row.product?.commission_dkk !== null &&
+                                  row.product?.commission_dkk !== undefined
+                                    ? String(row.product.commission_dkk)
                                     : "")
                                 }
-                                onChange={(e) =>
-                                  handleChange(mapping.id, "provision", e.target.value)
-                                }
+                                onChange={(e) => handleChange(row.key, "provision", e.target.value)}
                                 placeholder="0,00"
                               />
                             </TableCell>
@@ -249,18 +275,18 @@ export default function MgTest() {
                                 className="h-9"
                                 value={
                                   current?.cpo ??
-                                  (product?.revenue_dkk !== null && product?.revenue_dkk !== undefined
-                                    ? String(product.revenue_dkk)
+                                  (row.product?.revenue_dkk !== null && row.product?.revenue_dkk !== undefined
+                                    ? String(row.product.revenue_dkk)
                                     : "")
                                 }
-                                onChange={(e) => handleChange(mapping.id, "cpo", e.target.value)}
+                                onChange={(e) => handleChange(row.key, "cpo", e.target.value)}
                                 placeholder="0,00"
                               />
                             </TableCell>
                             <TableCell className="text-right">
                               <Button
                                 size="sm"
-                                onClick={() => handleSave(mapping)}
+                                onClick={() => handleSave(row)}
                                 disabled={upsertProductValues.isPending}
                               >
                                 {upsertProductValues.isPending ? (
