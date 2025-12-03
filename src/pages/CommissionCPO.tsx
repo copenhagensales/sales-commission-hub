@@ -187,6 +187,24 @@ export default function CommissionCPO() {
     },
   });
 
+  const updateProductMutation = useMutation({
+    mutationFn: async ({ id, product_id }: { id: string; product_id: string | null }) => {
+      const { error } = await supabase
+        .from("campaign_product_mappings")
+        .update({ product_id })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaign-mappings-with-products"] });
+      toast({ title: "Produkt opdateret" });
+    },
+    onError: (error) => {
+      toast({ title: "Fejl ved opdatering", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleEditClick = (mapping: CampaignMapping) => {
     setEditingMapping({ ...mapping });
     setIsEditDialogOpen(true);
@@ -335,11 +353,11 @@ export default function CommissionCPO() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Adversus Kampagne ID</TableHead>
-                        <TableHead>Outcome / Produkt</TableHead>
+                        <TableHead>Adversus Outcome</TableHead>
+                        <TableHead className="min-w-[200px]">Produkt Mapping</TableHead>
                         <TableHead>Kunde</TableHead>
                         <TableHead>Provision</TableHead>
-                        <TableHead>CPO (Omsætning)</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>CPO</TableHead>
                         <TableHead className="w-[80px]"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -352,16 +370,32 @@ export default function CommissionCPO() {
                             </code>
                           </TableCell>
                           <TableCell>
-                            <div className="space-y-1">
-                              {mapping.adversus_outcome && (
-                                <span className="text-sm text-muted-foreground block">
-                                  {mapping.adversus_outcome}
-                                </span>
-                              )}
-                              <span className="font-medium">
-                                {mapping.products?.name || "-"}
-                              </span>
-                            </div>
+                            <span className="text-sm">
+                              {mapping.adversus_outcome || "-"}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={mapping.product_id || "none"}
+                              onValueChange={(value) => 
+                                updateProductMutation.mutate({ 
+                                  id: mapping.id, 
+                                  product_id: value === "none" ? null : value 
+                                })
+                              }
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Vælg produkt" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-popover z-50">
+                                <SelectItem value="none">Ingen produkt</SelectItem>
+                                {products?.map((product) => (
+                                  <SelectItem key={product.id} value={product.id}>
+                                    {product.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell>
                             {mapping.liquidity_customers?.name || "-"}
@@ -374,17 +408,6 @@ export default function CommissionCPO() {
                           </TableCell>
                           <TableCell>
                             {formatCurrency(mapping.products?.revenue_amount)}
-                          </TableCell>
-                          <TableCell>
-                            {mapping.product_id ? (
-                              <Badge variant="default" className="bg-green-600">
-                                Konfigureret
-                              </Badge>
-                            ) : (
-                              <Badge variant="destructive">
-                                Mangler produkt
-                              </Badge>
-                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
