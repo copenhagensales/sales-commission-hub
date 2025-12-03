@@ -233,6 +233,7 @@ export default function MgTest() {
     });
   }, [aggregatedProducts, clients]);
 
+
   const upsertProductValues = useMutation({
     mutationFn: async (params: {
       row: AggregatedProduct;
@@ -416,6 +417,62 @@ export default function MgTest() {
       return data as CampaignMapping[];
     },
   });
+
+  const campaignsByClient = useMemo(() => {
+    const groups = new Map<
+      string,
+      { clientId: string | null; clientLabel: string; rows: CampaignMapping[] }
+    >();
+
+    // Første gruppe: Manglende mapping (ingen kunde valgt)
+    groups.set("unmapped", {
+      clientId: null,
+      clientLabel: "Manglende mapping",
+      rows: [],
+    });
+
+    // Én gruppe pr. kendt kunde fra "Kundenavne"-fanen
+    clients?.forEach((client) => {
+      if (!groups.has(client.id)) {
+        groups.set(client.id, {
+          clientId: client.id,
+          clientLabel: client.name,
+          rows: [],
+        });
+      }
+    });
+
+    // Fordel kampagner i grupper efter gemt kunde-tilknytning
+    campaignMappings?.forEach((mapping) => {
+      const existingClientId =
+        clientCampaigns?.find((c) => c.id === mapping.client_campaign_id)?.client_id ?? null;
+      const groupKey = existingClientId ?? "unmapped";
+      const existing = groups.get(groupKey);
+
+      if (existing) {
+        existing.rows.push(mapping);
+      } else {
+        groups.set(groupKey, {
+          clientId: existingClientId,
+          clientLabel: existingClientId ? "Ukendt kunde" : "Manglende mapping",
+          rows: [mapping],
+        });
+      }
+    });
+
+    const result = Array.from(groups.values());
+
+    // Sortér så "Manglende mapping" altid står først, derefter kunder alfabetisk
+    return result.sort((a, b) => {
+      const aIsUnmapped = a.clientLabel === "Manglende mapping";
+      const bIsUnmapped = b.clientLabel === "Manglende mapping";
+
+      if (aIsUnmapped && !bIsUnmapped) return -1;
+      if (!aIsUnmapped && bIsUnmapped) return 1;
+
+      return a.clientLabel.localeCompare(b.clientLabel, "da");
+    });
+  }, [campaignMappings, clientCampaigns, clients]);
 
   const updateCampaignMapping = useMutation({
     mutationFn: async ({ mappingId, clientId }: { mappingId: string; clientId: string | null }) => {
