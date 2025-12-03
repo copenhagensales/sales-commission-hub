@@ -1,12 +1,35 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
+import { RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Sales() {
+  const queryClient = useQueryClient();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const syncLast24Hours = async () => {
+    setIsSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-adversus', {
+        body: { action: 'sync-sales-to-db', days: 1 }
+      });
+      if (error) throw error;
+      toast.success(`Synkronisering færdig: ${data?.salesCreated || 0} nye salg`);
+      queryClient.invalidateQueries({ queryKey: ['sales-list'] });
+    } catch (error: any) {
+      toast.error(`Fejl ved synkronisering: ${error.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const { data: sales, isLoading } = useQuery({
     queryKey: ['sales-list'],
     queryFn: async () => {
@@ -28,7 +51,13 @@ export default function Sales() {
           <p className="text-muted-foreground">View all recorded sales</p>
         </div>
         <Card>
-          <CardHeader><CardTitle>Recent Sales</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Recent Sales</CardTitle>
+            <Button onClick={syncLast24Hours} disabled={isSyncing} size="sm">
+              <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              {isSyncing ? 'Synkroniserer...' : 'Sync sidste 24 timer'}
+            </Button>
+          </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="text-center py-8 text-muted-foreground">Loading...</div>
