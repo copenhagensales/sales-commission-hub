@@ -22,6 +22,7 @@ interface WebhookSaleItem {
     name: string;
     commission_dkk: number | null;
     revenue_dkk: number | null;
+    client_campaign_id: string | null;
   } | null;
   sales: {
     client_campaign_id: string | null;
@@ -37,6 +38,7 @@ interface AggregatedProduct {
     name: string;
     commission_dkk: number | null;
     revenue_dkk: number | null;
+    client_campaign_id: string | null;
   } | null;
   campaignId: string | null;
   campaignLabel: string;
@@ -78,6 +80,7 @@ export default function MgTest() {
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [editingClientName, setEditingClientName] = useState("");
   const [campaignSelections, setCampaignSelections] = useState<Record<string, string | null>>({});
+  const [productClientSelections, setProductClientSelections] = useState<Record<string, string | null>>({});
 
   // Hent alle kunder (kundenavne)
   const { data: clients, isLoading: loadingClients } = useQuery<ClientRow[]>({
@@ -118,7 +121,7 @@ export default function MgTest() {
       const { data, error } = await supabase
         .from("sale_items")
         .select(
-          "id, adversus_external_id, adversus_product_title, product_id, products(id, name, commission_dkk, revenue_dkk), sales(client_campaign_id)"
+          "id, adversus_external_id, adversus_product_title, product_id, products(id, name, commission_dkk, revenue_dkk, client_campaign_id), sales(client_campaign_id)"
         )
         .not("adversus_product_title", "is", null);
 
@@ -151,6 +154,7 @@ export default function MgTest() {
                 name: item.products.name,
                 commission_dkk: item.products.commission_dkk,
                 revenue_dkk: item.products.revenue_dkk,
+                client_campaign_id: item.products.client_campaign_id,
               }
             : null,
           campaignId,
@@ -343,6 +347,55 @@ export default function MgTest() {
     },
   });
 
+  const updateProductClient = useMutation({
+    mutationFn: async ({ productId, clientId }: { productId: string; clientId: string | null }) => {
+      let clientCampaignId: string | null = null;
+
+      if (clientId) {
+        const { data: campaigns, error: campaignsError } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", clientId);
+
+        if (campaignsError) throw campaignsError;
+
+        if (campaigns && campaigns.length > 0) {
+          clientCampaignId = campaigns[0].id as string;
+        } else {
+          const { data: newCampaign, error: insertError } = await supabase
+            .from("client_campaigns")
+            .insert({ client_id: clientId, name: "Standard" })
+            .select("id")
+            .single();
+
+          if (insertError) throw insertError;
+          clientCampaignId = newCampaign.id as string;
+        }
+      }
+
+      const { error } = await supabase
+        .from("products")
+        .update({ client_campaign_id: clientCampaignId })
+        .eq("id", productId);
+
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      toast.success("Kunde tilknyttet produkt");
+      setProductClientSelections((prev) => {
+        const next = { ...prev };
+        delete next[variables.productId];
+        return next;
+      });
+      queryClient.invalidateQueries({ queryKey: ["mg-webhook-products"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke gemme kunde på produkt");
+    },
+  });
+
   // Kunder: tilføj, opdater og slet
   const addClientMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -402,7 +455,7 @@ export default function MgTest() {
     },
   });
 
-  const isLoadingProductsTab = loadingSaleItems || loadingClientCampaigns;
+  const isLoadingProductsTab = loadingSaleItems || loadingClientCampaigns || loadingClients;
   const isLoadingCampaignTab = loadingCampaignMappings || loadingClientCampaigns;
   const isLoadingCustomersTab = loadingClients;
 
@@ -468,16 +521,27 @@ export default function MgTest() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[30%]">Adversus produktnavn</TableHead>
-                            <TableHead className="w-[20%]">External ID</TableHead>
-                            <TableHead className="w-[15%]">Provision (DKK)</TableHead>
-                            <TableHead className="w-[15%]">CPO / omsætning (DKK)</TableHead>
-                            <TableHead className="w-[20%] text-right">Handling</TableHead>
+                            <TableHead className="w-[28%]">Adversus produktnavn</TableHead>
+                            <TableHead className="w-[18%]">External ID</TableHead>
+                            <TableHead className="w-[22%]">Kunde</TableHead>
+                            <TableHead className="w-[14%]">Provision (DKK)</TableHead>
+                            <TableHead className="w-[14%]">CPO / omsætning (DKK)</TableHead>
+                            <TableHead className="w-[14%] text-right">Handling</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {group.rows.map((row) => {
                             const current = editValues[row.key];
+                            const productId = row.product?.id ?? null;
+                            const existingClientCampaignId = row.product?.client_campaign_id ?? null;
+                            const existingClientId =
+                              existingClientCampaignId
+                                ? clientCampaigns?.find((c) => c.id === existingClientCampaignId)?.client_id ?? null
+                                : null;
+                            const selectedClientId =
+                              productId && productClientSelections[productId] !== undefined
+                                ? productClientSelections[productId]
+                                : existingClientId;
 
                             return (
                               <TableRow key={row.key}>
@@ -497,6 +561,57 @@ export default function MgTest() {
                                   <span className="text-xs font-mono text-muted-foreground">
                                     {row.adversus_external_id || "(mangler)"}
                                   </span>
+                                </TableCell>
+                                <TableCell>
+                                  {row.product ? (
+                                    <div className="flex flex-col gap-2 max-w-xs">
+                                      <Select
+                                        value={selectedClientId ?? undefined}
+                                        onValueChange={(value) =>
+                                          productId &&
+                                          setProductClientSelections((prev) => ({
+                                            ...prev,
+                                            [productId]: value,
+                                          }))
+                                        }
+                                      >
+                                        <SelectTrigger className="w-full">
+                                          <SelectValue placeholder="Vælg kunde" />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-background border z-50 max-h-72">
+                                          {clients?.map((client) => (
+                                            <SelectItem key={client.id} value={client.id} className="text-sm">
+                                              {client.name}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <div className="flex justify-end">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() =>
+                                            productId &&
+                                            updateProductClient.mutate({
+                                              productId,
+                                              clientId: selectedClientId,
+                                            })
+                                          }
+                                          disabled={
+                                            !productId ||
+                                            updateProductClient.isPending ||
+                                            selectedClientId === existingClientId
+                                          }
+                                        >
+                                          Gem kunde
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">
+                                      Gem provision / CPO først for at oprette produktet
+                                    </span>
+                                  )}
                                 </TableCell>
                                 <TableCell>
                                   <Input
