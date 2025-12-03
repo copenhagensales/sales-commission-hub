@@ -314,7 +314,7 @@ export default function MgTest() {
         productId = newProduct.id as string;
       }
 
-      // 2) Opret/opfdatér mapping baseret på adversus_external_id
+      // 2) Opret/opdatér mapping baseret på adversus_external_id
       if (row.adversus_external_id) {
         const { error: mappingError } = await supabase
           .from("adversus_product_mappings")
@@ -330,18 +330,36 @@ export default function MgTest() {
         if (mappingError) throw mappingError;
       }
 
+      // 3) Opdater alle sale_items med samme adversus_product_title så de peger på dette produkt
+      if (productId && row.adversus_product_title) {
+        const { error: saleItemsError } = await supabase
+          .from("sale_items")
+          .update({ product_id: productId })
+          .eq("adversus_product_title", row.adversus_product_title);
+
+        if (saleItemsError) throw saleItemsError;
+      }
+
       return { productId };
     },
     onSuccess: (_data, variables) => {
-      toast.success("CPO og provision gemt");
+      toast.success("Gemt – produktet er nu tilknyttet kunden");
       setProductClientDrafts((prev) => {
         const next = { ...prev };
         delete next[variables.row.key];
         return next;
       });
+      setProductClientSelections((prev) => {
+        const next = { ...prev };
+        if (variables.row.product?.id) {
+          delete next[variables.row.product.id];
+        }
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: ["mg-webhook-products"] });
       queryClient.invalidateQueries({ queryKey: ["adversus-product-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke gemme værdier");
