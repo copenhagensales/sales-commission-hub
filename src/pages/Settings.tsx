@@ -116,7 +116,7 @@ export default function Settings() {
         name,
         code: name.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 20).toUpperCase(),
         commission_type: 'fixed' as const,
-        commission_value: 500, // Default commission
+        commission_value: 0,
         clawback_window_days: 30,
         is_active: true,
         revenue_amount: 0
