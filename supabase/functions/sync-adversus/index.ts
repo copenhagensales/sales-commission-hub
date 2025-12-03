@@ -436,9 +436,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Debug action: scan all campaigns for products
+    // Debug action: scan all campaigns for products AND outcomes
     if (debugAction === 'scan-all-products') {
-      console.log(`Debug: Scanning all campaigns for products...`)
+      console.log(`Debug: Scanning all campaigns for products and outcomes...`)
       
       // First fetch all campaigns
       const campaignsResponse = await fetch(`${baseUrl}/campaigns?pageSize=200`, {
@@ -458,59 +458,135 @@ Deno.serve(async (req) => {
       const campaignsData = await campaignsResponse.json()
       const campaigns = Array.isArray(campaignsData) ? campaignsData : (campaignsData.campaigns || [])
       
-      // Get sales for last 30 days for all campaigns
-      const now = new Date()
-      const startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-      const filters = { created: { $gt: startDate.toISOString() } }
-      const filterStr = encodeURIComponent(JSON.stringify(filters))
-      
-      const salesResponse = await fetch(`${baseUrl}/sales?pageSize=500&filters=${filterStr}`, {
-        headers: {
-          'Authorization': `Basic ${authHeader}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      if (!salesResponse.ok) {
-        return new Response(
-          JSON.stringify({ error: 'Failed to fetch sales' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-      
-      const salesData = await salesResponse.json()
-      const sales = Array.isArray(salesData) ? salesData : (salesData.sales || [])
-      
-      // Group products by campaign
-      const campaignProducts: Record<string, { campaignId: number, campaignName: string, products: Record<string, number> }> = {}
-      
       // Create campaign lookup
       const campaignLookup: Record<number, string> = {}
       for (const c of campaigns) {
         campaignLookup[c.id] = c.name
       }
       
-      for (const sale of sales) {
-        const campaignId = sale.campaignId || sale.campaign
-        const campaignName = campaignLookup[campaignId] || `Unknown (${campaignId})`
+      // Result structure
+      const campaignResults: Record<string, { 
+        campaignId: number
+        campaignName: string
+        products: Record<string, number>  // From /sales lines
+        outcomes: Record<string, number>  // From sessions/resultData
+      }> = {}
+      
+      // 1. Get products from /sales endpoint (like Codan)
+      const now = new Date()
+      const startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      const filters = { created: { $gt: startDate.toISOString() } }
+      const filterStr = encodeURIComponent(JSON.stringify(filters))
+      
+      try {
+        const salesResponse = await fetch(`${baseUrl}/sales?pageSize=500&filters=${filterStr}`, {
+          headers: {
+            'Authorization': `Basic ${authHeader}`,
+            'Content-Type': 'application/json'
+          }
+        })
         
-        if (!campaignProducts[campaignId]) {
-          campaignProducts[campaignId] = { campaignId, campaignName, products: {} }
-        }
-        
-        if (sale.lines) {
-          for (const line of sale.lines) {
-            const title = line.title || 'Unknown'
-            campaignProducts[campaignId].products[title] = (campaignProducts[campaignId].products[title] || 0) + 1
+        if (salesResponse.ok) {
+          const salesData = await salesResponse.json()
+          const sales = Array.isArray(salesData) ? salesData : (salesData.sales || [])
+          
+          for (const sale of sales) {
+            const campaignId = sale.campaignId || sale.campaign
+            const campaignName = campaignLookup[campaignId] || `Unknown (${campaignId})`
+            
+            if (!campaignResults[campaignId]) {
+              campaignResults[campaignId] = { campaignId, campaignName, products: {}, outcomes: {} }
+            }
+            
+            if (sale.lines) {
+              for (const line of sale.lines) {
+                const title = line.title || 'Unknown'
+                campaignResults[campaignId].products[title] = (campaignResults[campaignId].products[title] || 0) + 1
+              }
+            }
           }
         }
+      } catch (e) {
+        console.log('Error fetching sales:', e)
+      }
+      
+      // 2. Get outcomes from sessions (for campaigns that don't use /sales)
+      // Fetch sessions with status=success from last 14 days
+      const sessionStartDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
+      const sessionFilters = { 
+        startTime: { $gt: sessionStartDate.toISOString() },
+        status: 'success'
+      }
+      const sessionFilterStr = encodeURIComponent(JSON.stringify(sessionFilters))
+      
+      try {
+        const sessionsResponse = await fetch(`${baseUrl}/sessions?pageSize=200&filters=${sessionFilterStr}`, {
+          headers: {
+            'Authorization': `Basic ${authHeader}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (sessionsResponse.ok) {
+          const sessionsData = await sessionsResponse.json()
+          const sessions = Array.isArray(sessionsData) ? sessionsData : (sessionsData.sessions || [])
+          
+          for (const session of sessions) {
+            const campaignId = session.campaignId
+            const campaignName = campaignLookup[campaignId] || `Unknown (${campaignId})`
+            
+            if (!campaignResults[campaignId]) {
+              campaignResults[campaignId] = { campaignId, campaignName, products: {}, outcomes: {} }
+            }
+            
+            // Extract outcome from various sources
+            let outcome = session.closingCode || session.outcome || session.result
+            
+            // If no direct outcome, try to get from lead resultData
+            if (!outcome && session.leadId) {
+              try {
+                await new Promise(r => setTimeout(r, 100)) // Small delay
+                const leadResponse = await fetch(`${baseUrl}/leads/${session.leadId}`, {
+                  headers: {
+                    'Authorization': `Basic ${authHeader}`,
+                    'Content-Type': 'application/json'
+                  }
+                })
+                
+                if (leadResponse.ok) {
+                  const lead = await leadResponse.json()
+                  const resultData = lead.resultData || []
+                  
+                  // Look for common outcome fields
+                  for (const field of resultData) {
+                    const label = (field.label || '').toLowerCase()
+                    if (label.includes('succes') || label.includes('produkt') || label.includes('outcome')) {
+                      outcome = field.value
+                      break
+                    }
+                  }
+                }
+              } catch (e) {
+                // Skip lead fetch errors
+              }
+            }
+            
+            if (outcome) {
+              campaignResults[campaignId].outcomes[outcome] = (campaignResults[campaignId].outcomes[outcome] || 0) + 1
+            }
+          }
+        }
+      } catch (e) {
+        console.log('Error fetching sessions:', e)
       }
       
       return new Response(
         JSON.stringify({ 
-          campaigns: Object.values(campaignProducts),
-          totalCampaigns: campaigns.length,
-          totalSales: sales.length
+          campaigns: Object.values(campaignResults).filter(c => 
+            Object.keys(c.products).length > 0 || Object.keys(c.outcomes).length > 0
+          ),
+          allCampaigns: campaigns.map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })),
+          totalCampaigns: campaigns.length
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
