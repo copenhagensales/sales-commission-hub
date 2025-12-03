@@ -15,8 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
-import { Link2, ChevronLeft, ChevronRight, Sparkles, Check, Zap } from "lucide-react";
+import { Link2, ChevronDown, ChevronRight, Sparkles, Check, Zap, Building2 } from "lucide-react";
 
 interface Product {
   id: string;
@@ -42,7 +47,38 @@ interface Props {
   onBulkApprove?: (mappings: { id: string; productId: string }[]) => void;
 }
 
-const ITEMS_PER_PAGE = 10;
+// Extract customer name from campaign name or outcome
+function extractCustomerName(campaignName: string, outcome: string | null): string {
+  // Check outcome first for " - Customer" pattern
+  if (outcome) {
+    const outcomeMatch = outcome.match(/\s-\s([^-]+)$/);
+    if (outcomeMatch) {
+      return outcomeMatch[1].trim();
+    }
+  }
+  
+  // Common customer keywords to look for in campaign name
+  const customerKeywords = [
+    'Codan', 'Finansforbundet', 'TDC', 'Tryg', 'Business Danmark', 
+    'Eesy', 'Hiper', 'Relatel', 'YouSee', 'AKA', 'ASE', 'Min A-kasse', 'SIXT'
+  ];
+  
+  const nameLower = campaignName.toLowerCase();
+  
+  for (const keyword of customerKeywords) {
+    if (nameLower.includes(keyword.toLowerCase())) {
+      return keyword;
+    }
+  }
+  
+  // Try to extract from " - " or " – " pattern in campaign name
+  const dashMatch = campaignName.match(/^([^-–]+)/);
+  if (dashMatch && dashMatch[1].trim().length > 2) {
+    return dashMatch[1].trim();
+  }
+  
+  return 'Øvrige';
+}
 
 // Function to calculate similarity between two strings (simple)
 function calculateSimilarity(str1: string, str2: string): number {
@@ -52,7 +88,6 @@ function calculateSimilarity(str1: string, str2: string): number {
   if (s1 === s2) return 1;
   if (s1.includes(s2) || s2.includes(s1)) return 0.9;
   
-  // Check for word matches
   const words1 = str1.toLowerCase().split(/\s+/);
   const words2 = str2.toLowerCase().split(/\s+/);
   
@@ -69,15 +104,12 @@ function calculateSimilarity(str1: string, str2: string): number {
 function findSuggestedProduct(campaignName: string, outcome: string | null, products: Product[]): { product: Product; confidence: number } | null {
   let bestMatch: { product: Product; confidence: number } | null = null;
   
-  // Combine campaign name and outcome for matching
   const searchString = outcome ? `${campaignName} ${outcome}` : campaignName;
   
   for (const product of products) {
     if (!product.is_active) continue;
     
-    // Check name similarity
     const nameSim = calculateSimilarity(searchString, product.name);
-    // Check code similarity
     const codeSim = calculateSimilarity(searchString, product.code);
     
     const confidence = Math.max(nameSim, codeSim);
@@ -90,60 +122,66 @@ function findSuggestedProduct(campaignName: string, outcome: string | null, prod
   return bestMatch;
 }
 
-// Group mappings by campaign
-function groupByCampaign(mappings: CampaignMapping[]) {
-  const groups = new Map<string, CampaignMapping[]>();
-  
-  for (const mapping of mappings) {
-    const key = mapping.adversus_campaign_id;
-    if (!groups.has(key)) {
-      groups.set(key, []);
-    }
-    groups.get(key)!.push(mapping);
-  }
-  
-  return groups;
+interface MappingWithMeta extends CampaignMapping {
+  suggestion: { product: Product; confidence: number } | null;
+  customerName: string;
 }
 
 export function CampaignMappingSection({ campaignMappings, products, onMappingChange, onBulkApprove }: Props) {
-  const [currentPage, setCurrentPage] = useState(1);
   const [showOnlyUnmapped, setShowOnlyUnmapped] = useState(false);
+  const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set());
 
-  // Add suggestions to mappings
-  const mappingsWithSuggestions = useMemo(() => {
+  // Add suggestions and customer name to mappings
+  const mappingsWithMeta = useMemo(() => {
     return campaignMappings.map(mapping => ({
       ...mapping,
-      suggestion: !mapping.product_id ? findSuggestedProduct(mapping.adversus_campaign_name, mapping.adversus_outcome, products) : null
+      suggestion: !mapping.product_id ? findSuggestedProduct(mapping.adversus_campaign_name, mapping.adversus_outcome, products) : null,
+      customerName: extractCustomerName(mapping.adversus_campaign_name, mapping.adversus_outcome)
     }));
   }, [campaignMappings, products]);
 
   // Filter
   const filteredMappings = useMemo(() => {
-    let filtered = mappingsWithSuggestions;
+    let filtered = mappingsWithMeta;
     if (showOnlyUnmapped) {
       filtered = filtered.filter(m => !m.product_id);
     }
     return filtered;
-  }, [mappingsWithSuggestions, showOnlyUnmapped]);
+  }, [mappingsWithMeta, showOnlyUnmapped]);
 
-  // Group by campaign for display
-  const groupedMappings = useMemo(() => groupByCampaign(filteredMappings), [filteredMappings]);
-  const campaignIds = Array.from(groupedMappings.keys());
-  
-  // Pagination by campaign groups
-  const totalPages = Math.ceil(campaignIds.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedCampaignIds = campaignIds.slice(startIndex, endIndex);
+  // Group by customer, then by campaign
+  const groupedByCustomer = useMemo(() => {
+    const customerMap = new Map<string, Map<string, MappingWithMeta[]>>();
+    
+    for (const mapping of filteredMappings) {
+      const customer = mapping.customerName;
+      const campaignId = mapping.adversus_campaign_id;
+      
+      if (!customerMap.has(customer)) {
+        customerMap.set(customer, new Map());
+      }
+      
+      const campaignMap = customerMap.get(customer)!;
+      if (!campaignMap.has(campaignId)) {
+        campaignMap.set(campaignId, []);
+      }
+      campaignMap.get(campaignId)!.push(mapping);
+    }
+    
+    return customerMap;
+  }, [filteredMappings]);
+
+  const customerNames = Array.from(groupedByCustomer.keys()).sort();
 
   // Stats
   const mappedCount = campaignMappings.filter(m => m.product_id).length;
   const unmappedCount = campaignMappings.filter(m => !m.product_id).length;
-  const withSuggestions = mappingsWithSuggestions.filter(m => !m.product_id && m.suggestion && m.suggestion.confidence >= 0.8);
+  const withSuggestions = mappingsWithMeta.filter(m => !m.product_id && m.suggestion && m.suggestion.confidence >= 0.8);
 
   const stats = {
     total: campaignMappings.length,
     campaigns: new Set(campaignMappings.map(m => m.adversus_campaign_id)).size,
+    customers: customerNames.length,
     mapped: mappedCount,
     unmapped: unmappedCount,
     withSuggestions: withSuggestions.length
@@ -157,6 +195,24 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
       }));
       onBulkApprove(mappingsToApprove);
     }
+  };
+
+  const toggleCustomer = (customer: string) => {
+    const newExpanded = new Set(expandedCustomers);
+    if (newExpanded.has(customer)) {
+      newExpanded.delete(customer);
+    } else {
+      newExpanded.add(customer);
+    }
+    setExpandedCustomers(newExpanded);
+  };
+
+  const expandAll = () => {
+    setExpandedCustomers(new Set(customerNames));
+  };
+
+  const collapseAll = () => {
+    setExpandedCustomers(new Set());
   };
 
   if (campaignMappings.length === 0) {
@@ -175,10 +231,11 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3 flex-wrap">
           <Badge variant="outline" className="gap-1.5">
-            <span className="font-normal text-muted-foreground">Kampagner:</span> {stats.campaigns}
+            <Building2 className="h-3 w-3" />
+            <span className="font-normal text-muted-foreground">Kunder:</span> {stats.customers}
           </Badge>
           <Badge variant="outline" className="gap-1.5">
-            <span className="font-normal text-muted-foreground">Kombinationer:</span> {stats.total}
+            <span className="font-normal text-muted-foreground">Kampagner:</span> {stats.campaigns}
           </Badge>
           <Badge variant="outline" className="gap-1.5 border-success/30 bg-success/5">
             <Check className="h-3 w-3 text-success" />
@@ -207,183 +264,185 @@ export function CampaignMappingSection({ campaignMappings, products, onMappingCh
             </Button>
           )}
           <Button
+            variant="ghost"
+            size="sm"
+            onClick={expandAll}
+          >
+            Udvid alle
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={collapseAll}
+          >
+            Luk alle
+          </Button>
+          <Button
             variant={showOnlyUnmapped ? "secondary" : "outline"}
             size="sm"
-            onClick={() => {
-              setShowOnlyUnmapped(!showOnlyUnmapped);
-              setCurrentPage(1);
-            }}
+            onClick={() => setShowOnlyUnmapped(!showOnlyUnmapped)}
           >
             {showOnlyUnmapped ? "Vis alle" : "Vis kun umappede"}
           </Button>
         </div>
       </div>
 
-      {/* Campaigns grouped with outcomes */}
-      <div className="space-y-4">
-        {paginatedCampaignIds.map(campaignId => {
-          const mappings = groupedMappings.get(campaignId)!;
-          const campaignName = mappings[0].adversus_campaign_name;
-          const hasMultipleOutcomes = mappings.length > 1 || mappings.some(m => m.adversus_outcome);
+      {/* Customers with campaigns */}
+      <div className="space-y-3">
+        {customerNames.map(customer => {
+          const campaignMap = groupedByCustomer.get(customer)!;
+          const campaignIds = Array.from(campaignMap.keys());
+          const isExpanded = expandedCustomers.has(customer);
+          
+          // Stats for this customer
+          const allMappings = campaignIds.flatMap(id => campaignMap.get(id)!);
+          const customerMapped = allMappings.filter(m => m.product_id).length;
+          const customerTotal = allMappings.length;
           
           return (
-            <div key={campaignId} className="rounded-lg border border-border overflow-hidden">
-              {/* Campaign Header */}
-              <div className="px-4 py-3 bg-muted/30 border-b border-border flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h3 className="font-medium text-foreground">{campaignName}</h3>
-                  <span className="text-xs text-muted-foreground font-mono">ID: {campaignId}</span>
-                </div>
-                {hasMultipleOutcomes && (
-                  <Badge variant="outline" className="text-xs">
-                    {mappings.length} afslutningskode{mappings.length !== 1 ? 'r' : ''}
-                  </Badge>
-                )}
-              </div>
-              
-              {/* Outcomes/Mappings */}
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border hover:bg-transparent">
-                    <TableHead className="text-muted-foreground">Afslutningskode</TableHead>
-                    <TableHead className="text-muted-foreground w-[300px]">Produkt</TableHead>
-                    <TableHead className="text-muted-foreground w-24">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mappings.map((mapping) => {
-                    const mappingWithSuggestion = mappingsWithSuggestions.find(m => m.id === mapping.id);
-                    const suggestion = mappingWithSuggestion?.suggestion;
-                    
-                    return (
-                      <TableRow key={mapping.id} className="border-border">
-                        <TableCell>
-                          {mapping.adversus_outcome ? (
-                            <span className="font-medium text-foreground">{mapping.adversus_outcome}</span>
-                          ) : (
-                            <span className="text-muted-foreground italic">(ingen afslutningskode)</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Select
-                              value={mapping.product_id || 'none'}
-                              onValueChange={(value) => onMappingChange(mapping.id, value)}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Vælg produkt..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">
-                                  <span className="text-muted-foreground">Ikke mappet</span>
-                                </SelectItem>
-                                {suggestion && (
-                                  <SelectItem value={suggestion.product.id}>
-                                    <span className="flex items-center gap-2">
-                                      <Sparkles className="h-3 w-3 text-primary" />
-                                      {suggestion.product.name} (foreslået)
-                                    </span>
-                                  </SelectItem>
-                                )}
-                                {products.filter(p => p.is_active && p.id !== suggestion?.product.id).map((product) => (
-                                  <SelectItem key={product.id} value={product.id}>
-                                    {product.name} ({product.code})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {suggestion && suggestion.confidence >= 0.8 && !mapping.product_id && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="shrink-0"
-                                onClick={() => onMappingChange(mapping.id, suggestion.product.id)}
-                              >
-                                <Check className="h-4 w-4" />
-                              </Button>
+            <Collapsible key={customer} open={isExpanded} onOpenChange={() => toggleCustomer(customer)}>
+              <div className="rounded-lg border border-border overflow-hidden">
+                {/* Customer Header */}
+                <CollapsibleTrigger asChild>
+                  <button className="w-full px-4 py-3 bg-muted/50 border-b border-border flex items-center justify-between hover:bg-muted/70 transition-colors">
+                    <div className="flex items-center gap-3">
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <Building2 className="h-4 w-4 text-primary" />
+                      <h3 className="font-semibold text-foreground">{customer}</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {campaignIds.length} kampagne{campaignIds.length !== 1 ? 'r' : ''}
+                      </Badge>
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs ${customerMapped === customerTotal ? 'border-success/30 bg-success/10 text-success' : 'border-warning/30 bg-warning/10 text-warning'}`}
+                      >
+                        {customerMapped}/{customerTotal} mappet
+                      </Badge>
+                    </div>
+                  </button>
+                </CollapsibleTrigger>
+                
+                <CollapsibleContent>
+                  <div className="divide-y divide-border">
+                    {campaignIds.map(campaignId => {
+                      const mappings = campaignMap.get(campaignId)!;
+                      const campaignName = mappings[0].adversus_campaign_name;
+                      
+                      return (
+                        <div key={campaignId} className="bg-card">
+                          {/* Campaign subheader */}
+                          <div className="px-4 py-2 bg-muted/20 border-b border-border/50 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-foreground">{campaignName}</span>
+                              <span className="text-xs text-muted-foreground font-mono">ID: {campaignId}</span>
+                            </div>
+                            {mappings.length > 1 && (
+                              <span className="text-xs text-muted-foreground">
+                                {mappings.length} produkter
+                              </span>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          {mapping.product_id ? (
-                            <Badge variant="outline" className="border-success/30 bg-success/10 text-success">
-                              <Check className="h-3 w-3 mr-1" />
-                              Mappet
-                            </Badge>
-                          ) : suggestion ? (
-                            <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-                              <Sparkles className="h-3 w-3 mr-1" />
-                              Forslag
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
-                              Mangler
-                            </Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                          
+                          {/* Mappings table */}
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="border-border hover:bg-transparent">
+                                <TableHead className="text-muted-foreground text-xs">Produkt/Outcome</TableHead>
+                                <TableHead className="text-muted-foreground text-xs w-[280px]">Internt produkt</TableHead>
+                                <TableHead className="text-muted-foreground text-xs w-20">Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {mappings.map((mapping) => {
+                                const suggestion = mapping.suggestion;
+                                
+                                return (
+                                  <TableRow key={mapping.id} className="border-border/50">
+                                    <TableCell className="py-2">
+                                      {mapping.adversus_outcome ? (
+                                        <span className="text-sm text-foreground">{mapping.adversus_outcome}</span>
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground italic">(standard)</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="py-2">
+                                      <div className="flex items-center gap-2">
+                                        <Select
+                                          value={mapping.product_id || 'none'}
+                                          onValueChange={(value) => onMappingChange(mapping.id, value)}
+                                        >
+                                          <SelectTrigger className="h-8 text-xs">
+                                            <SelectValue placeholder="Vælg produkt..." />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="none">
+                                              <span className="text-muted-foreground">Ikke mappet</span>
+                                            </SelectItem>
+                                            {suggestion && (
+                                              <SelectItem value={suggestion.product.id}>
+                                                <span className="flex items-center gap-2">
+                                                  <Sparkles className="h-3 w-3 text-primary" />
+                                                  {suggestion.product.name} (foreslået)
+                                                </span>
+                                              </SelectItem>
+                                            )}
+                                            {products.filter(p => p.is_active && p.id !== suggestion?.product.id).map((product) => (
+                                              <SelectItem key={product.id} value={product.id}>
+                                                {product.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                        {suggestion && suggestion.confidence >= 0.8 && !mapping.product_id && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-8 w-8 p-0 shrink-0"
+                                            onClick={() => onMappingChange(mapping.id, suggestion.product.id)}
+                                          >
+                                            <Check className="h-3 w-3" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-2">
+                                      {mapping.product_id ? (
+                                        <Badge variant="outline" className="text-xs border-success/30 bg-success/10 text-success">
+                                          <Check className="h-2.5 w-2.5 mr-1" />
+                                          OK
+                                        </Badge>
+                                      ) : suggestion ? (
+                                        <Badge variant="outline" className="text-xs border-primary/30 bg-primary/10 text-primary">
+                                          <Sparkles className="h-2.5 w-2.5 mr-1" />
+                                          Forslag
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="text-xs border-warning/30 bg-warning/10 text-warning">
+                                          Mangler
+                                        </Badge>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
           );
         })}
       </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
-          <p className="text-sm text-muted-foreground">
-            Viser {startIndex + 1}-{Math.min(endIndex, campaignIds.length)} af {campaignIds.length} kampagner
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Forrige
-            </Button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum: number;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={currentPage === pageNum ? "default" : "ghost"}
-                    size="sm"
-                    className="w-8 h-8 p-0"
-                    onClick={() => setCurrentPage(pageNum)}
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Næste
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
