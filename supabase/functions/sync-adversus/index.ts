@@ -436,6 +436,86 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Debug action: scan all campaigns for products
+    if (debugAction === 'scan-all-products') {
+      console.log(`Debug: Scanning all campaigns for products...`)
+      
+      // First fetch all campaigns
+      const campaignsResponse = await fetch(`${baseUrl}/campaigns?pageSize=200`, {
+        headers: {
+          'Authorization': `Basic ${authHeader}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!campaignsResponse.ok) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch campaigns' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      const campaignsData = await campaignsResponse.json()
+      const campaigns = Array.isArray(campaignsData) ? campaignsData : (campaignsData.campaigns || [])
+      
+      // Get sales for last 30 days for all campaigns
+      const now = new Date()
+      const startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      const filters = { created: { $gt: startDate.toISOString() } }
+      const filterStr = encodeURIComponent(JSON.stringify(filters))
+      
+      const salesResponse = await fetch(`${baseUrl}/sales?pageSize=500&filters=${filterStr}`, {
+        headers: {
+          'Authorization': `Basic ${authHeader}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!salesResponse.ok) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch sales' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      const salesData = await salesResponse.json()
+      const sales = Array.isArray(salesData) ? salesData : (salesData.sales || [])
+      
+      // Group products by campaign
+      const campaignProducts: Record<string, { campaignId: number, campaignName: string, products: Record<string, number> }> = {}
+      
+      // Create campaign lookup
+      const campaignLookup: Record<number, string> = {}
+      for (const c of campaigns) {
+        campaignLookup[c.id] = c.name
+      }
+      
+      for (const sale of sales) {
+        const campaignId = sale.campaignId || sale.campaign
+        const campaignName = campaignLookup[campaignId] || `Unknown (${campaignId})`
+        
+        if (!campaignProducts[campaignId]) {
+          campaignProducts[campaignId] = { campaignId, campaignName, products: {} }
+        }
+        
+        if (sale.lines) {
+          for (const line of sale.lines) {
+            const title = line.title || 'Unknown'
+            campaignProducts[campaignId].products[title] = (campaignProducts[campaignId].products[title] || 0) + 1
+          }
+        }
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          campaigns: Object.values(campaignProducts),
+          totalCampaigns: campaigns.length,
+          totalSales: sales.length
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Debug action: fetch specific campaign details
     if (debugAction === 'fetch-campaign' && debugCampaignId) {
       console.log(`Debug: Fetching Adversus campaign ${debugCampaignId}...`)
