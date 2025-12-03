@@ -576,6 +576,71 @@ export default function MgTest() {
     },
   });
 
+  const autoAssignCampaigns = useMutation({
+    mutationFn: async () => {
+      if (!campaignMappings || !clients) return { updated: 0 };
+
+      const updates: { mappingId: string; clientId: string }[] = [];
+
+      for (const mapping of campaignMappings) {
+        const existingClientId =
+          clientCampaigns?.find((c) => c.id === mapping.client_campaign_id)?.client_id ?? null;
+
+        if (existingClientId) continue;
+
+        const parsedClient = parseClientFromTitle(mapping.adversus_campaign_name, clients);
+        if (parsedClient) {
+          updates.push({ mappingId: mapping.id, clientId: parsedClient.id });
+        }
+      }
+
+      for (const { mappingId, clientId } of updates) {
+        let clientCampaignId: string | null = null;
+
+        const { data: campaigns, error: campaignsError } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", clientId);
+
+        if (campaignsError) throw campaignsError;
+
+        if (campaigns && campaigns.length > 0) {
+          clientCampaignId = campaigns[0].id as string;
+        } else {
+          const { data: newCampaign, error: insertError } = await supabase
+            .from("client_campaigns")
+            .insert({ client_id: clientId, name: "Standard" })
+            .select("id")
+            .single();
+
+          if (insertError) throw insertError;
+          clientCampaignId = newCampaign.id as string;
+        }
+
+        const { error } = await supabase
+          .from("adversus_campaign_mappings")
+          .update({ client_campaign_id: clientCampaignId })
+          .eq("id", mappingId);
+
+        if (error) throw error;
+      }
+
+      return { updated: updates.length };
+    },
+    onSuccess: ({ updated }) => {
+      if (updated === 0) {
+        toast.success("Ingen kampagner kunne fordeles automatisk ud fra kundenavn.");
+      } else {
+        toast.success(`Fordelte ${updated} kampagner automatisk ud fra kundenavn.`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["mg-campaign-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke auto-fordele kampagner");
+    },
+  });
+
   const updateProductClient = useMutation({
     mutationFn: async ({ productId, clientId }: { productId: string; clientId: string | null }) => {
       let clientCampaignId: string | null = null;
@@ -956,7 +1021,21 @@ export default function MgTest() {
                     Her mapper du Adversus campaignId til dine interne kundekampagner.
                   </p>
                 </div>
-                <Badge variant="outline">{campaignMappings?.length ?? 0} kampagner</Badge>
+                <div className="flex items-center gap-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="hover-scale"
+                    onClick={() => autoAssignCampaigns.mutate()}
+                    disabled={autoAssignCampaigns.isPending || !campaignMappings || campaignMappings.length === 0}
+                  >
+                    {autoAssignCampaigns.isPending && (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    )}
+                    Auto-fordel kampagner
+                  </Button>
+                  <Badge variant="outline">{campaignMappings?.length ?? 0} kampagner</Badge>
+                </div>
               </CardHeader>
               <CardContent>
                 {isLoadingCampaignTab ? (
