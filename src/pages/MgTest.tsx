@@ -641,6 +641,79 @@ export default function MgTest() {
     },
   });
 
+  const backfillSalesCampaigns = useMutation({
+    mutationFn: async () => {
+      // 1) Hent alle kampagnemappings med tilknyttet intern kampagne
+      const { data: mappings, error: mappingsError } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("adversus_campaign_id, client_campaign_id")
+        .not("client_campaign_id", "is", null);
+
+      if (mappingsError) throw mappingsError;
+
+      const mappingByCampaignId = new Map<string, string>();
+      (mappings || []).forEach((m: any) => {
+        if (m.client_campaign_id) {
+          mappingByCampaignId.set(m.adversus_campaign_id, m.client_campaign_id as string);
+        }
+      });
+
+      if (mappingByCampaignId.size === 0) {
+        return { updated: 0 };
+      }
+
+      // 2) Hent alle salg uden kampagne, men med adversus_event_id
+      const { data: sales, error: salesError } = await supabase
+        .from("sales")
+        .select("id, adversus_event_id, client_campaign_id, adversus_events(payload)")
+        .is("client_campaign_id", null)
+        .not("adversus_event_id", "is", null)
+        .limit(500);
+
+      if (salesError) throw salesError;
+      if (!sales || sales.length === 0) {
+        return { updated: 0 };
+      }
+
+      let updated = 0;
+
+      for (const sale of sales as any[]) {
+        const event = sale.adversus_events as any;
+        const adversusPayload = event?.payload as any;
+        const adversusCampaignId = adversusPayload?.payload?.campaign?.id as string | undefined;
+
+        if (!adversusCampaignId) continue;
+
+        const clientCampaignId = mappingByCampaignId.get(adversusCampaignId);
+        if (!clientCampaignId) continue;
+
+        const { error: updateError } = await supabase
+          .from("sales")
+          .update({ client_campaign_id: clientCampaignId })
+          .eq("id", sale.id);
+
+        if (updateError) throw updateError;
+        updated += 1;
+      }
+
+      return { updated };
+    },
+    onSuccess: ({ updated }) => {
+      if (updated === 0) {
+        toast.success("Ingen salg skulle opdateres. Alt ser allerede rigtigt ud.");
+      } else {
+        toast.success(`Opdaterede ${updated} salg med korrekt kunde/kampagne.`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["sales-list"] });
+      queryClient.invalidateQueries({ queryKey: ["codan-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["tdc-erhverv-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-webhook-products"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke backfille salg til kampagner");
+    },
+  });
+
   const updateProductClient = useMutation({
     mutationFn: async ({ productId, clientId }: { productId: string; clientId: string | null }) => {
       let clientCampaignId: string | null = null;
@@ -1021,7 +1094,7 @@ export default function MgTest() {
                     Her mapper du Adversus campaignId til dine interne kundekampagner.
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <Button
                     size="sm"
                     variant="outline"
@@ -1033,6 +1106,18 @@ export default function MgTest() {
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     )}
                     Auto-fordel kampagner
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="hover-scale"
+                    onClick={() => backfillSalesCampaigns.mutate()}
+                    disabled={backfillSalesCampaigns.isPending}
+                  >
+                    {backfillSalesCampaigns.isPending && (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    )}
+                    Backfill salg til kampagner
                   </Button>
                   <Badge variant="outline">{campaignMappings?.length ?? 0} kampagner</Badge>
                 </div>
