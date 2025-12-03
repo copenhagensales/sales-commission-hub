@@ -16,6 +16,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Pencil, Check, ChevronsUpDown } from "lucide-react";
 import { EditableCell } from "@/components/commission/EditableCell";
+import { ProductCombobox } from "@/components/commission/ProductCombobox";
 import { cn } from "@/lib/utils";
 
 interface CampaignMapping {
@@ -480,27 +481,16 @@ export default function CommissionCPO() {
                             </span>
                           </TableCell>
                           <TableCell>
-                            <Select
-                              value={mapping.product_id || "none"}
+                            <ProductCombobox
+                              products={products || []}
+                              value={mapping.product_id}
                               onValueChange={(value) => 
                                 updateProductMutation.mutate({ 
                                   id: mapping.id, 
-                                  product_id: value === "none" ? null : value 
+                                  product_id: value 
                                 })
                               }
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Vælg produkt" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-popover z-50">
-                                <SelectItem value="none">Ingen produkt</SelectItem>
-                                {products?.map((product) => (
-                                  <SelectItem key={product.id} value={product.id}>
-                                    {product.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            />
                           </TableCell>
                           <TableCell>
                             {mapping.liquidity_customers?.name || "-"}
