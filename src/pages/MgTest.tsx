@@ -136,16 +136,49 @@ export default function MgTest() {
   const aggregatedProducts: AggregatedProduct[] = useMemo(() => {
     const map = new Map<string, AggregatedProduct>();
 
+    const parseClientFromTitle = (title: string | null, clientList?: ClientRow[]) => {
+      if (!title || !clientList || clientList.length === 0) return null;
+      const trimmed = title.trim();
+      if (!trimmed) return null;
+
+      const separators = [" - ", " – ", "|"];
+      let candidate = trimmed;
+
+      for (const sep of separators) {
+        const idx = trimmed.lastIndexOf(sep);
+        if (idx !== -1) {
+          candidate = trimmed.slice(idx + sep.length).trim();
+          break;
+        }
+      }
+
+      if (!candidate) return null;
+      const lowerCandidate = candidate.toLowerCase();
+
+      return (
+        clientList.find((client) => client.name && client.name.trim().toLowerCase() === lowerCandidate) || null
+      );
+    };
+
     saleItems?.forEach((item) => {
       const productCampaignId = item.products?.client_campaign_id ?? null;
       const saleCampaignId = item.sales?.client_campaign_id ?? null;
       const campaignId = productCampaignId ?? saleCampaignId ?? null;
 
       const campaign = campaignId ? clientCampaigns?.find((c) => c.id === campaignId) || null : null;
-      const clientId = campaign?.client_id ?? null;
-      const clientName = clientId
+      let clientId = campaign?.client_id ?? null;
+      let clientName = clientId
         ? clients?.find((client) => client.id === clientId)?.name ?? "Ukendt kunde"
         : null;
+
+      // Midlertidig hjælp: hvis der ikke er fundet kunde, forsøg at udlede kundenavn fra produktnavnet
+      if (!clientId) {
+        const parsedClient = parseClientFromTitle(item.adversus_product_title, clients);
+        if (parsedClient) {
+          clientId = parsedClient.id;
+          clientName = parsedClient.name ?? "Ukendt kunde";
+        }
+      }
 
       const productKey = item.adversus_external_id || item.adversus_product_title || item.id;
       const fullKey = `${clientId ?? "no-client"}::${productKey}`;
