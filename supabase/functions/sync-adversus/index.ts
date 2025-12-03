@@ -464,11 +464,11 @@ Deno.serve(async (req) => {
         campaignLookup[c.id] = c.name
       }
       
-      // Result structure
+      // Result structure - now includes commission data for Codan
       const campaignResults: Record<string, { 
         campaignId: number
         campaignName: string
-        products: Record<string, number>  // From /sales lines
+        products: Record<string, { count: number, commission?: number }>  // From /sales lines with commission
         outcomes: Record<string, number>  // From sessions/resultData
       }> = {}
       
@@ -490,6 +490,8 @@ Deno.serve(async (req) => {
           const salesData = await salesResponse.json()
           const sales = Array.isArray(salesData) ? salesData : (salesData.sales || [])
           
+          console.log(`Debug: Found ${sales.length} sales from /sales endpoint`)
+          
           for (const sale of sales) {
             const campaignId = sale.campaignId || sale.campaign
             const campaignName = campaignLookup[campaignId] || `Unknown (${campaignId})`
@@ -501,7 +503,18 @@ Deno.serve(async (req) => {
             if (sale.lines) {
               for (const line of sale.lines) {
                 const title = line.title || 'Unknown'
-                campaignResults[campaignId].products[title] = (campaignResults[campaignId].products[title] || 0) + 1
+                // Extract commission from salesCommission or unitPrice field
+                const commission = line.salesCommission ?? line.unitPrice ?? line.price ?? null
+                
+                if (!campaignResults[campaignId].products[title]) {
+                  campaignResults[campaignId].products[title] = { count: 0, commission: commission }
+                }
+                campaignResults[campaignId].products[title].count++
+                
+                // Update commission if we find a valid one and don't have one yet
+                if (commission !== null && campaignResults[campaignId].products[title].commission === null) {
+                  campaignResults[campaignId].products[title].commission = commission
+                }
               }
             }
           }
