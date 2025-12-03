@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Pencil } from "lucide-react";
 
 interface CampaignMapping {
   id: string;
@@ -50,6 +50,8 @@ export default function CommissionCPO() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingMapping, setEditingMapping] = useState<CampaignMapping | null>(null);
   const [newMapping, setNewMapping] = useState({
     adversus_campaign_id: "",
     adversus_campaign_name: "",
@@ -158,6 +160,37 @@ export default function CommissionCPO() {
       toast({ title: "Fejl ved tilføjelse", description: error.message, variant: "destructive" });
     },
   });
+
+  const editMutation = useMutation({
+    mutationFn: async (mapping: CampaignMapping) => {
+      const { error } = await supabase
+        .from("campaign_product_mappings")
+        .update({
+          adversus_campaign_id: mapping.adversus_campaign_id,
+          adversus_campaign_name: mapping.adversus_campaign_name,
+          adversus_outcome: mapping.adversus_outcome || null,
+          product_id: mapping.product_id || null,
+          liquidity_customer_id: mapping.liquidity_customer_id || null,
+        })
+        .eq("id", mapping.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaign-mappings-with-products"] });
+      toast({ title: "Mapping opdateret" });
+      setIsEditDialogOpen(false);
+      setEditingMapping(null);
+    },
+    onError: (error) => {
+      toast({ title: "Fejl ved opdatering", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleEditClick = (mapping: CampaignMapping) => {
+    setEditingMapping({ ...mapping });
+    setIsEditDialogOpen(true);
+  };
 
   // Group campaigns by campaign name
   const groupedCampaigns = campaigns?.reduce((acc, campaign) => {
@@ -348,14 +381,23 @@ export default function CommissionCPO() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => deleteMutation.mutate(mapping.id)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditClick(mapping)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => deleteMutation.mutate(mapping.id)}
+                                disabled={deleteMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -374,6 +416,83 @@ export default function CommissionCPO() {
             )}
           </div>
         )}
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Rediger kampagne-mapping</DialogTitle>
+            </DialogHeader>
+            {editingMapping && (
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Kampagne ID</Label>
+                  <Input
+                    value={editingMapping.adversus_campaign_id}
+                    onChange={(e) => setEditingMapping({ ...editingMapping, adversus_campaign_id: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Kampagne navn</Label>
+                  <Input
+                    value={editingMapping.adversus_campaign_name}
+                    onChange={(e) => setEditingMapping({ ...editingMapping, adversus_campaign_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Outcome (valgfrit)</Label>
+                  <Input
+                    value={editingMapping.adversus_outcome || ""}
+                    onChange={(e) => setEditingMapping({ ...editingMapping, adversus_outcome: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Produkt</Label>
+                  <Select
+                    value={editingMapping.product_id || ""}
+                    onValueChange={(value) => setEditingMapping({ ...editingMapping, product_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vælg produkt" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {products?.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>
+                          {product.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Kunde (valgfrit)</Label>
+                  <Select
+                    value={editingMapping.liquidity_customer_id || ""}
+                    onValueChange={(value) => setEditingMapping({ ...editingMapping, liquidity_customer_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vælg kunde" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers?.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button 
+                  onClick={() => editMutation.mutate(editingMapping)} 
+                  disabled={editMutation.isPending}
+                  className="w-full"
+                >
+                  {editMutation.isPending ? "Gemmer..." : "Gem ændringer"}
+                </Button>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
