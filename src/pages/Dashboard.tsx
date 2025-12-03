@@ -22,7 +22,7 @@ export default function Dashboard() {
   const { data: salesCount } = useQuery({
     queryKey: ['dashboard-sales-count'],
     queryFn: async () => {
-      const { count, error } = await supabase.from('sales').select('*', { count: 'exact', head: true });
+      const { count, error } = await supabase.from('sale_items').select('*', { count: 'exact', head: true });
       if (error) throw error;
       return count || 0;
     }

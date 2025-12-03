@@ -106,7 +106,6 @@ export default function Codan() {
 
       const codanSales = (sales || []) as unknown as CodanSale[];
 
-      let salesThisMonth = codanSales.length;
       let revenueThisMonth = 0;
       let commissionThisMonth = 0;
 
@@ -123,22 +122,30 @@ export default function Codan() {
 
       let revenueToday = 0;
       let commissionToday = 0;
+      let salesTodayCount = 0;
+      let salesThisMonthCount = 0;
 
       todaysSales.forEach((sale) => {
         sale.sale_items?.forEach((item) => {
           revenueToday += Number(item.mapped_revenue) || 0;
           commissionToday += Number(item.mapped_commission) || 0;
         });
+        salesTodayCount += sale.sale_items?.length || 0;
+      });
+
+      codanSales.forEach((sale) => {
+        salesThisMonthCount += sale.sale_items?.length || 0;
       });
 
       const stats: CodanStats = {
-        salesToday: todaysSales.length,
+        salesToday: salesTodayCount,
         revenueToday,
         commissionToday,
-        salesThisMonth,
+        salesThisMonth: salesThisMonthCount,
         revenueThisMonth,
         commissionThisMonth,
-        avgCommissionPerSale: salesThisMonth > 0 ? commissionThisMonth / salesThisMonth : 0,
+        avgCommissionPerSale:
+          salesThisMonthCount > 0 ? commissionThisMonth / salesThisMonthCount : 0,
       };
 
       const recentSales = codanSales.slice(0, 25);

@@ -67,23 +67,32 @@ export default function Wallboard() {
 
     // Get unique active agents today
     const activeAgentNames = new Set(todaysSales.map(s => s.agent_name).filter(Boolean));
+    const salesTodayCount = todaysSales.reduce(
+      (count, sale) => count + (sale.sale_items?.length || 0),
+      0,
+    );
+    const salesThisMonthCount = salesData.reduce(
+      (count, sale) => count + (sale.sale_items?.length || 0),
+      0,
+    );
 
     setStats({
-      salesToday: todaysSales.length,
+      salesToday: salesTodayCount,
       revenueToday,
-      salesThisMonth: salesData.length,
+      salesThisMonth: salesThisMonthCount,
       revenueThisMonth,
       activeAgents: activeAgentNames.size,
     });
 
     // Calculate top agents for today
     const agentSalesMap = new Map<string, { name: string; sales: number; revenue: number }>();
-    
+
     todaysSales.forEach(sale => {
       const agentName = sale.agent_name;
       if (agentName) {
         const existing = agentSalesMap.get(agentName) || { name: agentName, sales: 0, revenue: 0 };
-        existing.sales += 1;
+        const saleCount = sale.sale_items?.length || 0;
+        existing.sales += saleCount;
         sale.sale_items?.forEach((item: any) => {
           existing.revenue += Number(item.mapped_revenue) || 0;
         });
