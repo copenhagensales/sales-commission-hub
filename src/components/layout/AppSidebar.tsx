@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Agenter", href: "/agents", icon: Users },
   { name: "Salg", href: "/sales", icon: ShoppingCart },
+  { name: "Codan", href: "/codan", icon: Shield },
   { name: "Provision og CPO", href: "/commission-cpo", icon: Percent },
   { name: "Lønkørsler", href: "/payroll", icon: Wallet },
   { name: "Wallboard", href: "/wallboard", icon: Tv },
