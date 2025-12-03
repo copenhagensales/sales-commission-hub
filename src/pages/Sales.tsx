@@ -51,9 +51,43 @@ interface SaleWithDetails {
 
 const PAGE_SIZE = 50;
 
+// Extract customer name from product name suffix
+function extractCustomer(productName: string): string {
+  const suffixes = [
+    ' - Finansforbundet',
+    ' - TDC Erhverv',
+    ' - Tryg',
+    ' - TRYG',
+    ' - Codan',
+    ' - Business Danmark',
+    ' - SIXT',
+    ' - AKA',
+    ' - ASE',
+    ' - Eesy',
+    ' - Relatel',
+    ' - YouSee',
+    ' - Min A-Kasse'
+  ];
+  
+  for (const suffix of suffixes) {
+    if (productName.toLowerCase().includes(suffix.toLowerCase())) {
+      return suffix.replace(' - ', '');
+    }
+  }
+  
+  const lastDash = productName.lastIndexOf(' - ');
+  if (lastDash !== -1) {
+    return productName.substring(lastDash + 3);
+  }
+  
+  return 'Ukendt';
+}
+
 export default function Sales() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [campaignFilter, setCampaignFilter] = useState<string>("all");
+  const [customerFilter, setCustomerFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortByProduct, setSortByProduct] = useState<'asc' | 'desc' | null>(null);
   const [selectedSale, setSelectedSale] = useState<SaleWithDetails | null>(null);
@@ -79,9 +113,37 @@ export default function Sales() {
     }
   };
 
+  // Fetch unique campaigns
+  const { data: campaigns } = useQuery({
+    queryKey: ['unique-campaigns'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sales')
+        .select('campaign_name')
+        .not('campaign_name', 'is', null);
+      if (error) throw error;
+      const unique = [...new Set(data.map(s => s.campaign_name).filter(Boolean))];
+      return unique.sort() as string[];
+    }
+  });
+
+  // Fetch unique customers from products
+  const { data: customers } = useQuery({
+    queryKey: ['unique-customers-from-products'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('name');
+      if (error) throw error;
+      const customerSet = new Set<string>();
+      data.forEach(p => customerSet.add(extractCustomer(p.name)));
+      return [...customerSet].sort();
+    }
+  });
+
   // Fetch total count for pagination
   const { data: totalCount } = useQuery({
-    queryKey: ['sales-count', statusFilter],
+    queryKey: ['sales-count', statusFilter, campaignFilter],
     queryFn: async () => {
       let query = supabase
         .from('sales')
@@ -89,6 +151,9 @@ export default function Sales() {
       
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter as SaleStatus);
+      }
+      if (campaignFilter !== 'all') {
+        query = query.eq('campaign_name', campaignFilter);
       }
       
       const { count, error } = await query;
@@ -98,7 +163,7 @@ export default function Sales() {
   });
 
   const { data: sales, isLoading } = useQuery({
-    queryKey: ['sales-with-details', currentPage, statusFilter, sortByProduct],
+    queryKey: ['sales-with-details', currentPage, statusFilter, campaignFilter, customerFilter, sortByProduct],
     queryFn: async () => {
       const from = (currentPage - 1) * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
@@ -121,6 +186,9 @@ export default function Sales() {
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter as SaleStatus);
       }
+      if (campaignFilter !== 'all') {
+        query = query.eq('campaign_name', campaignFilter);
+      }
       
       // Apply sorting - default to sale_date desc if no product sort
       if (sortByProduct) {
@@ -135,8 +203,14 @@ export default function Sales() {
     }
   });
 
-  // Client-side search filtering
+  // Client-side search and customer filtering
   const filteredSales = (sales || []).filter(sale => {
+    // Customer filter (client-side since it's based on product name)
+    if (customerFilter !== 'all') {
+      const productCustomer = sale.product?.name ? extractCustomer(sale.product.name) : 'Ukendt';
+      if (productCustomer !== customerFilter) return false;
+    }
+    
     if (!search) return true;
     const searchLower = search.toLowerCase();
     const agentName = sale.agent?.name || '';
@@ -220,16 +294,53 @@ export default function Sales() {
             />
           </div>
           <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="mr-2 h-4 w-4" />
+            <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Alle</SelectItem>
+              <SelectItem value="all">Alle statusser</SelectItem>
               <SelectItem value="pending">Afventer</SelectItem>
               <SelectItem value="active">Aktiv</SelectItem>
               <SelectItem value="cancelled">Annulleret</SelectItem>
               <SelectItem value="clawbacked">Modregnet</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select 
+            value={campaignFilter} 
+            onValueChange={(value) => {
+              setCampaignFilter(value);
+              setCurrentPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Kampagne" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle kampagner</SelectItem>
+              {campaigns?.map(campaign => (
+                <SelectItem key={campaign} value={campaign}>
+                  {campaign}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select 
+            value={customerFilter} 
+            onValueChange={(value) => {
+              setCustomerFilter(value);
+              setCurrentPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Kunde" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle kunder</SelectItem>
+              {customers?.map(customer => (
+                <SelectItem key={customer} value={customer}>
+                  {customer}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
