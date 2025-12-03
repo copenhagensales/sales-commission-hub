@@ -15,6 +15,7 @@ import LiquidityOverview from "./pages/LiquidityOverview";
 import LiquidityCustomers from "./pages/LiquidityCustomers";
 import LiquidityExpenses from "./pages/LiquidityExpenses";
 import LiquidityScenarios from "./pages/LiquidityScenarios";
+import CommissionCPO from "./pages/CommissionCPO";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,6 +68,7 @@ const App = () => (
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/agents" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
+          <Route path="/commission-cpo" element={<ProtectedRoute><CommissionCPO /></ProtectedRoute>} />
           <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
           <Route path="/wallboard" element={<Wallboard />} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

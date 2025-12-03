@@ -8,7 +8,8 @@ import {
   LogOut,
   TrendingUp,
   Receipt,
-  GitBranch
+  GitBranch,
+  Percent
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Agenter", href: "/agents", icon: Users },
   { name: "Salg", href: "/sales", icon: ShoppingCart },
+  { name: "Provision og CPO", href: "/commission-cpo", icon: Percent },
   { name: "Lønkørsler", href: "/payroll", icon: Wallet },
   { name: "Likviditet", href: "/liquidity", icon: TrendingUp },
   { name: "Kunder", href: "/liquidity/customers", icon: Receipt },
