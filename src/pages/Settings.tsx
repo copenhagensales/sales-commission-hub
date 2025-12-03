@@ -132,7 +132,14 @@ export default function Settings() {
       });
       if (error) throw error;
       setScanResults(data);
-      toast.success(`Fundet ${data.campaigns?.length || 0} kampagner med produkter`);
+      
+      // Refresh campaign mappings after scan creates new ones
+      queryClient.invalidateQueries({ queryKey: ['campaign-mappings'] });
+      
+      const mappingsMsg = data.mappingsCreated > 0 
+        ? ` (${data.mappingsCreated} nye mappings oprettet)` 
+        : '';
+      toast.success(`Fundet ${data.campaigns?.length || 0} kampagner fra ${data.totalSalesScanned || 0} salg${mappingsMsg}`);
     } catch (err) {
       console.error('Scan error:', err);
       toast.error('Scan fejlede');
