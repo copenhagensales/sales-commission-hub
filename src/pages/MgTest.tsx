@@ -77,6 +77,7 @@ export default function MgTest() {
   const [newClientName, setNewClientName] = useState("");
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [editingClientName, setEditingClientName] = useState("");
+  const [campaignSelections, setCampaignSelections] = useState<Record<string, string | null>>({});
 
   // Hent alle kunder (kundenavne)
   const { data: clients, isLoading: loadingClients } = useQuery<ClientRow[]>({
@@ -322,8 +323,13 @@ export default function MgTest() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       toast.success("Kampagnemapping gemt");
+      setCampaignSelections((prev) => {
+        const next = { ...prev };
+        delete next[variables.mappingId];
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: ["mg-campaign-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
     },
@@ -580,9 +586,12 @@ export default function MgTest() {
                       </TableHeader>
                       <TableBody>
                         {campaignMappings.map((mapping) => {
+                          const existingClientId =
+                            clientCampaigns?.find((c) => c.id === mapping.client_campaign_id)?.client_id ?? null;
                           const selectedClientId =
-                            clientCampaigns?.find((c) => c.id === mapping.client_campaign_id)?.client_id ??
-                            undefined;
+                            campaignSelections[mapping.id] !== undefined
+                              ? campaignSelections[mapping.id]
+                              : existingClientId;
 
                           return (
                             <TableRow key={mapping.id}>
@@ -597,26 +606,42 @@ export default function MgTest() {
                                 </span>
                               </TableCell>
                               <TableCell>
-                                <Select
-                                  value={selectedClientId}
-                                  onValueChange={(value) =>
-                                    updateCampaignMapping.mutate({
-                                      mappingId: mapping.id,
-                                      clientId: value,
-                                    })
-                                  }
-                                >
-                                  <SelectTrigger className="w-full max-w-xl">
-                                    <SelectValue placeholder="Vælg kunde" />
-                                  </SelectTrigger>
-                                  <SelectContent className="bg-background border z-50 max-h-72">
-                                    {clients?.map((client) => (
-                                      <SelectItem key={client.id} value={client.id} className="text-sm">
-                                        {client.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                <div className="flex flex-col gap-2 max-w-xl">
+                                  <Select
+                                    value={selectedClientId ?? undefined}
+                                    onValueChange={(value) =>
+                                      setCampaignSelections((prev) => ({
+                                        ...prev,
+                                        [mapping.id]: value,
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger className="w-full">
+                                      <SelectValue placeholder="Vælg kunde" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-background border z-50 max-h-72">
+                                      {clients?.map((client) => (
+                                        <SelectItem key={client.id} value={client.id} className="text-sm">
+                                          {client.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <div className="flex justify-end">
+                                    <Button
+                                      size="sm"
+                                      onClick={() =>
+                                        updateCampaignMapping.mutate({
+                                          mappingId: mapping.id,
+                                          clientId: selectedClientId,
+                                        })
+                                      }
+                                      disabled={updateCampaignMapping.isPending || selectedClientId === existingClientId}
+                                    >
+                                      Gem
+                                    </Button>
+                                  </div>
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
