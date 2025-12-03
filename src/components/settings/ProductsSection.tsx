@@ -40,28 +40,38 @@ interface Props {
 
 const ITEMS_PER_PAGE = 10;
 
-// Extract campaign prefix from product code
-function getCampaignPrefix(code: string): string {
-  const parts = code.split('-');
-  return parts[0] || code;
+// Extract customer name from product name suffix
+function extractCustomer(productName: string): string {
+  const suffixes = [
+    ' - Finansforbundet',
+    ' - TDC Erhverv',
+    ' - Tryg',
+    ' - TRYG',
+    ' - Codan',
+    ' - Business Danmark',
+    ' - SIXT',
+    ' - AKA',
+    ' - ASE',
+    ' - Eesy',
+    ' - Relatel',
+    ' - YouSee',
+    ' - Min A-Kasse'
+  ];
+  
+  for (const suffix of suffixes) {
+    if (productName.toLowerCase().includes(suffix.toLowerCase())) {
+      return suffix.replace(' - ', '');
+    }
+  }
+  
+  // Fallback: extract after last " - "
+  const lastDash = productName.lastIndexOf(' - ');
+  if (lastDash !== -1) {
+    return productName.substring(lastDash + 3);
+  }
+  
+  return 'Ukendt';
 }
-
-// Map prefix to readable campaign name
-const PREFIX_TO_CAMPAIGN: Record<string, string> = {
-  'AKA': 'AKA',
-  'ASE': 'ASE',
-  'BD': 'Business Danmark',
-  'CODAN': 'Codan',
-  'EESY': 'Eesy',
-  'FF': 'Finansforbundet',
-  'MAK': 'Min A-Kasse',
-  'REL': 'Relatel',
-  'TDCE': 'TDC Erhverv',
-  'TDC': 'TDC',
-  'TRYG': 'Tryg',
-  'YS': 'YouSee',
-  'STD': 'Standard',
-};
 
 export function ProductsSection({ products }: Props) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -93,15 +103,11 @@ export function ProductsSection({ products }: Props) {
     setEditDialogOpen(true);
   };
 
-  // Get unique campaigns from products
-  const campaigns = useMemo(() => {
-    const prefixes = new Set<string>();
-    products.forEach(p => prefixes.add(getCampaignPrefix(p.code)));
-    return Array.from(prefixes).sort((a, b) => {
-      const nameA = PREFIX_TO_CAMPAIGN[a] || a;
-      const nameB = PREFIX_TO_CAMPAIGN[b] || b;
-      return nameA.localeCompare(nameB);
-    });
+  // Get unique customers from products
+  const customers = useMemo(() => {
+    const customerSet = new Set<string>();
+    products.forEach(p => customerSet.add(extractCustomer(p.name)));
+    return Array.from(customerSet).sort((a, b) => a.localeCompare(b));
   }, [products]);
 
   // Filter products
@@ -113,7 +119,7 @@ export function ProductsSection({ products }: Props) {
     }
     
     if (selectedCampaign !== "all") {
-      filtered = filtered.filter(p => getCampaignPrefix(p.code) === selectedCampaign);
+      filtered = filtered.filter(p => extractCustomer(p.name) === selectedCampaign);
     }
     
     return filtered;
@@ -124,14 +130,14 @@ export function ProductsSection({ products }: Props) {
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
 
-  // Stats per campaign
-  const campaignStats = useMemo(() => {
+  // Stats per customer
+  const customerStats = useMemo(() => {
     const stats: Record<string, { total: number; active: number }> = {};
     products.forEach(p => {
-      const prefix = getCampaignPrefix(p.code);
-      if (!stats[prefix]) stats[prefix] = { total: 0, active: 0 };
-      stats[prefix].total++;
-      if (p.is_active) stats[prefix].active++;
+      const customer = extractCustomer(p.name);
+      if (!stats[customer]) stats[customer] = { total: 0, active: 0 };
+      stats[customer].total++;
+      if (p.is_active) stats[customer].active++;
     });
     return stats;
   }, [products]);
@@ -173,18 +179,17 @@ export function ProductsSection({ products }: Props) {
           >
             <SelectTrigger className="w-[200px]">
               <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Vælg kampagne..." />
+              <SelectValue placeholder="Vælg kunde..." />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">
-                Alle kampagner ({stats.total})
+                Alle kunder ({stats.total})
               </SelectItem>
-              {campaigns.map(prefix => {
-                const campaignName = PREFIX_TO_CAMPAIGN[prefix] || prefix;
-                const prefixStats = campaignStats[prefix];
+              {customers.map(customer => {
+                const custStats = customerStats[customer];
                 return (
-                  <SelectItem key={prefix} value={prefix}>
-                    {campaignName} ({prefixStats?.active || 0}/{prefixStats?.total || 0})
+                  <SelectItem key={customer} value={customer}>
+                    {customer} ({custStats?.active || 0}/{custStats?.total || 0})
                   </SelectItem>
                 );
               })}
@@ -208,12 +213,12 @@ export function ProductsSection({ products }: Props) {
         </div>
       </div>
 
-      {/* Selected campaign indicator */}
+      {/* Selected customer indicator */}
       {selectedCampaign !== "all" && (
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Filtreret:</span>
           <Badge variant="secondary">
-            {PREFIX_TO_CAMPAIGN[selectedCampaign] || selectedCampaign}
+            {selectedCampaign}
           </Badge>
           <span className="text-muted-foreground">
             ({filteredProducts.length} produkter)
@@ -236,7 +241,7 @@ export function ProductsSection({ products }: Props) {
             <TableRow className="border-border hover:bg-transparent bg-muted/30">
               <TableHead className="text-muted-foreground">Produkt</TableHead>
               <TableHead className="text-muted-foreground w-24">Kode</TableHead>
-              <TableHead className="text-muted-foreground w-28">Kampagne</TableHead>
+              <TableHead className="text-muted-foreground w-28">Kunde</TableHead>
               <TableHead className="text-muted-foreground w-28">Omsætning</TableHead>
               <TableHead className="text-muted-foreground w-32">Provision</TableHead>
               <TableHead className="text-muted-foreground w-28">Clawback</TableHead>
@@ -246,8 +251,7 @@ export function ProductsSection({ products }: Props) {
           </TableHeader>
           <TableBody>
             {paginatedProducts.map((product) => {
-              const prefix = getCampaignPrefix(product.code);
-              const campaignName = PREFIX_TO_CAMPAIGN[prefix] || prefix;
+              const customerName = extractCustomer(product.name);
               
               return (
                 <TableRow key={product.id} className="border-border">
@@ -262,11 +266,11 @@ export function ProductsSection({ products }: Props) {
                       variant="outline" 
                       className="text-xs cursor-pointer hover:bg-muted"
                       onClick={() => {
-                        setSelectedCampaign(prefix);
+                        setSelectedCampaign(customerName);
                         setCurrentPage(1);
                       }}
                     >
-                      {campaignName}
+                      {customerName}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-foreground">
