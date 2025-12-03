@@ -81,6 +81,7 @@ export default function MgTest() {
   const [editingClientName, setEditingClientName] = useState("");
   const [campaignSelections, setCampaignSelections] = useState<Record<string, string | null>>({});
   const [productClientSelections, setProductClientSelections] = useState<Record<string, string | null>>({});
+  const [productClientDrafts, setProductClientDrafts] = useState<Record<string, string | null>>({});
 
   // Hent alle kunder (kundenavne)
   const { data: clients, isLoading: loadingClients } = useQuery<ClientRow[]>({
@@ -200,26 +201,79 @@ export default function MgTest() {
   }, [aggregatedProducts]);
 
   const upsertProductValues = useMutation({
-    mutationFn: async (params: { row: AggregatedProduct; provision: number; cpo: number }) => {
-      const { row, provision, cpo } = params;
+    mutationFn: async (params: {
+      row: AggregatedProduct;
+      provision: number;
+      cpo: number;
+      clientId?: string | null;
+    }) => {
+      const { row, provision, cpo, clientId } = params;
       let productId = row.product?.id ?? null;
+
+      let clientCampaignId: string | null = null;
+
+      if (clientId) {
+        const { data: campaigns, error: campaignsError } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", clientId);
+
+        if (campaignsError) throw campaignsError;
+
+        if (campaigns && campaigns.length > 0) {
+          clientCampaignId = campaigns[0].id as string;
+        } else {
+          const { data: newCampaign, error: insertError } = await supabase
+            .from("client_campaigns")
+            .insert({ client_id: clientId, name: "Standard" })
+            .select("id")
+            .single();
+
+          if (insertError) throw insertError;
+          clientCampaignId = newCampaign.id as string;
+        }
+      }
 
       // 1) Opdater eksisterende produkt eller opret et nyt
       if (productId) {
+        const updatePayload: {
+          commission_dkk: number;
+          revenue_dkk: number;
+          client_campaign_id?: string | null;
+        } = {
+          commission_dkk: provision,
+          revenue_dkk: cpo,
+        };
+
+        if (clientCampaignId !== null) {
+          updatePayload.client_campaign_id = clientCampaignId;
+        }
+
         const { error } = await supabase
           .from("products")
-          .update({ commission_dkk: provision, revenue_dkk: cpo })
+          .update(updatePayload)
           .eq("id", productId);
 
         if (error) throw error;
       } else {
+        const insertPayload: {
+          name: string;
+          commission_dkk: number;
+          revenue_dkk: number;
+          client_campaign_id?: string | null;
+        } = {
+          name: row.adversus_product_title || "Adversus produkt",
+          commission_dkk: provision,
+          revenue_dkk: cpo,
+        };
+
+        if (clientCampaignId !== null) {
+          insertPayload.client_campaign_id = clientCampaignId;
+        }
+
         const { data: newProduct, error: insertError } = await supabase
           .from("products")
-          .insert({
-            name: row.adversus_product_title || "Adversus produkt",
-            commission_dkk: provision,
-            revenue_dkk: cpo,
-          })
+          .insert(insertPayload)
           .select("id")
           .single();
 
@@ -245,8 +299,13 @@ export default function MgTest() {
 
       return { productId };
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       toast.success("CPO og provision gemt");
+      setProductClientDrafts((prev) => {
+        const next = { ...prev };
+        delete next[variables.row.key];
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: ["mg-webhook-products"] });
       queryClient.invalidateQueries({ queryKey: ["adversus-product-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -276,7 +335,21 @@ export default function MgTest() {
     const provision = parseFloat(provisionRaw.replace(",", ".")) || 0;
     const cpo = parseFloat(cpoRaw.replace(",", ".")) || 0;
 
-    upsertProductValues.mutate({ row, provision, cpo });
+    const productId = row.product?.id ?? null;
+    const existingClientCampaignId = row.product?.client_campaign_id ?? null;
+    const existingClientId =
+      existingClientCampaignId
+        ? clientCampaigns?.find((c) => c.id === existingClientCampaignId)?.client_id ?? null
+        : null;
+
+    const selectionFromProduct =
+      productId && productClientSelections[productId] !== undefined
+        ? productClientSelections[productId]
+        : null;
+    const draftClientId = productClientDrafts[row.key] ?? null;
+    const selectedClientId = selectionFromProduct ?? draftClientId ?? existingClientId;
+
+    upsertProductValues.mutate({ row, provision, cpo, clientId: selectedClientId ?? null });
   };
 
   // Kampagne-mapping (Adversus campaignId -> intern client_campaign)
@@ -538,10 +611,12 @@ export default function MgTest() {
                               existingClientCampaignId
                                 ? clientCampaigns?.find((c) => c.id === existingClientCampaignId)?.client_id ?? null
                                 : null;
-                            const selectedClientId =
+                            const selectionFromProduct =
                               productId && productClientSelections[productId] !== undefined
                                 ? productClientSelections[productId]
-                                : existingClientId;
+                                : null;
+                            const draftClientId = productClientDrafts[row.key] ?? null;
+                            const selectedClientId = selectionFromProduct ?? draftClientId ?? existingClientId;
 
                             return (
                               <TableRow key={row.key}>
@@ -563,29 +638,34 @@ export default function MgTest() {
                                   </span>
                                 </TableCell>
                                 <TableCell>
-                                  {row.product ? (
-                                    <div className="flex flex-col gap-2 max-w-xs">
-                                      <Select
-                                        value={selectedClientId ?? undefined}
-                                        onValueChange={(value) =>
-                                          productId &&
+                                  <div className="flex flex-col gap-2 max-w-xs">
+                                    <Select
+                                      value={selectedClientId ?? undefined}
+                                      onValueChange={(value) => {
+                                        if (productId) {
                                           setProductClientSelections((prev) => ({
                                             ...prev,
                                             [productId]: value,
-                                          }))
+                                          }));
                                         }
-                                      >
-                                        <SelectTrigger className="w-full">
-                                          <SelectValue placeholder="Vælg kunde" />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-background border z-50 max-h-72">
-                                          {clients?.map((client) => (
-                                            <SelectItem key={client.id} value={client.id} className="text-sm">
-                                              {client.name}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
+                                        setProductClientDrafts((prev) => ({
+                                          ...prev,
+                                          [row.key]: value,
+                                        }));
+                                      }}
+                                    >
+                                      <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Vælg kunde" />
+                                      </SelectTrigger>
+                                      <SelectContent className="bg-background border z-50 max-h-72">
+                                        {clients?.map((client) => (
+                                          <SelectItem key={client.id} value={client.id} className="text-sm">
+                                            {client.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    {row.product ? (
                                       <div className="flex justify-end">
                                         <Button
                                           size="sm"
@@ -606,12 +686,12 @@ export default function MgTest() {
                                           Gem kunde
                                         </Button>
                                       </div>
-                                    </div>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">
-                                      Gem provision / CPO først for at oprette produktet
-                                    </span>
-                                  )}
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground">
+                                        Gem provision / CPO først for at oprette produktet
+                                      </span>
+                                    )}
+                                  </div>
                                 </TableCell>
                                 <TableCell>
                                   <Input
