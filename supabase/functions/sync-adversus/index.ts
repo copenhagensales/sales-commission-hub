@@ -452,19 +452,40 @@ Deno.serve(async (req) => {
       const allUsers: AdversusUser[] = usersData.users || usersData
       console.log(`Found ${allUsers.length} total users in Adversus`)
       
+      // Log first user structure to understand the data
+      if (allUsers.length > 0) {
+        console.log('Sample user structure:', JSON.stringify(allUsers[0]).slice(0, 500))
+      }
+      
       // Filter to only include agents (exclude managers)
-      // Adversus roles: typically 'agent', 'manager', 'admin', etc.
+      // Handle various role formats: string, object, array
       const users = allUsers.filter(user => {
-        const role = (user.role || '').toLowerCase()
-        const accessLevel = (user.accessLevel || '').toLowerCase()
+        // Safely extract role as string
+        let roleStr = ''
+        if (typeof user.role === 'string') {
+          roleStr = user.role.toLowerCase()
+        } else if (user.role && typeof user.role === 'object') {
+          // Role might be an object with name/type property
+          const roleObj = user.role as Record<string, unknown>
+          roleStr = String(roleObj.name || roleObj.type || roleObj.id || '').toLowerCase()
+        }
+        
+        // Safely extract accessLevel
+        let accessStr = ''
+        if (typeof user.accessLevel === 'string') {
+          accessStr = user.accessLevel.toLowerCase()
+        } else if (user.accessLevel && typeof user.accessLevel === 'object') {
+          const accessObj = user.accessLevel as Record<string, unknown>
+          accessStr = String(accessObj.name || accessObj.type || '').toLowerCase()
+        }
         
         // Exclude if explicitly marked as manager or admin
-        const isManager = role.includes('manager') || role.includes('admin') || 
-                         accessLevel.includes('manager') || accessLevel.includes('admin') ||
+        const isManager = roleStr.includes('manager') || roleStr.includes('admin') || 
+                         accessStr.includes('manager') || accessStr.includes('admin') ||
                          user.isManager === true
         
         if (isManager) {
-          console.log(`Skipping manager: ${user.name} (role: ${user.role}, accessLevel: ${user.accessLevel})`)
+          console.log(`Skipping manager: ${user.name} (role: ${JSON.stringify(user.role)})`)
           return false
         }
         return true
