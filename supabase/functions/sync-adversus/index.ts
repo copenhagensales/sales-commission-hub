@@ -436,7 +436,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Debug action: scan all campaigns for products AND outcomes
+    // Debug action: scan all campaigns for products AND outcomes - creates mappings automatically
     if (debugAction === 'scan-all-products') {
       console.log(`Debug: Scanning all campaigns for products and outcomes...`)
       
@@ -463,155 +463,146 @@ Deno.serve(async (req) => {
       // Create campaign lookup
       const campaignLookup: Record<number, string> = {}
       for (const c of campaigns) {
-        campaignLookup[c.id] = c.name
+        const name = c.settings?.name || c.name
+        if (name) {
+          campaignLookup[c.id] = name
+        }
       }
       
-      // Result structure - now includes commission data for Codan
+      // Result structure
       const campaignResults: Record<string, { 
         campaignId: number
         campaignName: string
-        products: Record<string, { count: number, commission?: number }>  // From /sales lines with commission
-        outcomes: Record<string, number>  // From sessions/resultData
+        products: Record<string, { count: number, commission?: number }>
+        outcomes: Record<string, number>
       }> = {}
       
-      // 1. Get products from /sales endpoint (like Codan)
+      // Track new mappings to create
+      const mappingsToCreate: { campaignId: string; campaignName: string; outcome: string }[] = []
+      
+      // 1. Get products from /sales endpoint - fetch multiple pages
       const now = new Date()
-      const startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      const startDate = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000) // 60 days
       const filters = { created: { $gt: startDate.toISOString() } }
       const filterStr = encodeURIComponent(JSON.stringify(filters))
       
-      try {
-        const salesResponse = await fetch(`${baseUrl}/sales?pageSize=500&filters=${filterStr}`, {
-          headers: {
-            'Authorization': `Basic ${authHeader}`,
-            'Content-Type': 'application/json'
-          }
-        })
-        
-        if (salesResponse.ok) {
-          const salesData = await salesResponse.json()
-          const sales = Array.isArray(salesData) ? salesData : (salesData.sales || [])
-          
-          console.log(`Debug: Found ${sales.length} sales from /sales endpoint`)
-          
-          // Log first sale structure for debugging
-          if (sales.length > 0) {
-            console.log(`=== FIRST SALE STRUCTURE ===`)
-            console.log(JSON.stringify(sales[0], null, 2))
-            console.log(`=== END FIRST SALE ===`)
-            
-            if (sales[0].lines && sales[0].lines.length > 0) {
-              console.log(`=== FIRST LINE STRUCTURE ===`)
-              console.log(JSON.stringify(sales[0].lines[0], null, 2))
-              console.log(`=== END FIRST LINE ===`)
+      let allSales: unknown[] = []
+      let page = 1
+      const pageSize = 100
+      
+      while (page <= 10) { // Max 10 pages = 1000 sales
+        try {
+          console.log(`Fetching sales page ${page}...`)
+          const salesResponse = await fetch(`${baseUrl}/sales?pageSize=${pageSize}&page=${page}&filters=${filterStr}`, {
+            headers: {
+              'Authorization': `Basic ${authHeader}`,
+              'Content-Type': 'application/json'
             }
+          })
+          
+          if (salesResponse.status === 429) {
+            console.log('Rate limited on sales fetch, stopping pagination')
+            break
           }
           
-          for (const sale of sales) {
-            const campaignId = sale.campaignId || sale.campaign
-            const campaignName = campaignLookup[campaignId] || `Unknown (${campaignId})`
+          if (salesResponse.ok) {
+            const salesData = await salesResponse.json()
+            const sales = Array.isArray(salesData) ? salesData : (salesData.sales || [])
             
-            if (!campaignResults[campaignId]) {
-              campaignResults[campaignId] = { campaignId, campaignName, products: {}, outcomes: {} }
-            }
+            if (sales.length === 0) break
             
-            if (sale.lines) {
-              for (const line of sale.lines) {
-                const title = line.title || 'Unknown'
-                // Log all line fields to find the commission field
-                if (!campaignResults[campaignId].products[title]) {
-                  console.log(`Line fields for "${title}": ${JSON.stringify(Object.keys(line))}`)
-                  console.log(`Line data: ${JSON.stringify(line)}`)
-                }
-                
-                // Extract commission - check multiple possible field names
-                const commission = line.salesCommission ?? line.agentCommission ?? line.commission ?? line.unitPrice ?? line.price ?? null
-                
-                if (!campaignResults[campaignId].products[title]) {
-                  campaignResults[campaignId].products[title] = { count: 0, commission: commission }
-                }
-                campaignResults[campaignId].products[title].count++
-                
-                // Update commission if we find a valid one and don't have one yet
-                if (commission !== null && campaignResults[campaignId].products[title].commission === null) {
-                  campaignResults[campaignId].products[title].commission = commission
-                }
-              }
-            }
+            allSales = [...allSales, ...sales]
+            console.log(`Page ${page}: Got ${sales.length} sales, total: ${allSales.length}`)
+            
+            if (sales.length < pageSize) break
+            page++
+            
+            // Small delay between pages
+            await new Promise(r => setTimeout(r, 500))
+          } else {
+            console.error(`Failed to fetch sales page ${page}:`, await salesResponse.text())
+            break
           }
+        } catch (e) {
+          console.log('Error fetching sales page:', e)
+          break
         }
-      } catch (e) {
-        console.log('Error fetching sales:', e)
       }
       
-      // 2. Get outcomes from sessions (for campaigns that don't use /sales)
-      // Fetch sessions with status=success from last 14 days
-      const sessionStartDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
-      const sessionFilters = { 
-        startTime: { $gt: sessionStartDate.toISOString() },
-        status: 'success'
-      }
-      const sessionFilterStr = encodeURIComponent(JSON.stringify(sessionFilters))
+      console.log(`Total sales fetched: ${allSales.length}`)
       
-      try {
-        const sessionsResponse = await fetch(`${baseUrl}/sessions?pageSize=200&filters=${sessionFilterStr}`, {
-          headers: {
-            'Authorization': `Basic ${authHeader}`,
-            'Content-Type': 'application/json'
-          }
-        })
+      // Process sales - extract campaign + line.title combinations
+      for (const sale of allSales as { campaignId?: number; campaign?: number; lines?: { title?: string; salesCommission?: number }[] }[]) {
+        const campaignId = sale.campaignId || sale.campaign
+        if (!campaignId) continue
         
-        if (sessionsResponse.ok) {
-          const sessionsData = await sessionsResponse.json()
-          const sessions = Array.isArray(sessionsData) ? sessionsData : (sessionsData.sessions || [])
-          
-          for (const session of sessions) {
-            const campaignId = session.campaignId
-            const campaignName = campaignLookup[campaignId] || `Unknown (${campaignId})`
+        const campaignName = campaignLookup[campaignId] || `Unknown (${campaignId})`
+        
+        if (!campaignResults[campaignId]) {
+          campaignResults[campaignId] = { campaignId, campaignName, products: {}, outcomes: {} }
+        }
+        
+        if (sale.lines && Array.isArray(sale.lines)) {
+          for (const line of sale.lines) {
+            const title = line.title
+            if (!title) continue
             
-            if (!campaignResults[campaignId]) {
-              campaignResults[campaignId] = { campaignId, campaignName, products: {}, outcomes: {} }
+            // Track product with count
+            if (!campaignResults[campaignId].products[title]) {
+              campaignResults[campaignId].products[title] = { count: 0, commission: line.salesCommission }
+              
+              // Add to mappings to create
+              mappingsToCreate.push({
+                campaignId: String(campaignId),
+                campaignName,
+                outcome: title
+              })
             }
-            
-            // Extract outcome from various sources
-            let outcome = session.closingCode || session.outcome || session.result
-            
-            // If no direct outcome, try to get from lead resultData
-            if (!outcome && session.leadId) {
-              try {
-                await new Promise(r => setTimeout(r, 100)) // Small delay
-                const leadResponse = await fetch(`${baseUrl}/leads/${session.leadId}`, {
-                  headers: {
-                    'Authorization': `Basic ${authHeader}`,
-                    'Content-Type': 'application/json'
-                  }
-                })
-                
-                if (leadResponse.ok) {
-                  const lead = await leadResponse.json()
-                  const resultData = lead.resultData || []
-                  
-                  // Look for common outcome fields
-                  for (const field of resultData) {
-                    const label = (field.label || '').toLowerCase()
-                    if (label.includes('succes') || label.includes('produkt') || label.includes('outcome')) {
-                      outcome = field.value
-                      break
-                    }
-                  }
-                }
-              } catch (e) {
-                // Skip lead fetch errors
-              }
-            }
-            
-            if (outcome) {
-              campaignResults[campaignId].outcomes[outcome] = (campaignResults[campaignId].outcomes[outcome] || 0) + 1
-            }
+            campaignResults[campaignId].products[title].count++
           }
         }
-      } catch (e) {
-        console.log('Error fetching sessions:', e)
+      }
+      
+      // 2. Load existing mappings to avoid duplicates
+      const { data: existingMappings } = await supabase
+        .from('campaign_product_mappings')
+        .select('adversus_campaign_id, adversus_outcome')
+      
+      const existingKeys = new Set(
+        (existingMappings || []).map(m => `${m.adversus_campaign_id}|${m.adversus_outcome || ''}`)
+      )
+      
+      // 3. Create new mappings for campaign+product combinations
+      const newMappings = mappingsToCreate.filter(m => {
+        const key = `${m.campaignId}|${m.outcome}`
+        return !existingKeys.has(key)
+      })
+      
+      let mappingsCreated = 0
+      if (newMappings.length > 0) {
+        console.log(`Creating ${newMappings.length} new campaign-product mappings...`)
+        
+        // Insert in batches of 50
+        for (let i = 0; i < newMappings.length; i += 50) {
+          const batch = newMappings.slice(i, i + 50).map(m => ({
+            adversus_campaign_id: m.campaignId,
+            adversus_campaign_name: m.campaignName,
+            adversus_outcome: m.outcome,
+            product_id: null
+          }))
+          
+          const { error } = await supabase
+            .from('campaign_product_mappings')
+            .insert(batch)
+          
+          if (error) {
+            console.error('Error creating mappings batch:', error)
+          } else {
+            mappingsCreated += batch.length
+          }
+        }
+        
+        console.log(`Created ${mappingsCreated} new mappings`)
       }
       
       return new Response(
@@ -619,8 +610,13 @@ Deno.serve(async (req) => {
           campaigns: Object.values(campaignResults).filter(c => 
             Object.keys(c.products).length > 0 || Object.keys(c.outcomes).length > 0
           ),
-          allCampaigns: campaigns.map((c: { id: number; name: string }) => ({ id: c.id, name: c.name })),
-          totalCampaigns: campaigns.length
+          allCampaigns: campaigns.map((c: { id: number; name: string; settings?: { name?: string } }) => ({ 
+            id: c.id, 
+            name: c.settings?.name || c.name 
+          })),
+          totalCampaigns: campaigns.length,
+          mappingsCreated,
+          totalSalesScanned: allSales.length
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
