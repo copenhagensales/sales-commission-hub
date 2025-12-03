@@ -44,7 +44,10 @@ export default function Settings() {
   const [defaultClawbackDays, setDefaultClawbackDays] = useState("30");
   const [isSyncing, setIsSyncing] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [scanResults, setScanResults] = useState<{campaigns: {campaignId: number; campaignName: string; products: Record<string, number>}[]} | null>(null);
+  const [scanResults, setScanResults] = useState<{
+    campaigns: {campaignId: number; campaignName: string; products: Record<string, number>; outcomes: Record<string, number>}[]
+    allCampaigns?: {id: number; name: string}[]
+  } | null>(null);
   const [syncProgress, setSyncProgress] = useState<{
     current: number;
     total: number;
@@ -436,17 +439,42 @@ export default function Settings() {
             {/* Scan results */}
             {scanResults && scanResults.campaigns && (
               <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3 max-h-96 overflow-auto">
-                <p className="font-medium text-foreground">Produkter fundet i {scanResults.campaigns.length} kampagner:</p>
+                <p className="font-medium text-foreground">Fundet data i {scanResults.campaigns.length} kampagner:</p>
                 {scanResults.campaigns.map((c) => (
                   <div key={c.campaignId} className="text-sm border-b border-border pb-2">
-                    <p className="font-medium">{c.campaignName}</p>
-                    <ul className="pl-4 text-muted-foreground">
-                      {Object.entries(c.products).map(([product, count]) => (
-                        <li key={product}>{product}: {count} salg</li>
-                      ))}
-                    </ul>
+                    <p className="font-medium">{c.campaignName} <span className="text-muted-foreground text-xs">({c.campaignId})</span></p>
+                    {Object.keys(c.products).length > 0 && (
+                      <div className="mt-1">
+                        <p className="text-xs text-muted-foreground font-medium">Produkter (fra /sales):</p>
+                        <ul className="pl-4 text-muted-foreground">
+                          {Object.entries(c.products).map(([product, count]) => (
+                            <li key={product} className="text-green-600">{product}: {count} salg</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {Object.keys(c.outcomes || {}).length > 0 && (
+                      <div className="mt-1">
+                        <p className="text-xs text-muted-foreground font-medium">Outcomes (fra sessions):</p>
+                        <ul className="pl-4 text-muted-foreground">
+                          {Object.entries(c.outcomes).map(([outcome, count]) => (
+                            <li key={outcome} className="text-blue-600">{outcome}: {count} salg</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 ))}
+                {scanResults.allCampaigns && (
+                  <details className="mt-4">
+                    <summary className="cursor-pointer text-xs text-muted-foreground">Alle {scanResults.allCampaigns.length} kampagner</summary>
+                    <ul className="pl-4 text-xs text-muted-foreground mt-1">
+                      {scanResults.allCampaigns.map(c => (
+                        <li key={c.id}>{c.name} ({c.id})</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </div>
             )}
 
