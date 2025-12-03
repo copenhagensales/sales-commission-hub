@@ -12,10 +12,17 @@ import { Upload, RefreshCw, AlertTriangle, CheckCircle, Package, Link2 } from "l
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+type EditingCell = {
+  productId: string;
+  field: 'name' | 'commission_dkk' | 'revenue_dkk';
+} | null;
+
 export default function Commission() {
   const queryClient = useQueryClient();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string>("all");
+  const [editingCell, setEditingCell] = useState<EditingCell>(null);
+  const [editValue, setEditValue] = useState<string>("");
 
   // Fetch clients for filter
   const { data: clients } = useQuery({
@@ -48,6 +55,46 @@ export default function Commission() {
       return data;
     }
   });
+
+  // Update product mutation
+  const updateProductMutation = useMutation({
+    mutationFn: async ({ productId, field, value }: { productId: string; field: string; value: string | number }) => {
+      const { error } = await supabase
+        .from('products')
+        .update({ [field]: value })
+        .eq('id', productId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Produkt opdateret');
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      setEditingCell(null);
+    },
+    onError: (error) => {
+      toast.error(`Fejl: ${error.message}`);
+    }
+  });
+
+  const startEditing = (productId: string, field: 'name' | 'commission_dkk' | 'revenue_dkk', currentValue: string | number) => {
+    setEditingCell({ productId, field });
+    setEditValue(String(currentValue));
+  };
+
+  const saveEdit = () => {
+    if (!editingCell) return;
+    const value = editingCell.field === 'name' ? editValue : parseFloat(editValue) || 0;
+    updateProductMutation.mutate({ productId: editingCell.productId, field: editingCell.field, value });
+  };
+
+  const cancelEdit = () => {
+    setEditingCell(null);
+    setEditValue("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') saveEdit();
+    if (e.key === 'Escape') cancelEdit();
+  };
 
   // Fetch unmapped sale items
   const { data: unmappedItems, isLoading: loadingUnmapped } = useQuery({
@@ -297,12 +344,68 @@ export default function Commission() {
                         
                         return filteredProducts.map((product) => (
                           <TableRow key={product.id}>
-                            <TableCell className="font-medium">{product.name}</TableCell>
+                            <TableCell className="font-medium">
+                              {editingCell?.productId === product.id && editingCell?.field === 'name' ? (
+                                <Input
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  onBlur={saveEdit}
+                                  onKeyDown={handleKeyDown}
+                                  autoFocus
+                                  className="h-7 w-full"
+                                />
+                              ) : (
+                                <span
+                                  onClick={() => startEditing(product.id, 'name', product.name)}
+                                  className="cursor-pointer hover:bg-muted px-2 py-1 rounded -mx-2"
+                                >
+                                  {product.name}
+                                </span>
+                              )}
+                            </TableCell>
                             <TableCell>
                               {product.client_campaigns?.clients?.name} / {product.client_campaigns?.name}
                             </TableCell>
-                            <TableCell className="text-right">{Number(product.commission_dkk).toLocaleString('da-DK')}</TableCell>
-                            <TableCell className="text-right">{Number(product.revenue_dkk).toLocaleString('da-DK')}</TableCell>
+                            <TableCell className="text-right">
+                              {editingCell?.productId === product.id && editingCell?.field === 'commission_dkk' ? (
+                                <Input
+                                  type="number"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  onBlur={saveEdit}
+                                  onKeyDown={handleKeyDown}
+                                  autoFocus
+                                  className="h-7 w-24 text-right ml-auto"
+                                />
+                              ) : (
+                                <span
+                                  onClick={() => startEditing(product.id, 'commission_dkk', product.commission_dkk ?? 0)}
+                                  className="cursor-pointer hover:bg-muted px-2 py-1 rounded"
+                                >
+                                  {Number(product.commission_dkk).toLocaleString('da-DK')}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {editingCell?.productId === product.id && editingCell?.field === 'revenue_dkk' ? (
+                                <Input
+                                  type="number"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  onBlur={saveEdit}
+                                  onKeyDown={handleKeyDown}
+                                  autoFocus
+                                  className="h-7 w-24 text-right ml-auto"
+                                />
+                              ) : (
+                                <span
+                                  onClick={() => startEditing(product.id, 'revenue_dkk', product.revenue_dkk ?? 0)}
+                                  className="cursor-pointer hover:bg-muted px-2 py-1 rounded"
+                                >
+                                  {Number(product.revenue_dkk).toLocaleString('da-DK')}
+                                </span>
+                              )}
+                            </TableCell>
                             <TableCell>
                               {product.external_product_code || <span className="text-muted-foreground">—</span>}
                             </TableCell>
