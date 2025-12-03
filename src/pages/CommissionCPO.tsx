@@ -196,8 +196,8 @@ export default function CommissionCPO() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["campaign-mappings-with-products"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["campaign-mappings-with-products"] });
       toast({ title: "Produkt opdateret" });
     },
     onError: (error) => {
