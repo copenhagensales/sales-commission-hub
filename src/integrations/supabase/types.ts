@@ -14,40 +14,102 @@ export type Database = {
   }
   public: {
     Tables: {
-      absences: {
+      adversus_campaign_mappings: {
         Row: {
-          agent_id: string
-          comment: string | null
+          adversus_campaign_id: string
+          adversus_campaign_name: string | null
+          client_campaign_id: string | null
           created_at: string | null
-          date: string
-          hours: number | null
           id: string
-          type: Database["public"]["Enums"]["absence_type"] | null
+          updated_at: string | null
         }
         Insert: {
-          agent_id: string
-          comment?: string | null
+          adversus_campaign_id: string
+          adversus_campaign_name?: string | null
+          client_campaign_id?: string | null
           created_at?: string | null
-          date: string
-          hours?: number | null
           id?: string
-          type?: Database["public"]["Enums"]["absence_type"] | null
+          updated_at?: string | null
         }
         Update: {
-          agent_id?: string
-          comment?: string | null
+          adversus_campaign_id?: string
+          adversus_campaign_name?: string | null
+          client_campaign_id?: string | null
           created_at?: string | null
-          date?: string
-          hours?: number | null
           id?: string
-          type?: Database["public"]["Enums"]["absence_type"] | null
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "absences_agent_id_fkey"
-            columns: ["agent_id"]
+            foreignKeyName: "adversus_campaign_mappings_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
             isOneToOne: false
-            referencedRelation: "agents"
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      adversus_events: {
+        Row: {
+          created_at: string | null
+          event_type: string
+          external_id: string
+          id: string
+          payload: Json
+          processed: boolean | null
+          received_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_type?: string
+          external_id: string
+          id?: string
+          payload: Json
+          processed?: boolean | null
+          received_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_type?: string
+          external_id?: string
+          id?: string
+          payload?: Json
+          processed?: boolean | null
+          received_at?: string | null
+        }
+        Relationships: []
+      }
+      adversus_product_mappings: {
+        Row: {
+          adversus_external_id: string | null
+          adversus_product_title: string | null
+          created_at: string | null
+          id: string
+          product_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          adversus_external_id?: string | null
+          adversus_product_title?: string | null
+          created_at?: string | null
+          id?: string
+          product_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          adversus_external_id?: string | null
+          adversus_product_title?: string | null
+          created_at?: string | null
+          id?: string
+          product_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adversus_product_mappings_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -95,92 +157,156 @@ export type Database = {
         }
         Relationships: []
       }
-      campaign_product_mappings: {
+      client_campaigns: {
         Row: {
-          adversus_campaign_id: string
-          adversus_campaign_name: string
-          adversus_outcome: string | null
-          created_at: string
+          client_id: string
+          created_at: string | null
+          external_adversus_id: string | null
           id: string
-          liquidity_customer_id: string | null
-          product_id: string | null
-          updated_at: string
+          name: string
+          updated_at: string | null
         }
         Insert: {
-          adversus_campaign_id: string
-          adversus_campaign_name: string
-          adversus_outcome?: string | null
-          created_at?: string
+          client_id: string
+          created_at?: string | null
+          external_adversus_id?: string | null
           id?: string
-          liquidity_customer_id?: string | null
-          product_id?: string | null
-          updated_at?: string
+          name: string
+          updated_at?: string | null
         }
         Update: {
-          adversus_campaign_id?: string
-          adversus_campaign_name?: string
-          adversus_outcome?: string | null
-          created_at?: string
+          client_id?: string
+          created_at?: string | null
+          external_adversus_id?: string | null
           id?: string
-          liquidity_customer_id?: string | null
-          product_id?: string | null
-          updated_at?: string
+          name?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "campaign_product_mappings_liquidity_customer_id_fkey"
-            columns: ["liquidity_customer_id"]
+            foreignKeyName: "client_campaigns_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: "liquidity_customers"
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      clients: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          client_campaign_id: string | null
+          commission_dkk: number | null
+          created_at: string | null
+          external_product_code: string | null
+          id: string
+          name: string
+          revenue_dkk: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_campaign_id?: string | null
+          commission_dkk?: number | null
+          created_at?: string | null
+          external_product_code?: string | null
+          id?: string
+          name: string
+          revenue_dkk?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_campaign_id?: string | null
+          commission_dkk?: number | null
+          created_at?: string | null
+          external_product_code?: string | null
+          id?: string
+          name?: string
+          revenue_dkk?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
           {
-            foreignKeyName: "campaign_product_mappings_product_id_fkey"
+            foreignKeyName: "products_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "client_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sale_items: {
+        Row: {
+          adversus_external_id: string | null
+          adversus_product_title: string | null
+          created_at: string | null
+          id: string
+          mapped_commission: number | null
+          mapped_revenue: number | null
+          needs_mapping: boolean | null
+          product_id: string | null
+          quantity: number | null
+          raw_data: Json | null
+          sale_id: string
+          unit_price: number | null
+        }
+        Insert: {
+          adversus_external_id?: string | null
+          adversus_product_title?: string | null
+          created_at?: string | null
+          id?: string
+          mapped_commission?: number | null
+          mapped_revenue?: number | null
+          needs_mapping?: boolean | null
+          product_id?: string | null
+          quantity?: number | null
+          raw_data?: Json | null
+          sale_id: string
+          unit_price?: number | null
+        }
+        Update: {
+          adversus_external_id?: string | null
+          adversus_product_title?: string | null
+          created_at?: string | null
+          id?: string
+          mapped_commission?: number | null
+          mapped_revenue?: number | null
+          needs_mapping?: boolean | null
+          product_id?: string | null
+          quantity?: number | null
+          raw_data?: Json | null
+          sale_id?: string
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      commission_transactions: {
-        Row: {
-          agent_id: string
-          amount: number | null
-          created_at: string | null
-          id: string
-          reason: string | null
-          sale_id: string
-          type: Database["public"]["Enums"]["commission_transaction_type"]
-        }
-        Insert: {
-          agent_id: string
-          amount?: number | null
-          created_at?: string | null
-          id?: string
-          reason?: string | null
-          sale_id: string
-          type: Database["public"]["Enums"]["commission_transaction_type"]
-        }
-        Update: {
-          agent_id?: string
-          amount?: number | null
-          created_at?: string | null
-          id?: string
-          reason?: string | null
-          sale_id?: string
-          type?: Database["public"]["Enums"]["commission_transaction_type"]
-        }
-        Relationships: [
           {
-            foreignKeyName: "commission_transactions_agent_id_fkey"
-            columns: ["agent_id"]
-            isOneToOne: false
-            referencedRelation: "agents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "commission_transactions_sale_id_fkey"
+            foreignKeyName: "sale_items_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
@@ -188,333 +314,59 @@ export type Database = {
           },
         ]
       }
-      liquidity_customers: {
-        Row: {
-          average_delay_days: number | null
-          created_at: string | null
-          id: string
-          invoice_day: number | null
-          is_active: boolean | null
-          monthly_invoice_amount: number
-          name: string
-          payment_terms_days: number
-          pays_on_time: boolean | null
-          updated_at: string | null
-        }
-        Insert: {
-          average_delay_days?: number | null
-          created_at?: string | null
-          id?: string
-          invoice_day?: number | null
-          is_active?: boolean | null
-          monthly_invoice_amount?: number
-          name: string
-          payment_terms_days?: number
-          pays_on_time?: boolean | null
-          updated_at?: string | null
-        }
-        Update: {
-          average_delay_days?: number | null
-          created_at?: string | null
-          id?: string
-          invoice_day?: number | null
-          is_active?: boolean | null
-          monthly_invoice_amount?: number
-          name?: string
-          payment_terms_days?: number
-          pays_on_time?: boolean | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      liquidity_expenses: {
-        Row: {
-          amount: number
-          created_at: string | null
-          expense_type: string
-          id: string
-          is_active: boolean | null
-          is_vat_deductible: boolean | null
-          name: string
-          one_time_date: string | null
-          payment_day: number | null
-          recurrence: string
-          updated_at: string | null
-        }
-        Insert: {
-          amount?: number
-          created_at?: string | null
-          expense_type: string
-          id?: string
-          is_active?: boolean | null
-          is_vat_deductible?: boolean | null
-          name: string
-          one_time_date?: string | null
-          payment_day?: number | null
-          recurrence?: string
-          updated_at?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string | null
-          expense_type?: string
-          id?: string
-          is_active?: boolean | null
-          is_vat_deductible?: boolean | null
-          name?: string
-          one_time_date?: string | null
-          payment_day?: number | null
-          recurrence?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      liquidity_settings: {
-        Row: {
-          id: string
-          setting_key: string
-          setting_value: Json
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          setting_key: string
-          setting_value?: Json
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          setting_key?: string
-          setting_value?: Json
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      payroll_lines: {
-        Row: {
-          agent_id: string
-          base_salary_amount: number | null
-          bonus_amount: number | null
-          commission_amount: number | null
-          created_at: string | null
-          details_json: Json | null
-          id: string
-          payroll_run_id: string
-          sick_deduction_amount: number | null
-          total_payout: number | null
-          updated_at: string | null
-          vacation_pay_base: number | null
-        }
-        Insert: {
-          agent_id: string
-          base_salary_amount?: number | null
-          bonus_amount?: number | null
-          commission_amount?: number | null
-          created_at?: string | null
-          details_json?: Json | null
-          id?: string
-          payroll_run_id: string
-          sick_deduction_amount?: number | null
-          total_payout?: number | null
-          updated_at?: string | null
-          vacation_pay_base?: number | null
-        }
-        Update: {
-          agent_id?: string
-          base_salary_amount?: number | null
-          bonus_amount?: number | null
-          commission_amount?: number | null
-          created_at?: string | null
-          details_json?: Json | null
-          id?: string
-          payroll_run_id?: string
-          sick_deduction_amount?: number | null
-          total_payout?: number | null
-          updated_at?: string | null
-          vacation_pay_base?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payroll_lines_agent_id_fkey"
-            columns: ["agent_id"]
-            isOneToOne: false
-            referencedRelation: "agents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payroll_lines_payroll_run_id_fkey"
-            columns: ["payroll_run_id"]
-            isOneToOne: false
-            referencedRelation: "payroll_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payroll_runs: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          id: string
-          period_end: string
-          period_start: string
-          status: Database["public"]["Enums"]["payroll_status"] | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          period_end: string
-          period_start: string
-          status?: Database["public"]["Enums"]["payroll_status"] | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          id?: string
-          period_end?: string
-          period_start?: string
-          status?: Database["public"]["Enums"]["payroll_status"] | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      products: {
-        Row: {
-          clawback_window_days: number | null
-          code: string
-          commission_type: Database["public"]["Enums"]["commission_type"] | null
-          commission_value: number | null
-          created_at: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          revenue_amount: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          clawback_window_days?: number | null
-          code: string
-          commission_type?:
-            | Database["public"]["Enums"]["commission_type"]
-            | null
-          commission_value?: number | null
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          revenue_amount?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          clawback_window_days?: number | null
-          code?: string
-          commission_type?:
-            | Database["public"]["Enums"]["commission_type"]
-            | null
-          commission_value?: number | null
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          revenue_amount?: number | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       sales: {
         Row: {
-          adversus_call_id: string | null
-          agent_id: string
-          campaign_name: string | null
-          cancellation_date: string | null
+          adversus_event_id: string | null
+          agent_external_id: string | null
+          agent_name: string | null
+          client_campaign_id: string | null
           created_at: string | null
-          customer_id: string | null
+          customer_company: string | null
           customer_phone: string | null
-          effective_date: string | null
           id: string
-          outcome: string | null
-          product_id: string
-          sale_amount: number | null
-          sale_date: string | null
-          status: Database["public"]["Enums"]["sale_status"] | null
+          sale_datetime: string
           updated_at: string | null
         }
         Insert: {
-          adversus_call_id?: string | null
-          agent_id: string
-          campaign_name?: string | null
-          cancellation_date?: string | null
+          adversus_event_id?: string | null
+          agent_external_id?: string | null
+          agent_name?: string | null
+          client_campaign_id?: string | null
           created_at?: string | null
-          customer_id?: string | null
+          customer_company?: string | null
           customer_phone?: string | null
-          effective_date?: string | null
           id?: string
-          outcome?: string | null
-          product_id: string
-          sale_amount?: number | null
-          sale_date?: string | null
-          status?: Database["public"]["Enums"]["sale_status"] | null
+          sale_datetime?: string
           updated_at?: string | null
         }
         Update: {
-          adversus_call_id?: string | null
-          agent_id?: string
-          campaign_name?: string | null
-          cancellation_date?: string | null
+          adversus_event_id?: string | null
+          agent_external_id?: string | null
+          agent_name?: string | null
+          client_campaign_id?: string | null
           created_at?: string | null
-          customer_id?: string | null
+          customer_company?: string | null
           customer_phone?: string | null
-          effective_date?: string | null
           id?: string
-          outcome?: string | null
-          product_id?: string
-          sale_amount?: number | null
-          sale_date?: string | null
-          status?: Database["public"]["Enums"]["sale_status"] | null
+          sale_datetime?: string
           updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "sales_agent_id_fkey"
-            columns: ["agent_id"]
+            foreignKeyName: "sales_adversus_event_id_fkey"
+            columns: ["adversus_event_id"]
             isOneToOne: false
-            referencedRelation: "agents"
+            referencedRelation: "adversus_events"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "sales_product_id_fkey"
-            columns: ["product_id"]
+            foreignKeyName: "sales_client_campaign_id_fkey"
+            columns: ["client_campaign_id"]
             isOneToOne: false
-            referencedRelation: "products"
+            referencedRelation: "client_campaigns"
             referencedColumns: ["id"]
           },
         ]
-      }
-      settings: {
-        Row: {
-          created_at: string | null
-          id: string
-          key: string
-          updated_at: string | null
-          value_json: Json | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          key: string
-          updated_at?: string | null
-          value_json?: Json | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          key?: string
-          updated_at?: string | null
-          value_json?: Json | null
-        }
-        Relationships: []
       }
       user_roles: {
         Row: {
