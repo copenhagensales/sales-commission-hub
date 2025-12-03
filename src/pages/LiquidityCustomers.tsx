@@ -20,11 +20,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { Loader2, Plus, Pencil, Trash2, Users, ChevronDown, ChevronRight, Link2, Unlink } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -406,92 +401,91 @@ export default function LiquidityCustomers() {
                   const hasCampaigns = customer.campaigns && customer.campaigns.length > 0;
                   
                   return (
-                    <Collapsible key={customer.id} open={isExpanded} onOpenChange={() => toggleExpanded(customer.id)} asChild>
-                      <>
-                        <TableRow className={!customer.is_active ? 'opacity-50' : ''}>
-                          <TableCell className="w-8">
-                            {hasCampaigns && (
-                              <CollapsibleTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-6 w-6">
-                                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                </Button>
-                              </CollapsibleTrigger>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-medium">{customer.name}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(customer.monthly_invoice_amount)}</TableCell>
-                          <TableCell className="text-center">
-                            {customer.invoice_day === 0 ? 'Sidste' : customer.invoice_day}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {customer.payment_terms_days} dage
-                            {!customer.pays_on_time && (
-                              <span className="text-warning ml-1">(+{customer.average_delay_days})</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant={hasCampaigns ? "default" : "outline"}>
-                              {customer.campaigns?.length || 0}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className={`px-2 py-1 rounded-full text-xs ${customer.is_active ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'}`}>
-                              {customer.is_active ? 'Aktiv' : 'Inaktiv'}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  setEditingCustomer(customer);
-                                  setIsDialogOpen(true);
-                                }}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(customer.id)}
-                              >
-                                <Trash2 className="h-4 w-4 text-danger" />
-                              </Button>
+                    <>
+                      <TableRow key={customer.id} className={!customer.is_active ? 'opacity-50' : ''}>
+                        <TableCell className="w-8">
+                          {hasCampaigns && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6"
+                              onClick={() => toggleExpanded(customer.id)}
+                            >
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </Button>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium">{customer.name}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(customer.monthly_invoice_amount)}</TableCell>
+                        <TableCell className="text-center">
+                          {customer.invoice_day === 0 ? 'Sidste' : customer.invoice_day}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {customer.payment_terms_days} dage
+                          {!customer.pays_on_time && (
+                            <span className="text-warning ml-1">(+{customer.average_delay_days})</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={hasCampaigns ? "default" : "outline"}>
+                            {customer.campaigns?.length || 0}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className={`px-2 py-1 rounded-full text-xs ${customer.is_active ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'}`}>
+                            {customer.is_active ? 'Aktiv' : 'Inaktiv'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingCustomer(customer);
+                                setIsDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(customer.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-danger" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {hasCampaigns && isExpanded && (
+                        <TableRow key={`${customer.id}-campaigns`} className="bg-muted/30">
+                          <TableCell colSpan={8} className="py-3">
+                            <div className="pl-8 space-y-2">
+                              <p className="text-sm font-medium text-muted-foreground mb-2">Tilknyttede kampagner:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {customer.campaigns?.map(campaign => (
+                                  <Badge key={campaign.id} variant="secondary" className="gap-1 pr-1">
+                                    {campaign.adversus_campaign_name}
+                                    {campaign.adversus_outcome && (
+                                      <span className="text-muted-foreground"> · {campaign.adversus_outcome}</span>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-4 w-4 ml-1 hover:bg-destructive/20"
+                                      onClick={() => unlinkCampaign(campaign.id)}
+                                    >
+                                      <Unlink className="h-3 w-3" />
+                                    </Button>
+                                  </Badge>
+                                ))}
+                              </div>
                             </div>
                           </TableCell>
                         </TableRow>
-                        {hasCampaigns && (
-                          <CollapsibleContent asChild>
-                            <TableRow className="bg-muted/30">
-                              <TableCell colSpan={8} className="py-3">
-                                <div className="pl-8 space-y-2">
-                                  <p className="text-sm font-medium text-muted-foreground mb-2">Tilknyttede kampagner:</p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {customer.campaigns?.map(campaign => (
-                                      <Badge key={campaign.id} variant="secondary" className="gap-1 pr-1">
-                                        {campaign.adversus_campaign_name}
-                                        {campaign.adversus_outcome && (
-                                          <span className="text-muted-foreground"> · {campaign.adversus_outcome}</span>
-                                        )}
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-4 w-4 ml-1 hover:bg-destructive/20"
-                                          onClick={() => unlinkCampaign(campaign.id)}
-                                        >
-                                          <Unlink className="h-3 w-3" />
-                                        </Button>
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          </CollapsibleContent>
-                        )}
-                      </>
-                    </Collapsible>
+                      )}
+                    </>
                   );
                 })}
               </TableBody>
