@@ -4,6 +4,7 @@ import { CostBreakdownChart } from "@/components/km-test/CostBreakdownChart";
 import { YearComparisonChart } from "@/components/km-test/YearComparisonChart";
 import { ForecastTable } from "@/components/km-test/ForecastTable";
 import { CostDetailsTable } from "@/components/km-test/CostDetailsTable";
+import { MonthlyTrendChart } from "@/components/km-test/MonthlyTrendChart";
 import { summaryData, totalFixedCosts, totalFixedCostsPreviousYear } from "@/data/financialData";
 
 export default function KmTest() {
@@ -49,6 +50,9 @@ export default function KmTest() {
 
         {/* Forecast Table */}
         <ForecastTable />
+
+        {/* Monthly Trend */}
+        <MonthlyTrendChart />
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
