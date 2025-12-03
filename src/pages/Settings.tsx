@@ -149,20 +149,54 @@ export default function Settings() {
     
     setIsCreatingProducts(true);
     try {
-      const productsToCreate = Array.from(selectedProducts).map(name => ({
-        name,
-        code: name.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 20).toUpperCase(),
-        commission_type: 'fixed' as const,
-        commission_value: 0,
-        clawback_window_days: 30,
-        is_active: true,
-        revenue_amount: 0
-      }));
+      // Fetch existing products to avoid duplicates
+      const { data: existingProducts } = await supabase
+        .from('products')
+        .select('name, code');
+      
+      const existingNames = new Set(existingProducts?.map(p => p.name.toLowerCase()) || []);
+      const existingCodes = new Set(existingProducts?.map(p => p.code.toLowerCase()) || []);
+      
+      // Filter out products that already exist
+      const newProductNames = Array.from(selectedProducts).filter(
+        name => !existingNames.has(name.toLowerCase())
+      );
+      
+      if (newProductNames.length === 0) {
+        toast.info('Alle valgte produkter eksisterer allerede');
+        setSelectedProducts(new Set());
+        return;
+      }
+      
+      // Generate unique codes
+      const productsToCreate = newProductNames.map(name => {
+        let baseCode = name.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 16).toUpperCase();
+        let code = baseCode;
+        let counter = 1;
+        
+        // Ensure unique code
+        while (existingCodes.has(code.toLowerCase())) {
+          code = `${baseCode}-${counter}`;
+          counter++;
+        }
+        existingCodes.add(code.toLowerCase()); // Track for this batch
+        
+        return {
+          name,
+          code,
+          commission_type: 'fixed' as const,
+          commission_value: 0,
+          clawback_window_days: 30,
+          is_active: true,
+          revenue_amount: 0
+        };
+      });
       
       const { error } = await supabase.from('products').insert(productsToCreate);
       if (error) throw error;
       
-      toast.success(`${productsToCreate.length} produkter oprettet`);
+      const skipped = selectedProducts.size - newProductNames.length;
+      toast.success(`${productsToCreate.length} produkter oprettet${skipped > 0 ? ` (${skipped} eksisterede allerede)` : ''}`);
       setSelectedProducts(new Set());
       queryClient.invalidateQueries({ queryKey: ['products'] });
     } catch (err) {
