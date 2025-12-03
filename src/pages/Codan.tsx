@@ -65,7 +65,7 @@ export default function Codan() {
       const { data: clients, error: clientsError } = await supabase
         .from("clients")
         .select("id")
-        .eq("name", "Codan")
+        .ilike("name", "%codan%")
         .limit(1);
 
       if (clientsError) throw clientsError;
