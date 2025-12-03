@@ -73,6 +73,30 @@ interface ClientRow {
   name: string;
 }
 
+const parseClientFromTitle = (title: string | null, clientList?: ClientRow[]): ClientRow | null => {
+  if (!title || !clientList || clientList.length === 0) return null;
+  const trimmed = title.trim();
+  if (!trimmed) return null;
+
+  const separators = [" - ", " – ", "|"];
+  let candidate = trimmed;
+
+  for (const sep of separators) {
+    const idx = trimmed.lastIndexOf(sep);
+    if (idx !== -1) {
+      candidate = trimmed.slice(idx + sep.length).trim();
+      break;
+    }
+  }
+
+  if (!candidate) return null;
+  const lowerCandidate = candidate.toLowerCase();
+
+  return (
+    clientList.find((client) => client.name && client.name.trim().toLowerCase() === lowerCandidate) || null
+  );
+};
+
 export default function MgTest() {
   const queryClient = useQueryClient();
   const [editValues, setEditValues] = useState<EditValues>({});
@@ -135,30 +159,6 @@ export default function MgTest() {
 
   const aggregatedProducts: AggregatedProduct[] = useMemo(() => {
     const map = new Map<string, AggregatedProduct>();
-
-    const parseClientFromTitle = (title: string | null, clientList?: ClientRow[]) => {
-      if (!title || !clientList || clientList.length === 0) return null;
-      const trimmed = title.trim();
-      if (!trimmed) return null;
-
-      const separators = [" - ", " – ", "|"];
-      let candidate = trimmed;
-
-      for (const sep of separators) {
-        const idx = trimmed.lastIndexOf(sep);
-        if (idx !== -1) {
-          candidate = trimmed.slice(idx + sep.length).trim();
-          break;
-        }
-      }
-
-      if (!candidate) return null;
-      const lowerCandidate = candidate.toLowerCase();
-
-      return (
-        clientList.find((client) => client.name && client.name.trim().toLowerCase() === lowerCandidate) || null
-      );
-    };
 
     saleItems?.forEach((item) => {
       const productCampaignId = item.products?.client_campaign_id ?? null;
@@ -788,7 +788,15 @@ export default function MgTest() {
                                     ? productClientSelections[productId]
                                     : null;
                                 const draftClientId = productClientDrafts[row.key] ?? null;
-                                const selectedClientId = selectionFromProduct ?? draftClientId ?? existingClientId;
+                                const parsedClient =
+                                  !existingClientId && !selectionFromProduct && !draftClientId
+                                    ? parseClientFromTitle(row.adversus_product_title, clients)
+                                    : null;
+                                const selectedClientId =
+                                  selectionFromProduct ??
+                                  draftClientId ??
+                                  existingClientId ??
+                                  (parsedClient ? parsedClient.id : null);
 
                                 return (
                                   <TableRow key={row.key}>
