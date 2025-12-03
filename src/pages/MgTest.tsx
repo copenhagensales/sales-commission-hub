@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,12 +24,7 @@ interface WebhookSaleItem {
     revenue_dkk: number | null;
   } | null;
   sales: {
-    client_campaigns: {
-      name: string | null;
-      clients: {
-        name: string | null;
-      } | null;
-    } | null;
+    client_campaign_id: string | null;
   } | null;
 }
 
@@ -41,6 +38,7 @@ interface AggregatedProduct {
     commission_dkk: number | null;
     revenue_dkk: number | null;
   } | null;
+  campaignId: string | null;
   campaignLabel: string;
 }
 
@@ -51,22 +49,51 @@ interface EditEntry {
 
 type EditValues = Record<string, EditEntry>;
 
+interface CampaignMapping {
+  id: string;
+  adversus_campaign_id: string;
+  adversus_campaign_name: string | null;
+  client_campaign_id: string | null;
+}
+
+interface ClientCampaignRow {
+  id: string;
+  name: string;
+  clients: {
+    name: string | null;
+  } | null;
+}
+
 export default function MgTest() {
   const queryClient = useQueryClient();
   const [editValues, setEditValues] = useState<EditValues>({});
 
-  // Hent alle produkter direkte fra webhook-data (sale_items) inkl. kampagne
+  // Hent alle interne kampagner + kunder
+  const { data: clientCampaigns, isLoading: loadingClientCampaigns } = useQuery<ClientCampaignRow[]>({
+    queryKey: ["mg-client-campaigns"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_campaigns")
+        .select("id, name, clients(name)")
+        .order("name");
+
+      if (error) throw error;
+      return data as ClientCampaignRow[];
+    },
+  });
+
+  // Hent alle produkter direkte fra webhook-data (sale_items) inkl. kampagne-id
   const {
     data: saleItems,
     isLoading: loadingSaleItems,
-    isError,
+    isError: isSaleItemsError,
   } = useQuery<WebhookSaleItem[]>({
     queryKey: ["mg-webhook-products"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sale_items")
         .select(
-          "id, adversus_external_id, adversus_product_title, product_id, products(id, name, commission_dkk, revenue_dkk), sales(client_campaigns(name, clients(name)))"
+          "id, adversus_external_id, adversus_product_title, product_id, products(id, name, commission_dkk, revenue_dkk), sales(client_campaign_id)"
         )
         .not("adversus_product_title", "is", null);
 
@@ -79,12 +106,14 @@ export default function MgTest() {
     const map = new Map<string, AggregatedProduct>();
 
     saleItems?.forEach((item) => {
-      const campaignName = item.sales?.client_campaigns?.name || "Ukendt kampagne";
-      const clientName = item.sales?.client_campaigns?.clients?.name || "Ukendt kunde";
-      const campaignLabel = `${clientName} – ${campaignName}`;
+      const campaignId = item.sales?.client_campaign_id || null;
+      const campaign = clientCampaigns?.find((c) => c.id === campaignId) || null;
+      const campaignLabel = campaign
+        ? `${campaign.clients?.name ?? "Ukendt kunde"} – ${campaign.name}`
+        : "Ukendt kampagne";
 
       const productKey = item.adversus_external_id || item.adversus_product_title || item.id;
-      const fullKey = `${campaignLabel}::${productKey}`;
+      const fullKey = `${campaignId ?? "no-campaign"}::${productKey}`;
 
       if (!map.has(fullKey)) {
         map.set(fullKey, {
@@ -99,6 +128,7 @@ export default function MgTest() {
                 revenue_dkk: item.products.revenue_dkk,
               }
             : null,
+          campaignId,
           campaignLabel,
         });
       }
@@ -112,7 +142,7 @@ export default function MgTest() {
       const titleB = b.adversus_product_title || "";
       return titleA.localeCompare(titleB, "da");
     });
-  }, [saleItems]);
+  }, [saleItems, clientCampaigns]);
 
   const productsByCampaign = useMemo(() => {
     const groups = new Map<string, AggregatedProduct[]>();
@@ -204,136 +234,266 @@ export default function MgTest() {
     upsertProductValues.mutate({ row, provision, cpo });
   };
 
-  const isLoading = loadingSaleItems;
+  // Kampagne-mapping (Adversus campaignId -> intern client_campaign)
+  const { data: campaignMappings, isLoading: loadingCampaignMappings } = useQuery<CampaignMapping[]>({
+    queryKey: ["mg-campaign-mappings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("id, adversus_campaign_id, adversus_campaign_name, client_campaign_id")
+        .order("adversus_campaign_name", { ascending: true });
+
+      if (error) throw error;
+      return data as CampaignMapping[];
+    },
+  });
+
+  const updateCampaignMapping = useMutation({
+    mutationFn: async ({ mappingId, clientCampaignId }: { mappingId: string; clientCampaignId: string | null }) => {
+      const { error } = await supabase
+        .from("adversus_campaign_mappings")
+        .update({ client_campaign_id: clientCampaignId })
+        .eq("id", mappingId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Kampagnemapping gemt");
+      queryClient.invalidateQueries({ queryKey: ["mg-campaign-mappings"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke gemme kampagnemapping");
+    },
+  });
+
+  const isLoadingProductsTab = loadingSaleItems || loadingClientCampaigns;
+  const isLoadingCampaignTab = loadingCampaignMappings || loadingClientCampaigns;
 
   return (
     <MainLayout>
       <div className="space-y-6">
         <header className="space-y-2">
-          <h1 className="text-3xl font-bold">MG test – Adversus produktmapping</h1>
+          <h1 className="text-3xl font-bold">MG test – Adversus mapping</h1>
           <p className="text-muted-foreground text-sm max-w-2xl">
-            Her ser du alle produkter, vi har modtaget via Adversus-webhook (baseret på salg), opdelt på
-            kampagner. Udfyld CPO og provision for hvert produkt, så de kan bruges i kommissionsberegninger.
+            Her kan du mappe både produkter og kampagner fra Adversus til dine interne produkter og
+            kundekampagner.
           </p>
         </header>
 
-        <section className="space-y-4">
-          {isLoading ? (
+        <Tabs defaultValue="product" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="product">Mapping produkt</TabsTrigger>
+            <TabsTrigger value="customer">Mapping kunde</TabsTrigger>
+          </TabsList>
+
+          {/* Mapping produkt */}
+          <TabsContent value="product" className="space-y-4">
+            {isLoadingProductsTab ? (
+              <Card>
+                <CardContent className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Henter produkter…</span>
+                </CardContent>
+              </Card>
+            ) : isSaleItemsError ? (
+              <Card>
+                <CardContent className="py-6">
+                  <p className="text-sm text-destructive">
+                    Der opstod en fejl ved hentning af produkter. Prøv at genindlæse siden.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : productsByCampaign.length === 0 ? (
+              <Card>
+                <CardContent className="py-6">
+                  <p className="text-sm text-muted-foreground">
+                    Der er endnu ikke modtaget nogen produkter via webhook. Når de første leads kommer ind, vil
+                    de dukke op her.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              productsByCampaign.map(([campaignLabel, rows]) => (
+                <Card key={campaignLabel} className="border-muted">
+                  <CardHeader className="flex flex-row items-center justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-base font-semibold">{campaignLabel}</CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {rows.length} unikke produkter fra denne kampagne.
+                      </p>
+                    </div>
+                    <Badge variant="outline">{rows.length} produkter</Badge>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[30%]">Adversus produktnavn</TableHead>
+                            <TableHead className="w-[20%]">External ID</TableHead>
+                            <TableHead className="w-[15%]">Provision (DKK)</TableHead>
+                            <TableHead className="w-[15%]">CPO / omsætning (DKK)</TableHead>
+                            <TableHead className="w-[20%] text-right">Handling</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {rows.map((row) => {
+                            const current = editValues[row.key];
+
+                            return (
+                              <TableRow key={row.key}>
+                                <TableCell>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">
+                                      {row.adversus_product_title || "(ingen titel)"}
+                                    </span>
+                                    {row.product && (
+                                      <span className="text-xs text-muted-foreground">
+                                        Internt produkt: {row.product.name}
+                                      </span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-xs font-mono text-muted-foreground">
+                                    {row.adversus_external_id || "(mangler)"}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    className="h-9"
+                                    value={
+                                      current?.provision ??
+                                      (row.product?.commission_dkk !== null &&
+                                      row.product?.commission_dkk !== undefined
+                                        ? String(row.product.commission_dkk)
+                                        : "")
+                                    }
+                                    onChange={(e) => handleChange(row.key, "provision", e.target.value)}
+                                    placeholder="0,00"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    className="h-9"
+                                    value={
+                                      current?.cpo ??
+                                      (row.product?.revenue_dkk !== null &&
+                                      row.product?.revenue_dkk !== undefined
+                                        ? String(row.product.revenue_dkk)
+                                        : "")
+                                    }
+                                    onChange={(e) => handleChange(row.key, "cpo", e.target.value)}
+                                    placeholder="0,00"
+                                  />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleSave(row)}
+                                    disabled={upsertProductValues.isPending}
+                                  >
+                                    {upsertProductValues.isPending ? (
+                                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    ) : (
+                                      <Save className="h-4 w-4 mr-2" />
+                                    )}
+                                    Gem
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </TabsContent>
+
+          {/* Mapping kunde / kampagne */}
+          <TabsContent value="customer">
             <Card>
-              <CardContent className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Henter produkter…</span>
-              </CardContent>
-            </Card>
-          ) : isError ? (
-            <Card>
-              <CardContent className="py-6">
-                <p className="text-sm text-destructive">
-                  Der opstod en fejl ved hentning af produkter. Prøv at genindlæse siden.
-                </p>
-              </CardContent>
-            </Card>
-          ) : productsByCampaign.length === 0 ? (
-            <Card>
-              <CardContent className="py-6">
-                <p className="text-sm text-muted-foreground">
-                  Der er endnu ikke modtaget nogen produkter via webhook. Når de første leads kommer ind, vil
-                  de dukke op her.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            productsByCampaign.map(([campaignLabel, rows]) => (
-              <Card key={campaignLabel} className="border-muted">
-                <CardHeader className="flex flex-row items-center justify-between gap-4">
-                  <div>
-                    <CardTitle className="text-base font-semibold">{campaignLabel}</CardTitle>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {rows.length} unikke produkter fra denne kampagne.
-                    </p>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Mapping kunde / kampagne</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Her mapper du Adversus campaignId til dine interne kundekampagner.
+                  </p>
+                </div>
+                <Badge variant="outline">{campaignMappings?.length ?? 0} kampagner</Badge>
+              </CardHeader>
+              <CardContent>
+                {isLoadingCampaignTab ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Henter kampagner…</span>
                   </div>
-                  <Badge variant="outline">{rows.length} produkter</Badge>
-                </CardHeader>
-                <CardContent>
+                ) : !campaignMappings || campaignMappings.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Der er endnu ikke registreret nogen Adversus-kampagner. Når de første webhooks kommer ind,
+                    oprettes de automatisk her.
+                  </p>
+                ) : (
                   <div className="rounded-md border overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[30%]">Adversus produktnavn</TableHead>
-                          <TableHead className="w-[20%]">External ID</TableHead>
-                          <TableHead className="w-[15%]">Provision (DKK)</TableHead>
-                          <TableHead className="w-[15%]">CPO / omsætning (DKK)</TableHead>
-                          <TableHead className="w-[20%] text-right">Handling</TableHead>
+                          <TableHead className="w-[30%]">Adversus kampagnenavn</TableHead>
+                          <TableHead className="w-[20%]">Adversus campaignId</TableHead>
+                          <TableHead className="w-[50%]">Intern kunde / kampagne</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {rows.map((row) => {
-                          const current = editValues[row.key];
+                        {campaignMappings.map((mapping) => {
+                          const selectedCampaign = clientCampaigns?.find(
+                            (c) => c.id === mapping.client_campaign_id,
+                          );
+                          const selectedLabel = selectedCampaign
+                            ? `${selectedCampaign.clients?.name ?? "Ukendt kunde"} – ${selectedCampaign.name}`
+                            : "Vælg intern kampagne";
 
                           return (
-                            <TableRow key={row.key}>
+                            <TableRow key={mapping.id}>
                               <TableCell>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">
-                                    {row.adversus_product_title || "(ingen titel)"}
-                                  </span>
-                                  {row.product && (
-                                    <span className="text-xs text-muted-foreground">
-                                      Internt produkt: {row.product.name}
-                                    </span>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <span className="text-xs font-mono text-muted-foreground">
-                                  {row.adversus_external_id || "(mangler)"}
+                                <span className="font-medium">
+                                  {mapping.adversus_campaign_name || "(ingen navn)"}
                                 </span>
                               </TableCell>
                               <TableCell>
-                                <Input
-                                  type="text"
-                                  inputMode="decimal"
-                                  className="h-9"
-                                  value={
-                                    current?.provision ??
-                                    (row.product?.commission_dkk !== null &&
-                                    row.product?.commission_dkk !== undefined
-                                      ? String(row.product.commission_dkk)
-                                      : "")
-                                  }
-                                  onChange={(e) => handleChange(row.key, "provision", e.target.value)}
-                                  placeholder="0,00"
-                                />
+                                <span className="text-xs font-mono text-muted-foreground">
+                                  {mapping.adversus_campaign_id}
+                                </span>
                               </TableCell>
                               <TableCell>
-                                <Input
-                                  type="text"
-                                  inputMode="decimal"
-                                  className="h-9"
-                                  value={
-                                    current?.cpo ??
-                                    (row.product?.revenue_dkk !== null &&
-                                    row.product?.revenue_dkk !== undefined
-                                      ? String(row.product.revenue_dkk)
-                                      : "")
+                                <Select
+                                  value={mapping.client_campaign_id ?? undefined}
+                                  onValueChange={(value) =>
+                                    updateCampaignMapping.mutate({
+                                      mappingId: mapping.id,
+                                      clientCampaignId: value,
+                                    })
                                   }
-                                  onChange={(e) => handleChange(row.key, "cpo", e.target.value)}
-                                  placeholder="0,00"
-                                />
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleSave(row)}
-                                  disabled={upsertProductValues.isPending}
                                 >
-                                  {upsertProductValues.isPending ? (
-                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                  ) : (
-                                    <Save className="h-4 w-4 mr-2" />
-                                  )}
-                                  Gem
-                                </Button>
+                                  <SelectTrigger className="w-full max-w-xl">
+                                    <SelectValue placeholder="Vælg intern kampagne">
+                                      {selectedLabel}
+                                    </SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-background border z-50 max-h-72">
+                                    {clientCampaigns?.map((c) => (
+                                      <SelectItem key={c.id} value={c.id} className="text-sm">
+                                        {c.clients?.name ?? "Ukendt kunde"} – {c.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </TableCell>
                             </TableRow>
                           );
@@ -341,11 +501,11 @@ export default function MgTest() {
                       </TableBody>
                     </Table>
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </section>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );
