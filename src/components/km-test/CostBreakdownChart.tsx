@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
-import { costCategories, summaryData } from "@/data/financialData";
+import { costCategories } from "@/data/financialData";
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 export function CostBreakdownChart() {
   const formatCurrency = (value: number) => {
@@ -14,18 +14,17 @@ export function CostBreakdownChart() {
     }).format(value);
   };
 
-  const chartData = [
-    { name: "Lønninger", value: summaryData.totalSalaries },
-    ...costCategories.map((cat, index) => ({
+  const chartData = costCategories
+    .map((cat) => ({
       name: cat.category,
       value: cat.total,
-    })),
-  ];
+    }))
+    .sort((a, b) => b.value - a.value);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Omkostningsfordeling (Faste)</CardTitle>
+        <CardTitle className="text-lg">Omkostningsfordeling (ekskl. løn)</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[350px]">

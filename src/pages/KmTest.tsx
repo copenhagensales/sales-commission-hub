@@ -5,7 +5,8 @@ import { YearComparisonChart } from "@/components/km-test/YearComparisonChart";
 import { ForecastTable } from "@/components/km-test/ForecastTable";
 import { CostDetailsTable } from "@/components/km-test/CostDetailsTable";
 import { MonthlyTrendChart } from "@/components/km-test/MonthlyTrendChart";
-import { summaryData, totalFixedCosts, totalFixedCostsPreviousYear } from "@/data/financialData";
+import { MonthlyFixedCostsCard } from "@/components/km-test/MonthlyFixedCostsCard";
+import { summaryData, totalFixedCosts, totalFixedCostsPreviousYear, monthlyFixedCosts } from "@/data/financialData";
 
 export default function KmTest() {
   return (
@@ -15,7 +16,7 @@ export default function KmTest() {
         <div>
           <h1 className="text-2xl font-bold">Økonomi Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Resultatopgørelse {summaryData.period} • Copenhagen Sales ApS
+            Resultatopgørelse {summaryData.period} • Copenhagen Sales ApS • Ekskl. lønomkostninger
           </p>
         </div>
 
@@ -34,10 +35,10 @@ export default function KmTest() {
             subtitle={`${((summaryData.contributionMargin / summaryData.revenue) * 100).toFixed(1)}% af omsætning`}
           />
           <FinancialKpiCard
-            title="Faste omkostninger"
-            value={totalFixedCosts}
-            previousYear={totalFixedCostsPreviousYear}
-            subtitle="Løn + kapacitetsomk."
+            title="Faste omk. pr. måned"
+            value={monthlyFixedCosts}
+            previousYear={totalFixedCostsPreviousYear / summaryData.months}
+            subtitle="Ekskl. løn"
             invertTrend
           />
           <FinancialKpiCard
@@ -48,8 +49,13 @@ export default function KmTest() {
           />
         </div>
 
-        {/* Forecast Table */}
-        <ForecastTable />
+        {/* Monthly Fixed Costs + Forecast */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <MonthlyFixedCostsCard />
+          <div className="lg:col-span-2">
+            <ForecastTable />
+          </div>
+        </div>
 
         {/* Monthly Trend */}
         <MonthlyTrendChart />

@@ -32,16 +32,10 @@ export function ForecastTable() {
       forecast: (summaryData.contributionMargin / summaryData.months) * 12,
     },
     {
-      label: "Lønninger",
-      ytd: summaryData.totalSalaries,
-      monthly: monthlyAverage.salaries,
-      forecast: forecastFullYear.salaries,
-    },
-    {
-      label: "Øvrige faste omkostninger",
-      ytd: totalFixedCosts - summaryData.totalSalaries,
-      monthly: (totalFixedCosts - summaryData.totalSalaries) / summaryData.months,
-      forecast: ((totalFixedCosts - summaryData.totalSalaries) / summaryData.months) * 12,
+      label: "Faste omkostninger (ekskl. løn)",
+      ytd: totalFixedCosts,
+      monthly: monthlyAverage.fixedCosts,
+      forecast: forecastFullYear.fixedCosts,
     },
     {
       label: "Resultat før skat",
@@ -60,6 +54,7 @@ export function ForecastTable() {
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Forecast 2025 (baseret på {summaryData.months} måneder)</CardTitle>
+        <p className="text-sm text-muted-foreground">Ekskl. lønomkostninger</p>
       </CardHeader>
       <CardContent>
         <Table>
