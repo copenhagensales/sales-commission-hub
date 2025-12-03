@@ -15,6 +15,7 @@ import Commission from "./pages/Commission";
 import MgTest from "./pages/MgTest";
 import KmTest from "./pages/KmTest";
 import Codan from "./pages/Codan";
+import TdcErhverv from "./pages/TdcErhverv";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -68,6 +69,7 @@ const App = () => (
           <Route path="/agents" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
           <Route path="/codan" element={<ProtectedRoute><Codan /></ProtectedRoute>} />
+          <Route path="/tdc-erhverv" element={<ProtectedRoute><TdcErhverv /></ProtectedRoute>} />
           <Route path="/commission-cpo" element={<ProtectedRoute><Commission /></ProtectedRoute>} />
           <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
           <Route path="/wallboard" element={<Wallboard />} />
