@@ -316,12 +316,17 @@ export default function MgTest() {
         }
       }
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("adversus_campaign_mappings")
         .update({ client_campaign_id: clientCampaignId })
-        .eq("id", mappingId);
+        .eq("id", mappingId)
+        .select("id, client_campaign_id")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) {
+        throw new Error("Kunne ikke gemme kampagnemapping (mangler rettigheder?)");
+      }
     },
     onSuccess: (_data, variables) => {
       toast.success("Kampagnemapping gemt");
