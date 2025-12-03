@@ -1,449 +1,100 @@
-import { MainLayout } from "@/components/layout/MainLayout";
-import { KPICard } from "@/components/dashboard/KPICard";
-import { TopAgentsTable } from "@/components/dashboard/TopAgentsTable";
-import { RevenueChart } from "@/components/dashboard/RevenueChart";
-import { SickLeaveChart } from "@/components/dashboard/SickLeaveChart";
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  RefreshCw, 
-  Loader2, 
-  DollarSign,
-  PiggyBank
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-
-interface DashboardStats {
-  // Daily KPIs
-  revenueToday: number;
-  netMarginToday: number;
-  
-  // Monthly KPIs
-  revenue: number;
-  commissionCosts: number;
-  vacationPayCosts: number;
-  sickPayCosts: number;
-  netMargin: number;
-  
-  // Performance KPIs
-  salesThisMonth: number;
-  clawbackRate: number;
-  clawbackedSalesCount: number;
-  
-  // Absence KPIs
-  sickDaysThisMonth: number;
-  totalWorkDays: number;
-  sickPercentage: number;
-  
-  // Legacy
-  salesToday: number;
-  salesYesterday: number;
-  earnedCommission: number;
-  pendingCommission: number;
-  pendingSalesCount: number;
-}
-
-interface TopAgent {
-  id: string;
-  name: string;
-  sales: number;
-  commission: number;
-  revenue: number;
-}
+import { MainLayout } from "@/components/layout/MainLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DollarSign, ShoppingCart, Package, AlertTriangle } from "lucide-react";
 
 export default function Dashboard() {
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState<DashboardStats>({
-    revenueToday: 0,
-    netMarginToday: 0,
-    revenue: 0,
-    commissionCosts: 0,
-    vacationPayCosts: 0,
-    sickPayCosts: 0,
-    netMargin: 0,
-    salesThisMonth: 0,
-    clawbackRate: 0,
-    clawbackedSalesCount: 0,
-    sickDaysThisMonth: 0,
-    totalWorkDays: 0,
-    sickPercentage: 0,
-    salesToday: 0,
-    salesYesterday: 0,
-    earnedCommission: 0,
-    pendingCommission: 0,
-    pendingSalesCount: 0,
-  });
-  const [topAgents, setTopAgents] = useState<TopAgent[]>([]);
-
-  const fetchDashboardData = async () => {
-    try {
-      // Get current date info - aktuel måned
-      const today = new Date();
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
-      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-      const startOfYesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1).toISOString();
-
-      // Calculate working days this month (approx 22 days per month)
-      const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-      const daysSoFar = today.getDate();
-      const workDaysInMonth = Math.round(daysInMonth * (5/7));
-      const workDaysSoFar = Math.round(daysSoFar * (5/7));
-
-      // Fetch sales with product info for revenue calculation
-      const { data: salesData, error: salesError } = await supabase
-        .from('sales')
-        .select(`
-          id, 
-          sale_date, 
-          status, 
-          agent_id,
-          sale_amount,
-          product_id,
-          products (
-            id,
-            name,
-            revenue_amount,
-            commission_value,
-            commission_type
-          )
-        `)
-        .gte('sale_date', startOfMonth);
-
-      if (salesError) throw salesError;
-
-      // Calculate sales stats
-      const activeSales = salesData?.filter(s => s.status === 'active' || s.status === 'pending') || [];
-      const clawbackedSales = salesData?.filter(s => s.status === 'clawbacked' || s.status === 'cancelled') || [];
-      const totalSales = salesData?.length || 0;
-      const clawbackRate = totalSales > 0 ? (clawbackedSales.length / totalSales) * 100 : 0;
-
-      const salesToday = salesData?.filter(s => s.sale_date && new Date(s.sale_date) >= new Date(startOfToday)).length || 0;
-      const salesYesterday = salesData?.filter(s => {
-        if (!s.sale_date) return false;
-        const saleDate = new Date(s.sale_date);
-        return saleDate >= new Date(startOfYesterday) && saleDate < new Date(startOfToday);
-      }).length || 0;
-
-      // Calculate revenue from active/pending sales
-      let revenue = 0;
-      activeSales.forEach(sale => {
-        const product = sale.products as any;
-        if (product?.revenue_amount) {
-          revenue += product.revenue_amount;
-        }
-      });
-
-      // Calculate today's revenue
-      const todaysSales = activeSales.filter(s => s.sale_date && new Date(s.sale_date) >= new Date(startOfToday));
-      let revenueToday = 0;
-      todaysSales.forEach(sale => {
-        const product = sale.products as any;
-        if (product?.revenue_amount) {
-          revenueToday += product.revenue_amount;
-        }
-      });
-
-      // Fetch commission transactions
-      const { data: commissionData, error: commissionError } = await supabase
-        .from('commission_transactions')
-        .select('type, amount, sale_id, agent_id')
-        .gte('created_at', startOfMonth);
-
-      if (commissionError) throw commissionError;
-
-      // Calculate commission costs (earned - clawback = net cost)
-      let earnedCommission = 0;
-      let clawbackedCommission = 0;
-      
-      commissionData?.forEach(ct => {
-        if (ct.type === 'earn') {
-          earnedCommission += ct.amount || 0;
-        } else if (ct.type === 'clawback') {
-          clawbackedCommission += Math.abs(ct.amount || 0);
-        }
-      });
-
-      const commissionCosts = earnedCommission - clawbackedCommission;
-      
-      // Vacation pay is typically 12.5% of commission
-      const vacationPayRate = 0.125;
-      const vacationPayCosts = commissionCosts * vacationPayRate;
-
-      // Fetch absences for sick leave calculation
-      const { data: absencesData, error: absencesError } = await supabase
-        .from('absences')
-        .select('id, agent_id, type, hours, date')
-        .eq('type', 'sick')
-        .gte('date', startOfMonth.split('T')[0]);
-
-      if (absencesError) throw absencesError;
-
-      // Calculate sick days
-      const sickDaysThisMonth = absencesData?.reduce((sum, a) => sum + ((a.hours || 7.5) / 7.5), 0) || 0;
-      
-      // Calculate sick pay based on average daily earnings
-      // Get average daily commission per agent
-      const { data: agentsData, error: agentsError } = await supabase
-        .from('agents')
-        .select('id, name')
-        .eq('is_active', true);
-
-      if (agentsError) throw agentsError;
-
-      // Calculate average daily commission (rough estimate based on this month)
-      const avgDailyCommission = workDaysSoFar > 0 && agentsData && agentsData.length > 0
-        ? commissionCosts / (workDaysSoFar * agentsData.length)
-        : 500; // Default assumption if no data
-
-      const sickPayCosts = sickDaysThisMonth * avgDailyCommission;
-
-      // Calculate sick percentage
-      const totalPossibleWorkDays = (agentsData?.length || 1) * workDaysSoFar;
-      const sickPercentage = totalPossibleWorkDays > 0 
-        ? (sickDaysThisMonth / totalPossibleWorkDays) * 100 
-        : 0;
-
-      // Calculate net margin
-      const netMargin = revenue - commissionCosts - vacationPayCosts - sickPayCosts;
-
-      // Calculate today's commission costs (rough estimate based on today's sales)
-      const todaysCommissionCosts = todaysSales.reduce((sum, sale) => {
-        const product = sale.products as any;
-        return sum + (product?.commission_value || 0);
-      }, 0);
-      const todaysVacationPay = todaysCommissionCosts * vacationPayRate;
-      const netMarginToday = revenueToday - todaysCommissionCosts - todaysVacationPay;
-
-      // Calculate pending commission
-      const pendingSales = salesData?.filter(s => s.status === 'pending') || [];
-      const pendingCommissions = commissionData?.filter(ct => 
-        ct.type === 'earn' && pendingSales.some(s => s.id === ct.sale_id)
-      ) || [];
-      const pendingCommission = pendingCommissions.reduce((sum, ct) => sum + (ct.amount || 0), 0);
-
-      setStats({
-        revenueToday,
-        netMarginToday,
-        revenue,
-        commissionCosts,
-        vacationPayCosts,
-        sickPayCosts,
-        netMargin,
-        salesThisMonth: totalSales,
-        clawbackRate,
-        clawbackedSalesCount: clawbackedSales.length,
-        sickDaysThisMonth,
-        totalWorkDays: totalPossibleWorkDays,
-        sickPercentage,
-        salesToday,
-        salesYesterday,
-        earnedCommission,
-        pendingCommission,
-        pendingSalesCount: pendingSales.length,
-      });
-
-      // Calculate agent stats for top agents
-      const agentStats: TopAgent[] = [];
-      
-      for (const agent of agentsData || []) {
-        const agentSales = salesData?.filter(s => s.agent_id === agent.id) || [];
-        const agentActiveSales = agentSales.filter(s => s.status === 'active' || s.status === 'pending');
-        
-        // Calculate agent revenue
-        let agentRevenue = 0;
-        agentActiveSales.forEach(sale => {
-          const product = sale.products as any;
-          if (product?.revenue_amount) {
-            agentRevenue += product.revenue_amount;
-          }
-        });
-
-        const agentCommission = commissionData?.filter(ct => ct.agent_id === agent.id)
-          .reduce((sum, ct) => sum + (ct.amount || 0), 0) || 0;
-
-        if (agentSales.length > 0 || agentCommission > 0) {
-          agentStats.push({
-            id: agent.id,
-            name: agent.name,
-            sales: agentActiveSales.length,
-            commission: agentCommission,
-            revenue: agentRevenue,
-          });
-        }
-      }
-
-      // Sort by revenue and take top 5
-      agentStats.sort((a, b) => b.revenue - a.revenue);
-      setTopAgents(agentStats.slice(0, 5));
-
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      toast.error('Kunne ikke hente dashboard data');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const handleSync = async () => {
-    setIsSyncing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('sync-adversus', {
-        body: { hours: 24 }
-      });
-
+  const { data: salesData } = useQuery({
+    queryKey: ['dashboard-sales'],
+    queryFn: async () => {
+      const { data: saleItems, error } = await supabase
+        .from('sale_items')
+        .select('mapped_commission, mapped_revenue, needs_mapping');
       if (error) throw error;
-
-      toast.success(`Synkronisering fuldført: ${data.summary?.sessions?.salesCreated || 0} nye salg`);
-      await fetchDashboardData();
-    } catch (error) {
-      console.error('Sync error:', error);
-      toast.error('Synkronisering fejlede');
-    } finally {
-      setIsSyncing(false);
+      const totalCommission = saleItems?.reduce((sum, item) => sum + (Number(item.mapped_commission) || 0), 0) || 0;
+      const totalRevenue = saleItems?.reduce((sum, item) => sum + (Number(item.mapped_revenue) || 0), 0) || 0;
+      const unmappedCount = saleItems?.filter(item => item.needs_mapping).length || 0;
+      return { totalCommission, totalRevenue, unmappedCount, totalItems: saleItems?.length || 0 };
     }
-  };
+  });
 
-  const formatCurrency = (value: number) => {
-    return value.toLocaleString('da-DK') + ' kr';
-  };
+  const { data: salesCount } = useQuery({
+    queryKey: ['dashboard-sales-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase.from('sales').select('*', { count: 'exact', head: true });
+      if (error) throw error;
+      return count || 0;
+    }
+  });
 
-  const formatPercent = (value: number) => {
-    return value.toFixed(1) + '%';
-  };
-
-  const currentMonth = new Date().toLocaleDateString('da-DK', { month: 'long', year: 'numeric' });
-
-  if (isLoading) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      </MainLayout>
-    );
-  }
+  const { data: productsCount } = useQuery({
+    queryKey: ['dashboard-products-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase.from('products').select('*', { count: 'exact', head: true });
+      if (error) throw error;
+      return count || 0;
+    }
+  });
 
   return (
     <MainLayout>
-      <div className="space-y-8 animate-fade-in">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
-            <p className="mt-1 text-muted-foreground">
-              Økonomisk overblik for {currentMonth}
-            </p>
-          </div>
-          <Button 
-            onClick={handleSync} 
-            disabled={isSyncing}
-            className="gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-            Synkroniser Adversus
-          </Button>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Overview of your commission system</p>
         </div>
-
-        {/* Top KPIs - Daily & Monthly Overview */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <KPICard
-            title="Omsætning (dag)"
-            value={formatCurrency(stats.revenueToday)}
-            icon={DollarSign}
-            variant="success"
-            subtitle="I dag"
-          />
-          <KPICard
-            title="Netto margin (dag)"
-            value={formatCurrency(stats.netMarginToday)}
-            icon={stats.netMarginToday >= 0 ? TrendingUp : TrendingDown}
-            variant={stats.netMarginToday >= 0 ? "success" : "danger"}
-            subtitle="I dag"
-          />
-          <KPICard
-            title="Omsætning (md)"
-            value={formatCurrency(stats.revenue)}
-            icon={DollarSign}
-            variant="success"
-            subtitle={currentMonth}
-          />
-          <KPICard
-            title="Netto margin (md)"
-            value={formatCurrency(stats.netMargin)}
-            icon={stats.netMargin >= 0 ? TrendingUp : TrendingDown}
-            variant={stats.netMargin >= 0 ? "success" : "danger"}
-            subtitle={currentMonth}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Commission</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{(salesData?.totalCommission || 0).toLocaleString('da-DK')} DKK</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{(salesData?.totalRevenue || 0).toLocaleString('da-DK')} DKK</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{salesCount || 0}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Products</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{productsCount || 0}</div>
+            </CardContent>
+          </Card>
         </div>
-
-        {/* Charts Row */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <RevenueChart />
-          <SickLeaveChart />
-        </div>
-
-        {/* Performance & Details Row */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <TopAgentsTable agents={topAgents} />
-          
-          {/* Economic Summary */}
-          <div className="rounded-xl border border-border bg-card p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <PiggyBank className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold text-foreground">Økonomisk overblik</h3>
-            </div>
-            <p className="text-xs text-muted-foreground mb-4">{currentMonth}</p>
-            
-            <div className="space-y-3">
-              <div className="flex items-center justify-between py-2 border-b border-border">
-                <span className="text-sm text-muted-foreground">Omsætning</span>
-                <span className="font-semibold text-success">+{formatCurrency(stats.revenue)}</span>
-              </div>
-              
-              <div className="flex items-center justify-between py-2 border-b border-border">
-                <span className="text-sm text-muted-foreground">Provision</span>
-                <span className="font-semibold text-danger">-{formatCurrency(stats.commissionCosts)}</span>
-              </div>
-              
-              <div className="flex items-center justify-between py-2 border-b border-border">
-                <span className="text-sm text-muted-foreground">Feriepenge (12.5%)</span>
-                <span className="font-semibold text-danger">-{formatCurrency(stats.vacationPayCosts)}</span>
-              </div>
-              
-              <div className="flex items-center justify-between py-2 border-b border-border">
-                <span className="text-sm text-muted-foreground">Sygeløn</span>
-                <span className="font-semibold text-danger">-{formatCurrency(stats.sickPayCosts)}</span>
-              </div>
-              
-              <div className="flex items-center justify-between py-3 bg-muted/50 rounded-lg px-3 -mx-3">
-                <span className="font-semibold text-foreground">Netto margin</span>
-                <span className={`text-xl font-bold ${stats.netMargin >= 0 ? 'text-success' : 'text-danger'}`}>
-                  {stats.netMargin >= 0 ? '' : '-'}{formatCurrency(Math.abs(stats.netMargin))}
-                </span>
-              </div>
-            </div>
-
-            {/* Quick stats */}
-            <div className="grid grid-cols-2 gap-4 mt-6 pt-4 border-t border-border">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-foreground">{stats.salesThisMonth}</p>
-                <p className="text-xs text-muted-foreground">Salg i alt</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-foreground">{formatPercent(stats.clawbackRate)}</p>
-                <p className="text-xs text-muted-foreground">Clawback rate</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        {(salesData?.unmappedCount || 0) > 0 && (
+          <Card className="border-amber-500/50 bg-amber-500/5">
+            <CardHeader className="flex flex-row items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <CardTitle className="text-amber-500">Attention Required</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                You have <span className="font-bold text-amber-500">{salesData?.unmappedCount}</span> items needing mapping.
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </MainLayout>
   );
