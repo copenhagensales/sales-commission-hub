@@ -369,13 +369,30 @@ Deno.serve(async (req) => {
 
     // Debug action: fetch sales for a campaign
     if (debugAction === 'fetch-sales') {
-      console.log(`Debug: Fetching Adversus sales...`)
-      // Try different filter approaches
-      let url = `${baseUrl}/sales?pageSize=20`
-      if (debugCampaignId) {
-        // Try with campaignId filter
-        url = `${baseUrl}/sales?pageSize=20`
+      let filterCampaignId: number | null = null
+      let filterDays = 7 // default 7 days
+      try {
+        const body = await req.clone().json()
+        filterCampaignId = body.campaignId || null
+        filterDays = body.days || 7
+      } catch {}
+      
+      // Build filter for date range
+      const now = new Date()
+      const startDate = new Date(now.getTime() - filterDays * 24 * 60 * 60 * 1000)
+      
+      // Build filters object
+      const filters: Record<string, unknown> = {
+        created: { $gt: startDate.toISOString() }
       }
+      if (filterCampaignId) {
+        filters.campaign = { $eq: filterCampaignId }
+      }
+      
+      const filterStr = encodeURIComponent(JSON.stringify(filters))
+      const url = `${baseUrl}/sales?pageSize=100&filters=${filterStr}`
+      
+      console.log(`Debug: Fetching Adversus sales... URL: ${url}`)
       
       const salesResponse = await fetch(url, {
         headers: {
@@ -385,12 +402,30 @@ Deno.serve(async (req) => {
       })
       
       const responseText = await salesResponse.text()
-      console.log(`Sales response status: ${salesResponse.status}, body: ${responseText.slice(0, 2000)}`)
+      console.log(`Sales response status: ${salesResponse.status}, body length: ${responseText.length}`)
       
       if (salesResponse.ok) {
         const salesData = JSON.parse(responseText)
+        const sales = Array.isArray(salesData) ? salesData : (salesData.sales || salesData || [])
+        
+        // Extract unique product titles from sales lines
+        const productTitles = new Map<string, number>()
+        for (const sale of sales) {
+          if (sale.lines) {
+            for (const line of sale.lines) {
+              const title = line.title || 'Unknown'
+              productTitles.set(title, (productTitles.get(title) || 0) + 1)
+            }
+          }
+        }
+        
         return new Response(
-          JSON.stringify({ sales: salesData }),
+          JSON.stringify({ 
+            sales, 
+            total: sales.length,
+            productSummary: Object.fromEntries(productTitles),
+            filters: { campaignId: filterCampaignId, days: filterDays }
+          }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       } else {
