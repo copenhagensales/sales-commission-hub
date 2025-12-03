@@ -45,7 +45,7 @@ export default function Settings() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResults, setScanResults] = useState<{
-    campaigns: {campaignId: number; campaignName: string; products: Record<string, number>; outcomes: Record<string, number>}[]
+    campaigns: {campaignId: number; campaignName: string; products: Record<string, {count: number; commission?: number}>; outcomes: Record<string, number>}[]
     allCampaigns?: {id: number; name: string}[]
   } | null>(null);
   const [syncProgress, setSyncProgress] = useState<{
@@ -447,8 +447,15 @@ export default function Settings() {
                       <div className="mt-1">
                         <p className="text-xs text-muted-foreground font-medium">Produkter (fra /sales):</p>
                         <ul className="pl-4 text-muted-foreground">
-                          {Object.entries(c.products).map(([product, count]) => (
-                            <li key={product} className="text-green-600">{product}: {count} salg</li>
+                          {Object.entries(c.products).map(([product, data]) => (
+                            <li key={product} className="text-green-600">
+                              {product}: {data.count} salg
+                              {data.commission !== undefined && data.commission !== null && (
+                                <span className="ml-2 text-amber-500 font-medium">
+                                  (Provision: {data.commission} kr)
+                                </span>
+                              )}
+                            </li>
                           ))}
                         </ul>
                       </div>
