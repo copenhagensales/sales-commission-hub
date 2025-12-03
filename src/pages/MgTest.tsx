@@ -169,13 +169,29 @@ export default function MgTest() {
   }, [saleItems, clientCampaigns]);
 
   const productsByCampaign = useMemo(() => {
-    const groups = new Map<string, AggregatedProduct[]>();
+    const groups = new Map<
+      string,
+      { campaignId: string | null; campaignLabel: string; rows: AggregatedProduct[] }
+    >();
+
     aggregatedProducts.forEach((row) => {
-      const list = groups.get(row.campaignLabel) || [];
-      list.push(row);
-      groups.set(row.campaignLabel, list);
+      const key = row.campaignId ?? "no-campaign";
+      const existing = groups.get(key);
+
+      if (existing) {
+        existing.rows.push(row);
+      } else {
+        groups.set(key, {
+          campaignId: row.campaignId,
+          campaignLabel: row.campaignLabel,
+          rows: [row],
+        });
+      }
     });
-    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], "da"));
+
+    return Array.from(groups.values()).sort((a, b) =>
+      a.campaignLabel.localeCompare(b.campaignLabel, "da"),
+    );
   }, [aggregatedProducts]);
 
   const upsertProductValues = useMutation({
@@ -424,16 +440,17 @@ export default function MgTest() {
                 </CardContent>
               </Card>
             ) : (
-              productsByCampaign.map(([campaignLabel, rows]) => (
-                <Card key={campaignLabel} className="border-muted">
+              productsByCampaign.map((group) => (
+                <Card key={group.campaignId ?? "no-campaign"} className="border-muted">
                   <CardHeader className="flex flex-row items-center justify-between gap-4">
                     <div>
-                      <CardTitle className="text-base font-semibold">{campaignLabel}</CardTitle>
+                      <CardTitle className="text-base font-semibold">{group.campaignLabel}</CardTitle>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {rows.length} unikke produkter fra denne kampagne.
+                        Kampagne ID: {group.campaignId ?? "Ukendt"} · {group.rows.length} unikke produkter fra denne
+                        kampagne.
                       </p>
                     </div>
-                    <Badge variant="outline">{rows.length} produkter</Badge>
+                    <Badge variant="outline">{group.rows.length} produkter</Badge>
                   </CardHeader>
                   <CardContent>
                     <div className="rounded-md border overflow-x-auto">
@@ -448,7 +465,7 @@ export default function MgTest() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {rows.map((row) => {
+                          {group.rows.map((row) => {
                             const current = editValues[row.key];
 
                             return (
