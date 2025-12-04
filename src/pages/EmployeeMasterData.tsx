@@ -94,6 +94,7 @@ export default function EmployeeMasterData() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
   const [formData, setFormData] = useState<NewEmployee>(defaultEmployee);
@@ -181,14 +182,38 @@ export default function EmployeeMasterData() {
     saveMutation.mutate(editingEmployee ? { ...formData, id: editingEmployee.id } : formData);
   };
 
-  const filteredEmployees = employees.filter(
-    (e) =>
-      `${e.first_name} ${e.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.private_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.department?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase
+        .from("employee_master_data")
+        .update({ is_active })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+      toast({ title: "Status opdateret" });
+    },
+    onError: (error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const filteredEmployees = employees
+    .filter((e) => {
+      if (statusFilter === "active") return e.is_active;
+      if (statusFilter === "inactive") return !e.is_active;
+      return true;
+    })
+    .filter(
+      (e) =>
+        `${e.first_name} ${e.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.private_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.department?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   const activeCount = employees.filter((e) => e.is_active).length;
+  const inactiveCount = employees.length - activeCount;
 
   return (
     <MainLayout>
@@ -426,11 +451,39 @@ export default function EmployeeMasterData() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-4">
               <CardTitle>Medarbejderoversigt</CardTitle>
-              <div className="relative w-64">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Søg..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8" />
+              <div className="flex items-center gap-3">
+                <div className="flex items-center rounded-lg border border-border p-1">
+                  <Button
+                    variant={statusFilter === "active" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setStatusFilter("active")}
+                    className="h-7 px-3"
+                  >
+                    Aktive ({activeCount})
+                  </Button>
+                  <Button
+                    variant={statusFilter === "inactive" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setStatusFilter("inactive")}
+                    className="h-7 px-3"
+                  >
+                    Inaktive ({inactiveCount})
+                  </Button>
+                  <Button
+                    variant={statusFilter === "all" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setStatusFilter("all")}
+                    className="h-7 px-3"
+                  >
+                    Alle ({employees.length})
+                  </Button>
+                </div>
+                <div className="relative w-64">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Søg..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8" />
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -471,10 +524,11 @@ export default function EmployeeMasterData() {
                         {employee.salary_type === "hourly" && "Timeløn"}
                         {!employee.salary_type && "-"}
                       </TableCell>
-                      <TableCell>
-                        <Badge variant={employee.is_active ? "default" : "secondary"}>
-                          {employee.is_active ? "Aktiv" : "Inaktiv"}
-                        </Badge>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Switch 
+                          checked={employee.is_active} 
+                          onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: employee.id, is_active: checked })}
+                        />
                       </TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
