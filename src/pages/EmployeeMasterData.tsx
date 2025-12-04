@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Mail, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -98,6 +98,7 @@ export default function EmployeeMasterData() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
   const [formData, setFormData] = useState<NewEmployee>(defaultEmployee);
+  const [sendingInvitation, setSendingInvitation] = useState<string | null>(null);
 
   const { data: employees = [], isLoading } = useQuery({
     queryKey: ["employee-master-data"],
@@ -203,6 +204,46 @@ export default function EmployeeMasterData() {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
     },
   });
+
+  const handleSendInvitation = async (employee: EmployeeMasterDataRecord) => {
+    if (!employee.private_email) {
+      toast({ title: "Mangler email", description: "Medarbejderen skal have en email-adresse", variant: "destructive" });
+      return;
+    }
+
+    setSendingInvitation(employee.id);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-employee-invitation`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            employeeId: employee.id,
+            email: employee.private_email,
+            firstName: employee.first_name,
+            lastName: employee.last_name,
+          }),
+        }
+      );
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Kunne ikke sende invitation");
+      }
+
+      toast({ title: "Invitation sendt", description: `Email sendt til ${employee.private_email}` });
+    } catch (error) {
+      console.error("Invitation error:", error);
+      toast({
+        title: "Fejl",
+        description: error instanceof Error ? error.message : "Kunne ikke sende invitation",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingInvitation(null);
+    }
+  };
 
   const filteredEmployees = employees
     .filter((e) => {
@@ -576,6 +617,22 @@ export default function EmployeeMasterData() {
                           disabled={!employee.private_phone}
                         >
                           <MessageSquare className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            handleSendInvitation(employee);
+                          }}
+                          disabled={!employee.private_email || sendingInvitation === employee.id}
+                          title="Send invitation til medarbejder"
+                        >
+                          {sendingInvitation === employee.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Mail className="h-4 w-4" />
+                          )}
                         </Button>
                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
                           <Pencil className="h-4 w-4" />

@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.cleanup-inactive-employees]
 verify_jwt = false
+
+[functions.reset-login-attempts]
+verify_jwt = false
+
+[functions.send-employee-invitation]
+verify_jwt = false

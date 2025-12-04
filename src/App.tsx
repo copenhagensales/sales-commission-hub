@@ -21,6 +21,7 @@ import AdversusData from "./pages/AdversusData";
 import Logikker from "./pages/Logikker";
 import EmployeeMasterData from "./pages/EmployeeMasterData";
 import EmployeeDetail from "./pages/EmployeeDetail";
+import EmployeeOnboarding from "./pages/EmployeeOnboarding";
 // Vagt-flow pages
 import VagtFlowIndex from "./pages/vagt-flow/Index";
 import VagtBookWeek from "./pages/vagt-flow/BookWeek";
@@ -80,6 +81,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+          <Route path="/onboarding" element={<EmployeeOnboarding />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/agents" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
           <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
