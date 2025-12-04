@@ -100,7 +100,7 @@ export default function EmployeeMasterData() {
   const [formData, setFormData] = useState<NewEmployee>(defaultEmployee);
   const [sendingInvitation, setSendingInvitation] = useState<string | null>(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [inviteData, setInviteData] = useState({ first_name: "", last_name: "", email: "" });
+  const [inviteData, setInviteData] = useState({ first_name: "", last_name: "", email: "", job_title: "" as "Fieldmarketing" | "Salgskonsulent" | "" });
   const [creatingInvite, setCreatingInvite] = useState(false);
 
   const { data: employees = [], isLoading } = useQuery({
@@ -279,8 +279,8 @@ export default function EmployeeMasterData() {
   };
 
   const handleInviteNewEmployee = async () => {
-    if (!inviteData.first_name || !inviteData.email) {
-      toast({ title: "Udfyld fornavn og email", variant: "destructive" });
+    if (!inviteData.first_name || !inviteData.email || !inviteData.job_title) {
+      toast({ title: "Udfyld fornavn, email og stilling", variant: "destructive" });
       return;
     }
 
@@ -293,6 +293,7 @@ export default function EmployeeMasterData() {
           first_name: inviteData.first_name,
           last_name: inviteData.last_name || "",
           private_email: inviteData.email,
+          job_title: inviteData.job_title,
           is_active: true,
         })
         .select()
@@ -324,7 +325,7 @@ export default function EmployeeMasterData() {
       queryClient.invalidateQueries({ queryKey: ["employee-invitations"] });
       toast({ title: "Medarbejder oprettet og invitation sendt", description: `Email sendt til ${inviteData.email}` });
       setInviteDialogOpen(false);
-      setInviteData({ first_name: "", last_name: "", email: "" });
+      setInviteData({ first_name: "", last_name: "", email: "", job_title: "" });
     } catch (error) {
       console.error("Invite error:", error);
       toast({
@@ -364,7 +365,7 @@ export default function EmployeeMasterData() {
           <div className="flex gap-2">
             <Dialog open={inviteDialogOpen} onOpenChange={(open) => {
               setInviteDialogOpen(open);
-              if (!open) setInviteData({ first_name: "", last_name: "", email: "" });
+              if (!open) setInviteData({ first_name: "", last_name: "", email: "", job_title: "" });
             }}>
               <DialogTrigger asChild>
                 <Button variant="outline"><Mail className="mr-2 h-4 w-4" /> Inviter ny medarbejder</Button>
@@ -403,6 +404,24 @@ export default function EmployeeMasterData() {
                       onChange={(e) => setInviteData({ ...inviteData, email: e.target.value })} 
                       placeholder="medarbejder@email.dk"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Stilling *</Label>
+                    <Select 
+                      value={inviteData.job_title} 
+                      onValueChange={(value: "Fieldmarketing" | "Salgskonsulent") => setInviteData({ ...inviteData, job_title: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Vælg stilling" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Salgskonsulent">Salgskonsulent</SelectItem>
+                        <SelectItem value="Fieldmarketing">Fieldmarketing</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Flere rettigheder kan tilføjes af en ejer senere.
+                    </p>
                   </div>
                 </div>
                 <div className="flex justify-end">
