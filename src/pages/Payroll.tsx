@@ -5,6 +5,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -80,10 +81,20 @@ const emptyCancellations: CancellationSummary = {
   unmatched: [],
 };
 
+interface SearchableSale {
+  id: string;
+  sale_datetime: string;
+  agent_name: string | null;
+  customer_company: string | null;
+  customer_phone: string | null;
+  adversus_external_id: string | null;
+  sale_items: PayrollSaleItem[];
+}
+
 function getDefaultPayrollPeriod() {
   const today = new Date();
   const year = today.getFullYear();
-  const month = today.getMonth(); // 0-indexed
+  const month = today.getMonth();
   const day = today.getDate();
 
   if (day >= 15) {
@@ -104,6 +115,7 @@ export default function Payroll() {
   const defaultPeriod = getDefaultPayrollPeriod();
   const [fromDate, setFromDate] = useState<Date | undefined>(defaultPeriod.from);
   const [toDate, setToDate] = useState<Date | undefined>(defaultPeriod.to);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { data: clients, isLoading: loadingClients } = useQuery<ClientRow[]>({
     queryKey: ["payroll-clients"],
@@ -401,10 +413,56 @@ export default function Payroll() {
     },
   });
 
+  const { data: searchableSales, isLoading: loadingSearchableSales } = useQuery<SearchableSale[]>({
+    queryKey: [
+      "payroll-search-sales",
+      selectedClientId,
+      fromDate ? fromDate.toISOString() : undefined,
+      toDate ? toDate.toISOString() : undefined,
+    ],
+    enabled: !!selectedClientId && !!fromDate && !!toDate,
+    queryFn: async () => {
+      if (!selectedClientId || !fromDate || !toDate) return [];
+
+      const { data: campaigns, error: campaignsError } = await supabase
+        .from("client_campaigns")
+        .select("id")
+        .eq("client_id", selectedClientId);
+
+      if (campaignsError) throw campaignsError;
+
+      const campaignIds = (campaigns || []).map((c: any) => c.id as string);
+      if (!campaignIds.length) return [];
+
+      const { data: sales, error: salesError } = await supabase
+        .from("sales")
+        .select(
+          "id, sale_datetime, agent_name, customer_company, customer_phone, adversus_external_id, sale_items(mapped_commission, mapped_revenue, quantity)"
+        )
+        .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", fromDate.toISOString())
+        .lte("sale_datetime", toDate.toISOString());
+
+      if (salesError) throw salesError;
+
+      return (sales || []) as unknown as SearchableSale[];
+    },
+  });
+
   useEffect(() => {
     if (!clients || clients.length === 0 || selectedClientId) return;
     setSelectedClientId(clients[0]?.id);
   }, [clients, selectedClientId]);
+
+  const filteredSales = (searchableSales || []).filter((sale) => {
+    if (!searchTerm.trim()) return false;
+    const term = searchTerm.toLowerCase();
+    const inExternalId = sale.adversus_external_id?.toLowerCase().includes(term) ?? false;
+    const inPhone = sale.customer_phone?.toLowerCase().includes(term) ?? false;
+    const inCompany = sale.customer_company?.toLowerCase().includes(term) ?? false;
+    const inAgent = sale.agent_name?.toLowerCase().includes(term) ?? false;
+    return inExternalId || inPhone || inCompany || inAgent;
+  });
 
   return (
     <MainLayout>
@@ -617,9 +675,7 @@ export default function Payroll() {
                         <TableRow key={m.saleId + m.externalId}>
                           <TableCell className="font-mono text-xs">{m.externalId}</TableCell>
                           <TableCell>
-                            {m.saleDate
-                              ? format(new Date(m.saleDate), "dd.MM.yyyy")
-                              : "-"}
+                            {m.saleDate ? format(new Date(m.saleDate), "dd.MM.yyyy") : "-"}
                           </TableCell>
                           <TableCell>{m.agentName ?? "Ukendt"}</TableCell>
                           <TableCell>{m.cancellationDate || "-"}</TableCell>
@@ -670,7 +726,7 @@ export default function Payroll() {
                     </TableHeader>
                     <TableBody>
                       {cancellations.unmatched.map((u) => (
-                        <TableRow key={u.externalId + (u.cancellationDate || "")}> 
+                        <TableRow key={u.externalId + (u.cancellationDate || "")}>
                           <TableCell className="font-mono text-xs">{u.externalId}</TableCell>
                           <TableCell className="font-mono text-xs">{u.oppNumber || "-"}</TableCell>
                           <TableCell>{u.cancellationDate || "-"}</TableCell>
@@ -684,7 +740,89 @@ export default function Payroll() {
             )}
           </CardContent>
         </Card>
-       </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Søg TDC-salg</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!selectedClientId || !fromDate || !toDate ? (
+              <div className="text-center py-6 text-muted-foreground">
+                Vælg kunde og lønperiode for at søge efter salg.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <Input
+                  placeholder="Søg på ordre-id, telefon, kundenavn eller agent"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="max-w-md"
+                />
+
+                {searchTerm.trim() && loadingSearchableSales && (
+                  <div className="text-sm text-muted-foreground">Søger efter salg...</div>
+                )}
+
+                {searchTerm.trim() && !loadingSearchableSales && filteredSales.length === 0 && (
+                  <div className="text-sm text-muted-foreground">Ingen salg matcher din søgning.</div>
+                )}
+
+                {searchTerm.trim() && filteredSales.length > 0 && (
+                  <div className="rounded-lg border bg-muted/40 overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Dato</TableHead>
+                          <TableHead>Agent</TableHead>
+                          <TableHead>Kunde</TableHead>
+                          <TableHead>Telefon</TableHead>
+                          <TableHead>Ordre-id</TableHead>
+                          <TableHead className="text-right">Salg (stk.)</TableHead>
+                          <TableHead className="text-right">Provision</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredSales.map((sale) => {
+                          const units = (sale.sale_items || []).reduce((sum, item) => {
+                            const qty = Number(item.quantity ?? 1) || 1;
+                            return sum + qty;
+                          }, 0);
+
+                          const commission = (sale.sale_items || []).reduce((sum, item) => {
+                            const qty = Number(item.quantity ?? 1) || 1;
+                            const c = Number(item.mapped_commission) || 0;
+                            return sum + qty * c;
+                          }, 0);
+
+                          return (
+                            <TableRow key={sale.id}>
+                              <TableCell>
+                                {sale.sale_datetime
+                                  ? format(new Date(sale.sale_datetime), "dd.MM.yyyy")
+                                  : "-"}
+                              </TableCell>
+                              <TableCell>{sale.agent_name ?? "Ukendt"}</TableCell>
+                              <TableCell>{sale.customer_company ?? "-"}</TableCell>
+                              <TableCell>{sale.customer_phone ?? "-"}</TableCell>
+                              <TableCell className="font-mono text-xs">
+                                {sale.adversus_external_id ?? "-"}
+                              </TableCell>
+                              <TableCell className="text-right">{units}</TableCell>
+                              <TableCell className="text-right">
+                                {commission.toLocaleString("da-DK")} DKK
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </MainLayout>
   );
 }
