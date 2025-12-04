@@ -33,6 +33,11 @@ import VagtVehicles from "./pages/vagt-flow/Vehicles";
 import VagtTimeOffRequests from "./pages/vagt-flow/TimeOffRequests";
 import VagtLocationDetail from "./pages/vagt-flow/LocationDetail";
 import VagtBilling from "./pages/vagt-flow/Billing";
+// Shift planning pages (internal)
+import ShiftOverview from "./pages/shift-planning/ShiftOverview";
+import MySchedule from "./pages/shift-planning/MySchedule";
+import AbsenceManagement from "./pages/shift-planning/AbsenceManagement";
+import TimeTracking from "./pages/shift-planning/TimeTracking";
 
 const queryClient = new QueryClient();
 
@@ -108,6 +113,11 @@ const App = () => (
           <Route path="/vagt-flow/vehicles" element={<ProtectedRoute><VagtVehicles /></ProtectedRoute>} />
           <Route path="/vagt-flow/time-off" element={<ProtectedRoute><VagtTimeOffRequests /></ProtectedRoute>} />
           <Route path="/vagt-flow/billing" element={<ProtectedRoute><VagtBilling /></ProtectedRoute>} />
+          {/* Shift planning routes (internal) */}
+          <Route path="/shift-planning" element={<ProtectedRoute><ShiftOverview /></ProtectedRoute>} />
+          <Route path="/shift-planning/my-schedule" element={<ProtectedRoute><MySchedule /></ProtectedRoute>} />
+          <Route path="/shift-planning/absence" element={<ProtectedRoute><AbsenceManagement /></ProtectedRoute>} />
+          <Route path="/shift-planning/time-tracking" element={<ProtectedRoute><TimeTracking /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
