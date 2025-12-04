@@ -524,33 +524,61 @@ export type Database = {
       }
       employee_absence: {
         Row: {
+          approved_at: string | null
+          approved_by_employee_id: string | null
           created_at: string | null
           employee_id: string
           end_date: string
+          end_time: string | null
           id: string
+          is_full_day: boolean | null
           note: string | null
           reason: Database["public"]["Enums"]["vagt_absence_reason"]
+          rejection_reason: string | null
           start_date: string
+          start_time: string | null
+          status: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by_employee_id?: string | null
           created_at?: string | null
           employee_id: string
           end_date: string
+          end_time?: string | null
           id?: string
+          is_full_day?: boolean | null
           note?: string | null
           reason: Database["public"]["Enums"]["vagt_absence_reason"]
+          rejection_reason?: string | null
           start_date: string
+          start_time?: string | null
+          status?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by_employee_id?: string | null
           created_at?: string | null
           employee_id?: string
           end_date?: string
+          end_time?: string | null
           id?: string
+          is_full_day?: boolean | null
           note?: string | null
           reason?: Database["public"]["Enums"]["vagt_absence_reason"]
+          rejection_reason?: string | null
           start_date?: string
+          start_time?: string | null
+          status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "employee_absence_approved_by_employee_id_fkey"
+            columns: ["approved_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "employee_absence_employee_id_fkey"
             columns: ["employee_id"]
@@ -604,11 +632,13 @@ export type Database = {
           address_city: string | null
           address_postal_code: string | null
           address_street: string | null
+          available_after_date: string | null
           can_book_eesy: boolean | null
           can_book_yousee: boolean | null
           contact_email: string | null
           contact_person_name: string | null
           contact_phone: string | null
+          cooldown_weeks: number | null
           created_at: string | null
           id: string
           is_favorite: boolean | null
@@ -623,11 +653,13 @@ export type Database = {
           address_city?: string | null
           address_postal_code?: string | null
           address_street?: string | null
+          available_after_date?: string | null
           can_book_eesy?: boolean | null
           can_book_yousee?: boolean | null
           contact_email?: string | null
           contact_person_name?: string | null
           contact_phone?: string | null
+          cooldown_weeks?: number | null
           created_at?: string | null
           id?: string
           is_favorite?: boolean | null
@@ -642,11 +674,13 @@ export type Database = {
           address_city?: string | null
           address_postal_code?: string | null
           address_street?: string | null
+          available_after_date?: string | null
           can_book_eesy?: boolean | null
           can_book_yousee?: boolean | null
           contact_email?: string | null
           contact_person_name?: string | null
           contact_phone?: string | null
+          cooldown_weeks?: number | null
           created_at?: string | null
           id?: string
           is_favorite?: boolean | null
@@ -1050,6 +1084,7 @@ export type Database = {
           is_active: boolean | null
           license_plate: string
           name: string
+          notes: string | null
         }
         Insert: {
           created_at?: string | null
@@ -1057,6 +1092,7 @@ export type Database = {
           is_active?: boolean | null
           license_plate: string
           name: string
+          notes?: string | null
         }
         Update: {
           created_at?: string | null
@@ -1064,8 +1100,63 @@ export type Database = {
           is_active?: boolean | null
           license_plate?: string
           name?: string
+          notes?: string | null
         }
         Relationships: []
+      }
+      vehicle_mileage: {
+        Row: {
+          booking_id: string | null
+          created_at: string | null
+          date: string
+          end_mileage: number
+          estimated_distance: number | null
+          id: string
+          notes: string | null
+          start_mileage: number
+          updated_at: string | null
+          vehicle_id: string
+        }
+        Insert: {
+          booking_id?: string | null
+          created_at?: string | null
+          date: string
+          end_mileage: number
+          estimated_distance?: number | null
+          id?: string
+          notes?: string | null
+          start_mileage: number
+          updated_at?: string | null
+          vehicle_id: string
+        }
+        Update: {
+          booking_id?: string | null
+          created_at?: string | null
+          date?: string
+          end_mileage?: number
+          estimated_distance?: number | null
+          id?: string
+          notes?: string | null
+          start_mileage?: number
+          updated_at?: string | null
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_mileage_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_mileage_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
