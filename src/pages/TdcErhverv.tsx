@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfDay, startOfMonth, subDays, isWeekend, addDays } from "date-fns";
 import { Line, LineChart, CartesianGrid, ReferenceDot, XAxis, YAxis } from "recharts";
@@ -58,6 +58,11 @@ interface TdcDashboardData {
   allSales: TdcSale[];
 }
 
+interface ClientRow {
+  id: string;
+  name: string | null;
+}
+
 type DatePreset = "THIS_MONTH" | "LAST_MONTH" | "LAST_30" | "LAST_90" | "CUSTOM";
 
 const initialStats: TdcStats = {
@@ -88,6 +93,30 @@ export default function TdcErhverv() {
   const [datePreset, setDatePreset] = useState<DatePreset>("LAST_90");
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
+  const [selectedClientId, setSelectedClientId] = useState<string | undefined>(undefined);
+
+  const { data: clients, isLoading: loadingClients } = useQuery<ClientRow[]>({
+    queryKey: ["dashboard-clients"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name")
+        .order("name");
+
+      if (error) throw error;
+      return data as ClientRow[];
+    },
+  });
+
+  useEffect(() => {
+    if (!clients || clients.length === 0 || selectedClientId) return;
+
+    const tdcClient = clients.find((client) =>
+      (client.name ?? "").toLowerCase().includes("tdc erhverv"),
+    );
+
+    setSelectedClientId(tdcClient?.id ?? clients[0]?.id);
+  }, [clients, selectedClientId]);
 
   const { data, isLoading } = useQuery<TdcDashboardData>({
     queryKey: ["tdc-erhverv-dashboard"],
@@ -356,9 +385,31 @@ export default function TdcErhverv() {
               Live overblik over salg, omsætning og provision for kunden TDC Erhverv.
             </p>
           </div>
-          <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
-            <Building2 className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-muted-foreground">Kunde: TDC Erhverv</span>
+          <div className="flex flex-col items-stretch gap-2 md:items-end">
+            <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
+              <Building2 className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-muted-foreground">Kunde: TDC Erhverv</span>
+            </div>
+            <div className="w-full md:w-[240px]">
+              <Select
+                value={selectedClientId}
+                onValueChange={setSelectedClientId}
+                disabled={loadingClients || !clients || clients.length === 0}
+              >
+                <SelectTrigger className="w-full bg-background">
+                  <SelectValue
+                    placeholder={loadingClients ? "Indlæser kunder..." : "Vælg kunde (fra MG test)"}
+                  />
+                </SelectTrigger>
+                <SelectContent className="bg-popover z-50">
+                  {clients?.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name ?? "Ukendt kunde"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
