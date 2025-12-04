@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useVagtEmployees, type VagtEmployee } from "@/hooks/useVagtEmployee";
@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, ChevronDown } from "lucide-react";
+import { Loader2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 interface WebhookSaleItem {
@@ -545,22 +545,12 @@ export default function MgTest() {
     },
   });
 
-  const handleChange = (key: string, field: keyof EditEntry, value: string) => {
-    setEditValues((prev) => ({
-      ...prev,
-      [key]: {
-        provision: field === "provision" ? value : prev[key]?.provision ?? "",
-        cpo: field === "cpo" ? value : prev[key]?.cpo ?? "",
-      },
-    }));
-  };
+  // Debounce refs for auto-save
+  const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
-  const handleSave = (row: AggregatedProduct) => {
-    const current: EditEntry = editValues[row.key] || {};
-
-    const provisionRaw =
-      current.provision ?? (row.product?.commission_dkk != null ? String(row.product.commission_dkk) : "0");
-    const cpoRaw = current.cpo ?? (row.product?.revenue_dkk != null ? String(row.product.revenue_dkk) : "0");
+  const triggerAutoSave = useCallback((row: AggregatedProduct, newValues: EditEntry) => {
+    const provisionRaw = newValues.provision ?? (row.product?.commission_dkk != null ? String(row.product.commission_dkk) : "0");
+    const cpoRaw = newValues.cpo ?? (row.product?.revenue_dkk != null ? String(row.product.revenue_dkk) : "0");
 
     const provision = parseFloat(provisionRaw.replace(",", ".")) || 0;
     const cpo = parseFloat(cpoRaw.replace(",", ".")) || 0;
@@ -580,7 +570,36 @@ export default function MgTest() {
     const selectedClientId = selectionFromProduct ?? draftClientId ?? existingClientId;
 
     upsertProductValues.mutate({ row, provision, cpo, clientId: selectedClientId ?? null });
+  }, [clientCampaigns, productClientSelections, productClientDrafts, upsertProductValues]);
+
+  const handleChange = (key: string, field: keyof EditEntry, value: string, row: AggregatedProduct) => {
+    const newValues: EditEntry = {
+      provision: field === "provision" ? value : editValues[key]?.provision ?? "",
+      cpo: field === "cpo" ? value : editValues[key]?.cpo ?? "",
+    };
+
+    setEditValues((prev) => ({
+      ...prev,
+      [key]: newValues,
+    }));
+
+    // Clear existing timer
+    if (debounceTimers.current[key]) {
+      clearTimeout(debounceTimers.current[key]);
+    }
+
+    // Set new debounced save (1 second delay)
+    debounceTimers.current[key] = setTimeout(() => {
+      triggerAutoSave(row, newValues);
+    }, 1000);
   };
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(debounceTimers.current).forEach(clearTimeout);
+    };
+  }, []);
 
   // Kampagne-mapping (Adversus campaignId -> intern client_campaign)
   const { data: campaignMappings, isLoading: loadingCampaignMappings } = useQuery<CampaignMapping[]>({
@@ -1183,12 +1202,11 @@ export default function MgTest() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="w-[28%]">Adversus produktnavn</TableHead>
+                                <TableHead className="w-[30%]">Adversus produktnavn</TableHead>
                                 <TableHead className="w-[18%]">External ID</TableHead>
-                                <TableHead className="w-[22%]">Kunde</TableHead>
+                                <TableHead className="w-[24%]">Kunde</TableHead>
                                 <TableHead className="w-[14%]">Provision (DKK)</TableHead>
                                 <TableHead className="w-[14%]">CPO / omsætning (DKK)</TableHead>
-                                <TableHead className="w-[14%] text-right">Handling</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1302,7 +1320,7 @@ export default function MgTest() {
                                             ? String(row.product.commission_dkk)
                                             : "")
                                         }
-                                        onChange={(e) => handleChange(row.key, "provision", e.target.value)}
+                                        onChange={(e) => handleChange(row.key, "provision", e.target.value, row)}
                                         placeholder="0,00"
                                       />
                                     </TableCell>
@@ -1318,23 +1336,9 @@ export default function MgTest() {
                                             ? String(row.product.revenue_dkk)
                                             : "")
                                         }
-                                        onChange={(e) => handleChange(row.key, "cpo", e.target.value)}
+                                        onChange={(e) => handleChange(row.key, "cpo", e.target.value, row)}
                                         placeholder="0,00"
                                       />
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      <Button
-                                        size="sm"
-                                        onClick={() => handleSave(row)}
-                                        disabled={upsertProductValues.isPending}
-                                      >
-                                        {upsertProductValues.isPending ? (
-                                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                        ) : (
-                                          <Save className="h-4 w-4 mr-2" />
-                                        )}
-                                        Gem
-                                      </Button>
                                     </TableCell>
                                   </TableRow>
                                 );
