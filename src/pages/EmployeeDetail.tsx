@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X, History, Phone, Mail, Pencil, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, TrendingUp, AlertTriangle } from "lucide-react";
+import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X, History, Phone, Mail, Pencil, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, TrendingUp, AlertTriangle, AlarmClock } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -384,6 +384,22 @@ export default function EmployeeDetail() {
     enabled: !!id,
   });
 
+  // Fetch lateness records for this employee
+  const { data: latenessRecords = [] } = useQuery({
+    queryKey: ["employee-lateness", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data, error } = await supabase
+        .from("lateness_record")
+        .select("*")
+        .eq("employee_id", id)
+        .order("date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
   // Calculate absence statistics
   const absenceStats = useMemo(() => {
     const now = new Date();
@@ -461,6 +477,34 @@ export default function EmployeeDetail() {
       sickAbsences,
     };
   }, [absences]);
+
+  // Calculate lateness statistics
+  const latenessStats = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    
+    const thisYearLateness = latenessRecords.filter(l => new Date(l.date).getFullYear() === currentYear);
+    const last12MonthsLateness = latenessRecords.filter(l => {
+      const date = new Date(l.date);
+      return date >= oneYearAgo && date <= now;
+    });
+    
+    const totalMinutesThisYear = thisYearLateness.reduce((sum, l) => sum + l.minutes, 0);
+    const totalMinutesLast12Months = last12MonthsLateness.reduce((sum, l) => sum + l.minutes, 0);
+    
+    const avgMinutesPerLateness = last12MonthsLateness.length > 0 
+      ? totalMinutesLast12Months / last12MonthsLateness.length 
+      : 0;
+    
+    return {
+      countThisYear: thisYearLateness.length,
+      countLast12Months: last12MonthsLateness.length,
+      totalMinutesThisYear,
+      totalMinutesLast12Months,
+      avgMinutesPerLateness,
+    };
+  }, [latenessRecords]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ field, value }: { field: string; value: unknown }) => {
@@ -1030,6 +1074,68 @@ export default function EmployeeDetail() {
                   <p className="text-xs text-muted-foreground">
                     Det danske gennemsnit for sygefravær ligger på ca. 3,5% af arbejdsdagene.
                   </p>
+                </CardContent>
+              </Card>
+
+              {/* Lateness Report */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <AlarmClock className="h-4 w-4 text-orange-500" />
+                    Forsinkelsesrapport
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-3 mb-6">
+                    <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                      <p className="text-sm text-muted-foreground">Antal (12 mdr)</p>
+                      <p className="text-xl font-bold">{latenessStats.countLast12Months} gange</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                      <p className="text-sm text-muted-foreground">Total tid (12 mdr)</p>
+                      <p className="text-xl font-bold">{latenessStats.totalMinutesLast12Months} min</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                      <p className="text-sm text-muted-foreground">Gns. forsinkelse</p>
+                      <p className="text-xl font-bold">{latenessStats.avgMinutesPerLateness.toFixed(0)} min</p>
+                    </div>
+                  </div>
+                  
+                  {latenessRecords.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <AlarmClock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>Ingen registrerede forsinkelser</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {latenessRecords.slice(0, 15).map((record) => (
+                        <div 
+                          key={record.id}
+                          className="flex items-center justify-between p-3 rounded-lg border bg-orange-500/5 border-orange-500/20"
+                        >
+                          <div className="flex items-center gap-3">
+                            <AlarmClock className="h-4 w-4 text-orange-500" />
+                            <div>
+                              <p className="font-medium text-sm">
+                                {format(new Date(record.date), "EEEE d. MMM yyyy", { locale: da })}
+                              </p>
+                              {record.note && (
+                                <p className="text-xs text-muted-foreground">{record.note}</p>
+                              )}
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="border-orange-500/30 text-orange-600">
+                            {record.minutes} min
+                          </Badge>
+                        </div>
+                      ))}
+                      {latenessRecords.length > 15 && (
+                        <p className="text-xs text-center text-muted-foreground pt-2">
+                          Viser de seneste 15 af {latenessRecords.length} forsinkelser
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
