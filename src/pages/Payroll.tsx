@@ -291,6 +291,18 @@ export default function Payroll() {
           const rawDate = row[dateHeader];
           if (rawDate instanceof Date) {
             cancellationDate = rawDate;
+          } else if (typeof rawDate === "number") {
+            const parsed = (XLSX as any).SSF?.parse_date_code
+              ? (XLSX as any).SSF.parse_date_code(rawDate)
+              : null;
+            if (parsed) {
+              cancellationDate = new Date(parsed.y, parsed.m - 1, parsed.d, parsed.H, parsed.M, parsed.S);
+            } else {
+              const excelEpoch = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+              if (!isNaN(excelEpoch.getTime())) {
+                cancellationDate = excelEpoch;
+              }
+            }
           } else if (typeof rawDate === "string" && rawDate.trim()) {
             const parsed = new Date(rawDate);
             if (!isNaN(parsed.getTime())) {
