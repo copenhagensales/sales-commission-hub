@@ -61,6 +61,7 @@ export default function VagtLocations() {
     contact_email: "",
     can_book_eesy: false,
     can_book_yousee: false,
+    daily_rate: 1000,
   });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -113,6 +114,7 @@ export default function VagtLocations() {
         contact_email: "",
         can_book_eesy: false,
         can_book_yousee: false,
+        daily_rate: 1000,
       });
     },
     onError: (error: any) => {
@@ -138,6 +140,17 @@ export default function VagtLocations() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vagt-locations-list"] });
       toast({ title: "Cooldown opdateret" });
+    },
+  });
+
+  const updateDailyRate = useMutation({
+    mutationFn: async ({ id, daily_rate }: { id: string; daily_rate: number }) => {
+      const { error } = await supabase.from("location").update({ daily_rate }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-locations-list"] });
+      toast({ title: "Dagspris opdateret" });
     },
   });
 
@@ -289,6 +302,7 @@ export default function VagtLocations() {
                     <TableHead>Navn</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>By</TableHead>
+                    <TableHead>Dagspris</TableHead>
                     <TableHead>Cooldown</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Brands</TableHead>
@@ -317,6 +331,28 @@ export default function VagtLocations() {
                       <TableCell className="font-medium">{loc.name}</TableCell>
                       <TableCell>{loc.type || "-"}</TableCell>
                       <TableCell>{loc.address_city || "-"}</TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            min={0}
+                            className="w-20 h-8 text-center"
+                            defaultValue={loc.daily_rate || 1000}
+                            onBlur={(e) => {
+                              const value = parseInt(e.target.value) || 1000;
+                              if (value !== (loc.daily_rate || 1000)) {
+                                updateDailyRate.mutate({ id: loc.id, daily_rate: value });
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                (e.target as HTMLInputElement).blur();
+                              }
+                            }}
+                          />
+                          <span className="text-muted-foreground text-sm">kr</span>
+                        </div>
+                      </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
                           <Input
@@ -386,7 +422,14 @@ export default function VagtLocations() {
               </div>
               <div>
                 <Label>Type</Label>
-                <Select value={newLocation.type} onValueChange={(v) => setNewLocation({ ...newLocation, type: v })}>
+                <Select 
+                  value={newLocation.type} 
+                  onValueChange={(v) => setNewLocation({ 
+                    ...newLocation, 
+                    type: v,
+                    daily_rate: v === "Storcenter" ? 1500 : 1000
+                  })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Vælg type" />
                   </SelectTrigger>
@@ -397,6 +440,14 @@ export default function VagtLocations() {
                     <SelectItem value="Messer">Messer</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label>Dagspris (kr ex moms)</Label>
+                <Input 
+                  type="number" 
+                  value={newLocation.daily_rate} 
+                  onChange={(e) => setNewLocation({ ...newLocation, daily_rate: parseInt(e.target.value) || 1000 })} 
+                />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">

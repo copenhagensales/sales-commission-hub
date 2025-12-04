@@ -148,7 +148,11 @@ export default function LocationDetail() {
                   <Label>Type</Label>
                   <Select
                     value={formData.type || ""}
-                    onValueChange={(v) => setFormData({ ...formData, type: v })}
+                    onValueChange={(v) => setFormData({ 
+                      ...formData, 
+                      type: v,
+                      daily_rate: formData.daily_rate || (v === "Storcenter" ? 1500 : 1000)
+                    })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Vælg type" />
@@ -178,6 +182,14 @@ export default function LocationDetail() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div>
+                <Label>Dagspris (kr ex moms)</Label>
+                <Input
+                  type="number"
+                  value={formData.daily_rate || 1000}
+                  onChange={(e) => setFormData({ ...formData, daily_rate: parseInt(e.target.value) || 1000 })}
+                />
               </div>
               <div>
                 <Label>Region</Label>
