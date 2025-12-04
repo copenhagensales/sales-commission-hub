@@ -517,11 +517,33 @@ export default function EmployeeDetail() {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => {
-                toast({ 
-                  title: "Nulstil adgangskode", 
-                  description: "Funktionen er endnu ikke implementeret. Kræver integration med auth-system." 
-                });
+              onClick={async () => {
+                if (!employee.private_email) {
+                  toast({ 
+                    title: "Mangler email", 
+                    description: "Medarbejderen har ikke en email registreret.",
+                    variant: "destructive"
+                  });
+                  return;
+                }
+                
+                const { error } = await supabase.auth.resetPasswordForEmail(
+                  employee.private_email,
+                  { redirectTo: `${window.location.origin}/auth` }
+                );
+                
+                if (error) {
+                  toast({ 
+                    title: "Fejl ved nulstilling", 
+                    description: error.message,
+                    variant: "destructive"
+                  });
+                } else {
+                  toast({ 
+                    title: "Email sendt", 
+                    description: `En email til nulstilling af adgangskode er sendt til ${employee.private_email}` 
+                  });
+                }
               }}
             >
               <KeyRound className="h-4 w-4 mr-2" />
