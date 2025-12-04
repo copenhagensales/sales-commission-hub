@@ -461,25 +461,36 @@ export default function Payroll() {
                 <div>
                   <p className="text-sm font-medium mb-2">Fordeling pr. agent</p>
                   <div className="overflow-hidden rounded-lg border bg-muted/40">
-                    <div className="grid grid-cols-4 gap-2 border-b bg-muted px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    <div className="grid grid-cols-5 gap-2 border-b bg-muted px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       <span>Agent</span>
                       <span className="text-right">Salg (stk.)</span>
+                      <span className="text-right">Annullerede salg</span>
                       <span className="text-right">Omsætning</span>
                       <span className="text-right">Provision</span>
                     </div>
                     <div className="divide-y divide-border">
-                      {summary.perAgent.map((row) => (
-                        <div key={row.agentName} className="grid grid-cols-4 gap-2 px-4 py-2 text-sm">
-                          <span>{row.agentName}</span>
-                          <span className="text-right">{row.units}</span>
-                          <span className="text-right">
-                            {row.revenue.toLocaleString("da-DK")} DKK
-                          </span>
-                          <span className="text-right">
-                            {row.commission.toLocaleString("da-DK")} DKK
-                          </span>
-                        </div>
-                      ))}
+                      {summary.perAgent.map((row) => {
+                        const cancelledCount =
+                          cancellations?.matches.filter((m) => {
+                            const agentName =
+                              m.agentName && m.agentName.trim().length > 0 ? m.agentName : "Ukendt";
+                            return agentName === row.agentName;
+                          }).length ?? 0;
+
+                        return (
+                          <div key={row.agentName} className="grid grid-cols-5 gap-2 px-4 py-2 text-sm">
+                            <span>{row.agentName}</span>
+                            <span className="text-right">{row.units}</span>
+                            <span className="text-right">{cancelledCount}</span>
+                            <span className="text-right">
+                              {row.revenue.toLocaleString("da-DK")} DKK
+                            </span>
+                            <span className="text-right">
+                              {row.commission.toLocaleString("da-DK")} DKK
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
