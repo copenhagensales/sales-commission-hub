@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X, History } from "lucide-react";
+import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X, History, Phone, Mail, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -115,6 +115,89 @@ function EditableField({ label, value, field, type = "text", onSave, displayValu
     >
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">{displayValue ?? value ?? "-"}</span>
+    </div>
+  );
+}
+
+interface ClickableContactFieldProps {
+  label: string;
+  value: string | null;
+  field: keyof EmployeeMasterDataRecord;
+  type: "phone" | "email";
+  onSave: (field: string, value: string | null) => void;
+}
+
+function ClickableContactField({ label, value, field, type, onSave }: ClickableContactFieldProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(value || "");
+
+  const handleSave = () => {
+    onSave(field, editValue || null);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditValue(value || "");
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleSave();
+    if (e.key === "Escape") handleCancel();
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex justify-between items-center py-2 border-b border-border last:border-0 gap-2">
+        <span className="text-muted-foreground shrink-0">{label}</span>
+        <div className="flex items-center gap-1">
+          <Input
+            type={type === "email" ? "email" : "tel"}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="h-7 w-40 text-right"
+            autoFocus
+          />
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave}>
+            <Check className="h-3 w-3 text-green-600" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCancel}>
+            <X className="h-3 w-3 text-destructive" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const href = type === "phone" ? `tel:${value}` : `mailto:${value}`;
+  const Icon = type === "phone" ? Phone : Mail;
+
+  return (
+    <div className="flex justify-between items-center py-2 border-b border-border last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-2">
+        {value ? (
+          <a 
+            href={href} 
+            className="font-medium text-primary hover:underline flex items-center gap-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {value}
+          </a>
+        ) : (
+          <span className="font-medium">-</span>
+        )}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-6 w-6 opacity-50 hover:opacity-100" 
+          onClick={() => setIsEditing(true)}
+        >
+          <Pencil className="h-3 w-3" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -451,8 +534,8 @@ export default function EmployeeDetail() {
                   <EditableField label="Postnummer" value={employee.address_postal_code} field="address_postal_code" onSave={handleSave} />
                   <EditableField label="By" value={employee.address_city} field="address_city" onSave={handleSave} />
                   <EditableField label="Land" value={employee.address_country} field="address_country" onSave={handleSave} />
-                  <EditableField label="Telefon" value={employee.private_phone} field="private_phone" onSave={handleSave} />
-                  <EditableField label="E-mail" value={employee.private_email} field="private_email" type="email" onSave={handleSave} />
+                  <ClickableContactField label="Telefon" value={employee.private_phone} field="private_phone" type="phone" onSave={handleSave} />
+                  <ClickableContactField label="E-mail" value={employee.private_email} field="private_email" type="email" onSave={handleSave} />
                 </CardContent>
               </Card>
 
