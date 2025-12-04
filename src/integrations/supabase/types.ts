@@ -1376,6 +1376,30 @@ export type Database = {
         }
         Relationships: []
       }
+      tdc_cancellation_imports: {
+        Row: {
+          id: string
+          raw_data: Json
+          row_index: number
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          id?: string
+          raw_data: Json
+          row_index: number
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          id?: string
+          raw_data?: Json
+          row_index?: number
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       time_entry: {
         Row: {
           actual_hours: number | null

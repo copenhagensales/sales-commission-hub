@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, RefreshCw, Send, Database, Download } from "lucide-react";
+import { Settings as SettingsIcon, RefreshCw, Send, Database, Download, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -17,6 +17,9 @@ export default function Settings() {
   const [tdcMonthlyData, setTdcMonthlyData] = useState<{ month: string; count: number }[] | null>(null);
   const [tdcMonthlyLoading, setTdcMonthlyLoading] = useState(false);
   const [tdcMonthlyError, setTdcMonthlyError] = useState<string | null>(null);
+  const [tdcFile, setTdcFile] = useState<File | null>(null);
+  const [tdcUploadLoading, setTdcUploadLoading] = useState(false);
+  const [tdcLastImport, setTdcLastImport] = useState<{ uploaded_at: string; uploaded_by: string | null } | null>(null);
   const testFetchCampaigns = async () => {
     setLoading("campaigns");
     try {
@@ -190,6 +193,79 @@ export default function Settings() {
     }
   };
 
+  const loadLastTdcImport = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("tdc_cancellation_imports")
+        .select("uploaded_at, uploaded_by")
+        .order("uploaded_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        setTdcLastImport(data as { uploaded_at: string; uploaded_by: string | null });
+      }
+    } catch (error) {
+      console.error("Fejl ved hentning af seneste TDC ann-import", error);
+    }
+  };
+
+  useEffect(() => {
+    loadLastTdcImport();
+  }, []);
+
+  const handleTdcUpload = async () => {
+    if (!tdcFile) {
+      toast.error("Vælg først en Excel-fil");
+      return;
+    }
+
+    setTdcUploadLoading(true);
+
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Kunne ikke læse filen"));
+        reader.onload = () => {
+          const result = reader.result as string;
+          const base64 = result.split(",")[1] ?? "";
+          resolve(base64);
+        };
+        reader.readAsDataURL(tdcFile);
+      });
+
+      const { data, error } = await supabase
+        .from("tdc_cancellation_imports")
+        .insert({
+          row_index: 0,
+          raw_data: {
+            filename: tdcFile.name,
+            size: tdcFile.size,
+            type: tdcFile.type,
+            content_base64: fileBase64,
+          },
+          uploaded_at: new Date().toISOString(),
+          uploaded_by: userData?.user?.id ?? null,
+        })
+        .select("uploaded_at, uploaded_by")
+        .single();
+
+      if (error) throw error;
+
+      setTdcLastImport(data as { uploaded_at: string; uploaded_by: string | null });
+      setTdcFile(null);
+      toast.success("TDC annulleringer importeret");
+    } catch (error: any) {
+      console.error("Fejl ved upload af TDC annulleringer", error);
+      toast.error(error?.message ?? "Kunne ikke uploade filen");
+    } finally {
+      setTdcUploadLoading(false);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -326,6 +402,45 @@ export default function Settings() {
               <Button onClick={testWebhook} disabled={loading === "webhook"} variant="outline">
                 {loading === "webhook" && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
                 Send Test Webhook
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="md:col-span-2 border-dashed border-secondary/60 bg-secondary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Excel-datakilde: TDC annulleringer ("tdc ann")
+                </span>
+                {tdcLastImport && (
+                  <span className="text-xs text-muted-foreground">
+                    Seneste import:{" "}
+                    {new Date(tdcLastImport.uploaded_at).toLocaleString("da-DK", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })}
+                  </span>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Upload den nyeste Excel-fil <code>tdc ann</code>. Den erstatter den tidligere import og bruges til
+                TDC-annulleringer.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="tdcExcel">Excel-fil (.xlsx)</Label>
+                <Input
+                  id="tdcExcel"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => setTdcFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+              <Button onClick={handleTdcUpload} disabled={!tdcFile || tdcUploadLoading} className="w-full">
+                {tdcUploadLoading && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+                Upload & gem som nyeste TDC-ann fil
               </Button>
             </CardContent>
           </Card>
