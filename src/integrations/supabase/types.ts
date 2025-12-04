@@ -626,6 +626,47 @@ export type Database = {
           },
         ]
       }
+      employee_invitations: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          email: string
+          employee_id: string | null
+          expires_at: string
+          id: string
+          status: string
+          token: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          email: string
+          employee_id?: string | null
+          expires_at?: string
+          id?: string
+          status?: string
+          token: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          email?: string
+          employee_id?: string | null
+          expires_at?: string
+          id?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_invitations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_master_data: {
         Row: {
           address_city: string | null
