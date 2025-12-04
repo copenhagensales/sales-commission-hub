@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,10 +35,18 @@ const vagtFlowNavigation = [
   { name: "Fakturering", href: "/vagt-flow/billing", icon: Receipt },
 ];
 
+const shiftPlanningNavigation = [
+  { name: "Vagtplan (leder)", href: "/shift-planning", icon: Calendar },
+  { name: "Min kalender", href: "/shift-planning/my-schedule", icon: UserCheck },
+  { name: "Fravær", href: "/shift-planning/absence", icon: Clock },
+  { name: "Tidsregistrering", href: "/shift-planning/time-tracking", icon: Timer },
+];
+
 export function AppSidebar() {
   const location = useLocation();
   const { toast } = useToast();
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
+  const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -85,6 +93,38 @@ export function AppSidebar() {
             </CollapsibleTrigger>
             <CollapsibleContent className="pl-4 space-y-1 mt-1">
               {vagtFlowNavigation.map((item) => {
+                const isActive = location.pathname === item.href;
+                return (
+                  <NavLink
+                    key={item.name}
+                    to={item.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                      isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.name}
+                  </NavLink>
+                );
+              })}
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Intern Vagtplan menu */}
+          <Collapsible open={shiftPlanningOpen} onOpenChange={setShiftPlanningOpen}>
+            <CollapsibleTrigger className={cn(
+              "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              location.pathname.startsWith("/shift-planning") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}>
+              <div className="flex items-center gap-3">
+                <ClipboardList className="h-5 w-5" />
+                Intern vagtplan
+              </div>
+              {shiftPlanningOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pl-4 space-y-1 mt-1">
+              {shiftPlanningNavigation.map((item) => {
                 const isActive = location.pathname === item.href;
                 return (
                   <NavLink
