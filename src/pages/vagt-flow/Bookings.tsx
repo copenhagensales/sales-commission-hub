@@ -522,8 +522,8 @@ export default function VagtBookings() {
                                               : "bg-muted/30 hover:bg-muted/50"
                                         }`}
                                       >
-                                        <p className="text-xs text-muted-foreground">{day}</p>
-                                        <p className="text-sm font-medium truncate">
+                                        <p className={`text-xs ${assignment || isBooked ? "text-gray-600" : "text-muted-foreground"}`}>{day}</p>
+                                        <p className={`text-sm font-medium truncate ${assignment ? "text-green-800" : isBooked ? "text-red-700" : "text-foreground"}`}>
                                           {assignment?.employee?.full_name?.split(" ")[0] || "-"}
                                         </p>
                                       </div>
