@@ -59,16 +59,24 @@ interface CancellationMatch {
   cancellationStatus?: string;
 }
 
+interface UnmatchedCancellation {
+  externalId: string;
+  cancellationDate?: string;
+  cancellationStatus?: string;
+}
+
 interface CancellationSummary {
   totalCancelled: number;
   totalCancelledCommission: number;
   matches: CancellationMatch[];
+  unmatched: UnmatchedCancellation[];
 }
 
 const emptyCancellations: CancellationSummary = {
   totalCancelled: 0,
   totalCancelledCommission: 0,
   matches: [],
+  unmatched: [],
 };
 
 function getDefaultPayrollPeriod() {
@@ -327,33 +335,45 @@ export default function Payroll() {
         });
       });
 
-      if (!matches.length) {
-        return emptyCancellations;
-      }
-
-      const cancelledSaleIds = matches.map((m) => m.saleId);
-
-      const { data: cancelledSales, error: cancelledSalesError } = await supabase
-        .from("sales")
-        .select("id, sale_items(mapped_commission, quantity)")
-        .in("id", cancelledSaleIds);
-
-      if (cancelledSalesError) throw cancelledSalesError;
-
       let totalCancelledCommission = 0;
 
-      (cancelledSales || []).forEach((sale: any) => {
-        (sale.sale_items || []).forEach((item: any) => {
-          const qty = Number(item.quantity ?? 1) || 1;
-          const commission = Number(item.mapped_commission) || 0;
-          totalCancelledCommission += qty * commission;
+      if (matches.length) {
+        const cancelledSaleIds = matches.map((m) => m.saleId);
+
+        const { data: cancelledSales, error: cancelledSalesError } = await supabase
+          .from("sales")
+          .select("id, sale_items(mapped_commission, quantity)")
+          .in("id", cancelledSaleIds);
+
+        if (cancelledSalesError) throw cancelledSalesError;
+
+        (cancelledSales || []).forEach((sale: any) => {
+          (sale.sale_items || []).forEach((item: any) => {
+            const qty = Number(item.quantity ?? 1) || 1;
+            const commission = Number(item.mapped_commission) || 0;
+            totalCancelledCommission += qty * commission;
+          });
         });
+      }
+
+      const matchedOrderIds = new Set(matches.map((m) => m.externalId));
+      const unmatched: UnmatchedCancellation[] = [];
+
+      cancellationByOrder.forEach((value, orderId) => {
+        if (!matchedOrderIds.has(orderId)) {
+          unmatched.push({
+            externalId: orderId,
+            cancellationDate: value.date,
+            cancellationStatus: value.status,
+          });
+        }
       });
 
       return {
         totalCancelled: matches.length,
         totalCancelledCommission,
         matches,
+        unmatched,
       } satisfies CancellationSummary;
     },
   });
@@ -590,7 +610,56 @@ export default function Payroll() {
             )}
           </CardContent>
         </Card>
-      </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-muted-foreground" />
+              Annulleringer uden match (kun i Excel)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!selectedClientId || !fromDate || !toDate ? (
+              <div className="text-center py-6 text-muted-foreground">
+                Vælg kunde og lønperiode for at se annulleringer uden match.
+              </div>
+            ) : loadingCancellations ? (
+              <div className="text-center py-6 text-muted-foreground">Henter annulleringer...</div>
+            ) : !cancellations || cancellations.unmatched.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                Alle annulleringer i perioden er matchet til salg.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {cancellations.unmatched.length} annulleringer findes i TDC-ann Excel-filen, men kunne ikke
+                  matches til salg (ordre-id) i systemet.
+                </p>
+                <div className="rounded-lg border bg-muted/40 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Ordre-id (Excel)</TableHead>
+                        <TableHead>Annulleringsdato</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {cancellations.unmatched.map((u) => (
+                        <TableRow key={u.externalId + (u.cancellationDate || "")}> 
+                          <TableCell className="font-mono text-xs">{u.externalId}</TableCell>
+                          <TableCell>{u.cancellationDate || "-"}</TableCell>
+                          <TableCell>{u.cancellationStatus || "-"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+       </div>
     </MainLayout>
   );
 }
