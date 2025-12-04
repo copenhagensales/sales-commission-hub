@@ -82,14 +82,24 @@ const tdcSalesChartConfig: ChartConfig = {
 const formatCurrency = (value: number) => `${value.toLocaleString("da-DK")} DKK`;
 
 export default function TdcErhverv() {
+  const [customFrom, setCustomFrom] = useState<string>("");
+  const [customTo, setCustomTo] = useState<string>("");
   const [rangeDays, setRangeDays] = useState<30 | 90 | 180>(180);
+  const [agentFilter, setAgentFilter] = useState<string>("ALL");
+
   const { data, isLoading } = useQuery<TdcDashboardData>({
-    queryKey: ["tdc-erhverv-dashboard"],
+    queryKey: [
+      "tdc-erhverv-dashboard",
+      { from: customFrom || null },
+    ],
     queryFn: async () => {
       const today = new Date();
       const monthStart = startOfMonth(today).toISOString();
       const todayStart = startOfDay(today).toISOString();
-      const historyStart = subDays(today, 180).toISOString();
+      const historyStartDate = customFrom
+        ? new Date(customFrom + "T00:00:00")
+        : subDays(today, 180);
+      const historyStart = historyStartDate.toISOString();
 
       // Find TDC Erhverv-klienten
       const { data: clients, error: clientsError } = await supabase
@@ -198,10 +208,6 @@ export default function TdcErhverv() {
   const stats = data?.stats ?? initialStats;
   const recentSales = data?.recentSales ?? [];
   const allSales = data?.allSales ?? [];
-
-  const [agentFilter, setAgentFilter] = useState<string>("ALL");
-  const [customFrom, setCustomFrom] = useState<string>("");
-  const [customTo, setCustomTo] = useState<string>("");
 
   const agentOptions = useMemo(() => {
     const names = Array.from(
