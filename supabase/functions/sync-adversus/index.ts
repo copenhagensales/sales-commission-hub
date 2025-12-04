@@ -611,6 +611,8 @@ Deno.serve(async (req) => {
             )
           }
 
+          const oppNumber = extractOppNumberFromObject(sale)
+
           const { data: saleData, error: saleError } = await supabase
             .from('sales')
             .insert({
@@ -622,6 +624,7 @@ Deno.serve(async (req) => {
               customer_phone: '',
               sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString(),
               adversus_external_id: externalId,
+              adversus_opp_number: oppNumber,
             })
             .select()
             .single()
@@ -817,6 +820,8 @@ Deno.serve(async (req) => {
               }, { onConflict: 'adversus_campaign_id' })
           }
 
+          const oppNumber = extractOppNumberFromObject(sale)
+
           const { data: saleData, error: saleError } = await supabase
             .from('sales')
             .insert({
@@ -828,6 +833,7 @@ Deno.serve(async (req) => {
               customer_phone: '',
               sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString(),
               adversus_external_id: externalId,
+              adversus_opp_number: oppNumber,
             })
             .select()
             .single()
@@ -1383,6 +1389,48 @@ Deno.serve(async (req) => {
         salesCache.set(leadId, null)
         return null
       }
+    }
+
+    // Helper function to extract OPP number (e.g. "OPP-1067162") from any Adversus sale/lead object
+    function extractOppNumberFromObject(obj: unknown): string | null {
+      if (!obj || typeof obj !== 'object') return null
+
+      const visited = new Set<unknown>()
+
+      const search = (current: any): string | null => {
+        if (!current || typeof current !== 'object') return null
+        if (visited.has(current)) return null
+        visited.add(current)
+
+        for (const [key, value] of Object.entries(current)) {
+          if (typeof value === 'string') {
+            const trimmed = value.trim()
+            if (!trimmed) continue
+
+            // Direct match like "OPP-1067162" or "opp 1067162"
+            const oppMatch = trimmed.match(/opp[-\s:]?(\d{4,})/i)
+            if (oppMatch) {
+              const normalized = `OPP-${oppMatch[1]}`
+              console.log(`✓ Found OPP number "${normalized}" on key "${key}"`)
+              return normalized
+            }
+
+            // Values that are only digits but the key mentions OPP
+            if (/^\d{4,}$/.test(trimmed) && key.toLowerCase().includes('opp')) {
+              const normalized = `OPP-${trimmed}`
+              console.log(`✓ Found OPP number "${normalized}" on key "${key}" (digits only)`)
+              return normalized
+            }
+          } else if (value && typeof value === 'object') {
+            const nested = search(value as any)
+            if (nested) return nested
+          }
+        }
+
+        return null
+      }
+
+      return search(obj as any)
     }
 
     // Helper function to fetch lead data
