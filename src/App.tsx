@@ -27,6 +27,7 @@ import VagtEmployees from "./pages/vagt-flow/Employees";
 import VagtVehicles from "./pages/vagt-flow/Vehicles";
 import VagtTimeOffRequests from "./pages/vagt-flow/TimeOffRequests";
 import VagtLocationDetail from "./pages/vagt-flow/LocationDetail";
+import VagtBilling from "./pages/vagt-flow/Billing";
 
 const queryClient = new QueryClient();
 
@@ -96,6 +97,7 @@ const App = () => (
           <Route path="/vagt-flow/employees" element={<ProtectedRoute><VagtEmployees /></ProtectedRoute>} />
           <Route path="/vagt-flow/vehicles" element={<ProtectedRoute><VagtVehicles /></ProtectedRoute>} />
           <Route path="/vagt-flow/time-off" element={<ProtectedRoute><VagtTimeOffRequests /></ProtectedRoute>} />
+          <Route path="/vagt-flow/billing" element={<ProtectedRoute><VagtBilling /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
