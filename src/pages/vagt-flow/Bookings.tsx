@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { ChevronUp, ChevronDown, Trash2, Plus, Calendar, Car, AlertTriangle, Users, FileText } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar, Car, AlertTriangle, Users, FileText, X } from "lucide-react";
 import { format, startOfWeek, addDays, getWeek, getYear } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +32,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export default function VagtBookings() {
   const { toast } = useToast();
@@ -45,6 +50,7 @@ export default function VagtBookings() {
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set([`${selectedYear}-${selectedWeek}`]));
   const [absenceExpanded, setAbsenceExpanded] = useState(true);
+  const [openAssignPopover, setOpenAssignPopover] = useState<string | null>(null);
 
   const weekStart = startOfWeek(new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7), { weekStartsOn: 1 });
   const DAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
@@ -114,6 +120,19 @@ export default function VagtBookings() {
     },
   });
 
+  const { data: employees } = useQuery({
+    queryKey: ["vagt-employees-active"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee")
+        .select("id, full_name, team")
+        .eq("is_active", true)
+        .order("full_name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("booking").delete().eq("id", id);
@@ -123,6 +142,38 @@ export default function VagtBookings() {
       queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
       toast({ title: "Booking slettet" });
       setDeleteBookingId(null);
+    },
+  });
+
+  const assignEmployeeMutation = useMutation({
+    mutationFn: async ({ bookingId, employeeId, date }: { bookingId: string; employeeId: string; date: string }) => {
+      const { error } = await supabase.from("booking_assignment").insert({
+        booking_id: bookingId,
+        employee_id: employeeId,
+        date: date,
+        start_time: "09:00",
+        end_time: "17:00",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Medarbejder tildelt" });
+      setOpenAssignPopover(null);
+    },
+    onError: () => {
+      toast({ title: "Kunne ikke tildele medarbejder", variant: "destructive" });
+    },
+  });
+
+  const removeAssignmentMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      const { error } = await supabase.from("booking_assignment").delete().eq("id", assignmentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Tildeling fjernet" });
     },
   });
 
@@ -420,24 +471,87 @@ export default function VagtBookings() {
                             <div className="grid grid-cols-7 gap-2">
                               {DAYS.map((day, idx) => {
                                 const assignment = getAssignmentForDay(booking, idx);
+                                const targetDate = format(addDays(weekStart, idx), "yyyy-MM-dd");
                                 const isBooked = new Date(booking.start_date) <= addDays(weekStart, idx) && 
                                                  new Date(booking.end_date) >= addDays(weekStart, idx);
+                                const popoverKey = `${booking.id}-${idx}`;
+                                
                                 return (
-                                  <div
+                                  <Popover
                                     key={idx}
-                                    className={`p-2 rounded-lg text-center ${
-                                      assignment 
-                                        ? "bg-green-100 border-green-200 border" 
-                                        : isBooked 
-                                          ? "bg-red-50 border border-red-200"
-                                          : "bg-muted/30"
-                                    }`}
+                                    open={openAssignPopover === popoverKey}
+                                    onOpenChange={(open) => setOpenAssignPopover(open ? popoverKey : null)}
                                   >
-                                    <p className="text-xs text-muted-foreground">{day}</p>
-                                    <p className="text-sm font-medium truncate">
-                                      {assignment?.employee?.full_name?.split(" ")[0] || "-"}
-                                    </p>
-                                  </div>
+                                    <PopoverTrigger asChild>
+                                      <div
+                                        className={`p-2 rounded-lg text-center cursor-pointer transition-colors hover:ring-2 hover:ring-primary/50 ${
+                                          assignment 
+                                            ? "bg-green-100 border-green-200 border" 
+                                            : isBooked 
+                                              ? "bg-red-50 border border-red-200 hover:bg-red-100"
+                                              : "bg-muted/30 hover:bg-muted/50"
+                                        }`}
+                                      >
+                                        <p className="text-xs text-muted-foreground">{day}</p>
+                                        <p className="text-sm font-medium truncate">
+                                          {assignment?.employee?.full_name?.split(" ")[0] || "-"}
+                                        </p>
+                                      </div>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-64 p-2" align="start">
+                                      <div className="space-y-2">
+                                        <p className="text-sm font-medium px-2 py-1">
+                                          {assignment ? "Skift medarbejder" : "Tildel medarbejder"}
+                                        </p>
+                                        {assignment && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="w-full justify-start text-destructive hover:text-destructive"
+                                            onClick={() => removeAssignmentMutation.mutate(assignment.id)}
+                                          >
+                                            <X className="h-4 w-4 mr-2" />
+                                            Fjern tildeling
+                                          </Button>
+                                        )}
+                                        <div className="max-h-48 overflow-y-auto">
+                                          {employees?.map((emp) => (
+                                            <Button
+                                              key={emp.id}
+                                              variant="ghost"
+                                              size="sm"
+                                              className="w-full justify-start"
+                                              onClick={() => {
+                                                if (assignment) {
+                                                  removeAssignmentMutation.mutate(assignment.id, {
+                                                    onSuccess: () => {
+                                                      assignEmployeeMutation.mutate({
+                                                        bookingId: booking.id,
+                                                        employeeId: emp.id,
+                                                        date: targetDate,
+                                                      });
+                                                    },
+                                                  });
+                                                } else {
+                                                  assignEmployeeMutation.mutate({
+                                                    bookingId: booking.id,
+                                                    employeeId: emp.id,
+                                                    date: targetDate,
+                                                  });
+                                                }
+                                              }}
+                                            >
+                                              <Users className="h-4 w-4 mr-2" />
+                                              {emp.full_name}
+                                              {emp.team && (
+                                                <span className="ml-auto text-xs text-muted-foreground">{emp.team}</span>
+                                              )}
+                                            </Button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
                                 );
                               })}
                             </div>
