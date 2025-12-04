@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfDay, startOfMonth, subDays, isWeekend } from "date-fns";
 import { LineChart, CartesianGrid, XAxis, YAxis, Line, ReferenceDot } from "recharts";
@@ -7,6 +8,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 
 interface TdcSaleItem {
@@ -77,6 +79,7 @@ const tdcSalesChartConfig: ChartConfig = {
 const formatCurrency = (value: number) => `${value.toLocaleString("da-DK")} DKK`;
 
 export default function TdcErhverv() {
+  const [rangeDays, setRangeDays] = useState<30 | 90 | 180>(180);
   const { data, isLoading } = useQuery<TdcDashboardData>({
     queryKey: ["tdc-erhverv-dashboard"],
     queryFn: async () => {
@@ -266,7 +269,19 @@ export default function TdcErhverv() {
   const stats = data?.stats ?? initialStats;
   const recentSales = data?.recentSales ?? [];
   const historicalSales = data?.historicalSales ?? [];
-  const bestDayPoint = historicalSales.find((p) => p.isBest);
+
+  const filteredHistoricalSales = useMemo(() => {
+    if (!historicalSales.length) return [];
+    const cutoff = subDays(new Date(), rangeDays);
+    return historicalSales.filter((point) => new Date(point.date) >= cutoff);
+  }, [historicalSales, rangeDays]);
+
+  const bestDayPoint = useMemo(() => {
+    if (!filteredHistoricalSales.length) return undefined;
+    return filteredHistoricalSales.reduce((best, point) =>
+      point.sales > best.sales ? point : best,
+    filteredHistoricalSales[0]);
+  }, [filteredHistoricalSales]);
 
   return (
     <MainLayout>
@@ -330,14 +345,33 @@ export default function TdcErhverv() {
           </Card>
         </div>
 
-        {historicalSales.length > 0 && (
+        {filteredHistoricalSales.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Historisk salgsudvikling (hverdage)</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Vælg periode: {rangeDays} dage
+                </p>
+                <div className="inline-flex gap-1 rounded-md border border-border bg-background p-0.5">
+                  {[30, 90, 180].map((days) => (
+                    <Button
+                      key={days}
+                      size="sm"
+                      variant={rangeDays === days ? "default" : "outline"}
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setRangeDays(days as 30 | 90 | 180)}
+                    >
+                      {days} dage
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
               <ChartContainer config={tdcSalesChartConfig} className="h-80 w-full">
-                <LineChart data={historicalSales} margin={{ left: 12, right: 12, top: 10, bottom: 0 }}>
+                <LineChart data={filteredHistoricalSales} margin={{ left: 12, right: 12, top: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis
                     dataKey="label"
@@ -382,7 +416,7 @@ export default function TdcErhverv() {
                 </LineChart>
               </ChartContainer>
               <p className="mt-2 text-xs text-muted-foreground">
-                Viser antal solgte enheder pr. hverdag for de sidste 180 dage. Bedste salgsdag er fremhævet.
+                Viser antal solgte enheder pr. hverdag for de sidste 180 dage. Bedste salgsdag i den valgte periode er fremhævet.
               </p>
             </CardContent>
           </Card>
