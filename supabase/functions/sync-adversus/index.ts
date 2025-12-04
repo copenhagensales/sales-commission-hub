@@ -544,6 +544,33 @@ Deno.serve(async (req) => {
         const externalId = String(sale.id)
 
         if (existingIds.has(externalId)) {
+          // Existing sale: ensure OPP nr is filled via lead/resultData
+          try {
+            const oppNumber = await fetchOppNumberForSale(sale, externalId)
+            if (oppNumber) {
+              const { error: oppUpdateError } = await supabase
+                .from('sales')
+                .update({ adversus_opp_number: oppNumber })
+                .eq('adversus_external_id', externalId)
+
+              if (oppUpdateError) {
+                console.warn(
+                  `Could not update OPP nr for existing TDC October sale ${externalId}:`,
+                  oppUpdateError.message,
+                )
+              } else {
+                console.log(
+                  `Updated OPP nr for existing TDC October sale ${externalId} to "${oppNumber}"`,
+                )
+              }
+            }
+          } catch (err) {
+            console.warn(
+              `Error while ensuring OPP nr for existing TDC October sale ${externalId}:`,
+              err,
+            )
+          }
+
           skipped++
           continue
         }
@@ -769,6 +796,33 @@ Deno.serve(async (req) => {
         const externalId = String(sale.id)
         
         if (existingIds.has(externalId)) {
+          // Existing sale: ensure OPP nr is filled via lead/resultData
+          try {
+            const oppNumber = await fetchOppNumberForSale(sale, externalId)
+            if (oppNumber) {
+              const { error: oppUpdateError } = await supabase
+                .from('sales')
+                .update({ adversus_opp_number: oppNumber })
+                .eq('adversus_external_id', externalId)
+
+              if (oppUpdateError) {
+                console.warn(
+                  `Could not update OPP nr for existing sale ${externalId}:`,
+                  oppUpdateError.message,
+                )
+              } else {
+                console.log(
+                  `Updated OPP nr for existing sale ${externalId} to "${oppNumber}"`,
+                )
+              }
+            }
+          } catch (err) {
+            console.warn(
+              `Error while ensuring OPP nr for existing sale ${externalId}:`,
+              err,
+            )
+          }
+
           skipped++
           continue
         }
