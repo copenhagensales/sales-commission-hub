@@ -24,7 +24,7 @@ const vagtFlowNavigation = [
   { name: "Oversigt", href: "/vagt-flow", icon: LayoutDashboard },
   { name: "Min uge", href: "/vagt-flow/min-uge", icon: UserCheck },
   { name: "Book uge", href: "/vagt-flow/book-week", icon: Calendar },
-  { name: "Bookinger", href: "/vagt-flow/bookings", icon: Calendar },
+  { name: "Vagtplan", href: "/vagt-flow/bookings", icon: Calendar },
   { name: "Lokationer", href: "/vagt-flow/locations", icon: MapPin },
   { name: "Medarbejdere", href: "/vagt-flow/employees", icon: Users },
   { name: "Fravær", href: "/vagt-flow/time-off", icon: Clock },
