@@ -848,7 +848,7 @@ export default function Payroll() {
                           );
                           const rawOpp =
                             sale.adversus_opp_number ?? matchFromCancellations?.oppNumber ?? "";
-                          const oppNumber = rawOpp ? `OPP ${rawOpp}` : "-";
+                          const oppNumber = rawOpp || "-";
 
                           return (
                             <TableRow
@@ -925,7 +925,7 @@ export default function Payroll() {
                                   (m) => m.saleId === selectedSale.id,
                                 );
                                 const rawOpp = selectedSale.adversus_opp_number ?? match?.oppNumber ?? "";
-                                return rawOpp ? `OPP ${rawOpp}` : "-";
+                                return rawOpp || "-";
                               })()}
                             </p>
                           </div>
