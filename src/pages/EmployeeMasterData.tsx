@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -554,7 +554,29 @@ export default function EmployeeMasterData() {
                           onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: employee.id, is_active: checked })}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="flex items-center gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            toast({ title: "Ring op", description: "Softphone integration kommer snart" });
+                          }}
+                          disabled={!employee.private_phone}
+                        >
+                          <Phone className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            toast({ title: "Send SMS", description: "SMS integration kommer snart" });
+                          }}
+                          disabled={!employee.private_phone}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
                           <Pencil className="h-4 w-4" />
                         </Button>
