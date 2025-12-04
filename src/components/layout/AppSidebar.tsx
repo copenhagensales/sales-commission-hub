@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +29,7 @@ const vagtFlowNavigation = [
   { name: "Medarbejdere", href: "/vagt-flow/employees", icon: Users },
   { name: "Fravær", href: "/vagt-flow/time-off", icon: Clock },
   { name: "Køretøjer", href: "/vagt-flow/vehicles", icon: Car },
+  { name: "Fakturering", href: "/vagt-flow/billing", icon: Receipt },
 ];
 
 export function AppSidebar() {
