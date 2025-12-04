@@ -209,9 +209,7 @@ export default function Payroll() {
       const { data: sales, error: salesError } = await supabase
         .from("sales")
         .select("id, sale_datetime, agent_name, adversus_external_id")
-        .in("client_campaign_id", campaignIds)
-        .gte("sale_datetime", fromDate.toISOString())
-        .lte("sale_datetime", toDate.toISOString());
+        .in("client_campaign_id", campaignIds);
 
       if (salesError) throw salesError;
 
@@ -255,10 +253,12 @@ export default function Payroll() {
           );
         }) || headers[0];
 
-      const dateHeader = headers.find((h) => {
-        const n = normalize(h);
-        return n.includes("dato") || n.includes("date");
-      });
+      const dateHeader =
+        headers.find((h) => normalize(h).includes("starttidspunkt")) ||
+        headers.find((h) => {
+          const n = normalize(h);
+          return n.includes("dato") || n.includes("date");
+        });
 
       const statusHeader = headers.find((h) => {
         const n = normalize(h);
@@ -267,18 +267,37 @@ export default function Payroll() {
 
       const cancellationByOrder = new Map<string, { row: Record<string, any>; date?: string; status?: string }>();
 
+      const from = fromDate;
+      const to = toDate;
+
       rows.forEach((row) => {
         const rawOrder = row[orderHeader];
         if (!rawOrder) return;
         const orderId = String(rawOrder).trim();
         if (!orderId) return;
 
-        const dateValue = dateHeader ? String(row[dateHeader] ?? "").trim() : undefined;
+        let cancellationDate: Date | undefined;
+        if (dateHeader) {
+          const rawDate = row[dateHeader];
+          if (rawDate instanceof Date) {
+            cancellationDate = rawDate;
+          } else if (typeof rawDate === "string" && rawDate.trim()) {
+            const parsed = new Date(rawDate);
+            if (!isNaN(parsed.getTime())) {
+              cancellationDate = parsed;
+            }
+          }
+        }
+
+        if (!cancellationDate) return;
+        if (from && cancellationDate < from) return;
+        if (to && cancellationDate > to) return;
+
         const statusValue = statusHeader ? String(row[statusHeader] ?? "").trim() : undefined;
 
         cancellationByOrder.set(orderId, {
           row,
-          date: dateValue,
+          date: format(cancellationDate, "dd.MM.yyyy"),
           status: statusValue,
         });
       });
