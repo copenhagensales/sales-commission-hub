@@ -892,6 +892,98 @@ export default function MgTest() {
     },
   });
 
+  const mergeEmployeeSuggestion = useMutation({
+    mutationFn: async ({ agent, vagtEmployee }: { agent: AgentRow; vagtEmployee: VagtEmployee }) => {
+      const email = (agent.email || vagtEmployee.email || "").trim() || null;
+      const displayName = agent.name || vagtEmployee.full_name;
+      const phone = vagtEmployee.phone ?? null;
+      const isActive = agent.is_active ?? vagtEmployee.is_active ?? true;
+
+      let masterId: string | null = null;
+
+      if (email) {
+        const { data: existing, error: existingError } = await supabase
+          .from("master_employee")
+          .select("id")
+          .eq("primary_email", email)
+          .limit(1);
+
+        if (existingError) throw existingError;
+
+        if (existing && existing.length > 0) {
+          masterId = (existing[0] as any).id as string;
+        }
+      }
+
+      if (!masterId) {
+        const { data: newMaster, error: insertError } = await supabase
+          .from("master_employee")
+          .insert({
+            full_name: displayName,
+            primary_email: email,
+            phone,
+            is_active: isActive,
+          })
+          .select("id")
+          .single();
+
+        if (insertError) throw insertError;
+        masterId = (newMaster as any).id as string;
+      }
+
+      const { error: identityError } = await supabase.from("employee_identity").upsert(
+        [
+          {
+            master_employee_id: masterId,
+            source: "agent",
+            source_employee_id: agent.id,
+            source_email: agent.email,
+            source_name: agent.name,
+          },
+          {
+            master_employee_id: masterId,
+            source: "vagt_employee",
+            source_employee_id: vagtEmployee.id,
+            source_email: vagtEmployee.email,
+            source_name: vagtEmployee.full_name,
+          },
+        ],
+        { onConflict: "source,source_employee_id" }
+      );
+
+      if (identityError) throw identityError;
+
+      // Opdatér eksisterende tabeller forsigtigt, hvis der mangler e-mail
+      if (!vagtEmployee.email && agent.email) {
+        try {
+          await supabase.from("employee").update({ email: agent.email }).eq("id", vagtEmployee.id);
+        } catch {
+          // Ignorer fejl - mappingen er stadig oprettet
+        }
+      }
+
+      if (!agent.email && vagtEmployee.email) {
+        try {
+          await supabase.from("agents").update({ email: vagtEmployee.email }).eq("id", agent.id);
+        } catch {
+          // Ignorer fejl
+        }
+      }
+
+      return { masterId };
+    },
+    onSuccess: () => {
+      toast.success("Medarbejdere er nu merged til én master-profil");
+      queryClient.invalidateQueries({ queryKey: ["mg-agents"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["master-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-identities"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke merge medarbejdere");
+    },
+  });
+
   // Kunder: tilføj, opdater og slet
   const addClientMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -954,6 +1046,8 @@ export default function MgTest() {
   const isLoadingProductsTab = loadingSaleItems || loadingClientCampaigns || loadingClients;
   const isLoadingCampaignTab = loadingCampaignMappings || loadingClientCampaigns;
   const isLoadingCustomersTab = loadingClients;
+  const isLoadingEmployeeTab =
+    loadingAgents || loadingMasterEmployees || loadingEmployeeIdentities || loadingVagtEmployees;
 
   return (
     <MainLayout>
@@ -1400,18 +1494,112 @@ export default function MgTest() {
           </TabsContent>
 
           {/* Medarbejder mapping */}
-          <TabsContent value="employee-mapping">
+          <TabsContent value="employee-mapping" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Medarbejder mapping</CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Her vil du kunne mappe Adversus-data til interne medarbejdere. Funktionen er endnu ikke sat op.
+                  Merge medarbejdere fra Agenter og Vagt-flow til én fælles master-medarbejder, baseret på e-mail.
                 </p>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Fanen er oprettet. Sig til, hvordan du gerne vil matche medarbejdere, så bygger vi resten.
-                </p>
+              <CardContent className="space-y-6">
+                {isLoadingEmployeeTab ? (
+                  <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Henter medarbejderdata…</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <Card className="border-dashed">
+                        <CardHeader className="py-3">
+                          <p className="text-xs font-medium text-muted-foreground">Agenter uden mapping</p>
+                          <p className="text-2xl font-semibold">
+                            {unmappedAgentsCount}
+                          </p>
+                        </CardHeader>
+                      </Card>
+                      <Card className="border-dashed">
+                        <CardHeader className="py-3">
+                          <p className="text-xs font-medium text-muted-foreground">Vagt-medarbejdere uden mapping</p>
+                          <p className="text-2xl font-semibold">
+                            {unmappedEmployeesCount}
+                          </p>
+                        </CardHeader>
+                      </Card>
+                      <Card className="border-dashed">
+                        <CardHeader className="py-3 flex flex-row items-center justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground">E-mail-baserede forslag</p>
+                            <p className="text-2xl font-semibold">{emailSuggestions.length}</p>
+                          </div>
+                          <Badge variant="outline">Auto-match</Badge>
+                        </CardHeader>
+                      </Card>
+                    </div>
+
+                    {emailSuggestions.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Der er ingen e-mail-baserede forslag lige nu. Enten er alle allerede matchet, eller også
+                        mangler der e-mails på nogle profiler.
+                      </p>
+                    ) : (
+                      <div className="rounded-md border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[24%]">E-mail</TableHead>
+                              <TableHead className="w-[26%]">Agent (provisionssystem)</TableHead>
+                              <TableHead className="w-[26%]">Vagt-medarbejder</TableHead>
+                              <TableHead className="w-[14%]">Status</TableHead>
+                              <TableHead className="w-[10%] text-right">Handling</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {emailSuggestions.map((s) => (
+                              <TableRow key={`${s.agent.id}-${s.vagtEmployee.id}`}>
+                                <TableCell>
+                                  <span className="font-mono text-xs">{s.email}</span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{s.agent.name}</span>
+                                    <span className="text-xs text-muted-foreground">Agent-ID: {s.agent.id}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{s.vagtEmployee.full_name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      Medarbejder-ID: {s.vagtEmployee.id}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-xs">
+                                    Klar til merge
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => mergeEmployeeSuggestion.mutate({ agent: s.agent, vagtEmployee: s.vagtEmployee })}
+                                    disabled={mergeEmployeeSuggestion.isPending}
+                                  >
+                                    {mergeEmployeeSuggestion.isPending && (
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    )}
+                                    Merge
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
