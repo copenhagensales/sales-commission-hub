@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.finance-summary]
 verify_jwt = false
+
+[functions.cleanup-inactive-employees]
+verify_jwt = false
