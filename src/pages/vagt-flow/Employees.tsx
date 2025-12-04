@@ -7,8 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
-import { Users, Phone, Mail, Edit, Plus, Trash2 } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Users, Phone, Mail, Edit, Plus, Trash2, ChevronLeft, ChevronRight, Calendar, CheckCircle2, XCircle, UserPlus, Key } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -34,16 +33,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { startOfWeek, addWeeks, addDays, format, getWeek, getYear, parseISO, isWithinInterval } from "date-fns";
+import { da } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+
+const DAY_LABELS = ["M", "T", "O", "T", "F", "L", "S"];
 
 export default function VagtEmployees() {
   const queryClient = useQueryClient();
@@ -51,8 +46,15 @@ export default function VagtEmployees() {
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
+  const [showAbsenceDialog, setShowAbsenceDialog] = useState<any>(null);
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [referenceDate, setReferenceDate] = useState(new Date());
+
+  const weekStart = startOfWeek(referenceDate, { weekStartsOn: 1 });
+  const weekNumber = getWeek(referenceDate, { weekStartsOn: 1 });
+  const year = getYear(referenceDate);
+  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   const [editForm, setEditForm] = useState({
     role: "employee" as "admin" | "planner" | "employee",
@@ -69,6 +71,13 @@ export default function VagtEmployees() {
     is_active: true,
   });
 
+  const [absenceForm, setAbsenceForm] = useState({
+    start_date: "",
+    end_date: "",
+    reason: "Ferie" as "Ferie" | "Syg" | "Barn syg" | "Andet",
+    note: "",
+  });
+
   const { data: employees, isLoading } = useQuery({
     queryKey: ["vagt-all-employees"],
     queryFn: async () => {
@@ -76,6 +85,23 @@ export default function VagtEmployees() {
         .from("employee")
         .select("*")
         .order("full_name");
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: absences } = useQuery({
+    queryKey: ["vagt-week-absences", year, weekNumber],
+    queryFn: async () => {
+      const weekStartStr = format(weekStart, "yyyy-MM-dd");
+      const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
+
+      const { data, error } = await supabase
+        .from("employee_absence")
+        .select("*")
+        .lte("start_date", weekEndStr)
+        .gte("end_date", weekStartStr);
 
       if (error) throw error;
       return data;
@@ -148,6 +174,26 @@ export default function VagtEmployees() {
     },
   });
 
+  const addAbsenceMutation = useMutation({
+    mutationFn: async (data: { employee_id: string; start_date: string; end_date: string; reason: "Ferie" | "Syg" | "Barn syg" | "Andet"; note: string }) => {
+      const { error } = await supabase.from("employee_absence").insert({
+        employee_id: data.employee_id,
+        start_date: data.start_date,
+        end_date: data.end_date,
+        reason: data.reason,
+        note: data.note || null,
+        status: "pending",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-week-absences"] });
+      setShowAbsenceDialog(null);
+      setAbsenceForm({ start_date: "", end_date: "", reason: "Ferie", note: "" });
+      toast({ title: "Fravær tilføjet" });
+    },
+  });
+
   const openEditDialog = (employee: any) => {
     setSelectedEmployee(employee);
     setEditForm({
@@ -167,6 +213,28 @@ export default function VagtEmployees() {
     });
   };
 
+  const navigateWeek = (direction: "prev" | "next") => {
+    setReferenceDate(addWeeks(referenceDate, direction === "next" ? 1 : -1));
+  };
+
+  const getEmployeeAbsenceDays = (employeeId: string) => {
+    const employeeAbsences = absences?.filter(a => a.employee_id === employeeId && a.status === "APPROVED") || [];
+    const absentDays: number[] = [];
+
+    employeeAbsences.forEach(absence => {
+      const absenceStart = parseISO(absence.start_date);
+      const absenceEnd = parseISO(absence.end_date);
+
+      weekDates.forEach((date, idx) => {
+        if (isWithinInterval(date, { start: absenceStart, end: absenceEnd })) {
+          absentDays.push(idx);
+        }
+      });
+    });
+
+    return absentDays;
+  };
+
   const filteredEmployees = employees?.filter((emp) => {
     const matchesSearch = !searchQuery ||
       emp.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -177,104 +245,225 @@ export default function VagtEmployees() {
     return matchesSearch && matchesTeam;
   });
 
+  const activeEmployees = filteredEmployees?.filter(e => e.is_active) || [];
+  const availableCount = activeEmployees.filter(emp => {
+    const absentDays = getEmployeeAbsenceDays(emp.id);
+    return absentDays.length < 5; // Available if absent less than 5 days
+  }).length;
+  const unavailableCount = activeEmployees.length - availableCount;
+
   const roleLabels: Record<string, string> = {
-    admin: "Administrator",
+    admin: "Admin",
     planner: "Planlægger",
     employee: "Medarbejder",
   };
 
+  const roleBadgeColors: Record<string, string> = {
+    admin: "bg-red-500 text-white",
+    planner: "bg-blue-500 text-white",
+    employee: "bg-green-500 text-white",
+  };
+
   const teamColors: Record<string, string> = {
-    Eesy: "bg-orange-500",
-    YouSee: "bg-blue-600",
+    Eesy: "bg-emerald-500 text-white",
+    YouSee: "bg-cyan-600 text-white",
   };
 
   return (
     <MainLayout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Medarbejdere</h1>
-            <p className="text-muted-foreground">Administrer medarbejdere og teams</p>
+            <p className="text-muted-foreground">Administrer medarbejdere og deres roller</p>
           </div>
-          <Button onClick={() => setShowAddDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Ny medarbejder
-          </Button>
+          <div className="flex items-center gap-4">
+            <Input
+              placeholder="Søg medarbejder..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-[200px]"
+            />
+            <Select value={teamFilter} onValueChange={setTeamFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Alle teams" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle teams</SelectItem>
+                <SelectItem value="Eesy">Eesy</SelectItem>
+                <SelectItem value="YouSee">YouSee</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={() => setShowAddDialog(true)} className="bg-emerald-500 hover:bg-emerald-600">
+              <Plus className="h-4 w-4 mr-2" /> Tilføj medarbejder
+            </Button>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Users className="h-5 w-5" />
+              <span>{activeEmployees.length} medarbejdere</span>
+            </div>
+          </div>
         </div>
 
-        <Card>
+        {/* Week availability section */}
+        <Card className="bg-muted/30">
           <CardContent className="pt-6">
-            <div className="flex gap-4 mb-6">
-              <Input
-                placeholder="Søg efter navn eller email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="max-w-sm"
-              />
-              <Select value={teamFilter} onValueChange={setTeamFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Alle teams" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Alle teams</SelectItem>
-                  <SelectItem value="Eesy">Eesy</SelectItem>
-                  <SelectItem value="YouSee">YouSee</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Tilgængelighed for uge</span>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => navigateWeek("prev")}>
+                    <ChevronLeft className="h-4 w-4 mr-1" /> Forrige uge
+                  </Button>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-background rounded-md border">
+                    <Calendar className="h-4 w-4" />
+                    <span className="font-medium">Uge {weekNumber}, {year}</span>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => navigateWeek("next")}>
+                    Næste uge <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-lg border border-green-200 bg-green-50">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <span className="text-2xl font-bold text-green-600">{availableCount}</span>
+                  <span className="text-sm text-green-600">Til rådighed</span>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-lg border border-red-200 bg-red-50">
+                  <XCircle className="h-5 w-5 text-red-600" />
+                  <span className="text-2xl font-bold text-red-600">{unavailableCount}</span>
+                  <span className="text-sm text-red-600">Ikke til rådighed</span>
+                </div>
+              </div>
             </div>
+          </CardContent>
+        </Card>
 
-            {isLoading ? (
-              <p>Indlæser...</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Navn</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Telefon</TableHead>
-                    <TableHead>Team</TableHead>
-                    <TableHead>Rolle</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredEmployees?.map((emp) => (
-                    <TableRow key={emp.id}>
-                      <TableCell className="font-medium">{emp.full_name}</TableCell>
-                      <TableCell>{emp.email}</TableCell>
-                      <TableCell>{emp.phone || "-"}</TableCell>
-                      <TableCell>
-                        {emp.team ? (
-                          <Badge className={`${teamColors[emp.team] || "bg-gray-500"} text-white`}>
-                            {emp.team}
+        {/* Sort headers */}
+        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+          <button className="flex items-center gap-1 hover:text-foreground">
+            Navn <span className="text-xs">↑</span>
+          </button>
+          <button className="flex items-center gap-1 hover:text-foreground">
+            Team <span className="text-xs">↑↓</span>
+          </button>
+          <button className="flex items-center gap-1 hover:text-foreground">
+            Rolle <span className="text-xs">↑↓</span>
+          </button>
+        </div>
+
+        {/* Employee cards */}
+        {isLoading ? (
+          <p>Indlæser...</p>
+        ) : (
+          <div className="space-y-3">
+            {filteredEmployees?.map((emp) => {
+              const absentDays = getEmployeeAbsenceDays(emp.id);
+              const isAvailable = absentDays.length < 5;
+
+              return (
+                <Card key={emp.id} className={cn(
+                  "border-l-4 transition-all hover:shadow-md",
+                  emp.team === "YouSee" ? "border-l-cyan-500" : 
+                  emp.team === "Eesy" ? "border-l-emerald-500" : "border-l-gray-300"
+                )}>
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="font-semibold text-lg">{emp.full_name}</span>
+                          {emp.team && (
+                            <Badge className={teamColors[emp.team] || "bg-gray-500 text-white"}>
+                              {emp.team}
+                            </Badge>
+                          )}
+                          <Badge className={roleBadgeColors[emp.role] || "bg-gray-500 text-white"}>
+                            {roleLabels[emp.role] || emp.role}
                           </Badge>
-                        ) : (
-                          "-"
+                        </div>
+                        <div className="flex items-center gap-4">
+                          {/* Day circles */}
+                          <div className="flex items-center gap-1">
+                            {DAY_LABELS.map((label, idx) => {
+                              const isAbsent = absentDays.includes(idx);
+                              return (
+                                <div
+                                  key={idx}
+                                  className={cn(
+                                    "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
+                                    isAbsent
+                                      ? "bg-red-100 text-red-600"
+                                      : "bg-green-500 text-white"
+                                  )}
+                                >
+                                  {label}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <button
+                            onClick={() => {
+                              setShowAbsenceDialog(emp);
+                              setAbsenceForm({
+                                start_date: format(weekStart, "yyyy-MM-dd"),
+                                end_date: format(weekStart, "yyyy-MM-dd"),
+                                reason: "Ferie",
+                                note: "",
+                              });
+                            }}
+                            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                          >
+                            <Plus className="h-4 w-4" /> Tilføj fravær
+                          </button>
+                        </div>
+                        {emp.email && !emp.email.includes("@placeholder.local") && (
+                          <div className="flex items-center gap-1 mt-2 text-sm text-muted-foreground">
+                            <Mail className="h-4 w-4" />
+                            {emp.email}
+                          </div>
                         )}
-                      </TableCell>
-                      <TableCell>{roleLabels[emp.role] || emp.role}</TableCell>
-                      <TableCell>
-                        <Badge variant={emp.is_active ? "default" : "secondary"}>
-                          {emp.is_active ? "Aktiv" : "Inaktiv"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => openEditDialog(emp)}>
-                            <Edit className="h-4 w-4" />
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          {isAvailable ? (
+                            <>
+                              <CheckCircle2 className="h-5 w-5 text-green-500" />
+                              <span className="text-green-600 font-medium">Til rådighed</span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="h-5 w-5 text-red-500" />
+                              <span className="text-red-600 font-medium">Ikke til rådighed</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {emp.role === "admin" && (
+                            <Button variant="outline" size="sm">
+                              <Key className="h-4 w-4 mr-1" /> Skift adgangskode
+                            </Button>
+                          )}
+                          {emp.role !== "admin" && (
+                            <Button variant="outline" size="sm">
+                              <UserPlus className="h-4 w-4 mr-1" /> Inviter
+                            </Button>
+                          )}
+                          <Button variant="outline" size="sm" onClick={() => openEditDialog(emp)}>
+                            <Edit className="h-4 w-4 mr-1" /> Rediger
                           </Button>
                           <Button variant="ghost" size="icon" onClick={() => setShowDeleteDialog(emp.id)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Edit dialog */}
@@ -370,6 +559,58 @@ export default function VagtEmployees() {
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>Annuller</Button>
             <Button onClick={() => addEmployeeMutation.mutate(newEmployeeForm)} disabled={!newEmployeeForm.full_name || addEmployeeMutation.isPending}>
               Opret
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add absence dialog */}
+      <Dialog open={!!showAbsenceDialog} onOpenChange={() => setShowAbsenceDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tilføj fravær for {showAbsenceDialog?.full_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Start dato</Label>
+              <Input type="date" value={absenceForm.start_date} onChange={(e) => setAbsenceForm({ ...absenceForm, start_date: e.target.value })} />
+            </div>
+            <div>
+              <Label>Slut dato</Label>
+              <Input type="date" value={absenceForm.end_date} onChange={(e) => setAbsenceForm({ ...absenceForm, end_date: e.target.value })} />
+            </div>
+            <div>
+              <Label>Årsag</Label>
+              <Select value={absenceForm.reason} onValueChange={(v: any) => setAbsenceForm({ ...absenceForm, reason: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Ferie">Ferie</SelectItem>
+                  <SelectItem value="Syg">Syg</SelectItem>
+                  <SelectItem value="Barn syg">Barn syg</SelectItem>
+                  <SelectItem value="Andet">Andet</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Note</Label>
+              <Input value={absenceForm.note} onChange={(e) => setAbsenceForm({ ...absenceForm, note: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAbsenceDialog(null)}>Annuller</Button>
+            <Button
+              onClick={() => addAbsenceMutation.mutate({
+                employee_id: showAbsenceDialog?.id,
+                start_date: absenceForm.start_date,
+                end_date: absenceForm.end_date,
+                reason: absenceForm.reason,
+                note: absenceForm.note,
+              })}
+              disabled={!absenceForm.start_date || !absenceForm.end_date || addAbsenceMutation.isPending}
+            >
+              Tilføj
             </Button>
           </DialogFooter>
         </DialogContent>
