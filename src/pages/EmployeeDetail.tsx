@@ -270,6 +270,18 @@ export default function EmployeeDetail() {
     enabled: !!employee?.manager_id,
   });
 
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const updateMutation = useMutation({
     mutationFn: async ({ field, value }: { field: string; value: unknown }) => {
       if (!id) throw new Error("No ID");
@@ -403,8 +415,25 @@ export default function EmployeeDetail() {
             <CardContent className="space-y-1">
               <EditableField label="Ansættelsesdato" value={employee.employment_start_date} field="employment_start_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_start_date)} />
               <EditableField label="Slutdato" value={employee.employment_end_date} field="employment_end_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_end_date)} />
-              <EditableField label="Stilling" value={employee.job_title} field="job_title" onSave={handleSave} />
-              <EditableField label="Afdeling / Team" value={employee.department} field="department" onSave={handleSave} />
+              <EditableSelect
+                label="Stilling"
+                value={employee.job_title}
+                field="job_title"
+                options={[
+                  { value: "Salgskonsulent", label: "Salgskonsulent" },
+                  { value: "Fieldmarketing", label: "Fieldmarketing" },
+                ]}
+                onSave={handleSave}
+                displayValue={employee.job_title}
+              />
+              <EditableSelect
+                label="Afdeling / Team"
+                value={employee.department}
+                field="department"
+                options={clients.map(c => ({ value: c.name, label: c.name }))}
+                onSave={handleSave}
+                displayValue={employee.department}
+              />
               <EditableField label="Arbejdssted" value={employee.work_location} field="work_location" onSave={handleSave} />
               <div className="flex justify-between py-2 border-b border-border last:border-0">
                 <span className="text-muted-foreground">Leder</span>
@@ -463,10 +492,10 @@ export default function EmployeeDetail() {
                 field="vacation_type"
                 options={[
                   { value: "vacation_pay", label: "Ferieløn" },
-                  { value: "vacation_bonus", label: "Feriebonus" },
+                  { value: "vacation_bonus", label: "1% ferietillæg" },
                 ]}
                 onSave={handleSave}
-                displayValue={getVacationTypeLabel(employee.vacation_type)}
+                displayValue={employee.vacation_type === "vacation_bonus" ? "1% ferietillæg" : "Ferieløn"}
               />
               {employee.vacation_type === "vacation_bonus" && (
                 <EditableField 
@@ -512,9 +541,19 @@ export default function EmployeeDetail() {
               <CardTitle>Arbejdstid</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-              <EditableField label="Model" value={employee.working_hours_model} field="working_hours_model" onSave={handleSave} />
-              <EditableField label="Timer pr. uge" value={employee.weekly_hours} field="weekly_hours" type="number" onSave={handleSave} />
-              <EditableField label="Mødetid" value={employee.standard_start_time} field="standard_start_time" type="time" onSave={handleSave} />
+              <EditableField label="Timer pr. uge" value={employee.weekly_hours || 37.5} field="weekly_hours" type="number" onSave={handleSave} />
+              <EditableSelect
+                label="Mødetid"
+                value={employee.standard_start_time}
+                field="standard_start_time"
+                options={[
+                  { value: "08:00-16:30", label: "8-16.30" },
+                  { value: "08:30-16:30", label: "8.30-16.30" },
+                  { value: "09:30-17:30", label: "9.30-17.30" },
+                ]}
+                onSave={handleSave}
+                displayValue={employee.standard_start_time || "-"}
+              />
             </CardContent>
           </Card>
         </div>
