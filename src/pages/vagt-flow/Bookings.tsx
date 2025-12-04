@@ -628,11 +628,11 @@ export default function VagtBookings() {
                                   <div
                                     key={idx}
                                     className={`p-2 rounded-lg text-center ${
-                                      vehicle ? "bg-blue-50 border border-blue-200" : "bg-muted/30"
+                                      vehicle ? "bg-blue-100 border border-blue-200" : "bg-muted/30"
                                     }`}
                                   >
-                                    <p className="text-xs text-muted-foreground">{day}</p>
-                                    <p className="text-sm truncate flex items-center justify-center gap-1">
+                                    <p className={`text-xs ${vehicle ? "text-blue-600" : "text-muted-foreground"}`}>{day}</p>
+                                    <p className={`text-sm truncate flex items-center justify-center gap-1 ${vehicle ? "text-blue-800 font-medium" : "text-foreground"}`}>
                                       {vehicle ? (
                                         <>
                                           <Car className="h-3 w-3" />
