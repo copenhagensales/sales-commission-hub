@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -90,6 +90,7 @@ const defaultEmployee: NewEmployee = {
 };
 
 export default function EmployeeMasterData() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
@@ -452,11 +453,13 @@ export default function EmployeeMasterData() {
                 </TableHeader>
                 <TableBody>
                   {filteredEmployees.map((employee) => (
-                    <TableRow key={employee.id} className="cursor-pointer hover:bg-muted/50">
+                    <TableRow 
+                      key={employee.id} 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/employees/${employee.id}`)}
+                    >
                       <TableCell className="font-medium">
-                        <Link to={`/employees/${employee.id}`} className="text-primary hover:underline">
-                          {employee.first_name} {employee.last_name}
-                        </Link>
+                        {employee.first_name} {employee.last_name}
                       </TableCell>
                       <TableCell>{employee.private_email || "-"}</TableCell>
                       <TableCell>{employee.private_phone || "-"}</TableCell>
@@ -474,7 +477,7 @@ export default function EmployeeMasterData() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(employee)}>
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </TableCell>
