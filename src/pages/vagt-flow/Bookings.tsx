@@ -268,17 +268,19 @@ export default function VagtBookings() {
       acc[team][employeeId] = {
         employeeId,
         employeeName,
-        absenceDays: new Set<number>(),
+        absenceDays: [] as number[],
       };
     }
     
-    // Add all days from this absence record
-    const start = new Date(absence.start_date);
-    const end = new Date(absence.end_date);
+    // Add all days from this absence record using string comparison
+    const startDate = absence.start_date;
+    const endDate = absence.end_date;
     for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-      const currentDay = addDays(weekStart, dayIndex);
-      if (currentDay >= start && currentDay <= end) {
-        acc[team][employeeId].absenceDays.add(dayIndex);
+      const currentDayStr = format(addDays(weekStart, dayIndex), "yyyy-MM-dd");
+      if (currentDayStr >= startDate && currentDayStr <= endDate) {
+        if (!acc[team][employeeId].absenceDays.includes(dayIndex)) {
+          acc[team][employeeId].absenceDays.push(dayIndex);
+        }
       }
     }
     
@@ -450,7 +452,7 @@ export default function VagtBookings() {
                             </span>
                             <div className="flex gap-1.5">
                               {DAYS.map((day, idx) => {
-                                const isAbsent = employee.absenceDays.has(idx);
+                                const isAbsent = employee.absenceDays.includes(idx);
                                 const dayLetter = day.charAt(0);
                                 return (
                                   <div
