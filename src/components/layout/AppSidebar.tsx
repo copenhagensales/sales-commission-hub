@@ -15,7 +15,7 @@ const navigation = [
   { name: "Codan", href: "/codan", icon: Shield },
   { name: "TDC Erhverv", href: "/tdc-erhverv", icon: Building2 },
   { name: "Provision og CPO", href: "/commission-cpo", icon: Percent },
-  { name: "Lønkørsler", href: "/payroll", icon: Wallet },
+  { name: "Lønkørsel", href: "/payroll", icon: Wallet },
   { name: "Wallboard", href: "/wallboard", icon: Tv },
   { name: "Datakilder info", href: "/adversus-data", icon: Database },
   { name: "Logikker", href: "/logikker", icon: ListChecks },
