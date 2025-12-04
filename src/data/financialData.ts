@@ -34,14 +34,17 @@ export const summaryData = {
 // Omkostningskategorier (uden løn)
 export const costCategories: CostCategory[] = [
   {
-    category: "Field Marketing",
-    total: 1154772.00 + 78147.50 + 167664.96 + 255546.52, // Stadeplads + Hotel + Rejse
-    previousYearTotal: 1066969.00 + 38742.00 + 59131.28 + 187676.70,
+    category: "Field Marketing & Autodrift",
+    total: 1154772.00 + 78147.50 + 167664.96 + 255546.52 + 109844.87, // Stadeplads + Hotel + Rejse + Autodrift
+    previousYearTotal: 1066969.00 + 38742.00 + 59131.28 + 187676.70 + 64951.77,
     items: [
       { account: "2810", name: "Stadeplads med moms", actual: 1154772.00, previousYear: 1066969.00 },
       { account: "2809", name: "Stadeplads uden moms", actual: 78147.50, previousYear: 38742.00 },
       { account: "2775", name: "Hotelophold", actual: 167664.96, previousYear: 59131.28 },
       { account: "2770", name: "Rejseudgifter", actual: 255546.52, previousYear: 187676.70 },
+      { account: "3110", name: "Brændstof", actual: 67130.15, previousYear: 28188.90 },
+      { account: "3140", name: "Reparation/vedligeholdelse", actual: 31506.56, previousYear: 26834.06 },
+      { account: "3120", name: "Bilforsikring", actual: 11208.16, previousYear: 6308.81 },
     ],
   },
   {
@@ -99,16 +102,6 @@ export const costCategories: CostCategory[] = [
       { account: "2750", name: "Restaurationsbesøg", actual: 134619.47, previousYear: 155552.45 },
       { account: "2754", name: "Gaver og blomster", actual: 58195.84, previousYear: 61233.45 },
       { account: "2240", name: "Bespisning personale", actual: 38465.44, previousYear: 36845.29 },
-    ],
-  },
-  {
-    category: "Autodrift",
-    total: 109844.87,
-    previousYearTotal: 64951.77,
-    items: [
-      { account: "3110", name: "Brændstof", actual: 67130.15, previousYear: 28188.90 },
-      { account: "3140", name: "Reparation/vedligeholdelse", actual: 31506.56, previousYear: 26834.06 },
-      { account: "3120", name: "Bilforsikring", actual: 11208.16, previousYear: 6308.81 },
     ],
   },
   {
