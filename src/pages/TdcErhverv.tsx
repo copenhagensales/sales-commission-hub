@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface TdcSaleItem {
   mapped_commission: number | null;
@@ -52,7 +53,7 @@ interface TdcDailySeriesPoint {
 interface TdcDashboardData {
   stats: TdcStats;
   recentSales: TdcSale[];
-  historicalSales: TdcDailySeriesPoint[];
+  allSales: TdcSale[];
 }
 
 const initialStats: TdcStats = {
@@ -100,7 +101,7 @@ export default function TdcErhverv() {
       const tdcClientId = clients?.[0]?.id as string | undefined;
 
       if (!tdcClientId) {
-        return { stats: initialStats, recentSales: [], historicalSales: [] };
+        return { stats: initialStats, recentSales: [], allSales: [] };
       }
 
       // Find alle kampagner for TDC Erhverv
@@ -114,7 +115,7 @@ export default function TdcErhverv() {
       const campaignIds = (campaigns || []).map((c) => c.id as string);
 
       if (campaignIds.length === 0) {
-        return { stats: initialStats, recentSales: [], historicalSales: [] };
+        return { stats: initialStats, recentSales: [], allSales: [] };
       }
 
       // Hent alle TDC Erhverv-salg fra de sidste 180 dage
@@ -188,100 +189,115 @@ export default function TdcErhverv() {
 
       const recentSales = tdcSales.slice(0, 25);
 
-      // Byg historisk serie (kun hverdage) baseret på alle hentede salg (180 dage)
-      const dailyMap = new Map<string, number>();
-
-      tdcSales.forEach((sale) => {
-        if (!sale.sale_datetime) return;
-        const saleDate = new Date(sale.sale_datetime);
-        const dateKey = format(saleDate, "yyyy-MM-dd");
-
-        let dailyUnits = 0;
-        sale.sale_items?.forEach((item) => {
-          const qty = Number((item as any).quantity) || 1;
-          dailyUnits += qty;
-        });
-
-        if (dailyUnits === 0) return;
-
-        dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + dailyUnits);
-      });
-
-      const dailyEntries = Array.from(dailyMap.entries())
-        .map(([dateKey, salesCount]) => ({ dateKey, sales: salesCount }))
-        .sort((a, b) => (a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0));
-
-      const weekdayEntries = dailyEntries.filter(({ dateKey }) => {
-        const d = new Date(dateKey);
-        return !isWeekend(d);
-      });
-
-      let historicalSales: TdcDailySeriesPoint[] = [];
-
-      if (weekdayEntries.length > 0) {
-        let bestIndex = 0;
-        let maxSales = weekdayEntries[0].sales;
-
-        for (let i = 1; i < weekdayEntries.length; i++) {
-          if (weekdayEntries[i].sales > maxSales) {
-            maxSales = weekdayEntries[i].sales;
-            bestIndex = i;
-          }
-        }
-
-        const n = weekdayEntries.length;
-        let sumX = 0;
-        let sumY = 0;
-        let sumXY = 0;
-        let sumX2 = 0;
-
-        weekdayEntries.forEach((entry, index) => {
-          const x = index;
-          const y = entry.sales;
-          sumX += x;
-          sumY += y;
-          sumXY += x * y;
-          sumX2 += x * x;
-        });
-
-        const denominator = n * sumX2 - sumX * sumX;
-        const slope = denominator !== 0 ? (n * sumXY - sumX * sumY) / denominator : 0;
-        const intercept = n > 0 ? (sumY - slope * sumX) / n : 0;
-
-        historicalSales = weekdayEntries.map((entry, index) => {
-          const date = new Date(entry.dateKey);
-          const trendRaw = intercept + slope * index;
-
-          return {
-            date: entry.dateKey,
-            label: format(date, "dd/MM"),
-            sales: entry.sales,
-            trend: Number(trendRaw.toFixed(1)),
-            isBest: index === bestIndex,
-          };
-        });
-      }
-
-      return { stats, recentSales, historicalSales };
+      return { stats, recentSales, allSales: tdcSales };
     },
   });
 
   const stats = data?.stats ?? initialStats;
   const recentSales = data?.recentSales ?? [];
-  const historicalSales = data?.historicalSales ?? [];
+  const allSales = data?.allSales ?? [];
 
-  const filteredHistoricalSales = useMemo(() => {
-    if (!historicalSales.length) return [];
-    const cutoff = subDays(new Date(), rangeDays);
-    return historicalSales.filter((point) => new Date(point.date) >= cutoff);
-  }, [historicalSales, rangeDays]);
+  const [agentFilter, setAgentFilter] = useState<string>("ALL");
+  const [customFrom, setCustomFrom] = useState<string>("");
+  const [customTo, setCustomTo] = useState<string>("");
+
+  const agentOptions = useMemo(() => {
+    const names = Array.from(
+      new Set(
+        allSales.map((sale) => (sale.agent_name && sale.agent_name.trim().length > 0 ? sale.agent_name : "Ukendt")),
+      ),
+    );
+    return names.sort((a, b) => a.localeCompare(b, "da-DK"));
+  }, [allSales]);
+
+  const chartPoints = useMemo<TdcDailySeriesPoint[]>(() => {
+    if (!allSales.length) return [];
+
+    const today = new Date();
+    const end = customTo ? new Date(customTo + "T23:59:59") : today;
+    const start = customFrom ? new Date(customFrom + "T00:00:00") : subDays(end, rangeDays);
+
+    const dailyMap = new Map<string, number>();
+
+    allSales.forEach((sale) => {
+      if (!sale.sale_datetime) return;
+      const saleDate = new Date(sale.sale_datetime);
+      if (saleDate < start || saleDate > end) return;
+
+      const agentName = sale.agent_name && sale.agent_name.trim().length > 0 ? sale.agent_name : "Ukendt";
+      if (agentFilter !== "ALL" && agentName !== agentFilter) return;
+
+      const dateKey = format(saleDate, "yyyy-MM-dd");
+
+      let dailyUnits = 0;
+      sale.sale_items?.forEach((item) => {
+        const qty = Number((item as any).quantity) || 1;
+        dailyUnits += qty;
+      });
+
+      if (dailyUnits === 0) return;
+
+      dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + dailyUnits);
+    });
+
+    const dailyEntries = Array.from(dailyMap.entries())
+      .map(([dateKey, salesCount]) => ({ dateKey, sales: salesCount }))
+      .sort((a, b) => (a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0));
+
+    const weekdayEntries = dailyEntries.filter(({ dateKey }) => {
+      const d = new Date(dateKey);
+      return !isWeekend(d);
+    });
+
+    if (!weekdayEntries.length) return [];
+
+    const n = weekdayEntries.length;
+    let sumX = 0;
+    let sumY = 0;
+    let sumXY = 0;
+    let sumX2 = 0;
+
+    weekdayEntries.forEach((entry, index) => {
+      const x = index;
+      const y = entry.sales;
+      sumX += x;
+      sumY += y;
+      sumXY += x * y;
+      sumX2 += x * x;
+    });
+
+    const denominator = n * sumX2 - sumX * sumX;
+    const slope = denominator !== 0 ? (n * sumXY - sumX * sumY) / denominator : 0;
+    const intercept = n > 0 ? (sumY - slope * sumX) / n : 0;
+
+    let bestIndex = 0;
+    let maxSales = weekdayEntries[0].sales;
+
+    weekdayEntries.forEach((entry, index) => {
+      if (entry.sales > maxSales) {
+        maxSales = entry.sales;
+        bestIndex = index;
+      }
+    });
+
+    return weekdayEntries.map((entry, index) => {
+      const date = new Date(entry.dateKey);
+      const trendRaw = intercept + slope * index;
+
+      return {
+        date: entry.dateKey,
+        label: format(date, "dd/MM"),
+        sales: entry.sales,
+        trend: Number(trendRaw.toFixed(1)),
+        isBest: index === bestIndex,
+      };
+    });
+  }, [allSales, agentFilter, customFrom, customTo, rangeDays]);
 
   const bestDayPoint = useMemo(() => {
-    if (!filteredHistoricalSales.length) return undefined;
-    return filteredHistoricalSales.reduce((best, point) =>
-      point.sales > best.sales ? point : best,
-    filteredHistoricalSales[0]);
-  }, [filteredHistoricalSales]);
+    if (!chartPoints.length) return undefined;
+    return chartPoints.reduce((best, point) => (point.sales > best.sales ? point : best), chartPoints[0]);
+  }, [chartPoints]);
 
   return (
     <MainLayout>
@@ -345,16 +361,55 @@ export default function TdcErhverv() {
           </Card>
         </div>
 
-        {filteredHistoricalSales.length > 0 && (
+        {chartPoints.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Historisk salgsudvikling (hverdage)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
-                  Vælg periode: {rangeDays} dage
-                </p>
+              <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-muted-foreground">Agent</span>
+                    <div className="min-w-[160px]">
+                      <Select value={agentFilter} onValueChange={setAgentFilter}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Alle agenter" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">Alle agenter</SelectItem>
+                          {agentOptions.map((name) => (
+                            <SelectItem key={name} value={name}>
+                              {name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-end gap-3">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-muted-foreground">Fra dato</span>
+                      <input
+                        type="date"
+                        value={customFrom}
+                        onChange={(e) => setCustomFrom(e.target.value)}
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-muted-foreground">Til dato</span>
+                      <input
+                        type="date"
+                        value={customTo}
+                        onChange={(e) => setCustomTo(e.target.value)}
+                        className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="inline-flex gap-1 rounded-md border border-border bg-background p-0.5">
                   {[30, 90, 180].map((days) => (
                     <Button
@@ -371,7 +426,7 @@ export default function TdcErhverv() {
               </div>
 
               <ChartContainer config={tdcSalesChartConfig} className="h-80 w-full">
-                <LineChart data={filteredHistoricalSales} margin={{ left: 12, right: 12, top: 10, bottom: 0 }}>
+                <LineChart data={chartPoints} margin={{ left: 12, right: 12, top: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis
                     dataKey="label"
@@ -416,7 +471,7 @@ export default function TdcErhverv() {
                 </LineChart>
               </ChartContainer>
               <p className="mt-2 text-xs text-muted-foreground">
-                Viser antal solgte enheder pr. hverdag for de sidste 180 dage. Bedste salgsdag i den valgte periode er fremhævet.
+                Viser antal solgte enheder pr. hverdag i den valgte periode (maks. 180 dage tilbage). Bedste salgsdag for filtret er fremhævet.
               </p>
             </CardContent>
           </Card>
