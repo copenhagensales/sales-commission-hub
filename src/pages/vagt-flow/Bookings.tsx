@@ -401,9 +401,9 @@ export default function VagtBookings() {
             return (
               <Collapsible key={brandId} open={isExpanded} onOpenChange={() => toggleWeek(weekKey)}>
                 <Card>
-                  <CollapsibleTrigger className="w-full">
-                    <CardContent className="pt-4 pb-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                  <CardContent className="pt-4 pb-4 flex items-center justify-between">
+                    <CollapsibleTrigger asChild>
+                      <div className="flex items-center gap-3 cursor-pointer flex-1">
                         <span className="font-bold text-lg">Uge {selectedWeek}, {selectedYear}</span>
                         <Badge style={{ backgroundColor: data.brand?.color_hex, color: "#fff" }}>
                           {data.brand?.name}
@@ -411,15 +411,15 @@ export default function VagtBookings() {
                         <Badge variant="secondary" className="bg-green-100 text-green-700">
                           {data.bookings.length} booking{data.bookings.length !== 1 ? "s" : ""}
                         </Badge>
+                        {isExpanded ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" className="text-primary border-primary">
-                          <FileText className="h-4 w-4 mr-1" /> Eksporter PDF
-                        </Button>
-                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </div>
-                    </CardContent>
-                  </CollapsibleTrigger>
+                    </CollapsibleTrigger>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="text-primary border-primary">
+                        <FileText className="h-4 w-4 mr-1" /> Eksporter PDF
+                      </Button>
+                    </div>
+                  </CardContent>
                   <CollapsibleContent>
                     <CardContent className="pt-0 space-y-6">
                       {data.bookings.map((booking: any) => (
@@ -449,7 +449,25 @@ export default function VagtBookings() {
                               >
                                 {booking.status}
                               </Badge>
-                              <Button variant="ghost" size="sm" className="text-primary">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-primary"
+                                onClick={() => {
+                                  // Find first day without assignment within booking dates
+                                  for (let i = 0; i < 7; i++) {
+                                    const dayDate = addDays(weekStart, i);
+                                    if (dayDate >= new Date(booking.start_date) && dayDate <= new Date(booking.end_date)) {
+                                      const existing = getAssignmentForDay(booking, i);
+                                      if (!existing) {
+                                        setOpenAssignPopover(`${booking.id}-${i}`);
+                                        return;
+                                      }
+                                    }
+                                  }
+                                  toast({ title: "Alle dage har allerede en tildeling" });
+                                }}
+                              >
                                 <Plus className="h-4 w-4 mr-1" /> Tilføj
                               </Button>
                               <Button variant="ghost" size="sm" className="text-primary">
