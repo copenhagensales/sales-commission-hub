@@ -252,6 +252,12 @@ export default function VagtEmployees() {
 
   const addAbsenceMutation = useMutation({
     mutationFn: async (data: { employee_id: string; selectedDays: number[]; reason: "Ferie" | "Syg" | "Barn syg" | "Andet"; note: string; weekStart: Date }) => {
+      console.log("Adding absence with data:", data);
+      
+      if (!data.selectedDays || data.selectedDays.length === 0) {
+        throw new Error("Ingen dage valgt");
+      }
+      
       // Create individual absences for each selected day
       const absencesToInsert = data.selectedDays.map(dayIndex => {
         const date = addDays(data.weekStart, dayIndex);
@@ -266,14 +272,23 @@ export default function VagtEmployees() {
         };
       });
 
+      console.log("Absences to insert:", absencesToInsert);
+
       const { error } = await supabase.from("employee_absence").insert(absencesToInsert);
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vagt-week-absences"] });
       setShowAbsenceDialog(null);
       setAbsenceForm({ selectedDays: [], reason: "Ferie", note: "" });
       toast({ title: "Fravær tilføjet" });
+    },
+    onError: (error: any) => {
+      console.error("Mutation error:", error);
+      toast({ title: "Fejl ved oprettelse af fravær", description: error.message, variant: "destructive" });
     },
   });
 
