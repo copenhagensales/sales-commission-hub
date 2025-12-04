@@ -38,6 +38,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { AddEmployeeDialog } from "@/components/vagt-flow/AddEmployeeDialog";
+import { AddVehicleDialog } from "@/components/vagt-flow/AddVehicleDialog";
 
 export default function VagtBookings() {
   const { toast } = useToast();
@@ -53,6 +54,7 @@ export default function VagtBookings() {
   const [absenceExpanded, setAbsenceExpanded] = useState(true);
   const [openAssignPopover, setOpenAssignPopover] = useState<string | null>(null);
   const [addEmployeeDialogBooking, setAddEmployeeDialogBooking] = useState<any>(null);
+  const [addVehicleDialogBooking, setAddVehicleDialogBooking] = useState<any>(null);
 
   const weekStart = startOfWeek(new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7), { weekStartsOn: 1 });
   const DAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
@@ -188,6 +190,28 @@ export default function VagtBookings() {
     },
     onError: () => {
       toast({ title: "Kunne ikke tildele medarbejdere", variant: "destructive" });
+    },
+  });
+
+  const bulkVehicleAssignMutation = useMutation({
+    mutationFn: async ({ bookingId, vehicleId, dates }: { bookingId: string; vehicleId: string; dates: string[] }) => {
+      const inserts = dates.map(date => ({
+        booking_id: bookingId,
+        vehicle_id: vehicleId,
+        date,
+        start_mileage: 0,
+        end_mileage: 0,
+      }));
+      const { error } = await supabase.from("vehicle_mileage").insert(inserts);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-vehicle-mileage"] });
+      toast({ title: "Bil tildelt" });
+      setAddVehicleDialogBooking(null);
+    },
+    onError: () => {
+      toast({ title: "Kunne ikke tildele bil", variant: "destructive" });
     },
   });
 
@@ -482,7 +506,12 @@ export default function VagtBookings() {
                               >
                                 <Plus className="h-4 w-4 mr-1" /> Tilføj
                               </Button>
-                              <Button variant="ghost" size="sm" className="text-primary">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-primary"
+                                onClick={() => setAddVehicleDialogBooking(booking)}
+                              >
                                 <Car className="h-4 w-4 mr-1" /> Bil
                               </Button>
                               <Button 
@@ -670,6 +699,24 @@ export default function VagtBookings() {
               dates: a.dates,
             }))
           );
+        }}
+      />
+
+      <AddVehicleDialog
+        open={!!addVehicleDialogBooking}
+        onOpenChange={(open) => !open && setAddVehicleDialogBooking(null)}
+        booking={addVehicleDialogBooking}
+        weekNumber={selectedWeek}
+        year={selectedYear}
+        weekStart={weekStart}
+        vehicles={vehicles || []}
+        onAddAssignments={(assignment) => {
+          if (!addVehicleDialogBooking) return;
+          bulkVehicleAssignMutation.mutate({
+            bookingId: addVehicleDialogBooking.id,
+            vehicleId: assignment.vehicleId,
+            dates: assignment.dates,
+          });
         }}
       />
     </MainLayout>
