@@ -400,17 +400,15 @@ export default function EmployeeDetail() {
     enabled: !!id,
   });
 
-  // Calculate absence statistics
+  // Calculate absence statistics - based on last 2 months
   const absenceStats = useMemo(() => {
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
     
-    // Filter absences for different periods
-    const thisYearAbsences = absences.filter(a => new Date(a.start_date).getFullYear() === currentYear);
-    const lastYearAbsences = absences.filter(a => {
+    // Filter absences for last 2 months
+    const last2MonthsAbsences = absences.filter(a => {
       const date = new Date(a.start_date);
-      return date >= oneYearAgo && date <= now;
+      return date >= twoMonthsAgo && date <= now;
     });
     
     // Count sick and vacation days
@@ -427,29 +425,26 @@ export default function EmployeeDetail() {
       return absenceList.filter(a => a.type === type).length;
     };
     
-    // Calculate working days in period (approximate: 260 per year)
-    const workingDaysPerYear = 260;
+    // Calculate working days in 2 months (approximate: ~43 working days)
+    const workingDaysIn2Months = 43;
     
-    const sickDaysThisYear = countDays(thisYearAbsences, "sick");
-    const sickDaysLast12Months = countDays(lastYearAbsences, "sick");
-    const vacationDaysThisYear = countDays(thisYearAbsences, "vacation");
-    const sickOccurrencesThisYear = countOccurrences(thisYearAbsences, "sick");
-    const sickOccurrencesLast12Months = countOccurrences(lastYearAbsences, "sick");
+    const sickDaysLast2Months = countDays(last2MonthsAbsences, "sick");
+    const vacationDaysLast2Months = countDays(last2MonthsAbsences, "vacation");
+    const sickOccurrencesLast2Months = countOccurrences(last2MonthsAbsences, "sick");
     
     // Sick percentage (of working days)
-    const sickPercentThisYear = (sickDaysThisYear / workingDaysPerYear) * 100;
-    const sickPercentLast12Months = (sickDaysLast12Months / workingDaysPerYear) * 100;
+    const sickPercentLast2Months = (sickDaysLast2Months / workingDaysIn2Months) * 100;
     
     // Average days per sick occurrence
-    const avgDaysPerSick = sickOccurrencesLast12Months > 0 
-      ? sickDaysLast12Months / sickOccurrencesLast12Months 
+    const avgDaysPerSick = sickOccurrencesLast2Months > 0 
+      ? sickDaysLast2Months / sickOccurrencesLast2Months 
       : 0;
     
     // Check for patterns (many short sick periods could indicate issues)
-    const hasFrequentShortSickness = sickOccurrencesLast12Months >= 5 && avgDaysPerSick < 2;
+    const hasFrequentShortSickness = sickOccurrencesLast2Months >= 3 && avgDaysPerSick < 2;
     
     // Get sick absences sorted by date for pattern analysis
-    const sickAbsences = lastYearAbsences.filter(a => a.type === "sick").sort(
+    const sickAbsences = last2MonthsAbsences.filter(a => a.type === "sick").sort(
       (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
     );
     
@@ -458,18 +453,15 @@ export default function EmployeeDetail() {
       const day = new Date(a.start_date).getDay();
       return day === 1 || day === 5;
     }).length;
-    const mondayFridayPercent = sickOccurrencesLast12Months > 0 
-      ? (mondayFridaySick / sickOccurrencesLast12Months) * 100 
+    const mondayFridayPercent = sickOccurrencesLast2Months > 0 
+      ? (mondayFridaySick / sickOccurrencesLast2Months) * 100 
       : 0;
     
     return {
-      sickDaysThisYear,
-      sickDaysLast12Months,
-      vacationDaysThisYear,
-      sickOccurrencesThisYear,
-      sickOccurrencesLast12Months,
-      sickPercentThisYear,
-      sickPercentLast12Months,
+      sickDaysLast2Months,
+      vacationDaysLast2Months,
+      sickOccurrencesLast2Months,
+      sickPercentLast2Months,
       avgDaysPerSick,
       hasFrequentShortSickness,
       mondayFridayPercent,
@@ -478,30 +470,25 @@ export default function EmployeeDetail() {
     };
   }, [absences]);
 
-  // Calculate lateness statistics
+  // Calculate lateness statistics - based on last 2 months
   const latenessStats = useMemo(() => {
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
     
-    const thisYearLateness = latenessRecords.filter(l => new Date(l.date).getFullYear() === currentYear);
-    const last12MonthsLateness = latenessRecords.filter(l => {
+    const last2MonthsLateness = latenessRecords.filter(l => {
       const date = new Date(l.date);
-      return date >= oneYearAgo && date <= now;
+      return date >= twoMonthsAgo && date <= now;
     });
     
-    const totalMinutesThisYear = thisYearLateness.reduce((sum, l) => sum + l.minutes, 0);
-    const totalMinutesLast12Months = last12MonthsLateness.reduce((sum, l) => sum + l.minutes, 0);
+    const totalMinutesLast2Months = last2MonthsLateness.reduce((sum, l) => sum + l.minutes, 0);
     
-    const avgMinutesPerLateness = last12MonthsLateness.length > 0 
-      ? totalMinutesLast12Months / last12MonthsLateness.length 
+    const avgMinutesPerLateness = last2MonthsLateness.length > 0 
+      ? totalMinutesLast2Months / last2MonthsLateness.length 
       : 0;
     
     return {
-      countThisYear: thisYearLateness.length,
-      countLast12Months: last12MonthsLateness.length,
-      totalMinutesThisYear,
-      totalMinutesLast12Months,
+      countLast2Months: last2MonthsLateness.length,
+      totalMinutesLast2Months,
       avgMinutesPerLateness,
     };
   }, [latenessRecords]);
@@ -975,10 +962,10 @@ export default function EmployeeDetail() {
                         <Thermometer className="h-5 w-5 text-red-500" />
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Sygefravær (12 mdr)</p>
-                        <p className="text-2xl font-bold">{absenceStats.sickPercentLast12Months.toFixed(1)}%</p>
+                        <p className="text-sm text-muted-foreground">Sygefravær (2 mdr)</p>
+                        <p className="text-2xl font-bold">{absenceStats.sickPercentLast2Months.toFixed(1)}%</p>
                         <p className="text-xs text-muted-foreground">
-                          {absenceStats.sickDaysLast12Months} dage • {absenceStats.sickOccurrencesLast12Months} gange
+                          {absenceStats.sickDaysLast2Months} dage • {absenceStats.sickOccurrencesLast2Months} gange
                         </p>
                       </div>
                     </div>
@@ -992,10 +979,10 @@ export default function EmployeeDetail() {
                         <Palmtree className="h-5 w-5 text-amber-500" />
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Ferie (i år)</p>
-                        <p className="text-2xl font-bold">{absenceStats.vacationDaysThisYear} dage</p>
+                        <p className="text-sm text-muted-foreground">Ferie (2 mdr)</p>
+                        <p className="text-2xl font-bold">{absenceStats.vacationDaysLast2Months} dage</p>
                         <p className="text-xs text-muted-foreground">
-                          Afholdt ferie i {new Date().getFullYear()}
+                          Afholdt ferie seneste 2 måneder
                         </p>
                       </div>
                     </div>
@@ -1030,10 +1017,10 @@ export default function EmployeeDetail() {
                         <p className="font-medium text-amber-700 dark:text-amber-400">Fraværsmønster bemærket</p>
                         <div className="text-sm text-muted-foreground space-y-1">
                           {absenceStats.hasFrequentShortSickness && (
-                            <p>• Du har haft {absenceStats.sickOccurrencesLast12Months} korte sygeperioder på under 2 dage i gennemsnit. Overvej om der er noget vi kan hjælpe med?</p>
+                            <p>• Du har haft {absenceStats.sickOccurrencesLast2Months} korte sygeperioder på under 2 dage i gennemsnit. Overvej om der er noget vi kan hjælpe med?</p>
                           )}
-                          {absenceStats.mondayFridayPercent > 50 && absenceStats.sickOccurrencesLast12Months >= 3 && (
-                            <p>• {absenceStats.mondayFridaySick} af {absenceStats.sickOccurrencesLast12Months} sygemeldinger ({absenceStats.mondayFridayPercent.toFixed(0)}%) er faldet på mandag eller fredag.</p>
+                          {absenceStats.mondayFridayPercent > 50 && absenceStats.sickOccurrencesLast2Months >= 2 && (
+                            <p>• {absenceStats.mondayFridaySick} af {absenceStats.sickOccurrencesLast2Months} sygemeldinger ({absenceStats.mondayFridayPercent.toFixed(0)}%) er faldet på mandag eller fredag.</p>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-3">
@@ -1056,11 +1043,11 @@ export default function EmployeeDetail() {
                 <CardContent className="space-y-4">
                   <div>
                     <div className="flex justify-between text-sm mb-1">
-                      <span>Dit fravær (12 mdr)</span>
-                      <span className="font-medium">{absenceStats.sickPercentLast12Months.toFixed(1)}%</span>
+                      <span>Dit fravær (2 mdr)</span>
+                      <span className="font-medium">{absenceStats.sickPercentLast2Months.toFixed(1)}%</span>
                     </div>
                     <Progress 
-                      value={Math.min(absenceStats.sickPercentLast12Months * 10, 100)} 
+                      value={Math.min(absenceStats.sickPercentLast2Months * 10, 100)} 
                       className="h-2"
                     />
                   </div>
@@ -1088,12 +1075,12 @@ export default function EmployeeDetail() {
                 <CardContent>
                   <div className="grid gap-4 md:grid-cols-3 mb-6">
                     <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
-                      <p className="text-sm text-muted-foreground">Antal (12 mdr)</p>
-                      <p className="text-xl font-bold">{latenessStats.countLast12Months} gange</p>
+                      <p className="text-sm text-muted-foreground">Antal (2 mdr)</p>
+                      <p className="text-xl font-bold">{latenessStats.countLast2Months} gange</p>
                     </div>
                     <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
-                      <p className="text-sm text-muted-foreground">Total tid (12 mdr)</p>
-                      <p className="text-xl font-bold">{latenessStats.totalMinutesLast12Months} min</p>
+                      <p className="text-sm text-muted-foreground">Total tid (2 mdr)</p>
+                      <p className="text-xl font-bold">{latenessStats.totalMinutesLast2Months} min</p>
                     </div>
                     <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
                       <p className="text-sm text-muted-foreground">Gns. forsinkelse</p>
@@ -1139,60 +1126,51 @@ export default function EmployeeDetail() {
                 </CardContent>
               </Card>
 
-              {/* Absence History */}
+              {/* Sick Absence History - only sickness, not vacation */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
-                    <CalendarX className="h-4 w-4 text-primary" />
-                    Fraværshistorik
+                    <Thermometer className="h-4 w-4 text-red-500" />
+                    Sygehistorik
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {absences.length === 0 ? (
+                  {absences.filter(a => a.type === "sick").length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
-                      <CalendarX className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>Ingen registreret fravær</p>
+                      <Thermometer className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>Ingen registreret sygdom</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {absences.slice(0, 15).map((absence) => {
+                      {absences.filter(a => a.type === "sick").slice(0, 15).map((absence) => {
                         const start = new Date(absence.start_date);
                         const end = new Date(absence.end_date);
                         const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-                        const isSick = absence.type === "sick";
                         
                         return (
                           <div 
                             key={absence.id}
-                            className={`flex items-center justify-between p-3 rounded-lg border ${
-                              isSick ? "bg-red-500/5 border-red-500/20" : "bg-amber-500/5 border-amber-500/20"
-                            }`}
+                            className="flex items-center justify-between p-3 rounded-lg border bg-red-500/5 border-red-500/20"
                           >
                             <div className="flex items-center gap-3">
-                              {isSick ? (
-                                <Thermometer className="h-4 w-4 text-red-500" />
-                              ) : (
-                                <Palmtree className="h-4 w-4 text-amber-500" />
-                              )}
+                              <Thermometer className="h-4 w-4 text-red-500" />
                               <div>
-                                <p className="font-medium text-sm">
-                                  {isSick ? "Sygdom" : "Ferie"}
-                                </p>
+                                <p className="font-medium text-sm">Sygdom</p>
                                 <p className="text-xs text-muted-foreground">
                                   {format(start, "d. MMM yyyy", { locale: da })}
                                   {days > 1 && ` – ${format(end, "d. MMM yyyy", { locale: da })}`}
                                 </p>
                               </div>
                             </div>
-                            <Badge variant="outline" className={isSick ? "border-red-500/30" : "border-amber-500/30"}>
+                            <Badge variant="outline" className="border-red-500/30">
                               {days} {days === 1 ? "dag" : "dage"}
                             </Badge>
                           </div>
                         );
                       })}
-                      {absences.length > 15 && (
+                      {absences.filter(a => a.type === "sick").length > 15 && (
                         <p className="text-xs text-center text-muted-foreground pt-2">
-                          Viser de seneste 15 af {absences.length} fraværsregistreringer
+                          Viser de seneste 15 af {absences.filter(a => a.type === "sick").length} sygemeldinger
                         </p>
                       )}
                     </div>
