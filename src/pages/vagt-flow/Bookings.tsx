@@ -262,9 +262,9 @@ export default function VagtBookings() {
     return days;
   };
 
-  const getAssignmentForDay = (booking: any, dayIndex: number) => {
+  const getAssignmentsForDay = (booking: any, dayIndex: number) => {
     const targetDate = format(addDays(weekStart, dayIndex), "yyyy-MM-dd");
-    return booking.booking_assignment?.find((a: any) => a.date === targetDate);
+    return booking.booking_assignment?.filter((a: any) => a.date === targetDate) || [];
   };
 
   const getVehicleForDay = (bookingId: string, dayIndex: number) => {
@@ -500,11 +500,12 @@ export default function VagtBookings() {
                             <p className="text-xs font-medium text-muted-foreground mb-2">Medarbejdere</p>
                             <div className="grid grid-cols-7 gap-2">
                               {DAYS.map((day, idx) => {
-                                const assignment = getAssignmentForDay(booking, idx);
+                                const assignments = getAssignmentsForDay(booking, idx);
                                 const targetDate = format(addDays(weekStart, idx), "yyyy-MM-dd");
                                 const isBooked = new Date(booking.start_date) <= addDays(weekStart, idx) && 
                                                  new Date(booking.end_date) >= addDays(weekStart, idx);
                                 const popoverKey = `${booking.id}-${idx}`;
+                                const hasAssignments = assignments.length > 0;
                                 
                                 return (
                                   <Popover
@@ -514,70 +515,71 @@ export default function VagtBookings() {
                                   >
                                     <PopoverTrigger asChild>
                                       <div
-                                        className={`p-2 rounded-lg text-center cursor-pointer transition-colors hover:ring-2 hover:ring-primary/50 ${
-                                          assignment 
+                                        className={`p-2 rounded-lg text-center cursor-pointer transition-colors hover:ring-2 hover:ring-primary/50 min-h-[60px] ${
+                                          hasAssignments 
                                             ? "bg-green-100 border-green-200 border" 
                                             : isBooked 
                                               ? "bg-red-50 border border-red-200 hover:bg-red-100"
                                               : "bg-muted/30 hover:bg-muted/50"
                                         }`}
                                       >
-                                        <p className={`text-xs ${assignment || isBooked ? "text-gray-600" : "text-muted-foreground"}`}>{day}</p>
-                                        <p className={`text-sm font-medium truncate ${assignment ? "text-green-800" : isBooked ? "text-red-700" : "text-foreground"}`}>
-                                          {assignment?.employee?.full_name?.split(" ")[0] || "-"}
-                                        </p>
+                                        <p className={`text-xs ${hasAssignments || isBooked ? "text-gray-600" : "text-muted-foreground"}`}>{day}</p>
+                                        {hasAssignments ? (
+                                          <div className="space-y-0.5">
+                                            {assignments.map((a: any) => (
+                                              <p key={a.id} className="text-xs font-medium truncate text-green-800">
+                                                {a.employee?.full_name?.split(" ")[0]}
+                                              </p>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className={`text-sm font-medium ${isBooked ? "text-red-700" : "text-foreground"}`}>-</p>
+                                        )}
                                       </div>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-64 p-2" align="start">
                                       <div className="space-y-2">
                                         <p className="text-sm font-medium px-2 py-1">
-                                          {assignment ? "Skift medarbejder" : "Tildel medarbejder"}
+                                          {hasAssignments ? "Administrer tildelinger" : "Tildel medarbejder"}
                                         </p>
-                                        {assignment && (
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="w-full justify-start text-destructive hover:text-destructive"
-                                            onClick={() => removeAssignmentMutation.mutate(assignment.id)}
-                                          >
-                                            <X className="h-4 w-4 mr-2" />
-                                            Fjern tildeling
-                                          </Button>
-                                        )}
-                                        <div className="max-h-48 overflow-y-auto">
-                                          {employees?.map((emp) => (
+                                        {assignments.map((a: any) => (
+                                          <div key={a.id} className="flex items-center justify-between px-2 py-1 bg-muted/50 rounded">
+                                            <span className="text-sm">{a.employee?.full_name}</span>
                                             <Button
-                                              key={emp.id}
                                               variant="ghost"
                                               size="sm"
-                                              className="w-full justify-start"
-                                              onClick={() => {
-                                                if (assignment) {
-                                                  removeAssignmentMutation.mutate(assignment.id, {
-                                                    onSuccess: () => {
-                                                      assignEmployeeMutation.mutate({
-                                                        bookingId: booking.id,
-                                                        employeeId: emp.id,
-                                                        date: targetDate,
-                                                      });
-                                                    },
-                                                  });
-                                                } else {
+                                              className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                              onClick={() => removeAssignmentMutation.mutate(a.id)}
+                                            >
+                                              <X className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        ))}
+                                        <div className="border-t pt-2">
+                                          <p className="text-xs text-muted-foreground px-2 mb-1">Tilføj medarbejder:</p>
+                                          <div className="max-h-48 overflow-y-auto">
+                                            {employees?.filter(emp => !assignments.some((a: any) => a.employee_id === emp.id)).map((emp) => (
+                                              <Button
+                                                key={emp.id}
+                                                variant="ghost"
+                                                size="sm"
+                                                className="w-full justify-start"
+                                                onClick={() => {
                                                   assignEmployeeMutation.mutate({
                                                     bookingId: booking.id,
                                                     employeeId: emp.id,
                                                     date: targetDate,
                                                   });
-                                                }
-                                              }}
-                                            >
-                                              <Users className="h-4 w-4 mr-2" />
-                                              {emp.full_name}
-                                              {emp.team && (
-                                                <span className="ml-auto text-xs text-muted-foreground">{emp.team}</span>
-                                              )}
-                                            </Button>
-                                          ))}
+                                                }}
+                                              >
+                                                <Users className="h-4 w-4 mr-2" />
+                                                {emp.full_name}
+                                                {emp.team && (
+                                                  <span className="ml-auto text-xs text-muted-foreground">{emp.team}</span>
+                                                )}
+                                              </Button>
+                                            ))}
+                                          </div>
                                         </div>
                                       </div>
                                     </PopoverContent>
