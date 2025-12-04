@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Agenter", href: "/agents", icon: Users },
+  { name: "Medarbejdere", href: "/employees", icon: Users },
   { name: "Salg", href: "/sales", icon: ShoppingCart },
   { name: "Codan", href: "/codan", icon: Shield },
   { name: "TDC Erhverv", href: "/tdc-erhverv", icon: Building2 },
