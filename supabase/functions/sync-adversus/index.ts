@@ -439,6 +439,12 @@ Deno.serve(async (req) => {
       const body = requestBody || {}
       filterDays = body.days || 30
       
+      // Safety clamp to avoid huge ranges that can cause timeouts
+      if (filterDays > 120) {
+        console.log(`Requested days (${filterDays}) exceeds max 120, clamping to 120`)
+        filterDays = 120
+      }
+      
       console.log(`Syncing sales to database (last ${filterDays} days)...`)
       
       // Fetch campaigns first for lookup
