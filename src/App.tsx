@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import AdversusData from "./pages/AdversusData";
 import Logikker from "./pages/Logikker";
 import EmployeeMasterData from "./pages/EmployeeMasterData";
+import EmployeeDetail from "./pages/EmployeeDetail";
 // Vagt-flow pages
 import VagtFlowIndex from "./pages/vagt-flow/Index";
 import VagtBookWeek from "./pages/vagt-flow/BookWeek";
@@ -92,6 +93,7 @@ const App = () => (
           <Route path="/adversus-data" element={<ProtectedRoute><AdversusData /></ProtectedRoute>} />
           <Route path="/logikker" element={<ProtectedRoute><Logikker /></ProtectedRoute>} />
           <Route path="/employees" element={<ProtectedRoute><EmployeeMasterData /></ProtectedRoute>} />
+          <Route path="/employees/:id" element={<ProtectedRoute><EmployeeDetail /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           {/* Vagt-flow routes */}
           <Route path="/vagt-flow" element={<ProtectedRoute><VagtFlowIndex /></ProtectedRoute>} />
