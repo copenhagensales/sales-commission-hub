@@ -302,6 +302,45 @@ export default function EmployeeDetail() {
   });
 
   const handleSave = (field: string, value: unknown) => {
+    // Special handling for is_active to update dates automatically
+    if (field === "is_active") {
+      const today = new Date().toISOString().split("T")[0];
+      const isActive = value as boolean;
+      
+      if (isActive) {
+        // Reactivating: set new start date, clear end date
+        supabase
+          .from("employee_master_data")
+          .update({ is_active: true, employment_start_date: today, employment_end_date: null })
+          .eq("id", id)
+          .then(({ error }) => {
+            if (error) {
+              toast({ title: "Fejl", description: error.message, variant: "destructive" });
+            } else {
+              queryClient.invalidateQueries({ queryKey: ["employee-detail", id] });
+              queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+              toast({ title: "Medarbejder genaktiveret" });
+            }
+          });
+      } else {
+        // Deactivating: set end date
+        supabase
+          .from("employee_master_data")
+          .update({ is_active: false, employment_end_date: today })
+          .eq("id", id)
+          .then(({ error }) => {
+            if (error) {
+              toast({ title: "Fejl", description: error.message, variant: "destructive" });
+            } else {
+              queryClient.invalidateQueries({ queryKey: ["employee-detail", id] });
+              queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+              toast({ title: "Medarbejder deaktiveret" });
+            }
+          });
+      }
+      return;
+    }
+    
     updateMutation.mutate({ field, value });
   };
 
