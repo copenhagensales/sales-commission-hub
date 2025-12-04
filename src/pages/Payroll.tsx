@@ -91,6 +91,7 @@ interface SearchableSale {
   customer_company: string | null;
   customer_phone: string | null;
   adversus_external_id: string | null;
+  adversus_opp_number: string | null;
   sale_items: PayrollSaleItem[];
 }
 
@@ -440,7 +441,7 @@ export default function Payroll() {
       const { data: sales, error: salesError } = await supabase
         .from("sales")
         .select(
-          "id, sale_datetime, agent_name, customer_company, customer_phone, adversus_external_id, sale_items(adversus_product_title, mapped_commission, mapped_revenue, quantity)"
+          "id, sale_datetime, agent_name, customer_company, customer_phone, adversus_external_id, adversus_opp_number, sale_items(adversus_product_title, mapped_commission, mapped_revenue, quantity)"
         )
         .in("client_campaign_id", campaignIds);
 
@@ -466,6 +467,7 @@ export default function Payroll() {
     if (!searchTerm.trim()) return false;
     const term = searchTerm.toLowerCase();
     const inExternalId = sale.adversus_external_id?.toLowerCase().includes(term) ?? false;
+    const inOppAdversus = sale.adversus_opp_number?.toLowerCase().includes(term) ?? false;
     const inPhone = sale.customer_phone?.toLowerCase().includes(term) ?? false;
     const inCompany = sale.customer_company?.toLowerCase().includes(term) ?? false;
     const inAgent = sale.agent_name?.toLowerCase().includes(term) ?? false;
@@ -474,7 +476,7 @@ export default function Payroll() {
     const inOpp = matchFromCancellations?.oppNumber?.toLowerCase().includes(term) ?? false;
     const inCancelOrderId = matchFromCancellations?.externalId?.toLowerCase().includes(term) ?? false;
 
-    return inExternalId || inPhone || inCompany || inAgent || inOpp || inCancelOrderId;
+    return inExternalId || inOppAdversus || inPhone || inCompany || inAgent || inOpp || inCancelOrderId;
   });
 
   return (
@@ -770,7 +772,7 @@ export default function Payroll() {
             ) : (
               <div className="space-y-4">
                 <Input
-                  placeholder="Søg på ordre-id, telefon, kundenavn eller agent"
+                  placeholder="Søg på OPP-nummer, ordre-id, telefon, kundenavn eller agent"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="max-w-md"
