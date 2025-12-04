@@ -37,6 +37,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { AddEmployeeDialog } from "@/components/vagt-flow/AddEmployeeDialog";
 
 export default function VagtBookings() {
   const { toast } = useToast();
@@ -51,6 +52,7 @@ export default function VagtBookings() {
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set([`${selectedYear}-${selectedWeek}`]));
   const [absenceExpanded, setAbsenceExpanded] = useState(true);
   const [openAssignPopover, setOpenAssignPopover] = useState<string | null>(null);
+  const [addEmployeeDialogBooking, setAddEmployeeDialogBooking] = useState<any>(null);
 
   const weekStart = startOfWeek(new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7), { weekStartsOn: 1 });
   const DAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
@@ -158,11 +160,34 @@ export default function VagtBookings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
-      toast({ title: "Medarbejder tildelt" });
       setOpenAssignPopover(null);
     },
     onError: () => {
       toast({ title: "Kunne ikke tildele medarbejder", variant: "destructive" });
+    },
+  });
+
+  const bulkAssignMutation = useMutation({
+    mutationFn: async (assignments: { bookingId: string; employeeId: string; dates: string[] }[]) => {
+      const inserts = assignments.flatMap(a => 
+        a.dates.map(date => ({
+          booking_id: a.bookingId,
+          employee_id: a.employeeId,
+          date,
+          start_time: "09:00",
+          end_time: "17:00",
+        }))
+      );
+      const { error } = await supabase.from("booking_assignment").insert(inserts);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Medarbejdere tildelt" });
+      setAddEmployeeDialogBooking(null);
+    },
+    onError: () => {
+      toast({ title: "Kunne ikke tildele medarbejdere", variant: "destructive" });
     },
   });
 
@@ -453,20 +478,7 @@ export default function VagtBookings() {
                                 variant="ghost" 
                                 size="sm" 
                                 className="text-primary"
-                                onClick={() => {
-                                  // Find first day without assignment within booking dates
-                                  for (let i = 0; i < 7; i++) {
-                                    const dayDate = addDays(weekStart, i);
-                                    if (dayDate >= new Date(booking.start_date) && dayDate <= new Date(booking.end_date)) {
-                                      const existing = getAssignmentForDay(booking, i);
-                                      if (!existing) {
-                                        setOpenAssignPopover(`${booking.id}-${i}`);
-                                        return;
-                                      }
-                                    }
-                                  }
-                                  toast({ title: "Alle dage har allerede en tildeling" });
-                                }}
+                                onClick={() => setAddEmployeeDialogBooking(booking)}
                               >
                                 <Plus className="h-4 w-4 mr-1" /> Tilføj
                               </Button>
@@ -638,6 +650,26 @@ export default function VagtBookings() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AddEmployeeDialog
+        open={!!addEmployeeDialogBooking}
+        onOpenChange={(open) => !open && setAddEmployeeDialogBooking(null)}
+        booking={addEmployeeDialogBooking}
+        weekNumber={selectedWeek}
+        year={selectedYear}
+        weekStart={weekStart}
+        employees={employees || []}
+        onAddAssignments={(assignments) => {
+          if (!addEmployeeDialogBooking) return;
+          bulkAssignMutation.mutate(
+            assignments.map(a => ({
+              bookingId: addEmployeeDialogBooking.id,
+              employeeId: a.employeeId,
+              dates: a.dates,
+            }))
+          );
+        }}
+      />
     </MainLayout>
   );
 }
