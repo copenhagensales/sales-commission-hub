@@ -3,10 +3,10 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useSearchParams } from "react-router-dom";
-import { Calendar, ChevronLeft, ChevronRight, Plus, Star, Search, Trash2 } from "lucide-react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { Calendar, ChevronLeft, ChevronRight, Plus, Star, Search, Phone } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -30,24 +30,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { format, startOfWeek, getWeek, getYear, addWeeks, differenceInWeeks } from "date-fns";
-import { da } from "date-fns/locale";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { format, startOfWeek, getWeek, getYear, differenceInWeeks } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CapacityPanel } from "@/components/vagt-flow/CapacityPanel";
+
+type LocationTab = "mulige" | "cooldown" | "utilgaengelige";
 
 export default function VagtBookWeek() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const weekParam = searchParams.get("week");
@@ -60,10 +54,11 @@ export default function VagtBookWeek() {
   );
   const [selectedBrandId, setSelectedBrandId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [locationType, setLocationType] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<LocationTab>("mulige");
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4]);
-  const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
 
   const DAYS = [
     { label: "Mandag", value: 0 },
@@ -88,31 +83,12 @@ export default function VagtBookWeek() {
   });
 
   const { data: locations } = useQuery({
-    queryKey: ["vagt-locations"],
+    queryKey: ["vagt-locations-bookweek"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("location")
         .select("*, booking(id, brand_id, week_number, year, end_date, brand(name, color_hex))")
-        .eq("status", "Aktiv")
         .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: weekBookings, refetch: refetchBookings } = useQuery({
-    queryKey: ["vagt-week-bookings", selectedWeek, selectedYear],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("booking")
-        .select(`
-          *,
-          location(name, address_city),
-          brand(name, color_hex)
-        `)
-        .eq("week_number", selectedWeek)
-        .eq("year", selectedYear)
-        .in("status", ["Planlagt", "Bekræftet"]);
       if (error) throw error;
       return data;
     },
@@ -149,66 +125,92 @@ export default function VagtBookWeek() {
       toast({ title: "Booking oprettet!" });
       setBookingDialogOpen(false);
       setSelectedLocation(null);
-      refetchBookings();
-      queryClient.invalidateQueries({ queryKey: ["vagt-locations"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-locations-bookweek"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-week-bookings-capacity"] });
     },
     onError: (error: any) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
     },
   });
 
-  const deleteBookingMutation = useMutation({
-    mutationFn: async (bookingId: string) => {
-      const { error } = await supabase.from("booking").delete().eq("id", bookingId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vagt-week-bookings"] });
-      queryClient.invalidateQueries({ queryKey: ["vagt-locations"] });
-      toast({ title: "Booking slettet" });
-      setDeleteBookingId(null);
-    },
-  });
-
   const selectedBrand = brands?.find((b) => b.id === selectedBrandId);
+  const weekStartDate = startOfWeek(new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7), { weekStartsOn: 1 });
 
+  // Process locations into categories
+  const processedLocations = useMemo(() => {
+    if (!locations || !selectedBrand) return { mulige: [], cooldown: [], utilgaengelige: [] };
+
+    const brandName = selectedBrand.name;
+    
+    const categorized = {
+      mulige: [] as any[],
+      cooldown: [] as any[],
+      utilgaengelige: [] as any[],
+    };
+
+    locations.forEach((loc: any) => {
+      // Check if brand can book this location
+      const canBook = (brandName === "Eesy" && loc.can_book_eesy) || (brandName === "YouSee" && loc.can_book_yousee);
+      
+      // Check if already booked this week for this brand
+      const hasBookingInWeek = loc.booking?.some(
+        (b: any) => b.brand_id === selectedBrandId && b.week_number === selectedWeek && b.year === selectedYear
+      );
+
+      // Get last booking for this brand
+      const lastBooking = loc.booking
+        ?.filter((b: any) => b.brand_id === selectedBrandId)
+        .sort((a: any, b: any) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime())[0];
+
+      const weeksSince = lastBooking ? differenceInWeeks(weekStartDate, new Date(lastBooking.end_date)) : 999;
+      const cooldownWeeks = loc.cooldown_weeks || 4;
+      const isInCooldown = weeksSince < cooldownWeeks && weeksSince !== 999;
+
+      const enrichedLoc = { ...loc, lastBooking, weeksSince };
+
+      // Categorize
+      if (!canBook || loc.status === "Sortlistet" || loc.status === "Pause" || hasBookingInWeek) {
+        categorized.utilgaengelige.push(enrichedLoc);
+      } else if (isInCooldown) {
+        categorized.cooldown.push(enrichedLoc);
+      } else {
+        categorized.mulige.push(enrichedLoc);
+      }
+    });
+
+    // Sort each category
+    const sortFn = (a: any, b: any) => {
+      if (a.is_favorite && !b.is_favorite) return -1;
+      if (!a.is_favorite && b.is_favorite) return 1;
+      return b.weeksSince - a.weeksSince;
+    };
+
+    categorized.mulige.sort(sortFn);
+    categorized.cooldown.sort(sortFn);
+    categorized.utilgaengelige.sort(sortFn);
+
+    return categorized;
+  }, [locations, selectedBrand, selectedBrandId, selectedWeek, selectedYear, weekStartDate]);
+
+  // Filter by search and type
   const filteredLocations = useMemo(() => {
-    if (!locations || !selectedBrand) return [];
+    let locs = processedLocations[activeTab] || [];
 
-    const weekStartDate = startOfWeek(new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7), { weekStartsOn: 1 });
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      locs = locs.filter((loc: any) => 
+        loc.name?.toLowerCase().includes(query) || 
+        loc.address_city?.toLowerCase().includes(query) ||
+        loc.type?.toLowerCase().includes(query)
+      );
+    }
 
-    return locations
-      .filter((loc: any) => {
-        const brandName = selectedBrand.name;
-        const canBook = (brandName === "Eesy" && loc.can_book_eesy) || (brandName === "YouSee" && loc.can_book_yousee);
-        if (!canBook) return false;
+    if (locationType !== "all") {
+      locs = locs.filter((loc: any) => loc.type === locationType);
+    }
 
-        const hasBookingInWeek = loc.booking?.some(
-          (b: any) => b.brand_id === selectedBrandId && b.week_number === selectedWeek && b.year === selectedYear
-        );
-        if (hasBookingInWeek) return false;
-
-        if (searchQuery) {
-          const query = searchQuery.toLowerCase();
-          return loc.name?.toLowerCase().includes(query) || loc.address_city?.toLowerCase().includes(query);
-        }
-        return true;
-      })
-      .map((loc: any) => {
-        const lastBooking = loc.booking
-          ?.filter((b: any) => b.brand_id === selectedBrandId)
-          .sort((a: any, b: any) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime())[0];
-
-        const weeksSince = lastBooking ? differenceInWeeks(weekStartDate, new Date(lastBooking.end_date)) : 999;
-
-        return { ...loc, lastBooking, weeksSince };
-      })
-      .sort((a, b) => {
-        if (a.is_favorite && !b.is_favorite) return -1;
-        if (!a.is_favorite && b.is_favorite) return 1;
-        return b.weeksSince - a.weeksSince;
-      });
-  }, [locations, selectedBrand, selectedBrandId, selectedWeek, selectedYear, searchQuery]);
+    return locs;
+  }, [processedLocations, activeTab, searchQuery, locationType]);
 
   const handlePrevWeek = () => {
     const newWeek = selectedWeek - 1;
@@ -228,13 +230,21 @@ export default function VagtBookWeek() {
     );
   };
 
+  const statusColors: Record<string, string> = {
+    Ny: "bg-blue-100 text-blue-700",
+    Aktiv: "bg-green-100 text-green-700",
+    Pause: "bg-yellow-100 text-yellow-700",
+    Sortlistet: "bg-red-100 text-red-700",
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Book uge</h1>
-            <p className="text-muted-foreground">Planlæg bookinger for en hel uge</p>
+            <p className="text-muted-foreground">Planlæg bookinger for en hel uge med fuldt overblik</p>
           </div>
           <div className="flex items-center gap-3 bg-card px-6 py-4 rounded-xl border">
             <Button variant="outline" size="icon" onClick={handlePrevWeek}>
@@ -250,60 +260,19 @@ export default function VagtBookWeek() {
           </div>
         </div>
 
-        {/* Current week bookings */}
-        <Card>
-          <CardContent className="pt-6">
-            <h3 className="font-semibold mb-4">Bookinger i uge {selectedWeek}</h3>
-            {weekBookings && weekBookings.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Lokation</TableHead>
-                    <TableHead>Brand</TableHead>
-                    <TableHead>Datoer</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {weekBookings.map((booking: any) => (
-                    <TableRow key={booking.id}>
-                      <TableCell className="font-medium">
-                        {booking.location?.name}
-                        <span className="text-muted-foreground ml-2 text-sm">{booking.location?.address_city}</span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge style={{ backgroundColor: booking.brand?.color_hex, color: "#fff" }}>
-                          {booking.brand?.name}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {format(new Date(booking.start_date), "d/M")} - {format(new Date(booking.end_date), "d/M")}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{booking.status}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => setDeleteBookingId(booking.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <p className="text-muted-foreground text-sm">Ingen bookinger i denne uge</p>
-            )}
-          </CardContent>
-        </Card>
+        {/* Capacity Panel */}
+        <CapacityPanel
+          selectedDate={weekStartDate}
+          weekNumber={selectedWeek}
+          year={selectedYear}
+        />
 
-        {/* Booking form */}
+        {/* Filters */}
         <Card>
           <CardContent className="pt-6">
-            <div className="grid gap-4 md:grid-cols-3 mb-6">
+            <div className="grid gap-4 md:grid-cols-3">
               <div>
-                <label className="text-sm font-medium mb-2 block">Brand *</label>
+                <label className="text-xs font-medium mb-2 block uppercase text-muted-foreground">Brand *</label>
                 <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Vælg brand" />
@@ -317,68 +286,164 @@ export default function VagtBookWeek() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="col-span-2">
-                <label className="text-sm font-medium mb-2 block">Søg lokation</label>
+              <div>
+                <label className="text-xs font-medium mb-2 block uppercase text-muted-foreground">Søg butik</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Søg efter navn eller by..."
+                    placeholder="Søg på navn, by eller type..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
                   />
                 </div>
               </div>
+              <div>
+                <label className="text-xs font-medium mb-2 block uppercase text-muted-foreground">Lokationstype</label>
+                <Select value={locationType} onValueChange={setLocationType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Alle typer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle typer</SelectItem>
+                    <SelectItem value="Butik">Butik</SelectItem>
+                    <SelectItem value="Storcenter">Storcenter</SelectItem>
+                    <SelectItem value="Markeder">Markeder</SelectItem>
+                    <SelectItem value="Messer">Messer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+          </CardContent>
+        </Card>
 
-            {selectedBrandId ? (
+        {/* Location list with tabs */}
+        {selectedBrandId ? (
+          <Card>
+            <CardHeader className="pb-0">
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Lokationer for {selectedBrand?.name}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {/* Tabs */}
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as LocationTab)} className="mb-4">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="mulige" className="gap-2">
+                    Mulige
+                    <Badge variant="secondary" className="ml-1 bg-green-100 text-green-700">
+                      {processedLocations.mulige.length}
+                    </Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="cooldown" className="gap-2">
+                    Cooldown
+                    <Badge variant="secondary" className="ml-1 bg-orange-100 text-orange-700">
+                      {processedLocations.cooldown.length}
+                    </Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="utilgaengelige" className="gap-2">
+                    Utilgængelige
+                    <Badge variant="secondary" className="ml-1">
+                      {processedLocations.utilgaengelige.length}
+                    </Badge>
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {/* Table */}
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead></TableHead>
-                    <TableHead>Lokation</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>By</TableHead>
-                    <TableHead>Uger siden</TableHead>
-                    <TableHead></TableHead>
+                    <TableHead className="w-[250px]">Lokation ↕</TableHead>
+                    <TableHead>Type ↕</TableHead>
+                    <TableHead>By ↕</TableHead>
+                    <TableHead>Uger siden ↓</TableHead>
+                    <TableHead>Sidst besøgt</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Handlinger</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredLocations.map((loc: any) => (
-                    <TableRow key={loc.id}>
-                      <TableCell>
-                        {loc.is_favorite && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
-                      </TableCell>
-                      <TableCell className="font-medium">{loc.name}</TableCell>
-                      <TableCell>{loc.type || "-"}</TableCell>
-                      <TableCell>{loc.address_city || "-"}</TableCell>
-                      <TableCell>
-                        {loc.weeksSince === 999 ? (
-                          <Badge variant="secondary">Aldrig</Badge>
-                        ) : (
-                          <span>{loc.weeksSince} uger</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedLocation(loc);
-                            setBookingDialogOpen(true);
-                          }}
-                        >
-                          <Plus className="h-4 w-4 mr-1" /> Book
-                        </Button>
+                  {filteredLocations.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        Ingen lokationer i denne kategori
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    filteredLocations.map((loc: any) => (
+                      <TableRow 
+                        key={loc.id} 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => navigate(`/vagt-flow/locations/${loc.id}`)}
+                      >
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {loc.is_favorite && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
+                            {loc.name}
+                          </div>
+                        </TableCell>
+                        <TableCell>{loc.type || "-"}</TableCell>
+                        <TableCell>{loc.address_city || "-"}</TableCell>
+                        <TableCell>
+                          {loc.weeksSince === 999 ? (
+                            <span className="text-muted-foreground">Aldrig</span>
+                          ) : (
+                            <span>{loc.weeksSince} uger</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {loc.lastBooking ? (
+                            format(new Date(loc.lastBooking.end_date), "d/M-yyyy")
+                          ) : (
+                            <span className="text-muted-foreground">Aldrig</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={statusColors[loc.status || "Ny"]}>
+                            {loc.status || "Ny"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {loc.contact_phone && (
+                              <a
+                                href={`tel:${loc.contact_phone}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-2 rounded-md hover:bg-muted transition-colors"
+                              >
+                                <Phone className="h-4 w-4 text-muted-foreground" />
+                              </a>
+                            )}
+                            {activeTab === "mulige" && (
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedLocation(loc);
+                                  setBookingDialogOpen(true);
+                                }}
+                              >
+                                <Plus className="h-4 w-4 mr-1" /> Book
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
-            ) : (
-              <p className="text-muted-foreground text-center py-8">Vælg et brand for at se tilgængelige lokationer</p>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="py-12">
+              <p className="text-muted-foreground text-center">Vælg et brand for at se tilgængelige lokationer</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Booking dialog */}
@@ -426,27 +491,6 @@ export default function VagtBookWeek() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Delete confirmation */}
-      <AlertDialog open={!!deleteBookingId} onOpenChange={() => setDeleteBookingId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Slet booking?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Er du sikker på at du vil slette denne booking? Handlingen kan ikke fortrydes.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuller</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteBookingId && deleteBookingMutation.mutate(deleteBookingId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Slet
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </MainLayout>
   );
 }
