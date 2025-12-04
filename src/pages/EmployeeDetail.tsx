@@ -1050,7 +1050,7 @@ export default function EmployeeDetail() {
                     </div>
                     <Progress 
                       value={Math.min(absenceStats.sickPercentInPeriod * 10, 100)} 
-                      className="h-2"
+                      className={`h-3 ${absenceStats.sickPercentInPeriod > 3.5 ? '[&>div]:bg-destructive' : ''}`}
                     />
                   </div>
                   <div>
