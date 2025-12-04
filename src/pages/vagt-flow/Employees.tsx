@@ -72,11 +72,11 @@ export default function VagtEmployees() {
   });
 
   const [absenceForm, setAbsenceForm] = useState({
-    start_date: "",
-    end_date: "",
+    selectedDays: [] as number[],
     reason: "Ferie" as "Ferie" | "Syg" | "Barn syg" | "Andet",
     note: "",
   });
+  const [absenceWeekDate, setAbsenceWeekDate] = useState(new Date());
 
   const { data: employees, isLoading } = useQuery({
     queryKey: ["vagt-all-employees"],
@@ -251,21 +251,28 @@ export default function VagtEmployees() {
   });
 
   const addAbsenceMutation = useMutation({
-    mutationFn: async (data: { employee_id: string; start_date: string; end_date: string; reason: "Ferie" | "Syg" | "Barn syg" | "Andet"; note: string }) => {
-      const { error } = await supabase.from("employee_absence").insert({
-        employee_id: data.employee_id,
-        start_date: data.start_date,
-        end_date: data.end_date,
-        reason: data.reason,
-        note: data.note || null,
-        status: "pending",
+    mutationFn: async (data: { employee_id: string; selectedDays: number[]; reason: "Ferie" | "Syg" | "Barn syg" | "Andet"; note: string; weekStart: Date }) => {
+      // Create individual absences for each selected day
+      const absencesToInsert = data.selectedDays.map(dayIndex => {
+        const date = addDays(data.weekStart, dayIndex);
+        const dateStr = format(date, "yyyy-MM-dd");
+        return {
+          employee_id: data.employee_id,
+          start_date: dateStr,
+          end_date: dateStr,
+          reason: data.reason,
+          note: data.note || null,
+          status: "APPROVED",
+        };
       });
+
+      const { error } = await supabase.from("employee_absence").insert(absencesToInsert);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vagt-week-absences"] });
       setShowAbsenceDialog(null);
-      setAbsenceForm({ start_date: "", end_date: "", reason: "Ferie", note: "" });
+      setAbsenceForm({ selectedDays: [], reason: "Ferie", note: "" });
       toast({ title: "Fravær tilføjet" });
     },
   });
@@ -490,9 +497,9 @@ export default function VagtEmployees() {
                           <button
                             onClick={() => {
                               setShowAbsenceDialog(emp);
+                              setAbsenceWeekDate(referenceDate);
                               setAbsenceForm({
-                                start_date: format(weekStart, "yyyy-MM-dd"),
-                                end_date: format(weekStart, "yyyy-MM-dd"),
+                                selectedDays: [],
                                 reason: "Ferie",
                                 note: "",
                               });
@@ -651,23 +658,110 @@ export default function VagtEmployees() {
 
       {/* Add absence dialog */}
       <Dialog open={!!showAbsenceDialog} onOpenChange={() => setShowAbsenceDialog(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Tilføj fravær for {showAbsenceDialog?.full_name}</DialogTitle>
+            <DialogTitle>Tilføj fravær</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-6 py-4">
+            {/* Employee name and week */}
             <div>
-              <Label>Start dato</Label>
-              <Input type="date" value={absenceForm.start_date} onChange={(e) => setAbsenceForm({ ...absenceForm, start_date: e.target.value })} />
+              <p className="font-semibold">{showAbsenceDialog?.full_name}</p>
+              <p className="text-sm text-muted-foreground">
+                Uge {getWeek(absenceWeekDate, { weekStartsOn: 1 })}, {getYear(absenceWeekDate)}
+              </p>
             </div>
+
+            {/* Day selector */}
             <div>
-              <Label>Slut dato</Label>
-              <Input type="date" value={absenceForm.end_date} onChange={(e) => setAbsenceForm({ ...absenceForm, end_date: e.target.value })} />
+              <Label className="text-sm font-medium">Vælg dage</Label>
+              <div className="mt-3">
+                {/* Week navigation */}
+                <div className="flex items-center justify-between mb-4">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setAbsenceWeekDate(addWeeks(absenceWeekDate, -1))}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm font-medium">
+                    Uge {getWeek(absenceWeekDate, { weekStartsOn: 1 })}, {getYear(absenceWeekDate)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setAbsenceWeekDate(addWeeks(absenceWeekDate, 1))}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Day circles */}
+                <div className="flex justify-center gap-2">
+                  {(() => {
+                    const dialogWeekStart = startOfWeek(absenceWeekDate, { weekStartsOn: 1 });
+                    return DAY_LABELS.map((label, idx) => {
+                      const date = addDays(dialogWeekStart, idx);
+                      const isSelected = absenceForm.selectedDays.includes(idx);
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setAbsenceForm({
+                                ...absenceForm,
+                                selectedDays: absenceForm.selectedDays.filter(d => d !== idx),
+                              });
+                            } else {
+                              setAbsenceForm({
+                                ...absenceForm,
+                                selectedDays: [...absenceForm.selectedDays, idx].sort(),
+                              });
+                            }
+                          }}
+                          className={cn(
+                            "flex flex-col items-center transition-all",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "w-12 h-12 rounded-xl flex items-center justify-center text-lg font-semibold transition-all",
+                              isSelected
+                                ? "bg-emerald-600 text-white"
+                                : "bg-muted hover:bg-muted/80 text-foreground"
+                            )}
+                          >
+                            {label}
+                          </div>
+                          <span className="text-xs text-muted-foreground mt-1">
+                            {format(date, "d/M")}
+                          </span>
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
+
+                {/* Selected days summary */}
+                {absenceForm.selectedDays.length > 0 && (
+                  <p className="text-sm text-center text-muted-foreground mt-3">
+                    Valgte dage: {absenceForm.selectedDays.map(idx => {
+                      const dayNames = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"];
+                      return dayNames[idx];
+                    }).join(", ")}
+                  </p>
+                )}
+              </div>
             </div>
+
+            {/* Type */}
             <div>
-              <Label>Årsag</Label>
+              <Label>Type</Label>
               <Select value={absenceForm.reason} onValueChange={(v: any) => setAbsenceForm({ ...absenceForm, reason: v })}>
-                <SelectTrigger>
+                <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -678,24 +772,35 @@ export default function VagtEmployees() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Note */}
             <div>
-              <Label>Note</Label>
-              <Input value={absenceForm.note} onChange={(e) => setAbsenceForm({ ...absenceForm, note: e.target.value })} />
+              <Label>Bemærkning (valgfri)</Label>
+              <textarea
+                value={absenceForm.note}
+                onChange={(e) => setAbsenceForm({ ...absenceForm, note: e.target.value })}
+                placeholder="Tilføj evt. en note..."
+                className="mt-1 w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAbsenceDialog(null)}>Annuller</Button>
             <Button
-              onClick={() => addAbsenceMutation.mutate({
-                employee_id: showAbsenceDialog?.id,
-                start_date: absenceForm.start_date,
-                end_date: absenceForm.end_date,
-                reason: absenceForm.reason,
-                note: absenceForm.note,
-              })}
-              disabled={!absenceForm.start_date || !absenceForm.end_date || addAbsenceMutation.isPending}
+              onClick={() => {
+                const dialogWeekStart = startOfWeek(absenceWeekDate, { weekStartsOn: 1 });
+                addAbsenceMutation.mutate({
+                  employee_id: showAbsenceDialog?.id,
+                  selectedDays: absenceForm.selectedDays,
+                  reason: absenceForm.reason,
+                  note: absenceForm.note,
+                  weekStart: dialogWeekStart,
+                });
+              }}
+              disabled={absenceForm.selectedDays.length === 0 || addAbsenceMutation.isPending}
+              className="bg-emerald-600 hover:bg-emerald-700"
             >
-              Tilføj
+              Opret fravær
             </Button>
           </DialogFooter>
         </DialogContent>
