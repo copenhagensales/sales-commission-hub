@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X, History, Phone, Mail, Pencil, MessageSquare, KeyRound, RotateCcw } from "lucide-react";
+import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X, History, Phone, Mail, Pencil, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, TrendingUp, AlertTriangle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -366,6 +367,101 @@ export default function EmployeeDetail() {
     },
   });
 
+  // Fetch absence history for this employee
+  const { data: absences = [] } = useQuery({
+    queryKey: ["employee-absences", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data, error } = await supabase
+        .from("absence_request_v2")
+        .select("*")
+        .eq("employee_id", id)
+        .eq("status", "approved")
+        .order("start_date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  // Calculate absence statistics
+  const absenceStats = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    
+    // Filter absences for different periods
+    const thisYearAbsences = absences.filter(a => new Date(a.start_date).getFullYear() === currentYear);
+    const lastYearAbsences = absences.filter(a => {
+      const date = new Date(a.start_date);
+      return date >= oneYearAgo && date <= now;
+    });
+    
+    // Count sick and vacation days
+    const countDays = (absenceList: typeof absences, type: string) => {
+      return absenceList.filter(a => a.type === type).reduce((sum, a) => {
+        const start = new Date(a.start_date);
+        const end = new Date(a.end_date);
+        const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        return sum + days;
+      }, 0);
+    };
+    
+    const countOccurrences = (absenceList: typeof absences, type: string) => {
+      return absenceList.filter(a => a.type === type).length;
+    };
+    
+    // Calculate working days in period (approximate: 260 per year)
+    const workingDaysPerYear = 260;
+    
+    const sickDaysThisYear = countDays(thisYearAbsences, "sick");
+    const sickDaysLast12Months = countDays(lastYearAbsences, "sick");
+    const vacationDaysThisYear = countDays(thisYearAbsences, "vacation");
+    const sickOccurrencesThisYear = countOccurrences(thisYearAbsences, "sick");
+    const sickOccurrencesLast12Months = countOccurrences(lastYearAbsences, "sick");
+    
+    // Sick percentage (of working days)
+    const sickPercentThisYear = (sickDaysThisYear / workingDaysPerYear) * 100;
+    const sickPercentLast12Months = (sickDaysLast12Months / workingDaysPerYear) * 100;
+    
+    // Average days per sick occurrence
+    const avgDaysPerSick = sickOccurrencesLast12Months > 0 
+      ? sickDaysLast12Months / sickOccurrencesLast12Months 
+      : 0;
+    
+    // Check for patterns (many short sick periods could indicate issues)
+    const hasFrequentShortSickness = sickOccurrencesLast12Months >= 5 && avgDaysPerSick < 2;
+    
+    // Get sick absences sorted by date for pattern analysis
+    const sickAbsences = lastYearAbsences.filter(a => a.type === "sick").sort(
+      (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+    );
+    
+    // Check for Monday/Friday patterns
+    const mondayFridaySick = sickAbsences.filter(a => {
+      const day = new Date(a.start_date).getDay();
+      return day === 1 || day === 5;
+    }).length;
+    const mondayFridayPercent = sickOccurrencesLast12Months > 0 
+      ? (mondayFridaySick / sickOccurrencesLast12Months) * 100 
+      : 0;
+    
+    return {
+      sickDaysThisYear,
+      sickDaysLast12Months,
+      vacationDaysThisYear,
+      sickOccurrencesThisYear,
+      sickOccurrencesLast12Months,
+      sickPercentThisYear,
+      sickPercentLast12Months,
+      avgDaysPerSick,
+      hasFrequentShortSickness,
+      mondayFridayPercent,
+      mondayFridaySick,
+      sickAbsences,
+    };
+  }, [absences]);
+
   const updateMutation = useMutation({
     mutationFn: async ({ field, value }: { field: string; value: unknown }) => {
       if (!id) throw new Error("No ID");
@@ -603,6 +699,10 @@ export default function EmployeeDetail() {
         <Tabs defaultValue="stamdata" className="w-full">
           <TabsList>
             <TabsTrigger value="stamdata">Stamdata</TabsTrigger>
+            <TabsTrigger value="fravaer">
+              <CalendarX className="h-4 w-4 mr-2" />
+              Fravær
+            </TabsTrigger>
             <TabsTrigger value="historik">
               <History className="h-4 w-4 mr-2" />
               Historik
@@ -818,6 +918,182 @@ export default function EmployeeDetail() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="fravaer" className="mt-6">
+            <div className="space-y-6">
+              {/* Overview Stats */}
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-red-500/10">
+                        <Thermometer className="h-5 w-5 text-red-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Sygefravær (12 mdr)</p>
+                        <p className="text-2xl font-bold">{absenceStats.sickPercentLast12Months.toFixed(1)}%</p>
+                        <p className="text-xs text-muted-foreground">
+                          {absenceStats.sickDaysLast12Months} dage • {absenceStats.sickOccurrencesLast12Months} gange
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-amber-500/10">
+                        <Palmtree className="h-5 w-5 text-amber-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Ferie (i år)</p>
+                        <p className="text-2xl font-bold">{absenceStats.vacationDaysThisYear} dage</p>
+                        <p className="text-xs text-muted-foreground">
+                          Afholdt ferie i {new Date().getFullYear()}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-blue-500/10">
+                        <TrendingUp className="h-5 w-5 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Gns. sygeperiode</p>
+                        <p className="text-2xl font-bold">{absenceStats.avgDaysPerSick.toFixed(1)} dage</p>
+                        <p className="text-xs text-muted-foreground">
+                          Per sygemelding
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Pattern Analysis */}
+              {(absenceStats.hasFrequentShortSickness || absenceStats.mondayFridayPercent > 50) && (
+                <Card className="border-amber-500/30 bg-amber-500/5">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
+                      <div className="space-y-2">
+                        <p className="font-medium text-amber-700 dark:text-amber-400">Fraværsmønster bemærket</p>
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          {absenceStats.hasFrequentShortSickness && (
+                            <p>• Du har haft {absenceStats.sickOccurrencesLast12Months} korte sygeperioder på under 2 dage i gennemsnit. Overvej om der er noget vi kan hjælpe med?</p>
+                          )}
+                          {absenceStats.mondayFridayPercent > 50 && absenceStats.sickOccurrencesLast12Months >= 3 && (
+                            <p>• {absenceStats.mondayFridaySick} af {absenceStats.sickOccurrencesLast12Months} sygemeldinger ({absenceStats.mondayFridayPercent.toFixed(0)}%) er faldet på mandag eller fredag.</p>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-3">
+                          💡 Hvis du oplever tilbagevendende helbredsproblemer, er du velkommen til at tale med din leder om evt. tilpasninger.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Sick percentage visual */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Thermometer className="h-4 w-4 text-primary" />
+                    Sygefraværsprocent sammenlignet
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>Dit fravær (12 mdr)</span>
+                      <span className="font-medium">{absenceStats.sickPercentLast12Months.toFixed(1)}%</span>
+                    </div>
+                    <Progress 
+                      value={Math.min(absenceStats.sickPercentLast12Months * 10, 100)} 
+                      className="h-2"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-muted-foreground">Dansk gennemsnit</span>
+                      <span className="text-muted-foreground">3.5%</span>
+                    </div>
+                    <Progress value={35} className="h-2 opacity-50" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Det danske gennemsnit for sygefravær ligger på ca. 3,5% af arbejdsdagene.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Absence History */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <CalendarX className="h-4 w-4 text-primary" />
+                    Fraværshistorik
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {absences.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <CalendarX className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>Ingen registreret fravær</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {absences.slice(0, 15).map((absence) => {
+                        const start = new Date(absence.start_date);
+                        const end = new Date(absence.end_date);
+                        const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                        const isSick = absence.type === "sick";
+                        
+                        return (
+                          <div 
+                            key={absence.id}
+                            className={`flex items-center justify-between p-3 rounded-lg border ${
+                              isSick ? "bg-red-500/5 border-red-500/20" : "bg-amber-500/5 border-amber-500/20"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              {isSick ? (
+                                <Thermometer className="h-4 w-4 text-red-500" />
+                              ) : (
+                                <Palmtree className="h-4 w-4 text-amber-500" />
+                              )}
+                              <div>
+                                <p className="font-medium text-sm">
+                                  {isSick ? "Sygdom" : "Ferie"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {format(start, "d. MMM yyyy", { locale: da })}
+                                  {days > 1 && ` – ${format(end, "d. MMM yyyy", { locale: da })}`}
+                                </p>
+                              </div>
+                            </div>
+                            <Badge variant="outline" className={isSick ? "border-red-500/30" : "border-amber-500/30"}>
+                              {days} {days === 1 ? "dag" : "dage"}
+                            </Badge>
+                          </div>
+                        );
+                      })}
+                      {absences.length > 15 && (
+                        <p className="text-xs text-center text-muted-foreground pt-2">
+                          Viser de seneste 15 af {absences.length} fraværsregistreringer
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="historik" className="mt-6">
