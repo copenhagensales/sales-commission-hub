@@ -108,6 +108,82 @@ export default function VagtEmployees() {
     },
   });
 
+  // Find absence ID for a specific employee and day
+  const getAbsenceForDay = (employeeId: string, dayIndex: number) => {
+    const date = weekDates[dayIndex];
+    return absences?.find(a => {
+      if (a.employee_id !== employeeId) return false;
+      const absenceStart = parseISO(a.start_date);
+      const absenceEnd = parseISO(a.end_date);
+      return isWithinInterval(date, { start: absenceStart, end: absenceEnd });
+    });
+  };
+
+  const toggleDayAbsenceMutation = useMutation({
+    mutationFn: async (data: { employeeId: string; dayIndex: number; isAbsent: boolean; absenceId?: string }) => {
+      const date = weekDates[data.dayIndex];
+      const dateStr = format(date, "yyyy-MM-dd");
+
+      if (data.isAbsent && data.absenceId) {
+        // Remove absence - check if it's a single day or needs splitting
+        const absence = absences?.find(a => a.id === data.absenceId);
+        if (absence) {
+          const absenceStart = absence.start_date;
+          const absenceEnd = absence.end_date;
+          
+          if (absenceStart === absenceEnd) {
+            // Single day absence - just delete it
+            const { error } = await supabase.from("employee_absence").delete().eq("id", data.absenceId);
+            if (error) throw error;
+          } else if (absenceStart === dateStr) {
+            // First day of multi-day - move start forward
+            const newStart = format(addDays(date, 1), "yyyy-MM-dd");
+            const { error } = await supabase.from("employee_absence").update({ start_date: newStart }).eq("id", data.absenceId);
+            if (error) throw error;
+          } else if (absenceEnd === dateStr) {
+            // Last day of multi-day - move end backward
+            const newEnd = format(addDays(date, -1), "yyyy-MM-dd");
+            const { error } = await supabase.from("employee_absence").update({ end_date: newEnd }).eq("id", data.absenceId);
+            if (error) throw error;
+          } else {
+            // Middle of multi-day - split into two
+            const { error: updateError } = await supabase.from("employee_absence")
+              .update({ end_date: format(addDays(date, -1), "yyyy-MM-dd") })
+              .eq("id", data.absenceId);
+            if (updateError) throw updateError;
+            
+            const { error: insertError } = await supabase.from("employee_absence").insert({
+              employee_id: data.employeeId,
+              start_date: format(addDays(date, 1), "yyyy-MM-dd"),
+              end_date: absenceEnd,
+              reason: absence.reason,
+              status: absence.status,
+              note: absence.note,
+            });
+            if (insertError) throw insertError;
+          }
+        }
+      } else {
+        // Add absence for this day
+        const { error } = await supabase.from("employee_absence").insert({
+          employee_id: data.employeeId,
+          start_date: dateStr,
+          end_date: dateStr,
+          reason: "Andet" as const,
+          status: "APPROVED",
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-week-absences"] });
+      toast({ title: "Tilgængelighed opdateret" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
   const updateEmployeeMutation = useMutation({
     mutationFn: async (data: { id: string; role: any; is_active: boolean; team: any }) => {
       const { error } = await supabase
@@ -383,22 +459,31 @@ export default function VagtEmployees() {
                           </Badge>
                         </div>
                         <div className="flex items-center gap-4">
-                          {/* Day circles */}
+                          {/* Day circles - clickable */}
                           <div className="flex items-center gap-1">
                             {DAY_LABELS.map((label, idx) => {
                               const isAbsent = absentDays.includes(idx);
+                              const absence = getAbsenceForDay(emp.id, idx);
                               return (
-                                <div
+                                <button
                                   key={idx}
+                                  onClick={() => toggleDayAbsenceMutation.mutate({
+                                    employeeId: emp.id,
+                                    dayIndex: idx,
+                                    isAbsent,
+                                    absenceId: absence?.id,
+                                  })}
+                                  disabled={toggleDayAbsenceMutation.isPending}
                                   className={cn(
-                                    "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
+                                    "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all cursor-pointer hover:scale-110 hover:shadow-md",
                                     isAbsent
-                                      ? "bg-red-100 text-red-600"
-                                      : "bg-green-500 text-white"
+                                      ? "bg-red-100 text-red-600 hover:bg-red-200"
+                                      : "bg-green-500 text-white hover:bg-green-600"
                                   )}
+                                  title={isAbsent ? "Klik for at fjerne fravær" : "Klik for at tilføje fravær"}
                                 >
                                   {label}
-                                </div>
+                                </button>
                               );
                             })}
                           </div>
