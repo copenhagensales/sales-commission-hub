@@ -200,6 +200,7 @@ serve(async (req) => {
         customer_company: body.payload.lead.company,
         customer_phone: body.payload.lead.phone,
         sale_datetime: body.event_time || new Date().toISOString(),
+        adversus_external_id: externalId,
       })
       .select()
       .single();

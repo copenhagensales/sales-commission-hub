@@ -580,7 +580,8 @@ Deno.serve(async (req) => {
               agent_external_id: String(sale.ownedBy || sale.createdBy),
               customer_company: '',
               customer_phone: '',
-              sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString()
+              sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString(),
+              adversus_external_id: externalId,
             })
             .select()
             .single()

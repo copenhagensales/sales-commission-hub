@@ -858,6 +858,7 @@ export type Database = {
       sales: {
         Row: {
           adversus_event_id: string | null
+          adversus_external_id: string | null
           agent_external_id: string | null
           agent_name: string | null
           client_campaign_id: string | null
@@ -870,6 +871,7 @@ export type Database = {
         }
         Insert: {
           adversus_event_id?: string | null
+          adversus_external_id?: string | null
           agent_external_id?: string | null
           agent_name?: string | null
           client_campaign_id?: string | null
@@ -882,6 +884,7 @@ export type Database = {
         }
         Update: {
           adversus_event_id?: string | null
+          adversus_external_id?: string | null
           agent_external_id?: string | null
           agent_name?: string | null
           client_campaign_id?: string | null
