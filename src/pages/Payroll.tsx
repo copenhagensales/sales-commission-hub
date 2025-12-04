@@ -420,12 +420,10 @@ export default function Payroll() {
     queryKey: [
       "payroll-search-sales",
       selectedClientId,
-      fromDate ? fromDate.toISOString() : undefined,
-      toDate ? toDate.toISOString() : undefined,
     ],
-    enabled: !!selectedClientId && !!fromDate && !!toDate,
+    enabled: !!selectedClientId,
     queryFn: async () => {
-      if (!selectedClientId || !fromDate || !toDate) return [];
+      if (!selectedClientId) return [];
 
       const { data: campaigns, error: campaignsError } = await supabase
         .from("client_campaigns")
@@ -442,9 +440,7 @@ export default function Payroll() {
         .select(
           "id, sale_datetime, agent_name, customer_company, customer_phone, adversus_external_id, sale_items(adversus_product_title, mapped_commission, mapped_revenue, quantity)"
         )
-        .in("client_campaign_id", campaignIds)
-        .gte("sale_datetime", fromDate.toISOString())
-        .lte("sale_datetime", toDate.toISOString());
+        .in("client_campaign_id", campaignIds);
 
       if (salesError) throw salesError;
 
