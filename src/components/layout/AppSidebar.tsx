@@ -17,7 +17,7 @@ const navigation = [
   { name: "Provision og CPO", href: "/commission-cpo", icon: Percent },
   { name: "Lønkørsler", href: "/payroll", icon: Wallet },
   { name: "Wallboard", href: "/wallboard", icon: Tv },
-  { name: "Adversus data", href: "/adversus-data", icon: Database },
+  { name: "Datakilder info", href: "/adversus-data", icon: Database },
   { name: "Logikker", href: "/logikker", icon: ListChecks },
   { name: "MG test", href: "/mg-test", icon: Percent },
   { name: "KM test", href: "/km-test", icon: Percent },

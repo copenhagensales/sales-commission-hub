@@ -19,7 +19,7 @@ interface AdversusStats {
 
 export default function AdversusData() {
   useEffect(() => {
-    document.title = "Adversus data | CPH Sales";
+    document.title = "Datakilder info | CPH Sales";
   }, []);
 
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<AdversusStats>({
@@ -72,9 +72,9 @@ export default function AdversusData() {
       <div className="space-y-6">
         <header className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Adversus data</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Datakilder info</h1>
             <p className="text-muted-foreground">
-              Overblik over de webhook-events og salg der kommer ind fra Adversus
+              Overblik over de datakilder der bruges til Adversus-integration og salg
             </p>
           </div>
           <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
