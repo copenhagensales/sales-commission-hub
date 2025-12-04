@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfDay, startOfMonth, subDays, isWeekend } from "date-fns";
+import { format, startOfDay, startOfMonth, subDays, isWeekend, addDays } from "date-fns";
 import { Line, LineChart, CartesianGrid, ReferenceDot, XAxis, YAxis } from "recharts";
 import { Building2, CalendarIcon, DollarSign, ShoppingCart, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -242,14 +242,21 @@ export default function TdcErhverv() {
       dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + dailyUnits);
     });
 
-    const dailyEntries = Array.from(dailyMap.entries())
-      .map(([dateKey, salesCount]) => ({ dateKey, sales: salesCount }))
-      .sort((a, b) => (a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0));
+    // Build continuous weekday series including days with zero sales
+    const weekdayEntries: { dateKey: string; sales: number }[] = [];
+    let cursor = startOfDay(start);
+    const endDay = startOfDay(end);
 
-    const weekdayEntries = dailyEntries.filter(({ dateKey }) => {
-      const d = new Date(dateKey);
-      return !isWeekend(d);
-    });
+    while (cursor <= endDay) {
+      if (!isWeekend(cursor)) {
+        const dateKey = format(cursor, "yyyy-MM-dd");
+        weekdayEntries.push({
+          dateKey,
+          sales: dailyMap.get(dateKey) || 0,
+        });
+      }
+      cursor = addDays(cursor, 1);
+    }
 
     if (!weekdayEntries.length) return [];
 
