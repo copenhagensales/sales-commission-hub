@@ -17,6 +17,11 @@ import KmTest from "./pages/KmTest";
 import Codan from "./pages/Codan";
 import TdcErhverv from "./pages/TdcErhverv";
 import NotFound from "./pages/NotFound";
+// Vagt-flow pages
+import VagtFlowIndex from "./pages/vagt-flow/Index";
+import VagtBookWeek from "./pages/vagt-flow/BookWeek";
+import VagtLocations from "./pages/vagt-flow/Locations";
+import VagtBookings from "./pages/vagt-flow/Bookings";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +81,11 @@ const App = () => (
           <Route path="/mg-test" element={<ProtectedRoute><MgTest /></ProtectedRoute>} />
           <Route path="/km-test" element={<ProtectedRoute><KmTest /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          {/* Vagt-flow routes */}
+          <Route path="/vagt-flow" element={<ProtectedRoute><VagtFlowIndex /></ProtectedRoute>} />
+          <Route path="/vagt-flow/book-week" element={<ProtectedRoute><VagtBookWeek /></ProtectedRoute>} />
+          <Route path="/vagt-flow/locations" element={<ProtectedRoute><VagtLocations /></ProtectedRoute>} />
+          <Route path="/vagt-flow/bookings" element={<ProtectedRoute><VagtBookings /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

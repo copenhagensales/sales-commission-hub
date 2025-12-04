@@ -175,6 +175,150 @@ export type Database = {
         }
         Relationships: []
       }
+      booking: {
+        Row: {
+          brand_id: string
+          comment: string | null
+          created_at: string | null
+          end_date: string
+          expected_staff_count: number | null
+          id: string
+          location_id: string
+          start_date: string
+          status: Database["public"]["Enums"]["booking_status"] | null
+          updated_at: string | null
+          week_number: number
+          year: number
+        }
+        Insert: {
+          brand_id: string
+          comment?: string | null
+          created_at?: string | null
+          end_date: string
+          expected_staff_count?: number | null
+          id?: string
+          location_id: string
+          start_date: string
+          status?: Database["public"]["Enums"]["booking_status"] | null
+          updated_at?: string | null
+          week_number: number
+          year: number
+        }
+        Update: {
+          brand_id?: string
+          comment?: string | null
+          created_at?: string | null
+          end_date?: string
+          expected_staff_count?: number | null
+          id?: string
+          location_id?: string
+          start_date?: string
+          status?: Database["public"]["Enums"]["booking_status"] | null
+          updated_at?: string | null
+          week_number?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brand"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booking_assignment: {
+        Row: {
+          booking_id: string
+          created_at: string | null
+          date: string
+          employee_id: string
+          end_time: string
+          id: string
+          leads_reported: number | null
+          note: string | null
+          on_my_way_at: string | null
+          sales_reported: number | null
+          start_time: string
+          updated_at: string | null
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string | null
+          date: string
+          employee_id: string
+          end_time: string
+          id?: string
+          leads_reported?: number | null
+          note?: string | null
+          on_my_way_at?: string | null
+          sales_reported?: number | null
+          start_time: string
+          updated_at?: string | null
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string | null
+          date?: string
+          employee_id?: string
+          end_time?: string
+          id?: string
+          leads_reported?: number | null
+          note?: string | null
+          on_my_way_at?: string | null
+          sales_reported?: number | null
+          start_time?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_assignment_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_assignment_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brand: {
+        Row: {
+          color_hex: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+        }
+        Insert: {
+          color_hex: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+        }
+        Update: {
+          color_hex?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+        }
+        Relationships: []
+      }
       client_campaigns: {
         Row: {
           client_id: string
@@ -231,6 +375,90 @@ export type Database = {
         }
         Relationships: []
       }
+      communication_log: {
+        Row: {
+          booking_id: string | null
+          channel: Database["public"]["Enums"]["communication_channel"]
+          created_at: string | null
+          created_by_employee_id: string
+          id: string
+          location_id: string | null
+          note: string
+        }
+        Insert: {
+          booking_id?: string | null
+          channel: Database["public"]["Enums"]["communication_channel"]
+          created_at?: string | null
+          created_by_employee_id: string
+          id?: string
+          location_id?: string | null
+          note: string
+        }
+        Update: {
+          booking_id?: string | null
+          channel?: Database["public"]["Enums"]["communication_channel"]
+          created_at?: string | null
+          created_by_employee_id?: string
+          id?: string
+          location_id?: string | null
+          note?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_log_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_log_created_by_employee_id_fkey"
+            columns: ["created_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_log_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consent_log: {
+        Row: {
+          consent_type: string
+          consented_at: string | null
+          employee_id: string
+          id: string
+          ip_address: string | null
+        }
+        Insert: {
+          consent_type: string
+          consented_at?: string | null
+          employee_id: string
+          id?: string
+          ip_address?: string | null
+        }
+        Update: {
+          consent_type?: string
+          consented_at?: string | null
+          employee_id?: string
+          id?: string
+          ip_address?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consent_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       economic_events: {
         Row: {
           created_at: string
@@ -254,6 +482,83 @@ export type Database = {
           processed?: boolean | null
         }
         Relationships: []
+      }
+      employee: {
+        Row: {
+          availability_notes: string | null
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean | null
+          phone: string | null
+          role: Database["public"]["Enums"]["vagt_flow_role"]
+          team: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          availability_notes?: string | null
+          created_at?: string | null
+          email: string
+          full_name: string
+          id: string
+          is_active?: boolean | null
+          phone?: string | null
+          role?: Database["public"]["Enums"]["vagt_flow_role"]
+          team?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          availability_notes?: string | null
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          role?: Database["public"]["Enums"]["vagt_flow_role"]
+          team?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      employee_absence: {
+        Row: {
+          created_at: string | null
+          employee_id: string
+          end_date: string
+          id: string
+          note: string | null
+          reason: Database["public"]["Enums"]["vagt_absence_reason"]
+          start_date: string
+        }
+        Insert: {
+          created_at?: string | null
+          employee_id: string
+          end_date: string
+          id?: string
+          note?: string | null
+          reason: Database["public"]["Enums"]["vagt_absence_reason"]
+          start_date: string
+        }
+        Update: {
+          created_at?: string | null
+          employee_id?: string
+          end_date?: string
+          id?: string
+          note?: string | null
+          reason?: Database["public"]["Enums"]["vagt_absence_reason"]
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_absence_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fixed_costs: {
         Row: {
@@ -293,6 +598,124 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      location: {
+        Row: {
+          address_city: string | null
+          address_postal_code: string | null
+          address_street: string | null
+          can_book_eesy: boolean | null
+          can_book_yousee: boolean | null
+          contact_email: string | null
+          contact_person_name: string | null
+          contact_phone: string | null
+          created_at: string | null
+          id: string
+          is_favorite: boolean | null
+          name: string
+          notes: string | null
+          region: string | null
+          status: Database["public"]["Enums"]["location_status"] | null
+          type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address_city?: string | null
+          address_postal_code?: string | null
+          address_street?: string | null
+          can_book_eesy?: boolean | null
+          can_book_yousee?: boolean | null
+          contact_email?: string | null
+          contact_person_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          name: string
+          notes?: string | null
+          region?: string | null
+          status?: Database["public"]["Enums"]["location_status"] | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address_city?: string | null
+          address_postal_code?: string | null
+          address_street?: string | null
+          can_book_eesy?: boolean | null
+          can_book_yousee?: boolean | null
+          contact_email?: string | null
+          contact_person_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          name?: string
+          notes?: string | null
+          region?: string | null
+          status?: Database["public"]["Enums"]["location_status"] | null
+          type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      mileage_report: {
+        Row: {
+          booking_id: string | null
+          created_at: string | null
+          date: string
+          employee_id: string
+          end_km: number
+          id: string
+          route_description: string | null
+          start_km: number
+          vehicle_id: string | null
+        }
+        Insert: {
+          booking_id?: string | null
+          created_at?: string | null
+          date: string
+          employee_id: string
+          end_km: number
+          id?: string
+          route_description?: string | null
+          start_km: number
+          vehicle_id?: string | null
+        }
+        Update: {
+          booking_id?: string | null
+          created_at?: string | null
+          date?: string
+          employee_id?: string
+          end_km?: number
+          id?: string
+          route_description?: string | null
+          start_km?: number
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mileage_report_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mileage_report_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mileage_report_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
@@ -449,6 +872,48 @@ export type Database = {
           },
         ]
       }
+      sms_notification_log: {
+        Row: {
+          booking_assignment_id: string | null
+          employee_id: string
+          id: string
+          message_body: string
+          sent_at: string | null
+          type: Database["public"]["Enums"]["sms_type"]
+        }
+        Insert: {
+          booking_assignment_id?: string | null
+          employee_id: string
+          id?: string
+          message_body: string
+          sent_at?: string | null
+          type: Database["public"]["Enums"]["sms_type"]
+        }
+        Update: {
+          booking_assignment_id?: string | null
+          employee_id?: string
+          id?: string
+          message_body?: string
+          sent_at?: string | null
+          type?: Database["public"]["Enums"]["sms_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_notification_log_booking_assignment_id_fkey"
+            columns: ["booking_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "booking_assignment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_notification_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_state: {
         Row: {
           id: number
@@ -466,6 +931,57 @@ export type Database = {
           last_sync_at?: string | null
         }
         Relationships: []
+      }
+      time_off_request: {
+        Row: {
+          created_at: string | null
+          employee_id: string
+          end_date: string
+          id: string
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          start_date: string
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          employee_id: string
+          end_date: string
+          id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          start_date: string
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          employee_id?: string
+          end_date?: string
+          id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          start_date?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_off_request_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_off_request_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transactions: {
         Row: {
@@ -527,6 +1043,30 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          license_plate: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          license_plate: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          license_plate?: string
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -545,11 +1085,21 @@ export type Database = {
     Enums: {
       absence_type: "sick" | "vacation" | "other"
       app_role: "admin" | "payroll" | "manager" | "agent"
+      booking_status: "Planlagt" | "Bekræftet" | "Aflyst" | "Afsluttet"
       commission_transaction_type: "earn" | "clawback" | "manual_adjustment"
       commission_type: "fixed" | "percentage"
+      communication_channel: "Telefon" | "Mail" | "Andet"
       employment_type: "hourly" | "monthly"
+      location_status: "Ny" | "Aktiv" | "Pause" | "Sortlistet"
       payroll_status: "draft" | "approved" | "exported"
       sale_status: "pending" | "active" | "cancelled" | "clawbacked"
+      sms_type:
+        | "new_shift"
+        | "updated_shift"
+        | "deleted_shift"
+        | "week_confirmation"
+      vagt_absence_reason: "Ferie" | "Syg" | "Barn syg" | "Andet"
+      vagt_flow_role: "admin" | "planner" | "employee" | "brand_viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -679,11 +1229,22 @@ export const Constants = {
     Enums: {
       absence_type: ["sick", "vacation", "other"],
       app_role: ["admin", "payroll", "manager", "agent"],
+      booking_status: ["Planlagt", "Bekræftet", "Aflyst", "Afsluttet"],
       commission_transaction_type: ["earn", "clawback", "manual_adjustment"],
       commission_type: ["fixed", "percentage"],
+      communication_channel: ["Telefon", "Mail", "Andet"],
       employment_type: ["hourly", "monthly"],
+      location_status: ["Ny", "Aktiv", "Pause", "Sortlistet"],
       payroll_status: ["draft", "approved", "exported"],
       sale_status: ["pending", "active", "cancelled", "clawbacked"],
+      sms_type: [
+        "new_shift",
+        "updated_shift",
+        "deleted_shift",
+        "week_confirmation",
+      ],
+      vagt_absence_reason: ["Ferie", "Syg", "Barn syg", "Andet"],
+      vagt_flow_role: ["admin", "planner", "employee", "brand_viewer"],
     },
   },
 } as const

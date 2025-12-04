@@ -1,9 +1,11 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2 } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
+import { useState } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -16,12 +18,19 @@ const navigation = [
   { name: "Wallboard", href: "/wallboard", icon: Tv },
   { name: "MG test", href: "/mg-test", icon: Percent },
   { name: "KM test", href: "/km-test", icon: Percent },
-  { name: "Indstillinger", href: "/settings", icon: Settings },
+];
+
+const vagtFlowNavigation = [
+  { name: "Oversigt", href: "/vagt-flow", icon: LayoutDashboard },
+  { name: "Book uge", href: "/vagt-flow/book-week", icon: Calendar },
+  { name: "Lokationer", href: "/vagt-flow/locations", icon: MapPin },
+  { name: "Bookinger", href: "/vagt-flow/bookings", icon: Calendar },
 ];
 
 export function AppSidebar() {
   const location = useLocation();
   const { toast } = useToast();
+  const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -31,7 +40,7 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar">
+    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto">
       <div className="flex h-full flex-col">
         <div className="flex h-20 items-center justify-center border-b border-sidebar-border px-6">
           <img src={cphSalesLogo} alt="CPH Sales" className="h-14 w-auto object-contain" />
@@ -53,6 +62,49 @@ export function AppSidebar() {
               </NavLink>
             );
           })}
+
+          {/* Vagt-flow menu with submenu */}
+          <Collapsible open={vagtFlowOpen} onOpenChange={setVagtFlowOpen}>
+            <CollapsibleTrigger className={cn(
+              "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              location.pathname.startsWith("/vagt-flow") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}>
+              <div className="flex items-center gap-3">
+                <Calendar className="h-5 w-5" />
+                Vagtplan
+              </div>
+              {vagtFlowOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pl-4 space-y-1 mt-1">
+              {vagtFlowNavigation.map((item) => {
+                const isActive = location.pathname === item.href;
+                return (
+                  <NavLink
+                    key={item.name}
+                    to={item.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                      isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.name}
+                  </NavLink>
+                );
+              })}
+            </CollapsibleContent>
+          </Collapsible>
+
+          <NavLink
+            to="/settings"
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              location.pathname === "/settings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}
+          >
+            <Settings className="h-5 w-5" />
+            Indstillinger
+          </NavLink>
         </nav>
         <div className="border-t border-sidebar-border p-4">
           <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50">
