@@ -4,9 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapPin, Search, Plus, Trash2, Star } from "lucide-react";
+import { MapPin, Search, Plus, Trash2, Star, Upload } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -65,6 +65,7 @@ export default function VagtLocations() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: locations, isLoading } = useQuery({
     queryKey: ["vagt-locations-list"],
@@ -140,6 +141,75 @@ export default function VagtLocations() {
     },
   });
 
+  const handleCsvImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const text = await file.text();
+    const lines = text.split('\n').filter(line => line.trim());
+    const headers = lines[0].split(';');
+
+    const idIndex = headers.indexOf('id');
+    const contactPersonIndex = headers.indexOf('contact_person_name');
+    const contactPhoneIndex = headers.indexOf('contact_phone');
+    const contactEmailIndex = headers.indexOf('contact_email');
+    const notesIndex = headers.indexOf('notes');
+
+    if (idIndex === -1) {
+      toast({ title: "Fejl", description: "CSV mangler 'id' kolonne", variant: "destructive" });
+      return;
+    }
+
+    let updated = 0;
+    let errors = 0;
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(';');
+      const id = values[idIndex]?.trim();
+      
+      if (!id) continue;
+
+      const updateData: Record<string, string | null> = {};
+      
+      if (contactPersonIndex !== -1 && values[contactPersonIndex]?.trim()) {
+        updateData.contact_person_name = values[contactPersonIndex].trim();
+      }
+      if (contactPhoneIndex !== -1 && values[contactPhoneIndex]?.trim()) {
+        updateData.contact_phone = values[contactPhoneIndex].trim();
+      }
+      if (contactEmailIndex !== -1 && values[contactEmailIndex]?.trim()) {
+        updateData.contact_email = values[contactEmailIndex].trim();
+      }
+      if (notesIndex !== -1 && values[notesIndex]?.trim()) {
+        updateData.notes = values[notesIndex].trim();
+      }
+
+      if (Object.keys(updateData).length === 0) continue;
+
+      const { error } = await supabase
+        .from("location")
+        .update(updateData)
+        .eq("id", id);
+
+      if (error) {
+        errors++;
+      } else {
+        updated++;
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["vagt-locations-list"] });
+    toast({ 
+      title: "Import færdig", 
+      description: `${updated} lokationer opdateret${errors > 0 ? `, ${errors} fejl` : ''}` 
+    });
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const filteredLocations = locations?.filter((loc) => {
     const matchesSearch =
       !search ||
@@ -166,9 +236,21 @@ export default function VagtLocations() {
             <h1 className="text-3xl font-bold tracking-tight">Lokationer</h1>
             <p className="text-muted-foreground">Administrer butikker og steder</p>
           </div>
-          <Button onClick={() => setNewLocationOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Ny lokation
-          </Button>
+          <div className="flex gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              onChange={handleCsvImport}
+              className="hidden"
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-4 w-4 mr-2" /> Importer kontaktinfo
+            </Button>
+            <Button onClick={() => setNewLocationOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" /> Ny lokation
+            </Button>
+          </div>
         </div>
 
         <Card>
