@@ -60,6 +60,7 @@ interface CancellationMatch {
   agentName: string | null;
   cancellationDate?: string;
   cancellationStatus?: string;
+  oppNumber?: string;
 }
 
 interface UnmatchedCancellation {
@@ -369,6 +370,7 @@ export default function Payroll() {
           agentName: sale.agent_name,
           cancellationDate: match.date,
           cancellationStatus: match.status,
+          oppNumber: match.oppNumber,
         });
       });
 
@@ -467,7 +469,12 @@ export default function Payroll() {
     const inPhone = sale.customer_phone?.toLowerCase().includes(term) ?? false;
     const inCompany = sale.customer_company?.toLowerCase().includes(term) ?? false;
     const inAgent = sale.agent_name?.toLowerCase().includes(term) ?? false;
-    return inExternalId || inPhone || inCompany || inAgent;
+
+    const matchFromCancellations = cancellations?.matches.find((m) => m.saleId === sale.id);
+    const inOpp = matchFromCancellations?.oppNumber?.toLowerCase().includes(term) ?? false;
+    const inCancelOrderId = matchFromCancellations?.externalId?.toLowerCase().includes(term) ?? false;
+
+    return inExternalId || inPhone || inCompany || inAgent || inOpp || inCancelOrderId;
   });
 
   return (
