@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfDay, startOfMonth, subDays, isWeekend } from "date-fns";
-import { LineChart, CartesianGrid, XAxis, YAxis, Line, ReferenceDot } from "recharts";
-import { Building2, TrendingUp, DollarSign, ShoppingCart } from "lucide-react";
+import { Line, LineChart, CartesianGrid, ReferenceDot, XAxis, YAxis } from "recharts";
+import { Building2, CalendarIcon, DollarSign, ShoppingCart, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface TdcSaleItem {
   mapped_commission: number | null;
@@ -391,21 +393,63 @@ export default function TdcErhverv() {
                   <div className="flex flex-wrap items-end gap-3">
                     <div className="flex flex-col gap-1">
                       <span className="text-xs font-medium text-muted-foreground">Fra dato</span>
-                      <input
-                        type="date"
-                        value={customFrom}
-                        onChange={(e) => setCustomFrom(e.target.value)}
-                        className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={`h-8 px-2 text-xs justify-start text-left font-normal ${
+                              !customFrom ? "text-muted-foreground" : ""
+                            }`}
+                          >
+                            <CalendarIcon className="mr-1 h-3 w-3" />
+                            {customFrom ? format(new Date(customFrom), "dd/MM/yyyy") : <span>Vælg dato</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={customFrom ? new Date(customFrom) : undefined}
+                            onSelect={(date) => {
+                              if (!date) {
+                                setCustomFrom("");
+                              } else {
+                                setCustomFrom(format(date, "yyyy-MM-dd"));
+                              }
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div className="flex flex-col gap-1">
                       <span className="text-xs font-medium text-muted-foreground">Til dato</span>
-                      <input
-                        type="date"
-                        value={customTo}
-                        onChange={(e) => setCustomTo(e.target.value)}
-                        className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={`h-8 px-2 text-xs justify-start text-left font-normal ${
+                              !customTo ? "text-muted-foreground" : ""
+                            }`}
+                          >
+                            <CalendarIcon className="mr-1 h-3 w-3" />
+                            {customTo ? format(new Date(customTo), "dd/MM/yyyy") : <span>Vælg dato</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={customTo ? new Date(customTo) : undefined}
+                            onSelect={(date) => {
+                              if (!date) {
+                                setCustomTo("");
+                              } else {
+                                setCustomTo(format(date, "yyyy-MM-dd"));
+                              }
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
                 </div>
