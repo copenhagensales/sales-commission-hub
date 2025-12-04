@@ -144,7 +144,7 @@ function EditableSelect({ label, value, field, options, onSave, displayValue }: 
             <SelectTrigger className="h-7 w-40">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-50 bg-popover">
               {options.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
               ))}
