@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Mail, Loader2 } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Mail, Loader2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -225,7 +225,7 @@ export default function EmployeeMasterData() {
     },
   });
 
-  const handleSendInvitation = async (employee: EmployeeMasterDataRecord) => {
+  const handleSendInvitation = async (employee: EmployeeMasterDataRecord, isResend = false) => {
     if (!employee.private_email) {
       toast({ title: "Mangler email", description: "Medarbejderen skal have en email-adresse", variant: "destructive" });
       return;
@@ -233,6 +233,15 @@ export default function EmployeeMasterData() {
 
     setSendingInvitation(employee.id);
     try {
+      // Delete any existing expired/pending invitations for this employee if resending
+      if (isResend) {
+        await supabase
+          .from("employee_invitations")
+          .delete()
+          .eq("employee_id", employee.id)
+          .in("status", ["pending", "expired"]);
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-employee-invitation`,
         {
@@ -252,7 +261,8 @@ export default function EmployeeMasterData() {
         throw new Error(data.error || "Kunne ikke sende invitation");
       }
 
-      toast({ title: "Invitation sendt", description: `Email sendt til ${employee.private_email}` });
+      queryClient.invalidateQueries({ queryKey: ["employee-invitations"] });
+      toast({ title: isResend ? "Invitation gensendt" : "Invitation sendt", description: `Email sendt til ${employee.private_email}` });
     } catch (error) {
       console.error("Invitation error:", error);
       toast({
@@ -648,22 +658,33 @@ export default function EmployeeMasterData() {
                         >
                           <MessageSquare className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            handleSendInvitation(employee);
-                          }}
-                          disabled={!employee.private_email || sendingInvitation === employee.id}
-                          title="Send invitation til medarbejder"
-                        >
-                          {sendingInvitation === employee.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Mail className="h-4 w-4" />
-                          )}
-                        </Button>
+                        {(() => {
+                          const status = getInvitationStatus(employee.id);
+                          const isExpired = status === "expired";
+                          const isCompleted = status === "completed";
+                          const isPending = status === "pending";
+                          
+                          return (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                handleSendInvitation(employee, isExpired);
+                              }}
+                              disabled={!employee.private_email || sendingInvitation === employee.id || isCompleted || isPending}
+                              title={isExpired ? "Gensend invitation" : isCompleted ? "Invitation udfyldt" : isPending ? "Invitation afventer" : "Send invitation"}
+                            >
+                              {sendingInvitation === employee.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : isExpired ? (
+                                <RefreshCw className="h-4 w-4 text-destructive" />
+                              ) : (
+                                <Mail className="h-4 w-4" />
+                              )}
+                            </Button>
+                          );
+                        })()}
                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
                           <Pencil className="h-4 w-4" />
                         </Button>
