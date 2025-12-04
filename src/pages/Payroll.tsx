@@ -798,6 +798,7 @@ export default function Payroll() {
                           <TableHead>Kunde</TableHead>
                           <TableHead>Telefon</TableHead>
                           <TableHead>Ordre-id</TableHead>
+                          <TableHead>OPP-nummer</TableHead>
                           <TableHead className="text-right">Salg (stk.)</TableHead>
                           <TableHead className="text-right">Provision</TableHead>
                         </TableRow>
@@ -814,6 +815,12 @@ export default function Payroll() {
                             const c = Number(item.mapped_commission) || 0;
                             return sum + qty * c;
                           }, 0);
+
+                          const matchFromCancellations = cancellations?.matches.find(
+                            (m) => m.saleId === sale.id,
+                          );
+                          const oppNumber =
+                            sale.adversus_opp_number ?? matchFromCancellations?.oppNumber ?? "-";
 
                           return (
                             <TableRow
@@ -832,6 +839,7 @@ export default function Payroll() {
                               <TableCell className="font-mono text-xs">
                                 {sale.adversus_external_id ?? "-"}
                               </TableCell>
+                              <TableCell className="font-mono text-xs">{oppNumber}</TableCell>
                               <TableCell className="text-right">{units}</TableCell>
                               <TableCell className="text-right">
                                 {commission.toLocaleString("da-DK")} DKK
@@ -876,6 +884,19 @@ export default function Payroll() {
                           <div>
                             <p className="text-muted-foreground">Telefon</p>
                             <p className="font-medium">{selectedSale.customer_phone ?? "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Ordre-id</p>
+                            <p className="font-medium">{selectedSale.adversus_external_id ?? "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">OPP-nummer</p>
+                            <p className="font-medium">
+                              {selectedSale.adversus_opp_number ??
+                                cancellations?.matches.find((m) => m.saleId === selectedSale.id)
+                                  ?.oppNumber ??
+                                "-"}
+                            </p>
                           </div>
                         </div>
 
