@@ -610,7 +610,16 @@ export default function EmployeeMasterData() {
                       <TableCell className="font-medium">
                         {employee.first_name} {employee.last_name}
                       </TableCell>
-                      <TableCell>{employee.private_email || "-"}</TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {employee.private_email ? (
+                          <a 
+                            href={`mailto:${employee.private_email}`} 
+                            className="text-primary hover:underline"
+                          >
+                            {employee.private_email}
+                          </a>
+                        ) : "-"}
+                      </TableCell>
                       <TableCell>{employee.private_phone || "-"}</TableCell>
                       <TableCell>{employee.department || "-"}</TableCell>
                       <TableCell>{employee.job_title || "-"}</TableCell>
