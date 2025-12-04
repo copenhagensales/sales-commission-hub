@@ -999,6 +999,34 @@ export default function MgTest() {
   });
 
   // Kunder: tilføj, opdater og slet
+  const deleteIdentityMapping = useMutation({
+    mutationFn: async ({ identityId, masterId }: { identityId: string; masterId: string }) => {
+      const { error } = await supabase.from("employee_identity").delete().eq("id", identityId);
+      if (error) throw error;
+
+      const { data: remaining, error: remainingError } = await supabase
+        .from("employee_identity")
+        .select("id")
+        .eq("master_employee_id", masterId)
+        .limit(1);
+
+      if (remainingError) throw remainingError;
+
+      if (!remaining || remaining.length === 0) {
+        await supabase.from("master_employee").delete().eq("id", masterId);
+      }
+    },
+    onSuccess: () => {
+      toast.success("Mapping er fjernet");
+      queryClient.invalidateQueries({ queryKey: ["master-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-identities"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke fjerne mapping");
+    },
+  });
+
+  // Kunder: tilføj, opdater og slet
   const addClientMutation = useMutation({
     mutationFn: async (name: string) => {
       const trimmed = name.trim();
@@ -1597,7 +1625,12 @@ export default function MgTest() {
                                 <TableCell className="text-right">
                                   <Button
                                     size="sm"
-                                    onClick={() => mergeEmployeeSuggestion.mutate({ agent: s.agent, vagtEmployee: s.vagtEmployee })}
+                                    onClick={() =>
+                                      mergeEmployeeSuggestion.mutate({
+                                        agent: s.agent,
+                                        vagtEmployee: s.vagtEmployee,
+                                      })
+                                    }
                                     disabled={mergeEmployeeSuggestion.isPending}
                                   >
                                     {mergeEmployeeSuggestion.isPending && (
@@ -1610,6 +1643,76 @@ export default function MgTest() {
                             ))}
                           </TableBody>
                         </Table>
+                      </div>
+                    )}
+
+                    {mergedProfiles.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-medium">Eksisterende mappings</h3>
+                        <div className="rounded-md border overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[26%]">Master-medarbejder</TableHead>
+                                <TableHead className="w-[18%]">Master e-mail</TableHead>
+                                <TableHead className="w-[14%]">Kilde</TableHead>
+                                <TableHead className="w-[26%]">Kilde-navn</TableHead>
+                                <TableHead className="w-[16%]">Kilde-e-mail</TableHead>
+                                <TableHead className="w-[10%] text-right">Handling</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {mergedProfiles.map(({ master, identity }) => (
+                                <TableRow key={identity.id}>
+                                  <TableCell>
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{master?.full_name ?? "(ukendt)"}</span>
+                                      <span className="text-xs text-muted-foreground">ID: {identity.master_employee_id}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-xs font-mono text-muted-foreground">
+                                      {master?.primary_email ?? "(ingen)"}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-xs uppercase">
+                                      {identity.source}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{identity.source_name ?? "(ingen navn)"}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        Kilde-ID: {identity.source_employee_id}
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-xs font-mono text-muted-foreground">
+                                      {identity.source_email ?? "(ingen)"}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() =>
+                                        deleteIdentityMapping.mutate({
+                                          identityId: identity.id,
+                                          masterId: identity.master_employee_id,
+                                        })
+                                      }
+                                      disabled={deleteIdentityMapping.isPending}
+                                    >
+                                      Fjern mapping
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
                     )}
                   </>
