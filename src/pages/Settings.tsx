@@ -170,7 +170,7 @@ export default function Settings() {
                   value={salesDays}
                   onChange={(e) => setSalesDays(Number(e.target.value))}
                   min={1}
-                  max={90}
+                  max={370}
                 />
               </div>
               <Button onClick={testFetchSales} disabled={loading === "sales"} className="w-full" variant="outline">
@@ -197,7 +197,7 @@ export default function Settings() {
                   value={syncDays}
                   onChange={(e) => setSyncDays(Number(e.target.value))}
                   min={1}
-                  max={90}
+                  max={370}
                 />
               </div>
               <Button onClick={syncSalesToDb} disabled={loading === "sync"} className="w-full bg-green-600 hover:bg-green-700">

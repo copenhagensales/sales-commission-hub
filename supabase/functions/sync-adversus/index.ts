@@ -249,14 +249,15 @@ Deno.serve(async (req) => {
     let debugAction: string | null = null
     let debugCampaignId: number | null = null
     let scanDays: number = 60 // Default scan period
+    let requestBody: any = null
     
     try {
-      const body = await req.json()
-      startDate = body.startDate
-      endDate = body.endDate
-      debugAction = body.action
-      debugCampaignId = body.campaignId
-      scanDays = body.scanDays || 60
+      requestBody = await req.json()
+      startDate = requestBody.startDate
+      endDate = requestBody.endDate
+      debugAction = requestBody.action
+      debugCampaignId = requestBody.campaignId
+      scanDays = requestBody.scanDays || 60
     } catch {
       // Use default date range (last 30 days)
       const now = new Date()
@@ -268,12 +269,10 @@ Deno.serve(async (req) => {
     // Debug action: fetch Adversus products
     if (debugAction === 'fetch-products') {
       let searchFilter = ''
-      try {
-        const body = await req.clone().json()
-        if (body.filter) {
-          searchFilter = `&filters=${encodeURIComponent(JSON.stringify({ title: { $c: body.filter } }))}`
-        }
-      } catch {}
+      const body = requestBody || {}
+      if (body.filter) {
+        searchFilter = `&filters=${encodeURIComponent(JSON.stringify({ title: { $c: body.filter } }))}`
+      }
       
       console.log(`Debug: Fetching Adversus products... filter: ${searchFilter}`)
       
@@ -320,10 +319,8 @@ Deno.serve(async (req) => {
     // Debug action: fetch all campaigns and filter by name
     if (debugAction === 'fetch-campaigns') {
       let filterName = ''
-      try {
-        const body = await req.clone().json()
-        filterName = body.filter || ''
-      } catch {}
+      const body = requestBody || {}
+      filterName = body.filter || ''
       
       console.log(`Debug: Fetching Adversus campaigns... filter: ${filterName}`)
       
@@ -373,11 +370,9 @@ Deno.serve(async (req) => {
     if (debugAction === 'fetch-sales') {
       let filterCampaignId: number | null = null
       let filterDays = 7 // default 7 days
-      try {
-        const body = await req.clone().json()
-        filterCampaignId = body.campaignId || null
-        filterDays = body.days || 7
-      } catch {}
+      const body = requestBody || {}
+      filterCampaignId = body.campaignId ?? null
+      filterDays = body.days || 7
       
       // Build filter for date range
       const now = new Date()
@@ -441,10 +436,8 @@ Deno.serve(async (req) => {
     // ACTION: Sync sales to database
     if (debugAction === 'sync-sales-to-db') {
       let filterDays = 30
-      try {
-        const body = await req.clone().json()
-        filterDays = body.days || 30
-      } catch {}
+      const body = requestBody || {}
+      filterDays = body.days || 30
       
       console.log(`Syncing sales to database (last ${filterDays} days)...`)
       
