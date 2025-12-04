@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ListChecks, Info, RefreshCw, Layers3 } from "lucide-react";
+import { ListChecks, Info, RefreshCw, Layers3, UserX } from "lucide-react";
 
 export default function Logikker() {
   return (
@@ -87,6 +87,26 @@ export default function Logikker() {
                 <li>Dashboard, Wallboard, Codan og TDC Erhverv bruger alle <strong>sale_items</strong> og <strong>quantity</strong> til at tælle salg.</li>
                 <li>Salg vises kun på kundespecifikke dashboards, hvis <strong>client_campaign_id</strong> er sat korrekt via kampagnemapping.</li>
                 <li>Seneste TDC Erhverv-salg viser produktnavn sammen med <strong>(x quantity)</strong> pr. linje.</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserX className="h-5 w-5" />
+                Medarbejderdata & opbevaring
+              </CardTitle>
+              <CardDescription>
+                Regler for opbevaring og sletning af medarbejderdata.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Inaktive medarbejdere <strong>slettes automatisk efter 5 år</strong> fra slutdato.</li>
+                <li>Ved inaktivering sættes <strong>slutdato</strong> automatisk til dags dato.</li>
+                <li>Ved genaktivering sættes <strong>ansættelsesdato</strong> til dags dato og slutdato ryddes.</li>
+                <li>Oprydning kører automatisk én gang dagligt via baggrundsjob.</li>
               </ul>
             </CardContent>
           </Card>
