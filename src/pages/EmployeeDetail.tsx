@@ -552,11 +552,46 @@ export default function EmployeeDetail() {
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => {
-                toast({ 
-                  title: "Loginforsøg nulstillet", 
-                  description: "Funktionen er endnu ikke implementeret. Kræver integration med auth-system." 
-                });
+              onClick={async () => {
+                if (!employee.private_email) {
+                  toast({ 
+                    title: "Mangler email", 
+                    description: "Medarbejderen har ikke en email registreret.",
+                    variant: "destructive"
+                  });
+                  return;
+                }
+                
+                try {
+                  const { data, error } = await supabase.functions.invoke('reset-login-attempts', {
+                    body: { email: employee.private_email }
+                  });
+                  
+                  if (error) {
+                    toast({ 
+                      title: "Fejl ved nulstilling", 
+                      description: error.message,
+                      variant: "destructive"
+                    });
+                  } else if (data?.error) {
+                    toast({ 
+                      title: "Fejl", 
+                      description: data.error,
+                      variant: "destructive"
+                    });
+                  } else {
+                    toast({ 
+                      title: "Login nulstillet", 
+                      description: `Login-forsøg er nulstillet for ${employee.private_email}` 
+                    });
+                  }
+                } catch (err) {
+                  toast({ 
+                    title: "Fejl", 
+                    description: "Kunne ikke kontakte serveren",
+                    variant: "destructive"
+                  });
+                }
               }}
             >
               <RotateCcw className="h-4 w-4 mr-2" />
