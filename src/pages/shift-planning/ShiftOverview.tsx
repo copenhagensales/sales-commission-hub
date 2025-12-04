@@ -1,10 +1,9 @@
 import { useState, useMemo } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Users, Palmtree, Thermometer } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useShifts, useDepartments, useEmployeesForShifts, useDanishHolidays, useAbsencesForDateRange, Shift, AbsenceRequest } from "@/hooks/useShiftPlanning";
@@ -197,18 +196,65 @@ export default function ShiftOverview() {
 
   return (
     <MainLayout>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Vagtplan</h1>
-            <p className="text-muted-foreground">
-              Uge {format(currentDate, "w", { locale: da })} - {format(weekStart, "d. MMM", { locale: da })} til {format(weekEnd, "d. MMM yyyy", { locale: da })}
-            </p>
+      <div className="p-4 md:p-6 space-y-4">
+        {/* Compact Header with Navigation */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 pb-2 border-b border-border/50">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => setCurrentDate(subWeeks(currentDate, 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 px-2 text-xs"
+                onClick={() => setCurrentDate(new Date())}
+              >
+                I dag
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => setCurrentDate(addWeeks(currentDate, 1))}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold">
+                Uge {format(currentDate, "w", { locale: da })}
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                {format(weekStart, "d. MMM", { locale: da })} – {format(weekEnd, "d. MMM yyyy", { locale: da })}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Quick Stats */}
+            <div className="flex items-center gap-3 mr-3 text-xs">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Users className="h-3.5 w-3.5" />
+                <span>{employees?.length || 0}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <CalendarDays className="h-3.5 w-3.5" />
+                <span>{shifts?.length || 0} vagter</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                <span>{totalPlannedHours.toFixed(0)}t</span>
+              </div>
+            </div>
+            
             <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[140px] h-8 text-xs">
                 <SelectValue placeholder="Alle afdelinger" />
               </SelectTrigger>
               <SelectContent>
@@ -218,107 +264,64 @@ export default function ShiftOverview() {
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={() => { setSelectedDate(new Date()); setSelectedEmployeeId(null); setCreateDialogOpen(true); }}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button 
+              size="sm" 
+              className="h-8 text-xs"
+              onClick={() => { setSelectedDate(new Date()); setSelectedEmployeeId(null); setCreateDialogOpen(true); }}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" />
               Ny vagt
             </Button>
           </div>
         </div>
 
-        {/* Week Navigation */}
-        <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => setCurrentDate(subWeeks(currentDate, 1))}>
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Forrige uge
-          </Button>
-          <Button variant="ghost" onClick={() => setCurrentDate(new Date())}>
-            I dag
-          </Button>
-          <Button variant="outline" onClick={() => setCurrentDate(addWeeks(currentDate, 1))}>
-            Næste uge
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
+        {/* Inline Legend */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground/70">Klik:</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-sm bg-amber-400/60"></div>
+            <span>Ferie</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-sm bg-red-400/60"></div>
+            <span>Syg</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-sm bg-emerald-400/60"></div>
+            <span>Vagt</span>
+          </div>
+          <span className="text-muted-foreground/60">•</span>
+          <span className="text-muted-foreground/60">Dobbeltklik = opret vagt</span>
         </div>
 
-        {/* Legend */}
-        <div className="flex gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-green-500/20 border border-green-500"></div>
-            <span>Vagt / Normal</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-amber-500/20 border border-amber-500"></div>
-            <span>Ferie (1 klik)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-red-500/20 border border-red-500"></div>
-            <span>Syg (2 klik)</span>
-          </div>
-          <span className="text-muted-foreground text-xs ml-4">Dobbeltklik for at oprette vagt</span>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Medarbejdere</p>
-                  <p className="text-2xl font-bold">{employees?.length || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Vagter denne uge</p>
-                  <p className="text-2xl font-bold">{shifts?.length || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Planlagte timer</p>
-                  <p className="text-2xl font-bold">{totalPlannedHours.toFixed(1)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Weekly Calendar Grid */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Ugevisning</CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
+        {/* Calendar Grid */}
+        <div className="bg-card rounded-xl border border-border/50 overflow-hidden">
+          <div className="overflow-x-auto">
             <div className="min-w-[800px]">
               {/* Day Headers */}
-              <div className="grid grid-cols-8 gap-2 mb-4">
-                <div className="font-medium text-sm text-muted-foreground p-2">Medarbejder</div>
+              <div className="grid grid-cols-8 border-b border-border/50 bg-muted/30">
+                <div className="p-3 text-xs font-medium text-muted-foreground">
+                  Medarbejder
+                </div>
                 {weekDays.map(day => (
                   <div
                     key={day.toISOString()}
                     className={cn(
-                      "text-center p-2 rounded-lg",
-                      isToday(day) && "bg-primary/10",
-                      isHoliday(day) && "bg-destructive/10"
+                      "text-center py-2.5 px-2 border-l border-border/30",
+                      isToday(day) && "bg-primary/5"
                     )}
                   >
-                    <p className="font-medium text-sm">{format(day, "EEEE", { locale: da })}</p>
-                    <p className={cn("text-lg", isToday(day) && "text-primary font-bold")}>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                      {format(day, "EEE", { locale: da })}
+                    </p>
+                    <p className={cn(
+                      "text-sm font-semibold mt-0.5",
+                      isToday(day) && "text-primary"
+                    )}>
                       {format(day, "d")}
                     </p>
                     {isHoliday(day) && (
-                      <Badge variant="destructive" className="text-xs mt-1">
+                      <Badge variant="outline" className="text-[9px] px-1 py-0 mt-1 border-destructive/30 text-destructive bg-destructive/5">
                         {getHolidayName(day)}
                       </Badge>
                     )}
@@ -327,13 +330,20 @@ export default function ShiftOverview() {
               </div>
 
               {/* Employee Rows */}
-              {employees?.map(employee => (
-                <div key={employee.id} className="grid grid-cols-8 gap-2 mb-2 items-start">
-                  <div className="p-2 text-sm">
-                    <p className="font-medium">{employee.first_name} {employee.last_name}</p>
-                    <p className="text-xs text-muted-foreground">{employee.department}</p>
-                    {employee.standard_start_time && (
-                      <p className="text-xs text-muted-foreground">Mødetid: {employee.standard_start_time}</p>
+              {employees?.map((employee, idx) => (
+                <div 
+                  key={employee.id} 
+                  className={cn(
+                    "grid grid-cols-8 border-b border-border/30 last:border-b-0",
+                    idx % 2 === 0 ? "bg-background" : "bg-muted/10"
+                  )}
+                >
+                  <div className="p-2.5 flex flex-col justify-center">
+                    <p className="text-sm font-medium leading-tight">
+                      {employee.first_name} {employee.last_name?.charAt(0)}.
+                    </p>
+                    {employee.department && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{employee.department}</p>
                     )}
                   </div>
                   {weekDays.map(day => {
@@ -346,20 +356,18 @@ export default function ShiftOverview() {
                     const isVacation = absenceDisplay?.type === "vacation";
                     const isSick = absenceDisplay?.type === "sick";
                     
-                    // Determine cell styling based on status
-                    const cellClasses = cn(
-                      "min-h-[60px] border rounded-lg p-1 cursor-pointer transition-colors select-none",
-                      holiday && "bg-destructive/5 border-destructive/20 cursor-not-allowed",
-                      !holiday && hasShift && "bg-green-500/20 border-green-500 hover:bg-green-500/30",
-                      !holiday && !hasShift && isVacation && "bg-amber-500/20 border-amber-500 hover:bg-amber-500/30",
-                      !holiday && !hasShift && isSick && "bg-red-500/20 border-red-500 hover:bg-red-500/30",
-                      !holiday && !hasShift && !absenceDisplay && "border-border hover:bg-muted/50"
-                    );
-                    
                     return (
                       <div
                         key={day.toISOString()}
-                        className={cellClasses}
+                        className={cn(
+                          "min-h-[52px] p-1 border-l border-border/30 cursor-pointer transition-all duration-150",
+                          isToday(day) && "bg-primary/5",
+                          holiday && "bg-muted/40 cursor-not-allowed",
+                          !holiday && hasShift && "bg-emerald-500/10 hover:bg-emerald-500/20",
+                          !holiday && !hasShift && isVacation && "bg-amber-400/15 hover:bg-amber-400/25",
+                          !holiday && !hasShift && isSick && "bg-red-400/15 hover:bg-red-400/25",
+                          !holiday && !hasShift && !absenceDisplay && "hover:bg-muted/40"
+                        )}
                         onClick={() => {
                           if (!holiday) {
                             handleCellClick(employee.id, day, absence, hasShift);
@@ -375,24 +383,13 @@ export default function ShiftOverview() {
                           <ShiftCard key={shift.id} shift={shift} compact />
                         ))}
                         {!hasShift && isVacation && (
-                          <div className="flex flex-col items-center justify-center h-full text-amber-600 text-xs gap-1">
-                            <Palmtree className="h-4 w-4" />
-                            <span>Ferie</span>
+                          <div className="flex items-center justify-center h-full gap-1 text-amber-600">
+                            <Palmtree className="h-3.5 w-3.5" />
                           </div>
                         )}
                         {!hasShift && isSick && (
-                          <div className="flex flex-col items-center justify-center h-full text-red-600 text-xs gap-1">
-                            <Thermometer className="h-4 w-4" />
-                            <span>Syg</span>
-                          </div>
-                        )}
-                        {!hasShift && !absenceDisplay && !holiday && (
-                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-xs">
-                            {employee.standard_start_time ? (
-                              <span className="text-[10px]">{employee.standard_start_time}</span>
-                            ) : (
-                              <Plus className="h-3 w-3" />
-                            )}
+                          <div className="flex items-center justify-center h-full gap-1 text-red-500">
+                            <Thermometer className="h-3.5 w-3.5" />
                           </div>
                         )}
                       </div>
@@ -402,13 +399,13 @@ export default function ShiftOverview() {
               ))}
 
               {(!employees || employees.length === 0) && (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="text-center py-12 text-muted-foreground text-sm">
                   Ingen medarbejdere fundet
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Create Shift Dialog */}
         <CreateShiftDialog
