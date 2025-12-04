@@ -61,6 +61,7 @@ interface CancellationMatch {
 
 interface UnmatchedCancellation {
   externalId: string;
+  oppNumber?: string;
   cancellationDate?: string;
   cancellationStatus?: string;
 }
@@ -263,6 +264,8 @@ export default function Payroll() {
           );
         }) || headers[0];
 
+      const oppHeader = headers.find((h) => normalize(h).includes("opp"));
+
       const dateHeader =
         headers.find((h) => normalize(h).includes("starttidspunkt")) ||
         headers.find((h) => {
@@ -275,7 +278,10 @@ export default function Payroll() {
         return n.includes("status") || n.includes("resultat");
       });
 
-      const cancellationByOrder = new Map<string, { row: Record<string, any>; date?: string; status?: string }>();
+      const cancellationByOrder = new Map<
+        string,
+        { row: Record<string, any>; date?: string; status?: string; oppNumber?: string }
+      >();
 
       const from = fromDate;
       const to = toDate;
@@ -285,6 +291,9 @@ export default function Payroll() {
         if (!rawOrder) return;
         const orderId = String(rawOrder).trim();
         if (!orderId) return;
+
+        const rawOpp = oppHeader ? row[oppHeader] : undefined;
+        const oppNumber = rawOpp != null && String(rawOpp).trim() !== "" ? String(rawOpp).trim() : undefined;
 
         let cancellationDate: Date | undefined;
         if (dateHeader) {
@@ -321,6 +330,7 @@ export default function Payroll() {
           row,
           date: format(cancellationDate, "dd.MM.yyyy"),
           status: statusValue,
+          oppNumber,
         });
       });
 
@@ -375,6 +385,7 @@ export default function Payroll() {
         if (!matchedOrderIds.has(orderId)) {
           unmatched.push({
             externalId: orderId,
+            oppNumber: value.oppNumber,
             cancellationDate: value.date,
             cancellationStatus: value.status,
           });
@@ -652,6 +663,7 @@ export default function Payroll() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Ordre-id (Excel)</TableHead>
+                        <TableHead>OPP-nummer</TableHead>
                         <TableHead>Annulleringsdato</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
@@ -660,6 +672,7 @@ export default function Payroll() {
                       {cancellations.unmatched.map((u) => (
                         <TableRow key={u.externalId + (u.cancellationDate || "")}> 
                           <TableCell className="font-mono text-xs">{u.externalId}</TableCell>
+                          <TableCell className="font-mono text-xs">{u.oppNumber || "-"}</TableCell>
                           <TableCell>{u.cancellationDate || "-"}</TableCell>
                           <TableCell>{u.cancellationStatus || "-"}</TableCell>
                         </TableRow>
