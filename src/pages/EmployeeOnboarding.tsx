@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, ArrowRight, Check } from "lucide-react";
 import logo from "@/assets/cph-sales-logo.png";
 
 interface InvitationData {
@@ -29,11 +29,13 @@ export default function EmployeeOnboarding() {
   const token = searchParams.get("token");
 
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [invitation, setInvitation] = useState<InvitationData | null>(null);
   const [employee, setEmployee] = useState<EmployeeData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   // Form fields
   const [formData, setFormData] = useState({
@@ -49,6 +51,12 @@ export default function EmployeeOnboarding() {
     bank_account_number: "",
   });
 
+  const steps = [
+    { title: "Identitet", description: "Dine grundlæggende oplysninger" },
+    { title: "Kontaktoplysninger", description: "Hvordan vi kan kontakte dig" },
+    { title: "Bankoplysninger", description: "Til lønudbetaling" },
+  ];
+
   useEffect(() => {
     if (!token) {
       setError("Intet token fundet. Brug linket fra din invitation.");
@@ -61,7 +69,6 @@ export default function EmployeeOnboarding() {
 
   const validateToken = async () => {
     try {
-      // Fetch invitation by token
       const { data: invitationData, error: invError } = await supabase
         .from("employee_invitations")
         .select("*")
@@ -74,14 +81,12 @@ export default function EmployeeOnboarding() {
         return;
       }
 
-      // Check if expired
       if (new Date(invitationData.expires_at) < new Date()) {
         setError("Invitationen er udløbet. Kontakt venligst din leder.");
         setLoading(false);
         return;
       }
 
-      // Check if already completed
       if (invitationData.status === "completed") {
         setError("Du har allerede udfyldt dine oplysninger.");
         setLoading(false);
@@ -90,7 +95,6 @@ export default function EmployeeOnboarding() {
 
       setInvitation(invitationData);
 
-      // Fetch employee data
       const { data: employeeData, error: empError } = await supabase
         .from("employee_master_data")
         .select("first_name, last_name")
@@ -119,38 +123,73 @@ export default function EmployeeOnboarding() {
     }
   };
 
+  // Auto-save function
+  const autoSave = useCallback(async (data: typeof formData) => {
+    if (!invitation) return;
+    
+    setSaving(true);
+    try {
+      const { error: updateError } = await supabase
+        .from("employee_master_data")
+        .update({
+          first_name: data.first_name,
+          last_name: data.last_name,
+          private_email: data.private_email,
+          private_phone: data.private_phone,
+          address_street: data.address_street,
+          address_postal_code: data.address_postal_code,
+          address_city: data.address_city,
+          cpr_number: data.cpr_number,
+          bank_reg_number: data.bank_reg_number,
+          bank_account_number: data.bank_account_number,
+        })
+        .eq("id", invitation.employee_id);
+
+      if (!updateError) {
+        setLastSaved(new Date());
+      }
+    } catch (err) {
+      console.error("Auto-save error:", err);
+    } finally {
+      setSaving(false);
+    }
+  }, [invitation]);
+
+  // Debounced auto-save on form change
+  useEffect(() => {
+    if (!invitation) return;
+    
+    const timeoutId = setTimeout(() => {
+      autoSave(formData);
+    }, 1000); // Save 1 second after user stops typing
+
+    return () => clearTimeout(timeoutId);
+  }, [formData, autoSave, invitation]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleNext = async () => {
+    // Save before moving to next step
+    await autoSave(formData);
+    
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      // Final step - complete the invitation
+      await completeInvitation();
+    }
+  };
+
+  const completeInvitation = async () => {
     if (!invitation) return;
 
-    setSubmitting(true);
-
+    setSaving(true);
     try {
-      // Update employee master data
-      const { error: updateError } = await supabase
-        .from("employee_master_data")
-        .update({
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          private_email: formData.private_email,
-          private_phone: formData.private_phone,
-          address_street: formData.address_street,
-          address_postal_code: formData.address_postal_code,
-          address_city: formData.address_city,
-          cpr_number: formData.cpr_number,
-          bank_reg_number: formData.bank_reg_number,
-          bank_account_number: formData.bank_account_number,
-        })
-        .eq("id", invitation.employee_id);
-
-      if (updateError) {
-        throw updateError;
-      }
+      // Final save
+      await autoSave(formData);
 
       // Mark invitation as completed
       const { error: invUpdateError } = await supabase
@@ -171,14 +210,14 @@ export default function EmployeeOnboarding() {
         description: "Dine oplysninger er nu registreret. Tak!",
       });
     } catch (err) {
-      console.error("Submit error:", err);
+      console.error("Complete error:", err);
       toast({
         title: "Fejl",
-        description: "Der opstod en fejl ved gem af oplysninger.",
+        description: "Der opstod en fejl.",
         variant: "destructive",
       });
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
@@ -233,11 +272,47 @@ export default function EmployeeOnboarding() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        {/* Progress indicator */}
+        <div className="flex items-center justify-center mb-8 gap-2">
+          {steps.map((step, index) => (
+            <div key={index} className="flex items-center">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  index < currentStep
+                    ? "bg-green-500 text-white"
+                    : index === currentStep
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {index < currentStep ? <Check className="h-4 w-4" /> : index + 1}
+              </div>
+              {index < steps.length - 1 && (
+                <div className={`w-12 h-1 mx-1 ${index < currentStep ? "bg-green-500" : "bg-muted"}`} />
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Auto-save indicator */}
+        <div className="text-center mb-4 h-5">
+          {saving ? (
+            <span className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" /> Gemmer...
+            </span>
+          ) : lastSaved ? (
+            <span className="text-sm text-green-600 flex items-center justify-center gap-1">
+              <Check className="h-3 w-3" /> Gemt automatisk
+            </span>
+          ) : null}
+        </div>
+
+        {/* Step 1: Identity */}
+        {currentStep === 0 && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="text-lg">Identitet</CardTitle>
-              <CardDescription>Dine grundlæggende oplysninger</CardDescription>
+              <CardTitle className="text-lg">{steps[0].title}</CardTitle>
+              <CardDescription>{steps[0].description}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -274,11 +349,14 @@ export default function EmployeeOnboarding() {
               </div>
             </CardContent>
           </Card>
+        )}
 
+        {/* Step 2: Contact */}
+        {currentStep === 1 && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="text-lg">Kontaktoplysninger</CardTitle>
-              <CardDescription>Hvordan vi kan kontakte dig</CardDescription>
+              <CardTitle className="text-lg">{steps[1].title}</CardTitle>
+              <CardDescription>{steps[1].description}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -335,11 +413,14 @@ export default function EmployeeOnboarding() {
               </div>
             </CardContent>
           </Card>
+        )}
 
+        {/* Step 3: Bank */}
+        {currentStep === 2 && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="text-lg">Bankoplysninger</CardTitle>
-              <CardDescription>Til lønudbetaling</CardDescription>
+              <CardTitle className="text-lg">{steps[2].title}</CardTitle>
+              <CardDescription>{steps[2].description}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -368,18 +449,42 @@ export default function EmployeeOnboarding() {
               </div>
             </CardContent>
           </Card>
+        )}
 
-          <Button type="submit" className="w-full" size="lg" disabled={submitting}>
-            {submitting ? (
+        <div className="flex gap-4">
+          {currentStep > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setCurrentStep(currentStep - 1)}
+            >
+              Tilbage
+            </Button>
+          )}
+          <Button
+            type="button"
+            className="flex-1"
+            size="lg"
+            onClick={handleNext}
+            disabled={saving}
+          >
+            {saving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Gemmer...
               </>
+            ) : currentStep === steps.length - 1 ? (
+              <>
+                Afslut <CheckCircle2 className="ml-2 h-4 w-4" />
+              </>
             ) : (
-              "Gem oplysninger"
+              <>
+                Næste <ArrowRight className="ml-2 h-4 w-4" />
+              </>
             )}
           </Button>
-        </form>
+        </div>
       </div>
     </div>
   );
