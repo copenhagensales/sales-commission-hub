@@ -225,12 +225,20 @@ export default function Commission() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('sale_items')
-        .select('mapped_commission, mapped_revenue, needs_mapping');
+        .select('mapped_commission, mapped_revenue, needs_mapping, quantity');
       if (error) throw error;
       
-      const totalCommission = data?.reduce((sum, item) => sum + (Number(item.mapped_commission) || 0), 0) || 0;
-      const totalRevenue = data?.reduce((sum, item) => sum + (Number(item.mapped_revenue) || 0), 0) || 0;
-      const unmappedCount = data?.filter(item => item.needs_mapping).length || 0;
+      const totalCommission = data?.reduce((sum: number, item: any) => {
+        const qty = Number(item.quantity ?? 1) || 1;
+        const commissionPerUnit = Number(item.mapped_commission) || 0;
+        return sum + qty * commissionPerUnit;
+      }, 0) || 0;
+      const totalRevenue = data?.reduce((sum: number, item: any) => {
+        const qty = Number(item.quantity ?? 1) || 1;
+        const revenuePerUnit = Number(item.mapped_revenue) || 0;
+        return sum + qty * revenuePerUnit;
+      }, 0) || 0;
+      const unmappedCount = data?.filter((item: any) => item.needs_mapping).length || 0;
       
       return { totalCommission, totalRevenue, unmappedCount, totalItems: data?.length || 0 };
     }

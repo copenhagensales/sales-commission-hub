@@ -179,12 +179,14 @@ export default function Payroll() {
 
         sale.sale_items?.forEach((item) => {
           const qty = Number(item.quantity ?? 1) || 1;
-          const revenue = Number(item.mapped_revenue) || 0;
-          const commission = Number(item.mapped_commission) || 0;
+          const revenuePerUnit = Number(item.mapped_revenue) || 0;
+          const commissionPerUnit = Number(item.mapped_commission) || 0;
+          const lineRevenue = qty * revenuePerUnit;
+          const lineCommission = qty * commissionPerUnit;
 
           totalUnits += qty;
-          totalRevenue += revenue;
-          totalCommission += commission;
+          totalRevenue += lineRevenue;
+          totalCommission += lineCommission;
 
           const existing = perAgentMap.get(agentName) || {
             units: 0,
@@ -193,8 +195,8 @@ export default function Payroll() {
           };
 
           existing.units += qty;
-          existing.revenue += revenue;
-          existing.commission += commission;
+          existing.revenue += lineRevenue;
+          existing.commission += lineCommission;
 
           perAgentMap.set(agentName, existing);
         });
