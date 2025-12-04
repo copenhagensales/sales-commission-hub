@@ -501,7 +501,7 @@ export type Database = {
           created_at?: string | null
           email: string
           full_name: string
-          id: string
+          id?: string
           is_active?: boolean | null
           phone?: string | null
           role?: Database["public"]["Enums"]["vagt_flow_role"]
