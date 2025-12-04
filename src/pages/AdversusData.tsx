@@ -108,9 +108,43 @@ export default function AdversusData() {
     }
   }, [latestTdcImport]);
 
+  const TDC_PRIORITY_HEADER_KEYWORDS = [
+    "dato",
+    "date",
+    "ordrenr",
+    "ordre id",
+    "ordreid",
+    "orderid",
+    "order id",
+    "status",
+    "resultat",
+  ];
+
+  const normalizeTdcHeader = (header: string) => header.toLowerCase().replace(/[\s_]+/g, "");
+
+  const isPriorityTdcHeader = (header: string) => {
+    const norm = normalizeTdcHeader(header);
+    return TDC_PRIORITY_HEADER_KEYWORDS.some((keyword) =>
+      norm.includes(keyword.replace(/\s+/g, ""))
+    );
+  };
+
   const tdcHeaders = useMemo(() => {
     if (!tdcRows || tdcRows.length === 0) return [] as string[];
-    return Object.keys(tdcRows[0]);
+    const rawHeaders = Object.keys(tdcRows[0]);
+
+    const priority: string[] = [];
+    const others: string[] = [];
+
+    rawHeaders.forEach((header) => {
+      if (isPriorityTdcHeader(header)) {
+        priority.push(header);
+      } else {
+        others.push(header);
+      }
+    });
+
+    return [...priority, ...others];
   }, [tdcRows]);
 
   return (
@@ -422,6 +456,46 @@ export default function AdversusData() {
                               ? `${Math.round(latestTdcImport.raw_data.size / 1024)} kB`
                               : "-"}
                           </p>
+                        </div>
+                      )}
+
+                      {tdcRows && tdcRows.length > 0 && tdcHeaders.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium">Linjer i seneste fil</p>
+                          <div className="border rounded-md overflow-auto max-h-[600px]">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  {tdcHeaders.map((header) => (
+                                    <TableHead
+                                      key={header}
+                                      className={
+                                        isPriorityTdcHeader(header)
+                                          ? "font-semibold text-primary bg-muted/60"
+                                          : "text-muted-foreground"
+                                      }
+                                    >
+                                      {header}
+                                    </TableHead>
+                                  ))}
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {tdcRows.map((row, rowIndex) => (
+                                  <TableRow key={rowIndex}>
+                                    {tdcHeaders.map((header) => (
+                                      <TableCell
+                                        key={header}
+                                        className={isPriorityTdcHeader(header) ? "font-medium" : ""}
+                                      >
+                                        {String((row as Record<string, any>)[header] ?? "")}
+                                      </TableCell>
+                                    ))}
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
                         </div>
                       )}
 
