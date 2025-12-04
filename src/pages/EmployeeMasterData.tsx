@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -451,8 +452,12 @@ export default function EmployeeMasterData() {
                 </TableHeader>
                 <TableBody>
                   {filteredEmployees.map((employee) => (
-                    <TableRow key={employee.id}>
-                      <TableCell className="font-medium">{employee.first_name} {employee.last_name}</TableCell>
+                    <TableRow key={employee.id} className="cursor-pointer hover:bg-muted/50">
+                      <TableCell className="font-medium">
+                        <Link to={`/employees/${employee.id}`} className="text-primary hover:underline">
+                          {employee.first_name} {employee.last_name}
+                        </Link>
+                      </TableCell>
                       <TableCell>{employee.private_email || "-"}</TableCell>
                       <TableCell>{employee.private_phone || "-"}</TableCell>
                       <TableCell>{employee.department || "-"}</TableCell>
