@@ -462,13 +462,18 @@ export default function VagtBookWeek() {
                 <p className="font-medium">{selectedLocation?.name}</p>
                 <p className="text-sm text-muted-foreground">Uge {selectedWeek}, {selectedYear}</p>
               </div>
-              {selectedLocation?.contact_phone && (
+              {selectedLocation?.contact_phone ? (
                 <a
                   href={`tel:${selectedLocation.contact_phone}`}
                   className="p-2 rounded-md hover:bg-muted transition-colors"
+                  title={selectedLocation.contact_phone}
                 >
                   <Phone className="h-5 w-5 text-primary" />
                 </a>
+              ) : (
+                <span className="p-2 rounded-md" title="Intet telefonnummer">
+                  <Phone className="h-5 w-5 text-muted-foreground/30" />
+                </span>
               )}
             </div>
 
