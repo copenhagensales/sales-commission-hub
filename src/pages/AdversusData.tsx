@@ -81,6 +81,8 @@ export default function AdversusData() {
 
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedTdcImport, setSelectedTdcImport] = useState<any | null>(null);
+  const [tdcDetailOpen, setTdcDetailOpen] = useState(false);
 
   const latestTdcImport = (tdcImports && tdcImports[0]) as any | undefined;
 
@@ -405,6 +407,7 @@ export default function AdversusData() {
                               <TableHead>Filnavn</TableHead>
                               <TableHead>Størrelse</TableHead>
                               <TableHead>Uploadet af (id)</TableHead>
+                              <TableHead className="text-right">Detaljer</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -426,10 +429,77 @@ export default function AdversusData() {
                                 <TableCell className="font-mono text-xs">
                                   {imp.uploaded_by ? String(imp.uploaded_by).slice(0, 8) : "-"}
                                 </TableCell>
+                                <TableCell className="text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedTdcImport(imp);
+                                      setTdcDetailOpen(true);
+                                    }}
+                                    className="text-xs font-medium text-primary hover:underline"
+                                  >
+                                    Vis detaljer
+                                  </button>
+                                </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
                         </Table>
+
+                        <Dialog open={tdcDetailOpen} onOpenChange={setTdcDetailOpen}>
+                          <DialogContent className="max-w-3xl">
+                            <DialogHeader>
+                              <DialogTitle>TDC ann-import detaljer</DialogTitle>
+                            </DialogHeader>
+                            {selectedTdcImport && (
+                              <div className="space-y-4 text-sm">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <p className="text-muted-foreground">Uploadet</p>
+                                    <p>
+                                      {selectedTdcImport.uploaded_at
+                                        ? format(new Date(selectedTdcImport.uploaded_at), "dd.MM.yyyy HH:mm", {
+                                            locale: da,
+                                          })
+                                        : "-"}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Uploadet af (id)</p>
+                                    <p className="font-mono text-xs">
+                                      {selectedTdcImport.uploaded_by
+                                        ? String(selectedTdcImport.uploaded_by).slice(0, 36)
+                                        : "-"}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Filnavn</p>
+                                    <p className="font-mono text-xs break-all">
+                                      {selectedTdcImport.raw_data?.filename ??
+                                        selectedTdcImport.raw_data?.originalName ??
+                                        "tdc ann"}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">Størrelse</p>
+                                    <p>
+                                      {selectedTdcImport.raw_data?.size
+                                        ? `${Math.round(selectedTdcImport.raw_data.size / 1024)} kB`
+                                        : "-"}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <p className="text-sm font-medium mb-2">Rå metadata (raw_data)</p>
+                                  <pre className="bg-muted rounded-md p-3 text-xs max-h-80 overflow-auto font-mono whitespace-pre-wrap break-all">
+                                    {JSON.stringify(selectedTdcImport.raw_data, null, 2)}
+                                  </pre>
+                                </div>
+                              </div>
+                            )}
+                          </DialogContent>
+                        </Dialog>
                       </div>
                     </>
                   )}
