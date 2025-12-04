@@ -586,9 +586,9 @@ export default function EmployeeDetail() {
                 value={employee.standard_start_time}
                 field="standard_start_time"
                 options={[
-                  { value: "08:00-16:30", label: "8-16.30" },
-                  { value: "08:30-16:30", label: "8.30-16.30" },
-                  { value: "09:30-17:30", label: "9.30-17.30" },
+                  { value: "8.00-16.30", label: "8.00-16.30" },
+                  { value: "8.30-16.30", label: "8.30-16.30" },
+                  { value: "9.30-17.30", label: "9.30-17.30" },
                 ]}
                 onSave={handleSave}
                 displayValue={employee.standard_start_time || "-"}
