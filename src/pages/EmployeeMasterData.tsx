@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,9 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Mail, Loader2, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Mail, Loader2, RefreshCw, ArrowRight, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 
 interface EmployeeMasterDataRecord {
@@ -102,6 +101,18 @@ export default function EmployeeMasterData() {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteData, setInviteData] = useState({ first_name: "", last_name: "", email: "", job_title: "" as "Fieldmarketing" | "Salgskonsulent" | "" });
   const [creatingInvite, setCreatingInvite] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+  const dialogSteps = [
+    { title: "Identitet", key: "identity" },
+    { title: "Kontakt", key: "contact" },
+    { title: "Ansættelse", key: "employment" },
+    { title: "Løn", key: "salary" },
+    { title: "Ferie", key: "vacation" },
+    { title: "Andet", key: "other" },
+  ];
 
   const { data: employees = [], isLoading } = useQuery({
     queryKey: ["employee-master-data"],
@@ -204,6 +215,59 @@ export default function EmployeeMasterData() {
       return;
     }
     saveMutation.mutate(editingEmployee ? { ...formData, id: editingEmployee.id } : formData);
+  };
+
+  // Auto-save function for step navigation
+  const autoSaveEmployee = useCallback(async () => {
+    if (!editingEmployee) return; // Only auto-save for existing employees
+    
+    setAutoSaving(true);
+    try {
+      const { error } = await supabase
+        .from("employee_master_data")
+        .update(formData)
+        .eq("id", editingEmployee.id);
+      
+      if (!error) {
+        setLastSaved(new Date());
+        queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+      }
+    } catch (err) {
+      console.error("Auto-save error:", err);
+    } finally {
+      setAutoSaving(false);
+    }
+  }, [editingEmployee, formData, queryClient]);
+
+  // Debounced auto-save when form changes (only for editing existing employee)
+  useEffect(() => {
+    if (!editingEmployee || !dialogOpen) return;
+    
+    const timeoutId = setTimeout(() => {
+      autoSaveEmployee();
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData, editingEmployee, dialogOpen, autoSaveEmployee]);
+
+  const handleStepNext = async () => {
+    // Validate first step
+    if (currentStep === 0 && (!formData.first_name || !formData.last_name)) {
+      toast({ title: "Udfyld fornavn og efternavn", variant: "destructive" });
+      return;
+    }
+
+    // Auto-save for existing employee
+    if (editingEmployee) {
+      await autoSaveEmployee();
+    }
+
+    if (currentStep < dialogSteps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      // Final step - save and close
+      handleSave();
+    }
   };
 
   const toggleActiveMutation = useMutation({
@@ -441,26 +505,58 @@ export default function EmployeeMasterData() {
               if (!open) {
                 setEditingEmployee(null);
                 setFormData(defaultEmployee);
+                setCurrentStep(0);
+                setLastSaved(null);
               }
             }}>
               <DialogTrigger asChild>
                 <Button><Plus className="mr-2 h-4 w-4" /> Tilføj medarbejder</Button>
               </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingEmployee ? "Rediger medarbejder" : "Ny medarbejder"}</DialogTitle>
               </DialogHeader>
-              <Tabs defaultValue="identity" className="w-full">
-                <TabsList className="grid w-full grid-cols-6">
-                  <TabsTrigger value="identity">Identitet</TabsTrigger>
-                  <TabsTrigger value="contact">Kontakt</TabsTrigger>
-                  <TabsTrigger value="employment">Ansættelse</TabsTrigger>
-                  <TabsTrigger value="salary">Løn</TabsTrigger>
-                  <TabsTrigger value="vacation">Ferie</TabsTrigger>
-                  <TabsTrigger value="other">Andet</TabsTrigger>
-                </TabsList>
+              
+              {/* Progress indicator */}
+              <div className="flex items-center justify-center mb-4 gap-1">
+                {dialogSteps.map((step, index) => (
+                  <div key={index} className="flex items-center">
+                    <div
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                        index < currentStep
+                          ? "bg-green-500 text-white"
+                          : index === currentStep
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {index < currentStep ? <Check className="h-3 w-3" /> : index + 1}
+                    </div>
+                    {index < dialogSteps.length - 1 && (
+                      <div className={`w-6 h-0.5 ${index < currentStep ? "bg-green-500" : "bg-muted"}`} />
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              <p className="text-center text-sm font-medium mb-4">{dialogSteps[currentStep]?.title}</p>
 
-                <TabsContent value="identity" className="space-y-4 mt-4">
+              {/* Auto-save indicator */}
+              <div className="text-center mb-4 h-4">
+                {autoSaving ? (
+                  <span className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Gemmer...
+                  </span>
+                ) : lastSaved ? (
+                  <span className="text-xs text-green-600 flex items-center justify-center gap-1">
+                    <Check className="h-3 w-3" /> Gemt automatisk
+                  </span>
+                ) : null}
+              </div>
+
+              {/* Step 0: Identity */}
+              {currentStep === 0 && (
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Fornavn(e) *</Label>
@@ -475,9 +571,12 @@ export default function EmployeeMasterData() {
                       <Input type="password" value={formData.cpr_number || ""} onChange={(e) => setFormData({ ...formData, cpr_number: e.target.value || null })} placeholder="XXXXXX-XXXX" />
                     </div>
                   </div>
-                </TabsContent>
+                </div>
+              )}
 
-                <TabsContent value="contact" className="space-y-4 mt-4">
+              {/* Step 1: Contact */}
+              {currentStep === 1 && (
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2 col-span-2">
                       <Label>Adresse</Label>
@@ -504,9 +603,12 @@ export default function EmployeeMasterData() {
                       <Input type="email" value={formData.private_email || ""} onChange={(e) => setFormData({ ...formData, private_email: e.target.value || null })} />
                     </div>
                   </div>
-                </TabsContent>
+                </div>
+              )}
 
-                <TabsContent value="employment" className="space-y-4 mt-4">
+              {/* Step 2: Employment */}
+              {currentStep === 2 && (
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Ansættelsesdato</Label>
@@ -556,9 +658,12 @@ export default function EmployeeMasterData() {
                       <Label>Aktiv medarbejder</Label>
                     </div>
                   </div>
-                </TabsContent>
+                </div>
+              )}
 
-                <TabsContent value="salary" className="space-y-4 mt-4">
+              {/* Step 3: Salary */}
+              {currentStep === 3 && (
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Løntype</Label>
@@ -586,9 +691,12 @@ export default function EmployeeMasterData() {
                       <Input type="password" value={formData.bank_account_number || ""} onChange={(e) => setFormData({ ...formData, bank_account_number: e.target.value || null })} />
                     </div>
                   </div>
-                </TabsContent>
+                </div>
+              )}
 
-                <TabsContent value="vacation" className="space-y-4 mt-4">
+              {/* Step 4: Vacation */}
+              {currentStep === 4 && (
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Ferietype</Label>
@@ -607,9 +715,12 @@ export default function EmployeeMasterData() {
                       </div>
                     )}
                   </div>
-                </TabsContent>
+                </div>
+              )}
 
-                <TabsContent value="other" className="space-y-4 mt-4">
+              {/* Step 5: Other */}
+              {currentStep === 5 && (
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-center space-x-2">
                       <Switch checked={formData.has_parking} onCheckedChange={(checked) => setFormData({ ...formData, has_parking: checked })} />
@@ -640,11 +751,34 @@ export default function EmployeeMasterData() {
                       <Input type="time" value={formData.standard_start_time || ""} onChange={(e) => setFormData({ ...formData, standard_start_time: e.target.value || null })} />
                     </div>
                   </div>
-                </TabsContent>
-              </Tabs>
-              <div className="flex justify-end mt-6">
-                <Button onClick={handleSave} disabled={saveMutation.isPending}>
-                  {saveMutation.isPending ? "Gemmer..." : "Gem"}
+                </div>
+              )}
+
+              {/* Navigation buttons */}
+              <div className="flex gap-4 mt-6">
+                {currentStep > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setCurrentStep(currentStep - 1)}
+                  >
+                    Tilbage
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  className="flex-1"
+                  onClick={handleStepNext}
+                  disabled={saveMutation.isPending || autoSaving}
+                >
+                  {saveMutation.isPending || autoSaving ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gemmer...</>
+                  ) : currentStep === dialogSteps.length - 1 ? (
+                    <>Afslut <Check className="ml-2 h-4 w-4" /></>
+                  ) : (
+                    <>Næste <ArrowRight className="ml-2 h-4 w-4" /></>
+                  )}
                 </Button>
               </div>
             </DialogContent>
