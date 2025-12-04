@@ -92,12 +92,20 @@ export default function VagtBookings() {
   const { data: absences } = useQuery({
     queryKey: ["vagt-absences-week", selectedWeek, selectedYear],
     queryFn: async () => {
-      const weekEnd = addDays(weekStart, 6);
+      const weekEndDate = addDays(weekStart, 6);
       // Get absences that overlap with the week (start before week ends AND end after week starts)
       const { data, error } = await supabase
         .from("employee_absence")
-        .select(`*, employee:employee(full_name, team)`)
-        .lte("start_date", format(weekEnd, "yyyy-MM-dd"))
+        .select(`
+          id,
+          employee_id,
+          start_date,
+          end_date,
+          reason,
+          status,
+          employee:employee_id(full_name, team)
+        `)
+        .lte("start_date", format(weekEndDate, "yyyy-MM-dd"))
         .gte("end_date", format(weekStart, "yyyy-MM-dd"))
         .in("status", ["APPROVED", "PENDING"]);
       if (error) throw error;
