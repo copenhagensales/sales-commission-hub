@@ -167,6 +167,43 @@ export default function ShiftOverview() {
     return shifts?.reduce((sum, s) => sum + (s.planned_hours || 0), 0) || 0;
   }, [shifts]);
 
+  // Calculate absence statistics for the week and today
+  const absenceStats = useMemo(() => {
+    const employeeCount = employees?.length || 0;
+    if (employeeCount === 0) return { weekVacation: 0, weekSick: 0, todayVacation: 0, todaySick: 0 };
+
+    const today = new Date();
+    let weekVacationDays = 0;
+    let weekSickDays = 0;
+    let todayVacation = 0;
+    let todaySick = 0;
+
+    employees?.forEach(emp => {
+      weekDays.forEach(day => {
+        const absence = absences?.find(a => {
+          const start = parseISO(a.start_date);
+          const end = parseISO(a.end_date);
+          return a.employee_id === emp.id && isWithinInterval(day, { start, end });
+        });
+        if (absence?.type === "vacation") weekVacationDays++;
+        if (absence?.type === "sick") weekSickDays++;
+        
+        if (isToday(day)) {
+          if (absence?.type === "vacation") todayVacation++;
+          if (absence?.type === "sick") todaySick++;
+        }
+      });
+    });
+
+    const totalWeekSlots = employeeCount * weekDays.length;
+    return {
+      weekVacation: totalWeekSlots > 0 ? Math.round((weekVacationDays / totalWeekSlots) * 100) : 0,
+      weekSick: totalWeekSlots > 0 ? Math.round((weekSickDays / totalWeekSlots) * 100) : 0,
+      todayVacation: employeeCount > 0 ? Math.round((todayVacation / employeeCount) * 100) : 0,
+      todaySick: employeeCount > 0 ? Math.round((todaySick / employeeCount) * 100) : 0,
+    };
+  }, [employees, absences, weekDays]);
+
   // Handle cell click - cycle through: shift -> vacation -> sick -> shift
   const handleCellClick = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null, hasShift: boolean) => {
     const dateStr = format(date, "yyyy-MM-dd");
@@ -241,7 +278,7 @@ export default function ShiftOverview() {
           
           <div className="flex items-center gap-2 flex-wrap">
             {/* Quick Stats */}
-            <div className="flex items-center gap-3 mr-3 text-xs">
+            <div className="flex items-center gap-3 mr-2 text-xs">
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <Users className="h-3.5 w-3.5" />
                 <span>{employees?.length || 0}</span>
@@ -256,6 +293,19 @@ export default function ShiftOverview() {
               </div>
             </div>
             
+            {/* Absence Stats - subtle separator */}
+            <div className="flex items-center gap-2 pl-2 border-l border-border/40 text-xs">
+              <div className="flex items-center gap-1 text-amber-600/80" title="Ferie denne uge">
+                <Palmtree className="h-3 w-3" />
+                <span>{absenceStats.weekVacation}%</span>
+              </div>
+              <div className="flex items-center gap-1 text-red-500/80" title="Sygdom denne uge">
+                <Thermometer className="h-3 w-3" />
+                <span>{absenceStats.weekSick}%</span>
+              </div>
+            </div>
+            
+            <div className="w-px h-4 bg-border/40 mx-1" />
             <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
               <SelectTrigger className="w-[140px] h-8 text-xs">
                 <SelectValue placeholder="Alle afdelinger" />
