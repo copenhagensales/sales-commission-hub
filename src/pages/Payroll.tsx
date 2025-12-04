@@ -469,7 +469,6 @@ export default function Payroll() {
     if (!searchTerm.trim()) return false;
     const term = searchTerm.trim().toLowerCase();
     const inExternalId = sale.adversus_external_id?.toLowerCase().includes(term) ?? false;
-    const inOppAdversus = sale.adversus_opp_number?.toLowerCase().includes(term) ?? false;
     const inPhone = sale.customer_phone?.toLowerCase().includes(term) ?? false;
     const inCompany = sale.customer_company?.toLowerCase().includes(term) ?? false;
     const inAgent = sale.agent_name?.toLowerCase().includes(term) ?? false;
@@ -478,7 +477,7 @@ export default function Payroll() {
     const inOpp = matchFromCancellations?.oppNumber?.toLowerCase().includes(term) ?? false;
     const inCancelOrderId = matchFromCancellations?.externalId?.toLowerCase().includes(term) ?? false;
 
-    return inExternalId || inOppAdversus || inPhone || inCompany || inAgent || inOpp || inCancelOrderId;
+    return inExternalId || inPhone || inCompany || inAgent || inOpp || inCancelOrderId;
   });
 
   return (
@@ -819,8 +818,7 @@ export default function Payroll() {
                           const matchFromCancellations = cancellations?.matches.find(
                             (m) => m.saleId === sale.id,
                           );
-                          const oppNumber =
-                            sale.adversus_opp_number ?? matchFromCancellations?.oppNumber ?? "-";
+                          const oppNumber = matchFromCancellations?.oppNumber ?? "-";
 
                           return (
                             <TableRow
@@ -892,9 +890,7 @@ export default function Payroll() {
                           <div>
                             <p className="text-muted-foreground">OPP-nummer</p>
                             <p className="font-medium">
-                              {selectedSale.adversus_opp_number ??
-                                cancellations?.matches.find((m) => m.saleId === selectedSale.id)
-                                  ?.oppNumber ??
+                              {cancellations?.matches.find((m) => m.saleId === selectedSale.id)?.oppNumber ??
                                 "-"}
                             </p>
                           </div>
