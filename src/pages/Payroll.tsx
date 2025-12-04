@@ -61,11 +61,13 @@ interface CancellationMatch {
 
 interface CancellationSummary {
   totalCancelled: number;
+  totalCancelledCommission: number;
   matches: CancellationMatch[];
 }
 
 const emptyCancellations: CancellationSummary = {
   totalCancelled: 0,
+  totalCancelledCommission: 0,
   matches: [],
 };
 
@@ -325,8 +327,32 @@ export default function Payroll() {
         });
       });
 
+      if (!matches.length) {
+        return emptyCancellations;
+      }
+
+      const cancelledSaleIds = matches.map((m) => m.saleId);
+
+      const { data: cancelledSales, error: cancelledSalesError } = await supabase
+        .from("sales")
+        .select("id, sale_items(mapped_commission, quantity)")
+        .in("id", cancelledSaleIds);
+
+      if (cancelledSalesError) throw cancelledSalesError;
+
+      let totalCancelledCommission = 0;
+
+      (cancelledSales || []).forEach((sale: any) => {
+        (sale.sale_items || []).forEach((item: any) => {
+          const qty = Number(item.quantity ?? 1) || 1;
+          const commission = Number(item.mapped_commission) || 0;
+          totalCancelledCommission += qty * commission;
+        });
+      });
+
       return {
         totalCancelled: matches.length,
+        totalCancelledCommission,
         matches,
       } satisfies CancellationSummary;
     },
@@ -457,6 +483,15 @@ export default function Payroll() {
                     </p>
                   </div>
                 </div>
+
+                {cancellations && !loadingCancellations && (
+                  <p className="text-sm text-muted-foreground">
+                    Total annulleret provision i perioden: {" "}
+                    <span className="font-semibold">
+                      {cancellations.totalCancelledCommission.toLocaleString("da-DK")} DKK
+                    </span>
+                  </p>
+                )}
 
                 <div>
                   <p className="text-sm font-medium mb-2">Fordeling pr. agent</p>
