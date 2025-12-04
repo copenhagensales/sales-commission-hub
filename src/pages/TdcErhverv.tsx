@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
+import { format, startOfDay, startOfMonth, subDays, isWeekend } from "date-fns";
+import { LineChart, CartesianGrid, XAxis, YAxis, Line, ReferenceDot } from "recharts";
+import { Building2, TrendingUp, DollarSign, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format, startOfDay, startOfMonth } from "date-fns";
-import { Building2, TrendingUp, DollarSign, ShoppingCart } from "lucide-react";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 
 interface TdcSaleItem {
   mapped_commission: number | null;
@@ -37,9 +39,18 @@ interface TdcStats {
   avgCommissionPerSale: number;
 }
 
+interface TdcDailySeriesPoint {
+  date: string;
+  label: string;
+  sales: number;
+  trend: number;
+  isBest: boolean;
+}
+
 interface TdcDashboardData {
   stats: TdcStats;
   recentSales: TdcSale[];
+  historicalSales: TdcDailySeriesPoint[];
 }
 
 const initialStats: TdcStats = {
@@ -52,6 +63,17 @@ const initialStats: TdcStats = {
   avgCommissionPerSale: 0,
 };
 
+const tdcSalesChartConfig: ChartConfig = {
+  sales: {
+    label: "Salg (stk.)",
+    color: "hsl(var(--primary))",
+  },
+  trend: {
+    label: "Tendens",
+    color: "hsl(var(--muted-foreground))",
+  },
+};
+
 const formatCurrency = (value: number) => `${value.toLocaleString("da-DK")} DKK`;
 
 export default function TdcErhverv() {
@@ -61,6 +83,7 @@ export default function TdcErhverv() {
       const today = new Date();
       const monthStart = startOfMonth(today).toISOString();
       const todayStart = startOfDay(today).toISOString();
+      const historyStart = subDays(today, 180).toISOString();
 
       // Find TDC Erhverv-klienten
       const { data: clients, error: clientsError } = await supabase
@@ -74,7 +97,7 @@ export default function TdcErhverv() {
       const tdcClientId = clients?.[0]?.id as string | undefined;
 
       if (!tdcClientId) {
-        return { stats: initialStats, recentSales: [] };
+        return { stats: initialStats, recentSales: [], historicalSales: [] };
       }
 
       // Find alle kampagner for TDC Erhverv
@@ -88,38 +111,45 @@ export default function TdcErhverv() {
       const campaignIds = (campaigns || []).map((c) => c.id as string);
 
       if (campaignIds.length === 0) {
-        return { stats: initialStats, recentSales: [] };
+        return { stats: initialStats, recentSales: [], historicalSales: [] };
       }
 
-      // Hent alle TDC Erhverv-salg fra starten af måneden
+      // Hent alle TDC Erhverv-salg fra de sidste 180 dage
       const { data: sales, error: salesError } = await supabase
         .from("sales")
         .select(
-           `id, sale_datetime, agent_name, customer_company,
+          `id, sale_datetime, agent_name, customer_company,
            client_campaigns ( name ),
            sale_items ( mapped_commission, mapped_revenue, quantity, products ( name ) )`
         )
         .in("client_campaign_id", campaignIds)
-        .gte("sale_datetime", monthStart)
+        .gte("sale_datetime", historyStart)
         .order("sale_datetime", { ascending: false });
 
       if (salesError) throw salesError;
 
       const tdcSales = (sales || []) as unknown as TdcSale[];
 
+      const monthStartDate = new Date(monthStart);
+      const todayStartDate = new Date(todayStart);
+
+      const monthSales = tdcSales.filter(
+        (sale) => sale.sale_datetime && new Date(sale.sale_datetime) >= monthStartDate
+      );
+
+      const todaysSales = tdcSales.filter(
+        (sale) => sale.sale_datetime && new Date(sale.sale_datetime) >= todayStartDate
+      );
+
       let revenueThisMonth = 0;
       let commissionThisMonth = 0;
 
-      tdcSales.forEach((sale) => {
+      monthSales.forEach((sale) => {
         sale.sale_items?.forEach((item) => {
           revenueThisMonth += Number(item.mapped_revenue) || 0;
           commissionThisMonth += Number(item.mapped_commission) || 0;
         });
       });
-
-      const todaysSales = tdcSales.filter(
-        (sale) => sale.sale_datetime && new Date(sale.sale_datetime) >= new Date(todayStart)
-      );
 
       let revenueToday = 0;
       let commissionToday = 0;
@@ -135,7 +165,7 @@ export default function TdcErhverv() {
         });
       });
 
-      tdcSales.forEach((sale) => {
+      monthSales.forEach((sale) => {
         sale.sale_items?.forEach((item) => {
           const qty = Number((item as any).quantity) || 1;
           salesThisMonthCount += qty;
@@ -155,12 +185,88 @@ export default function TdcErhverv() {
 
       const recentSales = tdcSales.slice(0, 25);
 
-      return { stats, recentSales };
+      // Byg historisk serie (kun hverdage) baseret på alle hentede salg (180 dage)
+      const dailyMap = new Map<string, number>();
+
+      tdcSales.forEach((sale) => {
+        if (!sale.sale_datetime) return;
+        const saleDate = new Date(sale.sale_datetime);
+        const dateKey = format(saleDate, "yyyy-MM-dd");
+
+        let dailyUnits = 0;
+        sale.sale_items?.forEach((item) => {
+          const qty = Number((item as any).quantity) || 1;
+          dailyUnits += qty;
+        });
+
+        if (dailyUnits === 0) return;
+
+        dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + dailyUnits);
+      });
+
+      const dailyEntries = Array.from(dailyMap.entries())
+        .map(([dateKey, salesCount]) => ({ dateKey, sales: salesCount }))
+        .sort((a, b) => (a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0));
+
+      const weekdayEntries = dailyEntries.filter(({ dateKey }) => {
+        const d = new Date(dateKey);
+        return !isWeekend(d);
+      });
+
+      let historicalSales: TdcDailySeriesPoint[] = [];
+
+      if (weekdayEntries.length > 0) {
+        let bestIndex = 0;
+        let maxSales = weekdayEntries[0].sales;
+
+        for (let i = 1; i < weekdayEntries.length; i++) {
+          if (weekdayEntries[i].sales > maxSales) {
+            maxSales = weekdayEntries[i].sales;
+            bestIndex = i;
+          }
+        }
+
+        const n = weekdayEntries.length;
+        let sumX = 0;
+        let sumY = 0;
+        let sumXY = 0;
+        let sumX2 = 0;
+
+        weekdayEntries.forEach((entry, index) => {
+          const x = index;
+          const y = entry.sales;
+          sumX += x;
+          sumY += y;
+          sumXY += x * y;
+          sumX2 += x * x;
+        });
+
+        const denominator = n * sumX2 - sumX * sumX;
+        const slope = denominator !== 0 ? (n * sumXY - sumX * sumY) / denominator : 0;
+        const intercept = n > 0 ? (sumY - slope * sumX) / n : 0;
+
+        historicalSales = weekdayEntries.map((entry, index) => {
+          const date = new Date(entry.dateKey);
+          const trendRaw = intercept + slope * index;
+
+          return {
+            date: entry.dateKey,
+            label: format(date, "dd/MM"),
+            sales: entry.sales,
+            trend: Number(trendRaw.toFixed(1)),
+            isBest: index === bestIndex,
+          };
+        });
+      }
+
+      return { stats, recentSales, historicalSales };
     },
   });
 
   const stats = data?.stats ?? initialStats;
   const recentSales = data?.recentSales ?? [];
+  const historicalSales = data?.historicalSales ?? [];
+  const bestDayPoint = historicalSales.find((p) => p.isBest);
 
   return (
     <MainLayout>
@@ -224,6 +330,64 @@ export default function TdcErhverv() {
           </Card>
         </div>
 
+        {historicalSales.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Historisk salgsudvikling (hverdage)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={tdcSalesChartConfig} className="h-80 w-full">
+                <LineChart data={historicalSales} margin={{ left: 12, right: 12, top: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tickLine={false}
+                    axisLine={false}
+                    minTickGap={16}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                    width={40}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                  <Line
+                    type="monotone"
+                    dataKey="sales"
+                    stroke="var(--color-sales)"
+                    strokeWidth={2}
+                    dot={false}
+                    name="Salg"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="trend"
+                    stroke="var(--color-trend)"
+                    strokeWidth={1.5}
+                    strokeDasharray="5 5"
+                    dot={false}
+                    name="Tendens"
+                  />
+                  {bestDayPoint && (
+                    <ReferenceDot
+                      x={bestDayPoint.label}
+                      y={bestDayPoint.sales}
+                      r={5}
+                      fill="hsl(var(--primary))"
+                      stroke="hsl(var(--background))"
+                      strokeWidth={2}
+                    />
+                  )}
+                </LineChart>
+              </ChartContainer>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Viser antal solgte enheder pr. hverdag for de sidste 180 dage. Bedste salgsdag er fremhævet.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Seneste TDC Erhverv-salg</CardTitle>
@@ -261,7 +425,7 @@ export default function TdcErhverv() {
                     return (
                       <TableRow key={sale.id}>
                         <TableCell>
-                          {format(new Date(sale.sale_datetime), "dd/MM/yyyy HH:mm")}
+                          {format(new Date(sale.sale_datetime), "dd/MM/yyyy HH:mm")} 
                         </TableCell>
                         <TableCell>{sale.client_campaigns?.name || "—"}</TableCell>
                         <TableCell>{sale.customer_company || "—"}</TableCell>
