@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X, History, Phone, Mail, Pencil } from "lucide-react";
+import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X, History, Phone, Mail, Pencil, MessageSquare, KeyRound, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -496,6 +496,50 @@ export default function EmployeeDetail() {
                 </Badge>
               </div>
             </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {employee.private_phone && (
+              <>
+                <Button variant="outline" size="sm" asChild>
+                  <a href={`tel:${employee.private_phone}`}>
+                    <Phone className="h-4 w-4 mr-2" />
+                    Ring op
+                  </a>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <a href={`sms:${employee.private_phone}`}>
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Send SMS
+                  </a>
+                </Button>
+              </>
+            )}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                toast({ 
+                  title: "Nulstil adgangskode", 
+                  description: "Funktionen er endnu ikke implementeret. Kræver integration med auth-system." 
+                });
+              }}
+            >
+              <KeyRound className="h-4 w-4 mr-2" />
+              Nulstil kode
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                toast({ 
+                  title: "Loginforsøg nulstillet", 
+                  description: "Funktionen er endnu ikke implementeret. Kræver integration med auth-system." 
+                });
+              }}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Nulstil login
+            </Button>
           </div>
         </div>
 
