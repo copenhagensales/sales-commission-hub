@@ -260,20 +260,42 @@ export default function LocationDetail() {
                 <Label className="flex items-center gap-2">
                   <Phone className="h-4 w-4" /> Telefon
                 </Label>
-                <Input
-                  value={formData.contact_phone || ""}
-                  onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    value={formData.contact_phone || ""}
+                    onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                    className="flex-1"
+                  />
+                  {formData.contact_phone && (
+                    <a
+                      href={`tel:${formData.contact_phone}`}
+                      className="inline-flex items-center justify-center h-10 px-3 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                    >
+                      <Phone className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
               </div>
               <div>
                 <Label className="flex items-center gap-2">
                   <Mail className="h-4 w-4" /> Email
                 </Label>
-                <Input
-                  type="email"
-                  value={formData.contact_email || ""}
-                  onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    value={formData.contact_email || ""}
+                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                    className="flex-1"
+                  />
+                  {formData.contact_email && (
+                    <a
+                      href={`mailto:${formData.contact_email}`}
+                      className="inline-flex items-center justify-center h-10 px-3 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                    >
+                      <Mail className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
