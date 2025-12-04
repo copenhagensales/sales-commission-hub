@@ -473,7 +473,17 @@ export default function EmployeeDetail() {
                 onSave={handleSave}
                 displayValue={employee.department}
               />
-              <EditableField label="Arbejdssted" value={employee.work_location} field="work_location" onSave={handleSave} />
+              <EditableSelect
+                label="Arbejdssted"
+                value={employee.work_location}
+                field="work_location"
+                options={[
+                  { value: "København V", label: "København V" },
+                  { value: "Århus", label: "Århus" },
+                ]}
+                onSave={handleSave}
+                displayValue={employee.work_location || "-"}
+              />
               <div className="flex justify-between py-2 border-b border-border last:border-0">
                 <span className="text-muted-foreground">Leder</span>
                 <span className="font-medium">{manager ? `${manager.first_name} ${manager.last_name}` : "-"}</span>

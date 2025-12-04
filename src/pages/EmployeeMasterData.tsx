@@ -69,7 +69,7 @@ const defaultEmployee: NewEmployee = {
   employment_end_date: null,
   job_title: null,
   department: null,
-  work_location: null,
+  work_location: "København V",
   manager_id: null,
   contract_id: null,
   contract_version: null,
@@ -318,7 +318,13 @@ export default function EmployeeMasterData() {
                     </div>
                     <div className="space-y-2">
                       <Label>Arbejdssted</Label>
-                      <Input value={formData.work_location || ""} onChange={(e) => setFormData({ ...formData, work_location: e.target.value || null })} />
+                      <Select value={formData.work_location || "København V"} onValueChange={(v) => setFormData({ ...formData, work_location: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="København V">København V</SelectItem>
+                          <SelectItem value="Århus">Århus</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>Kontrakt-ID</Label>
