@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Database, Activity, ListOrdered, Link as LinkIcon, AlertCircle, CheckCircle2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import * as XLSX from "xlsx";
 
 interface AdversusStats {
   eventsTotal: number;
@@ -85,6 +86,32 @@ export default function AdversusData() {
   const [tdcDetailOpen, setTdcDetailOpen] = useState(false);
 
   const latestTdcImport = (tdcImports && tdcImports[0]) as any | undefined;
+
+  const tdcRows = useMemo(() => {
+    if (!latestTdcImport?.raw_data?.content_base64) return null;
+    try {
+      const base64 = latestTdcImport.raw_data.content_base64 as string;
+      const binary = atob(base64);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const workbook = XLSX.read(bytes, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
+      return json;
+    } catch (error) {
+      console.error("Fejl ved parsing af TDC ann Excel", error);
+      return null;
+    }
+  }, [latestTdcImport]);
+
+  const tdcHeaders = useMemo(() => {
+    if (!tdcRows || tdcRows.length === 0) return [] as string[];
+    return Object.keys(tdcRows[0]);
+  }, [tdcRows]);
 
   return (
     <MainLayout>
