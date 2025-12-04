@@ -915,6 +915,41 @@ export type Database = {
         }
         Relationships: []
       }
+      lateness_record: {
+        Row: {
+          created_at: string
+          date: string
+          employee_id: string
+          id: string
+          minutes: number
+          note: string | null
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          employee_id: string
+          id?: string
+          minutes?: number
+          note?: string | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          employee_id?: string
+          id?: string
+          minutes?: number
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lateness_record_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       location: {
         Row: {
           address_city: string | null

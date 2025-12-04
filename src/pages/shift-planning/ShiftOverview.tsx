@@ -1,20 +1,28 @@
 import { useState, useMemo } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useShifts, useDepartments, useEmployeesForShifts, useDanishHolidays, useAbsencesForDateRange, Shift, AbsenceRequest } from "@/hooks/useShiftPlanning";
 import { CreateShiftDialog } from "@/components/shift-planning/CreateShiftDialog";
 import { ShiftCard } from "@/components/shift-planning/ShiftCard";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-type CellStatus = "shift" | "vacation" | "sick";
+interface LatenessRecord {
+  id: string;
+  employee_id: string;
+  date: string;
+  minutes: number;
+  note: string | null;
+}
 
 export default function ShiftOverview() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -22,6 +30,9 @@ export default function ShiftOverview() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [delayDialogOpen, setDelayDialogOpen] = useState(false);
+  const [delayMinutes, setDelayMinutes] = useState("");
+  const [pendingDelayCell, setPendingDelayCell] = useState<{ employeeId: string; date: string } | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -44,6 +55,20 @@ export default function ShiftOverview() {
     format(weekStart, "yyyy-MM-dd"),
     format(weekEnd, "yyyy-MM-dd")
   );
+
+  // Fetch lateness records for the week
+  const { data: latenessRecords } = useQuery({
+    queryKey: ["lateness-records", format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd")],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lateness_record")
+        .select("*")
+        .gte("date", format(weekStart, "yyyy-MM-dd"))
+        .lte("date", format(weekEnd, "yyyy-MM-dd"));
+      if (error) throw error;
+      return data as LatenessRecord[];
+    },
+  });
 
   // Mutation to create absence
   const createAbsence = useMutation({
@@ -99,6 +124,44 @@ export default function ShiftOverview() {
     },
     onError: (error: any) => {
       toast.error("Kunne ikke slette fravær: " + error.message);
+    },
+  });
+
+  // Mutation to create lateness record
+  const createLateness = useMutation({
+    mutationFn: async ({ employeeId, date, minutes }: { employeeId: string; date: string; minutes: number }) => {
+      const { error } = await supabase
+        .from("lateness_record")
+        .insert({
+          employee_id: employeeId,
+          date,
+          minutes,
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["lateness-records"] });
+      toast.success("Forsinkelse registreret");
+    },
+    onError: (error: any) => {
+      toast.error("Kunne ikke registrere forsinkelse: " + error.message);
+    },
+  });
+
+  // Mutation to delete lateness record
+  const deleteLateness = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("lateness_record")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["lateness-records"] });
+    },
+    onError: (error: any) => {
+      toast.error("Kunne ikke slette forsinkelse: " + error.message);
     },
   });
 
@@ -163,6 +226,12 @@ export default function ShiftOverview() {
     }) || null;
   };
 
+  // Get lateness record for specific employee and date
+  const getLatenessForDate = (employeeId: string, date: Date): LatenessRecord | null => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return latenessRecords?.find(r => r.employee_id === employeeId && r.date === dateStr) || null;
+  };
+
   const totalPlannedHours = useMemo(() => {
     return shifts?.reduce((sum, s) => sum + (s.planned_hours || 0), 0) || 0;
   }, [shifts]);
@@ -204,8 +273,8 @@ export default function ShiftOverview() {
     };
   }, [employees, absences, weekDays]);
 
-  // Handle cell click - cycle through: shift -> vacation -> sick -> shift
-  const handleCellClick = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null, hasShift: boolean) => {
+  // Handle cell click - cycle through: empty -> late (dialog) -> vacation -> sick -> empty
+  const handleCellClick = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null, currentLateness: LatenessRecord | null, hasShift: boolean) => {
     const dateStr = format(date, "yyyy-MM-dd");
 
     if (hasShift) {
@@ -213,21 +282,45 @@ export default function ShiftOverview() {
       return;
     }
 
-    if (!currentAbsence) {
-      // No absence -> create vacation
+    // Cycle: empty -> late -> vacation -> sick -> empty
+    if (!currentLateness && !currentAbsence) {
+      // Empty -> show delay dialog
+      setPendingDelayCell({ employeeId, date: dateStr });
+      setDelayMinutes("");
+      setDelayDialogOpen(true);
+    } else if (currentLateness && !currentAbsence) {
+      // Late -> create vacation, delete lateness
+      deleteLateness.mutate(currentLateness.id);
       createAbsence.mutate({ employeeId, date: dateStr, type: "vacation" });
-    } else if (currentAbsence.type === "vacation") {
+    } else if (currentAbsence?.type === "vacation") {
       // Vacation -> change to sick
       updateAbsence.mutate({ id: currentAbsence.id, type: "sick" });
-    } else if (currentAbsence.type === "sick") {
-      // Sick -> remove absence (back to normal/shift)
+    } else if (currentAbsence?.type === "sick") {
+      // Sick -> remove absence (back to empty)
       deleteAbsence.mutate(currentAbsence.id);
     }
   };
 
+  // Handle delay dialog submit
+  const handleDelaySubmit = () => {
+    if (!pendingDelayCell || !delayMinutes) return;
+    const minutes = parseInt(delayMinutes, 10);
+    if (isNaN(minutes) || minutes <= 0) {
+      toast.error("Indtast et gyldigt antal minutter");
+      return;
+    }
+    createLateness.mutate({
+      employeeId: pendingDelayCell.employeeId,
+      date: pendingDelayCell.date,
+      minutes,
+    });
+    setDelayDialogOpen(false);
+    setPendingDelayCell(null);
+  };
+
   // Handle double-click to open create shift dialog
-  const handleCellDoubleClick = (employeeId: string, date: Date, absence: AbsenceRequest | null) => {
-    if (!absence) {
+  const handleCellDoubleClick = (employeeId: string, date: Date, absence: AbsenceRequest | null, lateness: LatenessRecord | null) => {
+    if (!absence && !lateness) {
       setSelectedEmployeeId(employeeId);
       setSelectedDate(date);
       setCreateDialogOpen(true);
@@ -335,12 +428,16 @@ export default function ShiftOverview() {
             <span>Arbejder</span>
           </div>
           <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-sm bg-orange-400/60"></div>
+            <span>Forsinket (1 klik)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-sm bg-amber-400/60"></div>
-            <span>Ferie (1 klik)</span>
+            <span>Ferie (2 klik)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-sm bg-red-400/60"></div>
-            <span>Syg (2 klik)</span>
+            <span>Syg (3 klik)</span>
           </div>
           <span className="text-muted-foreground/50">|</span>
           <span className="text-muted-foreground/60">Dobbeltklik = opret vagt</span>
@@ -404,12 +501,14 @@ export default function ShiftOverview() {
                     const holiday = isHoliday(day);
                     const absence = getAbsenceForDate(employee.id, day);
                     const absenceDisplay = isDateInAbsence(employee.id, day);
+                    const lateness = getLatenessForDate(employee.id, day);
                     const hasShift = dayShifts.length > 0;
                     const isVacation = absenceDisplay?.type === "vacation";
                     const isSick = absenceDisplay?.type === "sick";
+                    const isLate = !!lateness;
                     
-                    // Default is green (working), vacation is yellow, sick is red
-                    const isWorking = !absenceDisplay && !holiday;
+                    // Default is green (working), late is orange, vacation is yellow, sick is red
+                    const isWorking = !absenceDisplay && !lateness && !holiday;
                     
                     return (
                       <div
@@ -418,30 +517,37 @@ export default function ShiftOverview() {
                           "min-h-[52px] p-1 border-l border-border/30 cursor-pointer transition-all duration-150",
                           isToday(day) && "ring-1 ring-primary/30",
                           holiday && "bg-muted/40 cursor-not-allowed",
+                          !holiday && isLate && "bg-orange-400/20 hover:bg-orange-400/30",
                           !holiday && isVacation && "bg-amber-400/20 hover:bg-amber-400/30",
                           !holiday && isSick && "bg-red-400/20 hover:bg-red-400/30",
                           !holiday && isWorking && "bg-emerald-500/15 hover:bg-emerald-500/25"
                         )}
                         onClick={() => {
                           if (!holiday) {
-                            handleCellClick(employee.id, day, absence, hasShift);
+                            handleCellClick(employee.id, day, absence, lateness, hasShift);
                           }
                         }}
                         onDoubleClick={() => {
                           if (!holiday) {
-                            handleCellDoubleClick(employee.id, day, absenceDisplay);
+                            handleCellDoubleClick(employee.id, day, absenceDisplay, lateness);
                           }
                         }}
                       >
                         {hasShift && dayShifts.map(shift => (
                           <ShiftCard key={shift.id} shift={shift} compact />
                         ))}
-                        {!hasShift && isVacation && (
+                        {!hasShift && isLate && (
+                          <div className="flex flex-col items-center justify-center h-full gap-0.5 text-orange-600">
+                            <AlarmClock className="h-3.5 w-3.5" />
+                            <span className="text-[10px] font-medium">{lateness.minutes}m</span>
+                          </div>
+                        )}
+                        {!hasShift && !isLate && isVacation && (
                           <div className="flex items-center justify-center h-full gap-1 text-amber-600">
                             <Palmtree className="h-3.5 w-3.5" />
                           </div>
                         )}
-                        {!hasShift && isSick && (
+                        {!hasShift && !isLate && isSick && (
                           <div className="flex items-center justify-center h-full gap-1 text-red-500">
                             <Thermometer className="h-3.5 w-3.5" />
                           </div>
@@ -469,6 +575,43 @@ export default function ShiftOverview() {
           employees={employees || []}
           preselectedEmployeeId={selectedEmployeeId || undefined}
         />
+
+        {/* Delay Input Dialog */}
+        <Dialog open={delayDialogOpen} onOpenChange={setDelayDialogOpen}>
+          <DialogContent className="sm:max-w-[320px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlarmClock className="h-5 w-5 text-orange-500" />
+                Registrer forsinkelse
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <label className="text-sm text-muted-foreground mb-2 block">
+                Antal minutter forsinket
+              </label>
+              <Input
+                type="number"
+                min="1"
+                max="480"
+                placeholder="f.eks. 15"
+                value={delayMinutes}
+                onChange={(e) => setDelayMinutes(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleDelaySubmit();
+                }}
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDelayDialogOpen(false)}>
+                Annuller
+              </Button>
+              <Button onClick={handleDelaySubmit} className="bg-orange-500 hover:bg-orange-600">
+                Gem
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
