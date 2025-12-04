@@ -273,7 +273,7 @@ export default function ShiftOverview() {
     };
   }, [employees, absences, weekDays]);
 
-  // Handle cell click - cycle through: empty -> late (dialog) -> vacation -> sick -> empty
+  // Handle cell click - cycle through: empty -> vacation -> sick -> late (dialog) -> empty
   const handleCellClick = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null, currentLateness: LatenessRecord | null, hasShift: boolean) => {
     const dateStr = format(date, "yyyy-MM-dd");
 
@@ -282,22 +282,22 @@ export default function ShiftOverview() {
       return;
     }
 
-    // Cycle: empty -> late -> vacation -> sick -> empty
+    // Cycle: empty -> vacation -> sick -> late (dialog) -> empty
     if (!currentLateness && !currentAbsence) {
-      // Empty -> show delay dialog
+      // Empty -> create vacation
+      createAbsence.mutate({ employeeId, date: dateStr, type: "vacation" });
+    } else if (currentAbsence?.type === "vacation" && !currentLateness) {
+      // Vacation -> change to sick
+      updateAbsence.mutate({ id: currentAbsence.id, type: "sick" });
+    } else if (currentAbsence?.type === "sick" && !currentLateness) {
+      // Sick -> show delay dialog (user can skip to go back to empty)
+      deleteAbsence.mutate(currentAbsence.id);
       setPendingDelayCell({ employeeId, date: dateStr });
       setDelayMinutes("");
       setDelayDialogOpen(true);
-    } else if (currentLateness && !currentAbsence) {
-      // Late -> create vacation, delete lateness
+    } else if (currentLateness) {
+      // Late -> remove lateness (back to empty)
       deleteLateness.mutate(currentLateness.id);
-      createAbsence.mutate({ employeeId, date: dateStr, type: "vacation" });
-    } else if (currentAbsence?.type === "vacation") {
-      // Vacation -> change to sick
-      updateAbsence.mutate({ id: currentAbsence.id, type: "sick" });
-    } else if (currentAbsence?.type === "sick") {
-      // Sick -> remove absence (back to empty)
-      deleteAbsence.mutate(currentAbsence.id);
     }
   };
 
@@ -604,7 +604,7 @@ export default function ShiftOverview() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDelayDialogOpen(false)}>
-                Annuller
+                Spring over
               </Button>
               <Button onClick={handleDelaySubmit} className="bg-orange-500 hover:bg-orange-600">
                 Gem
