@@ -10,11 +10,19 @@ export default function Dashboard() {
     queryFn: async () => {
       const { data: saleItems, error } = await supabase
         .from('sale_items')
-        .select('mapped_commission, mapped_revenue, needs_mapping');
+        .select('mapped_commission, mapped_revenue, needs_mapping, quantity');
       if (error) throw error;
-      const totalCommission = saleItems?.reduce((sum, item) => sum + (Number(item.mapped_commission) || 0), 0) || 0;
-      const totalRevenue = saleItems?.reduce((sum, item) => sum + (Number(item.mapped_revenue) || 0), 0) || 0;
-      const unmappedCount = saleItems?.filter(item => item.needs_mapping).length || 0;
+      const totalCommission = saleItems?.reduce((sum: number, item: any) => {
+        const qty = Number(item.quantity ?? 1) || 1;
+        const commissionPerUnit = Number(item.mapped_commission) || 0;
+        return sum + qty * commissionPerUnit;
+      }, 0) || 0;
+      const totalRevenue = saleItems?.reduce((sum: number, item: any) => {
+        const qty = Number(item.quantity ?? 1) || 1;
+        const revenuePerUnit = Number(item.mapped_revenue) || 0;
+        return sum + qty * revenuePerUnit;
+      }, 0) || 0;
+      const unmappedCount = saleItems?.filter((item: any) => item.needs_mapping).length || 0;
       return { totalCommission, totalRevenue, unmappedCount, totalItems: saleItems?.length || 0 };
     }
   });

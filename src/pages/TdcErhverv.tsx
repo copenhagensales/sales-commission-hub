@@ -187,8 +187,11 @@ export default function TdcErhverv() {
 
       monthSales.forEach((sale) => {
         sale.sale_items?.forEach((item) => {
-          revenueThisMonth += Number(item.mapped_revenue) || 0;
-          commissionThisMonth += Number(item.mapped_commission) || 0;
+          const qty = Number((item as any).quantity ?? 1) || 1;
+          const revenuePerUnit = Number(item.mapped_revenue) || 0;
+          const commissionPerUnit = Number(item.mapped_commission) || 0;
+          revenueThisMonth += qty * revenuePerUnit;
+          commissionThisMonth += qty * commissionPerUnit;
         });
       });
 
@@ -199,9 +202,11 @@ export default function TdcErhverv() {
 
       todaysSales.forEach((sale) => {
         sale.sale_items?.forEach((item) => {
-          revenueToday += Number(item.mapped_revenue) || 0;
-          commissionToday += Number(item.mapped_commission) || 0;
-          const qty = Number((item as any).quantity) || 1;
+          const qty = Number((item as any).quantity ?? 1) || 1;
+          const revenuePerUnit = Number(item.mapped_revenue) || 0;
+          const commissionPerUnit = Number(item.mapped_commission) || 0;
+          revenueToday += qty * revenuePerUnit;
+          commissionToday += qty * commissionPerUnit;
           salesTodayCount += qty;
         });
       });
@@ -653,8 +658,11 @@ export default function TdcErhverv() {
                     let saleCommission = 0;
 
                     sale.sale_items?.forEach((item) => {
-                      saleRevenue += Number(item.mapped_revenue) || 0;
-                      saleCommission += Number(item.mapped_commission) || 0;
+                      const qty = Number((item as any).quantity ?? 1) || 1;
+                      const revenuePerUnit = Number(item.mapped_revenue) || 0;
+                      const commissionPerUnit = Number(item.mapped_commission) || 0;
+                      saleRevenue += qty * revenuePerUnit;
+                      saleCommission += qty * commissionPerUnit;
                     });
 
                     return (

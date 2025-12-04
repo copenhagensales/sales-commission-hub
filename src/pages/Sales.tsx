@@ -76,7 +76,11 @@ export default function Sales() {
                 </TableHeader>
                 <TableBody>
                   {sales?.map((sale) => {
-                    const totalCommission = sale.sale_items?.reduce((sum: number, item: any) => sum + (Number(item.mapped_commission) || 0), 0) || 0;
+                    const totalCommission = sale.sale_items?.reduce((sum: number, item: any) => {
+                      const qty = Number(item.quantity ?? 1) || 1;
+                      const commissionPerUnit = Number(item.mapped_commission) || 0;
+                      return sum + qty * commissionPerUnit;
+                    }, 0) || 0;
                     return (
                       <TableRow key={sale.id}>
                         <TableCell>{format(new Date(sale.sale_datetime), 'dd/MM/yyyy HH:mm')}</TableCell>
