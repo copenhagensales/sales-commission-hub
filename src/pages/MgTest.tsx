@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useVagtEmployees, type VagtEmployee } from "@/hooks/useVagtEmployee";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,36 @@ interface ClientCampaignRow {
 interface ClientRow {
   id: string;
   name: string;
+}
+
+interface AgentRow {
+  id: string;
+  name: string;
+  email: string;
+  is_active: boolean | null;
+}
+
+interface MasterEmployeeRow {
+  id: string;
+  full_name: string | null;
+  primary_email: string | null;
+  phone: string | null;
+  is_active: boolean | null;
+}
+
+interface EmployeeIdentityRow {
+  id: string;
+  master_employee_id: string;
+  source: string;
+  source_employee_id: string;
+  source_email: string | null;
+  source_name: string | null;
+}
+
+interface EmailMatchSuggestion {
+  email: string;
+  agent: AgentRow;
+  vagtEmployee: VagtEmployee;
 }
 
 const parseClientFromTitle = (title: string | null, clientList?: ClientRow[]): ClientRow | null => {
@@ -156,6 +187,46 @@ export default function MgTest() {
       return data as WebhookSaleItem[];
     },
   });
+
+  // Medarbejderkilder og master-profiler
+  const { data: agents, isLoading: loadingAgents } = useQuery<AgentRow[]>({
+    queryKey: ["mg-agents"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("agents").select("id, name, email, is_active");
+      if (error) throw error;
+      return data as AgentRow[];
+    },
+  });
+
+  const { data: masterEmployees, isLoading: loadingMasterEmployees } = useQuery<MasterEmployeeRow[]>({
+    queryKey: ["master-employees"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("master_employee")
+        .select("id, full_name, primary_email, phone, is_active")
+        .order("full_name", { ascending: true, nullsFirst: true });
+
+      if (error) throw error;
+      return data as MasterEmployeeRow[];
+    },
+  });
+
+  const { data: employeeIdentities, isLoading: loadingEmployeeIdentities } = useQuery<EmployeeIdentityRow[]>({
+    queryKey: ["employee-identities"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_identity")
+        .select("id, master_employee_id, source, source_employee_id, source_email, source_name");
+
+      if (error) throw error;
+      return data as EmployeeIdentityRow[];
+    },
+  });
+
+  const {
+    data: vagtEmployees,
+    isLoading: loadingVagtEmployees,
+  } = useVagtEmployees();
 
   const aggregatedProducts: AggregatedProduct[] = useMemo(() => {
     const map = new Map<string, AggregatedProduct>();
@@ -267,6 +338,64 @@ export default function MgTest() {
       return a.campaignLabel.localeCompare(b.campaignLabel, "da");
     });
   }, [aggregatedProducts, clients]);
+
+  const emailSuggestions = useMemo<EmailMatchSuggestion[]>(() => {
+    if (!agents || !vagtEmployees || !employeeIdentities) return [];
+
+    const mappedAgentIds = new Set(
+      employeeIdentities.filter((i) => i.source === "agent").map((i) => i.source_employee_id)
+    );
+    const mappedVagtIds = new Set(
+      employeeIdentities.filter((i) => i.source === "vagt_employee").map((i) => i.source_employee_id)
+    );
+
+    const unmappedAgents = agents.filter((agent) => !mappedAgentIds.has(agent.id) && !!agent.email);
+    const unmappedVagtEmployees = vagtEmployees.filter(
+      (emp) => !mappedVagtIds.has(emp.id) && !!emp.email
+    );
+
+    const employeesByEmail = new Map<string, VagtEmployee>();
+    unmappedVagtEmployees.forEach((emp) => {
+      if (!emp.email) return;
+      const key = emp.email.trim().toLowerCase();
+      if (!key) return;
+      if (!employeesByEmail.has(key)) {
+        employeesByEmail.set(key, emp);
+      }
+    });
+
+    const suggestions: EmailMatchSuggestion[] = [];
+
+    unmappedAgents.forEach((agent) => {
+      if (!agent.email) return;
+      const key = agent.email.trim().toLowerCase();
+      if (!key) return;
+      const match = employeesByEmail.get(key);
+      if (match) {
+        suggestions.push({ email: key, agent, vagtEmployee: match });
+      }
+    });
+
+    return suggestions.sort((a, b) => a.agent.name.localeCompare(b.agent.name, "da"));
+  }, [agents, vagtEmployees, employeeIdentities]);
+
+  const { unmappedAgentsCount, unmappedEmployeesCount } = useMemo(() => {
+    if (!agents || !vagtEmployees || !employeeIdentities) {
+      return { unmappedAgentsCount: 0, unmappedEmployeesCount: 0 };
+    }
+
+    const mappedAgentIds = new Set(
+      employeeIdentities.filter((i) => i.source === "agent").map((i) => i.source_employee_id)
+    );
+    const mappedVagtIds = new Set(
+      employeeIdentities.filter((i) => i.source === "vagt_employee").map((i) => i.source_employee_id)
+    );
+
+    const unmappedAgentsCount = agents.filter((agent) => !mappedAgentIds.has(agent.id)).length;
+    const unmappedEmployeesCount = vagtEmployees.filter((emp) => !mappedVagtIds.has(emp.id)).length;
+
+    return { unmappedAgentsCount, unmappedEmployeesCount };
+  }, [agents, vagtEmployees, employeeIdentities]);
 
 
   const upsertProductValues = useMutation({
