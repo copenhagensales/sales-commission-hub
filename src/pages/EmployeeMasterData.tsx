@@ -99,6 +99,9 @@ export default function EmployeeMasterData() {
   const [editingEmployee, setEditingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
   const [formData, setFormData] = useState<NewEmployee>(defaultEmployee);
   const [sendingInvitation, setSendingInvitation] = useState<string | null>(null);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteData, setInviteData] = useState({ first_name: "", last_name: "", email: "" });
+  const [creatingInvite, setCreatingInvite] = useState(false);
 
   const { data: employees = [], isLoading } = useQuery({
     queryKey: ["employee-master-data"],
@@ -275,6 +278,65 @@ export default function EmployeeMasterData() {
     }
   };
 
+  const handleInviteNewEmployee = async () => {
+    if (!inviteData.first_name || !inviteData.email) {
+      toast({ title: "Udfyld fornavn og email", variant: "destructive" });
+      return;
+    }
+
+    setCreatingInvite(true);
+    try {
+      // Create the employee first
+      const { data: newEmployee, error: createError } = await supabase
+        .from("employee_master_data")
+        .insert({
+          first_name: inviteData.first_name,
+          last_name: inviteData.last_name || "",
+          private_email: inviteData.email,
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+
+      // Send the invitation
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-employee-invitation`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            employeeId: newEmployee.id,
+            email: inviteData.email,
+            firstName: inviteData.first_name,
+            lastName: inviteData.last_name,
+          }),
+        }
+      );
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Kunne ikke sende invitation");
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-invitations"] });
+      toast({ title: "Medarbejder oprettet og invitation sendt", description: `Email sendt til ${inviteData.email}` });
+      setInviteDialogOpen(false);
+      setInviteData({ first_name: "", last_name: "", email: "" });
+    } catch (error) {
+      console.error("Invite error:", error);
+      toast({
+        title: "Fejl",
+        description: error instanceof Error ? error.message : "Kunne ikke oprette medarbejder",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingInvite(false);
+    }
+  };
+
   const filteredEmployees = employees
     .filter((e) => {
       if (statusFilter === "active") return e.is_active;
@@ -299,16 +361,72 @@ export default function EmployeeMasterData() {
             <h1 className="text-3xl font-bold tracking-tight">Medarbejdere</h1>
             <p className="text-muted-foreground">Stamkort og medarbejderdata</p>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) {
-              setEditingEmployee(null);
-              setFormData(defaultEmployee);
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button><Plus className="mr-2 h-4 w-4" /> Tilføj medarbejder</Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Dialog open={inviteDialogOpen} onOpenChange={(open) => {
+              setInviteDialogOpen(open);
+              if (!open) setInviteData({ first_name: "", last_name: "", email: "" });
+            }}>
+              <DialogTrigger asChild>
+                <Button variant="outline"><Mail className="mr-2 h-4 w-4" /> Inviter ny medarbejder</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Inviter ny medarbejder</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <p className="text-sm text-muted-foreground">
+                    Opret medarbejder og send invitation til at udfylde stamdata.
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Fornavn *</Label>
+                      <Input 
+                        value={inviteData.first_name} 
+                        onChange={(e) => setInviteData({ ...inviteData, first_name: e.target.value })} 
+                        placeholder="Fornavn"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Efternavn</Label>
+                      <Input 
+                        value={inviteData.last_name} 
+                        onChange={(e) => setInviteData({ ...inviteData, last_name: e.target.value })} 
+                        placeholder="Efternavn"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email *</Label>
+                    <Input 
+                      type="email"
+                      value={inviteData.email} 
+                      onChange={(e) => setInviteData({ ...inviteData, email: e.target.value })} 
+                      placeholder="medarbejder@email.dk"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button onClick={handleInviteNewEmployee} disabled={creatingInvite}>
+                    {creatingInvite ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sender...</>
+                    ) : (
+                      <><Mail className="mr-2 h-4 w-4" /> Send invitation</>
+                    )}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={dialogOpen} onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) {
+                setEditingEmployee(null);
+                setFormData(defaultEmployee);
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button><Plus className="mr-2 h-4 w-4" /> Tilføj medarbejder</Button>
+              </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingEmployee ? "Rediger medarbejder" : "Ny medarbejder"}</DialogTitle>
@@ -512,6 +630,7 @@ export default function EmployeeMasterData() {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
