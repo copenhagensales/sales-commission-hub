@@ -397,6 +397,20 @@ export default function MgTest() {
     return { unmappedAgentsCount, unmappedEmployeesCount };
   }, [agents, vagtEmployees, employeeIdentities]);
 
+  const mergedProfiles = useMemo(
+    () => {
+      if (!masterEmployees || !employeeIdentities) return [] as { master: MasterEmployeeRow | null; identity: EmployeeIdentityRow }[];
+
+      const mastersById = new Map(masterEmployees.map((m) => [m.id, m] as const));
+
+      return employeeIdentities.map((identity) => ({
+        identity,
+        master: mastersById.get(identity.master_employee_id) ?? null,
+      }));
+    },
+    [masterEmployees, employeeIdentities]
+  );
+
 
   const upsertProductValues = useMutation({
     mutationFn: async (params: {
