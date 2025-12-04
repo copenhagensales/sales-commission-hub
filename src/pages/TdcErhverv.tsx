@@ -58,6 +58,8 @@ interface TdcDashboardData {
   allSales: TdcSale[];
 }
 
+type DatePreset = "THIS_MONTH" | "LAST_MONTH" | "LAST_30" | "LAST_90" | "CUSTOM";
+
 const initialStats: TdcStats = {
   salesToday: 0,
   revenueToday: 0,
@@ -82,23 +84,18 @@ const tdcSalesChartConfig: ChartConfig = {
 const formatCurrency = (value: number) => `${value.toLocaleString("da-DK")} DKK`;
 
 export default function TdcErhverv() {
+  const [agentFilter, setAgentFilter] = useState<string>("ALL");
+  const [datePreset, setDatePreset] = useState<DatePreset>("LAST_90");
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
-  const [rangeDays, setRangeDays] = useState<30 | 90 | 180>(180);
-  const [agentFilter, setAgentFilter] = useState<string>("ALL");
 
   const { data, isLoading } = useQuery<TdcDashboardData>({
-    queryKey: [
-      "tdc-erhverv-dashboard",
-      { from: customFrom || null },
-    ],
+    queryKey: ["tdc-erhverv-dashboard"],
     queryFn: async () => {
       const today = new Date();
       const monthStart = startOfMonth(today).toISOString();
       const todayStart = startOfDay(today).toISOString();
-      const historyStartDate = customFrom
-        ? new Date(customFrom + "T00:00:00")
-        : subDays(today, 180);
+      const historyStartDate = subDays(today, 365);
       const historyStart = historyStartDate.toISOString();
 
       // Find TDC Erhverv-klienten
@@ -130,7 +127,7 @@ export default function TdcErhverv() {
         return { stats: initialStats, recentSales: [], allSales: [] };
       }
 
-      // Hent alle TDC Erhverv-salg fra de sidste 180 dage
+      // Hent alle TDC Erhverv-salg fra det seneste år
       const { data: sales, error: salesError } = await supabase
         .from("sales")
         .select(
@@ -222,8 +219,44 @@ export default function TdcErhverv() {
     if (!allSales.length) return [];
 
     const today = new Date();
-    const end = customTo ? new Date(customTo + "T23:59:59") : today;
-    const start = customFrom ? new Date(customFrom + "T00:00:00") : subDays(end, rangeDays);
+    let end = customTo ? new Date(customTo + "T23:59:59") : today;
+    let start: Date;
+
+    switch (datePreset) {
+      case "THIS_MONTH": {
+        start = startOfMonth(today);
+        break;
+      }
+      case "LAST_MONTH": {
+        const firstOfThisMonth = startOfMonth(today);
+        const endOfLastMonth = addDays(firstOfThisMonth, -1);
+        start = startOfMonth(endOfLastMonth);
+        end = endOfLastMonth;
+        break;
+      }
+      case "LAST_30": {
+        start = subDays(end, 30);
+        break;
+      }
+      case "LAST_90": {
+        start = subDays(end, 90);
+        break;
+      }
+      case "CUSTOM": {
+        if (customFrom) {
+          start = new Date(customFrom + "T00:00:00");
+        } else {
+          start = subDays(end, 30);
+        }
+        if (customTo) {
+          end = new Date(customTo + "T23:59:59");
+        }
+        break;
+      }
+      default: {
+        start = subDays(end, 90);
+      }
+    }
 
     const dailyMap = new Map<string, number>();
 
@@ -307,7 +340,7 @@ export default function TdcErhverv() {
         isBest: index === bestIndex,
       };
     });
-  }, [allSales, agentFilter, customFrom, customTo, rangeDays]);
+  }, [allSales, agentFilter, customFrom, customTo, datePreset]);
 
   const bestDayPoint = useMemo(() => {
     if (!chartPoints.length) return undefined;
@@ -403,87 +436,88 @@ export default function TdcErhverv() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-end gap-3">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-muted-foreground">Fra dato</span>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={`h-8 px-2 text-xs justify-start text-left font-normal ${
-                              !customFrom ? "text-muted-foreground" : ""
-                            }`}
-                          >
-                            <CalendarIcon className="mr-1 h-3 w-3" />
-                            {customFrom ? format(new Date(customFrom), "dd/MM/yyyy") : <span>Vælg dato</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={customFrom ? new Date(customFrom) : undefined}
-                            onSelect={(date) => {
-                              if (!date) {
-                                setCustomFrom("");
-                              } else {
-                                setCustomFrom(format(date, "yyyy-MM-dd"));
-                              }
-                            }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-muted-foreground">Til dato</span>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={`h-8 px-2 text-xs justify-start text-left font-normal ${
-                              !customTo ? "text-muted-foreground" : ""
-                            }`}
-                          >
-                            <CalendarIcon className="mr-1 h-3 w-3" />
-                            {customTo ? format(new Date(customTo), "dd/MM/yyyy") : <span>Vælg dato</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={customTo ? new Date(customTo) : undefined}
-                            onSelect={(date) => {
-                              if (!date) {
-                                setCustomTo("");
-                              } else {
-                                setCustomTo(format(date, "yyyy-MM-dd"));
-                              }
-                            }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-muted-foreground">Periode</span>
+                    <div className="min-w-[180px]">
+                      <Select value={datePreset} onValueChange={(value) => setDatePreset(value as DatePreset)}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Vælg periode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="THIS_MONTH">Denne måned</SelectItem>
+                          <SelectItem value="LAST_MONTH">Sidste måned</SelectItem>
+                          <SelectItem value="LAST_30">Sidste 30 dage</SelectItem>
+                          <SelectItem value="LAST_90">Sidste 90 dage</SelectItem>
+                          <SelectItem value="CUSTOM">Vælg selv dato</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                </div>
 
-                <div className="inline-flex gap-1 rounded-md border border-border bg-background p-0.5">
-                  {[30, 90, 180].map((days) => (
-                    <Button
-                      key={days}
-                      size="sm"
-                      variant={rangeDays === days ? "default" : "outline"}
-                      className="h-7 px-2 text-xs"
-                      onClick={() => {
-                        // Når man vælger en foruddefineret periode, nulstilles "Fra"/"Til" datoer
-                        setCustomFrom("");
-                        setCustomTo("");
-                        setRangeDays(days as 30 | 90 | 180);
-                      }}
-                    >
-                      {days} dage
-                    </Button>
-                  ))}
+                  {datePreset === "CUSTOM" && (
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-muted-foreground">Fra dato</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={`h-8 px-2 text-xs justify-start text-left font-normal ${
+                                !customFrom ? "text-muted-foreground" : ""
+                              }`}
+                            >
+                              <CalendarIcon className="mr-1 h-3 w-3" />
+                              {customFrom ? format(new Date(customFrom), "dd/MM/yyyy") : <span>Vælg dato</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={customFrom ? new Date(customFrom) : undefined}
+                              onSelect={(date) => {
+                                if (!date) {
+                                  setCustomFrom("");
+                                } else {
+                                  setCustomFrom(format(date, "yyyy-MM-dd"));
+                                }
+                              }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-muted-foreground">Til dato</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={`h-8 px-2 text-xs justify-start text-left font-normal ${
+                                !customTo ? "text-muted-foreground" : ""
+                              }`}
+                            >
+                              <CalendarIcon className="mr-1 h-3 w-3" />
+                              {customTo ? format(new Date(customTo), "dd/MM/yyyy") : <span>Vælg dato</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={customTo ? new Date(customTo) : undefined}
+                              onSelect={(date) => {
+                                if (!date) {
+                                  setCustomTo("");
+                                } else {
+                                  setCustomTo(format(date, "yyyy-MM-dd"));
+                                }
+                              }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
