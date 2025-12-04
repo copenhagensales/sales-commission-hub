@@ -293,6 +293,14 @@ export default function Payroll() {
         return digitsOnly || raw;
       };
 
+      const normalizeKey = (value: any): string | undefined => {
+        if (value == null) return undefined;
+        const raw = String(value).trim();
+        if (!raw) return undefined;
+        const digitsOnly = raw.replace(/\D/g, "");
+        return digitsOnly || raw.toLowerCase();
+      };
+
       const dateHeader =
         headers.find((h) => normalize(h).includes("starttidspunkt")) ||
         headers.find((h) => {
@@ -314,10 +322,9 @@ export default function Payroll() {
       const to = toDate;
 
       rows.forEach((row) => {
-        const rawOrder = row[orderHeader];
-        if (!rawOrder) return;
-        const orderId = String(rawOrder).trim();
-        if (!orderId) return;
+        const rawOrder = oppHeader ? row[oppHeader] : row[orderHeader];
+        const orderKey = normalizeKey(rawOrder);
+        if (!orderKey) return;
 
         const oppNumber = normalizeOpp(oppHeader ? row[oppHeader] : undefined);
 
@@ -352,7 +359,7 @@ export default function Payroll() {
 
         const statusValue = statusHeader ? String(row[statusHeader] ?? "").trim() : undefined;
 
-        cancellationByOrder.set(orderId, {
+        cancellationByOrder.set(orderKey, {
           row,
           date: format(cancellationDate, "dd.MM.yyyy"),
           status: statusValue,
@@ -367,7 +374,7 @@ export default function Payroll() {
       typedSales.forEach((sale) => {
         const externalId = (sale as any).adversus_external_id as string | null;
         if (!externalId) return;
-        const key = externalId.trim();
+        const key = normalizeKey(externalId);
         if (!key) return;
 
         const match = cancellationByOrder.get(key);
