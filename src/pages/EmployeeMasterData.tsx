@@ -184,9 +184,14 @@ export default function EmployeeMasterData() {
 
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const today = new Date().toISOString().split("T")[0];
+      const updateData = is_active
+        ? { is_active, employment_start_date: today, employment_end_date: null }
+        : { is_active, employment_end_date: today };
+      
       const { error } = await supabase
         .from("employee_master_data")
-        .update({ is_active })
+        .update(updateData)
         .eq("id", id);
       if (error) throw error;
     },
