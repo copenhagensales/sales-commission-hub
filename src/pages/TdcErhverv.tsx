@@ -468,7 +468,12 @@ export default function TdcErhverv() {
                       size="sm"
                       variant={rangeDays === days ? "default" : "outline"}
                       className="h-7 px-2 text-xs"
-                      onClick={() => setRangeDays(days as 30 | 90 | 180)}
+                      onClick={() => {
+                        // Når man vælger en foruddefineret periode, nulstilles "Fra"/"Til" datoer
+                        setCustomFrom("");
+                        setCustomTo("");
+                        setRangeDays(days as 30 | 90 | 180);
+                      }}
                     >
                       {days} dage
                     </Button>
