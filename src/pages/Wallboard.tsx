@@ -41,7 +41,8 @@ export default function Wallboard() {
         agent_name,
         sale_items (
           mapped_commission,
-          mapped_revenue
+          mapped_revenue,
+          quantity
         )
       `)
       .gte('sale_datetime', startOfMonth);
@@ -67,14 +68,20 @@ export default function Wallboard() {
 
     // Get unique active agents today
     const activeAgentNames = new Set(todaysSales.map(s => s.agent_name).filter(Boolean));
-    const salesTodayCount = todaysSales.reduce(
-      (count, sale) => count + (sale.sale_items?.length || 0),
-      0,
-    );
-    const salesThisMonthCount = salesData.reduce(
-      (count, sale) => count + (sale.sale_items?.length || 0),
-      0,
-    );
+    const salesTodayCount = todaysSales.reduce((count, sale) => {
+      const units = sale.sale_items?.reduce(
+        (sum: number, item: any) => sum + (Number(item.quantity) || 1),
+        0
+      ) || 0;
+      return count + units;
+    }, 0);
+    const salesThisMonthCount = salesData.reduce((count, sale) => {
+      const units = sale.sale_items?.reduce(
+        (sum: number, item: any) => sum + (Number(item.quantity) || 1),
+        0
+      ) || 0;
+      return count + units;
+    }, 0);
 
     setStats({
       salesToday: salesTodayCount,
@@ -91,7 +98,10 @@ export default function Wallboard() {
       const agentName = sale.agent_name;
       if (agentName) {
         const existing = agentSalesMap.get(agentName) || { name: agentName, sales: 0, revenue: 0 };
-        const saleCount = sale.sale_items?.length || 0;
+        const saleCount = sale.sale_items?.reduce(
+          (sum: number, item: any) => sum + (Number(item.quantity) || 1),
+          0
+        ) || 0;
         existing.sales += saleCount;
         sale.sale_items?.forEach((item: any) => {
           existing.revenue += Number(item.mapped_revenue) || 0;
