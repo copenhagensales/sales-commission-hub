@@ -397,43 +397,50 @@ export default function VagtBookings() {
         {/* Absence section */}
         {absences && absences.length > 0 && (
           <Collapsible open={absenceExpanded} onOpenChange={setAbsenceExpanded}>
-            <Card>
+            <Card className="overflow-hidden">
               <CollapsibleTrigger className="w-full">
-                <CardContent className="pt-4 pb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-orange-500" />
-                    <span className="font-semibold">Fravær uge {selectedWeek}</span>
-                    <span className="text-muted-foreground text-sm">({absences.length} medarbejdere)</span>
+                <CardContent className="py-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+                      <Users className="h-4 w-4 text-orange-600" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">Fravær uge {selectedWeek}</span>
+                      <span className="text-muted-foreground text-sm">({absences.length} medarbejdere)</span>
+                    </div>
                   </div>
-                  {absenceExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  {absenceExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
                 </CardContent>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <CardContent className="pt-0 space-y-4">
+                <CardContent className="pt-0 pb-6 space-y-6">
                   {Object.entries(absencesByTeam || {}).map(([team, teamAbsences]: [string, any]) => (
                     <div key={team}>
-                      <p className="text-xs font-semibold uppercase text-muted-foreground mb-2 tracking-wide">
+                      <p className="text-xs font-bold uppercase text-muted-foreground mb-3 tracking-wider">
                         Team {team}
                       </p>
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         {teamAbsences.map((absence: any) => {
                           const absenceDays = getAbsenceDays(absence);
                           return (
-                            <div key={absence.id} className="flex items-center justify-between py-2">
-                              <span className="text-sm truncate max-w-[200px]">{absence.employee?.full_name}</span>
-                              <div className="flex gap-1">
+                            <div key={absence.id} className="flex items-center justify-between py-1">
+                              <span className="text-sm text-foreground/80 truncate max-w-[250px]">
+                                {absence.employee?.full_name}
+                              </span>
+                              <div className="flex gap-1.5">
                                 {DAYS.map((day, idx) => {
                                   const isAbsent = absenceDays.includes(idx);
+                                  const dayLetter = day.charAt(0);
                                   return (
                                     <div
                                       key={idx}
-                                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
                                         isAbsent 
-                                          ? "bg-orange-500 text-white" 
-                                          : "text-muted-foreground/50"
+                                          ? "bg-orange-500 text-white shadow-sm" 
+                                          : "text-muted-foreground/40"
                                       }`}
                                     >
-                                      {day.charAt(0)}
+                                      {dayLetter}
                                     </div>
                                   );
                                 })}
