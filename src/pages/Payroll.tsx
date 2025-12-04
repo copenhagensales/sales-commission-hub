@@ -475,15 +475,27 @@ export default function Payroll() {
   const filteredSales = (searchableSales || []).filter((sale) => {
     if (!searchTerm.trim()) return false;
     const term = searchTerm.trim().toLowerCase();
-    const inExternalId = sale.adversus_external_id?.toLowerCase().includes(term) ?? false;
-    const inOppDirect = sale.adversus_opp_number?.toLowerCase().includes(term) ?? false;
+    const digitsTerm = term.replace(/\D/g, "");
+
+    const normalizeDigits = (value?: string | null) =>
+      (value ?? "").toLowerCase().replace(/\D/g, "");
+
+    const inExternalId =
+      sale.adversus_external_id?.toLowerCase().includes(term) ??
+      (digitsTerm ? normalizeDigits(sale.adversus_external_id).includes(digitsTerm) : false);
+
+    const inOppDirect =
+      !!digitsTerm && normalizeDigits(sale.adversus_opp_number).includes(digitsTerm);
+
     const inPhone = sale.customer_phone?.toLowerCase().includes(term) ?? false;
     const inCompany = sale.customer_company?.toLowerCase().includes(term) ?? false;
     const inAgent = sale.agent_name?.toLowerCase().includes(term) ?? false;
 
     const matchFromCancellations = cancellations?.matches.find((m) => m.saleId === sale.id);
-    const inOppFromCancel = matchFromCancellations?.oppNumber?.toLowerCase().includes(term) ?? false;
-    const inCancelOrderId = matchFromCancellations?.externalId?.toLowerCase().includes(term) ?? false;
+    const inOppFromCancel =
+      !!digitsTerm && normalizeDigits(matchFromCancellations?.oppNumber ?? "").includes(digitsTerm);
+    const inCancelOrderId =
+      !!digitsTerm && normalizeDigits(matchFromCancellations?.externalId ?? "").includes(digitsTerm);
 
     return (
       inExternalId ||
@@ -834,8 +846,9 @@ export default function Payroll() {
                           const matchFromCancellations = cancellations?.matches.find(
                             (m) => m.saleId === sale.id,
                           );
-                          const oppNumber =
-                            sale.adversus_opp_number ?? matchFromCancellations?.oppNumber ?? "-";
+                          const rawOpp =
+                            sale.adversus_opp_number ?? matchFromCancellations?.oppNumber ?? "";
+                          const oppNumber = rawOpp ? `OPP ${rawOpp}` : "-";
 
                           return (
                             <TableRow
@@ -907,9 +920,13 @@ export default function Payroll() {
                           <div>
                             <p className="text-muted-foreground">OPP-nummer</p>
                             <p className="font-medium">
-                              {selectedSale.adversus_opp_number ??
-                                cancellations?.matches.find((m) => m.saleId === selectedSale.id)?.oppNumber ??
-                                "-"}
+                              {(() => {
+                                const match = cancellations?.matches.find(
+                                  (m) => m.saleId === selectedSale.id,
+                                );
+                                const rawOpp = selectedSale.adversus_opp_number ?? match?.oppNumber ?? "";
+                                return rawOpp ? `OPP ${rawOpp}` : "-";
+                              })()}
                             </p>
                           </div>
                         </div>
