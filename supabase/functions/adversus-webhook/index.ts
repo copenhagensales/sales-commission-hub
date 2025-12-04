@@ -37,6 +37,11 @@ interface AdversusPayload {
   };
 }
 
+const getDateOnly = (dateStr: string) => {
+  const d = new Date(dateStr);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -52,22 +57,59 @@ serve(async (req) => {
 
     const externalId = String(body.payload.result_id);
 
-    // 1. Check if event already exists (idempotency)
-    const { data: existingEvent } = await supabase
+    // 1. Find existing events & sales for this result to handle corrections
+    const newEventDate = body.event_time
+      ? getDateOnly(body.event_time)
+      : getDateOnly(new Date().toISOString());
+
+    const { data: existingEvents, error: existingEventsError } = await supabase
       .from('adversus_events')
       .select('id')
-      .eq('external_id', externalId)
-      .maybeSingle();
+      .eq('external_id', externalId);
 
-    if (existingEvent) {
-      console.log('Event already processed:', externalId);
-      return new Response(
-        JSON.stringify({ success: true, message: 'Event already processed', event_id: existingEvent.id }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (existingEventsError) {
+      console.error('Error fetching existing events:', existingEventsError);
+      throw existingEventsError;
     }
 
-    // 2. Store raw event
+    let existingSales: { id: string; sale_datetime: string; adversus_event_id: string }[] = [];
+
+    if (existingEvents && existingEvents.length > 0) {
+      const existingEventIds = existingEvents.map((e: { id: string }) => e.id);
+
+      const { data: salesForResult, error: salesError } = await supabase
+        .from('sales')
+        .select('id, sale_datetime, adversus_event_id')
+        .in('adversus_event_id', existingEventIds);
+
+      if (salesError) {
+        console.error('Error fetching existing sales:', salesError);
+        throw salesError;
+      }
+
+      existingSales = salesForResult || [];
+    }
+
+    let isSameDayCorrection = false;
+    let ignoreNewEvent = false;
+
+    if (existingSales.length > 0) {
+      // Find original sale date for this result
+      const sortedSales = [...existingSales].sort(
+        (a, b) => new Date(a.sale_datetime).getTime() - new Date(b.sale_datetime).getTime(),
+      );
+      const originalSaleDate = getDateOnly(sortedSales[0].sale_datetime);
+
+      if (newEventDate.getTime() === originalSaleDate.getTime()) {
+        // Correction on same calendar day -> use latest event, delete previous sales
+        isSameDayCorrection = true;
+      } else {
+        // Correction after day change -> keep original data, ignore this event for metrics
+        ignoreNewEvent = true;
+      }
+    }
+
+    // 2. Store raw event (always)
     const { data: eventData, error: eventError } = await supabase
       .from('adversus_events')
       .insert({
@@ -86,6 +128,44 @@ serve(async (req) => {
     }
 
     console.log('Stored event:', eventData.id);
+
+    if (ignoreNewEvent) {
+      console.log('Ignoring new event due to day change for external_id:', externalId);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Event stored but ignored for metrics due to day change',
+          event_id: eventData.id,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // If this is a same-day correction, delete previous sales & sale items for this result
+    if (isSameDayCorrection && existingSales.length > 0) {
+      const saleIds = existingSales.map((s) => s.id);
+      console.log('Deleting previous sales for same-day correction, sale_ids:', saleIds);
+
+      const { error: deleteItemsError } = await supabase
+        .from('sale_items')
+        .delete()
+        .in('sale_id', saleIds);
+
+      if (deleteItemsError) {
+        console.error('Error deleting existing sale items:', deleteItemsError);
+        throw deleteItemsError;
+      }
+
+      const { error: deleteSalesError } = await supabase
+        .from('sales')
+        .delete()
+        .in('id', saleIds);
+
+      if (deleteSalesError) {
+        console.error('Error deleting existing sales:', deleteSalesError);
+        throw deleteSalesError;
+      }
+    }
 
     // 3. Find or create campaign mapping
     const adversusCampaignId = body.payload.campaign.id;
