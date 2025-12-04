@@ -129,6 +129,17 @@ export default function VagtLocations() {
     },
   });
 
+  const updateCooldown = useMutation({
+    mutationFn: async ({ id, cooldown_weeks }: { id: string; cooldown_weeks: number }) => {
+      const { error } = await supabase.from("location").update({ cooldown_weeks }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-locations-list"] });
+      toast({ title: "Cooldown opdateret" });
+    },
+  });
+
   const filteredLocations = locations?.filter((loc) => {
     const matchesSearch =
       !search ||
@@ -224,8 +235,28 @@ export default function VagtLocations() {
                       <TableCell className="font-medium">{loc.name}</TableCell>
                       <TableCell>{loc.type || "-"}</TableCell>
                       <TableCell>{loc.address_city || "-"}</TableCell>
-                      <TableCell>
-                        <span className="text-muted-foreground">{loc.cooldown_weeks || 4} uger</span>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            min={1}
+                            max={52}
+                            className="w-16 h-8 text-center"
+                            defaultValue={loc.cooldown_weeks || 4}
+                            onBlur={(e) => {
+                              const value = parseInt(e.target.value) || 4;
+                              if (value !== (loc.cooldown_weeks || 4)) {
+                                updateCooldown.mutate({ id: loc.id, cooldown_weeks: value });
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                (e.target as HTMLInputElement).blur();
+                              }
+                            }}
+                          />
+                          <span className="text-muted-foreground text-sm">uger</span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge className={`${statusColors[loc.status || "Ny"]} text-white`}>
