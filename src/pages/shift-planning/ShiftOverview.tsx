@@ -428,16 +428,16 @@ export default function ShiftOverview() {
             <span>Arbejder</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm bg-orange-400/60"></div>
-            <span>Forsinket (1 klik)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-sm bg-amber-400/60"></div>
-            <span>Ferie (2 klik)</span>
+            <span>Ferie (1 klik)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-sm bg-red-400/60"></div>
-            <span>Syg (3 klik)</span>
+            <span>Syg (2 klik)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-sm bg-orange-400/60"></div>
+            <span>Forsinket (3 klik)</span>
           </div>
           <span className="text-muted-foreground/50">|</span>
           <span className="text-muted-foreground/60">Dobbeltklik = opret vagt</span>
