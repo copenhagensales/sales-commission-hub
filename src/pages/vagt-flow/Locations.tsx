@@ -203,12 +203,19 @@ export default function VagtLocations() {
                 </TableHeader>
                 <TableBody>
                   {filteredLocations?.map((loc) => (
-                    <TableRow key={loc.id}>
+                    <TableRow 
+                      key={loc.id} 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/vagt-flow/locations/${loc.id}`)}
+                    >
                       <TableCell>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => toggleFavorite.mutate({ id: loc.id, isFavorite: !loc.is_favorite })}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite.mutate({ id: loc.id, isFavorite: !loc.is_favorite });
+                          }}
                         >
                           <Star className={`h-4 w-4 ${loc.is_favorite ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`} />
                         </Button>
@@ -228,7 +235,14 @@ export default function VagtLocations() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => setLocationToDelete(loc.id)}>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocationToDelete(loc.id);
+                          }}
+                        >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </TableCell>
