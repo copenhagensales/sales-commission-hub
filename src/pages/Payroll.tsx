@@ -518,7 +518,7 @@ export default function Payroll() {
 
                 {cancellations && !loadingCancellations && (
                   <p className="text-sm text-muted-foreground">
-                    Total annulleret provision i perioden:{" "}
+                    Total annulleret provision i perioden ({cancellations.totalCancelled ?? 0} salg):{" "}
                     <span className="font-semibold">
                       {(cancellations.totalCancelledCommission ?? 0).toLocaleString("da-DK")} DKK
                     </span>
