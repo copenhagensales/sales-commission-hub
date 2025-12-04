@@ -310,7 +310,20 @@ export default function EmployeeMasterData() {
                     </div>
                     <div className="space-y-2">
                       <Label>Stillingsbetegnelse</Label>
-                      <Input value={formData.job_title || ""} onChange={(e) => setFormData({ ...formData, job_title: e.target.value || null })} />
+                      <Select value={formData.job_title || ""} onValueChange={(v) => setFormData({ ...formData, job_title: v || null })}>
+                        <SelectTrigger><SelectValue placeholder="Vælg stilling" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Salgskonsulent">Salgskonsulent</SelectItem>
+                          <SelectItem value="Fieldmarketing">Fieldmarketing</SelectItem>
+                          <SelectItem value="Teamleder">Teamleder</SelectItem>
+                          <SelectItem value="Assisterende Teamleder">Assisterende Teamleder</SelectItem>
+                          <SelectItem value="Rekruttering">Rekruttering</SelectItem>
+                          <SelectItem value="SOME">SOME</SelectItem>
+                          <SelectItem value="Backoffice">Backoffice</SelectItem>
+                          <SelectItem value="Projektleder">Projektleder</SelectItem>
+                          <SelectItem value="Ejer">Ejer</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>Afdeling / Team</Label>

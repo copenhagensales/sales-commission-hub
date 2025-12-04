@@ -461,6 +461,13 @@ export default function EmployeeDetail() {
                 options={[
                   { value: "Salgskonsulent", label: "Salgskonsulent" },
                   { value: "Fieldmarketing", label: "Fieldmarketing" },
+                  { value: "Teamleder", label: "Teamleder" },
+                  { value: "Assisterende Teamleder", label: "Assisterende Teamleder" },
+                  { value: "Rekruttering", label: "Rekruttering" },
+                  { value: "SOME", label: "SOME" },
+                  { value: "Backoffice", label: "Backoffice" },
+                  { value: "Projektleder", label: "Projektleder" },
+                  { value: "Ejer", label: "Ejer" },
                 ]}
                 onSave={handleSave}
                 displayValue={employee.job_title}
