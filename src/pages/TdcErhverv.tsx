@@ -267,11 +267,14 @@ export default function TdcErhverv() {
                         <TableCell>{sale.customer_company || "—"}</TableCell>
                         <TableCell>{sale.agent_name || "—"}</TableCell>
                         <TableCell>
-                          {sale.sale_items?.map((item, index) => (
-                            <Badge key={index} variant="secondary" className="mr-1 text-xs">
-                              {item.products?.name || "Ukendt produkt"}
-                            </Badge>
-                          ))}
+                          {sale.sale_items?.map((item, index) => {
+                            const qty = Number((item as any).quantity) || 1;
+                            return (
+                              <Badge key={index} variant="secondary" className="mr-1 text-xs">
+                                {item.products?.name || "Ukendt produkt"} (x{qty})
+                              </Badge>
+                            );
+                          })}
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {formatCurrency(saleRevenue)}
