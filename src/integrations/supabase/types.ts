@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      absence_request_v2: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          employee_id: string
+          end_date: string
+          end_time: string | null
+          id: string
+          is_full_day: boolean | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          start_date: string
+          start_time: string | null
+          status: Database["public"]["Enums"]["absence_request_status"] | null
+          type: Database["public"]["Enums"]["absence_type_v2"]
+          updated_at: string | null
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          employee_id: string
+          end_date: string
+          end_time?: string | null
+          id?: string
+          is_full_day?: boolean | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          start_date: string
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["absence_request_status"] | null
+          type: Database["public"]["Enums"]["absence_type_v2"]
+          updated_at?: string | null
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          employee_id?: string
+          end_date?: string
+          end_time?: string | null
+          id?: string
+          is_full_day?: boolean | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          start_date?: string
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["absence_request_status"] | null
+          type?: Database["public"]["Enums"]["absence_type_v2"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "absence_request_v2_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       accounts_map: {
         Row: {
           account_number: string
@@ -458,6 +520,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      danish_holiday: {
+        Row: {
+          date: string
+          id: string
+          name: string
+          year: number
+        }
+        Insert: {
+          date: string
+          id?: string
+          name: string
+          year: number
+        }
+        Update: {
+          date?: string
+          id?: string
+          name?: string
+          year?: number
+        }
+        Relationships: []
       }
       economic_events: {
         Row: {
@@ -1147,6 +1230,92 @@ export type Database = {
           },
         ]
       }
+      shift: {
+        Row: {
+          break_minutes: number | null
+          created_at: string | null
+          created_by: string | null
+          date: string
+          employee_id: string
+          end_time: string
+          id: string
+          note: string | null
+          planned_hours: number | null
+          start_time: string
+          status: Database["public"]["Enums"]["shift_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          break_minutes?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          date: string
+          employee_id: string
+          end_time: string
+          id?: string
+          note?: string | null
+          planned_hours?: number | null
+          start_time: string
+          status?: Database["public"]["Enums"]["shift_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          break_minutes?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          employee_id?: string
+          end_time?: string
+          id?: string
+          note?: string | null
+          planned_hours?: number | null
+          start_time?: string
+          status?: Database["public"]["Enums"]["shift_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_notification: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          reference_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          reference_id?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          reference_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sms_notification_log: {
         Row: {
           booking_assignment_id: string | null
@@ -1206,6 +1375,60 @@ export type Database = {
           last_sync_at?: string | null
         }
         Relationships: []
+      }
+      time_entry: {
+        Row: {
+          actual_hours: number | null
+          clock_in: string | null
+          clock_out: string | null
+          created_at: string | null
+          date: string
+          employee_id: string
+          id: string
+          note: string | null
+          shift_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          actual_hours?: number | null
+          clock_in?: string | null
+          clock_out?: string | null
+          created_at?: string | null
+          date: string
+          employee_id: string
+          id?: string
+          note?: string | null
+          shift_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_hours?: number | null
+          clock_in?: string | null
+          clock_out?: string | null
+          created_at?: string | null
+          date?: string
+          employee_id?: string
+          id?: string
+          note?: string | null
+          shift_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entry_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entry_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shift"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       time_off_request: {
         Row: {
@@ -1416,7 +1639,9 @@ export type Database = {
       is_vagt_admin_or_planner: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      absence_request_status: "pending" | "approved" | "rejected"
       absence_type: "sick" | "vacation" | "other"
+      absence_type_v2: "vacation" | "sick"
       app_role: "admin" | "payroll" | "manager" | "agent"
       booking_status: "Planlagt" | "Bekræftet" | "Aflyst" | "Afsluttet"
       commission_transaction_type: "earn" | "clawback" | "manual_adjustment"
@@ -1427,6 +1652,7 @@ export type Database = {
       payroll_status: "draft" | "approved" | "exported"
       salary_type: "provision" | "fixed" | "hourly"
       sale_status: "pending" | "active" | "cancelled" | "clawbacked"
+      shift_status: "planned" | "completed" | "cancelled"
       sms_type:
         | "new_shift"
         | "updated_shift"
@@ -1562,7 +1788,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      absence_request_status: ["pending", "approved", "rejected"],
       absence_type: ["sick", "vacation", "other"],
+      absence_type_v2: ["vacation", "sick"],
       app_role: ["admin", "payroll", "manager", "agent"],
       booking_status: ["Planlagt", "Bekræftet", "Aflyst", "Afsluttet"],
       commission_transaction_type: ["earn", "clawback", "manual_adjustment"],
@@ -1573,6 +1801,7 @@ export const Constants = {
       payroll_status: ["draft", "approved", "exported"],
       salary_type: ["provision", "fixed", "hourly"],
       sale_status: ["pending", "active", "cancelled", "clawbacked"],
+      shift_status: ["planned", "completed", "cancelled"],
       sms_type: [
         "new_shift",
         "updated_shift",
