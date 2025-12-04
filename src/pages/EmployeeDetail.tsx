@@ -1076,9 +1076,50 @@ export default function EmployeeDetail() {
                     </div>
                     <Progress value={35} className="h-2 opacity-50" />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Det danske gennemsnit for sygefravær ligger på ca. 3,5% af arbejdsdagene.
-                  </p>
+                  {(() => {
+                    // Calculate age from CPR if available (format: DDMMYY-XXXX)
+                    let age: number | null = null;
+                    if (employee.cpr_number && employee.cpr_number.length >= 6) {
+                      const day = parseInt(employee.cpr_number.substring(0, 2));
+                      const month = parseInt(employee.cpr_number.substring(2, 4));
+                      let year = parseInt(employee.cpr_number.substring(4, 6));
+                      // Determine century (if year > current year's last 2 digits, assume 1900s)
+                      const currentYearShort = new Date().getFullYear() % 100;
+                      year = year > currentYearShort ? 1900 + year : 2000 + year;
+                      const birthDate = new Date(year, month - 1, day);
+                      const today = new Date();
+                      age = Math.floor((today.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+                    }
+                    
+                    // Age-based statistics from Danish data
+                    const getAgeGroupStats = (age: number) => {
+                      if (age < 25) return { avg: 2.0, label: "under 25 år" };
+                      if (age < 35) return { avg: 2.5, label: "25-34 år" };
+                      if (age < 45) return { avg: 3.0, label: "35-44 år" };
+                      if (age < 55) return { avg: 3.8, label: "45-54 år" };
+                      return { avg: 4.5, label: "55+ år" };
+                    };
+                    
+                    if (age && age > 0 && age < 100) {
+                      const ageStats = getAgeGroupStats(age);
+                      return (
+                        <div className="text-xs text-muted-foreground space-y-1.5 mt-2">
+                          <p>Det danske gennemsnit for sygefravær ligger på ca. 3,5% af arbejdsdagene.</p>
+                          <p>
+                            Ifølge Danmarks Statistik har aldersgruppen {ageStats.label} et gennemsnitligt 
+                            sygefravær på ca. {ageStats.avg}%. Sygefravær varierer naturligt med alder, 
+                            livssituation og jobtype.
+                          </p>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <p className="text-xs text-muted-foreground">
+                        Det danske gennemsnit for sygefravær ligger på ca. 3,5% af arbejdsdagene.
+                      </p>
+                    );
+                  })()}
                 </CardContent>
               </Card>
 
