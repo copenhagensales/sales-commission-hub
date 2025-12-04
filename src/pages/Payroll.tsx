@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { CalendarIcon, Wallet, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +24,7 @@ interface PayrollSaleItem {
   mapped_commission: number | null;
   mapped_revenue: number | null;
   quantity: number | null;
+  adversus_product_title?: string | null;
 }
 
 interface PayrollSale {
@@ -116,6 +118,7 @@ export default function Payroll() {
   const [fromDate, setFromDate] = useState<Date | undefined>(defaultPeriod.from);
   const [toDate, setToDate] = useState<Date | undefined>(defaultPeriod.to);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedSale, setSelectedSale] = useState<SearchableSale | null>(null);
 
   const { data: clients, isLoading: loadingClients } = useQuery<ClientRow[]>({
     queryKey: ["payroll-clients"],
@@ -437,7 +440,7 @@ export default function Payroll() {
       const { data: sales, error: salesError } = await supabase
         .from("sales")
         .select(
-          "id, sale_datetime, agent_name, customer_company, customer_phone, adversus_external_id, sale_items(mapped_commission, mapped_revenue, quantity)"
+          "id, sale_datetime, agent_name, customer_company, customer_phone, adversus_external_id, sale_items(adversus_product_title, mapped_commission, mapped_revenue, quantity)"
         )
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", fromDate.toISOString())
@@ -795,7 +798,11 @@ export default function Payroll() {
                           }, 0);
 
                           return (
-                            <TableRow key={sale.id}>
+                            <TableRow
+                              key={sale.id}
+                              className="cursor-pointer hover:bg-accent/40"
+                              onClick={() => setSelectedSale(sale)}
+                            >
                               <TableCell>
                                 {sale.sale_datetime
                                   ? format(new Date(sale.sale_datetime), "dd.MM.yyyy")
@@ -818,6 +825,84 @@ export default function Payroll() {
                     </Table>
                   </div>
                 )}
+
+                <Dialog open={!!selectedSale} onOpenChange={(open) => !open && setSelectedSale(null)}>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Detaljer for salg</DialogTitle>
+                      <DialogDescription>
+                        {selectedSale?.adversus_external_id
+                          ? `Ordre-id: ${selectedSale.adversus_external_id}`
+                          : "Detaljer for valgt salg"}
+                      </DialogDescription>
+                    </DialogHeader>
+                    {selectedSale && (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Dato</p>
+                            <p className="font-medium">
+                              {selectedSale.sale_datetime
+                                ? format(new Date(selectedSale.sale_datetime), "dd.MM.yyyy")
+                                : "-"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Agent</p>
+                            <p className="font-medium">{selectedSale.agent_name ?? "Ukendt"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Kunde</p>
+                            <p className="font-medium">{selectedSale.customer_company ?? "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Telefon</p>
+                            <p className="font-medium">{selectedSale.customer_phone ?? "-"}</p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border bg-muted/40 overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Produkt</TableHead>
+                                <TableHead className="text-right">Antal</TableHead>
+                                <TableHead className="text-right">Provision pr. stk.</TableHead>
+                                <TableHead className="text-right">Provision i alt</TableHead>
+                                <TableHead className="text-right">Omsætning</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {selectedSale.sale_items.map((item, index) => {
+                                const qty = Number(item.quantity ?? 1) || 1;
+                                const commissionPerUnit = Number(item.mapped_commission) || 0;
+                                const revenuePerUnit = Number(item.mapped_revenue) || 0;
+                                const lineCommission = qty * commissionPerUnit;
+                                const lineRevenue = qty * revenuePerUnit;
+
+                                return (
+                                  <TableRow key={index}>
+                                    <TableCell>{item.adversus_product_title ?? "Ukendt produkt"}</TableCell>
+                                    <TableCell className="text-right">{qty}</TableCell>
+                                    <TableCell className="text-right">
+                                      {commissionPerUnit.toLocaleString("da-DK")} DKK
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {lineCommission.toLocaleString("da-DK")} DKK
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {lineRevenue.toLocaleString("da-DK")} DKK
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
               </div>
             )}
           </CardContent>
