@@ -215,6 +215,27 @@ export function useAbsenceRequests(status?: "pending" | "approved" | "rejected",
   });
 }
 
+// Fetch approved absences for a date range (for shift overview)
+export function useAbsencesForDateRange(startDate: string, endDate: string) {
+  return useQuery({
+    queryKey: ["absences-date-range", startDate, endDate],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("absence_request_v2")
+        .select(`
+          *,
+          employee:employee_master_data(id, first_name, last_name, department)
+        `)
+        .eq("status", "approved")
+        .lte("start_date", endDate)
+        .gte("end_date", startDate);
+
+      if (error) throw error;
+      return data as AbsenceRequest[];
+    },
+  });
+}
+
 // Create absence request
 export function useCreateAbsenceRequest() {
   const queryClient = useQueryClient();

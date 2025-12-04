@@ -1,14 +1,13 @@
 import { useState, useMemo } from "react";
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay } from "date-fns";
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Users, Palmtree, Thermometer } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useShifts, useDepartments, useEmployeesForShifts, useDanishHolidays, Shift } from "@/hooks/useShiftPlanning";
+import { useShifts, useDepartments, useEmployeesForShifts, useDanishHolidays, useAbsencesForDateRange, Shift, AbsenceRequest } from "@/hooks/useShiftPlanning";
 import { CreateShiftDialog } from "@/components/shift-planning/CreateShiftDialog";
 import { ShiftCard } from "@/components/shift-planning/ShiftCard";
 import { cn } from "@/lib/utils";
@@ -31,6 +30,10 @@ export default function ShiftOverview() {
   const { data: departments } = useDepartments();
   const { data: employees } = useEmployeesForShifts(selectedDepartment);
   const { data: holidays } = useDanishHolidays(currentDate.getFullYear());
+  const { data: absences } = useAbsencesForDateRange(
+    format(weekStart, "yyyy-MM-dd"),
+    format(weekEnd, "yyyy-MM-dd")
+  );
 
   const isHoliday = (date: Date) => {
     return holidays?.some(h => isSameDay(new Date(h.date), date));
@@ -56,6 +59,30 @@ export default function ShiftOverview() {
     });
     return map;
   }, [shifts]);
+
+  // Map absences by employee ID
+  const absencesByEmployee = useMemo(() => {
+    const map = new Map<string, AbsenceRequest[]>();
+    absences?.forEach(absence => {
+      if (!map.has(absence.employee_id)) {
+        map.set(absence.employee_id, []);
+      }
+      map.get(absence.employee_id)!.push(absence);
+    });
+    return map;
+  }, [absences]);
+
+  // Check if employee has absence on a specific date
+  const getAbsenceForDate = (employeeId: string, date: Date): AbsenceRequest | null => {
+    const employeeAbsences = absencesByEmployee.get(employeeId);
+    if (!employeeAbsences) return null;
+    
+    return employeeAbsences.find(absence => {
+      const startDate = parseISO(absence.start_date);
+      const endDate = parseISO(absence.end_date);
+      return isWithinInterval(date, { start: startDate, end: endDate });
+    }) || null;
+  };
 
   const totalPlannedHours = useMemo(() => {
     return shifts?.reduce((sum, s) => sum + (s.planned_hours || 0), 0) || 0;
@@ -104,6 +131,22 @@ export default function ShiftOverview() {
             Næste uge
             <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
+        </div>
+
+        {/* Legend */}
+        <div className="flex gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded bg-green-500/20 border border-green-500"></div>
+            <span>Vagt</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded bg-amber-500/20 border border-amber-500"></div>
+            <span>Ferie</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded bg-red-500/20 border border-red-500"></div>
+            <span>Syg</span>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -181,32 +224,62 @@ export default function ShiftOverview() {
                   <div className="p-2 text-sm">
                     <p className="font-medium">{employee.first_name} {employee.last_name}</p>
                     <p className="text-xs text-muted-foreground">{employee.department}</p>
+                    {employee.standard_start_time && (
+                      <p className="text-xs text-muted-foreground">Mødetid: {employee.standard_start_time}</p>
+                    )}
                   </div>
                   {weekDays.map(day => {
                     const dateKey = format(day, "yyyy-MM-dd");
                     const dayShifts = shiftsByEmployeeAndDate.get(employee.id)?.get(dateKey) || [];
                     const holiday = isHoliday(day);
+                    const absence = getAbsenceForDate(employee.id, day);
+                    const hasShift = dayShifts.length > 0;
+                    const isVacation = absence?.type === "vacation";
+                    const isSick = absence?.type === "sick";
+                    
+                    // Determine cell styling based on status
+                    const cellClasses = cn(
+                      "min-h-[60px] border rounded-lg p-1 cursor-pointer transition-colors",
+                      holiday && "bg-destructive/5 border-destructive/20",
+                      !holiday && hasShift && "bg-green-500/20 border-green-500 hover:bg-green-500/30",
+                      !holiday && !hasShift && isVacation && "bg-amber-500/20 border-amber-500 hover:bg-amber-500/30",
+                      !holiday && !hasShift && isSick && "bg-red-500/20 border-red-500 hover:bg-red-500/30",
+                      !holiday && !hasShift && !absence && "border-border hover:bg-muted/50"
+                    );
                     
                     return (
                       <div
                         key={day.toISOString()}
-                        className={cn(
-                          "min-h-[60px] border border-border rounded-lg p-1 cursor-pointer hover:bg-muted/50 transition-colors",
-                          holiday && "bg-destructive/5"
-                        )}
+                        className={cellClasses}
                         onClick={() => {
-                          if (!holiday) {
+                          if (!holiday && !absence) {
                             setSelectedDate(day);
                             setCreateDialogOpen(true);
                           }
                         }}
                       >
-                        {dayShifts.map(shift => (
+                        {hasShift && dayShifts.map(shift => (
                           <ShiftCard key={shift.id} shift={shift} compact />
                         ))}
-                        {dayShifts.length === 0 && !holiday && (
-                          <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                            <Plus className="h-3 w-3" />
+                        {!hasShift && isVacation && (
+                          <div className="flex flex-col items-center justify-center h-full text-amber-600 text-xs gap-1">
+                            <Palmtree className="h-4 w-4" />
+                            <span>Ferie</span>
+                          </div>
+                        )}
+                        {!hasShift && isSick && (
+                          <div className="flex flex-col items-center justify-center h-full text-red-600 text-xs gap-1">
+                            <Thermometer className="h-4 w-4" />
+                            <span>Syg</span>
+                          </div>
+                        )}
+                        {!hasShift && !absence && !holiday && (
+                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-xs">
+                            {employee.standard_start_time ? (
+                              <span className="text-[10px]">{employee.standard_start_time}</span>
+                            ) : (
+                              <Plus className="h-3 w-3" />
+                            )}
                           </div>
                         )}
                       </div>
