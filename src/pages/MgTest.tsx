@@ -1257,22 +1257,35 @@ export default function MgTest() {
                                         <Select
                                           value={selectedClientId ?? undefined}
                                           onValueChange={(value) => {
+                                            const newClientId = value === "unmapped" ? null : value;
+
                                             if (productId) {
                                               setProductClientSelections((prev) => ({
                                                 ...prev,
-                                                [productId]: value,
+                                                [productId]: newClientId,
                                               }));
                                             }
+
                                             setProductClientDrafts((prev) => ({
                                               ...prev,
-                                              [row.key]: value,
+                                              [row.key]: newClientId,
                                             }));
+
+                                            if (productId && newClientId !== selectedClientId) {
+                                              updateProductClient.mutate({
+                                                productId,
+                                                clientId: newClientId,
+                                              });
+                                            }
                                           }}
                                         >
                                           <SelectTrigger className="w-full">
                                             <SelectValue placeholder="Vælg kunde" />
                                           </SelectTrigger>
                                           <SelectContent className="bg-background border z-50 max-h-72">
+                                            <SelectItem value="unmapped" className="text-sm text-muted-foreground">
+                                              Manglende mapping
+                                            </SelectItem>
                                             {clients?.map((client) => (
                                               <SelectItem key={client.id} value={client.id} className="text-sm">
                                                 {client.name}
@@ -1280,28 +1293,7 @@ export default function MgTest() {
                                             ))}
                                           </SelectContent>
                                         </Select>
-                                        {row.product ? (
-                                          <div className="flex justify-end">
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() =>
-                                                productId &&
-                                                updateProductClient.mutate({
-                                                  productId,
-                                                  clientId: selectedClientId,
-                                                })
-                                              }
-                                              disabled={
-                                                !productId ||
-                                                updateProductClient.isPending ||
-                                                selectedClientId === existingClientId
-                                              }
-                                            >
-                                              Gem kunde
-                                            </Button>
-                                          </div>
-                                        ) : (
+                                        {!row.product && (
                                           <span className="text-xs text-muted-foreground">
                                             Gem provision / CPO først for at oprette produktet
                                           </span>
