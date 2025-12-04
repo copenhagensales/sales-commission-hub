@@ -14,7 +14,9 @@ export default function Settings() {
   const [salesDays, setSalesDays] = useState(7);
   const [syncDays, setSyncDays] = useState(30);
   const [results, setResults] = useState<any>(null);
-
+  const [tdcMonthlyData, setTdcMonthlyData] = useState<{ month: string; count: number }[] | null>(null);
+  const [tdcMonthlyLoading, setTdcMonthlyLoading] = useState(false);
+  const [tdcMonthlyError, setTdcMonthlyError] = useState<string | null>(null);
   const testFetchCampaigns = async () => {
     setLoading("campaigns");
     try {
@@ -89,6 +91,86 @@ export default function Settings() {
       toast.error(err.message || "Webhook fejlede");
     } finally {
       setLoading(null);
+    }
+  };
+
+  const loadTdcMonthlyData = async () => {
+    setTdcMonthlyLoading(true);
+    setTdcMonthlyError(null);
+    try {
+      const { data: clients, error: clientsError } = await supabase
+        .from("clients")
+        .select("id")
+        .ilike("name", "%tdc erhverv%")
+        .limit(1);
+
+      if (clientsError) throw clientsError;
+
+      const tdcClientId = clients?.[0]?.id as string | undefined;
+
+      if (!tdcClientId) {
+        setTdcMonthlyData([]);
+        toast.info("Ingen klient fundet med navnet 'TDC Erhverv'");
+        return;
+      }
+
+      const { data: campaigns, error: campaignsError } = await supabase
+        .from("client_campaigns")
+        .select("id")
+        .eq("client_id", tdcClientId);
+
+      if (campaignsError) throw campaignsError;
+
+      const campaignIds = (campaigns || []).map((c) => c.id as string);
+
+      if (!campaignIds.length) {
+        setTdcMonthlyData([]);
+        toast.info("Ingen kampagner fundet for TDC Erhverv");
+        return;
+      }
+
+      type SaleWithItems = {
+        id: string;
+        sale_datetime: string;
+        sale_items: { quantity: number | null }[];
+      };
+
+      const { data: sales, error: salesError } = await supabase
+        .from("sales")
+        .select("id, sale_datetime, sale_items ( quantity )")
+        .in("client_campaign_id", campaignIds);
+
+      if (salesError) throw salesError;
+
+      const typedSales = (sales || []) as unknown as SaleWithItems[];
+
+      const monthlyMap = new Map<string, number>();
+
+      typedSales.forEach((sale) => {
+        const date = new Date(sale.sale_datetime);
+        if (Number.isNaN(date.getTime())) return;
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+        const units =
+          sale.sale_items?.reduce((sum, item) => {
+            const qty = Number(item.quantity ?? 0);
+            return sum + (qty || 0);
+          }, 0) ?? 0;
+        monthlyMap.set(key, (monthlyMap.get(key) || 0) + units);
+      });
+
+      const monthlyArray = Array.from(monthlyMap.entries())
+        .map(([month, count]) => ({ month, count }))
+        .sort((a, b) => a.month.localeCompare(b.month));
+
+      setTdcMonthlyData(monthlyArray);
+      toast.success("TDC Erhverv månedsoversigt opdateret");
+    } catch (error: any) {
+      console.error("Fejl ved hentning af TDC Erhverv månedsdata", error);
+      const message = error?.message || "Kunne ikke hente TDC Erhverv månedsdata";
+      setTdcMonthlyError(message);
+      toast.error(message);
+    } finally {
+      setTdcMonthlyLoading(false);
     }
   };
 
@@ -220,6 +302,59 @@ export default function Settings() {
                 {loading === "webhook" && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
                 Send Test Webhook
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="md:col-span-2 border-dashed border-primary/40 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <SettingsIcon className="h-5 w-5" />
+                  Debug: TDC Erhverv salg pr. måned
+                </span>
+                <Button size="sm" onClick={loadTdcMonthlyData} disabled={tdcMonthlyLoading}>
+                  {tdcMonthlyLoading && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+                  Opdater
+                </Button>
+              </CardTitle>
+              <CardDescription>
+                Viser samlet antal solgte produkter (sale_items.quantity) pr. måned for TDC Erhverv.
+                Oktober 2025 vil være nøglen <code>2025-10</code>.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {tdcMonthlyError && (
+                <p className="text-sm text-destructive">{tdcMonthlyError}</p>
+              )}
+              {!tdcMonthlyError && (!tdcMonthlyData || tdcMonthlyData.length === 0) && !tdcMonthlyLoading && (
+                <p className="text-sm text-muted-foreground">
+                  Ingen data endnu. Klik "Opdater" for at hente TDC Erhverv-salg.
+                </p>
+              )}
+              {tdcMonthlyData && tdcMonthlyData.length > 0 && (
+                <div className="rounded-md border bg-muted/40">
+                  <div className="grid grid-cols-2 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
+                    <span>Måned (ÅÅÅÅ-MM)</span>
+                    <span className="text-right">Antal salg (stk.)</span>
+                  </div>
+                  <div className="max-h-64 overflow-auto text-sm">
+                    {tdcMonthlyData.map((row) => {
+                      const isOctober2025 = row.month === "2025-10";
+                      return (
+                        <div
+                          key={row.month}
+                          className={`grid grid-cols-2 items-center px-3 py-1.5 border-b last:border-b-0 ${
+                            isOctober2025 ? "bg-primary/10 font-medium" : ""
+                          }`}
+                        >
+                          <span>{row.month}</span>
+                          <span className="text-right tabular-nums">{row.count.toLocaleString("da-DK")}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
