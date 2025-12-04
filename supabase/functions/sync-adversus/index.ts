@@ -611,7 +611,12 @@ Deno.serve(async (req) => {
             )
           }
 
-          const oppNumber = extractOppNumberFromObject(sale)
+          let oppNumber: string | null = null
+          try {
+            oppNumber = await fetchOppNumberForSale(sale, externalId)
+          } catch (err) {
+            console.warn(`Error while fetching OPP nr for TDC October sale ${externalId}:`, err)
+          }
 
           const { data: saleData, error: saleError } = await supabase
             .from('sales')
@@ -820,7 +825,12 @@ Deno.serve(async (req) => {
               }, { onConflict: 'adversus_campaign_id' })
           }
 
-          const oppNumber = extractOppNumberFromObject(sale)
+          let oppNumber: string | null = null
+          try {
+            oppNumber = await fetchOppNumberForSale(sale, externalId)
+          } catch (err) {
+            console.warn(`Error while fetching OPP nr for sale ${externalId}:`, err)
+          }
 
           const { data: saleData, error: saleError } = await supabase
             .from('sales')
@@ -1485,6 +1495,85 @@ Deno.serve(async (req) => {
       } catch (err) {
         console.warn(`Error fetching lead ${leadId}:`, err)
         leadCache.set(leadId, null)
+        return null
+      }
+    }
+
+    // Helper function to fetch OPP number ("OPP nr") for a sale via its lead/result data
+    async function fetchOppNumberForSale(sale: any, externalId: string): Promise<string | null> {
+      try {
+        if (!sale || !sale.leadId) {
+          console.log(`Sale ${externalId} has no leadId, skipping OPP nr lookup`)
+          return extractOppNumberFromObject(sale)
+        }
+
+        const lead = await fetchLead(sale.leadId, sale.campaignId)
+
+        if (!lead) {
+          console.log(`No lead data for sale ${externalId} (leadId ${sale.leadId}), falling back to sale object`)
+          return extractOppNumberFromObject(sale)
+        }
+
+        const leadAny = lead as any
+        const resultData = Array.isArray(leadAny.resultData) ? leadAny.resultData : []
+        const OPP_FIELD_ID = 80862
+
+        if (resultData.length > 0) {
+          // 1) Exact match on result field id 80862 ("OPP nr")
+          const byId = resultData.find(
+            (rd: any) => rd && rd.id === OPP_FIELD_ID && typeof rd.value === 'string' && rd.value.trim(),
+          )
+
+          if (byId) {
+            const value = (byId.value as string).trim()
+            console.log(
+              ` Found OPP nr for sale ${externalId} via resultData id ${OPP_FIELD_ID}: "${value}"`,
+            )
+            return value
+          }
+
+          // 2) Fallback: match on label containing "opp"
+          const byLabel = resultData.find(
+            (rd: any) =>
+              rd &&
+              typeof rd.label === 'string' &&
+              String(rd.label).toLowerCase().includes('opp') &&
+              typeof rd.value === 'string' &&
+              rd.value.trim(),
+          )
+
+          if (byLabel) {
+            const value = (byLabel.value as string).trim()
+            console.log(
+              ` Found OPP nr for sale ${externalId} via resultData label "${byLabel.label}": "${value}"`,
+            )
+            return value
+          }
+        } else {
+          console.log(`Lead ${sale.leadId} has no resultData, cannot extract OPP nr`)
+        }
+
+        // 3) Fallbacks: generic search in lead/sale objects
+        const fromLead = extractOppNumberFromObject(lead)
+        if (fromLead) {
+          console.log(
+            ` Found OPP nr for sale ${externalId} via generic search in lead: "${fromLead}"`,
+          )
+          return fromLead
+        }
+
+        const fromSale = extractOppNumberFromObject(sale)
+        if (fromSale) {
+          console.log(
+            ` Found OPP nr for sale ${externalId} via generic search in sale: "${fromSale}"`,
+          )
+          return fromSale
+        }
+
+        console.log(` Could not find OPP nr for sale ${externalId} (leadId ${sale.leadId})`)
+        return null
+      } catch (err) {
+        console.warn(`Error while extracting OPP nr for sale ${externalId}:`, err)
         return null
       }
     }
