@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface AdversusStats {
   eventsTotal: number;
@@ -60,12 +61,28 @@ export default function AdversusData() {
     },
   });
 
+  const { data: tdcImports, isLoading: tdcLoading, error: tdcError } = useQuery({
+    queryKey: ["tdc-ann-imports"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tdc_cancellation_imports")
+        .select("id, uploaded_at, uploaded_by, raw_data")
+        .order("uploaded_at", { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const processedPercentage = stats && stats.eventsTotal > 0
     ? Math.round((stats.eventsProcessed / stats.eventsTotal) * 100)
     : 0;
 
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+
+  const latestTdcImport = (tdcImports && tdcImports[0]) as any | undefined;
 
   return (
     <MainLayout>
@@ -174,146 +191,253 @@ export default function AdversusData() {
           </Card>
         </section>
 
-        {/* Seneste events */}
-        <section aria-label="Seneste Adversus events" className="space-y-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold">Seneste Adversus-events</h2>
-            <Badge variant="outline" className="text-xs">
-              {recentEvents?.length ?? 0} seneste events
-            </Badge>
-          </div>
-          <Card>
-            <CardContent className="pt-6">
-              {eventsLoading ? (
-                <p className="text-muted-foreground text-center py-8">Indlæser events...</p>
-              ) : eventsError ? (
-                <div className="flex items-center gap-2 text-destructive text-sm">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>Kunne ikke hente events.</span>
+        <Tabs defaultValue="adversus" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="adversus">Adversus CPH data</TabsTrigger>
+            <TabsTrigger value="tdc-ann">TDC annulleringer</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="adversus">
+            <section aria-label="Seneste Adversus events" className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">Seneste Adversus-events</h2>
+                <Badge variant="outline" className="text-xs">
+                  {recentEvents?.length ?? 0} seneste events
+                </Badge>
+              </div>
+              <Card>
+                <CardContent className="pt-6">
+                  {eventsLoading ? (
+                    <p className="text-muted-foreground text-center py-8">Indlæser events...</p>
+                  ) : eventsError ? (
+                    <div className="flex items-center gap-2 text-destructive text-sm">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Kunne ikke hente events.</span>
+                    </div>
+                  ) : !recentEvents || recentEvents.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">
+                      Der er endnu ikke modtaget nogen events fra Adversus.
+                    </p>
+                  ) : (
+                    <>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>ID</TableHead>
+                            <TableHead>External ID</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Modtaget</TableHead>
+                            <TableHead>Oprettet</TableHead>
+                            <TableHead className="text-right">Status</TableHead>
+                            <TableHead className="text-right">Detaljer</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {recentEvents.map((event: any) => (
+                            <TableRow key={event.id}>
+                              <TableCell className="font-mono text-xs">
+                                {String(event.id).slice(0, 8)}
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">
+                                {event.external_id || "-"}
+                              </TableCell>
+                              <TableCell>{event.event_type}</TableCell>
+                              <TableCell>
+                                {event.received_at
+                                  ? format(new Date(event.received_at), "dd.MM.yyyy HH:mm", { locale: da })
+                                  : "-"}
+                              </TableCell>
+                              <TableCell>
+                                {event.created_at
+                                  ? format(new Date(event.created_at), "dd.MM.yyyy HH:mm", { locale: da })
+                                  : "-"}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {event.processed ? (
+                                  <Badge className="bg-emerald-500 text-white hover:bg-emerald-500/90">
+                                    Processeret
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="border-amber-500 text-amber-600">
+                                    Afventer
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedEvent(event);
+                                    setDetailOpen(true);
+                                  }}
+                                  className="text-xs font-medium text-primary hover:underline"
+                                >
+                                  Vis alt
+                                </button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+
+                      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+                        <DialogContent className="max-w-3xl">
+                          <DialogHeader>
+                            <DialogTitle>Adversus event detaljer</DialogTitle>
+                          </DialogHeader>
+                          {selectedEvent && (
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <p className="text-muted-foreground">ID</p>
+                                  <p className="font-mono break-all text-xs">{selectedEvent.id}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">External ID</p>
+                                  <p className="font-mono break-all text-xs">{selectedEvent.external_id || "-"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Type</p>
+                                  <p>{selectedEvent.event_type}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Status</p>
+                                  <p>{selectedEvent.processed ? "Processeret" : "Afventer"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Modtaget</p>
+                                  <p>
+                                    {selectedEvent.received_at
+                                      ? format(new Date(selectedEvent.received_at), "dd.MM.yyyy HH:mm", {
+                                          locale: da,
+                                        })
+                                      : "-"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Oprettet</p>
+                                  <p>
+                                    {selectedEvent.created_at
+                                      ? format(new Date(selectedEvent.created_at), "dd.MM.yyyy HH:mm", {
+                                          locale: da,
+                                        })
+                                      : "-"}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div>
+                                <p className="text-sm font-medium mb-2">Payload (rå JSON fra Adversus)</p>
+                                <pre className="bg-muted rounded-md p-3 text-xs max-h-80 overflow-auto font-mono whitespace-pre-wrap break-all">
+                                  {JSON.stringify(selectedEvent.payload, null, 2)}
+                                </pre>
+                              </div>
+                            </div>
+                          )}
+                        </DialogContent>
+                      </Dialog>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </section>
+          </TabsContent>
+
+          <TabsContent value="tdc-ann">
+            <section aria-label="TDC annulleringer" className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-lg font-semibold">TDC annulleringer</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Overblik over Excel-importer til TDC annulleringer ("tdc ann") fra Indstillinger.
+                  </p>
                 </div>
-              ) : !recentEvents || recentEvents.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  Der er endnu ikke modtaget nogen events fra Adversus.
-                </p>
-              ) : (
-                <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>External ID</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Modtaget</TableHead>
-                        <TableHead>Oprettet</TableHead>
-                        <TableHead className="text-right">Status</TableHead>
-                        <TableHead className="text-right">Detaljer</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {recentEvents.map((event: any) => (
-                        <TableRow key={event.id}>
-                          <TableCell className="font-mono text-xs">
-                            {String(event.id).slice(0, 8)}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {event.external_id || "-"}
-                          </TableCell>
-                          <TableCell>{event.event_type}</TableCell>
-                          <TableCell>
-                            {event.received_at
-                              ? format(new Date(event.received_at), "dd.MM.yyyy HH:mm", { locale: da })
+                <Badge variant="outline" className="text-xs">
+                  {tdcImports?.length ?? 0} importer
+                </Badge>
+              </div>
+              <Card>
+                <CardContent className="pt-6 space-y-4">
+                  {tdcLoading ? (
+                    <p className="text-muted-foreground text-center py-8">Indlæser TDC ann-importer...</p>
+                  ) : tdcError ? (
+                    <div className="flex items-center gap-2 text-destructive text-sm">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Kunne ikke hente TDC ann-importer.</span>
+                    </div>
+                  ) : !tdcImports || tdcImports.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">
+                      Der er endnu ikke uploadet nogen TDC ann Excel-filer. Gå til Indstillinger &rarr; TDC annulleringer
+                      for at uploade den nyeste fil.
+                    </p>
+                  ) : (
+                    <>
+                      {latestTdcImport && (
+                        <div className="rounded-md border bg-muted/40 p-3 text-sm flex flex-col gap-1">
+                          <p className="font-medium">Seneste import</p>
+                          <p>
+                            Dato:{" "}
+                            {latestTdcImport.uploaded_at
+                              ? format(new Date(latestTdcImport.uploaded_at), "dd.MM.yyyy HH:mm", { locale: da })
                               : "-"}
-                          </TableCell>
-                          <TableCell>
-                            {event.created_at
-                              ? format(new Date(event.created_at), "dd.MM.yyyy HH:mm", { locale: da })
+                          </p>
+                          <p>
+                            Filnavn:{" "}
+                            {latestTdcImport.raw_data?.filename ??
+                              latestTdcImport.raw_data?.originalName ??
+                              "tdc ann (ukendt navn)"}
+                          </p>
+                          <p>
+                            Størrelse:{" "}
+                            {latestTdcImport.raw_data?.size
+                              ? `${Math.round(latestTdcImport.raw_data.size / 1024)} kB`
                               : "-"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {event.processed ? (
-                              <Badge className="bg-emerald-500 text-white hover:bg-emerald-500/90">
-                                Processeret
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="border-amber-500 text-amber-600">
-                                Afventer
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedEvent(event);
-                                setDetailOpen(true);
-                              }}
-                              className="text-xs font-medium text-primary hover:underline"
-                            >
-                              Vis alt
-                            </button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-
-                  <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-                    <DialogContent className="max-w-3xl">
-                      <DialogHeader>
-                        <DialogTitle>Adversus event detaljer</DialogTitle>
-                      </DialogHeader>
-                      {selectedEvent && (
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="text-muted-foreground">ID</p>
-                              <p className="font-mono break-all text-xs">{selectedEvent.id}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">External ID</p>
-                              <p className="font-mono break-all text-xs">{selectedEvent.external_id || "-"}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Type</p>
-                              <p>{selectedEvent.event_type}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Status</p>
-                              <p>{selectedEvent.processed ? "Processeret" : "Afventer"}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Modtaget</p>
-                              <p>
-                                {selectedEvent.received_at
-                                  ? format(new Date(selectedEvent.received_at), "dd.MM.yyyy HH:mm", { locale: da })
-                                  : "-"}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Oprettet</p>
-                              <p>
-                                {selectedEvent.created_at
-                                  ? format(new Date(selectedEvent.created_at), "dd.MM.yyyy HH:mm", { locale: da })
-                                  : "-"}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div>
-                            <p className="text-sm font-medium mb-2">Payload (rå JSON fra Adversus)</p>
-                            <pre className="bg-muted rounded-md p-3 text-xs max-h-80 overflow-auto font-mono whitespace-pre-wrap break-all">
-                              {JSON.stringify(selectedEvent.payload, null, 2)}
-                            </pre>
-                          </div>
+                          </p>
                         </div>
                       )}
-                    </DialogContent>
-                  </Dialog>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </section>
+
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Alle importer</p>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Dato</TableHead>
+                              <TableHead>Filnavn</TableHead>
+                              <TableHead>Størrelse</TableHead>
+                              <TableHead>Uploadet af (id)</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {tdcImports.map((imp: any) => (
+                              <TableRow key={imp.id}>
+                                <TableCell>
+                                  {imp.uploaded_at
+                                    ? format(new Date(imp.uploaded_at), "dd.MM.yyyy HH:mm", { locale: da })
+                                    : "-"}
+                                </TableCell>
+                                <TableCell className="font-mono text-xs">
+                                  {imp.raw_data?.filename ?? imp.raw_data?.originalName ?? "tdc ann"}
+                                </TableCell>
+                                <TableCell>
+                                  {imp.raw_data?.size
+                                    ? `${Math.round(imp.raw_data.size / 1024)} kB`
+                                    : "-"}
+                                </TableCell>
+                                <TableCell className="font-mono text-xs">
+                                  {imp.uploaded_by ? String(imp.uploaded_by).slice(0, 8) : "-"}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </section>
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );
