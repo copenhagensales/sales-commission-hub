@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { ChevronUp, ChevronDown, Trash2, Plus, Calendar, Car, AlertTriangle, Users, FileText, X } from "lucide-react";
-import { format, startOfWeek, addDays, getWeek, getYear } from "date-fns";
+import { format, startOfWeek, addDays, addWeeks, getWeek, getYear, startOfYear } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -56,7 +56,9 @@ export default function VagtBookings() {
   const [addEmployeeDialogBooking, setAddEmployeeDialogBooking] = useState<any>(null);
   const [addVehicleDialogBooking, setAddVehicleDialogBooking] = useState<any>(null);
 
-  const weekStart = startOfWeek(new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7), { weekStartsOn: 1 });
+  // Calculate week start correctly: find the first week of the year and add weeks
+  const firstWeekStart = startOfWeek(startOfYear(new Date(selectedYear, 0, 4)), { weekStartsOn: 1 });
+  const weekStart = addWeeks(firstWeekStart, selectedWeek - 1);
   const DAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
 
   const { data: bookings, isLoading } = useQuery({
