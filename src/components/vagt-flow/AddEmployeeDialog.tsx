@@ -143,14 +143,14 @@ export function AddEmployeeDialog({
                   value={emp || undefined}
                   onValueChange={(value) => updateEmployee(index, value)}
                 >
-                  <SelectTrigger className="flex-1">
+                  <SelectTrigger className="flex-1 bg-background text-foreground">
                     <SelectValue placeholder={`Medarbejder ${index + 1} (valgfri)`} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-popover">
                     {employees
                       .filter(e => !selectedEmployees.includes(e.id) || e.id === emp)
                       .map((employee) => (
-                        <SelectItem key={employee.id} value={employee.id}>
+                        <SelectItem key={employee.id} value={employee.id} className="text-popover-foreground">
                           {employee.full_name}
                         </SelectItem>
                       ))}
@@ -184,14 +184,14 @@ export function AddEmployeeDialog({
                   );
                 }}
               >
-                <SelectTrigger className="border-dashed">
+                <SelectTrigger className="border-dashed bg-background text-foreground">
                   <SelectValue placeholder={`Medarbejder ${selectedEmployees.length + 1} (valgfri)`} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-popover">
                   {employees
                     .filter(e => !selectedEmployees.includes(e.id))
                     .map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id}>
+                      <SelectItem key={employee.id} value={employee.id} className="text-popover-foreground">
                         {employee.full_name}
                       </SelectItem>
                     ))}
