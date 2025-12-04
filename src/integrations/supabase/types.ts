@@ -588,6 +588,44 @@ export type Database = {
           },
         ]
       }
+      employee_identity: {
+        Row: {
+          created_at: string | null
+          id: string
+          master_employee_id: string
+          source: string
+          source_email: string | null
+          source_employee_id: string
+          source_name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          master_employee_id: string
+          source: string
+          source_email?: string | null
+          source_employee_id: string
+          source_name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          master_employee_id?: string
+          source?: string
+          source_email?: string | null
+          source_employee_id?: string
+          source_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_identity_master_employee_id_fkey"
+            columns: ["master_employee_id"]
+            isOneToOne: false
+            referencedRelation: "master_employee"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fixed_costs: {
         Row: {
           active: boolean | null
@@ -692,6 +730,36 @@ export type Database = {
           region?: string | null
           status?: Database["public"]["Enums"]["location_status"] | null
           type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      master_employee: {
+        Row: {
+          created_at: string | null
+          full_name: string | null
+          id: string
+          is_active: boolean | null
+          phone: string | null
+          primary_email: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          full_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          primary_email?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          full_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          phone?: string | null
+          primary_email?: string | null
           updated_at?: string | null
         }
         Relationships: []
