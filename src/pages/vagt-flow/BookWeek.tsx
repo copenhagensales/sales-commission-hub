@@ -453,6 +453,24 @@ export default function VagtBookWeek() {
             <DialogTitle>Book {selectedLocation?.name}</DialogTitle>
           </DialogHeader>
           <div className="py-4">
+            {/* Location stamdata */}
+            <div className="mb-4 p-3 bg-muted rounded-lg space-y-1 text-sm">
+              {selectedLocation?.address_city && (
+                <p className="text-muted-foreground">{selectedLocation.address_city}</p>
+              )}
+              {selectedLocation?.contact_person_name && (
+                <p className="text-muted-foreground">Kontakt: {selectedLocation.contact_person_name}</p>
+              )}
+              {selectedLocation?.contact_phone && (
+                <a
+                  href={`tel:${selectedLocation.contact_phone}`}
+                  className="flex items-center gap-2 text-primary hover:underline"
+                >
+                  <Phone className="h-4 w-4" />
+                  {selectedLocation.contact_phone}
+                </a>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground mb-4">
               Uge {selectedWeek}, {selectedYear}
             </p>
