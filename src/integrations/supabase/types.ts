@@ -1172,6 +1172,7 @@ export type Database = {
         Returns: boolean
       }
       is_manager_or_above: { Args: { _user_id: string }; Returns: boolean }
+      is_vagt_admin_or_planner: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       absence_type: "sick" | "vacation" | "other"
