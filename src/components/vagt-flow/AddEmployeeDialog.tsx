@@ -140,11 +140,11 @@ export function AddEmployeeDialog({
             {selectedEmployees.map((emp, index) => (
               <div key={index} className="flex items-center gap-2">
                 <Select
-                  value={emp || undefined}
+                  value={emp || ""}
                   onValueChange={(value) => updateEmployee(index, value)}
                 >
                   <SelectTrigger className="flex-1 bg-background text-foreground">
-                    <SelectValue placeholder={`Medarbejder ${index + 1} (valgfri)`} />
+                    <SelectValue placeholder={`Medarbejder ${index + 1}`} />
                   </SelectTrigger>
                   <SelectContent className="bg-popover">
                     {employees
@@ -156,7 +156,7 @@ export function AddEmployeeDialog({
                       ))}
                   </SelectContent>
                 </Select>
-                {index > 0 && (
+                {selectedEmployees.length > 1 && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -170,33 +170,14 @@ export function AddEmployeeDialog({
             ))}
             
             {selectedEmployees.length < employees.length && (
-              <Select
-                value=""
-                onValueChange={(value) => {
-                  if (selectedEmployees[selectedEmployees.length - 1] !== null) {
-                    addEmployeeSlot();
-                  }
-                  updateEmployee(
-                    selectedEmployees[selectedEmployees.length - 1] === null 
-                      ? selectedEmployees.length - 1 
-                      : selectedEmployees.length, 
-                    value
-                  );
-                }}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addEmployeeSlot}
+                className="w-full border-dashed"
               >
-                <SelectTrigger className="border-dashed bg-background text-foreground">
-                  <SelectValue placeholder={`Medarbejder ${selectedEmployees.length + 1} (valgfri)`} />
-                </SelectTrigger>
-                <SelectContent className="bg-popover">
-                  {employees
-                    .filter(e => !selectedEmployees.includes(e.id))
-                    .map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id} className="text-popover-foreground">
-                        {employee.full_name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+                + Tilføj medarbejder
+              </Button>
             )}
           </div>
 
