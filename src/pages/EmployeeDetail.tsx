@@ -1,13 +1,18 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Pencil, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
 
 interface EmployeeMasterDataRecord {
   id: string;
@@ -46,18 +51,183 @@ interface EmployeeMasterDataRecord {
   updated_at: string;
 }
 
-function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
+interface EditableFieldProps {
+  label: string;
+  value: string | number | null | undefined;
+  field: keyof EmployeeMasterDataRecord;
+  type?: "text" | "date" | "number" | "time" | "email" | "password";
+  onSave: (field: string, value: string | number | null) => void;
+  displayValue?: string | null;
+}
+
+function EditableField({ label, value, field, type = "text", onSave, displayValue }: EditableFieldProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(String(value || ""));
+
+  const handleSave = () => {
+    let finalValue: string | number | null = editValue || null;
+    if (type === "number" && editValue) {
+      finalValue = parseFloat(editValue);
+    }
+    onSave(field, finalValue);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditValue(String(value || ""));
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleSave();
+    if (e.key === "Escape") handleCancel();
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex justify-between items-center py-2 border-b border-border last:border-0 gap-2">
+        <span className="text-muted-foreground shrink-0">{label}</span>
+        <div className="flex items-center gap-1">
+          <Input
+            type={type}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="h-7 w-40 text-right"
+            autoFocus
+          />
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave}>
+            <Check className="h-3 w-3 text-green-600" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCancel}>
+            <X className="h-3 w-3 text-destructive" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex justify-between py-2 border-b border-border last:border-0">
+    <div 
+      className="flex justify-between py-2 border-b border-border last:border-0 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 transition-colors"
+      onClick={() => setIsEditing(true)}
+    >
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">{value || "-"}</span>
+      <span className="font-medium">{displayValue ?? value ?? "-"}</span>
     </div>
   );
 }
 
-function MaskedField({ label, value }: { label: string; value: string | null }) {
+interface EditableSelectProps {
+  label: string;
+  value: string | null;
+  field: keyof EmployeeMasterDataRecord;
+  options: { value: string; label: string }[];
+  onSave: (field: string, value: string | null) => void;
+  displayValue?: string | null;
+}
+
+function EditableSelect({ label, value, field, options, onSave, displayValue }: EditableSelectProps) {
+  const [isEditing, setIsEditing] = useState(false);
+
+  const handleChange = (newValue: string) => {
+    onSave(field, newValue);
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex justify-between items-center py-2 border-b border-border last:border-0 gap-2">
+        <span className="text-muted-foreground shrink-0">{label}</span>
+        <div className="flex items-center gap-1">
+          <Select value={value || ""} onValueChange={handleChange}>
+            <SelectTrigger className="h-7 w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {options.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsEditing(false)}>
+            <X className="h-3 w-3 text-destructive" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex justify-between py-2 border-b border-border last:border-0">
+    <div 
+      className="flex justify-between py-2 border-b border-border last:border-0 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 transition-colors"
+      onClick={() => setIsEditing(true)}
+    >
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">{displayValue ?? "-"}</span>
+    </div>
+  );
+}
+
+interface EditableSwitchProps {
+  label: string;
+  value: boolean;
+  field: keyof EmployeeMasterDataRecord;
+  onSave: (field: string, value: boolean) => void;
+}
+
+function EditableSwitch({ label, value, field, onSave }: EditableSwitchProps) {
+  return (
+    <div className="flex justify-between items-center py-2 border-b border-border last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <Switch checked={value} onCheckedChange={(checked) => onSave(field, checked)} />
+    </div>
+  );
+}
+
+function MaskedField({ label, value, field, onSave }: { label: string; value: string | null; field: keyof EmployeeMasterDataRecord; onSave: (field: string, value: string | null) => void }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(value || "");
+
+  const handleSave = () => {
+    onSave(field, editValue || null);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditValue(value || "");
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex justify-between items-center py-2 border-b border-border last:border-0 gap-2">
+        <span className="text-muted-foreground shrink-0">{label}</span>
+        <div className="flex items-center gap-1">
+          <Input
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancel(); }}
+            className="h-7 w-40 text-right"
+            autoFocus
+          />
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave}>
+            <Check className="h-3 w-3 text-green-600" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCancel}>
+            <X className="h-3 w-3 text-destructive" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className="flex justify-between py-2 border-b border-border last:border-0 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 transition-colors"
+      onClick={() => setIsEditing(true)}
+    >
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">{value ? "••••••••" : "-"}</span>
     </div>
@@ -67,6 +237,8 @@ function MaskedField({ label, value }: { label: string; value: string | null }) 
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: employee, isLoading, error } = useQuery({
     queryKey: ["employee-detail", id],
@@ -97,6 +269,29 @@ export default function EmployeeDetail() {
     },
     enabled: !!employee?.manager_id,
   });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ field, value }: { field: string; value: unknown }) => {
+      if (!id) throw new Error("No ID");
+      const { error } = await supabase
+        .from("employee_master_data")
+        .update({ [field]: value })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+      toast({ title: "Gemt" });
+    },
+    onError: (error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSave = (field: string, value: unknown) => {
+    updateMutation.mutate({ field, value });
+  };
 
   const formatDate = (date: string | null) => {
     if (!date) return null;
@@ -167,9 +362,6 @@ export default function EmployeeDetail() {
               </div>
             </div>
           </div>
-          <Button onClick={() => navigate(`/employees?edit=${employee.id}`)}>
-            <Pencil className="mr-2 h-4 w-4" /> Rediger
-          </Button>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -180,9 +372,9 @@ export default function EmployeeDetail() {
               <CardTitle>Identitet</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-              <DetailRow label="Fornavn(e)" value={employee.first_name} />
-              <DetailRow label="Efternavn" value={employee.last_name} />
-              <MaskedField label="CPR-nr." value={employee.cpr_number} />
+              <EditableField label="Fornavn(e)" value={employee.first_name} field="first_name" onSave={handleSave} />
+              <EditableField label="Efternavn" value={employee.last_name} field="last_name" onSave={handleSave} />
+              <MaskedField label="CPR-nr." value={employee.cpr_number} field="cpr_number" onSave={handleSave} />
             </CardContent>
           </Card>
 
@@ -193,12 +385,12 @@ export default function EmployeeDetail() {
               <CardTitle>Kontakt</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-              <DetailRow label="Adresse" value={employee.address_street} />
-              <DetailRow label="Postnummer" value={employee.address_postal_code} />
-              <DetailRow label="By" value={employee.address_city} />
-              <DetailRow label="Land" value={employee.address_country} />
-              <DetailRow label="Telefon" value={employee.private_phone} />
-              <DetailRow label="E-mail" value={employee.private_email} />
+              <EditableField label="Adresse" value={employee.address_street} field="address_street" onSave={handleSave} />
+              <EditableField label="Postnummer" value={employee.address_postal_code} field="address_postal_code" onSave={handleSave} />
+              <EditableField label="By" value={employee.address_city} field="address_city" onSave={handleSave} />
+              <EditableField label="Land" value={employee.address_country} field="address_country" onSave={handleSave} />
+              <EditableField label="Telefon" value={employee.private_phone} field="private_phone" onSave={handleSave} />
+              <EditableField label="E-mail" value={employee.private_email} field="private_email" type="email" onSave={handleSave} />
             </CardContent>
           </Card>
 
@@ -209,14 +401,18 @@ export default function EmployeeDetail() {
               <CardTitle>Ansættelse</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-              <DetailRow label="Ansættelsesdato" value={formatDate(employee.employment_start_date)} />
-              <DetailRow label="Slutdato" value={formatDate(employee.employment_end_date)} />
-              <DetailRow label="Stilling" value={employee.job_title} />
-              <DetailRow label="Afdeling / Team" value={employee.department} />
-              <DetailRow label="Arbejdssted" value={employee.work_location} />
-              <DetailRow label="Leder" value={manager ? `${manager.first_name} ${manager.last_name}` : null} />
-              <DetailRow label="Kontrakt-ID" value={employee.contract_id} />
-              <DetailRow label="Kontrakt version" value={employee.contract_version} />
+              <EditableField label="Ansættelsesdato" value={employee.employment_start_date} field="employment_start_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_start_date)} />
+              <EditableField label="Slutdato" value={employee.employment_end_date} field="employment_end_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_end_date)} />
+              <EditableField label="Stilling" value={employee.job_title} field="job_title" onSave={handleSave} />
+              <EditableField label="Afdeling / Team" value={employee.department} field="department" onSave={handleSave} />
+              <EditableField label="Arbejdssted" value={employee.work_location} field="work_location" onSave={handleSave} />
+              <div className="flex justify-between py-2 border-b border-border last:border-0">
+                <span className="text-muted-foreground">Leder</span>
+                <span className="font-medium">{manager ? `${manager.first_name} ${manager.last_name}` : "-"}</span>
+              </div>
+              <EditableField label="Kontrakt-ID" value={employee.contract_id} field="contract_id" onSave={handleSave} />
+              <EditableField label="Kontrakt version" value={employee.contract_version} field="contract_version" onSave={handleSave} />
+              <EditableSwitch label="Aktiv medarbejder" value={employee.is_active} field="is_active" onSave={handleSave} />
             </CardContent>
           </Card>
 
@@ -227,12 +423,30 @@ export default function EmployeeDetail() {
               <CardTitle>Løn</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-              <DetailRow label="Løntype" value={getSalaryTypeLabel(employee.salary_type)} />
+              <EditableSelect
+                label="Løntype"
+                value={employee.salary_type}
+                field="salary_type"
+                options={[
+                  { value: "provision", label: "Provision" },
+                  { value: "fixed", label: "Fast løn" },
+                  { value: "hourly", label: "Timeløn" },
+                ]}
+                onSave={handleSave}
+                displayValue={getSalaryTypeLabel(employee.salary_type)}
+              />
               {(employee.salary_type === "fixed" || employee.salary_type === "hourly") && (
-                <DetailRow label="Beløb" value={employee.salary_amount ? `${employee.salary_amount.toLocaleString("da-DK")} DKK` : null} />
+                <EditableField 
+                  label="Beløb (DKK)" 
+                  value={employee.salary_amount} 
+                  field="salary_amount" 
+                  type="number" 
+                  onSave={handleSave} 
+                  displayValue={employee.salary_amount ? `${employee.salary_amount.toLocaleString("da-DK")} DKK` : null}
+                />
               )}
-              <MaskedField label="Reg.nr." value={employee.bank_reg_number} />
-              <MaskedField label="Kontonummer" value={employee.bank_account_number} />
+              <MaskedField label="Reg.nr." value={employee.bank_reg_number} field="bank_reg_number" onSave={handleSave} />
+              <MaskedField label="Kontonummer" value={employee.bank_account_number} field="bank_account_number" onSave={handleSave} />
             </CardContent>
           </Card>
 
@@ -243,9 +457,26 @@ export default function EmployeeDetail() {
               <CardTitle>Ferie</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-              <DetailRow label="Ferietype" value={getVacationTypeLabel(employee.vacation_type)} />
+              <EditableSelect
+                label="Ferietype"
+                value={employee.vacation_type}
+                field="vacation_type"
+                options={[
+                  { value: "vacation_pay", label: "Ferieløn" },
+                  { value: "vacation_bonus", label: "Feriebonus" },
+                ]}
+                onSave={handleSave}
+                displayValue={getVacationTypeLabel(employee.vacation_type)}
+              />
               {employee.vacation_type === "vacation_bonus" && (
-                <DetailRow label="Feriebonus" value={`${employee.vacation_bonus_percent}%`} />
+                <EditableField 
+                  label="Feriebonus %" 
+                  value={employee.vacation_bonus_percent} 
+                  field="vacation_bonus_percent" 
+                  type="number" 
+                  onSave={handleSave} 
+                  displayValue={employee.vacation_bonus_percent ? `${employee.vacation_bonus_percent}%` : null}
+                />
               )}
             </CardContent>
           </Card>
@@ -257,11 +488,18 @@ export default function EmployeeDetail() {
               <CardTitle>Parkering</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-              <DetailRow label="Parkeringsplads" value={employee.has_parking ? "Ja" : "Nej"} />
+              <EditableSwitch label="Parkeringsplads" value={employee.has_parking} field="has_parking" onSave={handleSave} />
               {employee.has_parking && (
                 <>
-                  <DetailRow label="Plads-ID" value={employee.parking_spot_id} />
-                  <DetailRow label="Månedlig pris" value={employee.parking_monthly_cost ? `${employee.parking_monthly_cost.toLocaleString("da-DK")} DKK` : null} />
+                  <EditableField label="Plads-ID" value={employee.parking_spot_id} field="parking_spot_id" onSave={handleSave} />
+                  <EditableField 
+                    label="Månedlig pris (DKK)" 
+                    value={employee.parking_monthly_cost} 
+                    field="parking_monthly_cost" 
+                    type="number" 
+                    onSave={handleSave}
+                    displayValue={employee.parking_monthly_cost ? `${employee.parking_monthly_cost.toLocaleString("da-DK")} DKK` : null}
+                  />
                 </>
               )}
             </CardContent>
@@ -274,9 +512,9 @@ export default function EmployeeDetail() {
               <CardTitle>Arbejdstid</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-              <DetailRow label="Model" value={employee.working_hours_model} />
-              <DetailRow label="Timer pr. uge" value={employee.weekly_hours} />
-              <DetailRow label="Mødetid" value={employee.standard_start_time} />
+              <EditableField label="Model" value={employee.working_hours_model} field="working_hours_model" onSave={handleSave} />
+              <EditableField label="Timer pr. uge" value={employee.weekly_hours} field="weekly_hours" type="number" onSave={handleSave} />
+              <EditableField label="Mødetid" value={employee.standard_start_time} field="standard_start_time" type="time" onSave={handleSave} />
             </CardContent>
           </Card>
         </div>
