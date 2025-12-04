@@ -702,9 +702,10 @@ export default function VagtEmployees() {
                 <div className="flex justify-center gap-2">
                   {(() => {
                     const dialogWeekStart = startOfWeek(absenceWeekDate, { weekStartsOn: 1 });
+                    const selectedDays = absenceForm.selectedDays || [];
                     return DAY_LABELS.map((label, idx) => {
                       const date = addDays(dialogWeekStart, idx);
-                      const isSelected = absenceForm.selectedDays.includes(idx);
+                      const isSelected = selectedDays.includes(idx);
                       return (
                         <button
                           key={idx}
@@ -713,12 +714,12 @@ export default function VagtEmployees() {
                             if (isSelected) {
                               setAbsenceForm({
                                 ...absenceForm,
-                                selectedDays: absenceForm.selectedDays.filter(d => d !== idx),
+                                selectedDays: selectedDays.filter(d => d !== idx),
                               });
                             } else {
                               setAbsenceForm({
                                 ...absenceForm,
-                                selectedDays: [...absenceForm.selectedDays, idx].sort(),
+                                selectedDays: [...selectedDays, idx].sort(),
                               });
                             }
                           }}
@@ -746,9 +747,9 @@ export default function VagtEmployees() {
                 </div>
 
                 {/* Selected days summary */}
-                {absenceForm.selectedDays.length > 0 && (
+                {(absenceForm.selectedDays || []).length > 0 && (
                   <p className="text-sm text-center text-muted-foreground mt-3">
-                    Valgte dage: {absenceForm.selectedDays.map(idx => {
+                    Valgte dage: {(absenceForm.selectedDays || []).map(idx => {
                       const dayNames = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"];
                       return dayNames[idx];
                     }).join(", ")}
@@ -791,13 +792,13 @@ export default function VagtEmployees() {
                 const dialogWeekStart = startOfWeek(absenceWeekDate, { weekStartsOn: 1 });
                 addAbsenceMutation.mutate({
                   employee_id: showAbsenceDialog?.id,
-                  selectedDays: absenceForm.selectedDays,
+                  selectedDays: absenceForm.selectedDays || [],
                   reason: absenceForm.reason,
                   note: absenceForm.note,
                   weekStart: dialogWeekStart,
                 });
               }}
-              disabled={absenceForm.selectedDays.length === 0 || addAbsenceMutation.isPending}
+              disabled={(absenceForm.selectedDays || []).length === 0 || addAbsenceMutation.isPending}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               Opret fravær
