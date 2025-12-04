@@ -457,6 +457,13 @@ export default function Payroll() {
     setSelectedClientId(clients[0]?.id);
   }, [clients, selectedClientId]);
 
+  const openSaleDetails = (saleId: string) => {
+    const sale = (searchableSales || []).find((s) => s.id === saleId);
+    if (sale) {
+      setSelectedSale(sale);
+    }
+  };
+
   const filteredSales = (searchableSales || []).filter((sale) => {
     if (!searchTerm.trim()) return false;
     const term = searchTerm.toLowerCase();
@@ -675,7 +682,11 @@ export default function Payroll() {
                     </TableHeader>
                     <TableBody>
                       {cancellations.matches.map((m) => (
-                        <TableRow key={m.saleId + m.externalId}>
+                        <TableRow
+                          key={m.saleId + m.externalId}
+                          className="cursor-pointer hover:bg-accent/40"
+                          onClick={() => openSaleDetails(m.saleId)}
+                        >
                           <TableCell className="font-mono text-xs">{m.externalId}</TableCell>
                           <TableCell>
                             {m.saleDate ? format(new Date(m.saleDate), "dd.MM.yyyy") : "-"}
