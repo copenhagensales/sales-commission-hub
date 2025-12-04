@@ -626,6 +626,132 @@ export type Database = {
           },
         ]
       }
+      employee_master_data: {
+        Row: {
+          address_city: string | null
+          address_country: string | null
+          address_postal_code: string | null
+          address_street: string | null
+          bank_account_number: string | null
+          bank_reg_number: string | null
+          contract_id: string | null
+          contract_version: string | null
+          cpr_number: string | null
+          created_at: string | null
+          department: string | null
+          employment_end_date: string | null
+          employment_start_date: string | null
+          first_name: string
+          has_parking: boolean | null
+          id: string
+          is_active: boolean | null
+          job_title: string | null
+          last_name: string
+          manager_id: string | null
+          parking_monthly_cost: number | null
+          parking_spot_id: string | null
+          private_email: string | null
+          private_phone: string | null
+          salary_amount: number | null
+          salary_type: Database["public"]["Enums"]["salary_type"] | null
+          standard_start_time: string | null
+          system_role_id: string | null
+          updated_at: string | null
+          vacation_bonus_percent: number | null
+          vacation_type: Database["public"]["Enums"]["vacation_type"] | null
+          weekly_hours: number | null
+          work_location: string | null
+          working_hours_model: string | null
+        }
+        Insert: {
+          address_city?: string | null
+          address_country?: string | null
+          address_postal_code?: string | null
+          address_street?: string | null
+          bank_account_number?: string | null
+          bank_reg_number?: string | null
+          contract_id?: string | null
+          contract_version?: string | null
+          cpr_number?: string | null
+          created_at?: string | null
+          department?: string | null
+          employment_end_date?: string | null
+          employment_start_date?: string | null
+          first_name: string
+          has_parking?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          job_title?: string | null
+          last_name: string
+          manager_id?: string | null
+          parking_monthly_cost?: number | null
+          parking_spot_id?: string | null
+          private_email?: string | null
+          private_phone?: string | null
+          salary_amount?: number | null
+          salary_type?: Database["public"]["Enums"]["salary_type"] | null
+          standard_start_time?: string | null
+          system_role_id?: string | null
+          updated_at?: string | null
+          vacation_bonus_percent?: number | null
+          vacation_type?: Database["public"]["Enums"]["vacation_type"] | null
+          weekly_hours?: number | null
+          work_location?: string | null
+          working_hours_model?: string | null
+        }
+        Update: {
+          address_city?: string | null
+          address_country?: string | null
+          address_postal_code?: string | null
+          address_street?: string | null
+          bank_account_number?: string | null
+          bank_reg_number?: string | null
+          contract_id?: string | null
+          contract_version?: string | null
+          cpr_number?: string | null
+          created_at?: string | null
+          department?: string | null
+          employment_end_date?: string | null
+          employment_start_date?: string | null
+          first_name?: string
+          has_parking?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          job_title?: string | null
+          last_name?: string
+          manager_id?: string | null
+          parking_monthly_cost?: number | null
+          parking_spot_id?: string | null
+          private_email?: string | null
+          private_phone?: string | null
+          salary_amount?: number | null
+          salary_type?: Database["public"]["Enums"]["salary_type"] | null
+          standard_start_time?: string | null
+          system_role_id?: string | null
+          updated_at?: string | null
+          vacation_bonus_percent?: number | null
+          vacation_type?: Database["public"]["Enums"]["vacation_type"] | null
+          weekly_hours?: number | null
+          work_location?: string | null
+          working_hours_model?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_master_data_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_master_data_system_role_id_fkey"
+            columns: ["system_role_id"]
+            isOneToOne: false
+            referencedRelation: "user_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fixed_costs: {
         Row: {
           active: boolean | null
@@ -1258,12 +1384,14 @@ export type Database = {
       employment_type: "hourly" | "monthly"
       location_status: "Ny" | "Aktiv" | "Pause" | "Sortlistet"
       payroll_status: "draft" | "approved" | "exported"
+      salary_type: "provision" | "fixed" | "hourly"
       sale_status: "pending" | "active" | "cancelled" | "clawbacked"
       sms_type:
         | "new_shift"
         | "updated_shift"
         | "deleted_shift"
         | "week_confirmation"
+      vacation_type: "vacation_pay" | "vacation_bonus"
       vagt_absence_reason: "Ferie" | "Syg" | "Barn syg" | "Andet"
       vagt_flow_role: "admin" | "planner" | "employee" | "brand_viewer"
     }
@@ -1402,6 +1530,7 @@ export const Constants = {
       employment_type: ["hourly", "monthly"],
       location_status: ["Ny", "Aktiv", "Pause", "Sortlistet"],
       payroll_status: ["draft", "approved", "exported"],
+      salary_type: ["provision", "fixed", "hourly"],
       sale_status: ["pending", "active", "cancelled", "clawbacked"],
       sms_type: [
         "new_shift",
@@ -1409,6 +1538,7 @@ export const Constants = {
         "deleted_shift",
         "week_confirmation",
       ],
+      vacation_type: ["vacation_pay", "vacation_bonus"],
       vagt_absence_reason: ["Ferie", "Syg", "Barn syg", "Andet"],
       vagt_flow_role: ["admin", "planner", "employee", "brand_viewer"],
     },
