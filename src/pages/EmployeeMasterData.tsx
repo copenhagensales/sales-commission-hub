@@ -112,6 +112,26 @@ export default function EmployeeMasterData() {
     },
   });
 
+  const { data: invitations = [] } = useQuery({
+    queryKey: ["employee-invitations"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_invitations")
+        .select("employee_id, status, expires_at")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const getInvitationStatus = (employeeId: string) => {
+    const invitation = invitations.find(inv => inv.employee_id === employeeId);
+    if (!invitation) return null;
+    if (invitation.status === "completed") return "completed";
+    if (new Date(invitation.expires_at) < new Date()) return "expired";
+    return "pending";
+  };
+
   const saveMutation = useMutation({
     mutationFn: async (employee: NewEmployee & { id?: string }) => {
       if (employee.id) {
@@ -565,6 +585,7 @@ export default function EmployeeMasterData() {
                     <TableHead>Afdeling</TableHead>
                     <TableHead>Stilling</TableHead>
                     <TableHead>Løntype</TableHead>
+                    <TableHead>Invitation</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
@@ -588,6 +609,15 @@ export default function EmployeeMasterData() {
                         {employee.salary_type === "fixed" && "Fast løn"}
                         {employee.salary_type === "hourly" && "Timeløn"}
                         {!employee.salary_type && "-"}
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const status = getInvitationStatus(employee.id);
+                          if (!status) return <span className="text-muted-foreground text-sm">-</span>;
+                          if (status === "completed") return <Badge variant="default" className="bg-green-500">Udfyldt</Badge>;
+                          if (status === "expired") return <Badge variant="destructive">Udløbet</Badge>;
+                          return <Badge variant="secondary">Afventer</Badge>;
+                        })()}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <Switch 
@@ -642,7 +672,7 @@ export default function EmployeeMasterData() {
                   ))}
                   {filteredEmployees.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center text-muted-foreground">
                         Ingen medarbejdere fundet
                       </TableCell>
                     </TableRow>
