@@ -7,9 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { CalendarIcon, Wallet } from "lucide-react";
+import { CalendarIcon, Wallet, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import * as XLSX from "xlsx";
 
 interface ClientRow {
   id: string;
@@ -46,6 +48,25 @@ const emptySummary: PayrollSummary = {
   totalRevenue: 0,
   totalCommission: 0,
   perAgent: [],
+};
+
+interface CancellationMatch {
+  saleId: string;
+  externalId: string;
+  saleDate: string;
+  agentName: string | null;
+  cancellationDate?: string;
+  cancellationStatus?: string;
+}
+
+interface CancellationSummary {
+  totalCancelled: number;
+  matches: CancellationMatch[];
+}
+
+const emptyCancellations: CancellationSummary = {
+  totalCancelled: 0,
+  matches: [],
 };
 
 function getDefaultPayrollPeriod() {
@@ -161,6 +182,134 @@ export default function Payroll() {
         totalCommission,
         perAgent,
       } satisfies PayrollSummary;
+    },
+  });
+
+  const { data: cancellations, isLoading: loadingCancellations } = useQuery<CancellationSummary>({
+    queryKey: [
+      "payroll-cancellations",
+      selectedClientId,
+      fromDate ? fromDate.toISOString() : undefined,
+      toDate ? toDate.toISOString() : undefined,
+    ],
+    enabled: !!selectedClientId && !!fromDate && !!toDate,
+    queryFn: async () => {
+      if (!selectedClientId || !fromDate || !toDate) return emptyCancellations;
+
+      const { data: campaigns, error: campaignsError } = await supabase
+        .from("client_campaigns")
+        .select("id")
+        .eq("client_id", selectedClientId);
+
+      if (campaignsError) throw campaignsError;
+
+      const campaignIds = (campaigns || []).map((c: any) => c.id as string);
+      if (!campaignIds.length) return emptyCancellations;
+
+      const { data: sales, error: salesError } = await supabase
+        .from("sales")
+        .select("id, sale_datetime, agent_name, adversus_external_id")
+        .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", fromDate.toISOString())
+        .lte("sale_datetime", toDate.toISOString());
+
+      if (salesError) throw salesError;
+
+      const typedSales = (sales || []) as unknown as PayrollSale[];
+
+      const { data: tdcImports, error: tdcError } = await supabase
+        .from("tdc_cancellation_imports")
+        .select("id, uploaded_at, raw_data")
+        .order("uploaded_at", { ascending: false })
+        .limit(1);
+
+      if (tdcError) throw tdcError;
+      const latest = tdcImports?.[0] as any | undefined;
+      if (!latest?.raw_data?.content_base64) return emptyCancellations;
+
+      const base64 = latest.raw_data.content_base64 as string;
+      const binary = atob(base64);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+
+      const workbook = XLSX.read(bytes, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
+
+      if (!rows.length) return emptyCancellations;
+
+      const headers = Object.keys(rows[0]);
+      const normalize = (header: string) => header.toLowerCase().replace(/[\s_]+/g, "");
+      const orderHeader =
+        headers.find((h) => {
+          const n = normalize(h);
+          return (
+            n.includes("ordre") ||
+            n.includes("ordrenr") ||
+            n.includes("ordrenummer") ||
+            n.includes("orderid")
+          );
+        }) || headers[0];
+
+      const dateHeader = headers.find((h) => {
+        const n = normalize(h);
+        return n.includes("dato") || n.includes("date");
+      });
+
+      const statusHeader = headers.find((h) => {
+        const n = normalize(h);
+        return n.includes("status") || n.includes("resultat");
+      });
+
+      const cancellationByOrder = new Map<string, { row: Record<string, any>; date?: string; status?: string }>();
+
+      rows.forEach((row) => {
+        const rawOrder = row[orderHeader];
+        if (!rawOrder) return;
+        const orderId = String(rawOrder).trim();
+        if (!orderId) return;
+
+        const dateValue = dateHeader ? String(row[dateHeader] ?? "").trim() : undefined;
+        const statusValue = statusHeader ? String(row[statusHeader] ?? "").trim() : undefined;
+
+        cancellationByOrder.set(orderId, {
+          row,
+          date: dateValue,
+          status: statusValue,
+        });
+      });
+
+      if (!cancellationByOrder.size) return emptyCancellations;
+
+      const matches: CancellationMatch[] = [];
+
+      typedSales.forEach((sale) => {
+        const externalId = (sale as any).adversus_external_id as string | null;
+        if (!externalId) return;
+        const key = externalId.trim();
+        if (!key) return;
+
+        const match = cancellationByOrder.get(key);
+        if (!match) return;
+
+        matches.push({
+          saleId: sale.id,
+          externalId: key,
+          saleDate: sale.sale_datetime,
+          agentName: sale.agent_name,
+          cancellationDate: match.date,
+          cancellationStatus: match.status,
+        });
+      });
+
+      return {
+        totalCancelled: matches.length,
+        matches,
+      } satisfies CancellationSummary;
     },
   });
 
@@ -314,6 +463,63 @@ export default function Payroll() {
                       ))}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Annullerede salg i perioden
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!selectedClientId || !fromDate || !toDate ? (
+              <div className="text-center py-6 text-muted-foreground">
+                Vælg kunde og lønperiode for at se matchede annulleringer.
+              </div>
+            ) : loadingCancellations ? (
+              <div className="text-center py-6 text-muted-foreground">Henter annulleringer...</div>
+            ) : !cancellations || cancellations.totalCancelled === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                Ingen annulleringer fundet i TDC-ann filen for salg i den valgte periode.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {cancellations.totalCancelled} salg er matchet mellem Adversus (ordre-id) og seneste
+                  TDC-ann Excel-fil.
+                </p>
+                <div className="rounded-lg border bg-muted/40 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Ordre-id (Adversus)</TableHead>
+                        <TableHead>Salgsdato</TableHead>
+                        <TableHead>Agent</TableHead>
+                        <TableHead>Annulleringsdato</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {cancellations.matches.map((m) => (
+                        <TableRow key={m.saleId + m.externalId}>
+                          <TableCell className="font-mono text-xs">{m.externalId}</TableCell>
+                          <TableCell>
+                            {m.saleDate
+                              ? format(new Date(m.saleDate), "dd.MM.yyyy")
+                              : "-"}
+                          </TableCell>
+                          <TableCell>{m.agentName ?? "Ukendt"}</TableCell>
+                          <TableCell>{m.cancellationDate || "-"}</TableCell>
+                          <TableCell>{m.cancellationStatus || "-"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             )}
