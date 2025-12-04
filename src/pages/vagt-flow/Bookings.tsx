@@ -91,11 +91,13 @@ export default function VagtBookings() {
     queryKey: ["vagt-absences-week", selectedWeek, selectedYear],
     queryFn: async () => {
       const weekEnd = addDays(weekStart, 6);
+      // Get absences that overlap with the week (start before week ends AND end after week starts)
       const { data, error } = await supabase
         .from("employee_absence")
         .select(`*, employee:employee(full_name, team)`)
-        .gte("start_date", format(weekStart, "yyyy-MM-dd"))
-        .lte("end_date", format(weekEnd, "yyyy-MM-dd"));
+        .lte("start_date", format(weekEnd, "yyyy-MM-dd"))
+        .gte("end_date", format(weekStart, "yyyy-MM-dd"))
+        .in("status", ["APPROVED", "PENDING"]);
       if (error) throw error;
       return data;
     },
@@ -278,10 +280,12 @@ export default function VagtBookings() {
     const days: number[] = [];
     const start = new Date(absence.start_date);
     const end = new Date(absence.end_date);
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dayOfWeek = d.getDay();
-      const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      days.push(dayIndex);
+    // Check each day of the current week
+    for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+      const currentDay = addDays(weekStart, dayIndex);
+      if (currentDay >= start && currentDay <= end) {
+        days.push(dayIndex);
+      }
     }
     return days;
   };
@@ -383,44 +387,51 @@ export default function VagtBookings() {
         {/* Absence section */}
         {absences && absences.length > 0 && (
           <Collapsible open={absenceExpanded} onOpenChange={setAbsenceExpanded}>
-            <Card className="border-orange-200 bg-orange-50/50">
+            <Card>
               <CollapsibleTrigger className="w-full">
                 <CardContent className="pt-4 pb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-orange-600" />
-                    <span className="font-medium">Fravær uge {selectedWeek}</span>
+                    <Users className="h-5 w-5 text-orange-500" />
+                    <span className="font-semibold">Fravær uge {selectedWeek}</span>
                     <span className="text-muted-foreground text-sm">({absences.length} medarbejdere)</span>
                   </div>
                   {absenceExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </CardContent>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <CardContent className="pt-0">
+                <CardContent className="pt-0 space-y-4">
                   {Object.entries(absencesByTeam || {}).map(([team, teamAbsences]: [string, any]) => (
-                    <div key={team} className="mb-4">
-                      <p className="text-xs font-medium uppercase text-muted-foreground mb-2">Team {team}</p>
-                      {teamAbsences.map((absence: any) => (
-                        <div key={absence.id} className="flex items-center justify-between py-2">
-                          <span>{absence.employee?.full_name}</span>
-                          <div className="flex gap-1">
-                            {DAYS.map((day, idx) => {
-                              const isAbsent = getAbsenceDays(absence).includes(idx);
-                              return (
-                                <div
-                                  key={idx}
-                                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs ${
-                                    isAbsent 
-                                      ? "bg-orange-500 text-white" 
-                                      : "text-muted-foreground"
-                                  }`}
-                                >
-                                  {day.charAt(0)}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
+                    <div key={team}>
+                      <p className="text-xs font-semibold uppercase text-muted-foreground mb-2 tracking-wide">
+                        Team {team}
+                      </p>
+                      <div className="space-y-1">
+                        {teamAbsences.map((absence: any) => {
+                          const absenceDays = getAbsenceDays(absence);
+                          return (
+                            <div key={absence.id} className="flex items-center justify-between py-2">
+                              <span className="text-sm truncate max-w-[200px]">{absence.employee?.full_name}</span>
+                              <div className="flex gap-1">
+                                {DAYS.map((day, idx) => {
+                                  const isAbsent = absenceDays.includes(idx);
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                                        isAbsent 
+                                          ? "bg-orange-500 text-white" 
+                                          : "text-muted-foreground/50"
+                                      }`}
+                                    >
+                                      {day.charAt(0)}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   ))}
                 </CardContent>
