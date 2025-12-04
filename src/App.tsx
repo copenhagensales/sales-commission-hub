@@ -17,6 +17,7 @@ import KmTest from "./pages/KmTest";
 import Codan from "./pages/Codan";
 import TdcErhverv from "./pages/TdcErhverv";
 import NotFound from "./pages/NotFound";
+import AdversusData from "./pages/AdversusData";
 // Vagt-flow pages
 import VagtFlowIndex from "./pages/vagt-flow/Index";
 import VagtBookWeek from "./pages/vagt-flow/BookWeek";
@@ -86,6 +87,7 @@ const App = () => (
           <Route path="/wallboard" element={<Wallboard />} />
           <Route path="/mg-test" element={<ProtectedRoute><MgTest /></ProtectedRoute>} />
           <Route path="/km-test" element={<ProtectedRoute><KmTest /></ProtectedRoute>} />
+          <Route path="/adversus-data" element={<ProtectedRoute><AdversusData /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           {/* Vagt-flow routes */}
           <Route path="/vagt-flow" element={<ProtectedRoute><VagtFlowIndex /></ProtectedRoute>} />
