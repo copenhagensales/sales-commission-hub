@@ -127,7 +127,7 @@ export default function TdcErhverv() {
         return { stats: initialStats, recentSales: [], allSales: [] };
       }
 
-      // Hent alle TDC Erhverv-salg fra det seneste år
+      // Hent alle TDC Erhverv-salg (ingen dato-begrænsning, filtrering sker i grafen)
       const { data: sales, error: salesError } = await supabase
         .from("sales")
         .select(
@@ -136,7 +136,6 @@ export default function TdcErhverv() {
            sale_items ( mapped_commission, mapped_revenue, quantity, products ( name ) )`
         )
         .in("client_campaign_id", campaignIds)
-        .gte("sale_datetime", historyStart)
         .order("sale_datetime", { ascending: false });
 
       if (salesError) throw salesError;
