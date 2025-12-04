@@ -324,6 +324,7 @@ export default function EmployeeDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
 
   const { data: employee, isLoading, error } = useQuery({
     queryKey: ["employee-detail", id],
@@ -400,15 +401,16 @@ export default function EmployeeDetail() {
     enabled: !!id,
   });
 
-  // Calculate absence statistics - based on last 2 months
+  // Calculate absence statistics - based on selected period
   const absenceStats = useMemo(() => {
     const now = new Date();
-    const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
+    const monthsBack = parseInt(absencePeriod);
+    const periodStart = new Date(now.getFullYear(), now.getMonth() - monthsBack, now.getDate());
     
-    // Filter absences for last 2 months
-    const last2MonthsAbsences = absences.filter(a => {
+    // Filter absences for selected period
+    const periodAbsences = absences.filter(a => {
       const date = new Date(a.start_date);
-      return date >= twoMonthsAgo && date <= now;
+      return date >= periodStart && date <= now;
     });
     
     // Count sick and vacation days
@@ -425,26 +427,26 @@ export default function EmployeeDetail() {
       return absenceList.filter(a => a.type === type).length;
     };
     
-    // Calculate working days in 2 months (approximate: ~43 working days)
-    const workingDaysIn2Months = 43;
+    // Calculate working days in period (approximate: ~21.5 working days per month)
+    const workingDaysInPeriod = parseInt(absencePeriod) * 21.5;
     
-    const sickDaysLast2Months = countDays(last2MonthsAbsences, "sick");
-    const vacationDaysLast2Months = countDays(last2MonthsAbsences, "vacation");
-    const sickOccurrencesLast2Months = countOccurrences(last2MonthsAbsences, "sick");
+    const sickDaysInPeriod = countDays(periodAbsences, "sick");
+    const vacationDaysInPeriod = countDays(periodAbsences, "vacation");
+    const sickOccurrencesInPeriod = countOccurrences(periodAbsences, "sick");
     
     // Sick percentage (of working days)
-    const sickPercentLast2Months = (sickDaysLast2Months / workingDaysIn2Months) * 100;
+    const sickPercentInPeriod = (sickDaysInPeriod / workingDaysInPeriod) * 100;
     
     // Average days per sick occurrence
-    const avgDaysPerSick = sickOccurrencesLast2Months > 0 
-      ? sickDaysLast2Months / sickOccurrencesLast2Months 
+    const avgDaysPerSick = sickOccurrencesInPeriod > 0 
+      ? sickDaysInPeriod / sickOccurrencesInPeriod 
       : 0;
     
     // Check for patterns (many short sick periods could indicate issues)
-    const hasFrequentShortSickness = sickOccurrencesLast2Months >= 3 && avgDaysPerSick < 2;
+    const hasFrequentShortSickness = sickOccurrencesInPeriod >= 3 && avgDaysPerSick < 2;
     
     // Get sick absences sorted by date for pattern analysis
-    const sickAbsences = last2MonthsAbsences.filter(a => a.type === "sick").sort(
+    const sickAbsences = periodAbsences.filter(a => a.type === "sick").sort(
       (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
     );
     
@@ -453,45 +455,47 @@ export default function EmployeeDetail() {
       const day = new Date(a.start_date).getDay();
       return day === 1 || day === 5;
     }).length;
-    const mondayFridayPercent = sickOccurrencesLast2Months > 0 
-      ? (mondayFridaySick / sickOccurrencesLast2Months) * 100 
+    const mondayFridayPercent = sickOccurrencesInPeriod > 0 
+      ? (mondayFridaySick / sickOccurrencesInPeriod) * 100 
       : 0;
     
     return {
-      sickDaysLast2Months,
-      vacationDaysLast2Months,
-      sickOccurrencesLast2Months,
-      sickPercentLast2Months,
+      sickDaysInPeriod,
+      vacationDaysInPeriod,
+      sickOccurrencesInPeriod,
+      sickPercentInPeriod,
       avgDaysPerSick,
       hasFrequentShortSickness,
       mondayFridayPercent,
       mondayFridaySick,
       sickAbsences,
+      periodLabel: `${absencePeriod} mdr`,
     };
-  }, [absences]);
+  }, [absences, absencePeriod]);
 
-  // Calculate lateness statistics - based on last 2 months
+  // Calculate lateness statistics - based on selected period
   const latenessStats = useMemo(() => {
     const now = new Date();
-    const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, now.getDate());
+    const monthsBack = parseInt(absencePeriod);
+    const periodStart = new Date(now.getFullYear(), now.getMonth() - monthsBack, now.getDate());
     
-    const last2MonthsLateness = latenessRecords.filter(l => {
+    const periodLateness = latenessRecords.filter(l => {
       const date = new Date(l.date);
-      return date >= twoMonthsAgo && date <= now;
+      return date >= periodStart && date <= now;
     });
     
-    const totalMinutesLast2Months = last2MonthsLateness.reduce((sum, l) => sum + l.minutes, 0);
+    const totalMinutesInPeriod = periodLateness.reduce((sum, l) => sum + l.minutes, 0);
     
-    const avgMinutesPerLateness = last2MonthsLateness.length > 0 
-      ? totalMinutesLast2Months / last2MonthsLateness.length 
+    const avgMinutesPerLateness = periodLateness.length > 0 
+      ? totalMinutesInPeriod / periodLateness.length 
       : 0;
     
     return {
-      countLast2Months: last2MonthsLateness.length,
-      totalMinutesLast2Months,
+      countInPeriod: periodLateness.length,
+      totalMinutesInPeriod,
       avgMinutesPerLateness,
     };
-  }, [latenessRecords]);
+  }, [latenessRecords, absencePeriod]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ field, value }: { field: string; value: unknown }) => {
@@ -953,6 +957,20 @@ export default function EmployeeDetail() {
 
           <TabsContent value="fravaer" className="mt-6">
             <div className="space-y-6">
+              {/* Period Selector */}
+              <div className="flex justify-end">
+                <Select value={absencePeriod} onValueChange={(v) => setAbsencePeriod(v as "2" | "6" | "12")}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="z-50 bg-popover">
+                    <SelectItem value="2">2 måneder</SelectItem>
+                    <SelectItem value="6">6 måneder</SelectItem>
+                    <SelectItem value="12">12 måneder</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Overview Stats */}
               <div className="grid gap-4 md:grid-cols-3">
                 <Card>
@@ -962,10 +980,10 @@ export default function EmployeeDetail() {
                         <Thermometer className="h-5 w-5 text-red-500" />
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Sygefravær (2 mdr)</p>
-                        <p className="text-2xl font-bold">{absenceStats.sickPercentLast2Months.toFixed(1)}%</p>
+                        <p className="text-sm text-muted-foreground">Sygefravær ({absenceStats.periodLabel})</p>
+                        <p className="text-2xl font-bold">{absenceStats.sickPercentInPeriod.toFixed(1)}%</p>
                         <p className="text-xs text-muted-foreground">
-                          {absenceStats.sickDaysLast2Months} dage • {absenceStats.sickOccurrencesLast2Months} gange
+                          {absenceStats.sickDaysInPeriod} dage • {absenceStats.sickOccurrencesInPeriod} gange
                         </p>
                       </div>
                     </div>
@@ -979,10 +997,10 @@ export default function EmployeeDetail() {
                         <Palmtree className="h-5 w-5 text-amber-500" />
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Ferie (2 mdr)</p>
-                        <p className="text-2xl font-bold">{absenceStats.vacationDaysLast2Months} dage</p>
+                        <p className="text-sm text-muted-foreground">Ferie ({absenceStats.periodLabel})</p>
+                        <p className="text-2xl font-bold">{absenceStats.vacationDaysInPeriod} dage</p>
                         <p className="text-xs text-muted-foreground">
-                          Afholdt ferie seneste 2 måneder
+                          Afholdt ferie seneste {absencePeriod} måneder
                         </p>
                       </div>
                     </div>
@@ -1017,10 +1035,10 @@ export default function EmployeeDetail() {
                         <p className="font-medium text-amber-700 dark:text-amber-400">Fraværsmønster bemærket</p>
                         <div className="text-sm text-muted-foreground space-y-1">
                           {absenceStats.hasFrequentShortSickness && (
-                            <p>• Du har haft {absenceStats.sickOccurrencesLast2Months} korte sygeperioder på under 2 dage i gennemsnit. Overvej om der er noget vi kan hjælpe med?</p>
+                            <p>• Du har haft {absenceStats.sickOccurrencesInPeriod} korte sygeperioder på under 2 dage i gennemsnit. Overvej om der er noget vi kan hjælpe med?</p>
                           )}
-                          {absenceStats.mondayFridayPercent > 50 && absenceStats.sickOccurrencesLast2Months >= 2 && (
-                            <p>• {absenceStats.mondayFridaySick} af {absenceStats.sickOccurrencesLast2Months} sygemeldinger ({absenceStats.mondayFridayPercent.toFixed(0)}%) er faldet på mandag eller fredag.</p>
+                          {absenceStats.mondayFridayPercent > 50 && absenceStats.sickOccurrencesInPeriod >= 2 && (
+                            <p>• {absenceStats.mondayFridaySick} af {absenceStats.sickOccurrencesInPeriod} sygemeldinger ({absenceStats.mondayFridayPercent.toFixed(0)}%) er faldet på mandag eller fredag.</p>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-3">
@@ -1043,11 +1061,11 @@ export default function EmployeeDetail() {
                 <CardContent className="space-y-4">
                   <div>
                     <div className="flex justify-between text-sm mb-1">
-                      <span>Dit fravær (2 mdr)</span>
-                      <span className="font-medium">{absenceStats.sickPercentLast2Months.toFixed(1)}%</span>
+                      <span>Dit fravær ({absenceStats.periodLabel})</span>
+                      <span className="font-medium">{absenceStats.sickPercentInPeriod.toFixed(1)}%</span>
                     </div>
                     <Progress 
-                      value={Math.min(absenceStats.sickPercentLast2Months * 10, 100)} 
+                      value={Math.min(absenceStats.sickPercentInPeriod * 10, 100)} 
                       className="h-2"
                     />
                   </div>
@@ -1075,12 +1093,12 @@ export default function EmployeeDetail() {
                 <CardContent>
                   <div className="grid gap-4 md:grid-cols-3 mb-6">
                     <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
-                      <p className="text-sm text-muted-foreground">Antal (2 mdr)</p>
-                      <p className="text-xl font-bold">{latenessStats.countLast2Months} gange</p>
+                      <p className="text-sm text-muted-foreground">Antal ({absenceStats.periodLabel})</p>
+                      <p className="text-xl font-bold">{latenessStats.countInPeriod} gange</p>
                     </div>
                     <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
-                      <p className="text-sm text-muted-foreground">Total tid (2 mdr)</p>
-                      <p className="text-xl font-bold">{latenessStats.totalMinutesLast2Months} min</p>
+                      <p className="text-sm text-muted-foreground">Total tid ({absenceStats.periodLabel})</p>
+                      <p className="text-xl font-bold">{latenessStats.totalMinutesInPeriod} min</p>
                     </div>
                     <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
                       <p className="text-sm text-muted-foreground">Gns. forsinkelse</p>
