@@ -487,8 +487,8 @@ export default function Payroll() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center">
           <div className="w-full md:w-[260px]">
             <Select
-              value={selectedClientId}
-              onValueChange={setSelectedClientId}
+              value={selectedClientId ?? ""}
+              onValueChange={(value) => setSelectedClientId(value)}
               disabled={loadingClients || !clients || clients.length === 0}
             >
               <SelectTrigger className="w-full bg-background">
@@ -767,9 +767,9 @@ export default function Payroll() {
             <CardTitle>Søg TDC-salg</CardTitle>
           </CardHeader>
           <CardContent>
-            {!selectedClientId || !fromDate || !toDate ? (
+            {!selectedClientId ? (
               <div className="text-center py-6 text-muted-foreground">
-                Vælg kunde og lønperiode for at søge efter salg.
+                Vælg kunde for at søge efter salg.
               </div>
             ) : (
               <div className="space-y-4">
