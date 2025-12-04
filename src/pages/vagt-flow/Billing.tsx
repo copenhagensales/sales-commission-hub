@@ -38,7 +38,7 @@ export default function VagtBilling() {
         .from("booking")
         .select(`
           *,
-          location(id, name, address_city),
+          location(id, name, address_city, daily_rate, type),
           brand(id, name, color_hex)
         `)
         .gte("start_date", format(monthStart, "yyyy-MM-dd"))
@@ -66,12 +66,16 @@ export default function VagtBilling() {
   // Group bookings by location
   const bookingsByLocation = filteredBookings?.reduce((acc: any, booking: any) => {
     const locationId = booking.location_id;
+    const dailyRate = booking.location?.daily_rate || 1000;
+    
     if (!acc[locationId]) {
       acc[locationId] = {
         location: booking.location,
         brand: booking.brand,
         bookings: [],
         totalDays: 0,
+        totalAmount: 0,
+        dailyRate: dailyRate,
         minDate: booking.start_date,
         maxDate: booking.end_date,
       };
@@ -82,6 +86,7 @@ export default function VagtBilling() {
     // Calculate days for this booking
     const days = differenceInDays(new Date(booking.end_date), new Date(booking.start_date)) + 1;
     acc[locationId].totalDays += days;
+    acc[locationId].totalAmount += days * dailyRate;
     
     // Track date range
     if (booking.start_date < acc[locationId].minDate) {
@@ -98,6 +103,9 @@ export default function VagtBilling() {
   const totalBookings = filteredBookings?.length || 0;
   const totalDays: number = (Object.values(bookingsByLocation || {}) as any[]).reduce(
     (sum: number, loc: any) => sum + (loc.totalDays || 0), 0
+  );
+  const totalAmount: number = (Object.values(bookingsByLocation || {}) as any[]).reduce(
+    (sum: number, loc: any) => sum + (loc.totalAmount || 0), 0
   );
   const uniqueLocations = Object.keys(bookingsByLocation || {}).length;
 
@@ -156,7 +164,7 @@ export default function VagtBilling() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-start justify-between">
@@ -199,6 +207,20 @@ export default function VagtBilling() {
               </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total Beløb</p>
+                  <p className="text-3xl font-bold mt-1">{totalAmount.toLocaleString("da-DK")}</p>
+                  <p className="text-xs text-muted-foreground mt-1">kr ex moms</p>
+                </div>
+                <div className="p-2 bg-muted rounded-lg">
+                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Detailed Table */}
@@ -229,6 +251,8 @@ export default function VagtBilling() {
                     <TableHead>Dato Periode</TableHead>
                     <TableHead className="text-right">Bookinger</TableHead>
                     <TableHead className="text-right">Dage</TableHead>
+                    <TableHead className="text-right">Dagspris</TableHead>
+                    <TableHead className="text-right">Beløb</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -256,7 +280,9 @@ export default function VagtBilling() {
                       </TableCell>
                       <TableCell>{formatDateRange(loc.minDate, loc.maxDate)}</TableCell>
                       <TableCell className="text-right">{loc.bookings.length}</TableCell>
-                      <TableCell className="text-right font-semibold">{loc.totalDays}</TableCell>
+                      <TableCell className="text-right">{loc.totalDays}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{loc.dailyRate.toLocaleString("da-DK")} kr</TableCell>
+                      <TableCell className="text-right font-semibold">{loc.totalAmount.toLocaleString("da-DK")} kr</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

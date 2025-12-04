@@ -640,6 +640,7 @@ export type Database = {
           contact_phone: string | null
           cooldown_weeks: number | null
           created_at: string | null
+          daily_rate: number | null
           id: string
           is_favorite: boolean | null
           name: string
@@ -661,6 +662,7 @@ export type Database = {
           contact_phone?: string | null
           cooldown_weeks?: number | null
           created_at?: string | null
+          daily_rate?: number | null
           id?: string
           is_favorite?: boolean | null
           name: string
@@ -682,6 +684,7 @@ export type Database = {
           contact_phone?: string | null
           cooldown_weeks?: number | null
           created_at?: string | null
+          daily_rate?: number | null
           id?: string
           is_favorite?: boolean | null
           name?: string
