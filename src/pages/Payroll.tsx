@@ -465,7 +465,7 @@ export default function Payroll() {
 
   const filteredSales = (searchableSales || []).filter((sale) => {
     if (!searchTerm.trim()) return false;
-    const term = searchTerm.toLowerCase();
+    const term = searchTerm.trim().toLowerCase();
     const inExternalId = sale.adversus_external_id?.toLowerCase().includes(term) ?? false;
     const inOppAdversus = sale.adversus_opp_number?.toLowerCase().includes(term) ?? false;
     const inPhone = sale.customer_phone?.toLowerCase().includes(term) ?? false;
