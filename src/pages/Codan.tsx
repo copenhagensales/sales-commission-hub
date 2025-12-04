@@ -10,6 +10,7 @@ import { Shield, TrendingUp, DollarSign, ShoppingCart } from "lucide-react";
 interface CodanSaleItem {
   mapped_commission: number | null;
   mapped_revenue: number | null;
+  quantity: number | null;
   products?: {
     name: string | null;
   } | null;
@@ -94,9 +95,9 @@ export default function Codan() {
       const { data: sales, error: salesError } = await supabase
         .from("sales")
         .select(
-          `id, sale_datetime, agent_name, customer_company,
+           `id, sale_datetime, agent_name, customer_company,
            client_campaigns ( name ),
-           sale_items ( mapped_commission, mapped_revenue, products ( name ) )`
+           sale_items ( mapped_commission, mapped_revenue, quantity, products ( name ) )`
         )
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", monthStart)
@@ -129,12 +130,16 @@ export default function Codan() {
         sale.sale_items?.forEach((item) => {
           revenueToday += Number(item.mapped_revenue) || 0;
           commissionToday += Number(item.mapped_commission) || 0;
+          const qty = Number((item as any).quantity) || 1;
+          salesTodayCount += qty;
         });
-        salesTodayCount += sale.sale_items?.length || 0;
       });
 
       codanSales.forEach((sale) => {
-        salesThisMonthCount += sale.sale_items?.length || 0;
+        sale.sale_items?.forEach((item) => {
+          const qty = Number((item as any).quantity) || 1;
+          salesThisMonthCount += qty;
+        });
       });
 
       const stats: CodanStats = {

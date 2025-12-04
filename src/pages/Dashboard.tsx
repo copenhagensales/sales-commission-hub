@@ -22,9 +22,10 @@ export default function Dashboard() {
   const { data: salesCount } = useQuery({
     queryKey: ['dashboard-sales-count'],
     queryFn: async () => {
-      const { count, error } = await supabase.from('sale_items').select('*', { count: 'exact', head: true });
+      const { data, error } = await supabase.from('sale_items').select('quantity');
       if (error) throw error;
-      return count || 0;
+      const totalUnits = data?.reduce((sum: number, item: any) => sum + (Number(item.quantity) || 1), 0) || 0;
+      return totalUnits;
     }
   });
 
