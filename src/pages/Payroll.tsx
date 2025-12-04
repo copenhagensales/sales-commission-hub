@@ -285,6 +285,14 @@ export default function Payroll() {
 
       const oppHeader = headers.find((h) => normalize(h).includes("opp"));
 
+      const normalizeOpp = (value: any): string | undefined => {
+        if (value == null) return undefined;
+        const raw = String(value).trim();
+        if (!raw) return undefined;
+        const digitsOnly = raw.replace(/\D/g, "");
+        return digitsOnly || raw;
+      };
+
       const dateHeader =
         headers.find((h) => normalize(h).includes("starttidspunkt")) ||
         headers.find((h) => {
@@ -311,8 +319,7 @@ export default function Payroll() {
         const orderId = String(rawOrder).trim();
         if (!orderId) return;
 
-        const rawOpp = oppHeader ? row[oppHeader] : undefined;
-        const oppNumber = rawOpp != null && String(rawOpp).trim() !== "" ? String(rawOpp).trim() : undefined;
+        const oppNumber = normalizeOpp(oppHeader ? row[oppHeader] : undefined);
 
         let cancellationDate: Date | undefined;
         if (dateHeader) {
