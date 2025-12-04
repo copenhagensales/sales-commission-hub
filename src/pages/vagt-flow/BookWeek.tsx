@@ -527,12 +527,22 @@ export default function VagtBookWeek() {
             <Button
               className="bg-green-600 hover:bg-green-700"
               onClick={() => {
-                if (selectedLocation && selectedBrandId) {
-                  createBookingMutation.mutate({
-                    locationId: selectedLocation.id,
-                    brandId: selectedBrandId,
-                  });
+                if (!selectedLocation) {
+                  toast({ title: "Fejl", description: "Ingen lokation valgt", variant: "destructive" });
+                  return;
                 }
+                if (!selectedBrandId) {
+                  toast({ title: "Fejl", description: "Ingen brand valgt", variant: "destructive" });
+                  return;
+                }
+                if (selectedDays.length === 0) {
+                  toast({ title: "Fejl", description: "Vælg mindst én dag", variant: "destructive" });
+                  return;
+                }
+                createBookingMutation.mutate({
+                  locationId: selectedLocation.id,
+                  brandId: selectedBrandId,
+                });
               }}
               disabled={selectedDays.length === 0 || createBookingMutation.isPending}
             >
