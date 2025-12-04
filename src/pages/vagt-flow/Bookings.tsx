@@ -457,8 +457,8 @@ export default function VagtBookings() {
                                     key={idx}
                                     className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
                                       isAbsent 
-                                        ? "bg-orange-500 text-white shadow-sm" 
-                                        : "text-muted-foreground/40"
+                                        ? "bg-red-500 text-white shadow-sm" 
+                                        : "bg-green-500 text-white shadow-sm"
                                     }`}
                                   >
                                     {dayLetter}
