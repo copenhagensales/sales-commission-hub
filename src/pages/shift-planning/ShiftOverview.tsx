@@ -27,7 +27,10 @@ export default function ShiftOverview() {
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
-  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+  // Only show weekdays (Monday-Friday), exclude weekend
+  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd }).filter(
+    day => day.getDay() !== 0 && day.getDay() !== 6
+  );
 
   const { data: shifts } = useShifts(
     format(weekStart, "yyyy-MM-dd"),
@@ -297,8 +300,8 @@ export default function ShiftOverview() {
         <div className="bg-card rounded-xl border border-border/50 overflow-hidden">
           <div className="overflow-x-auto">
             <div className="min-w-[800px]">
-              {/* Day Headers */}
-              <div className="grid grid-cols-8 border-b border-border/50 bg-muted/30">
+              {/* Day Headers - 6 columns: employee + 5 weekdays */}
+              <div className="grid grid-cols-6 border-b border-border/50 bg-muted/30">
                 <div className="p-3 text-xs font-medium text-muted-foreground">
                   Medarbejder
                 </div>
@@ -333,7 +336,7 @@ export default function ShiftOverview() {
                 <div 
                   key={employee.id} 
                   className={cn(
-                    "grid grid-cols-8 border-b border-border/30 last:border-b-0",
+                    "grid grid-cols-6 border-b border-border/30 last:border-b-0",
                     idx % 2 === 0 ? "bg-background" : "bg-muted/10"
                   )}
                 >
