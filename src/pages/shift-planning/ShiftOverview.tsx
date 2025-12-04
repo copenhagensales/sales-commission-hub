@@ -277,20 +277,19 @@ export default function ShiftOverview() {
 
         {/* Inline Legend */}
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground/70">Klik:</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500/50"></div>
+            <span>Arbejder</span>
+          </div>
           <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-sm bg-amber-400/60"></div>
-            <span>Ferie</span>
+            <span>Ferie (1 klik)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-sm bg-red-400/60"></div>
-            <span>Syg</span>
+            <span>Syg (2 klik)</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm bg-emerald-400/60"></div>
-            <span>Vagt</span>
-          </div>
-          <span className="text-muted-foreground/60">•</span>
+          <span className="text-muted-foreground/50">|</span>
           <span className="text-muted-foreground/60">Dobbeltklik = opret vagt</span>
         </div>
 
@@ -356,17 +355,19 @@ export default function ShiftOverview() {
                     const isVacation = absenceDisplay?.type === "vacation";
                     const isSick = absenceDisplay?.type === "sick";
                     
+                    // Default is green (working), vacation is yellow, sick is red
+                    const isWorking = !absenceDisplay && !holiday;
+                    
                     return (
                       <div
                         key={day.toISOString()}
                         className={cn(
                           "min-h-[52px] p-1 border-l border-border/30 cursor-pointer transition-all duration-150",
-                          isToday(day) && "bg-primary/5",
+                          isToday(day) && "ring-1 ring-primary/30",
                           holiday && "bg-muted/40 cursor-not-allowed",
-                          !holiday && hasShift && "bg-emerald-500/10 hover:bg-emerald-500/20",
-                          !holiday && !hasShift && isVacation && "bg-amber-400/15 hover:bg-amber-400/25",
-                          !holiday && !hasShift && isSick && "bg-red-400/15 hover:bg-red-400/25",
-                          !holiday && !hasShift && !absenceDisplay && "hover:bg-muted/40"
+                          !holiday && isVacation && "bg-amber-400/20 hover:bg-amber-400/30",
+                          !holiday && isSick && "bg-red-400/20 hover:bg-red-400/30",
+                          !holiday && isWorking && "bg-emerald-500/15 hover:bg-emerald-500/25"
                         )}
                         onClick={() => {
                           if (!holiday) {
