@@ -841,6 +841,7 @@ export default function MgTest() {
           <TabsList>
             <TabsTrigger value="product">Mapping produkt</TabsTrigger>
             <TabsTrigger value="customer">Mapping kunde / kampagne</TabsTrigger>
+            <TabsTrigger value="employee-mapping">Medarbejder mapping</TabsTrigger>
             <TabsTrigger value="customers">Kundenavne</TabsTrigger>
           </TabsList>
 
@@ -1265,6 +1266,23 @@ export default function MgTest() {
                     );
                   })
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Medarbejder mapping */}
+          <TabsContent value="employee-mapping">
+            <Card>
+              <CardHeader>
+                <CardTitle>Medarbejder mapping</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Her vil du kunne mappe Adversus-data til interne medarbejdere. Funktionen er endnu ikke sat op.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Fanen er oprettet. Sig til, hvordan du gerne vil matche medarbejdere, så bygger vi resten.
+                </p>
               </CardContent>
             </Card>
           </TabsContent>
