@@ -448,52 +448,79 @@ export default function VagtBookWeek() {
 
       {/* Booking dialog */}
       <Dialog open={bookingDialogOpen} onOpenChange={setBookingDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Book {selectedLocation?.name}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Vælg dage til booking
+            </DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            {/* Location stamdata */}
-            <div className="mb-4 p-3 bg-muted rounded-lg space-y-1 text-sm">
-              {selectedLocation?.address_city && (
-                <p className="text-muted-foreground">{selectedLocation.address_city}</p>
-              )}
-              {selectedLocation?.contact_person_name && (
-                <p className="text-muted-foreground">Kontakt: {selectedLocation.contact_person_name}</p>
-              )}
+          <div className="space-y-4">
+            {/* Location info */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">{selectedLocation?.name}</p>
+                <p className="text-sm text-muted-foreground">Uge {selectedWeek}, {selectedYear}</p>
+              </div>
               {selectedLocation?.contact_phone && (
                 <a
                   href={`tel:${selectedLocation.contact_phone}`}
-                  className="flex items-center gap-2 text-primary hover:underline"
+                  className="p-2 rounded-md hover:bg-muted transition-colors"
                 >
-                  <Phone className="h-4 w-4" />
-                  {selectedLocation.contact_phone}
+                  <Phone className="h-5 w-5 text-primary" />
                 </a>
               )}
             </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              Uge {selectedWeek}, {selectedYear}
-            </p>
-            <div className="space-y-3">
-              {DAYS.map((day) => (
-                <div key={day.value} className="flex items-center space-x-3">
-                  <Checkbox
-                    id={`day-${day.value}`}
-                    checked={selectedDays.includes(day.value)}
-                    onCheckedChange={() => toggleDay(day.value)}
-                  />
-                  <label htmlFor={`day-${day.value}`} className="text-sm cursor-pointer">
-                    {day.label}
-                  </label>
-                </div>
-              ))}
+
+            <p className="text-sm text-muted-foreground">Vælg hvilke dage lokationen skal bookes:</p>
+
+            {/* Day cards */}
+            <div className="space-y-2">
+              {DAYS.map((day) => {
+                const isSelected = selectedDays.includes(day.value);
+                const dayDate = new Date(weekStartDate);
+                dayDate.setDate(dayDate.getDate() + day.value);
+                const formattedDate = format(dayDate, "d. MMM").toLowerCase().replace('.', '');
+                
+                return (
+                  <button
+                    key={day.value}
+                    type="button"
+                    onClick={() => toggleDay(day.value)}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border-2 transition-colors ${
+                      isSelected
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-muted-foreground/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground"
+                            : "border-2 border-muted-foreground/30"
+                        }`}
+                      >
+                        {isSelected && (
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className="font-medium">{day.label}</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">{formattedDate}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setBookingDialogOpen(false)}>
               Annuller
             </Button>
             <Button
+              className="bg-green-600 hover:bg-green-700"
               onClick={() => {
                 if (selectedLocation && selectedBrandId) {
                   createBookingMutation.mutate({
@@ -504,7 +531,7 @@ export default function VagtBookWeek() {
               }}
               disabled={selectedDays.length === 0 || createBookingMutation.isPending}
             >
-              Opret booking
+              Book {selectedDays.length} {selectedDays.length === 1 ? "dag" : "dage"}
             </Button>
           </DialogFooter>
         </DialogContent>
