@@ -196,6 +196,7 @@ export default function VagtLocations() {
                     <TableHead>Navn</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>By</TableHead>
+                    <TableHead>Cooldown</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Brands</TableHead>
                     <TableHead></TableHead>
@@ -223,6 +224,9 @@ export default function VagtLocations() {
                       <TableCell className="font-medium">{loc.name}</TableCell>
                       <TableCell>{loc.type || "-"}</TableCell>
                       <TableCell>{loc.address_city || "-"}</TableCell>
+                      <TableCell>
+                        <span className="text-muted-foreground">{loc.cooldown_weeks || 4} uger</span>
+                      </TableCell>
                       <TableCell>
                         <Badge className={`${statusColors[loc.status || "Ny"]} text-white`}>
                           {loc.status || "Ny"}
