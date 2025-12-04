@@ -257,13 +257,36 @@ export default function VagtBookings() {
     return acc;
   }, {});
 
-  // Group absences by team
+  // First group absences by employee, then by team
   const absencesByTeam = absences?.reduce((acc: any, absence: any) => {
     const team = absence.employee?.team || "Uden team";
-    if (!acc[team]) acc[team] = [];
-    acc[team].push(absence);
+    const employeeId = absence.employee_id;
+    const employeeName = absence.employee?.full_name || "Ukendt";
+    
+    if (!acc[team]) acc[team] = {};
+    if (!acc[team][employeeId]) {
+      acc[team][employeeId] = {
+        employeeId,
+        employeeName,
+        absenceDays: new Set<number>(),
+      };
+    }
+    
+    // Add all days from this absence record
+    const start = new Date(absence.start_date);
+    const end = new Date(absence.end_date);
+    for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+      const currentDay = addDays(weekStart, dayIndex);
+      if (currentDay >= start && currentDay <= end) {
+        acc[team][employeeId].absenceDays.add(dayIndex);
+      }
+    }
+    
     return acc;
   }, {});
+
+  // Get unique employee count
+  const uniqueEmployeeCount = absences ? new Set(absences.map((a: any) => a.employee_id)).size : 0;
 
   const toggleWeek = (weekKey: string) => {
     const newExpanded = new Set(expandedWeeks);
@@ -406,7 +429,7 @@ export default function VagtBookings() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">Fravær uge {selectedWeek}</span>
-                      <span className="text-muted-foreground text-sm">({absences.length} medarbejdere)</span>
+                      <span className="text-muted-foreground text-sm">({uniqueEmployeeCount} medarbejdere)</span>
                     </div>
                   </div>
                   {absenceExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
@@ -414,40 +437,37 @@ export default function VagtBookings() {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <CardContent className="pt-0 pb-6 space-y-6">
-                  {Object.entries(absencesByTeam || {}).map(([team, teamAbsences]: [string, any]) => (
+                  {Object.entries(absencesByTeam || {}).map(([team, teamEmployees]: [string, any]) => (
                     <div key={team}>
                       <p className="text-xs font-bold uppercase text-muted-foreground mb-3 tracking-wider">
                         Team {team}
                       </p>
                       <div className="space-y-2">
-                        {teamAbsences.map((absence: any) => {
-                          const absenceDays = getAbsenceDays(absence);
-                          return (
-                            <div key={absence.id} className="flex items-center justify-between py-1">
-                              <span className="text-sm text-foreground/80 truncate max-w-[250px]">
-                                {absence.employee?.full_name}
-                              </span>
-                              <div className="flex gap-1.5">
-                                {DAYS.map((day, idx) => {
-                                  const isAbsent = absenceDays.includes(idx);
-                                  const dayLetter = day.charAt(0);
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
-                                        isAbsent 
-                                          ? "bg-orange-500 text-white shadow-sm" 
-                                          : "text-muted-foreground/40"
-                                      }`}
-                                    >
-                                      {dayLetter}
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                        {Object.values(teamEmployees).map((employee: any) => (
+                          <div key={employee.employeeId} className="flex items-center justify-between py-1">
+                            <span className="text-sm text-foreground/80 truncate max-w-[250px]">
+                              {employee.employeeName}
+                            </span>
+                            <div className="flex gap-1.5">
+                              {DAYS.map((day, idx) => {
+                                const isAbsent = employee.absenceDays.has(idx);
+                                const dayLetter = day.charAt(0);
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
+                                      isAbsent 
+                                        ? "bg-orange-500 text-white shadow-sm" 
+                                        : "text-muted-foreground/40"
+                                    }`}
+                                  >
+                                    {dayLetter}
+                                  </div>
+                                );
+                              })}
                             </div>
-                          );
-                        })}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))}
