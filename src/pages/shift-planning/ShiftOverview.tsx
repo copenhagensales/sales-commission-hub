@@ -11,18 +11,26 @@ import { useShifts, useDepartments, useEmployeesForShifts, useDanishHolidays, us
 import { CreateShiftDialog } from "@/components/shift-planning/CreateShiftDialog";
 import { ShiftCard } from "@/components/shift-planning/ShiftCard";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+type CellStatus = "shift" | "vacation" | "sick";
 
 export default function ShiftOverview() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  const { data: shifts, isLoading: shiftsLoading } = useShifts(
+  const { data: shifts } = useShifts(
     format(weekStart, "yyyy-MM-dd"),
     format(weekEnd, "yyyy-MM-dd"),
     selectedDepartment
@@ -34,6 +42,63 @@ export default function ShiftOverview() {
     format(weekStart, "yyyy-MM-dd"),
     format(weekEnd, "yyyy-MM-dd")
   );
+
+  // Mutation to create absence
+  const createAbsence = useMutation({
+    mutationFn: async ({ employeeId, date, type }: { employeeId: string; date: string; type: "vacation" | "sick" }) => {
+      const { error } = await supabase
+        .from("absence_request_v2")
+        .insert({
+          employee_id: employeeId,
+          start_date: date,
+          end_date: date,
+          type,
+          status: "approved",
+          is_full_day: true,
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["absences-date-range"] });
+    },
+    onError: (error: any) => {
+      toast.error("Kunne ikke oprette fravær: " + error.message);
+    },
+  });
+
+  // Mutation to update absence type
+  const updateAbsence = useMutation({
+    mutationFn: async ({ id, type }: { id: string; type: "vacation" | "sick" }) => {
+      const { error } = await supabase
+        .from("absence_request_v2")
+        .update({ type })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["absences-date-range"] });
+    },
+    onError: (error: any) => {
+      toast.error("Kunne ikke opdatere fravær: " + error.message);
+    },
+  });
+
+  // Mutation to delete absence
+  const deleteAbsence = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("absence_request_v2")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["absences-date-range"] });
+    },
+    onError: (error: any) => {
+      toast.error("Kunne ikke slette fravær: " + error.message);
+    },
+  });
 
   const isHoliday = (date: Date) => {
     return holidays?.some(h => isSameDay(new Date(h.date), date));
@@ -72,8 +137,20 @@ export default function ShiftOverview() {
     return map;
   }, [absences]);
 
-  // Check if employee has absence on a specific date
+  // Get absence for specific date (single-day match only for click cycling)
   const getAbsenceForDate = (employeeId: string, date: Date): AbsenceRequest | null => {
+    const employeeAbsences = absencesByEmployee.get(employeeId);
+    if (!employeeAbsences) return null;
+    
+    const dateStr = format(date, "yyyy-MM-dd");
+    return employeeAbsences.find(absence => {
+      // For click cycling, we only match single-day absences on exact date
+      return absence.start_date === dateStr && absence.end_date === dateStr;
+    }) || null;
+  };
+
+  // Check if date is within any absence range (for display)
+  const isDateInAbsence = (employeeId: string, date: Date): AbsenceRequest | null => {
     const employeeAbsences = absencesByEmployee.get(employeeId);
     if (!employeeAbsences) return null;
     
@@ -87,6 +164,36 @@ export default function ShiftOverview() {
   const totalPlannedHours = useMemo(() => {
     return shifts?.reduce((sum, s) => sum + (s.planned_hours || 0), 0) || 0;
   }, [shifts]);
+
+  // Handle cell click - cycle through: shift -> vacation -> sick -> shift
+  const handleCellClick = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null, hasShift: boolean) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+
+    if (hasShift) {
+      // If there's a shift, open edit dialog instead of cycling
+      return;
+    }
+
+    if (!currentAbsence) {
+      // No absence -> create vacation
+      createAbsence.mutate({ employeeId, date: dateStr, type: "vacation" });
+    } else if (currentAbsence.type === "vacation") {
+      // Vacation -> change to sick
+      updateAbsence.mutate({ id: currentAbsence.id, type: "sick" });
+    } else if (currentAbsence.type === "sick") {
+      // Sick -> remove absence (back to normal/shift)
+      deleteAbsence.mutate(currentAbsence.id);
+    }
+  };
+
+  // Handle double-click to open create shift dialog
+  const handleCellDoubleClick = (employeeId: string, date: Date, absence: AbsenceRequest | null) => {
+    if (!absence) {
+      setSelectedEmployeeId(employeeId);
+      setSelectedDate(date);
+      setCreateDialogOpen(true);
+    }
+  };
 
   return (
     <MainLayout>
@@ -111,7 +218,7 @@ export default function ShiftOverview() {
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={() => { setSelectedDate(new Date()); setCreateDialogOpen(true); }}>
+            <Button onClick={() => { setSelectedDate(new Date()); setSelectedEmployeeId(null); setCreateDialogOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" />
               Ny vagt
             </Button>
@@ -137,16 +244,17 @@ export default function ShiftOverview() {
         <div className="flex gap-4 text-sm">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-green-500/20 border border-green-500"></div>
-            <span>Vagt</span>
+            <span>Vagt / Normal</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-amber-500/20 border border-amber-500"></div>
-            <span>Ferie</span>
+            <span>Ferie (1 klik)</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-red-500/20 border border-red-500"></div>
-            <span>Syg</span>
+            <span>Syg (2 klik)</span>
           </div>
+          <span className="text-muted-foreground text-xs ml-4">Dobbeltklik for at oprette vagt</span>
         </div>
 
         {/* Stats Cards */}
@@ -233,18 +341,19 @@ export default function ShiftOverview() {
                     const dayShifts = shiftsByEmployeeAndDate.get(employee.id)?.get(dateKey) || [];
                     const holiday = isHoliday(day);
                     const absence = getAbsenceForDate(employee.id, day);
+                    const absenceDisplay = isDateInAbsence(employee.id, day);
                     const hasShift = dayShifts.length > 0;
-                    const isVacation = absence?.type === "vacation";
-                    const isSick = absence?.type === "sick";
+                    const isVacation = absenceDisplay?.type === "vacation";
+                    const isSick = absenceDisplay?.type === "sick";
                     
                     // Determine cell styling based on status
                     const cellClasses = cn(
-                      "min-h-[60px] border rounded-lg p-1 cursor-pointer transition-colors",
-                      holiday && "bg-destructive/5 border-destructive/20",
+                      "min-h-[60px] border rounded-lg p-1 cursor-pointer transition-colors select-none",
+                      holiday && "bg-destructive/5 border-destructive/20 cursor-not-allowed",
                       !holiday && hasShift && "bg-green-500/20 border-green-500 hover:bg-green-500/30",
                       !holiday && !hasShift && isVacation && "bg-amber-500/20 border-amber-500 hover:bg-amber-500/30",
                       !holiday && !hasShift && isSick && "bg-red-500/20 border-red-500 hover:bg-red-500/30",
-                      !holiday && !hasShift && !absence && "border-border hover:bg-muted/50"
+                      !holiday && !hasShift && !absenceDisplay && "border-border hover:bg-muted/50"
                     );
                     
                     return (
@@ -252,9 +361,13 @@ export default function ShiftOverview() {
                         key={day.toISOString()}
                         className={cellClasses}
                         onClick={() => {
-                          if (!holiday && !absence) {
-                            setSelectedDate(day);
-                            setCreateDialogOpen(true);
+                          if (!holiday) {
+                            handleCellClick(employee.id, day, absence, hasShift);
+                          }
+                        }}
+                        onDoubleClick={() => {
+                          if (!holiday) {
+                            handleCellDoubleClick(employee.id, day, absenceDisplay);
                           }
                         }}
                       >
@@ -273,7 +386,7 @@ export default function ShiftOverview() {
                             <span>Syg</span>
                           </div>
                         )}
-                        {!hasShift && !absence && !holiday && (
+                        {!hasShift && !absenceDisplay && !holiday && (
                           <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-xs">
                             {employee.standard_start_time ? (
                               <span className="text-[10px]">{employee.standard_start_time}</span>
@@ -303,6 +416,7 @@ export default function ShiftOverview() {
           onOpenChange={setCreateDialogOpen}
           selectedDate={selectedDate}
           employees={employees || []}
+          preselectedEmployeeId={selectedEmployeeId || undefined}
         />
       </div>
     </MainLayout>
