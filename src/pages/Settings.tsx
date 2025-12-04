@@ -65,6 +65,22 @@ export default function Settings() {
     }
   };
 
+  const syncTdcOctober2025 = async () => {
+    setLoading("sync-tdc-october-2025");
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-adversus", {
+        body: { action: "sync-tdc-october-2025" },
+      });
+      if (error) throw error;
+      setResults({ type: "sync-tdc-october-2025", data });
+      toast.success(data?.message || "Sync af TDC Erhverv (oktober 2025) gennemført");
+    } catch (err: any) {
+      toast.error(err.message || "Sync af TDC Erhverv (oktober 2025) fejlede");
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const testWebhook = async () => {
     setLoading("webhook");
     try {
@@ -285,6 +301,15 @@ export default function Settings() {
               <Button onClick={syncSalesToDb} disabled={loading === "sync"} className="w-full bg-green-600 hover:bg-green-700">
                 {loading === "sync" && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
                 Sync til Database
+              </Button>
+              <Button
+                onClick={syncTdcOctober2025}
+                disabled={loading === "sync-tdc-october-2025"}
+                variant="outline"
+                className="w-full mt-2"
+              >
+                {loading === "sync-tdc-october-2025" && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+                Sync kun TDC Erhverv (oktober 2025)
               </Button>
             </CardContent>
           </Card>
