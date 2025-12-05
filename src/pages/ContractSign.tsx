@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { MainLayout } from "@/components/layout/MainLayout";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,7 +28,7 @@ const statusLabels: Record<ContractStatus, string> = {
 export default function ContractSign() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [accepted, setAccepted] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -177,50 +177,52 @@ export default function ContractSign() {
     onError: () => toast.error("Kunne ikke afvise kontrakt"),
   });
 
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return (
-      <MainLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-        </div>
-      </MainLayout>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
     );
   }
 
   if (!contract) {
     return (
-      <MainLayout>
-        <Card>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
           <CardContent className="py-8 text-center">
             <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">Kontrakt ikke fundet</h2>
             <p className="text-muted-foreground mb-4">
               Kontrakten eksisterer ikke eller du har ikke adgang til den.
             </p>
-            <Button onClick={() => navigate("/my-contracts")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Tilbage til mine kontrakter
+            <Button onClick={() => navigate("/auth")}>
+              Log ind
             </Button>
           </CardContent>
         </Card>
-      </MainLayout>
+      </div>
     );
   }
 
   const mySignature = contract.signatures?.find(
     (s: any) => s.signer_employee_id === currentEmployee?.id
   );
-  const canSign = contract.status === "pending_employee" && mySignature && !mySignature.signed_at;
+  const canSign = user && contract.status === "pending_employee" && mySignature && !mySignature.signed_at;
   const alreadySigned = mySignature?.signed_at;
+  const needsLogin = !user && contract.status === "pending_employee";
 
   return (
-    <MainLayout>
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-4xl mx-auto p-4 space-y-6">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => navigate("/my-contracts")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Tilbage
-          </Button>
+          {user ? (
+            <Button variant="ghost" onClick={() => navigate("/my-contracts")}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Tilbage
+            </Button>
+          ) : (
+            <div />
+          )}
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -242,11 +244,11 @@ export default function ContractSign() {
                   : contract.status === "pending_employee"
                   ? "bg-amber-100 text-amber-800"
                   : "bg-muted text-muted-foreground"
-            }
-          >
-            {statusLabels[contract.status as ContractStatus]}
-          </Badge>
-          </div>
+              }
+            >
+              {statusLabels[contract.status as ContractStatus]}
+            </Badge>
+            </div>
         </div>
 
         <Card>
@@ -338,6 +340,22 @@ export default function ContractSign() {
           </Card>
         )}
 
+        {/* Login prompt for unauthenticated users */}
+        {needsLogin && (
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="pt-6">
+              <div className="text-center space-y-4">
+                <p className="text-amber-800 font-medium">
+                  Log ind for at underskrive denne kontrakt
+                </p>
+                <Button onClick={() => navigate(`/auth?redirect=/contract/${id}`)}>
+                  Log ind
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {alreadySigned && (
           <Card className="border-green-200 bg-green-50">
             <CardContent className="pt-6">
@@ -375,6 +393,6 @@ export default function ContractSign() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </MainLayout>
+    </div>
   );
 }
