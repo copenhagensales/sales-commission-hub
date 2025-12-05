@@ -51,17 +51,20 @@ export function AppSidebar() {
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
 
   const handleLogout = async () => {
+    // Clear local storage first to ensure logout works even if network fails
+    const keysToRemove = Object.keys(localStorage).filter(key => 
+      key.startsWith('sb-') || key.includes('supabase')
+    );
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        toast({ title: "Fejl ved logout", description: error.message, variant: "destructive" });
-      }
+      await supabase.auth.signOut();
     } catch (e) {
       console.error("Logout error:", e);
-    } finally {
-      // Always navigate to auth page, even if there's an error
-      navigate("/auth");
     }
+    
+    // Always navigate to auth page
+    navigate("/auth");
   };
 
   return (
