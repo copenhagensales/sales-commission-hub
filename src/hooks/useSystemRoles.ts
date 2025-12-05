@@ -147,14 +147,22 @@ export function useRemoveRole() {
 
 // Helper to check permissions
 export function useCanAccess() {
-  const { data: roleData, isLoading } = useCurrentUserRole();
+  const { data: roleData, isLoading, isFetching, isPending } = useCurrentUserRole();
+
+  // Consider loading if query is pending, loading, or fetching
+  const isRoleLoading = isLoading || isPending || isFetching;
 
   const isOwner = roleData?.role === "ejer";
   const isTeamleder = roleData?.role === "teamleder";
-  const isMedarbejder = roleData?.role === "medarbejder" || !roleData;
+  const isMedarbejder = roleData?.role === "medarbejder" || (!roleData && !isRoleLoading);
+
+  console.log("useCanAccess:", { 
+    isLoading, isPending, isFetching, isRoleLoading,
+    role: roleData?.role, isOwner, isTeamleder 
+  });
 
   return {
-    isLoading,
+    isLoading: isRoleLoading,
     role: roleData?.role || "medarbejder",
     isOwner,
     isTeamleder,
