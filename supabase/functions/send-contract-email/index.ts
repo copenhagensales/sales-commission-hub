@@ -101,7 +101,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const baseUrl = appUrl || "https://jwlimmeijpfmaksvmuru.lovableproject.com";
+    const baseUrl = "https://jwlimmeijpfmaksvmuru.lovable.app";
     const contractUrl = `${baseUrl}/contract/${contractId}`;
 
     const htmlBody = `
