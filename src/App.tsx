@@ -42,6 +42,7 @@ import TimeTracking from "./pages/shift-planning/TimeTracking";
 import Contracts from "./pages/Contracts";
 import MyContracts from "./pages/MyContracts";
 import ContractSign from "./pages/ContractSign";
+import Admin from "./pages/Admin";
 
 const queryClient = new QueryClient();
 
@@ -126,6 +127,8 @@ const App = () => (
           <Route path="/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
           <Route path="/my-contracts" element={<ProtectedRoute><MyContracts /></ProtectedRoute>} />
           <Route path="/contract/:id" element={<ProtectedRoute><ContractSign /></ProtectedRoute>} />
+          {/* Admin route */}
+          <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
