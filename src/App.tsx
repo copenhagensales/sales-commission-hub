@@ -38,6 +38,10 @@ import ShiftOverview from "./pages/shift-planning/ShiftOverview";
 import MySchedule from "./pages/shift-planning/MySchedule";
 import AbsenceManagement from "./pages/shift-planning/AbsenceManagement";
 import TimeTracking from "./pages/shift-planning/TimeTracking";
+// Contract pages
+import Contracts from "./pages/Contracts";
+import MyContracts from "./pages/MyContracts";
+import ContractSign from "./pages/ContractSign";
 
 const queryClient = new QueryClient();
 
@@ -118,6 +122,10 @@ const App = () => (
           <Route path="/shift-planning/my-schedule" element={<ProtectedRoute><MySchedule /></ProtectedRoute>} />
           <Route path="/shift-planning/absence" element={<ProtectedRoute><AbsenceManagement /></ProtectedRoute>} />
           <Route path="/shift-planning/time-tracking" element={<ProtectedRoute><TimeTracking /></ProtectedRoute>} />
+          {/* Contract routes */}
+          <Route path="/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
+          <Route path="/my-contracts" element={<ProtectedRoute><MyContracts /></ProtectedRoute>} />
+          <Route path="/contract/:id" element={<ProtectedRoute><ContractSign /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
