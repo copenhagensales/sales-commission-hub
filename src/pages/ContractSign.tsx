@@ -284,7 +284,30 @@ export default function ContractSign() {
             </div>
         </div>
 
-        <Card className="bg-white border-gray-200">
+        <Card className="bg-white border-gray-200 relative overflow-hidden">
+          {/* Official stamp overlay when signed */}
+          {contract.status === "signed" && (
+            <div className="absolute top-8 right-8 z-10 pointer-events-none">
+              <div className="relative">
+                {/* Outer ring */}
+                <div className="w-32 h-32 rounded-full border-4 border-green-600 flex items-center justify-center transform rotate-[-15deg] opacity-80">
+                  {/* Inner content */}
+                  <div className="w-28 h-28 rounded-full border-2 border-green-600 flex flex-col items-center justify-center bg-white/90">
+                    <span className="text-green-600 font-bold text-xs tracking-wider">COPENHAGEN</span>
+                    <span className="text-green-600 font-bold text-xs tracking-wider">SALES</span>
+                    <div className="w-16 h-0.5 bg-green-600 my-1" />
+                    <span className="text-green-700 font-extrabold text-sm">GODKENDT</span>
+                    <div className="w-16 h-0.5 bg-green-600 my-1" />
+                    <span className="text-green-600 text-[10px] font-medium">
+                      {format(new Date(), "dd.MM.yyyy")}
+                    </span>
+                  </div>
+                </div>
+                {/* Signature line effect */}
+                <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-20 h-1 bg-green-600/30 blur-sm" />
+              </div>
+            </div>
+          )}
           <CardHeader>
             <CardTitle className="text-gray-900">{contract.title}</CardTitle>
             {contract.sent_at && (
