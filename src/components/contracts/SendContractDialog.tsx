@@ -10,9 +10,39 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { Send, Eye } from "lucide-react";
+import { Send, Eye, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "other";
+
+// Required fields for contract merge - must have values before sending
+interface RequiredField {
+  key: keyof EmployeeData;
+  label: string;
+  check: (employee: EmployeeData) => boolean;
+}
+
+const requiredFieldsForContract: RequiredField[] = [
+  { key: "private_email", label: "Privat email", check: (e) => !!e.private_email },
+  { key: "cpr_number", label: "CPR-nummer", check: (e) => !!e.cpr_number },
+  { key: "address_street", label: "Adresse (vej)", check: (e) => !!e.address_street },
+  { key: "address_postal_code", label: "Postnummer", check: (e) => !!e.address_postal_code },
+  { key: "address_city", label: "By", check: (e) => !!e.address_city },
+  { key: "job_title", label: "Stilling", check: (e) => !!e.job_title },
+  { key: "work_location", label: "Arbejdssted", check: (e) => !!e.work_location },
+  { key: "weekly_hours", label: "Ugentlige timer", check: (e) => e.weekly_hours !== null && e.weekly_hours !== undefined },
+  { key: "salary_type", label: "Løntype", check: (e) => !!e.salary_type },
+  { key: "salary_amount", label: "Lønbeløb", check: (e) => e.salary_amount !== null && e.salary_amount !== undefined },
+  { key: "vacation_type", label: "Ferietype", check: (e) => !!e.vacation_type },
+  { key: "employment_start_date", label: "Ansættelsesdato", check: (e) => !!e.employment_start_date },
+  { key: "standard_start_time", label: "Mødetid", check: (e) => !!e.standard_start_time },
+];
+
+const getMissingFields = (employee: EmployeeData): string[] => {
+  return requiredFieldsForContract
+    .filter((field) => !field.check(employee))
+    .map((field) => field.label);
+};
 
 interface EmployeeData {
   id: string;
@@ -72,6 +102,10 @@ export function SendContractDialog({
   const [notes, setNotes] = useState("");
   const [previewContent, setPreviewContent] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+
+  // Check for missing required fields
+  const missingFields = getMissingFields(employee);
+  const hasMissingFields = missingFields.length > 0;
 
   // Fetch templates
   const { data: templates = [] } = useQuery({
@@ -246,6 +280,23 @@ export function SendContractDialog({
 
         {!showPreview ? (
           <div className="space-y-4">
+            {hasMissingFields && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Manglende stamdata</AlertTitle>
+                <AlertDescription>
+                  <p className="mb-2">
+                    Følgende oplysninger skal udfyldes på medarbejderen før kontrakten kan sendes:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1">
+                    {missingFields.map((field) => (
+                      <li key={field}>{field}</li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-2">
               <Label>Vælg skabelon</Label>
               <Select value={selectedTemplateId} onValueChange={handleTemplateChange}>
@@ -336,7 +387,7 @@ export function SendContractDialog({
               <Button
                 variant="outline"
                 onClick={() => setShowPreview(true)}
-                disabled={!selectedTemplateId}
+                disabled={!selectedTemplateId || hasMissingFields}
               >
                 <Eye className="h-4 w-4 mr-2" />
                 Forhåndsvis
