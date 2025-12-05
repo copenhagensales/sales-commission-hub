@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X, History, Phone, Mail, Pencil, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, TrendingUp, AlertTriangle, AlarmClock, FileText, Send } from "lucide-react";
 import { SendContractDialog } from "@/components/contracts/SendContractDialog";
+import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -1026,6 +1027,33 @@ export default function EmployeeDetail() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Employee Calendar */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Clock className="h-4 w-4 text-primary" />
+                    Min vagtplan
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <EmployeeCalendar
+                    standardStartTime={employee.standard_start_time}
+                    absences={absences.map(a => ({
+                      id: a.id,
+                      type: a.type as "sick" | "vacation",
+                      start_date: a.start_date,
+                      end_date: a.end_date,
+                    }))}
+                    latenessRecords={latenessRecords.map(l => ({
+                      id: l.id,
+                      date: l.date,
+                      minutes: l.minutes,
+                    }))}
+                    weeksToShow={8}
+                  />
+                </CardContent>
+              </Card>
 
               {/* Overview Stats */}
               <div className="grid gap-4 md:grid-cols-3">
