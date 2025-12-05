@@ -204,6 +204,14 @@ export default function VagtEmployees() {
       setShowDeleteDialog(null);
       toast({ title: "Medarbejder slettet" });
     },
+    onError: (error: any) => {
+      console.error("Delete error:", error);
+      toast({ 
+        title: "Kunne ikke slette medarbejder", 
+        description: error.message || "Du har muligvis ikke tilladelse til at slette medarbejdere.",
+        variant: "destructive" 
+      });
+    },
   });
 
   const addAbsenceMutation = useMutation({
