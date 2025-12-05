@@ -29,6 +29,7 @@ interface EmployeeMasterDataRecord {
   address_country: string | null;
   private_phone: string | null;
   private_email: string | null;
+  work_email: string | null;
   employment_start_date: string | null;
   employment_end_date: string | null;
   job_title: string | null;
@@ -67,6 +68,7 @@ const defaultEmployee: NewEmployee = {
   address_country: "Danmark",
   private_phone: null,
   private_email: null,
+  work_email: null,
   employment_start_date: null,
   employment_end_date: null,
   job_title: null,
@@ -206,6 +208,7 @@ export default function EmployeeMasterData() {
       address_country: employee.address_country,
       private_phone: employee.private_phone,
       private_email: employee.private_email,
+      work_email: employee.work_email,
       employment_start_date: employee.employment_start_date,
       employment_end_date: employee.employment_end_date,
       job_title: employee.job_title,

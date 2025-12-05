@@ -943,6 +943,7 @@ export type Database = {
           vacation_bonus_percent: number | null
           vacation_type: Database["public"]["Enums"]["vacation_type"] | null
           weekly_hours: number | null
+          work_email: string | null
           work_location: string | null
           working_hours_model: string | null
         }
@@ -979,6 +980,7 @@ export type Database = {
           vacation_bonus_percent?: number | null
           vacation_type?: Database["public"]["Enums"]["vacation_type"] | null
           weekly_hours?: number | null
+          work_email?: string | null
           work_location?: string | null
           working_hours_model?: string | null
         }
@@ -1015,6 +1017,7 @@ export type Database = {
           vacation_bonus_percent?: number | null
           vacation_type?: Database["public"]["Enums"]["vacation_type"] | null
           weekly_hours?: number | null
+          work_email?: string | null
           work_location?: string | null
           working_hours_model?: string | null
         }
