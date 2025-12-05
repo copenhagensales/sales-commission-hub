@@ -28,6 +28,7 @@ interface EmployeeMasterDataRecord {
   address_country: string | null;
   private_phone: string | null;
   private_email: string | null;
+  work_email: string | null;
   employment_start_date: string | null;
   employment_end_date: string | null;
   job_title: string | null;
@@ -777,7 +778,8 @@ export default function EmployeeDetail() {
                   <EditableField label="By" value={employee.address_city} field="address_city" onSave={handleSave} />
                   <EditableField label="Land" value={employee.address_country} field="address_country" onSave={handleSave} />
                   <ClickableContactField label="Telefon" value={employee.private_phone} field="private_phone" type="phone" onSave={handleSave} />
-                  <ClickableContactField label="E-mail" value={employee.private_email} field="private_email" type="email" onSave={handleSave} />
+                  <ClickableContactField label="Privat email" value={employee.private_email} field="private_email" type="email" onSave={handleSave} />
+                  <ClickableContactField label="Arbejdsemail" value={employee.work_email} field="work_email" type="email" onSave={handleSave} />
                 </CardContent>
               </Card>
 
