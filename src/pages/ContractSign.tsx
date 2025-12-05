@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { Check, X, FileText, ArrowLeft, Clock } from "lucide-react";
+import { Check, X, FileText, ArrowLeft, Clock, Download, Loader2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
@@ -32,6 +32,46 @@ export default function ContractSign() {
   const queryClient = useQueryClient();
   const [accepted, setAccepted] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  // Download PDF function
+  const handleDownloadPdf = async () => {
+    if (!id) return;
+    setDownloadingPdf(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-contract-pdf", {
+        body: { contractId: id },
+      });
+      
+      if (error) throw error;
+      if (!data?.pdf) throw new Error("No PDF data received");
+
+      // Convert base64 to blob and download
+      const byteCharacters = atob(data.pdf);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "application/pdf" });
+      
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = data.filename || "kontrakt.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success("PDF downloadet");
+    } catch (err: any) {
+      console.error("PDF download error:", err);
+      toast.error("Kunne ikke generere PDF");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   // Fetch contract with signatures
   const { data: contract, isLoading } = useQuery({
@@ -181,17 +221,32 @@ export default function ContractSign() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Tilbage
           </Button>
-          <Badge
-            className={
-              contract.status === "signed"
-                ? "bg-green-100 text-green-800"
-                : contract.status === "pending_employee"
-                ? "bg-amber-100 text-amber-800"
-                : "bg-muted text-muted-foreground"
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+            >
+              {downloadingPdf ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Download PDF
+            </Button>
+            <Badge
+              className={
+                contract.status === "signed"
+                  ? "bg-green-100 text-green-800"
+                  : contract.status === "pending_employee"
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-muted text-muted-foreground"
             }
           >
             {statusLabels[contract.status as ContractStatus]}
           </Badge>
+          </div>
         </div>
 
         <Card>
