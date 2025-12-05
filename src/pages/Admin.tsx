@@ -6,21 +6,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Shield, Users, Crown, User, Search, Info } from "lucide-react";
 import { useCanAccess, SystemRole } from "@/hooks/useSystemRoles";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-interface UserWithRole {
-  id: string;
-  email: string;
+interface EmployeeRole {
+  employee_id: string;
   first_name: string | null;
   last_name: string | null;
+  email: string | null;
   job_title: string | null;
-  role: SystemRole | null;
+  is_active: boolean;
+  auth_user_id: string | null;
   role_id: string | null;
+  role: SystemRole | null;
 }
 
 export default function Admin() {
@@ -28,108 +29,50 @@ export default function Admin() {
   const queryClient = useQueryClient();
   const { isOwner, isLoading: accessLoading } = useCanAccess();
 
-  // Fetch users with their roles
-  const { data: users, isLoading } = useQuery({
-    queryKey: ["admin-users-roles"],
+  // Fetch users with their roles using the secure RPC function
+  const { data: users, isLoading, error } = useQuery({
+    queryKey: ["admin-employee-roles"],
     queryFn: async () => {
-      // Get employees with email
-      const { data: employees, error: empError } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name, private_email, job_title")
-        .eq("is_active", true)
-        .order("first_name");
-
-      if (empError) throw empError;
-
-      // Get all roles
-      const { data: roles, error: roleError } = await supabase
-        .from("system_roles")
-        .select("*");
-
-      if (roleError) throw roleError;
-
-      // For each employee, try to find their auth user and role
-      const usersWithRoles: UserWithRole[] = [];
-
-      for (const emp of employees || []) {
-        if (!emp.private_email) continue;
-
-        // Find role by matching email pattern
-        const matchingRole = roles?.find((r) => {
-          // We need to get the auth user's email - this is a workaround
-          // In production, you'd want a view or function for this
-          return false;
-        });
-
-        usersWithRoles.push({
-          id: emp.id,
-          email: emp.private_email,
-          first_name: emp.first_name,
-          last_name: emp.last_name,
-          job_title: emp.job_title,
-          role: null,
-          role_id: null,
-        });
-      }
-
-      // Also include roles that have user_ids
-      for (const role of roles || []) {
-        const existingUser = usersWithRoles.find((u) => u.id === role.user_id);
-        if (existingUser) {
-          existingUser.role = role.role as SystemRole;
-          existingUser.role_id = role.id;
-        } else {
-          // User has role but not in employee_master_data - fetch from auth
-          usersWithRoles.push({
-            id: role.user_id,
-            email: "Ukendt",
-            first_name: null,
-            last_name: null,
-            job_title: null,
-            role: role.role as SystemRole,
-            role_id: role.id,
-          });
-        }
-      }
-
-      return usersWithRoles;
+      const { data, error } = await supabase.rpc("get_employee_roles_for_admin");
+      if (error) throw error;
+      return data as EmployeeRole[];
     },
     enabled: isOwner,
   });
 
-  // Assign role mutation
+  // Assign role mutation using RPC
   const assignRole = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: SystemRole }) => {
-      const { error } = await supabase
-        .from("system_roles")
-        .upsert({ user_id: userId, role }, { onConflict: "user_id" });
-
+    mutationFn: async ({ email, role }: { email: string; role: SystemRole }) => {
+      const { error } = await supabase.rpc("assign_role_by_email", {
+        _email: email,
+        _role: role,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-users-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-employee-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["system-role"] });
       toast.success("Rolle opdateret");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Kunne ikke opdatere rolle: " + error.message);
     },
   });
 
-  // Remove role mutation
+  // Remove role mutation using RPC
   const removeRole = useMutation({
-    mutationFn: async (userId: string) => {
-      const { error } = await supabase
-        .from("system_roles")
-        .delete()
-        .eq("user_id", userId);
-
+    mutationFn: async (email: string) => {
+      const { error } = await supabase.rpc("remove_role_by_email", {
+        _email: email,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-users-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-employee-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["system-role"] });
       toast.success("Rolle fjernet");
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Kunne ikke fjerne rolle: " + error.message);
     },
   });
@@ -282,7 +225,8 @@ export default function Admin() {
           <CardHeader>
             <CardTitle>Brugerroller</CardTitle>
             <CardDescription>
-              Tildel roller til brugere for at styre deres adgang til systemet
+              Tildel roller til brugere for at styre deres adgang til systemet.
+              Kun brugere med en aktiv login (auth konto) kan tildeles en rolle.
             </CardDescription>
             <div className="relative mt-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -299,6 +243,11 @@ export default function Admin() {
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
+            ) : error ? (
+              <Alert variant="destructive">
+                <AlertTitle>Fejl</AlertTitle>
+                <AlertDescription>{(error as Error).message}</AlertDescription>
+              </Alert>
             ) : (
               <Table>
                 <TableHeader>
@@ -306,31 +255,43 @@ export default function Admin() {
                     <TableHead>Navn</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Stilling</TableHead>
+                    <TableHead>Login status</TableHead>
                     <TableHead>Nuværende rolle</TableHead>
                     <TableHead>Handling</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredUsers?.map((user) => (
-                    <TableRow key={user.id}>
+                    <TableRow key={user.employee_id}>
                       <TableCell className="font-medium">
                         {user.first_name} {user.last_name}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {user.email}
+                        {user.email || "-"}
                       </TableCell>
                       <TableCell>{user.job_title || "-"}</TableCell>
+                      <TableCell>
+                        {user.auth_user_id ? (
+                          <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30">
+                            Aktiv
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            Ingen login
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        {user.auth_user_id && user.email ? (
                           <Select
                             value={user.role || "none"}
                             onValueChange={(value) => {
                               if (value === "none") {
-                                removeRole.mutate(user.id);
+                                removeRole.mutate(user.email!);
                               } else {
                                 assignRole.mutate({
-                                  userId: user.id,
+                                  email: user.email!,
                                   role: value as SystemRole,
                                 });
                               }
@@ -346,13 +307,17 @@ export default function Admin() {
                               <SelectItem value="ejer">Ejer</SelectItem>
                             </SelectContent>
                           </Select>
-                        </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            Kræver login
+                          </span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
                   {filteredUsers?.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         Ingen brugere fundet
                       </TableCell>
                     </TableRow>

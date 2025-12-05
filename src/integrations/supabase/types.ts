@@ -74,20 +74,6 @@ export type Database = {
             referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "absence_request_v2_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["employee_id"]
-          },
-          {
-            foreignKeyName: "absence_request_v2_reviewed_by_fkey"
-            columns: ["reviewed_by"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["auth_user_id"]
-          },
         ]
       }
       accounts_map: {
@@ -249,15 +235,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "agents_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["auth_user_id"]
-          },
-        ]
+        Relationships: []
       }
       booking: {
         Row: {
@@ -598,13 +576,6 @@ export type Database = {
             referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "contract_signatures_signer_employee_id_fkey"
-            columns: ["signer_employee_id"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["employee_id"]
-          },
         ]
       }
       contract_templates: {
@@ -644,15 +615,7 @@ export type Database = {
           updated_at?: string | null
           version?: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "contract_templates_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["auth_user_id"]
-          },
-        ]
+        Relationships: []
       }
       contracts: {
         Row: {
@@ -707,20 +670,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contracts_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["employee_id"]
-          },
-          {
-            foreignKeyName: "contracts_sent_by_fkey"
-            columns: ["sent_by"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["auth_user_id"]
           },
           {
             foreignKeyName: "contracts_template_id_fkey"
@@ -958,13 +907,6 @@ export type Database = {
             referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "employee_invitations_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["employee_id"]
-          },
         ]
       }
       employee_master_data: {
@@ -1085,13 +1027,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "employee_master_data_manager_id_fkey"
-            columns: ["manager_id"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["employee_id"]
-          },
-          {
             foreignKeyName: "employee_master_data_system_role_id_fkey"
             columns: ["system_role_id"]
             isOneToOne: false
@@ -1171,13 +1106,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lateness_record_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["employee_id"]
           },
         ]
       }
@@ -1544,25 +1472,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "shift_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["auth_user_id"]
-          },
-          {
             foreignKeyName: "shift_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "shift_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["employee_id"]
           },
         ]
       }
@@ -1597,15 +1511,7 @@ export type Database = {
           type?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "shift_notification_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["auth_user_id"]
-          },
-        ]
+        Relationships: []
       }
       sms_notification_log: {
         Row: {
@@ -1689,15 +1595,7 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "system_roles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["auth_user_id"]
-          },
-        ]
+        Relationships: []
       }
       tdc_cancellation_imports: {
         Row: {
@@ -1767,13 +1665,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "time_entry_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["employee_id"]
           },
           {
             foreignKeyName: "time_entry_shift_id_fkey"
@@ -1893,15 +1784,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_roles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "employee_roles_view"
-            referencedColumns: ["auth_user_id"]
-          },
-        ]
+        Relationships: []
       }
       vehicle: {
         Row: {
@@ -1986,26 +1869,34 @@ export type Database = {
       }
     }
     Views: {
-      employee_roles_view: {
-        Row: {
-          auth_user_id: string | null
-          email: string | null
-          employee_id: string | null
-          first_name: string | null
-          is_active: boolean | null
-          job_title: string | null
-          last_name: string | null
-          role: Database["public"]["Enums"]["system_role"] | null
-          role_id: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
+      assign_role_by_email: {
+        Args: {
+          _email: string
+          _role: Database["public"]["Enums"]["system_role"]
+        }
+        Returns: undefined
+      }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_auth_user_id_by_email: { Args: { _email: string }; Returns: string }
       get_current_employee_id: { Args: never; Returns: string }
       get_employee_id_for_user: { Args: { _user_id: string }; Returns: string }
+      get_employee_roles_for_admin: {
+        Args: never
+        Returns: {
+          auth_user_id: string
+          email: string
+          employee_id: string
+          first_name: string
+          is_active: boolean
+          job_title: string
+          last_name: string
+          role: Database["public"]["Enums"]["system_role"]
+          role_id: string
+        }[]
+      }
       get_invitation_by_token: {
         Args: { _token: string }
         Returns: {
@@ -2037,6 +1928,7 @@ export type Database = {
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_teamleder_or_above: { Args: { _user_id: string }; Returns: boolean }
       is_vagt_admin_or_planner: { Args: { _user_id: string }; Returns: boolean }
+      remove_role_by_email: { Args: { _email: string }; Returns: undefined }
     }
     Enums: {
       absence_request_status: "pending" | "approved" | "rejected"
