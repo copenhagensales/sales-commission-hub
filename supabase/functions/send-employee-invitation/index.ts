@@ -136,7 +136,7 @@ serve(async (req) => {
     }
 
     // Build invitation URL - always use production URL for emails
-    const productionUrl = "https://jwlimmeijpfmaksvmuru.lovableproject.com";
+    const productionUrl = "https://40ce8d9b-c988-4d3b-a8ed-63eb5bed2204.lovableproject.com";
     const invitationUrl = `${productionUrl}/onboarding?token=${token}`;
     
     console.log("Invitation URL:", invitationUrl);
