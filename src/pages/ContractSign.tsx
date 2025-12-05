@@ -212,11 +212,11 @@ export default function ContractSign() {
   const needsLogin = !user && contract.status === "pending_employee";
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white light">
       <div className="max-w-4xl mx-auto p-4 space-y-6">
         <div className="flex items-center justify-between">
           {user ? (
-            <Button variant="ghost" onClick={() => navigate("/my-contracts")}>
+            <Button variant="ghost" className="text-gray-700 hover:bg-gray-100" onClick={() => navigate("/my-contracts")}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Tilbage
             </Button>
@@ -227,6 +227,7 @@ export default function ContractSign() {
             <Button
               variant="outline"
               size="sm"
+              className="border-gray-300 text-gray-700 hover:bg-gray-100"
               onClick={handleDownloadPdf}
               disabled={downloadingPdf}
             >
@@ -251,11 +252,11 @@ export default function ContractSign() {
             </div>
         </div>
 
-        <Card className="bg-white">
+        <Card className="bg-white border-gray-200">
           <CardHeader>
-            <CardTitle>{contract.title}</CardTitle>
+            <CardTitle className="text-gray-900">{contract.title}</CardTitle>
             {contract.sent_at && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-gray-500">
                 Sendt {format(new Date(contract.sent_at), "d. MMMM yyyy", { locale: da })}
               </p>
             )}
@@ -269,19 +270,19 @@ export default function ContractSign() {
         </Card>
 
         {/* Signatures section */}
-        <Card>
+        <Card className="bg-white border-gray-200">
           <CardHeader>
-            <CardTitle className="text-lg">Underskrifter</CardTitle>
+            <CardTitle className="text-lg text-gray-900">Underskrifter</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {contract.signatures?.map((sig: any) => (
               <div
                 key={sig.id}
-                className="flex items-center justify-between p-3 border rounded-lg"
+                className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
               >
                 <div>
-                  <p className="font-medium">{sig.signer_name}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="font-medium text-gray-900">{sig.signer_name}</p>
+                  <p className="text-sm text-gray-500">
                     {sig.signer_type === "employee" ? "Medarbejder" : "Leder"}
                   </p>
                 </div>
@@ -305,7 +306,7 @@ export default function ContractSign() {
 
         {/* Sign section */}
         {canSign && (
-          <Card className="border-primary">
+          <Card className="border-primary bg-white">
             <CardContent className="pt-6 space-y-4">
               <div className="flex items-start gap-3">
                 <Checkbox
@@ -313,7 +314,7 @@ export default function ContractSign() {
                   checked={accepted}
                   onCheckedChange={(checked) => setAccepted(checked === true)}
                 />
-                <label htmlFor="accept" className="text-sm leading-relaxed cursor-pointer">
+                <label htmlFor="accept" className="text-sm leading-relaxed cursor-pointer text-gray-700">
                   Jeg har læst og forstået indholdet af denne kontrakt og accepterer hermed betingelserne.
                 </label>
               </div>
@@ -329,6 +330,7 @@ export default function ContractSign() {
                 </Button>
                 <Button
                   variant="outline"
+                  className="border-gray-300 text-gray-700 hover:bg-gray-100"
                   onClick={() => setRejectDialogOpen(true)}
                   disabled={rejectMutation.isPending}
                 >
