@@ -1573,6 +1573,30 @@ export type Database = {
         }
         Relationships: []
       }
+      system_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["system_role"]
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["system_role"]
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["system_role"]
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       tdc_cancellation_imports: {
         Row: {
           id: string
@@ -1850,6 +1874,7 @@ export type Database = {
     Functions: {
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_current_employee_id: { Args: never; Returns: string }
+      get_employee_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_invitation_by_token: {
         Args: { _token: string }
         Returns: {
@@ -1862,6 +1887,10 @@ export type Database = {
           status: string
         }[]
       }
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["system_role"]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1869,7 +1898,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_in_my_team: {
+        Args: { _employee_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_manager_or_above: { Args: { _user_id: string }; Returns: boolean }
+      is_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_teamleder_or_above: { Args: { _user_id: string }; Returns: boolean }
       is_vagt_admin_or_planner: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
@@ -1906,6 +1941,7 @@ export type Database = {
         | "updated_shift"
         | "deleted_shift"
         | "week_confirmation"
+      system_role: "medarbejder" | "teamleder" | "ejer"
       vacation_type: "vacation_pay" | "vacation_bonus"
       vagt_absence_reason: "Ferie" | "Syg" | "Barn syg" | "Andet"
       vagt_flow_role: "admin" | "planner" | "employee" | "brand_viewer"
@@ -2072,6 +2108,7 @@ export const Constants = {
         "deleted_shift",
         "week_confirmation",
       ],
+      system_role: ["medarbejder", "teamleder", "ejer"],
       vacation_type: ["vacation_pay", "vacation_bonus"],
       vagt_absence_reason: ["Ferie", "Syg", "Barn syg", "Andet"],
       vagt_flow_role: ["admin", "planner", "employee", "brand_viewer"],
