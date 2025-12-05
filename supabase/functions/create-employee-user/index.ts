@@ -67,11 +67,26 @@ serve(async (req) => {
 
     console.log(`Created auth user for ${email} with ID: ${authData.user.id}`);
 
+    // Assign default "medarbejder" role
+    const { error: roleError } = await supabase
+      .from("system_roles")
+      .insert({
+        user_id: authData.user.id,
+        role: "medarbejder"
+      });
+
+    if (roleError) {
+      console.error("Role assignment error:", roleError);
+      // Don't fail the whole operation, just log it
+    } else {
+      console.log(`Assigned medarbejder role to user ${authData.user.id}`);
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         userId: authData.user.id,
-        message: "Bruger oprettet" 
+        message: "Bruger oprettet med medarbejder-rolle" 
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
