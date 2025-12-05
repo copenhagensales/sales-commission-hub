@@ -110,20 +110,21 @@ const handler = async (req: Request): Promise<Response> => {
       <head>
         <meta charset="utf-8">
         <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
           .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .header img { max-width: 180px; height: auto; margin-bottom: 10px; }
           .content { background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; }
           .button { display: inline-block; background: #3b82f6; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
           .button:hover { background: #2563eb; }
-          .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+          .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; background: #f9f9f9; border-radius: 0 0 8px 8px; }
           .contract-title { background: #f3f4f6; padding: 15px; border-radius: 6px; margin: 15px 0; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1 style="margin: 0; font-size: 24px;">Copenhagen Sales</h1>
+            <img src="https://copenhagensales.dk/wp-content/uploads/2023/03/Logo-white-1536x791-1.png" alt="Copenhagen Sales" />
             <p style="margin: 10px 0 0 0; opacity: 0.9;">Ny kontrakt til underskrift</p>
           </div>
           <div class="content">

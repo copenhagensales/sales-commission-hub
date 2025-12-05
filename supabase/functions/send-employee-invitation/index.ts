@@ -150,27 +150,30 @@ serve(async (req) => {
       <head>
         <meta charset="utf-8">
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #1a365d; color: white; padding: 20px; text-align: center; }
-          .content { padding: 20px; background: #f9f9f9; }
-          .button { display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-          .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+          .header { background: #1a365d; color: white; padding: 30px 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .header img { max-width: 180px; height: auto; margin-bottom: 10px; }
+          .header h1 { margin: 10px 0 0 0; font-size: 24px; font-weight: normal; }
+          .content { padding: 30px; background: #ffffff; }
+          .button { display: inline-block; background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: 500; }
+          .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; background: #f9f9f9; border-radius: 0 0 8px 8px; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>Velkommen til CPH Sales</h1>
+            <img src="https://copenhagensales.dk/wp-content/uploads/2023/03/Logo-white-1536x791-1.png" alt="Copenhagen Sales" />
+            <h1>Velkommen!</h1>
           </div>
           <div class="content">
             <p>Hej ${firstName}${lastName ? " " + lastName : ""},</p>
-            <p>Du er blevet tilføjet som medarbejder hos CPH Sales. Vi beder dig udfylde dine personlige oplysninger via linket nedenfor.</p>
+            <p>Du er blevet tilføjet som medarbejder hos Copenhagen Sales. Vi beder dig udfylde dine personlige oplysninger via linket nedenfor.</p>
             <p>Klik på knappen for at udfylde dine stamdata:</p>
             <a href="${invitationUrl}" class="button">Udfyld mine oplysninger</a>
             <p>Linket er gyldigt i 7 dage.</p>
             <p>Hvis du har spørgsmål, er du velkommen til at kontakte os.</p>
-            <p>Med venlig hilsen,<br>CPH Sales</p>
+            <p>Med venlig hilsen,<br>Copenhagen Sales</p>
           </div>
           <div class="footer">
             <p>Denne email er sendt automatisk. Svar venligst ikke på denne email.</p>
@@ -183,7 +186,7 @@ serve(async (req) => {
     await sendEmail(
       accessToken,
       email,
-      "Velkommen til CPH Sales - Udfyld dine oplysninger",
+      "Velkommen til Copenhagen Sales - Udfyld dine oplysninger",
       emailHtml
     );
 
