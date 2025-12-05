@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay, addMonths, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isSameDay, addMonths, subMonths, startOfWeek, addDays, addWeeks } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Clock, CalendarPlus, Thermometer, Umbrella } from "lucide-react";
+import { ChevronLeft, ChevronRight, Briefcase, Thermometer, Umbrella, Palmtree, Clock, CalendarPlus } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +21,38 @@ export default function MySchedule() {
   
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
-  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  
+  // Generate weeks for the month (Mon-Fri only)
+  const generateWeeks = () => {
+    const weeks: Date[][] = [];
+    let weekStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+    
+    while (weekStart <= monthEnd) {
+      const weekDays: Date[] = [];
+      for (let d = 0; d < 5; d++) { // Only Mon-Fri
+        const day = addDays(weekStart, d);
+        if (day.getMonth() === currentDate.getMonth()) {
+          weekDays.push(day);
+        }
+      }
+      if (weekDays.length > 0) {
+        weeks.push(weekDays);
+      }
+      weekStart = addWeeks(weekStart, 1);
+    }
+    return weeks;
+  };
+  
+  const calendarWeeks = generateWeeks();
+
+  // Parse working hours from standard_start_time
+  const parseWorkingHours = (timeString: string | null) => {
+    if (!timeString) return { start: "09:00", end: "17:00" };
+    const [start, end] = timeString.split("-").map(t => t.trim().replace(".", ":"));
+    return { start, end };
+  };
+  
+  const workingHours = employee ? parseWorkingHours(employee.standard_start_time) : { start: "09:00", end: "17:00" };
 
   const { data: shifts } = useMyShifts(
     employee?.id,
@@ -154,92 +185,132 @@ export default function MySchedule() {
           </Button>
         </div>
 
+        {/* Legend */}
+        <div className="flex flex-wrap gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded bg-green-500/20 border border-green-500/30" />
+            <span className="text-muted-foreground">Arbejder</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded bg-amber-500/20 border border-amber-500/30" />
+            <span className="text-muted-foreground">Ferie</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded bg-red-500/20 border border-red-500/30" />
+            <span className="text-muted-foreground">Syg</span>
+          </div>
+        </div>
+
         {/* Calendar Grid */}
         <Card>
           <CardContent className="pt-6">
             {/* Day headers */}
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"].map(day => (
-                <div key={day} className="text-center text-sm font-medium text-muted-foreground p-2">
+            <div className="grid grid-cols-6 bg-muted/50 border-b rounded-t-lg">
+              <div className="p-2 text-xs font-medium text-muted-foreground">Uge</div>
+              {["Man", "Tir", "Ons", "Tor", "Fre"].map(day => (
+                <div key={day} className="p-2 text-xs font-medium text-center text-muted-foreground">
                   {day}
                 </div>
               ))}
             </div>
 
-            {/* Calendar days */}
-            <div className="grid grid-cols-7 gap-1">
-              {/* Empty cells for days before month starts */}
-              {Array.from({ length: (monthStart.getDay() + 6) % 7 }).map((_, i) => (
-                <div key={`empty-${i}`} className="min-h-[100px]" />
-              ))}
-              
-              {monthDays.map(day => {
-                const shift = getShiftForDay(day);
-                const holiday = isHoliday(day);
-                const holidayName = getHolidayName(day);
-                const absence = getAbsenceForDay(day);
-                const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+            {/* Calendar weeks */}
+            {calendarWeeks.map((week, weekIndex) => {
+              const weekNumber = week.length > 0 ? format(week[0], "w") : "";
+              const isCurrentWeek = week.some(day => isToday(day));
 
-                return (
-                  <div
-                    key={day.toISOString()}
-                    className={cn(
-                      "min-h-[100px] border border-border rounded-lg p-2 transition-colors",
-                      isToday(day) && "ring-2 ring-primary",
-                      holiday && "bg-destructive/10",
-                      isWeekend && !holiday && "bg-muted/50"
-                    )}
-                  >
-                    <div className="flex justify-between items-start mb-1">
-                      <span className={cn(
-                        "text-sm font-medium",
-                        isToday(day) && "text-primary"
-                      )}>
-                        {format(day, "d")}
-                      </span>
-                      {!holiday && !isWeekend && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5"
-                          onClick={() => handleDayClick(day, "vacation")}
-                        >
-                          <CalendarPlus className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-
-                    {holiday && (
-                      <Badge variant="destructive" className="text-[10px] mb-1">
-                        {holidayName}
-                      </Badge>
-                    )}
-
-                    {absence && (
-                      <Badge
-                        variant={absence.status === "approved" ? "default" : absence.status === "pending" ? "secondary" : "destructive"}
-                        className="text-[10px] mb-1"
-                      >
-                        {absence.type === "vacation" ? "Ferie" : "Syg"}
-                        {absence.status === "pending" && " (afventer)"}
-                      </Badge>
-                    )}
-
-                    {shift && !absence && (
-                      <div className="bg-primary/10 rounded p-1 text-xs">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          <span>{shift.start_time.slice(0, 5)} - {shift.end_time.slice(0, 5)}</span>
-                        </div>
-                        <p className="text-muted-foreground">{shift.planned_hours?.toFixed(1)}t</p>
-                      </div>
-                    )}
+              return (
+                <div 
+                  key={weekIndex} 
+                  className={cn(
+                    "grid grid-cols-6 border-b last:border-b-0",
+                    isCurrentWeek && "bg-primary/5"
+                  )}
+                >
+                  {/* Week number */}
+                  <div className="p-2 text-xs text-muted-foreground flex items-center justify-center border-r">
+                    {weekNumber}
                   </div>
-                );
-              })}
-            </div>
+
+                  {/* Days */}
+                  {week.map(day => {
+                    const shift = getShiftForDay(day);
+                    const holiday = isHoliday(day);
+                    const holidayName = getHolidayName(day);
+                    const absence = getAbsenceForDay(day);
+                    const isPast = day < new Date() && !isToday(day);
+
+                    // Determine cell style based on status
+                    let bgColor = "bg-green-500/15"; // Default: working day
+                    let icon = <Briefcase className="h-3 w-3 text-green-600" />;
+                    let statusText = workingHours.start.replace(":", ".") + "-" + workingHours.end.replace(":", ".");
+
+                    if (holiday) {
+                      bgColor = "bg-destructive/10";
+                      icon = <CalendarPlus className="h-3 w-3 text-destructive" />;
+                      statusText = holidayName || "Helligdag";
+                    } else if (absence) {
+                      if (absence.type === "vacation") {
+                        bgColor = "bg-amber-500/20";
+                        icon = <Palmtree className="h-3 w-3 text-amber-600" />;
+                        statusText = absence.status === "pending" ? "Ferie (afventer)" : "Ferie";
+                      } else {
+                        bgColor = "bg-red-500/20";
+                        icon = <Thermometer className="h-3 w-3 text-red-500" />;
+                        statusText = absence.status === "pending" ? "Syg (afventer)" : "Syg";
+                      }
+                    } else if (shift) {
+                      statusText = `${shift.start_time.slice(0, 5).replace(":", ".")}-${shift.end_time.slice(0, 5).replace(":", ".")}`;
+                    }
+
+                    return (
+                      <div 
+                        key={day.toISOString()}
+                        className={cn(
+                          "p-1.5 min-h-[60px] border-r last:border-r-0 transition-colors cursor-pointer hover:opacity-80",
+                          bgColor,
+                          isPast && "opacity-60"
+                        )}
+                        onClick={() => !holiday && handleDayClick(day, "vacation")}
+                      >
+                        <div className="flex flex-col h-full">
+                          {/* Date */}
+                          <div className={cn(
+                            "text-xs font-medium mb-1",
+                            isToday(day) && "text-primary font-bold"
+                          )}>
+                            {format(day, "d.")}
+                            {isToday(day) && <span className="ml-1 text-[10px]">(i dag)</span>}
+                          </div>
+
+                          {/* Status */}
+                          <div className="flex items-center gap-1 flex-1">
+                            {icon}
+                            <span className="text-[10px] text-muted-foreground truncate">
+                              {statusText}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Fill empty cells if week doesn't start on Monday */}
+                  {week.length < 5 && Array.from({ length: 5 - week.length }).map((_, i) => (
+                    <div key={`empty-${i}`} className="p-1.5 min-h-[60px] border-r last:border-r-0 bg-muted/30" />
+                  ))}
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
+        
+        {/* Working hours info */}
+        {employee?.standard_start_time && (
+          <p className="text-xs text-muted-foreground">
+            Din standardmødetid er <span className="font-medium">{employee.standard_start_time}</span> (mandag-fredag)
+          </p>
+        )}
 
         {/* Recent Absence Requests */}
         <Card>
