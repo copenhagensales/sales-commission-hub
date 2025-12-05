@@ -82,6 +82,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Generating PDF for contract: ${contract.title}`);
 
+    const isSigned = contract.status === 'signed';
+
     // Create PDF
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -109,6 +111,46 @@ const handler = async (req: Request): Promise<Response> => {
     doc.text('Kontraktdokument', margin, 25);
 
     yPos = 45;
+
+    // Draw official stamp on first page if signed
+    if (isSigned) {
+      const stampX = pageWidth - 55;
+      const stampY = 55;
+      const stampRadius = 22;
+      
+      // Outer circle
+      doc.setDrawColor(34, 139, 34);
+      doc.setLineWidth(1.5);
+      doc.circle(stampX, stampY, stampRadius, 'S');
+      
+      // Inner circle
+      doc.setLineWidth(0.5);
+      doc.circle(stampX, stampY, stampRadius - 3, 'S');
+      
+      // Text - rotated effect simulated with positioning
+      doc.setTextColor(34, 139, 34);
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'bold');
+      doc.text('COPENHAGEN', stampX, stampY - 12, { align: 'center' });
+      doc.text('SALES', stampX, stampY - 7, { align: 'center' });
+      
+      // Horizontal lines
+      doc.setLineWidth(0.3);
+      doc.line(stampX - 12, stampY - 4, stampX + 12, stampY - 4);
+      
+      // Main text
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('GODKENDT', stampX, stampY + 2, { align: 'center' });
+      
+      // Bottom line
+      doc.line(stampX - 12, stampY + 5, stampX + 12, stampY + 5);
+      
+      // Date
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'normal');
+      doc.text(new Date().toLocaleDateString('da-DK'), stampX, stampY + 11, { align: 'center' });
+    }
 
     // Contract title
     doc.setTextColor(0, 0, 0);
