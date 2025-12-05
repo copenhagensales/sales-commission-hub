@@ -16,7 +16,10 @@ export function RoleProtectedRoute({
   const { user, loading: authLoading } = useAuth();
   const { isLoading: roleLoading, role, isTeamlederOrAbove, isOwner } = useCanAccess();
   
-  if (authLoading || roleLoading) {
+  // Wait for both auth and role to fully load
+  const isLoading = authLoading || roleLoading;
+  
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Indlæser...</div>
@@ -28,9 +31,12 @@ export function RoleProtectedRoute({
     return <Navigate to="/auth" replace />;
   }
 
-  // Check role requirements
-  if (requiredRole === "ejer" && !isOwner) {
-    return <Navigate to="/my-schedule" replace />;
+  // Check role requirements - only redirect if we have confirmed role data
+  if (requiredRole === "ejer") {
+    if (!isOwner) {
+      console.log("Admin access denied - isOwner:", isOwner, "role:", role);
+      return <Navigate to="/my-schedule" replace />;
+    }
   }
 
   if (requireTeamlederOrAbove && !isTeamlederOrAbove) {
