@@ -6,8 +6,10 @@ import { useToast } from "@/hooks/use-toast";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useCanAccess } from "@/hooks/useSystemRoles";
 
-const navigation = [
+// Navigation items for teamleder and above
+const teamlederNavigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Agenter", href: "/agents", icon: Users },
   { name: "Medarbejdere", href: "/employees", icon: Users },
@@ -24,6 +26,12 @@ const navigation = [
   { name: "KM test", href: "/km-test", icon: Percent },
 ];
 
+// Navigation items for employees
+const employeeNavigation = [
+  { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
+  { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
+];
+
 const vagtFlowNavigation = [
   { name: "Oversigt", href: "/vagt-flow", icon: LayoutDashboard },
   { name: "Min uge", href: "/vagt-flow/min-uge", icon: UserCheck },
@@ -36,6 +44,11 @@ const vagtFlowNavigation = [
   { name: "Fakturering", href: "/vagt-flow/billing", icon: Receipt },
 ];
 
+// Employee-only vagt-flow items
+const employeeVagtFlowNavigation = [
+  { name: "Min uge", href: "/vagt-flow/min-uge", icon: UserCheck },
+];
+
 const shiftPlanningNavigation = [
   { name: "Vagtplan (leder)", href: "/shift-planning", icon: Calendar },
   { name: "Min kalender", href: "/shift-planning/my-schedule", icon: UserCheck },
@@ -43,15 +56,20 @@ const shiftPlanningNavigation = [
   { name: "Tidsregistrering", href: "/shift-planning/time-tracking", icon: Timer },
 ];
 
+// Employee-only shift planning items
+const employeeShiftPlanningNavigation = [
+  { name: "Min kalender", href: "/shift-planning/my-schedule", icon: UserCheck },
+];
+
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isTeamlederOrAbove, isOwner, isLoading } = useCanAccess();
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
 
   const handleLogout = async () => {
-    // Clear local storage first to ensure logout works even if network fails
     const keysToRemove = Object.keys(localStorage).filter(key => 
       key.startsWith('sb-') || key.includes('supabase')
     );
@@ -63,9 +81,28 @@ export function AppSidebar() {
       console.error("Logout error:", e);
     }
     
-    // Always navigate to auth page
     navigate("/auth");
   };
+
+  // Select navigation based on role
+  const mainNavigation = isTeamlederOrAbove ? teamlederNavigation : employeeNavigation;
+  const currentVagtFlowNav = isTeamlederOrAbove ? vagtFlowNavigation : employeeVagtFlowNavigation;
+  const currentShiftPlanningNav = isTeamlederOrAbove ? shiftPlanningNavigation : employeeShiftPlanningNavigation;
+
+  if (isLoading) {
+    return (
+      <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto">
+        <div className="flex h-full flex-col">
+          <div className="flex h-20 items-center justify-center border-b border-sidebar-border px-6">
+            <img src={cphSalesLogo} alt="CPH Sales" className="h-14 w-auto object-contain" />
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="animate-pulse text-muted-foreground">Indlæser...</div>
+          </div>
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto">
@@ -74,7 +111,7 @@ export function AppSidebar() {
           <img src={cphSalesLogo} alt="CPH Sales" className="h-14 w-auto object-contain" />
         </div>
         <nav className="flex-1 space-y-1 p-4">
-          {navigation.map((item) => {
+          {mainNavigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
               <NavLink
@@ -92,90 +129,98 @@ export function AppSidebar() {
           })}
 
           {/* Vagt-flow menu with submenu */}
-          <Collapsible open={vagtFlowOpen} onOpenChange={setVagtFlowOpen}>
-            <CollapsibleTrigger className={cn(
-              "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              location.pathname.startsWith("/vagt-flow") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-            )}>
-              <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5" />
-                Fieldmarketing
-              </div>
-              {vagtFlowOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pl-4 space-y-1 mt-1">
-              {vagtFlowNavigation.map((item) => {
-                const isActive = location.pathname === item.href;
-                return (
-                  <NavLink
-                    key={item.name}
-                    to={item.href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.name}
-                  </NavLink>
-                );
-              })}
-            </CollapsibleContent>
-          </Collapsible>
+          {currentVagtFlowNav.length > 0 && (
+            <Collapsible open={vagtFlowOpen} onOpenChange={setVagtFlowOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname.startsWith("/vagt-flow") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5" />
+                  Fieldmarketing
+                </div>
+                {vagtFlowOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {currentVagtFlowNav.map((item) => {
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                        isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.name}
+                    </NavLink>
+                  );
+                })}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           {/* Intern Vagtplan menu */}
-          <Collapsible open={shiftPlanningOpen} onOpenChange={setShiftPlanningOpen}>
-            <CollapsibleTrigger className={cn(
-              "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              location.pathname.startsWith("/shift-planning") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-            )}>
-              <div className="flex items-center gap-3">
-                <ClipboardList className="h-5 w-5" />
-                Intern vagtplan
-              </div>
-              {shiftPlanningOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pl-4 space-y-1 mt-1">
-              {shiftPlanningNavigation.map((item) => {
-                const isActive = location.pathname === item.href;
-                return (
-                  <NavLink
-                    key={item.name}
-                    to={item.href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.name}
-                  </NavLink>
-                );
-              })}
-            </CollapsibleContent>
-          </Collapsible>
+          {currentShiftPlanningNav.length > 0 && (
+            <Collapsible open={shiftPlanningOpen} onOpenChange={setShiftPlanningOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname.startsWith("/shift-planning") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <ClipboardList className="h-5 w-5" />
+                  Intern vagtplan
+                </div>
+                {shiftPlanningOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {currentShiftPlanningNav.map((item) => {
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                        isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.name}
+                    </NavLink>
+                  );
+                })}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
-          <NavLink
-            to="/admin"
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              location.pathname === "/admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-            )}
-          >
-            <Crown className="h-5 w-5" />
-            Administration
-          </NavLink>
+          {isOwner && (
+            <NavLink
+              to="/admin"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <Crown className="h-5 w-5" />
+              Administration
+            </NavLink>
+          )}
 
-          <NavLink
-            to="/settings"
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              location.pathname === "/settings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-            )}
-          >
-            <Settings className="h-5 w-5" />
-            Indstillinger
-          </NavLink>
+          {isTeamlederOrAbove && (
+            <NavLink
+              to="/settings"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/settings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <Settings className="h-5 w-5" />
+              Indstillinger
+            </NavLink>
+          )}
         </nav>
         <div className="border-t border-sidebar-border p-4">
           <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50">

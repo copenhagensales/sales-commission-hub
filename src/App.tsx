@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { ProtectedRoute, RoleProtectedRoute } from "@/components/RoleProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Agents from "./pages/Agents";
@@ -46,24 +47,6 @@ import Admin from "./pages/Admin";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Indlæser...</div>
-      </div>
-    );
-  }
-  
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-  
-  return <>{children}</>;
-}
-
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
@@ -76,7 +59,7 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   }
   
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/my-schedule" replace />;
   }
   
   return <>{children}</>;
@@ -89,46 +72,49 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/my-schedule" replace />} />
           <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
           <Route path="/onboarding" element={<EmployeeOnboarding />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/agents" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
-          <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
-          <Route path="/codan" element={<ProtectedRoute><Codan /></ProtectedRoute>} />
-          <Route path="/tdc-erhverv" element={<ProtectedRoute><TdcErhverv /></ProtectedRoute>} />
-          <Route path="/commission-cpo" element={<ProtectedRoute><Commission /></ProtectedRoute>} />
-          <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
-          <Route path="/wallboard" element={<Wallboard />} />
-          <Route path="/mg-test" element={<ProtectedRoute><MgTest /></ProtectedRoute>} />
-          <Route path="/km-test" element={<ProtectedRoute><KmTest /></ProtectedRoute>} />
-          <Route path="/adversus-data" element={<ProtectedRoute><AdversusData /></ProtectedRoute>} />
-          <Route path="/logikker" element={<ProtectedRoute><Logikker /></ProtectedRoute>} />
-          <Route path="/employees" element={<ProtectedRoute><EmployeeMasterData /></ProtectedRoute>} />
-          <Route path="/employees/:id" element={<ProtectedRoute><EmployeeDetail /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          {/* Vagt-flow routes */}
-          <Route path="/vagt-flow" element={<ProtectedRoute><VagtFlowIndex /></ProtectedRoute>} />
-          <Route path="/vagt-flow/book-week" element={<ProtectedRoute><VagtBookWeek /></ProtectedRoute>} />
-          <Route path="/vagt-flow/locations" element={<ProtectedRoute><VagtLocations /></ProtectedRoute>} />
-          <Route path="/vagt-flow/locations/:id" element={<ProtectedRoute><VagtLocationDetail /></ProtectedRoute>} />
-          <Route path="/vagt-flow/bookings" element={<ProtectedRoute><VagtBookings /></ProtectedRoute>} />
-          <Route path="/vagt-flow/min-uge" element={<ProtectedRoute><VagtMinUge /></ProtectedRoute>} />
-          <Route path="/vagt-flow/employees" element={<ProtectedRoute><VagtEmployees /></ProtectedRoute>} />
-          <Route path="/vagt-flow/vehicles" element={<ProtectedRoute><VagtVehicles /></ProtectedRoute>} />
-          <Route path="/vagt-flow/time-off" element={<ProtectedRoute><VagtTimeOffRequests /></ProtectedRoute>} />
-          <Route path="/vagt-flow/billing" element={<ProtectedRoute><VagtBilling /></ProtectedRoute>} />
-          {/* Shift planning routes (internal) */}
-          <Route path="/shift-planning" element={<ProtectedRoute><ShiftOverview /></ProtectedRoute>} />
-          <Route path="/shift-planning/my-schedule" element={<ProtectedRoute><MySchedule /></ProtectedRoute>} />
-          <Route path="/shift-planning/absence" element={<ProtectedRoute><AbsenceManagement /></ProtectedRoute>} />
-          <Route path="/shift-planning/time-tracking" element={<ProtectedRoute><TimeTracking /></ProtectedRoute>} />
-          {/* Contract routes */}
-          <Route path="/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
+          {/* Employee accessible routes */}
+          <Route path="/my-schedule" element={<ProtectedRoute><MySchedule /></ProtectedRoute>} />
           <Route path="/my-contracts" element={<ProtectedRoute><MyContracts /></ProtectedRoute>} />
           <Route path="/contract/:id" element={<ContractSign />} />
-          {/* Admin route */}
-          <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+          {/* Teamleder+ routes */}
+          <Route path="/dashboard" element={<RoleProtectedRoute requireTeamlederOrAbove><Dashboard /></RoleProtectedRoute>} />
+          <Route path="/agents" element={<RoleProtectedRoute requireTeamlederOrAbove><Agents /></RoleProtectedRoute>} />
+          <Route path="/sales" element={<RoleProtectedRoute requireTeamlederOrAbove><Sales /></RoleProtectedRoute>} />
+          <Route path="/codan" element={<RoleProtectedRoute requireTeamlederOrAbove><Codan /></RoleProtectedRoute>} />
+          <Route path="/tdc-erhverv" element={<RoleProtectedRoute requireTeamlederOrAbove><TdcErhverv /></RoleProtectedRoute>} />
+          <Route path="/commission-cpo" element={<RoleProtectedRoute requireTeamlederOrAbove><Commission /></RoleProtectedRoute>} />
+          <Route path="/payroll" element={<RoleProtectedRoute requireTeamlederOrAbove><Payroll /></RoleProtectedRoute>} />
+          <Route path="/wallboard" element={<Wallboard />} />
+          <Route path="/mg-test" element={<RoleProtectedRoute requireTeamlederOrAbove><MgTest /></RoleProtectedRoute>} />
+          <Route path="/km-test" element={<RoleProtectedRoute requireTeamlederOrAbove><KmTest /></RoleProtectedRoute>} />
+          <Route path="/adversus-data" element={<RoleProtectedRoute requireTeamlederOrAbove><AdversusData /></RoleProtectedRoute>} />
+          <Route path="/logikker" element={<RoleProtectedRoute requireTeamlederOrAbove><Logikker /></RoleProtectedRoute>} />
+          <Route path="/employees" element={<RoleProtectedRoute requireTeamlederOrAbove><EmployeeMasterData /></RoleProtectedRoute>} />
+          <Route path="/employees/:id" element={<RoleProtectedRoute requireTeamlederOrAbove><EmployeeDetail /></RoleProtectedRoute>} />
+          <Route path="/settings" element={<RoleProtectedRoute requireTeamlederOrAbove><Settings /></RoleProtectedRoute>} />
+          {/* Vagt-flow routes - teamleder+ */}
+          <Route path="/vagt-flow" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtFlowIndex /></RoleProtectedRoute>} />
+          <Route path="/vagt-flow/book-week" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtBookWeek /></RoleProtectedRoute>} />
+          <Route path="/vagt-flow/locations" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtLocations /></RoleProtectedRoute>} />
+          <Route path="/vagt-flow/locations/:id" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtLocationDetail /></RoleProtectedRoute>} />
+          <Route path="/vagt-flow/bookings" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtBookings /></RoleProtectedRoute>} />
+          <Route path="/vagt-flow/min-uge" element={<ProtectedRoute><VagtMinUge /></ProtectedRoute>} />
+          <Route path="/vagt-flow/employees" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtEmployees /></RoleProtectedRoute>} />
+          <Route path="/vagt-flow/vehicles" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtVehicles /></RoleProtectedRoute>} />
+          <Route path="/vagt-flow/time-off" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtTimeOffRequests /></RoleProtectedRoute>} />
+          <Route path="/vagt-flow/billing" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtBilling /></RoleProtectedRoute>} />
+          {/* Shift planning routes */}
+          <Route path="/shift-planning" element={<RoleProtectedRoute requireTeamlederOrAbove><ShiftOverview /></RoleProtectedRoute>} />
+          <Route path="/shift-planning/my-schedule" element={<ProtectedRoute><MySchedule /></ProtectedRoute>} />
+          <Route path="/shift-planning/absence" element={<RoleProtectedRoute requireTeamlederOrAbove><AbsenceManagement /></RoleProtectedRoute>} />
+          <Route path="/shift-planning/time-tracking" element={<RoleProtectedRoute requireTeamlederOrAbove><TimeTracking /></RoleProtectedRoute>} />
+          {/* Contract routes */}
+          <Route path="/contracts" element={<RoleProtectedRoute requireTeamlederOrAbove><Contracts /></RoleProtectedRoute>} />
+          {/* Admin route - owner only */}
+          <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
