@@ -444,27 +444,28 @@ export default function ShiftOverview() {
         </div>
 
         {/* Calendar Grid */}
-        <div className="bg-card rounded-xl border border-border/50 overflow-hidden">
+        <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <div className="min-w-[800px]">
               {/* Day Headers - 6 columns: employee + 5 weekdays */}
-              <div className="grid grid-cols-6 border-b border-border/50 bg-muted/30">
-                <div className="p-3 text-xs font-medium text-muted-foreground">
+              <div className="grid grid-cols-6 border-b-2 border-border bg-muted/50">
+                <div className="p-3 text-xs font-semibold text-foreground bg-muted/70 border-r-2 border-border">
                   Medarbejder
                 </div>
-                {weekDays.map(day => (
+                {weekDays.map((day, dayIdx) => (
                   <div
                     key={day.toISOString()}
                     className={cn(
-                      "text-center py-2.5 px-2 border-l border-border/30",
-                      isToday(day) && "bg-primary/5"
+                      "text-center py-2.5 px-2",
+                      dayIdx < weekDays.length - 1 && "border-r border-border/50",
+                      isToday(day) && "bg-primary/10"
                     )}
                   >
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                       {format(day, "EEE", { locale: da })}
                     </p>
                     <p className={cn(
-                      "text-sm font-semibold mt-0.5",
+                      "text-base font-bold mt-0.5",
                       isToday(day) && "text-primary"
                     )}>
                       {format(day, "d")}
@@ -483,19 +484,21 @@ export default function ShiftOverview() {
                 <div 
                   key={employee.id} 
                   className={cn(
-                    "grid grid-cols-6 border-b border-border/30 last:border-b-0",
-                    idx % 2 === 0 ? "bg-background" : "bg-muted/10"
+                    "grid grid-cols-6",
+                    idx < (employees?.length || 0) - 1 && "border-b border-border/60",
+                    idx % 2 === 0 ? "bg-background" : "bg-muted/20"
                   )}
                 >
-                  <div className="p-2.5 flex flex-col justify-center">
-                    <p className="text-sm font-medium leading-tight">
+                  {/* Employee name cell - sticky left with clear border */}
+                  <div className="p-3 flex flex-col justify-center border-r-2 border-border bg-inherit">
+                    <p className="text-sm font-semibold leading-tight text-foreground">
                       {employee.first_name} {employee.last_name?.charAt(0)}.
                     </p>
                     {employee.department && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{employee.department}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">{employee.department}</p>
                     )}
                   </div>
-                  {weekDays.map(day => {
+                  {weekDays.map((day, dayIdx) => {
                     const dateKey = format(day, "yyyy-MM-dd");
                     const dayShifts = shiftsByEmployeeAndDate.get(employee.id)?.get(dateKey) || [];
                     const holiday = isHoliday(day);
@@ -514,13 +517,14 @@ export default function ShiftOverview() {
                       <div
                         key={day.toISOString()}
                         className={cn(
-                          "min-h-[52px] p-1 border-l border-border/30 cursor-pointer transition-all duration-150",
-                          isToday(day) && "ring-1 ring-primary/30",
-                          holiday && "bg-muted/40 cursor-not-allowed",
-                          !holiday && isLate && "bg-orange-400/20 hover:bg-orange-400/30",
-                          !holiday && isVacation && "bg-amber-400/20 hover:bg-amber-400/30",
-                          !holiday && isSick && "bg-red-400/20 hover:bg-red-400/30",
-                          !holiday && isWorking && "bg-emerald-500/15 hover:bg-emerald-500/25"
+                          "min-h-[56px] p-1.5 cursor-pointer transition-all duration-150 relative",
+                          dayIdx < weekDays.length - 1 && "border-r border-border/40",
+                          isToday(day) && "ring-2 ring-inset ring-primary/40 bg-primary/5",
+                          holiday && "bg-muted/50 cursor-not-allowed",
+                          !holiday && isLate && "bg-orange-400/30 hover:bg-orange-400/40",
+                          !holiday && isVacation && "bg-amber-400/30 hover:bg-amber-400/40",
+                          !holiday && isSick && "bg-red-400/30 hover:bg-red-400/40",
+                          !holiday && isWorking && "bg-emerald-500/20 hover:bg-emerald-500/30"
                         )}
                         onClick={() => {
                           if (!holiday) {
@@ -538,18 +542,18 @@ export default function ShiftOverview() {
                         ))}
                         {!hasShift && isLate && (
                           <div className="flex flex-col items-center justify-center h-full gap-0.5 text-orange-600">
-                            <AlarmClock className="h-3.5 w-3.5" />
-                            <span className="text-[10px] font-medium">{lateness.minutes}m</span>
+                            <AlarmClock className="h-4 w-4" />
+                            <span className="text-[10px] font-semibold">{lateness.minutes}m</span>
                           </div>
                         )}
                         {!hasShift && !isLate && isVacation && (
                           <div className="flex items-center justify-center h-full gap-1 text-amber-600">
-                            <Palmtree className="h-3.5 w-3.5" />
+                            <Palmtree className="h-4 w-4" />
                           </div>
                         )}
                         {!hasShift && !isLate && isSick && (
                           <div className="flex items-center justify-center h-full gap-1 text-red-500">
-                            <Thermometer className="h-3.5 w-3.5" />
+                            <Thermometer className="h-4 w-4" />
                           </div>
                         )}
                       </div>
