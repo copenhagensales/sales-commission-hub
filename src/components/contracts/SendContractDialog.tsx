@@ -308,7 +308,7 @@ export function SendContractDialog({
         ) : (
           <div className="space-y-4">
             <div
-              className="prose prose-sm max-w-none border rounded-lg p-6 bg-background text-foreground dark:prose-invert"
+              className="prose prose-sm max-w-none border rounded-lg p-6 bg-white text-black max-h-[60vh] overflow-y-auto"
               dangerouslySetInnerHTML={{ __html: previewContent }}
             />
           </div>
