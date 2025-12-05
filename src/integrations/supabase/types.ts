@@ -1879,6 +1879,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      contract_has_pending_signature: {
+        Args: { contract_uuid: string }
+        Returns: boolean
+      }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_auth_user_id_by_email: { Args: { _email: string }; Returns: string }
       get_current_employee_id: { Args: never; Returns: string }
