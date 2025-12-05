@@ -521,6 +521,165 @@ export type Database = {
           },
         ]
       }
+      contract_signatures: {
+        Row: {
+          acceptance_text: string | null
+          contract_id: string
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          signed_at: string | null
+          signer_email: string | null
+          signer_employee_id: string | null
+          signer_name: string
+          signer_type: string
+          user_agent: string | null
+        }
+        Insert: {
+          acceptance_text?: string | null
+          contract_id: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          signed_at?: string | null
+          signer_email?: string | null
+          signer_employee_id?: string | null
+          signer_name: string
+          signer_type: string
+          user_agent?: string | null
+        }
+        Update: {
+          acceptance_text?: string | null
+          contract_id?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          signed_at?: string | null
+          signer_email?: string | null
+          signer_employee_id?: string | null
+          signer_name?: string
+          signer_type?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_signatures_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_signatures_signer_employee_id_fkey"
+            columns: ["signer_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_templates: {
+        Row: {
+          content: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          type: Database["public"]["Enums"]["contract_type"]
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          type: Database["public"]["Enums"]["contract_type"]
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          type?: Database["public"]["Enums"]["contract_type"]
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: []
+      }
+      contracts: {
+        Row: {
+          content: string
+          created_at: string | null
+          employee_id: string
+          expires_at: string | null
+          id: string
+          notes: string | null
+          sent_at: string | null
+          sent_by: string | null
+          status: Database["public"]["Enums"]["contract_status"] | null
+          template_id: string | null
+          title: string
+          type: Database["public"]["Enums"]["contract_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          employee_id: string
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: Database["public"]["Enums"]["contract_status"] | null
+          template_id?: string | null
+          title: string
+          type: Database["public"]["Enums"]["contract_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          employee_id?: string
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: Database["public"]["Enums"]["contract_status"] | null
+          template_id?: string | null
+          title?: string
+          type?: Database["public"]["Enums"]["contract_type"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "contract_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       danish_holiday: {
         Row: {
           date: string
@@ -1710,6 +1869,20 @@ export type Database = {
       commission_transaction_type: "earn" | "clawback" | "manual_adjustment"
       commission_type: "fixed" | "percentage"
       communication_channel: "Telefon" | "Mail" | "Andet"
+      contract_status:
+        | "draft"
+        | "pending_employee"
+        | "pending_manager"
+        | "signed"
+        | "rejected"
+        | "expired"
+      contract_type:
+        | "employment"
+        | "amendment"
+        | "nda"
+        | "company_car"
+        | "termination"
+        | "other"
       employment_type: "hourly" | "monthly"
       location_status: "Ny" | "Aktiv" | "Pause" | "Sortlistet"
       payroll_status: "draft" | "approved" | "exported"
@@ -1859,6 +2032,22 @@ export const Constants = {
       commission_transaction_type: ["earn", "clawback", "manual_adjustment"],
       commission_type: ["fixed", "percentage"],
       communication_channel: ["Telefon", "Mail", "Andet"],
+      contract_status: [
+        "draft",
+        "pending_employee",
+        "pending_manager",
+        "signed",
+        "rejected",
+        "expired",
+      ],
+      contract_type: [
+        "employment",
+        "amendment",
+        "nda",
+        "company_car",
+        "termination",
+        "other",
+      ],
       employment_type: ["hourly", "monthly"],
       location_status: ["Ny", "Aktiv", "Pause", "Sortlistet"],
       payroll_status: ["draft", "approved", "exported"],

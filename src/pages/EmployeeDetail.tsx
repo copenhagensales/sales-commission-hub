@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X, History, Phone, Mail, Pencil, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, TrendingUp, AlertTriangle, AlarmClock } from "lucide-react";
+import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X, History, Phone, Mail, Pencil, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, TrendingUp, AlertTriangle, AlarmClock, FileText, Send } from "lucide-react";
+import { SendContractDialog } from "@/components/contracts/SendContractDialog";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -325,6 +326,7 @@ export default function EmployeeDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
+  const [sendContractOpen, setSendContractOpen] = useState(false);
 
   const { data: employee, isLoading, error } = useQuery({
     queryKey: ["employee-detail", id],
@@ -734,6 +736,10 @@ export default function EmployeeDetail() {
         <Tabs defaultValue="stamdata" className="w-full">
           <TabsList>
             <TabsTrigger value="stamdata">Stamdata</TabsTrigger>
+            <TabsTrigger value="kontrakter">
+              <FileText className="h-4 w-4 mr-2" />
+              Kontrakter
+            </TabsTrigger>
             <TabsTrigger value="fravaer">
               <CalendarX className="h-4 w-4 mr-2" />
               Fravær
@@ -1199,7 +1205,37 @@ export default function EmployeeDetail() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="kontrakter" className="mt-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  Kontrakter
+                </CardTitle>
+                <Button onClick={() => setSendContractOpen(true)}>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send kontrakt
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12 text-muted-foreground">
+                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium">Ingen kontrakter sendt endnu</p>
+                  <p className="text-sm mt-2">Klik "Send kontrakt" for at sende en kontrakt til medarbejderen.</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
+
+        {employee && (
+          <SendContractDialog
+            open={sendContractOpen}
+            onOpenChange={setSendContractOpen}
+            employee={employee}
+          />
+        )}
       </div>
     </MainLayout>
   );
