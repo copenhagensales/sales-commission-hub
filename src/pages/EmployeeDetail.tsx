@@ -90,35 +90,32 @@ function EditableField({ label, value, field, type = "text", onSave, displayValu
 
   if (isEditing) {
     return (
-      <div className="flex justify-between items-center py-2 border-b border-border last:border-0 gap-2">
-        <span className="text-muted-foreground shrink-0">{label}</span>
-        <div className="flex items-center gap-1">
-          <Input
-            type={type}
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="h-7 w-40 text-right"
-            autoFocus
-          />
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave}>
-            <Check className="h-3 w-3 text-green-600" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCancel}>
-            <X className="h-3 w-3 text-destructive" />
-          </Button>
-        </div>
+      <div className="flex items-center gap-1">
+        <Input
+          type={type}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="h-9 flex-1"
+          autoFocus
+        />
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
+          <Check className="h-4 w-4 text-green-600" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleCancel}>
+          <X className="h-4 w-4 text-destructive" />
+        </Button>
       </div>
     );
   }
 
   return (
     <div 
-      className="flex justify-between py-2 border-b border-border last:border-0 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 transition-colors"
+      className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md cursor-pointer hover:bg-muted/50 transition-colors group min-h-[40px]"
       onClick={() => setIsEditing(true)}
     >
-      <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">{displayValue ?? value ?? "-"}</span>
+      <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
     </div>
   );
 }
@@ -152,24 +149,21 @@ function ClickableContactField({ label, value, field, type, onSave }: ClickableC
 
   if (isEditing) {
     return (
-      <div className="flex justify-between items-center py-2 border-b border-border last:border-0 gap-2">
-        <span className="text-muted-foreground shrink-0">{label}</span>
-        <div className="flex items-center gap-1">
-          <Input
-            type={type === "email" ? "email" : "tel"}
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="h-7 w-40 text-right"
-            autoFocus
-          />
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave}>
-            <Check className="h-3 w-3 text-green-600" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCancel}>
-            <X className="h-3 w-3 text-destructive" />
-          </Button>
-        </div>
+      <div className="flex items-center gap-1">
+        <Input
+          type={type === "email" ? "email" : "tel"}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="h-9 flex-1"
+          autoFocus
+        />
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
+          <Check className="h-4 w-4 text-green-600" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleCancel}>
+          <X className="h-4 w-4 text-destructive" />
+        </Button>
       </div>
     );
   }
@@ -178,30 +172,29 @@ function ClickableContactField({ label, value, field, type, onSave }: ClickableC
   const Icon = type === "phone" ? Phone : Mail;
 
   return (
-    <div className="flex justify-between items-center py-2 border-b border-border last:border-0">
-      <span className="text-muted-foreground">{label}</span>
+    <div className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md group min-h-[40px]">
       <div className="flex items-center gap-2">
         {value ? (
           <a 
             href={href} 
-            className="font-medium text-primary hover:underline flex items-center gap-1"
+            className="font-medium text-primary hover:underline flex items-center gap-1.5"
             onClick={(e) => e.stopPropagation()}
           >
-            <Icon className="h-3.5 w-3.5" />
+            <Icon className="h-4 w-4" />
             {value}
           </a>
         ) : (
-          <span className="font-medium">-</span>
+          <span className="font-medium text-muted-foreground">-</span>
         )}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-6 w-6 opacity-50 hover:opacity-100" 
-          onClick={() => setIsEditing(true)}
-        >
-          <Pencil className="h-3 w-3" />
-        </Button>
       </div>
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" 
+        onClick={() => setIsEditing(true)}
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </Button>
     </div>
   );
 }
@@ -225,34 +218,31 @@ function EditableSelect({ label, value, field, options, onSave, displayValue }: 
 
   if (isEditing) {
     return (
-      <div className="flex justify-between items-center py-2 border-b border-border last:border-0 gap-2">
-        <span className="text-muted-foreground shrink-0">{label}</span>
-        <div className="flex items-center gap-1">
-          <Select value={value || ""} onValueChange={handleChange}>
-            <SelectTrigger className="h-7 w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="z-50 bg-popover">
-              {options.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsEditing(false)}>
-            <X className="h-3 w-3 text-destructive" />
-          </Button>
-        </div>
+      <div className="flex items-center gap-1">
+        <Select value={value || ""} onValueChange={handleChange}>
+          <SelectTrigger className="h-9 flex-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="z-50 bg-popover">
+            {options.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setIsEditing(false)}>
+          <X className="h-4 w-4 text-destructive" />
+        </Button>
       </div>
     );
   }
 
   return (
     <div 
-      className="flex justify-between py-2 border-b border-border last:border-0 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 transition-colors"
+      className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md cursor-pointer hover:bg-muted/50 transition-colors group min-h-[40px]"
       onClick={() => setIsEditing(true)}
     >
-      <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">{displayValue ?? "-"}</span>
+      <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
     </div>
   );
 }
@@ -289,35 +279,32 @@ function MaskedField({ label, value, field, onSave }: { label: string; value: st
 
   if (isEditing) {
     return (
-      <div className="flex justify-between items-center py-2 border-b border-border last:border-0 gap-2">
-        <span className="text-muted-foreground shrink-0">{label}</span>
-        <div className="flex items-center gap-1">
-          <Input
-            type="text"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancel(); }}
-            className="h-7 w-40 text-right"
-            autoFocus
-          />
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave}>
-            <Check className="h-3 w-3 text-green-600" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCancel}>
-            <X className="h-3 w-3 text-destructive" />
-          </Button>
-        </div>
+      <div className="flex items-center gap-1">
+        <Input
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancel(); }}
+          className="h-9 flex-1"
+          autoFocus
+        />
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
+          <Check className="h-4 w-4 text-green-600" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleCancel}>
+          <X className="h-4 w-4 text-destructive" />
+        </Button>
       </div>
     );
   }
 
   return (
     <div 
-      className="flex justify-between py-2 border-b border-border last:border-0 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 transition-colors"
+      className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md cursor-pointer hover:bg-muted/50 transition-colors group min-h-[40px]"
       onClick={() => setIsEditing(true)}
     >
-      <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">{value ? "••••••••" : "-"}</span>
+      <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
     </div>
   );
 }
@@ -753,468 +740,297 @@ export default function EmployeeDetail() {
           </TabsList>
 
           <TabsContent value="stamdata" className="mt-6">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {/* Identitet */}
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <User className="h-5 w-5 text-primary" />
-                  <CardTitle>Identitet</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1">
-                  <EditableField label="Fornavn(e)" value={employee.first_name} field="first_name" onSave={handleSave} />
-                  <EditableField label="Efternavn" value={employee.last_name} field="last_name" onSave={handleSave} />
-                  <MaskedField label="CPR-nr." value={employee.cpr_number} field="cpr_number" onSave={handleSave} />
-                </CardContent>
-              </Card>
-
-              {/* Kontakt */}
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <MapPin className="h-5 w-5 text-primary" />
-                  <CardTitle>Kontakt</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1">
-                  <EditableField label="Adresse" value={employee.address_street} field="address_street" onSave={handleSave} />
-                  <EditableField label="Postnummer" value={employee.address_postal_code} field="address_postal_code" onSave={handleSave} />
-                  <EditableField label="By" value={employee.address_city} field="address_city" onSave={handleSave} />
-                  <EditableField label="Land" value={employee.address_country} field="address_country" onSave={handleSave} />
-                  <ClickableContactField label="Telefon" value={employee.private_phone} field="private_phone" type="phone" onSave={handleSave} />
-                  <ClickableContactField label="Privat email" value={employee.private_email} field="private_email" type="email" onSave={handleSave} />
-                  <ClickableContactField label="Arbejdsemail" value={employee.work_email} field="work_email" type="email" onSave={handleSave} />
-                </CardContent>
-              </Card>
-
-              {/* Ansættelse */}
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Briefcase className="h-5 w-5 text-primary" />
-                  <CardTitle>Ansættelse</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1">
-                  <EditableField label="Ansættelsesdato" value={employee.employment_start_date} field="employment_start_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_start_date)} />
-                  <EditableField label="Slutdato" value={employee.employment_end_date} field="employment_end_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_end_date)} />
-                  <EditableSelect
-                    label="Stilling"
-                    value={employee.job_title}
-                    field="job_title"
-                    options={[
-                      { value: "Salgskonsulent", label: "Salgskonsulent" },
-                      { value: "Fieldmarketing", label: "Fieldmarketing" },
-                      { value: "Teamleder", label: "Teamleder" },
-                      { value: "Assisterende Teamleder", label: "Assisterende Teamleder" },
-                      { value: "Rekruttering", label: "Rekruttering" },
-                      { value: "SOME", label: "SOME" },
-                      { value: "Backoffice", label: "Backoffice" },
-                      { value: "Projektleder", label: "Projektleder" },
-                      { value: "Ejer", label: "Ejer" },
-                    ]}
-                    onSave={handleSave}
-                    displayValue={employee.job_title}
-                  />
-                  <EditableSelect
-                    label="Afdeling / Team"
-                    value={employee.department}
-                    field="department"
-                    options={clients.map(c => ({ value: c.name, label: c.name }))}
-                    onSave={handleSave}
-                    displayValue={employee.department}
-                  />
-                  <EditableSelect
-                    label="Arbejdssted"
-                    value={employee.work_location}
-                    field="work_location"
-                    options={[
-                      { value: "København V", label: "København V" },
-                      { value: "Århus", label: "Århus" },
-                    ]}
-                    onSave={handleSave}
-                    displayValue={employee.work_location || "-"}
-                  />
-                  <div className="flex justify-between py-2 border-b border-border last:border-0">
-                    <span className="text-muted-foreground">Leder</span>
-                    <span className="font-medium">{manager ? `${manager.first_name} ${manager.last_name}` : "-"}</span>
-                  </div>
-                  <EditableField label="Kontrakt-ID" value={employee.contract_id} field="contract_id" onSave={handleSave} />
-                  <EditableField label="Kontrakt version" value={employee.contract_version} field="contract_version" onSave={handleSave} />
-                  <EditableSwitch label="Aktiv medarbejder" value={employee.is_active} field="is_active" onSave={handleSave} />
-                </CardContent>
-              </Card>
-
-              {/* Løn */}
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Wallet className="h-5 w-5 text-primary" />
-                  <CardTitle>Løn</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1">
-                  <EditableSelect
-                    label="Løntype"
-                    value={employee.salary_type}
-                    field="salary_type"
-                    options={[
-                      { value: "provision", label: "Provision" },
-                      { value: "fixed", label: "Fast løn" },
-                      { value: "hourly", label: "Timeløn" },
-                    ]}
-                    onSave={handleSave}
-                    displayValue={getSalaryTypeLabel(employee.salary_type)}
-                  />
-                  {(employee.salary_type === "fixed" || employee.salary_type === "hourly") && (
-                    <EditableField 
-                      label="Beløb (DKK)" 
-                      value={employee.salary_amount} 
-                      field="salary_amount" 
-                      type="number" 
-                      onSave={handleSave} 
-                      displayValue={employee.salary_amount ? `${employee.salary_amount.toLocaleString("da-DK")} DKK` : null}
-                    />
-                  )}
-                  <MaskedField label="Reg.nr." value={employee.bank_reg_number} field="bank_reg_number" onSave={handleSave} />
-                  <MaskedField label="Kontonummer" value={employee.bank_account_number} field="bank_account_number" onSave={handleSave} />
-                </CardContent>
-              </Card>
-
-              {/* Ferie */}
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Palmtree className="h-5 w-5 text-primary" />
-                  <CardTitle>Ferie</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1">
-                  <EditableSelect
-                    label="Ferietype"
-                    value={employee.vacation_type}
-                    field="vacation_type"
-                    options={[
-                      { value: "vacation_pay", label: "Ferieløn" },
-                      { value: "vacation_bonus", label: "Feriebonus" },
-                    ]}
-                    onSave={handleSave}
-                    displayValue={getVacationTypeLabel(employee.vacation_type)}
-                  />
-                  {employee.vacation_type === "vacation_bonus" && (
-                    <EditableField 
-                      label="Feriebonus %" 
-                      value={employee.vacation_bonus_percent} 
-                      field="vacation_bonus_percent" 
-                      type="number" 
-                      onSave={handleSave}
-                      displayValue={employee.vacation_bonus_percent ? `${employee.vacation_bonus_percent}%` : null}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Parkering */}
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Car className="h-5 w-5 text-primary" />
-                  <CardTitle>Parkering</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1">
-                  <EditableSwitch label="Parkeringsplads" value={employee.has_parking} field="has_parking" onSave={handleSave} />
-                  {employee.has_parking && (
-                    <>
-                      <EditableField label="Plads-ID" value={employee.parking_spot_id} field="parking_spot_id" onSave={handleSave} />
-                      <EditableField 
-                        label="Månedlig pris (DKK)" 
-                        value={employee.parking_monthly_cost} 
-                        field="parking_monthly_cost" 
-                        type="number" 
-                        onSave={handleSave}
-                        displayValue={employee.parking_monthly_cost ? `${employee.parking_monthly_cost.toLocaleString("da-DK")} DKK` : null}
-                      />
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Arbejdstid */}
-              <Card className="md:col-span-2 lg:col-span-1">
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Clock className="h-5 w-5 text-primary" />
-                  <CardTitle>Arbejdstid</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1">
-                  <EditableField label="Timer pr. uge" value={employee.weekly_hours || 37.5} field="weekly_hours" type="number" onSave={handleSave} />
-                  <EditableSelect
-                    label="Mødetid"
-                    value={employee.standard_start_time}
-                    field="standard_start_time"
-                    options={[
-                      { value: "8.00-16.30", label: "8.00-16.30" },
-                      { value: "8.30-16.30", label: "8.30-16.30" },
-                      { value: "9.30-17.30", label: "9.30-17.30" },
-                    ]}
-                    onSave={handleSave}
-                    displayValue={employee.standard_start_time || "-"}
-                  />
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Metadata */}
-            <Card className="mt-6">
-              <CardContent className="pt-6">
-                <div className="flex gap-8 text-sm text-muted-foreground">
-                  <span>Oprettet: {formatDate(employee.created_at)}</span>
-                  <span>Sidst opdateret: {formatDate(employee.updated_at)}</span>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="fravaer" className="mt-6">
             <div className="space-y-6">
-              {/* Period Selector */}
-              <div className="flex justify-end">
-                <Select value={absencePeriod} onValueChange={(v) => setAbsencePeriod(v as "2" | "6" | "12")}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="z-50 bg-popover">
-                    <SelectItem value="2">2 måneder</SelectItem>
-                    <SelectItem value="6">6 måneder</SelectItem>
-                    <SelectItem value="12">12 måneder</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Employee Calendar */}
+              {/* Personal Information - Combined Card */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Clock className="h-4 w-4 text-primary" />
-                    Min vagtplan
-                  </CardTitle>
+                  <CardTitle className="text-lg">Personlige oplysninger</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <EmployeeCalendar
-                    standardStartTime={employee.standard_start_time}
-                    absences={absences.map(a => ({
-                      id: a.id,
-                      type: a.type as "sick" | "vacation",
-                      start_date: a.start_date,
-                      end_date: a.end_date,
-                    }))}
-                    latenessRecords={latenessRecords.map(l => ({
-                      id: l.id,
-                      date: l.date,
-                      minutes: l.minutes,
-                    }))}
-                    weeksToShow={8}
-                  />
-                </CardContent>
-              </Card>
-
-              {/* Overview Stats */}
-              <div className="grid gap-4 md:grid-cols-3">
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-red-500/10">
-                        <Thermometer className="h-5 w-5 text-red-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Sygefravær ({absenceStats.periodLabel})</p>
-                        <p className="text-2xl font-bold">{absenceStats.sickPercentInPeriod.toFixed(1)}%</p>
-                        <p className="text-xs text-muted-foreground">
-                          {absenceStats.sickDaysInPeriod} dage • {absenceStats.sickOccurrencesInPeriod} gange
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-amber-500/10">
-                        <Palmtree className="h-5 w-5 text-amber-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Ferie ({absenceStats.periodLabel})</p>
-                        <p className="text-2xl font-bold">{absenceStats.vacationDaysInPeriod} dage</p>
-                        <p className="text-xs text-muted-foreground">
-                          Afholdt ferie seneste {absencePeriod} måneder
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-              </div>
-
-              {/* Pattern Analysis */}
-              {(absenceStats.hasFrequentShortSickness || absenceStats.mondayFridayPercent > 50) && (
-                <Card className="border-amber-500/30 bg-amber-500/5">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
-                      <div className="space-y-2">
-                        <p className="font-medium text-amber-700 dark:text-amber-400">Fraværsmønster bemærket</p>
-                        <div className="text-sm text-muted-foreground space-y-1">
-                          {absenceStats.hasFrequentShortSickness && (
-                            <p>• Du har haft {absenceStats.sickOccurrencesInPeriod} korte sygeperioder på under 2 dage i gennemsnit. Overvej om der er noget vi kan hjælpe med?</p>
-                          )}
-                          {absenceStats.mondayFridayPercent > 50 && absenceStats.sickOccurrencesInPeriod >= 2 && (
-                            <p>• {absenceStats.mondayFridaySick} af {absenceStats.sickOccurrencesInPeriod} sygemeldinger ({absenceStats.mondayFridayPercent.toFixed(0)}%) er faldet på mandag eller fredag.</p>
-                          )}
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {/* Left Column - Identity & Contact */}
+                    <div className="space-y-4">
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Identitet</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Fornavn(e)</label>
+                            <EditableField label="" value={employee.first_name} field="first_name" onSave={handleSave} />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Efternavn</label>
+                            <EditableField label="" value={employee.last_name} field="last_name" onSave={handleSave} />
+                          </div>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-3">
-                          💡 Hvis du oplever tilbagevendende helbredsproblemer, er du velkommen til at tale med din leder om evt. tilpasninger.
-                        </p>
+                        <div>
+                          <label className="text-xs text-muted-foreground">CPR-nr.</label>
+                          <MaskedField label="" value={employee.cpr_number} field="cpr_number" onSave={handleSave} />
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
 
-              {/* Sick percentage visual - only shown if above 3.5% */}
-              {absenceStats.sickPercentInPeriod > 3.5 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Thermometer className="h-4 w-4 text-primary" />
-                      Sygefraværsprocent sammenlignet
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Dit fravær ({absenceStats.periodLabel})</span>
-                        <span className="font-medium">{absenceStats.sickPercentInPeriod.toFixed(1)}%</span>
+                      <div className="space-y-3 pt-2">
+                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Kontakt</h4>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Telefon</label>
+                          <ClickableContactField label="" value={employee.private_phone} field="private_phone" type="phone" onSave={handleSave} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Privat email</label>
+                          <ClickableContactField label="" value={employee.private_email} field="private_email" type="email" onSave={handleSave} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Arbejdsemail</label>
+                          <ClickableContactField label="" value={employee.work_email} field="work_email" type="email" onSave={handleSave} />
+                        </div>
                       </div>
-                      <Progress 
-                        value={Math.min(absenceStats.sickPercentInPeriod * 10, 100)} 
-                        className="h-3 [&>div]:bg-destructive"
-                      />
                     </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-muted-foreground">Dansk gennemsnit</span>
-                        <span className="text-muted-foreground">3.5%</span>
-                      </div>
-                      <Progress value={35} className="h-2 opacity-50" />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Det danske gennemsnit for sygefravær ligger på ca. 3,5% af arbejdsdagene.
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
 
-              {/* Lateness Report */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <AlarmClock className="h-4 w-4 text-orange-500" />
-                    Forsinkelsesrapport
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-3 mb-6">
-                    <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
-                      <p className="text-sm text-muted-foreground">Antal ({absenceStats.periodLabel})</p>
-                      <p className="text-xl font-bold">{latenessStats.countInPeriod} gange</p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
-                      <p className="text-sm text-muted-foreground">Total tid ({absenceStats.periodLabel})</p>
-                      <p className="text-xl font-bold">{latenessStats.totalMinutesInPeriod} min</p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
-                      <p className="text-sm text-muted-foreground">Gns. forsinkelse</p>
-                      <p className="text-xl font-bold">{latenessStats.avgMinutesPerLateness.toFixed(0)} min</p>
+                    {/* Right Column - Address */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Adresse</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Vejnavn og nr.</label>
+                        <EditableField label="" value={employee.address_street} field="address_street" onSave={handleSave} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-muted-foreground">Postnummer</label>
+                          <EditableField label="" value={employee.address_postal_code} field="address_postal_code" onSave={handleSave} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">By</label>
+                          <EditableField label="" value={employee.address_city} field="address_city" onSave={handleSave} />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Land</label>
+                        <EditableField label="" value={employee.address_country} field="address_country" onSave={handleSave} />
+                      </div>
                     </div>
                   </div>
-                  
-                  {latenessRecords.length === 0 ? (
-                    <div className="text-center py-6 text-muted-foreground">
-                      <AlarmClock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>Ingen registrerede forsinkelser</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {latenessRecords.slice(0, 15).map((record) => (
-                        <div 
-                          key={record.id}
-                          className="flex items-center justify-between p-3 rounded-lg border bg-orange-500/5 border-orange-500/20"
-                        >
-                          <div className="flex items-center gap-3">
-                            <AlarmClock className="h-4 w-4 text-orange-500" />
-                            <div>
-                              <p className="font-medium text-sm">
-                                {format(new Date(record.date), "EEEE d. MMM yyyy", { locale: da })}
-                              </p>
-                              {record.note && (
-                                <p className="text-xs text-muted-foreground">{record.note}</p>
-                              )}
-                            </div>
-                          </div>
-                          <Badge variant="outline" className="border-orange-500/30 text-orange-600">
-                            {record.minutes} min
-                          </Badge>
-                        </div>
-                      ))}
-                      {latenessRecords.length > 15 && (
-                        <p className="text-xs text-center text-muted-foreground pt-2">
-                          Viser de seneste 15 af {latenessRecords.length} forsinkelser
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </CardContent>
               </Card>
 
-              {/* Sick Absence History - only sickness, not vacation */}
+              {/* Employment Information - Combined Card */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Thermometer className="h-4 w-4 text-red-500" />
-                    Sygehistorik
-                  </CardTitle>
+                  <CardTitle className="text-lg">Ansættelsesforhold</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {absences.filter(a => a.type === "sick").length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Thermometer className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>Ingen registreret sygdom</p>
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {/* Employment Details */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Stilling</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Jobtitel</label>
+                        <EditableSelect
+                          label=""
+                          value={employee.job_title}
+                          field="job_title"
+                          options={[
+                            { value: "Salgskonsulent", label: "Salgskonsulent" },
+                            { value: "Fieldmarketing", label: "Fieldmarketing" },
+                            { value: "Teamleder", label: "Teamleder" },
+                            { value: "Assisterende Teamleder", label: "Assisterende Teamleder" },
+                            { value: "Rekruttering", label: "Rekruttering" },
+                            { value: "SOME", label: "SOME" },
+                            { value: "Backoffice", label: "Backoffice" },
+                            { value: "Projektleder", label: "Projektleder" },
+                            { value: "Ejer", label: "Ejer" },
+                          ]}
+                          onSave={handleSave}
+                          displayValue={employee.job_title}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Afdeling / Team</label>
+                        <EditableSelect
+                          label=""
+                          value={employee.department}
+                          field="department"
+                          options={clients.map(c => ({ value: c.name, label: c.name }))}
+                          onSave={handleSave}
+                          displayValue={employee.department}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Arbejdssted</label>
+                        <EditableSelect
+                          label=""
+                          value={employee.work_location}
+                          field="work_location"
+                          options={[
+                            { value: "København V", label: "København V" },
+                            { value: "Århus", label: "Århus" },
+                          ]}
+                          onSave={handleSave}
+                          displayValue={employee.work_location || "-"}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Leder</label>
+                        <div className="py-2 font-medium">{manager ? `${manager.first_name} ${manager.last_name}` : "-"}</div>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {absences.filter(a => a.type === "sick").slice(0, 15).map((absence) => {
-                        const start = new Date(absence.start_date);
-                        const end = new Date(absence.end_date);
-                        const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-                        
-                        return (
-                          <div 
-                            key={absence.id}
-                            className="flex items-center justify-between p-3 rounded-lg border bg-red-500/5 border-red-500/20"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Thermometer className="h-4 w-4 text-red-500" />
-                              <div>
-                                <p className="font-medium text-sm">Sygdom</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {format(start, "d. MMM yyyy", { locale: da })}
-                                  {days > 1 && ` – ${format(end, "d. MMM yyyy", { locale: da })}`}
-                                </p>
-                              </div>
-                            </div>
-                            <Badge variant="outline" className="border-red-500/30">
-                              {days} {days === 1 ? "dag" : "dage"}
-                            </Badge>
-                          </div>
-                        );
-                      })}
-                      {absences.filter(a => a.type === "sick").length > 15 && (
-                        <p className="text-xs text-center text-muted-foreground pt-2">
-                          Viser de seneste 15 af {absences.filter(a => a.type === "sick").length} sygemeldinger
-                        </p>
+
+                    {/* Dates & Status */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Periode</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Ansættelsesdato</label>
+                        <EditableField label="" value={employee.employment_start_date} field="employment_start_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_start_date)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Slutdato</label>
+                        <EditableField label="" value={employee.employment_end_date} field="employment_end_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_end_date)} />
+                      </div>
+                      <div className="pt-2">
+                        <label className="text-xs text-muted-foreground">Status</label>
+                        <div className="flex items-center justify-between py-2">
+                          <span className="font-medium">{employee.is_active ? "Aktiv" : "Inaktiv"}</span>
+                          <Switch checked={employee.is_active} onCheckedChange={(checked) => handleSave("is_active", checked)} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Working Hours */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Arbejdstid</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Timer pr. uge</label>
+                        <EditableField label="" value={employee.weekly_hours} field="weekly_hours" type="number" onSave={handleSave} displayValue={employee.weekly_hours ? `${employee.weekly_hours} timer` : null} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Mødetid</label>
+                        <EditableSelect
+                          label=""
+                          value={employee.standard_start_time}
+                          field="standard_start_time"
+                          options={[
+                            { value: "8.00-16.30", label: "8.00-16.30" },
+                            { value: "8.30-16.30", label: "8.30-16.30" },
+                            { value: "9.30-17.30", label: "9.30-17.30" },
+                          ]}
+                          onSave={handleSave}
+                          displayValue={employee.standard_start_time || "-"}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Salary & Benefits - Combined Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Løn og goder</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {/* Salary */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Løn</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Løntype</label>
+                        <EditableSelect
+                          label=""
+                          value={employee.salary_type}
+                          field="salary_type"
+                          options={[
+                            { value: "provision", label: "Provision" },
+                            { value: "fixed", label: "Fast løn" },
+                            { value: "hourly", label: "Timeløn" },
+                          ]}
+                          onSave={handleSave}
+                          displayValue={getSalaryTypeLabel(employee.salary_type)}
+                        />
+                      </div>
+                      {(employee.salary_type === "fixed" || employee.salary_type === "hourly") && (
+                        <div>
+                          <label className="text-xs text-muted-foreground">Beløb (DKK)</label>
+                          <EditableField 
+                            label="" 
+                            value={employee.salary_amount} 
+                            field="salary_amount" 
+                            type="number" 
+                            onSave={handleSave} 
+                            displayValue={employee.salary_amount ? `${employee.salary_amount.toLocaleString("da-DK")} DKK` : null}
+                          />
+                        </div>
                       )}
                     </div>
-                  )}
+
+                    {/* Bank */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Bank</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Reg.nr.</label>
+                        <MaskedField label="" value={employee.bank_reg_number} field="bank_reg_number" onSave={handleSave} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Kontonummer</label>
+                        <MaskedField label="" value={employee.bank_account_number} field="bank_account_number" onSave={handleSave} />
+                      </div>
+                    </div>
+
+                    {/* Vacation & Parking */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Ferie</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Ferietype</label>
+                        <EditableSelect
+                          label=""
+                          value={employee.vacation_type}
+                          field="vacation_type"
+                          options={[
+                            { value: "vacation_pay", label: "Ferieløn" },
+                            { value: "vacation_bonus", label: "Feriebonus" },
+                          ]}
+                          onSave={handleSave}
+                          displayValue={getVacationTypeLabel(employee.vacation_type)}
+                        />
+                      </div>
+                      {employee.vacation_type === "vacation_bonus" && (
+                        <div>
+                          <label className="text-xs text-muted-foreground">Feriebonus %</label>
+                          <EditableField 
+                            label="" 
+                            value={employee.vacation_bonus_percent} 
+                            field="vacation_bonus_percent" 
+                            type="number" 
+                            onSave={handleSave}
+                            displayValue={employee.vacation_bonus_percent ? `${employee.vacation_bonus_percent}%` : null}
+                          />
+                        </div>
+                      )}
+                      <div className="pt-3">
+                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Parkering</h4>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Har parkering</span>
+                          <Switch checked={employee.has_parking} onCheckedChange={(checked) => handleSave("has_parking", checked)} />
+                        </div>
+                        {employee.has_parking && (
+                          <div className="mt-3 space-y-2">
+                            <div>
+                              <label className="text-xs text-muted-foreground">P-plads ID</label>
+                              <EditableField label="" value={employee.parking_spot_id} field="parking_spot_id" onSave={handleSave} />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground">Månedlig udgift</label>
+                              <EditableField 
+                                label="" 
+                                value={employee.parking_monthly_cost} 
+                                field="parking_monthly_cost" 
+                                type="number" 
+                                onSave={handleSave}
+                                displayValue={employee.parking_monthly_cost ? `${employee.parking_monthly_cost} DKK` : null}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
