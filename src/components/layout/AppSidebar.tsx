@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -43,6 +43,19 @@ const shiftPlanningNavigation = [
   { name: "Tidsregistrering", href: "/shift-planning/time-tracking", icon: Timer },
 ];
 
+// Fieldmarketing (vagt-flow) navigation - only for teamleder and above
+const vagtFlowNavigation = [
+  { name: "Oversigt", href: "/vagt-flow", icon: LayoutDashboard },
+  { name: "Min uge", href: "/vagt-flow/min-uge", icon: UserCheck },
+  { name: "Book uge", href: "/vagt-flow/book-week", icon: Calendar },
+  { name: "Vagtplan", href: "/vagt-flow/bookings", icon: Calendar },
+  { name: "Lokationer", href: "/vagt-flow/locations", icon: MapPin },
+  { name: "Medarbejdere", href: "/vagt-flow/employees", icon: Users },
+  { name: "Fravær", href: "/vagt-flow/time-off", icon: Clock },
+  { name: "Køretøjer", href: "/vagt-flow/vehicles", icon: Car },
+  { name: "Fakturering", href: "/vagt-flow/billing", icon: Receipt },
+];
+
 // Employee-only shift planning items (empty - employees don't see shift planning menu)
 const employeeShiftPlanningNavigation: typeof shiftPlanningNavigation = [];
 
@@ -53,6 +66,7 @@ export function AppSidebar() {
   const queryClient = useQueryClient();
   const { isTeamlederOrAbove, isOwner, isLoading, role } = useCanAccess();
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
+  const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
 
   // Fetch pending contracts count
   const { data: pendingContractsCount = 0 } = useQuery({
@@ -164,6 +178,40 @@ export function AppSidebar() {
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
                 {currentShiftPlanningNav.map((item) => {
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                        isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.name}
+                    </NavLink>
+                  );
+                })}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Fieldmarketing menu - only for teamleder and above */}
+          {isTeamlederOrAbove && (
+            <Collapsible open={vagtFlowOpen} onOpenChange={setVagtFlowOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname.startsWith("/vagt-flow") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5" />
+                  Fieldmarketing
+                </div>
+                {vagtFlowOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {vagtFlowNavigation.map((item) => {
                   const isActive = location.pathname === item.href;
                   return (
                     <NavLink
