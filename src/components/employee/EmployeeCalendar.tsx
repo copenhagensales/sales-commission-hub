@@ -30,14 +30,15 @@ export function EmployeeCalendar({
   latenessRecords,
   weeksToShow = 8 
 }: EmployeeCalendarProps) {
-  // Generate calendar days for the period
+  // Generate calendar days for the past weeks (including current week)
   const calendarWeeks = useMemo(() => {
     const today = new Date();
-    const startDate = startOfWeek(today, { weekStartsOn: 1 }); // Start from Monday
+    const currentWeekStart = startOfWeek(today, { weekStartsOn: 1 }); // Start from Monday
     const weeks: Date[][] = [];
 
-    for (let w = 0; w < weeksToShow; w++) {
-      const weekStart = addWeeks(startDate, w);
+    // Go back weeksToShow-1 weeks, then show up to current week
+    for (let w = weeksToShow - 1; w >= 0; w--) {
+      const weekStart = addWeeks(currentWeekStart, -w);
       const weekDays: Date[] = [];
       
       // Only Monday to Friday (5 days)
