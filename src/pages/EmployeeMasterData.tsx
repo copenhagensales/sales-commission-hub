@@ -476,7 +476,7 @@ export default function EmployeeMasterData() {
               if (!open) setInviteData({ first_name: "", last_name: "", email: "", job_title: "" });
             }}>
               <DialogTrigger asChild>
-                <Button variant="outline"><Mail className="mr-2 h-4 w-4" /> Inviter ny medarbejder</Button>
+                <Button><Plus className="mr-2 h-4 w-4" /> Inviter ny medarbejder</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
@@ -553,9 +553,6 @@ export default function EmployeeMasterData() {
                 setLastSaved(null);
               }
             }}>
-              <DialogTrigger asChild>
-                <Button><Plus className="mr-2 h-4 w-4" /> Tilføj medarbejder</Button>
-              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingEmployee ? "Rediger medarbejder" : "Ny medarbejder"}</DialogTitle>
