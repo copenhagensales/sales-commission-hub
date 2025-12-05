@@ -67,7 +67,7 @@ const handler = async (req: Request): Promise<Response> => {
       .select(`
         *,
         employee:employee_master_data(first_name, last_name, cpr_number, private_email),
-        signatures:contract_signatures(signer_type, signer_name, signed_at, acceptance_text)
+        signatures:contract_signatures(signer_type, signer_name, signed_at, acceptance_text, ip_address, user_agent)
       `)
       .eq("id", contractId)
       .single();
@@ -216,7 +216,7 @@ const handler = async (req: Request): Promise<Response> => {
       doc.setFont('helvetica', 'normal');
 
       for (const sig of contract.signatures) {
-        if (yPos > pageHeight - 40) {
+        if (yPos > pageHeight - 55) {
           doc.addPage();
           yPos = margin;
         }
@@ -231,13 +231,27 @@ const handler = async (req: Request): Promise<Response> => {
           doc.setTextColor(34, 139, 34); // Green
           doc.text(`✓ Underskrevet: ${formatDate(sig.signed_at)}`, margin + 5, yPos);
           yPos += 5;
-          if (sig.acceptance_text) {
-            doc.setTextColor(100, 100, 100);
-            doc.setFontSize(8);
-            doc.text(`"${sig.acceptance_text}"`, margin + 5, yPos);
-            doc.setFontSize(10);
-            yPos += 5;
+          
+          // IP address and user agent for documentation
+          doc.setTextColor(100, 100, 100);
+          doc.setFontSize(8);
+          if (sig.ip_address) {
+            doc.text(`IP-adresse: ${sig.ip_address}`, margin + 5, yPos);
+            yPos += 4;
           }
+          if (sig.user_agent) {
+            // Truncate user agent if too long
+            const truncatedUA = sig.user_agent.length > 80 
+              ? sig.user_agent.substring(0, 80) + '...' 
+              : sig.user_agent;
+            doc.text(`Browser: ${truncatedUA}`, margin + 5, yPos);
+            yPos += 4;
+          }
+          if (sig.acceptance_text) {
+            doc.text(`"${sig.acceptance_text}"`, margin + 5, yPos);
+            yPos += 4;
+          }
+          doc.setFontSize(10);
         } else {
           doc.setTextColor(200, 100, 0); // Orange
           doc.text('⏳ Afventer underskrift', margin + 5, yPos);
