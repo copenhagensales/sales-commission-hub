@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,16 +7,27 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, History, Thermometer, AlertTriangle, AlarmClock, TrendingUp } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, History, Thermometer, AlertTriangle, AlarmClock, TrendingUp, Pencil, Save, X } from "lucide-react";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 export default function MyProfile() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
+  const [isEditingContact, setIsEditingContact] = useState(false);
+  const [contactForm, setContactForm] = useState({
+    address_street: "",
+    address_postal_code: "",
+    address_city: "",
+    private_phone: "",
+  });
+  const [isSaving, setIsSaving] = useState(false);
 
   // Fetch current user's employee data
   const { data: employee, isLoading } = useQuery({
@@ -147,6 +158,47 @@ export default function MyProfile() {
     };
   }, [latenessRecords, absencePeriod]);
 
+  const startEditingContact = () => {
+    setContactForm({
+      address_street: employee?.address_street || "",
+      address_postal_code: employee?.address_postal_code || "",
+      address_city: employee?.address_city || "",
+      private_phone: employee?.private_phone || "",
+    });
+    setIsEditingContact(true);
+  };
+
+  const cancelEditingContact = () => {
+    setIsEditingContact(false);
+  };
+
+  const saveContactInfo = async () => {
+    if (!employee?.id) return;
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from("employee_master_data")
+        .update({
+          address_street: contactForm.address_street || null,
+          address_postal_code: contactForm.address_postal_code || null,
+          address_city: contactForm.address_city || null,
+          private_phone: contactForm.private_phone || null,
+        })
+        .eq("id", employee.id);
+      
+      if (error) throw error;
+      
+      toast.success("Kontaktoplysninger opdateret");
+      setIsEditingContact(false);
+      queryClient.invalidateQueries({ queryKey: ["my-profile"] });
+    } catch (error) {
+      console.error("Error saving contact info:", error);
+      toast.error("Kunne ikke gemme kontaktoplysninger");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const formatDate = (date: string | null) => {
     if (!date) return "-";
     return format(new Date(date), "d. MMM yyyy", { locale: da });
@@ -256,39 +308,106 @@ export default function MyProfile() {
 
               {/* Kontakt */}
               <Card>
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <MapPin className="h-5 w-5 text-primary" />
-                  <CardTitle>Kontakt</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-primary" />
+                    <CardTitle>Kontakt</CardTitle>
+                  </div>
+                  {!isEditingContact ? (
+                    <Button variant="ghost" size="sm" onClick={startEditingContact}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={cancelEditingContact} disabled={isSaving}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={saveContactInfo} disabled={isSaving}>
+                        <Save className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Adresse</span>
-                    <span className="font-medium">{employee.address_street || "-"}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Postnummer</span>
-                    <span className="font-medium">{employee.address_postal_code || "-"}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">By</span>
-                    <span className="font-medium">{employee.address_city || "-"}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Land</span>
-                    <span className="font-medium">{employee.address_country || "Danmark"}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Telefon</span>
-                    <span className="font-medium">{employee.private_phone || "-"}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Privat email</span>
-                    <span className="font-medium truncate max-w-[200px]">{employee.private_email || "-"}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Arbejdsemail</span>
-                    <span className="font-medium truncate max-w-[200px]">{employee.work_email || "-"}</span>
-                  </div>
+                  {isEditingContact ? (
+                    <>
+                      <div className="space-y-1 py-1 border-b border-border">
+                        <span className="text-muted-foreground text-sm">Adresse</span>
+                        <Input
+                          value={contactForm.address_street}
+                          onChange={(e) => setContactForm({ ...contactForm, address_street: e.target.value })}
+                          placeholder="Vejnavn og husnummer"
+                        />
+                      </div>
+                      <div className="space-y-1 py-1 border-b border-border">
+                        <span className="text-muted-foreground text-sm">Postnummer</span>
+                        <Input
+                          value={contactForm.address_postal_code}
+                          onChange={(e) => setContactForm({ ...contactForm, address_postal_code: e.target.value })}
+                          placeholder="Postnummer"
+                        />
+                      </div>
+                      <div className="space-y-1 py-1 border-b border-border">
+                        <span className="text-muted-foreground text-sm">By</span>
+                        <Input
+                          value={contactForm.address_city}
+                          onChange={(e) => setContactForm({ ...contactForm, address_city: e.target.value })}
+                          placeholder="By"
+                        />
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-border">
+                        <span className="text-muted-foreground">Land</span>
+                        <span className="font-medium">{employee.address_country || "Danmark"}</span>
+                      </div>
+                      <div className="space-y-1 py-1 border-b border-border">
+                        <span className="text-muted-foreground text-sm">Telefon</span>
+                        <Input
+                          value={contactForm.private_phone}
+                          onChange={(e) => setContactForm({ ...contactForm, private_phone: e.target.value })}
+                          placeholder="Telefonnummer"
+                        />
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-border">
+                        <span className="text-muted-foreground">Privat email</span>
+                        <span className="font-medium truncate max-w-[200px]">{employee.private_email || "-"}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Arbejdsemail</span>
+                        <span className="font-medium truncate max-w-[200px]">{employee.work_email || "-"}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex justify-between py-1 border-b border-border">
+                        <span className="text-muted-foreground">Adresse</span>
+                        <span className="font-medium">{employee.address_street || "-"}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-border">
+                        <span className="text-muted-foreground">Postnummer</span>
+                        <span className="font-medium">{employee.address_postal_code || "-"}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-border">
+                        <span className="text-muted-foreground">By</span>
+                        <span className="font-medium">{employee.address_city || "-"}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-border">
+                        <span className="text-muted-foreground">Land</span>
+                        <span className="font-medium">{employee.address_country || "Danmark"}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-border">
+                        <span className="text-muted-foreground">Telefon</span>
+                        <span className="font-medium">{employee.private_phone || "-"}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-border">
+                        <span className="text-muted-foreground">Privat email</span>
+                        <span className="font-medium truncate max-w-[200px]">{employee.private_email || "-"}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-muted-foreground">Arbejdsemail</span>
+                        <span className="font-medium truncate max-w-[200px]">{employee.work_email || "-"}</span>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
