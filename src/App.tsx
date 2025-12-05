@@ -126,7 +126,7 @@ const App = () => (
           {/* Contract routes */}
           <Route path="/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
           <Route path="/my-contracts" element={<ProtectedRoute><MyContracts /></ProtectedRoute>} />
-          <Route path="/contract/:id" element={<ProtectedRoute><ContractSign /></ProtectedRoute>} />
+          <Route path="/contract/:id" element={<ContractSign />} />
           {/* Admin route */}
           <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
