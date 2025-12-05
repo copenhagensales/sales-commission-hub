@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { format, startOfMonth, endOfMonth, isToday, isSameDay, addMonths, subMonths, startOfWeek, addDays, addWeeks } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Briefcase, Thermometer, Palmtree, CalendarPlus, User, MapPin, Wallet, Car, Clock, Umbrella } from "lucide-react";
+import { ChevronLeft, ChevronRight, Briefcase, Thermometer, Palmtree, CalendarPlus, Umbrella } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { useCurrentEmployee, useMyShifts, useDanishHolidays, useAbsenceRequests } from "@/hooks/useShiftPlanning";
 import { CreateAbsenceDialog } from "@/components/shift-planning/CreateAbsenceDialog";
 import { cn } from "@/lib/utils";
@@ -87,25 +87,6 @@ export default function MySchedule() {
     setAbsenceDialogOpen(true);
   };
 
-  const formatSalaryType = (type: string | null) => {
-    if (!type) return "-";
-    const map: Record<string, string> = {
-      provision: "Provision",
-      fixed: "Fast løn",
-      hourly: "Timeløn"
-    };
-    return map[type] || type;
-  };
-
-  const formatVacationType = (type: string | null) => {
-    if (!type) return "-";
-    const map: Record<string, string> = {
-      vacation_pay: "Ferieløn",
-      vacation_bonus: "1% ferietillæg"
-    };
-    return map[type] || type;
-  };
-
   if (employeeLoading) {
     return (
       <MainLayout>
@@ -147,13 +128,7 @@ export default function MySchedule() {
           </Button>
         </div>
 
-        <Tabs defaultValue="kalender" className="w-full">
-          <TabsList>
-            <TabsTrigger value="kalender">Kalender</TabsTrigger>
-            <TabsTrigger value="stamkort">Mit stamkort</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="kalender" className="mt-4 space-y-4">
+        <div className="space-y-4">
             {/* Month Navigation */}
             <div className="flex items-center justify-between">
               <Button variant="ghost" size="sm" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
@@ -331,120 +306,7 @@ export default function MySchedule() {
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-
-          <TabsContent value="stamkort" className="mt-4">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {/* Identitet */}
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                  <User className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-sm">Identitet</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1 text-sm">
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Navn</span>
-                    <span className="font-medium">{employee.first_name} {employee.last_name}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Stilling</span>
-                    <span className="font-medium">{employee.job_title || "-"}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Afdeling</span>
-                    <span className="font-medium">{employee.department || "-"}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Kontakt */}
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                  <MapPin className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-sm">Kontakt</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1 text-sm">
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Telefon</span>
-                    <span className="font-medium">{employee.private_phone || "-"}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Email</span>
-                    <span className="font-medium truncate max-w-[180px]">{employee.private_email || "-"}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Arbejdssted</span>
-                    <span className="font-medium">{employee.work_location || "-"}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Løn */}
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                  <Wallet className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-sm">Løn</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1 text-sm">
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Løntype</span>
-                    <span className="font-medium">{formatSalaryType(employee.salary_type)}</span>
-                  </div>
-                  {employee.salary_amount && (
-                    <div className="flex justify-between py-1">
-                      <span className="text-muted-foreground">Beløb</span>
-                      <span className="font-medium">{employee.salary_amount.toLocaleString("da-DK")} kr.</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Ferietype</span>
-                    <span className="font-medium">{formatVacationType(employee.vacation_type)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Arbejdstid */}
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                  <Clock className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-sm">Arbejdstid</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1 text-sm">
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Timer/uge</span>
-                    <span className="font-medium">{employee.weekly_hours || 37} timer</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Mødetid</span>
-                    <span className="font-medium">{employee.standard_start_time || "-"}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Parkering */}
-              {employee.has_parking && (
-                <Card>
-                  <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                    <Car className="h-4 w-4 text-primary" />
-                    <CardTitle className="text-sm">Parkering</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-1 text-sm">
-                    <div className="flex justify-between py-1">
-                      <span className="text-muted-foreground">P-plads</span>
-                      <span className="font-medium">{employee.parking_spot_id || "Tildelt"}</span>
-                    </div>
-                    {employee.parking_monthly_cost && (
-                      <div className="flex justify-between py-1">
-                        <span className="text-muted-foreground">Pris/md.</span>
-                        <span className="font-medium">{employee.parking_monthly_cost} kr.</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
+        </div>
 
         {/* Create Absence Dialog - only vacation */}
         <CreateAbsenceDialog
