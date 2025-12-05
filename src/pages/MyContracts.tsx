@@ -46,16 +46,25 @@ export default function MyContracts() {
     queryKey: ["my-contracts"],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return [];
+      console.log("MyContracts - Auth user:", userData.user?.email);
+      if (!userData.user) {
+        console.log("MyContracts - No auth user");
+        return [];
+      }
 
       // Get employee ID from email
-      const { data: employee } = await supabase
+      const { data: employee, error: empError } = await supabase
         .from("employee_master_data")
         .select("id")
         .eq("private_email", userData.user.email)
         .maybeSingle();
 
-      if (!employee) return [];
+      console.log("MyContracts - Employee lookup:", { employee, empError, email: userData.user.email });
+
+      if (!employee) {
+        console.log("MyContracts - No employee found for email");
+        return [];
+      }
 
       const { data, error } = await supabase
         .from("contracts")
@@ -65,6 +74,8 @@ export default function MyContracts() {
         `)
         .eq("employee_id", employee.id)
         .order("created_at", { ascending: false });
+
+      console.log("MyContracts - Contracts query:", { data, error, employeeId: employee.id });
 
       if (error) throw error;
       return data;
