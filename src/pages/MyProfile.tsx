@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, History, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail } from "lucide-react";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail } from "lucide-react";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
@@ -412,10 +412,6 @@ export default function MyProfile() {
               <CalendarX className="h-4 w-4 mr-2" />
               Fravær
             </TabsTrigger>
-            <TabsTrigger value="historik">
-              <History className="h-4 w-4 mr-2" />
-              Historik
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="stamdata" className="mt-6">
@@ -729,9 +725,8 @@ export default function MyProfile() {
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
 
-          <TabsContent value="historik" className="mt-6">
+            {/* History section */}
             <div className="grid gap-6 md:grid-cols-2">
               {/* Sick history */}
               <Card>
