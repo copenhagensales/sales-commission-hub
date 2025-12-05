@@ -11,6 +11,46 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Verify the caller is authenticated and has manager role
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Ikke autoriseret" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Create client with user's JWT to check their role
+    const supabaseUser = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        global: { headers: { Authorization: authHeader } },
+        auth: { autoRefreshToken: false, persistSession: false },
+      }
+    );
+
+    // Get the current user
+    const { data: { user: currentUser }, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !currentUser) {
+      return new Response(
+        JSON.stringify({ error: "Ikke autoriseret" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check if user has manager role using the security definer function
+    const { data: hasRole, error: roleError } = await supabaseUser.rpc("is_manager_or_above", {
+      _user_id: currentUser.id,
+    });
+
+    if (roleError || !hasRole) {
+      return new Response(
+        JSON.stringify({ error: "Kun ledere kan nulstille login-forsøg" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { email } = await req.json();
 
     if (!email) {

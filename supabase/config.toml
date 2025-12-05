@@ -22,7 +22,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.reset-login-attempts]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-employee-invitation]
 verify_jwt = false
