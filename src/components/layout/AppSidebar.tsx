@@ -43,10 +43,8 @@ const shiftPlanningNavigation = [
   { name: "Tidsregistrering", href: "/shift-planning/time-tracking", icon: Timer },
 ];
 
-// Employee-only shift planning items
-const employeeShiftPlanningNavigation = [
-  { name: "Min kalender", href: "/shift-planning/my-schedule", icon: UserCheck },
-];
+// Employee-only shift planning items (empty - employees don't see shift planning menu)
+const employeeShiftPlanningNavigation: typeof shiftPlanningNavigation = [];
 
 export function AppSidebar() {
   const location = useLocation();
