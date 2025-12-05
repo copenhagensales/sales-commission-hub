@@ -317,10 +317,12 @@ export default function ContractSign() {
             )}
           </CardHeader>
           <CardContent>
-            <div
-              className="prose prose-sm max-w-none text-black"
-              dangerouslySetInnerHTML={{ __html: contract.content }}
-            />
+            <div className="bg-white rounded-lg border border-gray-200 p-8 md:p-12 shadow-sm">
+              <div
+                className="prose prose-lg max-w-none text-black prose-headings:text-center prose-headings:font-serif prose-headings:font-bold prose-headings:tracking-wide prose-h1:text-2xl prose-h1:mb-8 prose-p:text-sm prose-p:leading-relaxed [&_table]:w-full [&_table]:border-collapse [&_td]:py-2 [&_td]:pr-4 [&_td:first-child]:font-semibold [&_td:first-child]:w-24"
+                dangerouslySetInnerHTML={{ __html: contract.content }}
+              />
+            </div>
           </CardContent>
         </Card>
 
