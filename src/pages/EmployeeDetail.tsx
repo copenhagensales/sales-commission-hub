@@ -1040,37 +1040,39 @@ export default function EmployeeDetail() {
                 </Card>
               )}
 
-              {/* Sick percentage visual */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Thermometer className="h-4 w-4 text-primary" />
-                    Sygefraværsprocent sammenlignet
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>Dit fravær ({absenceStats.periodLabel})</span>
-                      <span className="font-medium">{absenceStats.sickPercentInPeriod.toFixed(1)}%</span>
+              {/* Sick percentage visual - only shown if above 3.5% */}
+              {absenceStats.sickPercentInPeriod > 3.5 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Thermometer className="h-4 w-4 text-primary" />
+                      Sygefraværsprocent sammenlignet
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>Dit fravær ({absenceStats.periodLabel})</span>
+                        <span className="font-medium">{absenceStats.sickPercentInPeriod.toFixed(1)}%</span>
+                      </div>
+                      <Progress 
+                        value={Math.min(absenceStats.sickPercentInPeriod * 10, 100)} 
+                        className="h-3 [&>div]:bg-destructive"
+                      />
                     </div>
-                    <Progress 
-                      value={Math.min(absenceStats.sickPercentInPeriod * 10, 100)} 
-                      className={`h-3 ${absenceStats.sickPercentInPeriod > 3.5 ? '[&>div]:bg-destructive' : ''}`}
-                    />
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-muted-foreground">Dansk gennemsnit</span>
-                      <span className="text-muted-foreground">3.5%</span>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-muted-foreground">Dansk gennemsnit</span>
+                        <span className="text-muted-foreground">3.5%</span>
+                      </div>
+                      <Progress value={35} className="h-2 opacity-50" />
                     </div>
-                    <Progress value={35} className="h-2 opacity-50" />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Det danske gennemsnit for sygefravær ligger på ca. 3,5% af arbejdsdagene.
-                  </p>
-                </CardContent>
-              </Card>
+                    <p className="text-xs text-muted-foreground">
+                      Det danske gennemsnit for sygefravær ligger på ca. 3,5% af arbejdsdagene.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Lateness Report */}
               <Card>
