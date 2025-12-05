@@ -31,7 +31,6 @@ const teamlederNavigation = [
 
 // Navigation items for employees
 const employeeNavigation = [
-  { name: "Min vagtplan", href: "/shift-planning/my-schedule", icon: Calendar },
   { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
   { name: "Mit stamkort", href: "/my-profile", icon: Users },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
