@@ -11,6 +11,7 @@ interface InvitationRequest {
   email: string;
   firstName: string;
   lastName: string;
+  appUrl?: string;
 }
 
 async function getM365AccessToken(): Promise<string> {
@@ -104,7 +105,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { employeeId, email, firstName, lastName }: InvitationRequest = await req.json();
+    const { employeeId, email, firstName, lastName, appUrl }: InvitationRequest = await req.json();
 
     if (!employeeId || !email || !firstName) {
       return new Response(
@@ -134,8 +135,8 @@ serve(async (req) => {
       );
     }
 
-    // Build invitation URL
-    const baseUrl = req.headers.get("origin") || "https://lovable.dev";
+    // Build invitation URL - use provided appUrl or fall back to origin header
+    const baseUrl = appUrl || req.headers.get("origin") || "https://40ce8d9b-c988-4d3b-a8ed-63eb5bed2204.lovableproject.com";
     const invitationUrl = `${baseUrl}/onboarding?token=${token}`;
 
     // Get M365 access token and send email

@@ -363,6 +363,7 @@ export default function EmployeeMasterData() {
             email: employee.private_email,
             firstName: employee.first_name,
             lastName: employee.last_name,
+            appUrl: window.location.origin,
           }),
         }
       );
@@ -420,6 +421,7 @@ export default function EmployeeMasterData() {
             email: inviteData.email,
             firstName: inviteData.first_name,
             lastName: inviteData.last_name,
+            appUrl: window.location.origin,
           }),
         }
       );
