@@ -179,20 +179,20 @@ export default function ContractSign() {
 
   if (isLoading || authLoading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="min-h-screen bg-white light flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
       </div>
     );
   }
 
   if (!contract) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
+      <div className="min-h-screen bg-white light flex items-center justify-center p-4">
+        <Card className="max-w-md w-full bg-white border-gray-200">
           <CardContent className="py-8 text-center">
-            <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Kontrakt ikke fundet</h2>
-            <p className="text-muted-foreground mb-4">
+            <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+            <h2 className="text-xl font-semibold mb-2 text-gray-900">Kontrakt ikke fundet</h2>
+            <p className="text-gray-500 mb-4">
               Kontrakten eksisterer ikke eller du har ikke adgang til den.
             </p>
             <Button onClick={() => navigate("/auth")}>
