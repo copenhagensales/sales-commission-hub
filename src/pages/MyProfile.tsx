@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, History, Thermometer, AlertTriangle, AlarmClock, TrendingUp, Pencil, Save, X } from "lucide-react";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, History, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail } from "lucide-react";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
@@ -16,18 +16,96 @@ import { da } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
+// Read-only display field
+function DisplayField({ value, displayValue }: { value: string | number | null | undefined; displayValue?: string | null }) {
+  return (
+    <div className="py-2 px-3 bg-muted/30 rounded-md min-h-[40px] flex items-center">
+      <span className="font-medium">{displayValue ?? value ?? "-"}</span>
+    </div>
+  );
+}
+
+// Masked read-only field for sensitive data
+function MaskedDisplayField({ value }: { value: string | null }) {
+  return (
+    <div className="py-2 px-3 bg-muted/30 rounded-md min-h-[40px] flex items-center">
+      <span className="font-medium">{value ? "••••••••" : "-"}</span>
+    </div>
+  );
+}
+
+// Editable field for contact info
+function EditableContactField({ 
+  value, 
+  onSave, 
+  type = "text",
+  placeholder 
+}: { 
+  value: string | null; 
+  onSave: (value: string | null) => void;
+  type?: "text" | "tel" | "email";
+  placeholder?: string;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(value || "");
+
+  const handleSave = () => {
+    onSave(editValue || null);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditValue(value || "");
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleSave();
+    if (e.key === "Escape") handleCancel();
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          type={type}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="h-9 flex-1"
+          placeholder={placeholder}
+          autoFocus
+        />
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
+          <Check className="h-4 w-4 text-green-600" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleCancel}>
+          <X className="h-4 w-4 text-destructive" />
+        </Button>
+      </div>
+    );
+  }
+
+  const Icon = type === "tel" ? Phone : type === "email" ? Mail : null;
+
+  return (
+    <div 
+      className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md cursor-pointer hover:bg-muted/50 transition-colors group min-h-[40px]"
+      onClick={() => setIsEditing(true)}
+    >
+      <div className="flex items-center gap-2">
+        {Icon && value && <Icon className="h-4 w-4 text-muted-foreground" />}
+        <span className="font-medium">{value || "-"}</span>
+      </div>
+      <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+    </div>
+  );
+}
+
 export default function MyProfile() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
-  const [isEditingContact, setIsEditingContact] = useState(false);
-  const [contactForm, setContactForm] = useState({
-    address_street: "",
-    address_postal_code: "",
-    address_city: "",
-    private_phone: "",
-  });
-  const [isSaving, setIsSaving] = useState(false);
 
   // Fetch current user's employee data
   const { data: employee, isLoading } = useQuery({
@@ -158,62 +236,44 @@ export default function MyProfile() {
     };
   }, [latenessRecords, absencePeriod]);
 
-  const startEditingContact = () => {
-    setContactForm({
-      address_street: employee?.address_street || "",
-      address_postal_code: employee?.address_postal_code || "",
-      address_city: employee?.address_city || "",
-      private_phone: employee?.private_phone || "",
-    });
-    setIsEditingContact(true);
-  };
-
-  const cancelEditingContact = () => {
-    setIsEditingContact(false);
-  };
-
-  const saveContactInfo = async () => {
+  const handleSaveContact = async (field: string, value: string | null) => {
     if (!employee?.id) return;
-    setIsSaving(true);
     try {
       const { error } = await supabase
         .from("employee_master_data")
-        .update({
-          address_street: contactForm.address_street || null,
-          address_postal_code: contactForm.address_postal_code || null,
-          address_city: contactForm.address_city || null,
-          private_phone: contactForm.private_phone || null,
-        })
+        .update({ [field]: value })
         .eq("id", employee.id);
       
       if (error) throw error;
       
-      toast.success("Kontaktoplysninger opdateret");
-      setIsEditingContact(false);
+      toast.success("Oplysninger opdateret");
       queryClient.invalidateQueries({ queryKey: ["my-profile"] });
     } catch (error) {
-      console.error("Error saving contact info:", error);
-      toast.error("Kunne ikke gemme kontaktoplysninger");
-    } finally {
-      setIsSaving(false);
+      console.error("Error saving:", error);
+      toast.error("Kunne ikke gemme ændringer");
     }
   };
 
   const formatDate = (date: string | null) => {
     if (!date) return "-";
-    return format(new Date(date), "d. MMM yyyy", { locale: da });
+    return format(new Date(date), "d. MMMM yyyy", { locale: da });
   };
 
-  const formatSalaryType = (type: string | null) => {
-    if (!type) return "-";
-    const map: Record<string, string> = { provision: "Provision", fixed: "Fast løn", hourly: "Timeløn" };
-    return map[type] || type;
+  const getSalaryTypeLabel = (type: string | null) => {
+    switch (type) {
+      case "provision": return "Provision";
+      case "fixed": return "Fast løn";
+      case "hourly": return "Timeløn";
+      default: return null;
+    }
   };
 
-  const formatVacationType = (type: string | null) => {
-    if (!type) return "-";
-    const map: Record<string, string> = { vacation_pay: "Ferieløn", vacation_bonus: "1% ferietillæg" };
-    return map[type] || type;
+  const getVacationTypeLabel = (type: string | null) => {
+    switch (type) {
+      case "vacation_pay": return "Ferieløn";
+      case "vacation_bonus": return "Feriebonus";
+      default: return null;
+    }
   };
 
   const getContractStatusBadge = (status: string) => {
@@ -232,7 +292,9 @@ export default function MyProfile() {
   if (isLoading) {
     return (
       <MainLayout>
-        <div className="p-6">Indlæser...</div>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Indlæser...</p>
+        </div>
       </MainLayout>
     );
   }
@@ -253,12 +315,14 @@ export default function MyProfile() {
 
   return (
     <MainLayout>
-      <div className="p-6 space-y-6">
+      <div className="space-y-6">
+        {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold">Mit stamkort</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {employee.first_name} {employee.last_name}
+          </h1>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-muted-foreground">{employee.first_name} {employee.last_name}</span>
-            {employee.job_title && <span className="text-muted-foreground">• {employee.job_title}</span>}
+            {employee.job_title && <span className="text-muted-foreground">{employee.job_title}</span>}
             <Badge variant={employee.is_active ? "default" : "secondary"}>
               {employee.is_active ? "Aktiv" : "Inaktiv"}
             </Badge>
@@ -283,228 +347,188 @@ export default function MyProfile() {
           </TabsList>
 
           <TabsContent value="stamdata" className="mt-6">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {/* Identitet */}
+            <div className="space-y-6">
+              {/* Personal Information - Combined Card */}
               <Card>
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <User className="h-5 w-5 text-primary" />
-                  <CardTitle>Identitet</CardTitle>
+                <CardHeader>
+                  <CardTitle className="text-lg">Personlige oplysninger</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Fornavn(e)</span>
-                    <span className="font-medium">{employee.first_name}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Efternavn</span>
-                    <span className="font-medium">{employee.last_name}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">CPR-nr.</span>
-                    <span className="font-medium">{employee.cpr_number ? "••••••••" : "-"}</span>
-                  </div>
-                </CardContent>
-              </Card>
+                <CardContent>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {/* Left Column - Identity & Contact */}
+                    <div className="space-y-4">
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Identitet</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Fornavn(e)</label>
+                            <DisplayField value={employee.first_name} />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Efternavn</label>
+                            <DisplayField value={employee.last_name} />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">CPR-nr.</label>
+                          <MaskedDisplayField value={employee.cpr_number} />
+                        </div>
+                      </div>
 
-              {/* Kontakt */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-primary" />
-                    <CardTitle>Kontakt</CardTitle>
-                  </div>
-                  {!isEditingContact ? (
-                    <Button variant="ghost" size="sm" onClick={startEditingContact}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  ) : (
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={cancelEditingContact} disabled={isSaving}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={saveContactInfo} disabled={isSaving}>
-                        <Save className="h-4 w-4" />
-                      </Button>
+                      <div className="space-y-3 pt-2">
+                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Kontakt</h4>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Telefon (kan redigeres)</label>
+                          <EditableContactField 
+                            value={employee.private_phone} 
+                            type="tel"
+                            placeholder="Telefonnummer"
+                            onSave={(v) => handleSaveContact("private_phone", v)} 
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Privat email</label>
+                          <DisplayField value={employee.private_email} />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Arbejdsemail</label>
+                          <DisplayField value={employee.work_email} />
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {isEditingContact ? (
-                    <>
-                      <div className="space-y-1 py-1 border-b border-border">
-                        <span className="text-muted-foreground text-sm">Adresse</span>
-                        <Input
-                          value={contactForm.address_street}
-                          onChange={(e) => setContactForm({ ...contactForm, address_street: e.target.value })}
+
+                    {/* Right Column - Address (Editable) */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Adresse (kan redigeres)</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Vejnavn og nr.</label>
+                        <EditableContactField 
+                          value={employee.address_street} 
                           placeholder="Vejnavn og husnummer"
+                          onSave={(v) => handleSaveContact("address_street", v)} 
                         />
                       </div>
-                      <div className="space-y-1 py-1 border-b border-border">
-                        <span className="text-muted-foreground text-sm">Postnummer</span>
-                        <Input
-                          value={contactForm.address_postal_code}
-                          onChange={(e) => setContactForm({ ...contactForm, address_postal_code: e.target.value })}
-                          placeholder="Postnummer"
-                        />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-muted-foreground">Postnummer</label>
+                          <EditableContactField 
+                            value={employee.address_postal_code} 
+                            placeholder="Postnummer"
+                            onSave={(v) => handleSaveContact("address_postal_code", v)} 
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">By</label>
+                          <EditableContactField 
+                            value={employee.address_city} 
+                            placeholder="By"
+                            onSave={(v) => handleSaveContact("address_city", v)} 
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-1 py-1 border-b border-border">
-                        <span className="text-muted-foreground text-sm">By</span>
-                        <Input
-                          value={contactForm.address_city}
-                          onChange={(e) => setContactForm({ ...contactForm, address_city: e.target.value })}
-                          placeholder="By"
-                        />
+                      <div>
+                        <label className="text-xs text-muted-foreground">Land</label>
+                        <DisplayField value={employee.address_country || "Danmark"} />
                       </div>
-                      <div className="flex justify-between py-1 border-b border-border">
-                        <span className="text-muted-foreground">Land</span>
-                        <span className="font-medium">{employee.address_country || "Danmark"}</span>
-                      </div>
-                      <div className="space-y-1 py-1 border-b border-border">
-                        <span className="text-muted-foreground text-sm">Telefon</span>
-                        <Input
-                          value={contactForm.private_phone}
-                          onChange={(e) => setContactForm({ ...contactForm, private_phone: e.target.value })}
-                          placeholder="Telefonnummer"
-                        />
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-border">
-                        <span className="text-muted-foreground">Privat email</span>
-                        <span className="font-medium truncate max-w-[200px]">{employee.private_email || "-"}</span>
-                      </div>
-                      <div className="flex justify-between py-1">
-                        <span className="text-muted-foreground">Arbejdsemail</span>
-                        <span className="font-medium truncate max-w-[200px]">{employee.work_email || "-"}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex justify-between py-1 border-b border-border">
-                        <span className="text-muted-foreground">Adresse</span>
-                        <span className="font-medium">{employee.address_street || "-"}</span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-border">
-                        <span className="text-muted-foreground">Postnummer</span>
-                        <span className="font-medium">{employee.address_postal_code || "-"}</span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-border">
-                        <span className="text-muted-foreground">By</span>
-                        <span className="font-medium">{employee.address_city || "-"}</span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-border">
-                        <span className="text-muted-foreground">Land</span>
-                        <span className="font-medium">{employee.address_country || "Danmark"}</span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-border">
-                        <span className="text-muted-foreground">Telefon</span>
-                        <span className="font-medium">{employee.private_phone || "-"}</span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-border">
-                        <span className="text-muted-foreground">Privat email</span>
-                        <span className="font-medium truncate max-w-[200px]">{employee.private_email || "-"}</span>
-                      </div>
-                      <div className="flex justify-between py-1">
-                        <span className="text-muted-foreground">Arbejdsemail</span>
-                        <span className="font-medium truncate max-w-[200px]">{employee.work_email || "-"}</span>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Ansættelse */}
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Briefcase className="h-5 w-5 text-primary" />
-                  <CardTitle>Ansættelse</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Ansættelsesdato</span>
-                    <span className="font-medium">{formatDate(employee.employment_start_date)}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Slutdato</span>
-                    <span className="font-medium">{formatDate(employee.employment_end_date)}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Stilling</span>
-                    <span className="font-medium">{employee.job_title || "-"}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Afdeling / Team</span>
-                    <span className="font-medium">{employee.department || "-"}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Arbejdssted</span>
-                    <span className="font-medium">{employee.work_location || "-"}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Løn */}
+              {/* Employment Information - Combined Card */}
               <Card>
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Wallet className="h-5 w-5 text-primary" />
-                  <CardTitle>Løn</CardTitle>
+                <CardHeader>
+                  <CardTitle className="text-lg">Ansættelsesforhold</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Løntype</span>
-                    <span className="font-medium">{formatSalaryType(employee.salary_type)}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Reg.nr.</span>
-                    <span className="font-medium">{employee.bank_reg_number ? "••••" : "-"}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Kontonummer</span>
-                    <span className="font-medium">{employee.bank_account_number ? "••••••••" : "-"}</span>
+                <CardContent>
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {/* Employment Details */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Stilling</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Jobtitel</label>
+                        <DisplayField value={employee.job_title} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Afdeling / Team</label>
+                        <DisplayField value={employee.department} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Arbejdssted</label>
+                        <DisplayField value={employee.work_location} />
+                      </div>
+                    </div>
+
+                    {/* Dates */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Datoer</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Ansættelsesdato</label>
+                        <DisplayField value={employee.employment_start_date} displayValue={formatDate(employee.employment_start_date)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Slutdato</label>
+                        <DisplayField value={employee.employment_end_date} displayValue={formatDate(employee.employment_end_date)} />
+                      </div>
+                    </div>
+
+                    {/* Working Hours */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Arbejdstid</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Timer pr. uge</label>
+                        <DisplayField value={employee.weekly_hours || 37} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Mødetid</label>
+                        <DisplayField value={employee.standard_start_time} />
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Ferie */}
+              {/* Salary & Benefits - Combined Card */}
               <Card>
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Palmtree className="h-5 w-5 text-primary" />
-                  <CardTitle>Ferie</CardTitle>
+                <CardHeader>
+                  <CardTitle className="text-lg">Løn & Goder</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Ferietype</span>
-                    <span className="font-medium">{formatVacationType(employee.vacation_type)}</span>
-                  </div>
-                </CardContent>
-              </Card>
+                <CardContent>
+                  <div className="grid gap-6 md:grid-cols-3">
+                    {/* Salary */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Løn</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Løntype</label>
+                        <DisplayField value={employee.salary_type} displayValue={getSalaryTypeLabel(employee.salary_type)} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Reg.nr.</label>
+                        <MaskedDisplayField value={employee.bank_reg_number} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Kontonummer</label>
+                        <MaskedDisplayField value={employee.bank_account_number} />
+                      </div>
+                    </div>
 
-              {/* Parkering */}
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Car className="h-5 w-5 text-primary" />
-                  <CardTitle>Parkering</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Parkeringsplads</span>
-                    <span className="font-medium">{employee.has_parking ? "Ja" : "Nej"}</span>
-                  </div>
-                </CardContent>
-              </Card>
+                    {/* Vacation */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Ferie</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Ferietype</label>
+                        <DisplayField value={employee.vacation_type} displayValue={getVacationTypeLabel(employee.vacation_type)} />
+                      </div>
+                    </div>
 
-              {/* Arbejdstid */}
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-2">
-                  <Clock className="h-5 w-5 text-primary" />
-                  <CardTitle>Arbejdstid</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between py-1 border-b border-border">
-                    <span className="text-muted-foreground">Timer pr. uge</span>
-                    <span className="font-medium">{employee.weekly_hours || 37}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Mødetid</span>
-                    <span className="font-medium">{employee.standard_start_time || "-"}</span>
+                    {/* Parking */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Parkering</h4>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Parkeringsplads</label>
+                        <DisplayField value={employee.has_parking ? "Ja" : "Nej"} />
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
