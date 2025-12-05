@@ -7,7 +7,8 @@ import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useCanAccess } from "@/hooks/useSystemRoles";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
 
 // Navigation items for teamleder and above
 const teamlederNavigation = [
@@ -72,6 +73,32 @@ export function AppSidebar() {
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
 
+  // Fetch pending contracts count
+  const { data: pendingContractsCount = 0 } = useQuery({
+    queryKey: ["pending-contracts-count"],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return 0;
+
+      const { data: employee } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .eq("private_email", userData.user.email)
+        .maybeSingle();
+
+      if (!employee) return 0;
+
+      const { count } = await supabase
+        .from("contracts")
+        .select("*", { count: "exact", head: true })
+        .eq("employee_id", employee.id)
+        .eq("status", "pending_employee");
+
+      return count || 0;
+    },
+    staleTime: 30000,
+  });
+
   const handleLogout = async () => {
     // Clear all query cache first
     queryClient.clear();
@@ -119,17 +146,25 @@ export function AppSidebar() {
         <nav className="flex-1 space-y-1 p-4">
           {mainNavigation.map((item) => {
             const isActive = location.pathname === item.href;
+            const showBadge = item.href === "/my-contracts" && pendingContractsCount > 0;
             return (
               <NavLink
                 key={item.name}
                 to={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                  "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                   isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                 )}
               >
-                <item.icon className="h-5 w-5" />
-                {item.name}
+                <div className="flex items-center gap-3">
+                  <item.icon className="h-5 w-5" />
+                  {item.name}
+                </div>
+                {showBadge && (
+                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
+                    {pendingContractsCount}
+                  </Badge>
+                )}
               </NavLink>
             );
           })}
