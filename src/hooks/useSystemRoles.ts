@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export type SystemRole = "medarbejder" | "teamleder" | "ejer";
 
@@ -16,10 +16,14 @@ export interface SystemRoleRecord {
 export function useCurrentUserRole() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const previousUserId = useRef<string | undefined>();
 
-  // Clear role cache when user changes
+  // Clear role cache only when user actually changes (not on every render)
   useEffect(() => {
-    queryClient.removeQueries({ queryKey: ["system-role"] });
+    if (previousUserId.current && previousUserId.current !== user?.id) {
+      queryClient.removeQueries({ queryKey: ["system-role"] });
+    }
+    previousUserId.current = user?.id;
   }, [user?.id, queryClient]);
 
   return useQuery({
@@ -27,27 +31,18 @@ export function useCurrentUserRole() {
     queryFn: async () => {
       if (!user) return null;
 
-      console.log("[useCurrentUserRole] Fetching role for user:", user.id, user.email);
-
       const { data, error } = await supabase
         .from("system_roles")
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (error) {
-        console.error("[useCurrentUserRole] Error:", error);
-        throw error;
-      }
-      
-      console.log("[useCurrentUserRole] Role data:", data);
+      if (error) throw error;
       return data as SystemRoleRecord | null;
     },
     enabled: !!user,
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
   });
 }
 
@@ -172,18 +167,6 @@ export function useCanAccess() {
   const isOwner = actualRole === "ejer";
   const isTeamleder = actualRole === "teamleder";
   const isMedarbejder = actualRole === "medarbejder";
-
-  console.log("[useCanAccess] State:", {
-    userId: user?.id,
-    userEmail: user?.email,
-    roleData,
-    isValidData,
-    actualRole,
-    isOwner,
-    isTeamleder,
-    isTeamlederOrAbove: isTeamleder || isOwner,
-    isLoading: isRoleLoading,
-  });
 
   return {
     isLoading: isRoleLoading,
