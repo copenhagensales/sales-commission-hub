@@ -11,6 +11,7 @@ interface ContractEmailRequest {
   contractTitle: string;
   contractId: string;
   senderName?: string;
+  appUrl?: string;
 }
 
 // Get M365 access token
@@ -91,7 +92,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { employeeName, employeeEmail, contractTitle, contractId, senderName }: ContractEmailRequest = await req.json();
+    const { employeeName, employeeEmail, contractTitle, contractId, senderName, appUrl }: ContractEmailRequest = await req.json();
 
     if (!employeeEmail || !contractId || !contractTitle) {
       return new Response(
@@ -100,7 +101,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const baseUrl = Deno.env.get("SUPABASE_URL")?.replace("https://", "https://").replace(".supabase.co", ".lovable.app") || "https://jwlimmeijpfmaksvmuru.lovable.app";
+    const baseUrl = appUrl || "https://jwlimmeijpfmaksvmuru.lovableproject.com";
     const contractUrl = `${baseUrl}/contract/${contractId}`;
 
     const htmlBody = `
