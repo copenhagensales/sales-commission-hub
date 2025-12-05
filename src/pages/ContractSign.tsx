@@ -262,7 +262,7 @@ export default function ContractSign() {
           </CardHeader>
           <CardContent>
             <div
-              className="prose prose-sm max-w-none"
+              className="prose prose-sm max-w-none text-black"
               dangerouslySetInnerHTML={{ __html: contract.content }}
             />
           </CardContent>
