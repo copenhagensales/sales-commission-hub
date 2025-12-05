@@ -190,6 +190,27 @@ export function SendContractDialog({
 
       if (sigError) throw sigError;
 
+      // Send email notification to employee
+      if (employee.private_email) {
+        try {
+          const { error: emailError } = await supabase.functions.invoke("send-contract-email", {
+            body: {
+              employeeName: `${employee.first_name} ${employee.last_name}`,
+              employeeEmail: employee.private_email,
+              contractTitle: customTitle || template.name,
+              contractId: contract.id,
+            },
+          });
+          
+          if (emailError) {
+            console.error("Email notification failed:", emailError);
+            // Don't throw - contract is created, email is secondary
+          }
+        } catch (emailErr) {
+          console.error("Email notification error:", emailErr);
+        }
+      }
+
       return contract;
     },
     onSuccess: () => {
