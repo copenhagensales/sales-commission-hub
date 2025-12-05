@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ListChecks, Info, RefreshCw, Layers3, UserX, Thermometer, Trash2 } from "lucide-react";
+import { ListChecks, Info, RefreshCw, Layers3, UserX, Thermometer, Trash2, FileWarning } from "lucide-react";
 
 export default function Logikker() {
   return (
@@ -146,6 +146,26 @@ export default function Logikker() {
                 <li>Sletning fjerner al medarbejderdata og kan <strong>ikke fortrydes</strong>.</li>
                 <li>Teamledere og medarbejdere har ikke adgang til slettefunktionen.</li>
                 <li>Inaktivering anbefales frem for sletning for at bevare historik.</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileWarning className="h-5 w-5" />
+                Kontraktunderskrift & systemlås
+              </CardTitle>
+              <CardDescription>
+                Regler for manglende kontraktunderskrift.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Når en kontrakt sendes til en medarbejder, har de <strong>5 dage</strong> til at underskrive.</li>
+                <li>Efter 5 dage uden underskrift <strong>låses systemet</strong> for medarbejderen.</li>
+                <li>Medarbejderen kan <strong>kun tilgå underskriftssiden</strong> indtil kontrakten er underskrevet.</li>
+                <li>Når kontrakten er underskrevet, får medarbejderen <strong>fuld adgang igen</strong>.</li>
               </ul>
             </CardContent>
           </Card>
