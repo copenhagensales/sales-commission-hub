@@ -251,7 +251,7 @@ export default function ContractSign() {
             </div>
         </div>
 
-        <Card>
+        <Card className="bg-white">
           <CardHeader>
             <CardTitle>{contract.title}</CardTitle>
             {contract.sent_at && (
