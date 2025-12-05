@@ -9,13 +9,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { RichTextEditor } from "@/components/contracts/RichTextEditor";
 
 type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "other";
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
@@ -457,15 +457,14 @@ export default function Contracts() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Indhold (HTML)</Label>
+                <Label>Indhold</Label>
                 <p className="text-xs text-muted-foreground">
                   Brug placeholders som {`{{employee_name}}`}, {`{{job_title}}`}, {`{{salary_amount}}`} osv.
                 </p>
-                <Textarea
+                <RichTextEditor
                   value={templateForm.content}
-                  onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })}
-                  className="min-h-[400px] font-mono text-sm"
-                  placeholder="<h1>Kontrakt</h1>..."
+                  onChange={(content) => setTemplateForm({ ...templateForm, content })}
+                  placeholder="Skriv kontraktindhold her..."
                 />
               </div>
             </div>
