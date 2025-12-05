@@ -44,6 +44,7 @@ import Contracts from "./pages/Contracts";
 import MyContracts from "./pages/MyContracts";
 import ContractSign from "./pages/ContractSign";
 import Admin from "./pages/Admin";
+import MyProfile from "./pages/MyProfile";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +78,7 @@ const App = () => (
           <Route path="/onboarding" element={<EmployeeOnboarding />} />
           {/* Employee accessible routes */}
           <Route path="/my-schedule" element={<ProtectedRoute><MySchedule /></ProtectedRoute>} />
+          <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
           <Route path="/my-contracts" element={<ProtectedRoute><MyContracts /></ProtectedRoute>} />
           <Route path="/contract/:id" element={<ContractSign />} />
           {/* Teamleder+ routes */}
