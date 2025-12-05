@@ -31,12 +31,9 @@ export function RoleProtectedRoute({
     return <Navigate to="/auth" replace />;
   }
 
-  // Check role requirements - only redirect if we have confirmed role data
-  if (requiredRole === "ejer") {
-    if (!isOwner) {
-      console.log("Admin access denied - isOwner:", isOwner, "role:", role);
-      return <Navigate to="/my-schedule" replace />;
-    }
+  // Check role requirements
+  if (requiredRole === "ejer" && !isOwner) {
+    return <Navigate to="/my-schedule" replace />;
   }
 
   if (requireTeamlederOrAbove && !isTeamlederOrAbove) {
