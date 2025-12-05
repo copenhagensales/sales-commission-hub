@@ -113,7 +113,8 @@ const handler = async (req: Request): Promise<Response> => {
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
           .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-          .header img { max-width: 180px; height: auto; margin-bottom: 10px; }
+          .header h1 { margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px; }
+          .header p { margin: 10px 0 0 0; opacity: 0.9; }
           .content { background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; }
           .button { display: inline-block; background: #3b82f6; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
           .button:hover { background: #2563eb; }
@@ -127,8 +128,8 @@ const handler = async (req: Request): Promise<Response> => {
       <body>
         <div class="container">
           <div class="header">
-            <img src="https://copenhagensales.dk/wp-content/uploads/2023/03/Logo-white-1536x791-1.png" alt="Copenhagen Sales" />
-            <p style="margin: 10px 0 0 0; opacity: 0.9;">Ny kontrakt til underskrift</p>
+            <h1>COPENHAGEN SALES</h1>
+            <p>Ny kontrakt til underskrift</p>
           </div>
           <div class="content">
             <p>Kære ${employeeName},</p>

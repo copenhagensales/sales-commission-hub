@@ -138,7 +138,8 @@ const handler = async (req: Request): Promise<Response> => {
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f5f5f5; }
           .container { max-width: 700px; margin: 0 auto; padding: 20px; }
           .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-          .header img { max-width: 180px; height: auto; margin-bottom: 10px; }
+          .header h1 { margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px; }
+          .header p { margin: 10px 0 0 0; opacity: 0.9; }
           .content { background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; }
           .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; background: #f9f9f9; border-radius: 0 0 8px 8px; }
           .success-badge { background: #dcfce7; color: #166534; padding: 15px 25px; border-radius: 8px; text-align: center; margin: 20px 0; border: 1px solid #bbf7d0; }
@@ -156,8 +157,8 @@ const handler = async (req: Request): Promise<Response> => {
       <body>
         <div class="container">
           <div class="header">
-            <img src="https://copenhagensales.dk/wp-content/uploads/2023/03/Logo-white-1536x791-1.png" alt="Copenhagen Sales" />
-            <p style="margin: 10px 0 0 0; opacity: 0.9;">Bekræftelse på underskrift</p>
+            <h1>COPENHAGEN SALES</h1>
+            <p>Bekræftelse på underskrift</p>
           </div>
           <div class="content">
             <div class="success-badge">
