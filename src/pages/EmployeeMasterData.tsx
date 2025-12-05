@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Mail, Loader2, RefreshCw, ArrowRight, Check } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Mail, Loader2, RefreshCw, ArrowRight, Check, FileText } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 
@@ -137,6 +138,23 @@ export default function EmployeeMasterData() {
       return data;
     },
   });
+
+  // Fetch contracts to check signed status
+  const { data: contracts = [] } = useQuery({
+    queryKey: ["employee-contracts-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contracts")
+        .select("employee_id, status")
+        .eq("status", "signed");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const hasSignedContract = (employeeId: string) => {
+    return contracts.some(c => c.employee_id === employeeId);
+  };
 
   const getInvitationStatus = (employeeId: string) => {
     const invitation = invitations.find(inv => inv.employee_id === employeeId);
@@ -880,7 +898,17 @@ export default function EmployeeMasterData() {
                       onClick={() => navigate(`/employees/${employee.id}`)}
                     >
                       <TableCell className="font-medium">
-                        {employee.first_name} {employee.last_name}
+                        <div className="flex items-center gap-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <FileText className={`h-4 w-4 ${hasSignedContract(employee.id) ? "text-green-500" : "text-muted-foreground/40"}`} />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {hasSignedContract(employee.id) ? "Kontrakt underskrevet" : "Ingen underskrevet kontrakt"}
+                            </TooltipContent>
+                          </Tooltip>
+                          {employee.first_name} {employee.last_name}
+                        </div>
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         {employee.private_email ? (
