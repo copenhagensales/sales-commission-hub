@@ -124,9 +124,26 @@ export default function MyProfile() {
     },
   });
 
-  // Fetch absence history
-  const { data: absences = [] } = useQuery({
-    queryKey: ["my-absences", employee?.id],
+  // Find corresponding vagt-flow employee by email
+  const { data: vagtFlowEmployee } = useQuery({
+    queryKey: ["my-vagt-flow-employee", employee?.private_email, employee?.work_email],
+    queryFn: async () => {
+      if (!employee?.private_email && !employee?.work_email) return null;
+      const emails = [employee.private_email, employee.work_email].filter(Boolean);
+      const { data, error } = await supabase
+        .from("employee")
+        .select("id")
+        .in("email", emails)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!(employee?.private_email || employee?.work_email),
+  });
+
+  // Fetch absence history from absence_request_v2 (employee-initiated)
+  const { data: absencesV2 = [] } = useQuery({
+    queryKey: ["my-absences-v2", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return [];
       const { data, error } = await supabase
@@ -140,6 +157,61 @@ export default function MyProfile() {
     },
     enabled: !!employee?.id,
   });
+
+  // Fetch absence history from employee_absence (manager-initiated via vagt-flow)
+  const { data: absencesVagtFlow = [] } = useQuery({
+    queryKey: ["my-absences-vagtflow", vagtFlowEmployee?.id],
+    queryFn: async () => {
+      if (!vagtFlowEmployee?.id) return [];
+      const { data, error } = await supabase
+        .from("employee_absence")
+        .select("*")
+        .eq("employee_id", vagtFlowEmployee.id)
+        .order("start_date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!vagtFlowEmployee?.id,
+  });
+
+  // Combine absences from both sources and normalize format
+  const absences = useMemo(() => {
+    const normalized: Array<{
+      id: string;
+      type: "sick" | "vacation";
+      start_date: string;
+      end_date: string;
+      source: "request" | "vagtflow";
+    }> = [];
+
+    // Add absences from absence_request_v2
+    absencesV2.forEach(a => {
+      normalized.push({
+        id: a.id,
+        type: a.type as "sick" | "vacation",
+        start_date: a.start_date,
+        end_date: a.end_date,
+        source: "request",
+      });
+    });
+
+    // Add absences from employee_absence (map reason to type)
+    absencesVagtFlow.forEach(a => {
+      const type = a.reason === "Ferie" ? "vacation" : "sick";
+      normalized.push({
+        id: a.id,
+        type,
+        start_date: a.start_date,
+        end_date: a.end_date,
+        source: "vagtflow",
+      });
+    });
+
+    // Sort by start_date descending
+    return normalized.sort((a, b) => 
+      new Date(b.start_date).getTime() - new Date(a.start_date).getTime()
+    );
+  }, [absencesV2, absencesVagtFlow]);
 
   // Fetch lateness records
   const { data: latenessRecords = [] } = useQuery({
