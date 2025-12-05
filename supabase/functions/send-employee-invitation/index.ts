@@ -138,6 +138,8 @@ serve(async (req) => {
     // Build invitation URL - use provided appUrl or fall back to origin header
     const baseUrl = appUrl || req.headers.get("origin") || "https://40ce8d9b-c988-4d3b-a8ed-63eb5bed2204.lovableproject.com";
     const invitationUrl = `${baseUrl}/onboarding?token=${token}`;
+    
+    console.log("Invitation URL debug:", { appUrl, origin: req.headers.get("origin"), baseUrl, invitationUrl });
 
     // Get M365 access token and send email
     const accessToken = await getM365AccessToken();
