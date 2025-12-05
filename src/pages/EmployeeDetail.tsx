@@ -448,6 +448,22 @@ export default function EmployeeDetail() {
     );
   }, [absencesV2, absencesVagtFlow]);
 
+  // Fetch contracts for this employee
+  const { data: contracts = [] } = useQuery({
+    queryKey: ["employee-contracts", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data, error } = await supabase
+        .from("contracts")
+        .select("*, contract_signatures(*)")
+        .eq("employee_id", id)
+        .order("sent_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
   // Fetch lateness records for this employee
   const { data: latenessRecords = [] } = useQuery({
     queryKey: ["employee-lateness", id],
@@ -1301,7 +1317,7 @@ export default function EmployeeDetail() {
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
-                  Kontrakter
+                  Kontrakter ({contracts.length})
                 </CardTitle>
                 <Button onClick={() => setSendContractOpen(true)}>
                   <Send className="h-4 w-4 mr-2" />
@@ -1309,11 +1325,66 @@ export default function EmployeeDetail() {
                 </Button>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium">Ingen kontrakter sendt endnu</p>
-                  <p className="text-sm mt-2">Klik "Send kontrakt" for at sende en kontrakt til medarbejderen.</p>
-                </div>
+                {contracts.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg font-medium">Ingen kontrakter sendt endnu</p>
+                    <p className="text-sm mt-2">Klik "Send kontrakt" for at sende en kontrakt til medarbejderen.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {contracts.map((contract) => {
+                      const employeeSignature = contract.contract_signatures?.find(
+                        (s: { signer_type: string }) => s.signer_type === "employee"
+                      );
+                      const statusLabels: Record<string, string> = {
+                        draft: "Kladde",
+                        pending_employee: "Afventer medarbejder",
+                        pending_manager: "Afventer leder",
+                        signed: "Underskrevet",
+                        rejected: "Afvist",
+                        expired: "Udløbet",
+                      };
+                      const statusColors: Record<string, string> = {
+                        draft: "bg-muted text-muted-foreground",
+                        pending_employee: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+                        pending_manager: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+                        signed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+                        rejected: "bg-destructive/10 text-destructive",
+                        expired: "bg-muted text-muted-foreground",
+                      };
+                      return (
+                        <div
+                          key={contract.id}
+                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                          onClick={() => navigate(`/contract/sign/${contract.id}`)}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                              <FileText className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{contract.title}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Sendt {contract.sent_at ? format(new Date(contract.sent_at), "d. MMM yyyy", { locale: da }) : "-"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge className={statusColors[contract.status || "draft"]}>
+                              {statusLabels[contract.status || "draft"]}
+                            </Badge>
+                            {employeeSignature?.signed_at && (
+                              <span className="text-xs text-muted-foreground">
+                                Underskrevet {format(new Date(employeeSignature.signed_at), "d. MMM yyyy", { locale: da })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
