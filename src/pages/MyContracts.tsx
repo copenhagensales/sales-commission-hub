@@ -174,7 +174,7 @@ export default function MyContracts() {
               return (
                 <Card
                   key={contract.id}
-                  className={`hover:shadow-md transition-shadow bg-white ${
+                  className={`hover:shadow-md transition-shadow ${
                     isPending ? "border-amber-300" : ""
                   }`}
                 >
