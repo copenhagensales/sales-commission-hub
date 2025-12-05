@@ -18,12 +18,7 @@ export function useCurrentUserRole() {
   return useQuery({
     queryKey: ["system-role", user?.id],
     queryFn: async () => {
-      if (!user) {
-        console.log("useCurrentUserRole: No user");
-        return null;
-      }
-
-      console.log("useCurrentUserRole: Fetching role for user_id:", user.id, "email:", user.email);
+      if (!user) return null;
 
       const { data, error } = await supabase
         .from("system_roles")
@@ -31,12 +26,11 @@ export function useCurrentUserRole() {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      console.log("useCurrentUserRole: Result:", data, "Error:", error);
-
       if (error) throw error;
       return data as SystemRoleRecord | null;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes to avoid refetches
   });
 }
 
@@ -147,22 +141,15 @@ export function useRemoveRole() {
 
 // Helper to check permissions
 export function useCanAccess() {
-  const { data: roleData, isLoading, isFetching, isPending } = useCurrentUserRole();
+  const { data: roleData, isPending } = useCurrentUserRole();
 
-  // Consider loading if query is pending, loading, or fetching
-  const isRoleLoading = isLoading || isPending || isFetching;
-
+  // Only show loading on initial fetch (isPending), not on background refetches
   const isOwner = roleData?.role === "ejer";
   const isTeamleder = roleData?.role === "teamleder";
-  const isMedarbejder = roleData?.role === "medarbejder" || (!roleData && !isRoleLoading);
-
-  console.log("useCanAccess:", { 
-    isLoading, isPending, isFetching, isRoleLoading,
-    role: roleData?.role, isOwner, isTeamleder 
-  });
+  const isMedarbejder = roleData?.role === "medarbejder" || !roleData;
 
   return {
-    isLoading: isRoleLoading,
+    isLoading: isPending,
     role: roleData?.role || "medarbejder",
     isOwner,
     isTeamleder,
