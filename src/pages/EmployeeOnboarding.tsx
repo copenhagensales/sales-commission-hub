@@ -41,20 +41,17 @@ export default function EmployeeOnboarding() {
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
-    private_email: "",
-    private_phone: "",
+    cpr_number: "",
     address_street: "",
     address_postal_code: "",
     address_city: "",
-    cpr_number: "",
     bank_reg_number: "",
     bank_account_number: "",
   });
 
   const steps = [
     { title: "Identitet", description: "Dine grundlæggende oplysninger" },
-    { title: "Kontaktoplysninger", description: "Hvordan vi kan kontakte dig" },
-    { title: "Bankoplysninger", description: "Til lønudbetaling" },
+    { title: "Adresse & Bank", description: "Adresse og lønoplysninger" },
   ];
 
   useEffect(() => {
@@ -110,7 +107,6 @@ export default function EmployeeOnboarding() {
         ...prev,
         first_name: invitationData.first_name || "",
         last_name: invitationData.last_name || "",
-        private_email: invitationData.email || "",
       }));
 
       setLoading(false);
@@ -132,12 +128,11 @@ export default function EmployeeOnboarding() {
         .update({
           first_name: data.first_name,
           last_name: data.last_name,
-          private_email: data.private_email,
-          private_phone: data.private_phone,
+          cpr_number: data.cpr_number,
           address_street: data.address_street,
           address_postal_code: data.address_postal_code,
           address_city: data.address_city,
-          cpr_number: data.cpr_number,
+          address_country: "Danmark",
           bank_reg_number: data.bank_reg_number,
           bank_account_number: data.bank_account_number,
         })
@@ -336,20 +331,21 @@ export default function EmployeeOnboarding() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cpr_number">CPR-nummer</Label>
+                <Label htmlFor="cpr_number">CPR-nummer *</Label>
                 <Input
                   id="cpr_number"
                   name="cpr_number"
                   value={formData.cpr_number}
                   onChange={handleChange}
                   placeholder="DDMMÅÅ-XXXX"
+                  required
                 />
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Step 2: Contact */}
+        {/* Step 2: Address & Bank */}
         {currentStep === 1 && (
           <Card className="mb-6">
             <CardHeader>
@@ -358,72 +354,41 @@ export default function EmployeeOnboarding() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="private_email">Privat email *</Label>
-                <Input
-                  id="private_email"
-                  name="private_email"
-                  type="email"
-                  value={formData.private_email}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="private_phone">Telefonnummer</Label>
-                <Input
-                  id="private_phone"
-                  name="private_phone"
-                  type="tel"
-                  value={formData.private_phone}
-                  onChange={handleChange}
-                  placeholder="+45 12 34 56 78"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="address_street">Adresse</Label>
+                <Label htmlFor="address_street">Adresse *</Label>
                 <Input
                   id="address_street"
                   name="address_street"
                   value={formData.address_street}
                   onChange={handleChange}
                   placeholder="Vejnavn og nummer"
+                  required
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="address_postal_code">Postnummer</Label>
+                  <Label htmlFor="address_postal_code">Postnummer *</Label>
                   <Input
                     id="address_postal_code"
                     name="address_postal_code"
                     value={formData.address_postal_code}
                     onChange={handleChange}
+                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="address_city">By</Label>
+                  <Label htmlFor="address_city">By *</Label>
                   <Input
                     id="address_city"
                     name="address_city"
                     value={formData.address_city}
                     onChange={handleChange}
+                    required
                   />
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Step 3: Bank */}
-        {currentStep === 2 && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">{steps[2].title}</CardTitle>
-              <CardDescription>{steps[2].description}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                 <div className="space-y-2">
-                  <Label htmlFor="bank_reg_number">Reg. nr.</Label>
+                  <Label htmlFor="bank_reg_number">Reg. nr. *</Label>
                   <Input
                     id="bank_reg_number"
                     name="bank_reg_number"
@@ -431,10 +396,11 @@ export default function EmployeeOnboarding() {
                     onChange={handleChange}
                     placeholder="4 cifre"
                     maxLength={4}
+                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="bank_account_number">Kontonummer</Label>
+                  <Label htmlFor="bank_account_number">Kontonummer *</Label>
                   <Input
                     id="bank_account_number"
                     name="bank_account_number"
@@ -442,6 +408,7 @@ export default function EmployeeOnboarding() {
                     onChange={handleChange}
                     placeholder="Op til 10 cifre"
                     maxLength={10}
+                    required
                   />
                 </div>
               </div>
