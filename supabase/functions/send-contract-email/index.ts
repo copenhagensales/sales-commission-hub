@@ -101,8 +101,8 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const baseUrl = "https://jwlimmeijpfmaksvmuru.lovable.app";
-    const contractUrl = `${baseUrl}/contract/${contractId}`;
+    const baseUrl = appUrl || "https://jwlimmeijpfmaksvmuru.lovable.app";
+    const loginUrl = `${baseUrl}/auth`;
 
     const htmlBody = `
       <!DOCTYPE html>
@@ -119,6 +119,9 @@ const handler = async (req: Request): Promise<Response> => {
           .button:hover { background: #2563eb; }
           .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; background: #f9f9f9; border-radius: 0 0 8px 8px; }
           .contract-title { background: #f3f4f6; padding: 15px; border-radius: 6px; margin: 15px 0; }
+          .steps { background: #f8fafc; padding: 20px; border-radius: 6px; margin: 20px 0; }
+          .steps ol { margin: 10px 0 0 20px; padding: 0; }
+          .steps li { margin: 8px 0; }
         </style>
       </head>
       <body>
@@ -130,21 +133,23 @@ const handler = async (req: Request): Promise<Response> => {
           <div class="content">
             <p>Kære ${employeeName},</p>
             
-            <p>Du har modtaget en ny kontrakt, som afventer din underskrift:</p>
+            <p>Der ligger en ny kontrakt klar til din underskrift i medarbejderportalen:</p>
             
             <div class="contract-title">
               <strong>${contractTitle}</strong>
             </div>
             
-            <p>Klik på knappen nedenfor for at gennemgå og underskrive kontrakten:</p>
+            <div class="steps">
+              <strong>Sådan underskriver du:</strong>
+              <ol>
+                <li>Log ind på medarbejderportalen</li>
+                <li>Gå til "Mine kontrakter"</li>
+                <li>Gennemgå kontrakten og klik "Underskriv"</li>
+              </ol>
+            </div>
             
             <p style="text-align: center;">
-              <a href="${contractUrl}" class="button">Gennemgå og underskriv</a>
-            </p>
-            
-            <p style="color: #6b7280; font-size: 14px;">
-              Hvis knappen ikke virker, kan du kopiere dette link til din browser:<br>
-              <a href="${contractUrl}" style="color: #3b82f6;">${contractUrl}</a>
+              <a href="${loginUrl}" class="button">Log ind i portalen</a>
             </p>
             
             ${senderName ? `<p>Med venlig hilsen,<br><strong>${senderName}</strong></p>` : '<p>Med venlig hilsen,<br><strong>Copenhagen Sales</strong></p>'}
