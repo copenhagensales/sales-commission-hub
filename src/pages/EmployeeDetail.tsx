@@ -732,54 +732,6 @@ export default function EmployeeDetail() {
               <RotateCcw className="h-4 w-4 mr-2" />
               Nulstil login
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={async () => {
-                if (!employee.private_email) {
-                  toast({ 
-                    title: "Mangler email", 
-                    description: "Medarbejderen har ikke en email registreret.",
-                    variant: "destructive"
-                  });
-                  return;
-                }
-                
-                try {
-                  const response = await supabase.functions.invoke('send-employee-invitation', {
-                    body: {
-                      employeeId: employee.id,
-                      email: employee.private_email,
-                      firstName: employee.first_name,
-                      lastName: employee.last_name,
-                      appUrl: window.location.origin,
-                    }
-                  });
-                  
-                  if (response.error) {
-                    toast({ 
-                      title: "Fejl ved afsendelse", 
-                      description: response.error.message,
-                      variant: "destructive"
-                    });
-                  } else {
-                    toast({ 
-                      title: "Invitation sendt", 
-                      description: `En ny invitation er sendt til ${employee.private_email}` 
-                    });
-                  }
-                } catch (err) {
-                  toast({ 
-                    title: "Fejl", 
-                    description: "Kunne ikke sende invitation",
-                    variant: "destructive"
-                  });
-                }
-              }}
-            >
-              <Send className="h-4 w-4 mr-2" />
-              Gensend invitation
-            </Button>
           </div>
         </div>
 
