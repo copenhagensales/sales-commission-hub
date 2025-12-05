@@ -653,13 +653,6 @@ export default function MyProfile() {
               </Select>
             </div>
 
-            {/* Calendar */}
-            <EmployeeCalendar 
-              standardStartTime={employee.standard_start_time}
-              absences={absences.map(a => ({ id: a.id, type: a.type, start_date: a.start_date, end_date: a.end_date }))}
-              latenessRecords={latenessRecords.map(l => ({ id: l.id, date: l.date, minutes: l.minutes }))}
-            />
-
             {/* Stats cards */}
             <div className="grid gap-4 md:grid-cols-3">
               <Card>
@@ -801,6 +794,13 @@ export default function MyProfile() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Calendar */}
+            <EmployeeCalendar 
+              standardStartTime={employee.standard_start_time}
+              absences={absences.map(a => ({ id: a.id, type: a.type, start_date: a.start_date, end_date: a.end_date }))}
+              latenessRecords={latenessRecords.map(l => ({ id: l.id, date: l.date, minutes: l.minutes }))}
+            />
           </TabsContent>
         </Tabs>
       </div>
