@@ -30,7 +30,8 @@ export function useCurrentUserRole() {
       return data as SystemRoleRecord | null;
     },
     enabled: !!user,
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes to avoid refetches
+    staleTime: 0, // Always refetch
+    gcTime: 0, // Don't cache across sessions
   });
 }
 
@@ -141,16 +142,22 @@ export function useRemoveRole() {
 
 // Helper to check permissions
 export function useCanAccess() {
-  const { data: roleData, isPending } = useCurrentUserRole();
+  const { user } = useAuth();
+  const { data: roleData, isPending, isLoading, isFetching } = useCurrentUserRole();
 
-  // Only show loading on initial fetch (isPending), not on background refetches
-  const isOwner = roleData?.role === "ejer";
-  const isTeamleder = roleData?.role === "teamleder";
-  const isMedarbejder = roleData?.role === "medarbejder" || !roleData;
+  // Show loading if no user yet, or if query is still loading
+  const isRoleLoading = !user || isPending || isLoading;
+
+  // Only trust the role data if we have a user and the data's user_id matches
+  const isValidData = roleData && user && roleData.user_id === user.id;
+  
+  const isOwner = isValidData && roleData.role === "ejer";
+  const isTeamleder = isValidData && roleData.role === "teamleder";
+  const isMedarbejder = !isValidData || roleData?.role === "medarbejder";
 
   return {
-    isLoading: isPending,
-    role: roleData?.role || "medarbejder",
+    isLoading: isRoleLoading,
+    role: isValidData ? roleData.role : "medarbejder",
     isOwner,
     isTeamleder,
     isTeamlederOrAbove: isTeamleder || isOwner,
