@@ -1,5 +1,5 @@
 import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -45,14 +45,22 @@ const shiftPlanningNavigation = [
 
 export function AppSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast({ title: "Fejl ved logout", description: error.message, variant: "destructive" });
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        toast({ title: "Fejl ved logout", description: error.message, variant: "destructive" });
+      }
+    } catch (e) {
+      console.error("Logout error:", e);
+    } finally {
+      // Always navigate to auth page, even if there's an error
+      navigate("/auth");
     }
   };
 
