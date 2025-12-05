@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { format, startOfWeek, endOfWeek, addDays, isSameDay, isWeekend, startOfMonth, endOfMonth, addWeeks } from "date-fns";
 import { da } from "date-fns/locale";
-import { Palmtree, Thermometer, Briefcase } from "lucide-react";
+import { Palmtree, Thermometer, Briefcase, AlarmClock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Absence {
@@ -94,6 +94,10 @@ export function EmployeeCalendar({
           <div className="w-4 h-4 rounded bg-red-500/20 border border-red-500/30" />
           <span className="text-muted-foreground">Syg</span>
         </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-orange-500/20 border border-orange-500/30" />
+          <span className="text-muted-foreground">Forsinket</span>
+        </div>
       </div>
 
       {/* Calendar Grid */}
@@ -151,6 +155,11 @@ export function EmployeeCalendar({
                     icon = <Thermometer className="h-3 w-3 text-red-500" />;
                     statusText = "Syg";
                   }
+                } else if (lateness) {
+                  bgColor = "bg-orange-500/20";
+                  borderColor = "border-orange-500/30";
+                  icon = <AlarmClock className="h-3 w-3 text-orange-600" />;
+                  statusText = `${lateness.minutes} min`;
                 }
 
                 return (
