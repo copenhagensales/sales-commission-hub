@@ -59,12 +59,12 @@
 
     /* Sidebar */
     --sidebar-background: 222 47% 9%;
-    --sidebar-foreground: 240 5% 10%;
+    --sidebar-foreground: 0 0% 85%;
     --sidebar-primary: 258 89% 66%;
     --sidebar-primary-foreground: 250 100% 97%;
-    --sidebar-accent: 240 5% 33%;
+    --sidebar-accent: 240 5% 20%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 4% 83%;
+    --sidebar-border: 240 5% 20%;
     --sidebar-ring: 258 89% 66%;
     --chart-1: 255 91% 76%;
     --chart-2: 270 95% 75%;
