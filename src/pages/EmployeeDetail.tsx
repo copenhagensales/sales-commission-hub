@@ -1108,6 +1108,176 @@ export default function EmployeeDetail() {
             </div>
           </TabsContent>
 
+          <TabsContent value="fravaer" className="mt-6">
+            <div className="space-y-6">
+              {/* Period Selector */}
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-muted-foreground">Periode:</span>
+                <Select value={absencePeriod} onValueChange={(val: "2" | "6" | "12") => setAbsencePeriod(val)}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 måneder</SelectItem>
+                    <SelectItem value="6">6 måneder</SelectItem>
+                    <SelectItem value="12">12 måneder</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Warning Card if sick percentage is high */}
+              {absenceStats.sickPercentInPeriod > 3.5 && (
+                <Card className="border-2 border-red-500 bg-red-500/10">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 rounded-full bg-red-500/20">
+                        <AlertTriangle className="h-8 w-8 text-red-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-red-600 mb-1">
+                          Sygefraværsprocent over gennemsnit
+                        </h3>
+                        <p className="text-3xl font-bold text-red-600 mb-2">
+                          {absenceStats.sickPercentInPeriod.toFixed(1)}%
+                        </p>
+                        <Progress 
+                          value={Math.min(absenceStats.sickPercentInPeriod, 15)} 
+                          max={15}
+                          className="h-3 mb-3 bg-red-200 [&>div]:bg-red-500"
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Det danske gennemsnit er ca. 3.5%. Højt sygefravær kan påvirke teamet og karriereudviklingen.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Stats Cards */}
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-red-500/10">
+                        <Thermometer className="h-5 w-5 text-red-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Sygefravær ({absenceStats.periodLabel})</p>
+                        <p className="text-2xl font-bold">{absenceStats.sickDaysInPeriod} dage</p>
+                        <p className="text-xs text-muted-foreground">{absenceStats.sickOccurrencesInPeriod} perioder</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-amber-500/10">
+                        <Palmtree className="h-5 w-5 text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Ferie ({absenceStats.periodLabel})</p>
+                        <p className="text-2xl font-bold">{absenceStats.vacationDaysInPeriod} dage</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-orange-500/10">
+                        <AlarmClock className="h-5 w-5 text-orange-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Forsinkelser ({absenceStats.periodLabel})</p>
+                        <p className="text-2xl font-bold">{latenessStats.countInPeriod} gange</p>
+                        <p className="text-xs text-muted-foreground">{latenessStats.totalMinutesInPeriod} min total</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Sick History */}
+              {absences.filter(a => a.type === "sick").length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Thermometer className="h-4 w-4 text-red-500" />
+                      Sygehistorik
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {absences.filter(a => a.type === "sick").slice(0, 15).map((absence) => (
+                        <div key={absence.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                          <div className="flex items-center gap-2">
+                            <Thermometer className="h-4 w-4 text-red-500" />
+                            <span className="text-sm">
+                              {format(new Date(absence.start_date), "d. MMM yyyy", { locale: da })}
+                              {absence.start_date !== absence.end_date && (
+                                <> - {format(new Date(absence.end_date), "d. MMM yyyy", { locale: da })}</>
+                              )}
+                            </span>
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {Math.ceil((new Date(absence.end_date).getTime() - new Date(absence.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1} dag(e)
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Lateness History */}
+              {latenessRecords.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <AlarmClock className="h-4 w-4 text-orange-600" />
+                      Forsinkelseshistorik
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {latenessRecords.slice(0, 15).map((record) => (
+                        <div key={record.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                          <div className="flex items-center gap-2">
+                            <AlarmClock className="h-4 w-4 text-orange-600" />
+                            <span className="text-sm">
+                              {format(new Date(record.date), "d. MMM yyyy", { locale: da })}
+                            </span>
+                          </div>
+                          <Badge variant="outline" className="text-xs bg-orange-500/10">
+                            {record.minutes} min
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Calendar */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Kalender</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <EmployeeCalendar 
+                    standardStartTime={employee?.standard_start_time || null}
+                    absences={absences.map(a => ({ id: a.id, type: a.type, start_date: a.start_date, end_date: a.end_date }))}
+                    latenessRecords={latenessRecords.map(l => ({ id: l.id, date: l.date, minutes: l.minutes }))}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           <TabsContent value="historik" className="mt-6">
             <Card>
               <CardHeader>
