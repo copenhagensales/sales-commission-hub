@@ -711,15 +711,30 @@ export default function MyProfile() {
 
             {/* High sick absence warning */}
             {absenceStats.sickPercentInPeriod > 3.5 && (
-              <Card className="border-amber-500/50 bg-amber-500/5">
-                <CardContent className="pt-6">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium">Sygefraværsprocent over gennemsnit</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Dit sygefravær på {absenceStats.sickPercentInPeriod.toFixed(1)}% er højere end det danske gennemsnit på 3.5%.
-                      </p>
+              <Card className="border-2 border-red-500 bg-red-500/10 shadow-lg">
+                <CardContent className="pt-6 pb-6">
+                  <div className="flex items-start gap-4">
+                    <div className="rounded-full bg-red-500/20 p-3">
+                      <AlertTriangle className="h-8 w-8 text-red-500" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-red-600">Højt sygefravær</h3>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-bold text-red-600">{absenceStats.sickPercentInPeriod.toFixed(1)}%</span>
+                          <span className="text-sm text-muted-foreground">dit fravær</span>
+                          <span className="text-muted-foreground">vs.</span>
+                          <span className="text-lg font-semibold">3,5%</span>
+                          <span className="text-sm text-muted-foreground">landsgennemsnit</span>
+                        </div>
+                        <Progress 
+                          value={Math.min((absenceStats.sickPercentInPeriod / 10) * 100, 100)} 
+                          className="h-3 bg-red-200 [&>div]:bg-red-500" 
+                        />
+                        <p className="text-sm text-muted-foreground mt-3">
+                          Dit sygefravær ligger over det danske gennemsnit. Højt fravær kan påvirke både dit team og din egen udvikling i virksomheden.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
