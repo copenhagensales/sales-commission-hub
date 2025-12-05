@@ -18,13 +18,20 @@ export function useCurrentUserRole() {
   return useQuery({
     queryKey: ["system-role", user?.id],
     queryFn: async () => {
-      if (!user) return null;
+      if (!user) {
+        console.log("useCurrentUserRole: No user");
+        return null;
+      }
+
+      console.log("useCurrentUserRole: Fetching role for user_id:", user.id, "email:", user.email);
 
       const { data, error } = await supabase
         .from("system_roles")
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle();
+
+      console.log("useCurrentUserRole: Result:", data, "Error:", error);
 
       if (error) throw error;
       return data as SystemRoleRecord | null;
