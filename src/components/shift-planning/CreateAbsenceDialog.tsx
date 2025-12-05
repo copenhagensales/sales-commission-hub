@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CalendarIcon, AlertTriangle } from "lucide-react";
@@ -124,21 +123,6 @@ export function CreateAbsenceDialog({
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
-          {/* Type Selection */}
-          <div className="space-y-2">
-            <Label>Type</Label>
-            <RadioGroup value={type} onValueChange={(v) => setType(v as "vacation" | "sick")}>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="vacation" id="vacation" />
-                <Label htmlFor="vacation" className="cursor-pointer">Ferie</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="sick" id="sick" />
-                <Label htmlFor="sick" className="cursor-pointer">Sygdom</Label>
-              </div>
-            </RadioGroup>
-          </div>
-
           {/* Date Selection */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
