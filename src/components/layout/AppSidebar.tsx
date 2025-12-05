@@ -33,7 +33,7 @@ const teamlederNavigation = [
 const employeeNavigation = [
   { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
   { name: "Min profil", href: "/my-profile", icon: Users },
-  { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
+  { name: "Min kontrakt", href: "/my-contracts", icon: FileText },
 ];
 
 const vagtFlowNavigation = [
