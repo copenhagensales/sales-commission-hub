@@ -179,7 +179,7 @@ export default function ContractSign() {
 
   if (isLoading || authLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
@@ -187,7 +187,7 @@ export default function ContractSign() {
 
   if (!contract) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardContent className="py-8 text-center">
             <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -212,7 +212,7 @@ export default function ContractSign() {
   const needsLogin = !user && contract.status === "pending_employee";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-white">
       <div className="max-w-4xl mx-auto p-4 space-y-6">
         <div className="flex items-center justify-between">
           {user ? (
