@@ -27,7 +27,7 @@ const baseRequiredFields: RequiredField[] = [
   { key: "private_email", label: "Privat email", check: (e) => !!e.private_email },
 ];
 
-// Full employment contract requires all details
+// Full employment contract requires all details (salary excluded - added later)
 const employmentRequiredFields: RequiredField[] = [
   ...baseRequiredFields,
   { key: "cpr_number", label: "CPR-nummer", check: (e) => !!e.cpr_number },
@@ -37,11 +37,9 @@ const employmentRequiredFields: RequiredField[] = [
   { key: "job_title", label: "Stilling", check: (e) => !!e.job_title },
   { key: "work_location", label: "Arbejdssted", check: (e) => !!e.work_location },
   { key: "weekly_hours", label: "Ugentlige timer", check: (e) => e.weekly_hours !== null && e.weekly_hours !== undefined },
-  { key: "salary_type", label: "Løntype", check: (e) => !!e.salary_type },
-  { key: "salary_amount", label: "Lønbeløb", check: (e) => e.salary_amount !== null && e.salary_amount !== undefined },
   { key: "vacation_type", label: "Ferietype", check: (e) => !!e.vacation_type },
   { key: "employment_start_date", label: "Ansættelsesdato", check: (e) => !!e.employment_start_date },
-  { key: "standard_start_time", label: "Mødetid", check: (e) => !!e.standard_start_time },
+  { key: "standard_start_time", label: "Arbejdstid", check: (e) => !!e.standard_start_time },
 ];
 
 // Amendment requires identity + salary info
@@ -184,6 +182,7 @@ export function SendContractDialog({
       .join(", ");
 
     const replacements: Record<string, string> = {
+      // English keys
       employee_name: `${employee.first_name} ${employee.last_name}`,
       cpr_number: employee.cpr_number || "[CPR ikke angivet]",
       address: address || "[Adresse ikke angivet]",
@@ -201,6 +200,20 @@ export function SendContractDialog({
       effective_date: "[Angiv dato]",
       new_salary_details: "[Angiv nye lønoplysninger]",
       vehicle_details: "[Angiv køretøjsoplysninger]",
+      // Danish keys (used in templates)
+      fornavn: employee.first_name,
+      efternavn: employee.last_name,
+      cpr: employee.cpr_number || "[CPR ikke angivet]",
+      adresse: employee.address_street || "[Adresse ikke angivet]",
+      postnummer: employee.address_postal_code || "[Postnummer ikke angivet]",
+      by: employee.address_city || "[By ikke angivet]",
+      privat_email: employee.private_email || "[Email ikke angivet]",
+      stilling: employee.job_title || "[Stilling ikke angivet]",
+      timer_pr_uge: employee.weekly_hours?.toString() || "[Timer ikke angivet]",
+      arbejdstid: employee.standard_start_time || "[Arbejdstid ikke angivet]",
+      ansættelsesdato: employee.employment_start_date
+        ? format(new Date(employee.employment_start_date), "d. MMMM yyyy", { locale: da })
+        : "[Startdato ikke angivet]",
     };
 
     let merged = content;
