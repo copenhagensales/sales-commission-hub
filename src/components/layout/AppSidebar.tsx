@@ -7,6 +7,7 @@ import cphSalesLogo from "@/assets/cph-sales-logo.png";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useCanAccess } from "@/hooks/useSystemRoles";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Navigation items for teamleder and above
 const teamlederNavigation = [
@@ -65,11 +66,15 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isTeamlederOrAbove, isOwner, isLoading } = useCanAccess();
+  const queryClient = useQueryClient();
+  const { isTeamlederOrAbove, isOwner, isLoading, role } = useCanAccess();
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
 
   const handleLogout = async () => {
+    // Clear all query cache first
+    queryClient.clear();
+    
     const keysToRemove = Object.keys(localStorage).filter(key => 
       key.startsWith('sb-') || key.includes('supabase')
     );
