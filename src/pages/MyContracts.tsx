@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { FileText, Check, Clock, X, Eye, AlertCircle } from "lucide-react";
+import { FileText, Check, Clock, X, Eye, AlertCircle, PenLine } from "lucide-react";
 
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
 
@@ -171,22 +171,25 @@ export default function MyContracts() {
           ) : (
             contracts.map((contract) => {
               const StatusIcon = statusIcons[contract.status as ContractStatus];
+              const isPending = contract.status === "pending_employee";
               return (
                 <Card
                   key={contract.id}
-                  className={`hover:shadow-md transition-shadow cursor-pointer ${
-                    contract.status === "pending_employee" ? "border-amber-300" : ""
+                  className={`hover:shadow-md transition-shadow ${
+                    isPending ? "border-amber-300" : ""
                   }`}
-                  onClick={() => navigate(`/contract/${contract.id}`)}
                 >
                   <CardContent className="pt-6">
                     <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4">
+                      <div 
+                        className="flex items-start gap-4 flex-1 cursor-pointer"
+                        onClick={() => navigate(`/contract/${contract.id}`)}
+                      >
                         <div
                           className={`p-3 rounded-lg ${
                             contract.status === "signed"
                               ? "bg-green-100"
-                              : contract.status === "pending_employee"
+                              : isPending
                               ? "bg-amber-100"
                               : "bg-muted"
                           }`}
@@ -195,7 +198,7 @@ export default function MyContracts() {
                             className={`h-6 w-6 ${
                               contract.status === "signed"
                                 ? "text-green-600"
-                                : contract.status === "pending_employee"
+                                : isPending
                                 ? "text-amber-600"
                                 : "text-muted-foreground"
                             }`}
@@ -228,9 +231,30 @@ export default function MyContracts() {
                         <Badge className={statusColors[contract.status as ContractStatus]}>
                           {statusLabels[contract.status as ContractStatus]}
                         </Badge>
-                        <Button variant="ghost" size="icon">
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        {isPending ? (
+                          <Button 
+                            size="sm" 
+                            className="gap-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/contract/${contract.id}`);
+                            }}
+                          >
+                            <PenLine className="h-4 w-4" />
+                            Underskriv
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/contract/${contract.id}`);
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
