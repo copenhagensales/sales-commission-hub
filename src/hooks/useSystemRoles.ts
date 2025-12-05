@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
 
 export type SystemRole = "medarbejder" | "teamleder" | "ejer";
 
@@ -14,11 +15,19 @@ export interface SystemRoleRecord {
 
 export function useCurrentUserRole() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Clear role cache when user changes
+  useEffect(() => {
+    queryClient.removeQueries({ queryKey: ["system-role"] });
+  }, [user?.id, queryClient]);
 
   return useQuery({
     queryKey: ["system-role", user?.id],
     queryFn: async () => {
       if (!user) return null;
+
+      console.log("[useCurrentUserRole] Fetching role for user:", user.id, user.email);
 
       const { data, error } = await supabase
         .from("system_roles")
@@ -26,12 +35,19 @@ export function useCurrentUserRole() {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error("[useCurrentUserRole] Error:", error);
+        throw error;
+      }
+      
+      console.log("[useCurrentUserRole] Role data:", data);
       return data as SystemRoleRecord | null;
     },
     enabled: !!user,
-    staleTime: 0, // Always refetch
-    gcTime: 0, // Don't cache across sessions
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -143,7 +159,7 @@ export function useRemoveRole() {
 // Helper to check permissions
 export function useCanAccess() {
   const { user } = useAuth();
-  const { data: roleData, isPending, isLoading, isFetching } = useCurrentUserRole();
+  const { data: roleData, isPending, isLoading } = useCurrentUserRole();
 
   // Show loading if no user yet, or if query is still loading
   const isRoleLoading = !user || isPending || isLoading;
@@ -151,13 +167,27 @@ export function useCanAccess() {
   // Only trust the role data if we have a user and the data's user_id matches
   const isValidData = roleData && user && roleData.user_id === user.id;
   
-  const isOwner = isValidData && roleData.role === "ejer";
-  const isTeamleder = isValidData && roleData.role === "teamleder";
-  const isMedarbejder = !isValidData || roleData?.role === "medarbejder";
+  // Explicitly check for elevated roles - default to medarbejder if no valid data
+  const actualRole = isValidData ? roleData.role : "medarbejder";
+  const isOwner = actualRole === "ejer";
+  const isTeamleder = actualRole === "teamleder";
+  const isMedarbejder = actualRole === "medarbejder";
+
+  console.log("[useCanAccess] State:", {
+    userId: user?.id,
+    userEmail: user?.email,
+    roleData,
+    isValidData,
+    actualRole,
+    isOwner,
+    isTeamleder,
+    isTeamlederOrAbove: isTeamleder || isOwner,
+    isLoading: isRoleLoading,
+  });
 
   return {
     isLoading: isRoleLoading,
-    role: isValidData ? roleData.role : "medarbejder",
+    role: actualRole,
     isOwner,
     isTeamleder,
     isTeamlederOrAbove: isTeamleder || isOwner,
