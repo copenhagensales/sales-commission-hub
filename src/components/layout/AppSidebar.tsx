@@ -88,7 +88,7 @@ export function AppSidebar() {
             )}>
               <div className="flex items-center gap-3">
                 <Calendar className="h-5 w-5" />
-                Vagtplan
+                Fieldmarketing
               </div>
               {vagtFlowOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </CollapsibleTrigger>
