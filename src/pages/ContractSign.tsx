@@ -121,13 +121,27 @@ export default function ContractSign() {
 
       if (!signature) throw new Error("Ingen ventende underskrift fundet");
 
-      // Update signature
+      // Fetch real IP address
+      let ipAddress = "Ukendt";
+      try {
+        const ipResponse = await fetch("https://api.ipify.org?format=json");
+        if (ipResponse.ok) {
+          const ipData = await ipResponse.json();
+          ipAddress = ipData.ip;
+        }
+      } catch (ipError) {
+        console.error("Could not fetch IP address:", ipError);
+      }
+
+      const signedAt = new Date().toISOString();
+
+      // Update signature with real IP and timestamp
       const { error: sigError } = await supabase
         .from("contract_signatures")
         .update({
-          signed_at: new Date().toISOString(),
+          signed_at: signedAt,
           acceptance_text: "Jeg har læst og accepterer betingelserne i denne kontrakt.",
-          ip_address: "N/A", // Could be fetched from API
+          ip_address: ipAddress,
           user_agent: navigator.userAgent,
         })
         .eq("id", signature.id);
@@ -147,11 +161,29 @@ export default function ContractSign() {
         .eq("id", contract.id);
 
       if (contractError) throw contractError;
+
+      // Send confirmation email with contract copy
+      try {
+        await supabase.functions.invoke("send-contract-signed-confirmation", {
+          body: {
+            contractId: contract.id,
+            employeeName: `${currentEmployee.first_name} ${currentEmployee.last_name}`,
+            employeeEmail: currentEmployee.private_email,
+            contractTitle: contract.title,
+            signedAt: signedAt,
+            ipAddress: ipAddress,
+          },
+        });
+        console.log("Confirmation email sent");
+      } catch (emailError) {
+        console.error("Could not send confirmation email:", emailError);
+        // Don't fail the whole operation if email fails
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contract", id] });
       queryClient.invalidateQueries({ queryKey: ["my-contracts"] });
-      toast.success("Kontrakt underskrevet!");
+      toast.success("Kontrakt underskrevet! Bekræftelse sendt til din email.");
     },
     onError: () => toast.error("Kunne ikke underskrive kontrakt"),
   });

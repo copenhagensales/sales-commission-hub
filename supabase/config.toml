@@ -38,3 +38,6 @@ verify_jwt = true
 
 [functions.send-contract-reminders]
 verify_jwt = false
+
+[functions.send-contract-signed-confirmation]
+verify_jwt = true
