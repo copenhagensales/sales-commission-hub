@@ -509,13 +509,20 @@ export default function ShiftOverview() {
                 <div 
                   key={employee.id} 
                   className={cn(
-                    "grid grid-cols-6",
-                    idx < (employees?.length || 0) - 1 && "border-b border-border/60",
-                    idx % 2 === 0 ? "bg-background" : "bg-muted/20"
+                    "grid grid-cols-6 group/row",
+                    idx < (employees?.length || 0) - 1 && "border-b border-border/70",
+                    idx % 2 === 0 
+                      ? "bg-background" 
+                      : "bg-muted/40 dark:bg-muted/25"
                   )}
                 >
                   {/* Employee name cell - sticky left with clear border */}
-                  <div className="p-3 flex flex-col justify-center border-r-2 border-border bg-inherit">
+                  <div className={cn(
+                    "p-3 flex flex-col justify-center border-r-2 border-border",
+                    idx % 2 === 0 
+                      ? "bg-background" 
+                      : "bg-muted/50 dark:bg-muted/30"
+                  )}>
                     <p className="text-sm font-semibold leading-tight text-foreground">
                       {employee.first_name} {employee.last_name?.charAt(0)}.
                     </p>
