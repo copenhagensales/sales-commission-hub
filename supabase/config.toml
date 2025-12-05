@@ -26,3 +26,15 @@ verify_jwt = true
 
 [functions.send-employee-invitation]
 verify_jwt = false
+
+[functions.create-employee-user]
+verify_jwt = true
+
+[functions.send-contract-email]
+verify_jwt = true
+
+[functions.generate-contract-pdf]
+verify_jwt = true
+
+[functions.send-contract-reminders]
+verify_jwt = false

@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Mail, Loader2, RefreshCw, ArrowRight, Check, FileText, Trash2 } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -102,10 +102,10 @@ export default function EmployeeMasterData() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
   const [formData, setFormData] = useState<NewEmployee>(defaultEmployee);
-  const [sendingInvitation, setSendingInvitation] = useState<string | null>(null);
-  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [inviteData, setInviteData] = useState({ first_name: "", last_name: "", email: "", job_title: "" as "Fieldmarketing" | "Salgskonsulent" | "" });
-  const [creatingInvite, setCreatingInvite] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createData, setCreateData] = useState({ first_name: "", last_name: "", email: "", password: "", job_title: "" as "Fieldmarketing" | "Salgskonsulent" | "" });
+  const [creatingEmployee, setCreatingEmployee] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [autoSaving, setAutoSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -134,18 +134,6 @@ export default function EmployeeMasterData() {
     },
   });
 
-  const { data: invitations = [] } = useQuery({
-    queryKey: ["employee-invitations"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employee_invitations")
-        .select("employee_id, status, expires_at")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
-
   // Fetch contracts to check signed status
   const { data: contracts = [] } = useQuery({
     queryKey: ["employee-contracts-status"],
@@ -161,14 +149,6 @@ export default function EmployeeMasterData() {
 
   const hasSignedContract = (employeeId: string) => {
     return contracts.some(c => c.employee_id === employeeId);
-  };
-
-  const getInvitationStatus = (employeeId: string) => {
-    const invitation = invitations.find(inv => inv.employee_id === employeeId);
-    if (!invitation) return null;
-    if (invitation.status === "completed") return "completed";
-    if (new Date(invitation.expires_at) < new Date()) return "expired";
-    return "pending";
   };
 
   const saveMutation = useMutation({
@@ -336,115 +316,67 @@ export default function EmployeeMasterData() {
     },
   });
 
-  const handleSendInvitation = async (employee: EmployeeMasterDataRecord, isResend = false) => {
-    if (!employee.private_email) {
-      toast({ title: "Mangler email", description: "Medarbejderen skal have en email-adresse", variant: "destructive" });
+  const handleCreateEmployee = async () => {
+    if (!createData.first_name || !createData.email || !createData.password || !createData.job_title) {
+      toast({ title: "Udfyld fornavn, email, kode og stilling", variant: "destructive" });
       return;
     }
 
-    setSendingInvitation(employee.id);
+    if (createData.password.length < 6) {
+      toast({ title: "Koden skal være mindst 6 tegn", variant: "destructive" });
+      return;
+    }
+
+    setCreatingEmployee(true);
     try {
-      // Delete any existing expired/pending invitations for this employee if resending
-      if (isResend) {
-        await supabase
-          .from("employee_invitations")
-          .delete()
-          .eq("employee_id", employee.id)
-          .in("status", ["pending", "expired"]);
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-employee-invitation`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            employeeId: employee.id,
-            email: employee.private_email,
-            firstName: employee.first_name,
-            lastName: employee.last_name,
-            appUrl: window.location.origin,
-          }),
-        }
-      );
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Kunne ikke sende invitation");
-      }
-
-      queryClient.invalidateQueries({ queryKey: ["employee-invitations"] });
-      toast({ title: isResend ? "Invitation gensendt" : "Invitation sendt", description: `Email sendt til ${employee.private_email}` });
-    } catch (error) {
-      console.error("Invitation error:", error);
-      toast({
-        title: "Fejl",
-        description: error instanceof Error ? error.message : "Kunne ikke sende invitation",
-        variant: "destructive",
+      // Create auth user first
+      const response = await supabase.functions.invoke("create-employee-user", {
+        body: {
+          email: createData.email,
+          password: createData.password,
+          firstName: createData.first_name,
+          lastName: createData.last_name,
+        },
       });
-    } finally {
-      setSendingInvitation(null);
-    }
-  };
 
-  const handleInviteNewEmployee = async () => {
-    if (!inviteData.first_name || !inviteData.email || !inviteData.job_title) {
-      toast({ title: "Udfyld fornavn, email og stilling", variant: "destructive" });
-      return;
-    }
+      if (response.error) {
+        throw new Error(response.error.message || "Kunne ikke oprette bruger");
+      }
 
-    setCreatingInvite(true);
-    try {
-      // Create the employee first
-      const { data: newEmployee, error: createError } = await supabase
+      if (!response.data?.success) {
+        throw new Error(response.data?.error || "Kunne ikke oprette bruger");
+      }
+
+      // Create the employee record
+      const { error: createError } = await supabase
         .from("employee_master_data")
         .insert({
-          first_name: inviteData.first_name,
-          last_name: inviteData.last_name || "",
-          private_email: inviteData.email,
-          job_title: inviteData.job_title,
+          first_name: createData.first_name,
+          last_name: createData.last_name || "",
+          private_email: createData.email,
+          job_title: createData.job_title,
           is_active: true,
-        })
-        .select()
-        .single();
+          employment_start_date: new Date().toISOString().split("T")[0],
+        });
 
       if (createError) throw createError;
 
-      // Send the invitation
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-employee-invitation`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            employeeId: newEmployee.id,
-            email: inviteData.email,
-            firstName: inviteData.first_name,
-            lastName: inviteData.last_name,
-            appUrl: window.location.origin,
-          }),
-        }
-      );
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Kunne ikke sende invitation");
-      }
-
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
-      queryClient.invalidateQueries({ queryKey: ["employee-invitations"] });
-      toast({ title: "Medarbejder oprettet og invitation sendt", description: `Email sendt til ${inviteData.email}` });
-      setInviteDialogOpen(false);
-      setInviteData({ first_name: "", last_name: "", email: "", job_title: "" });
+      toast({ 
+        title: "Medarbejder oprettet", 
+        description: `Bruger oprettet med email: ${createData.email}. Giv medarbejderen login-oplysningerne.` 
+      });
+      setCreateDialogOpen(false);
+      setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
     } catch (error) {
-      console.error("Invite error:", error);
+      console.error("Create error:", error);
       toast({
         title: "Fejl",
         description: error instanceof Error ? error.message : "Kunne ikke oprette medarbejder",
         variant: "destructive",
       });
     } finally {
-      setCreatingInvite(false);
+      setCreatingEmployee(false);
     }
   };
 
@@ -473,35 +405,35 @@ export default function EmployeeMasterData() {
             <p className="text-muted-foreground">Stamkort og medarbejderdata</p>
           </div>
           <div className="flex gap-2">
-            <Dialog open={inviteDialogOpen} onOpenChange={(open) => {
-              setInviteDialogOpen(open);
-              if (!open) setInviteData({ first_name: "", last_name: "", email: "", job_title: "" });
+            <Dialog open={createDialogOpen} onOpenChange={(open) => {
+              setCreateDialogOpen(open);
+              if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
             }}>
               <DialogTrigger asChild>
-                <Button><Plus className="mr-2 h-4 w-4" /> Inviter ny medarbejder</Button>
+                <Button><Plus className="mr-2 h-4 w-4" /> Opret ny medarbejder</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Inviter ny medarbejder</DialogTitle>
+                  <DialogTitle>Opret ny medarbejder</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <p className="text-sm text-muted-foreground">
-                    Opret medarbejder og send invitation til at udfylde stamdata.
+                    Opret medarbejder med login. Giv medarbejderen login-oplysningerne.
                   </p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Fornavn *</Label>
                       <Input 
-                        value={inviteData.first_name} 
-                        onChange={(e) => setInviteData({ ...inviteData, first_name: e.target.value })} 
+                        value={createData.first_name} 
+                        onChange={(e) => setCreateData({ ...createData, first_name: e.target.value })} 
                         placeholder="Fornavn"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Efternavn</Label>
                       <Input 
-                        value={inviteData.last_name} 
-                        onChange={(e) => setInviteData({ ...inviteData, last_name: e.target.value })} 
+                        value={createData.last_name} 
+                        onChange={(e) => setCreateData({ ...createData, last_name: e.target.value })} 
                         placeholder="Efternavn"
                       />
                     </div>
@@ -510,16 +442,39 @@ export default function EmployeeMasterData() {
                     <Label>Email *</Label>
                     <Input 
                       type="email"
-                      value={inviteData.email} 
-                      onChange={(e) => setInviteData({ ...inviteData, email: e.target.value })} 
+                      value={createData.email} 
+                      onChange={(e) => setCreateData({ ...createData, email: e.target.value })} 
                       placeholder="medarbejder@email.dk"
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label>Kodeord *</Label>
+                    <div className="relative">
+                      <Input 
+                        type={showPassword ? "text" : "password"}
+                        value={createData.password} 
+                        onChange={(e) => setCreateData({ ...createData, password: e.target.value })} 
+                        placeholder="Mindst 6 tegn"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Medarbejderen kan ændre koden efter første login.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Stilling *</Label>
                     <Select 
-                      value={inviteData.job_title} 
-                      onValueChange={(value: "Fieldmarketing" | "Salgskonsulent") => setInviteData({ ...inviteData, job_title: value })}
+                      value={createData.job_title} 
+                      onValueChange={(value: "Fieldmarketing" | "Salgskonsulent") => setCreateData({ ...createData, job_title: value })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Vælg stilling" />
@@ -535,16 +490,17 @@ export default function EmployeeMasterData() {
                   </div>
                 </div>
                 <div className="flex justify-end">
-                  <Button onClick={handleInviteNewEmployee} disabled={creatingInvite}>
-                    {creatingInvite ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sender...</>
+                  <Button onClick={handleCreateEmployee} disabled={creatingEmployee}>
+                    {creatingEmployee ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opretter...</>
                     ) : (
-                      <><Mail className="mr-2 h-4 w-4" /> Send invitation</>
+                      <><Plus className="mr-2 h-4 w-4" /> Opret medarbejder</>
                     )}
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
+
 
             <Dialog open={dialogOpen} onOpenChange={(open) => {
               setDialogOpen(open);
@@ -910,7 +866,6 @@ export default function EmployeeMasterData() {
                     <TableHead>Afdeling</TableHead>
                     <TableHead>Stilling</TableHead>
                     <TableHead>Løntype</TableHead>
-                    <TableHead>Invitation</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
@@ -954,15 +909,6 @@ export default function EmployeeMasterData() {
                         {employee.salary_type === "hourly" && "Timeløn"}
                         {!employee.salary_type && "-"}
                       </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const status = getInvitationStatus(employee.id);
-                          if (!status) return <span className="text-muted-foreground text-sm">-</span>;
-                          if (status === "completed") return <Badge variant="default" className="bg-green-500">Udfyldt</Badge>;
-                          if (status === "expired") return <Badge variant="destructive">Udløbet</Badge>;
-                          return <Badge variant="secondary">Afventer</Badge>;
-                        })()}
-                      </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <Switch 
                           checked={employee.is_active} 
@@ -992,33 +938,6 @@ export default function EmployeeMasterData() {
                         >
                           <MessageSquare className="h-4 w-4" />
                         </Button>
-                        {(() => {
-                          const status = getInvitationStatus(employee.id);
-                          const isExpired = status === "expired";
-                          const isCompleted = status === "completed";
-                          const isPending = status === "pending";
-                          
-                          return (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={(e) => { 
-                                e.stopPropagation(); 
-                                handleSendInvitation(employee, isExpired);
-                              }}
-                              disabled={!employee.private_email || sendingInvitation === employee.id || isCompleted || isPending}
-                              title={isExpired ? "Gensend invitation" : isCompleted ? "Invitation udfyldt" : isPending ? "Invitation afventer" : "Send invitation"}
-                            >
-                              {sendingInvitation === employee.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : isExpired ? (
-                                <RefreshCw className="h-4 w-4 text-destructive" />
-                              ) : (
-                                <Mail className="h-4 w-4" />
-                              )}
-                            </Button>
-                          );
-                        })()}
                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -1037,7 +956,7 @@ export default function EmployeeMasterData() {
                   ))}
                   {filteredEmployees.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground">
                         Ingen medarbejdere fundet
                       </TableCell>
                     </TableRow>
