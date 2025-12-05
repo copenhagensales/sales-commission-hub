@@ -15,15 +15,21 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "other";
 
-// Required fields for contract merge - must have values before sending
+// Required fields for contract merge - varies by contract type
 interface RequiredField {
   key: keyof EmployeeData;
   label: string;
   check: (employee: EmployeeData) => boolean;
 }
 
-const requiredFieldsForContract: RequiredField[] = [
+// Base fields required for all contracts
+const baseRequiredFields: RequiredField[] = [
   { key: "private_email", label: "Privat email", check: (e) => !!e.private_email },
+];
+
+// Full employment contract requires all details
+const employmentRequiredFields: RequiredField[] = [
+  ...baseRequiredFields,
   { key: "cpr_number", label: "CPR-nummer", check: (e) => !!e.cpr_number },
   { key: "address_street", label: "Adresse (vej)", check: (e) => !!e.address_street },
   { key: "address_postal_code", label: "Postnummer", check: (e) => !!e.address_postal_code },
@@ -38,8 +44,50 @@ const requiredFieldsForContract: RequiredField[] = [
   { key: "standard_start_time", label: "Mødetid", check: (e) => !!e.standard_start_time },
 ];
 
-const getMissingFields = (employee: EmployeeData): string[] => {
-  return requiredFieldsForContract
+// Amendment requires identity + salary info
+const amendmentRequiredFields: RequiredField[] = [
+  ...baseRequiredFields,
+  { key: "cpr_number", label: "CPR-nummer", check: (e) => !!e.cpr_number },
+  { key: "job_title", label: "Stilling", check: (e) => !!e.job_title },
+  { key: "salary_type", label: "Løntype", check: (e) => !!e.salary_type },
+  { key: "salary_amount", label: "Lønbeløb", check: (e) => e.salary_amount !== null && e.salary_amount !== undefined },
+];
+
+// Company car requires identity + address
+const companyCarRequiredFields: RequiredField[] = [
+  ...baseRequiredFields,
+  { key: "cpr_number", label: "CPR-nummer", check: (e) => !!e.cpr_number },
+  { key: "address_street", label: "Adresse (vej)", check: (e) => !!e.address_street },
+  { key: "address_postal_code", label: "Postnummer", check: (e) => !!e.address_postal_code },
+  { key: "address_city", label: "By", check: (e) => !!e.address_city },
+];
+
+// NDA and termination only need basic identity
+const minimalRequiredFields: RequiredField[] = [
+  ...baseRequiredFields,
+  { key: "cpr_number", label: "CPR-nummer", check: (e) => !!e.cpr_number },
+];
+
+const getRequiredFieldsForType = (contractType: ContractType | null): RequiredField[] => {
+  switch (contractType) {
+    case "employment":
+      return employmentRequiredFields;
+    case "amendment":
+      return amendmentRequiredFields;
+    case "company_car":
+      return companyCarRequiredFields;
+    case "nda":
+    case "termination":
+      return minimalRequiredFields;
+    case "other":
+    default:
+      return baseRequiredFields;
+  }
+};
+
+const getMissingFields = (employee: EmployeeData, contractType: ContractType | null): string[] => {
+  const requiredFields = getRequiredFieldsForType(contractType);
+  return requiredFields
     .filter((field) => !field.check(employee))
     .map((field) => field.label);
 };
@@ -103,10 +151,6 @@ export function SendContractDialog({
   const [previewContent, setPreviewContent] = useState("");
   const [showPreview, setShowPreview] = useState(false);
 
-  // Check for missing required fields
-  const missingFields = getMissingFields(employee);
-  const hasMissingFields = missingFields.length > 0;
-
   // Fetch templates
   const { data: templates = [] } = useQuery({
     queryKey: ["contract-templates-active"],
@@ -120,6 +164,14 @@ export function SendContractDialog({
       return data as ContractTemplate[];
     },
   });
+
+  // Get selected template's contract type for validation
+  const selectedTemplate = templates?.find((t: ContractTemplate) => t.id === selectedTemplateId);
+  const selectedContractType: ContractType | null = selectedTemplate?.type || null;
+
+  // Check for missing required fields based on contract type
+  const missingFields = getMissingFields(employee, selectedContractType);
+  const hasMissingFields = missingFields.length > 0;
 
   // Merge placeholders with employee data
   const mergeContent = (content: string): string => {
