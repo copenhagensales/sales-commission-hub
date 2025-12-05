@@ -1850,6 +1850,18 @@ export type Database = {
     Functions: {
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_current_employee_id: { Args: never; Returns: string }
+      get_invitation_by_token: {
+        Args: { _token: string }
+        Returns: {
+          email: string
+          employee_id: string
+          expires_at: string
+          first_name: string
+          id: string
+          last_name: string
+          status: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

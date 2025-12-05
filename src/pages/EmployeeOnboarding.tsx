@@ -69,17 +69,17 @@ export default function EmployeeOnboarding() {
 
   const validateToken = async () => {
     try {
-      const { data: invitationData, error: invError } = await supabase
-        .from("employee_invitations")
-        .select("*")
-        .eq("token", token)
-        .single();
+      // Use secure function to lookup invitation by token (prevents email enumeration)
+      const { data, error: invError } = await supabase
+        .rpc("get_invitation_by_token", { _token: token });
 
-      if (invError || !invitationData) {
+      if (invError || !data || data.length === 0) {
         setError("Ugyldigt eller udløbet link.");
         setLoading(false);
         return;
       }
+
+      const invitationData = data[0];
 
       if (new Date(invitationData.expires_at) < new Date()) {
         setError("Invitationen er udløbet. Kontakt venligst din leder.");
@@ -93,25 +93,23 @@ export default function EmployeeOnboarding() {
         return;
       }
 
-      setInvitation(invitationData);
+      setInvitation({
+        id: invitationData.id,
+        employee_id: invitationData.employee_id,
+        email: invitationData.email,
+        status: invitationData.status,
+        expires_at: invitationData.expires_at,
+      });
 
-      const { data: employeeData, error: empError } = await supabase
-        .from("employee_master_data")
-        .select("first_name, last_name")
-        .eq("id", invitationData.employee_id)
-        .single();
+      setEmployee({
+        first_name: invitationData.first_name || "",
+        last_name: invitationData.last_name || "",
+      });
 
-      if (empError || !employeeData) {
-        setError("Medarbejder ikke fundet.");
-        setLoading(false);
-        return;
-      }
-
-      setEmployee(employeeData);
       setFormData((prev) => ({
         ...prev,
-        first_name: employeeData.first_name || "",
-        last_name: employeeData.last_name || "",
+        first_name: invitationData.first_name || "",
+        last_name: invitationData.last_name || "",
         private_email: invitationData.email || "",
       }));
 
