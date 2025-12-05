@@ -44,7 +44,6 @@ export default function VagtEmployees() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
   const [showAbsenceDialog, setShowAbsenceDialog] = useState<any>(null);
   const [teamFilter, setTeamFilter] = useState<string>("all");
@@ -60,15 +59,6 @@ export default function VagtEmployees() {
     role: "employee" as "admin" | "planner" | "employee",
     is_active: true,
     team: "" as string,
-  });
-
-  const [newEmployeeForm, setNewEmployeeForm] = useState({
-    full_name: "",
-    email: "",
-    phone: "",
-    role: "employee" as "admin" | "planner" | "employee",
-    team: "" as string,
-    is_active: true,
   });
 
   const [absenceForm, setAbsenceForm] = useState({
@@ -201,40 +191,6 @@ export default function VagtEmployees() {
       queryClient.invalidateQueries({ queryKey: ["vagt-all-employees"] });
       setSelectedEmployee(null);
       toast({ title: "Medarbejder opdateret" });
-    },
-  });
-
-  const addEmployeeMutation = useMutation({
-    mutationFn: async (data: typeof newEmployeeForm) => {
-      const employeeId = crypto.randomUUID();
-
-      const { error } = await supabase.from("employee").insert({
-        id: employeeId,
-        full_name: data.full_name,
-        email: data.email || `temp-${employeeId}@placeholder.local`,
-        phone: data.phone || null,
-        role: data.role,
-        team: data.team || null,
-        is_active: data.is_active,
-      });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vagt-all-employees"] });
-      setShowAddDialog(false);
-      setNewEmployeeForm({
-        full_name: "",
-        email: "",
-        phone: "",
-        role: "employee",
-        team: "",
-        is_active: true,
-      });
-      toast({ title: "Medarbejder tilføjet" });
-    },
-    onError: (error: any) => {
-      toast({ title: "Fejl", description: error.message, variant: "destructive" });
     },
   });
 
@@ -393,9 +349,6 @@ export default function VagtEmployees() {
                 <SelectItem value="YouSee">YouSee</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={() => setShowAddDialog(true)} className="bg-emerald-500 hover:bg-emerald-600">
-              <Plus className="h-4 w-4 mr-2" /> Tilføj medarbejder
-            </Button>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Users className="h-5 w-5" />
               <span>{activeEmployees.length} medarbejdere</span>
@@ -613,60 +566,6 @@ export default function VagtEmployees() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelectedEmployee(null)}>Annuller</Button>
             <Button onClick={handleUpdate} disabled={updateEmployeeMutation.isPending}>Gem</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Ny medarbejder</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label>Navn *</Label>
-              <Input value={newEmployeeForm.full_name} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, full_name: e.target.value })} />
-            </div>
-            <div>
-              <Label>Email</Label>
-              <Input type="email" value={newEmployeeForm.email} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, email: e.target.value })} />
-            </div>
-            <div>
-              <Label>Telefon</Label>
-              <Input value={newEmployeeForm.phone} onChange={(e) => setNewEmployeeForm({ ...newEmployeeForm, phone: e.target.value })} />
-            </div>
-            <div>
-              <Label>Team</Label>
-              <Select value={newEmployeeForm.team} onValueChange={(v) => setNewEmployeeForm({ ...newEmployeeForm, team: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Vælg team" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Eesy">Eesy</SelectItem>
-                  <SelectItem value="YouSee">YouSee</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Rolle</Label>
-              <Select value={newEmployeeForm.role} onValueChange={(v: any) => setNewEmployeeForm({ ...newEmployeeForm, role: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Administrator</SelectItem>
-                  <SelectItem value="planner">Planlægger</SelectItem>
-                  <SelectItem value="employee">Medarbejder</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>Annuller</Button>
-            <Button onClick={() => addEmployeeMutation.mutate(newEmployeeForm)} disabled={!newEmployeeForm.full_name || addEmployeeMutation.isPending}>
-              Opret
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
