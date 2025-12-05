@@ -329,118 +329,143 @@ export default function ShiftOverview() {
 
   return (
     <MainLayout>
-      <div className="p-4 md:p-6 space-y-4">
-        {/* Compact Header with Navigation */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 pb-2 border-b border-border/50">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1">
+      <div className="p-4 md:p-6 space-y-6">
+        {/* Header */}
+        <div className="space-y-4">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            {/* Week Navigation */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center bg-muted/50 rounded-lg p-1">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-9 w-9 rounded-md hover:bg-background"
+                  onClick={() => setCurrentDate(subWeeks(currentDate, 1))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-9 px-3 text-sm font-medium hover:bg-background"
+                  onClick={() => setCurrentDate(new Date())}
+                >
+                  I dag
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-9 w-9 rounded-md hover:bg-background"
+                  onClick={() => setCurrentDate(addWeeks(currentDate, 1))}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">
+                  Uge {format(currentDate, "w", { locale: da })}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {format(weekStart, "d. MMMM", { locale: da })} – {format(weekEnd, "d. MMMM yyyy", { locale: da })}
+                </p>
+              </div>
+            </div>
+            
+            {/* Actions */}
+            <div className="flex items-center gap-3">
+              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                <SelectTrigger className="w-[160px] h-9">
+                  <SelectValue placeholder="Alle afdelinger" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle afdelinger</SelectItem>
+                  {departments?.map(dept => (
+                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => setCurrentDate(subWeeks(currentDate, 1))}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button 
-                variant="ghost" 
                 size="sm" 
-                className="h-8 px-2 text-xs"
-                onClick={() => setCurrentDate(new Date())}
+                className="h-9"
+                onClick={() => { setSelectedDate(new Date()); setSelectedEmployeeId(null); setCreateDialogOpen(true); }}
               >
-                I dag
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => setCurrentDate(addWeeks(currentDate, 1))}
-              >
-                <ChevronRight className="h-4 w-4" />
+                <Plus className="h-4 w-4 mr-1.5" />
+                Ny vagt
               </Button>
             </div>
-            <div>
-              <h1 className="text-lg font-semibold">
-                Uge {format(currentDate, "w", { locale: da })}
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                {format(weekStart, "d. MMM", { locale: da })} – {format(weekEnd, "d. MMM yyyy", { locale: da })}
-              </p>
-            </div>
           </div>
-          
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Quick Stats */}
-            <div className="flex items-center gap-3 mr-2 text-xs">
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <Users className="h-3.5 w-3.5" />
-                <span>{employees?.length || 0}</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <CalendarDays className="h-3.5 w-3.5" />
-                <span>{shifts?.length || 0} vagter</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <Clock className="h-3.5 w-3.5" />
-                <span>{totalPlannedHours.toFixed(0)}t</span>
-              </div>
-            </div>
-            
-            {/* Absence Stats - subtle separator */}
-            <div className="flex items-center gap-2 pl-2 border-l border-border/40 text-xs">
-              <div className="flex items-center gap-1 text-amber-600/80" title="Ferie denne uge">
-                <Palmtree className="h-3 w-3" />
-                <span>{absenceStats.weekVacation}%</span>
-              </div>
-              <div className="flex items-center gap-1 text-red-500/80" title="Sygdom denne uge">
-                <Thermometer className="h-3 w-3" />
-                <span>{absenceStats.weekSick}%</span>
-              </div>
-            </div>
-            
-            <div className="w-px h-4 bg-border/40 mx-1" />
-            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-              <SelectTrigger className="w-[140px] h-8 text-xs">
-                <SelectValue placeholder="Alle afdelinger" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Alle afdelinger</SelectItem>
-                {departments?.map(dept => (
-                  <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button 
-              size="sm" 
-              className="h-8 text-xs"
-              onClick={() => { setSelectedDate(new Date()); setSelectedEmployeeId(null); setCreateDialogOpen(true); }}
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              Ny vagt
-            </Button>
-          </div>
-        </div>
 
-        {/* Inline Legend */}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500/50"></div>
-            <span>Arbejder</span>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+            <div className="bg-card border border-border/60 rounded-lg p-3 flex items-center gap-3">
+              <div className="p-2 rounded-md bg-primary/10">
+                <Users className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Medarbejdere</p>
+                <p className="text-lg font-semibold">{employees?.length || 0}</p>
+              </div>
+            </div>
+            <div className="bg-card border border-border/60 rounded-lg p-3 flex items-center gap-3">
+              <div className="p-2 rounded-md bg-blue-500/10">
+                <CalendarDays className="h-4 w-4 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Vagter</p>
+                <p className="text-lg font-semibold">{shifts?.length || 0}</p>
+              </div>
+            </div>
+            <div className="bg-card border border-border/60 rounded-lg p-3 flex items-center gap-3">
+              <div className="p-2 rounded-md bg-emerald-500/10">
+                <Clock className="h-4 w-4 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Timer</p>
+                <p className="text-lg font-semibold">{totalPlannedHours.toFixed(0)}t</p>
+              </div>
+            </div>
+            <div className="bg-card border border-border/60 rounded-lg p-3 flex items-center gap-3">
+              <div className="p-2 rounded-md bg-amber-500/10">
+                <Palmtree className="h-4 w-4 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Ferie</p>
+                <p className="text-lg font-semibold">{absenceStats.weekVacation}%</p>
+              </div>
+            </div>
+            <div className="bg-card border border-border/60 rounded-lg p-3 flex items-center gap-3">
+              <div className="p-2 rounded-md bg-red-500/10">
+                <Thermometer className="h-4 w-4 text-red-500" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Sygdom</p>
+                <p className="text-lg font-semibold">{absenceStats.weekSick}%</p>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm bg-amber-400/60"></div>
-            <span>Ferie (1 klik)</span>
+
+          {/* Legend */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground bg-muted/30 rounded-lg px-4 py-2.5">
+            <span className="font-medium text-foreground/70">Status:</span>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-emerald-500/40 border border-emerald-500/60"></div>
+              <span>Arbejder</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-amber-400/50 border border-amber-500/60"></div>
+              <span>Ferie</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-red-400/50 border border-red-500/60"></div>
+              <span>Syg</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-orange-400/50 border border-orange-500/60"></div>
+              <span>Forsinket</span>
+            </div>
+            <div className="hidden sm:block w-px h-4 bg-border/60 mx-1" />
+            <span className="text-xs text-muted-foreground/70">Klik for at skifte status • Dobbeltklik = ny vagt</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm bg-red-400/60"></div>
-            <span>Syg (2 klik)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm bg-orange-400/60"></div>
-            <span>Forsinket (3 klik)</span>
-          </div>
-          <span className="text-muted-foreground/50">|</span>
-          <span className="text-muted-foreground/60">Dobbeltklik = opret vagt</span>
         </div>
 
         {/* Calendar Grid */}
