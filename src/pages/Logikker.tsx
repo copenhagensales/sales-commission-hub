@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ListChecks, Info, RefreshCw, Layers3, UserX, Thermometer } from "lucide-react";
+import { ListChecks, Info, RefreshCw, Layers3, UserX, Thermometer, Trash2 } from "lucide-react";
 
 export default function Logikker() {
   return (
@@ -126,6 +126,26 @@ export default function Logikker() {
                 <li>"Sygefraværsprocent sammenlignet" vises <strong>kun hvis medarbejderen har mere end 3,5% sygefravær</strong> i den valgte periode.</li>
                 <li>3,5% er det danske gennemsnit for sygefravær.</li>
                 <li>Kortet viser medarbejderens fravær sammenlignet med landsgennemsnittet.</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trash2 className="h-5 w-5" />
+                Sletning af medarbejdere
+              </CardTitle>
+              <CardDescription>
+                Regler for manuel sletning af medarbejdere.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <ul className="list-disc space-y-1 pl-5">
+                <li><strong>Kun ejere</strong> kan slette medarbejdere permanent fra systemet.</li>
+                <li>Sletning fjerner al medarbejderdata og kan <strong>ikke fortrydes</strong>.</li>
+                <li>Teamledere og medarbejdere har ikke adgang til slettefunktionen.</li>
+                <li>Inaktivering anbefales frem for sletning for at bevare historik.</li>
               </ul>
             </CardContent>
           </Card>

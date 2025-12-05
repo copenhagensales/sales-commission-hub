@@ -11,10 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Mail, Loader2, RefreshCw, ArrowRight, Check, FileText } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Mail, Loader2, RefreshCw, ArrowRight, Check, FileText, Trash2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useCanAccess } from "@/hooks/useSystemRoles";
 
 interface EmployeeMasterDataRecord {
   id: string;
@@ -105,6 +107,9 @@ export default function EmployeeMasterData() {
   const [currentStep, setCurrentStep] = useState(0);
   const [autoSaving, setAutoSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [deleteEmployeeId, setDeleteEmployeeId] = useState<string | null>(null);
+  
+  const { isOwner } = useCanAccess();
 
   const dialogSteps = [
     { title: "Identitet", key: "identity" },
@@ -304,6 +309,24 @@ export default function EmployeeMasterData() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
       toast({ title: "Status opdateret" });
+    },
+    onError: (error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("employee_master_data")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+      toast({ title: "Medarbejder slettet" });
+      setDeleteEmployeeId(null);
     },
     onError: (error) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
@@ -997,6 +1020,16 @@ export default function EmployeeMasterData() {
                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
                           <Pencil className="h-4 w-4" />
                         </Button>
+                        {isOwner && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={(e) => { e.stopPropagation(); setDeleteEmployeeId(employee.id); }}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1012,6 +1045,27 @@ export default function EmployeeMasterData() {
             )}
           </CardContent>
         </Card>
+
+        {/* Delete confirmation dialog */}
+        <AlertDialog open={!!deleteEmployeeId} onOpenChange={(open) => !open && setDeleteEmployeeId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Slet medarbejder?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Dette vil permanent slette medarbejderen og alle tilknyttede data. Handlingen kan ikke fortrydes.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuller</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => deleteEmployeeId && deleteMutation.mutate(deleteEmployeeId)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Slet
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );
