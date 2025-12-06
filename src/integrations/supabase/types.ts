@@ -1152,7 +1152,10 @@ export type Database = {
           parking_spot_id: string | null
           private_email: string | null
           private_phone: string | null
+          referral_bonus: number | null
           salary_amount: number | null
+          salary_deduction: number | null
+          salary_deduction_note: string | null
           salary_type: Database["public"]["Enums"]["salary_type"] | null
           standard_start_time: string | null
           system_role_id: string | null
@@ -1190,7 +1193,10 @@ export type Database = {
           parking_spot_id?: string | null
           private_email?: string | null
           private_phone?: string | null
+          referral_bonus?: number | null
           salary_amount?: number | null
+          salary_deduction?: number | null
+          salary_deduction_note?: string | null
           salary_type?: Database["public"]["Enums"]["salary_type"] | null
           standard_start_time?: string | null
           system_role_id?: string | null
@@ -1228,7 +1234,10 @@ export type Database = {
           parking_spot_id?: string | null
           private_email?: string | null
           private_phone?: string | null
+          referral_bonus?: number | null
           salary_amount?: number | null
+          salary_deduction?: number | null
+          salary_deduction_note?: string | null
           salary_type?: Database["public"]["Enums"]["salary_type"] | null
           standard_start_time?: string | null
           system_role_id?: string | null
