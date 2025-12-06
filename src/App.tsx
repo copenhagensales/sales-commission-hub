@@ -52,6 +52,7 @@ import CareerWishesOverview from "./pages/CareerWishesOverview";
 import CarQuiz from "./pages/CarQuiz";
 import CarQuizAdmin from "./pages/CarQuizAdmin";
 import CodeOfConduct from "./pages/CodeOfConduct";
+import CodeOfConductAdmin from "./pages/CodeOfConductAdmin";
 
 const queryClient = new QueryClient();
 
@@ -130,6 +131,7 @@ const App = () => (
           <Route path="/pulse-survey-results" element={<RoleProtectedRoute requireTeamlederOrAbove><PulseSurveyResults /></RoleProtectedRoute>} />
           <Route path="/career-wishes-overview" element={<RoleProtectedRoute requireTeamlederOrAbove><CareerWishesOverview /></RoleProtectedRoute>} />
           <Route path="/car-quiz-admin" element={<RoleProtectedRoute requireTeamlederOrAbove><CarQuizAdmin /></RoleProtectedRoute>} />
+          <Route path="/code-of-conduct-admin" element={<RoleProtectedRoute requireTeamlederOrAbove><CodeOfConductAdmin /></RoleProtectedRoute>} />
           {/* Admin route - owner only */}
           <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
           <Route path="*" element={<NotFound />} />

@@ -29,6 +29,7 @@ const teamlederNavigation = [
   { name: "Logikker", href: "/logikker", icon: ListChecks },
   { name: "MG test", href: "/mg-test", icon: Percent },
   { name: "Bil-quiz overblik", href: "/car-quiz-admin", icon: Car },
+  { name: "Code of Conduct overblik", href: "/code-of-conduct-admin", icon: Shield },
 ];
 
 // Navigation items for rekruttering role
