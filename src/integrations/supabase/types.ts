@@ -1262,6 +1262,79 @@ export type Database = {
           },
         ]
       }
+      extra_work: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          date: string
+          employee_id: string
+          from_time: string
+          hours: number | null
+          id: string
+          reason: string | null
+          rejection_reason: string | null
+          shift_id: string | null
+          status: string
+          to_time: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          date: string
+          employee_id: string
+          from_time: string
+          hours?: number | null
+          id?: string
+          reason?: string | null
+          rejection_reason?: string | null
+          shift_id?: string | null
+          status?: string
+          to_time: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          date?: string
+          employee_id?: string
+          from_time?: string
+          hours?: number | null
+          id?: string
+          reason?: string | null
+          rejection_reason?: string | null
+          shift_id?: string | null
+          status?: string
+          to_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extra_work_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_work_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extra_work_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shift"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fixed_costs: {
         Row: {
           active: boolean | null

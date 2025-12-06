@@ -55,8 +55,11 @@ import CarQuiz from "./pages/CarQuiz";
 import CarQuizAdmin from "./pages/CarQuizAdmin";
 import CodeOfConduct from "./pages/CodeOfConduct";
 import CodeOfConductAdmin from "./pages/CodeOfConductAdmin";
+import ExtraWork from "./pages/ExtraWork";
+import ExtraWorkAdmin from "./pages/ExtraWorkAdmin";
 
 const queryClient = new QueryClient();
+
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -168,6 +171,9 @@ const App = () => (
           <Route path="/shift-planning/my-schedule" element={<ProtectedRoute><MySchedule /></ProtectedRoute>} />
           <Route path="/shift-planning/absence" element={<RoleProtectedRoute requireTeamlederOrAbove><AbsenceManagement /></RoleProtectedRoute>} />
           <Route path="/shift-planning/time-tracking" element={<RoleProtectedRoute requireTeamlederOrAbove><TimeTracking /></RoleProtectedRoute>} />
+          {/* Extra work routes */}
+          <Route path="/extra-work" element={<ProtectedRoute><ExtraWork /></ProtectedRoute>} />
+          <Route path="/extra-work-admin" element={<RoleProtectedRoute requireTeamlederOrAbove><ExtraWorkAdmin /></RoleProtectedRoute>} />
           {/* Contract routes */}
           <Route path="/contracts" element={<RoleProtectedRoute requireTeamlederOrAbove><Contracts /></RoleProtectedRoute>} />
           {/* Pulse survey results - teamleder+ */}
