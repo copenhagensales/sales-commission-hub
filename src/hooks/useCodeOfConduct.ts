@@ -329,14 +329,19 @@ export function useCodeOfConductCompletion() {
   return useQuery({
     queryKey: ["code-of-conduct-completion", user?.id],
     queryFn: async () => {
-      if (!user) return null;
+      if (!user?.email) return null;
 
       // Get employee ID from email
-      const { data: employee } = await supabase
+      const { data: employee, error: employeeError } = await supabase
         .from("employee_master_data")
         .select("id, employment_start_date")
         .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
         .maybeSingle();
+
+      if (employeeError) {
+        console.error("Error fetching employee:", employeeError);
+        return null;
+      }
 
       if (!employee) return null;
 
@@ -366,13 +371,18 @@ export function useCodeOfConductCurrentAttempt() {
   return useQuery({
     queryKey: ["code-of-conduct-current-attempt", user?.id],
     queryFn: async () => {
-      if (!user) return null;
+      if (!user?.email) return null;
 
-      const { data: employee } = await supabase
+      const { data: employee, error: employeeError } = await supabase
         .from("employee_master_data")
         .select("id")
         .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
         .maybeSingle();
+
+      if (employeeError) {
+        console.error("Error fetching employee:", employeeError);
+        return null;
+      }
 
       if (!employee) return null;
 
@@ -417,14 +427,15 @@ export function useSubmitCodeOfConduct() {
 
   return useMutation({
     mutationFn: async ({ answers, questionsToAnswer }: SubmitCodeOfConductParams) => {
-      if (!user) throw new Error("Not authenticated");
+      if (!user?.email) throw new Error("Not authenticated");
 
-      const { data: employee } = await supabase
+      const { data: employee, error: employeeError } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, private_email")
         .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
         .maybeSingle();
 
+      if (employeeError) throw new Error("Error finding employee");
       if (!employee) throw new Error("Employee not found");
 
       // Get IP address
@@ -507,13 +518,18 @@ export function useCodeOfConductLock() {
   const { data, isLoading } = useQuery({
     queryKey: ["code-of-conduct-lock", user?.id],
     queryFn: async () => {
-      if (!user) return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
+      if (!user?.email) return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
 
-      const { data: employee } = await supabase
+      const { data: employee, error: employeeError } = await supabase
         .from("employee_master_data")
         .select("id, job_title, employment_start_date")
         .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
         .maybeSingle();
+
+      if (employeeError) {
+        console.error("Error fetching employee for lock check:", employeeError);
+        return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
+      }
 
       if (!employee) return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
 

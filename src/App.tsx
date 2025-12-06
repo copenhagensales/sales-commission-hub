@@ -3,60 +3,62 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import React, { Component, ErrorInfo, ReactNode } from "react";
+import React, { Component, ErrorInfo, ReactNode, Suspense, lazy } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute, RoleProtectedRoute } from "@/components/RoleProtectedRoute";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Agents from "./pages/Agents";
-import Sales from "./pages/Sales";
-import Payroll from "./pages/Payroll";
-import Wallboard from "./pages/Wallboard";
-import Settings from "./pages/Settings";
-import Commission from "./pages/Commission";
-import MgTest from "./pages/MgTest";
-import KmTest from "./pages/KmTest";
-import Codan from "./pages/Codan";
-import TdcErhverv from "./pages/TdcErhverv";
-import NotFound from "./pages/NotFound";
-import AdversusData from "./pages/AdversusData";
-import Logikker from "./pages/Logikker";
-import EmployeeMasterData from "./pages/EmployeeMasterData";
-import EmployeeDetail from "./pages/EmployeeDetail";
-import EmployeeOnboarding from "./pages/EmployeeOnboarding";
-import Teams from "./pages/Teams";
+
+// Lazy load all pages to prevent import errors from breaking the entire app
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Agents = lazy(() => import("./pages/Agents"));
+const Sales = lazy(() => import("./pages/Sales"));
+const Payroll = lazy(() => import("./pages/Payroll"));
+const Wallboard = lazy(() => import("./pages/Wallboard"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Commission = lazy(() => import("./pages/Commission"));
+const MgTest = lazy(() => import("./pages/MgTest"));
+const KmTest = lazy(() => import("./pages/KmTest"));
+const Codan = lazy(() => import("./pages/Codan"));
+const TdcErhverv = lazy(() => import("./pages/TdcErhverv"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const AdversusData = lazy(() => import("./pages/AdversusData"));
+const Logikker = lazy(() => import("./pages/Logikker"));
+const EmployeeMasterData = lazy(() => import("./pages/EmployeeMasterData"));
+const EmployeeDetail = lazy(() => import("./pages/EmployeeDetail"));
+const EmployeeOnboarding = lazy(() => import("./pages/EmployeeOnboarding"));
+const Teams = lazy(() => import("./pages/Teams"));
 // Vagt-flow pages
-import VagtFlowIndex from "./pages/vagt-flow/Index";
-import VagtBookWeek from "./pages/vagt-flow/BookWeek";
-import VagtLocations from "./pages/vagt-flow/Locations";
-import VagtBookings from "./pages/vagt-flow/Bookings";
-import VagtMinUge from "./pages/vagt-flow/MinUge";
-import VagtEmployees from "./pages/vagt-flow/Employees";
-import VagtVehicles from "./pages/vagt-flow/Vehicles";
-import VagtTimeOffRequests from "./pages/vagt-flow/TimeOffRequests";
-import VagtLocationDetail from "./pages/vagt-flow/LocationDetail";
-import VagtBilling from "./pages/vagt-flow/Billing";
+const VagtFlowIndex = lazy(() => import("./pages/vagt-flow/Index"));
+const VagtBookWeek = lazy(() => import("./pages/vagt-flow/BookWeek"));
+const VagtLocations = lazy(() => import("./pages/vagt-flow/Locations"));
+const VagtBookings = lazy(() => import("./pages/vagt-flow/Bookings"));
+const VagtMinUge = lazy(() => import("./pages/vagt-flow/MinUge"));
+const VagtEmployees = lazy(() => import("./pages/vagt-flow/Employees"));
+const VagtVehicles = lazy(() => import("./pages/vagt-flow/Vehicles"));
+const VagtTimeOffRequests = lazy(() => import("./pages/vagt-flow/TimeOffRequests"));
+const VagtLocationDetail = lazy(() => import("./pages/vagt-flow/LocationDetail"));
+const VagtBilling = lazy(() => import("./pages/vagt-flow/Billing"));
 // Shift planning pages (internal)
-import ShiftOverview from "./pages/shift-planning/ShiftOverview";
-import MySchedule from "./pages/shift-planning/MySchedule";
-import AbsenceManagement from "./pages/shift-planning/AbsenceManagement";
-import TimeTracking from "./pages/shift-planning/TimeTracking";
+const ShiftOverview = lazy(() => import("./pages/shift-planning/ShiftOverview"));
+const MySchedule = lazy(() => import("./pages/shift-planning/MySchedule"));
+const AbsenceManagement = lazy(() => import("./pages/shift-planning/AbsenceManagement"));
+const TimeTracking = lazy(() => import("./pages/shift-planning/TimeTracking"));
 // Contract pages
-import Contracts from "./pages/Contracts";
-import MyContracts from "./pages/MyContracts";
-import ContractSign from "./pages/ContractSign";
-import PulseSurvey from "./pages/PulseSurvey";
-import PulseSurveyResults from "./pages/PulseSurveyResults";
-import Admin from "./pages/Admin";
-import MyProfile from "./pages/MyProfile";
-import CareerWishes from "./pages/CareerWishes";
-import CareerWishesOverview from "./pages/CareerWishesOverview";
-import CarQuiz from "./pages/CarQuiz";
-import CarQuizAdmin from "./pages/CarQuizAdmin";
-import CodeOfConduct from "./pages/CodeOfConduct";
-import CodeOfConductAdmin from "./pages/CodeOfConductAdmin";
-import ExtraWork from "./pages/ExtraWork";
-import ExtraWorkAdmin from "./pages/ExtraWorkAdmin";
+const Contracts = lazy(() => import("./pages/Contracts"));
+const MyContracts = lazy(() => import("./pages/MyContracts"));
+const ContractSign = lazy(() => import("./pages/ContractSign"));
+const PulseSurvey = lazy(() => import("./pages/PulseSurvey"));
+const PulseSurveyResults = lazy(() => import("./pages/PulseSurveyResults"));
+const Admin = lazy(() => import("./pages/Admin"));
+const MyProfile = lazy(() => import("./pages/MyProfile"));
+const CareerWishes = lazy(() => import("./pages/CareerWishes"));
+const CareerWishesOverview = lazy(() => import("./pages/CareerWishesOverview"));
+const CarQuiz = lazy(() => import("./pages/CarQuiz"));
+const CarQuizAdmin = lazy(() => import("./pages/CarQuizAdmin"));
+const CodeOfConduct = lazy(() => import("./pages/CodeOfConduct"));
+const CodeOfConductAdmin = lazy(() => import("./pages/CodeOfConductAdmin"));
+const ExtraWork = lazy(() => import("./pages/ExtraWork"));
+const ExtraWorkAdmin = lazy(() => import("./pages/ExtraWorkAdmin"));
 
 const queryClient = new QueryClient();
 
@@ -105,15 +107,20 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
+// Loading fallback component
+function PageLoader() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="animate-pulse text-foreground">Indlæser...</div>
+    </div>
+  );
+}
+
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Indlæser...</div>
-      </div>
-    );
+    return <PageLoader />;
   }
   
   if (user) {
@@ -167,11 +174,7 @@ function SmartRedirect() {
   }, [user, loading]);
 
   if (loading || !redirectPath) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-foreground">Indlæser...</div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   return <Navigate to={redirectPath} replace />;
@@ -184,66 +187,68 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<SmartRedirect />} />
-            <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
-            <Route path="/onboarding" element={<EmployeeOnboarding />} />
-            {/* Employee accessible routes */}
-            <Route path="/my-schedule" element={<ProtectedRoute><MySchedule /></ProtectedRoute>} />
-            <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
-            <Route path="/my-contracts" element={<ProtectedRoute><MyContracts /></ProtectedRoute>} />
-            <Route path="/pulse-survey" element={<ProtectedRoute><PulseSurvey /></ProtectedRoute>} />
-            <Route path="/career-wishes" element={<ProtectedRoute><CareerWishes /></ProtectedRoute>} />
-            <Route path="/car-quiz" element={<ProtectedRoute><CarQuiz /></ProtectedRoute>} />
-            <Route path="/code-of-conduct" element={<ProtectedRoute><CodeOfConduct /></ProtectedRoute>} />
-            <Route path="/contract/:id" element={<ContractSign />} />
-            {/* Teamleder+ routes */}
-            <Route path="/dashboard" element={<RoleProtectedRoute requireTeamlederOrAbove><Dashboard /></RoleProtectedRoute>} />
-            <Route path="/agents" element={<RoleProtectedRoute requireTeamlederOrAbove><Agents /></RoleProtectedRoute>} />
-            <Route path="/sales" element={<RoleProtectedRoute requireTeamlederOrAbove><Sales /></RoleProtectedRoute>} />
-            <Route path="/codan" element={<RoleProtectedRoute requireTeamlederOrAbove><Codan /></RoleProtectedRoute>} />
-            <Route path="/tdc-erhverv" element={<RoleProtectedRoute requireTeamlederOrAbove><TdcErhverv /></RoleProtectedRoute>} />
-            <Route path="/commission-cpo" element={<RoleProtectedRoute requireTeamlederOrAbove><Commission /></RoleProtectedRoute>} />
-            <Route path="/payroll" element={<RoleProtectedRoute requireTeamlederOrAbove><Payroll /></RoleProtectedRoute>} />
-            <Route path="/wallboard" element={<Wallboard />} />
-            <Route path="/mg-test" element={<RoleProtectedRoute requireTeamlederOrAbove><MgTest /></RoleProtectedRoute>} />
-            <Route path="/km-test" element={<RoleProtectedRoute requireTeamlederOrAbove><KmTest /></RoleProtectedRoute>} />
-            <Route path="/adversus-data" element={<RoleProtectedRoute requireTeamlederOrAbove><AdversusData /></RoleProtectedRoute>} />
-            <Route path="/logikker" element={<RoleProtectedRoute requireTeamlederOrAbove><Logikker /></RoleProtectedRoute>} />
-            <Route path="/employees" element={<RoleProtectedRoute requireTeamlederOrAbove><EmployeeMasterData /></RoleProtectedRoute>} />
-            <Route path="/employees/:id" element={<RoleProtectedRoute requireTeamlederOrAbove><EmployeeDetail /></RoleProtectedRoute>} />
-            <Route path="/teams" element={<RoleProtectedRoute requireTeamlederOrAbove><Teams /></RoleProtectedRoute>} />
-            <Route path="/settings" element={<RoleProtectedRoute requireTeamlederOrAbove><Settings /></RoleProtectedRoute>} />
-            {/* Vagt-flow routes - teamleder+ */}
-            <Route path="/vagt-flow" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtFlowIndex /></RoleProtectedRoute>} />
-            <Route path="/vagt-flow/book-week" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtBookWeek /></RoleProtectedRoute>} />
-            <Route path="/vagt-flow/locations" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtLocations /></RoleProtectedRoute>} />
-            <Route path="/vagt-flow/locations/:id" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtLocationDetail /></RoleProtectedRoute>} />
-            <Route path="/vagt-flow/bookings" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtBookings /></RoleProtectedRoute>} />
-            <Route path="/vagt-flow/min-uge" element={<ProtectedRoute><VagtMinUge /></ProtectedRoute>} />
-            <Route path="/vagt-flow/employees" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtEmployees /></RoleProtectedRoute>} />
-            <Route path="/vagt-flow/vehicles" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtVehicles /></RoleProtectedRoute>} />
-            <Route path="/vagt-flow/time-off" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtTimeOffRequests /></RoleProtectedRoute>} />
-            <Route path="/vagt-flow/billing" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtBilling /></RoleProtectedRoute>} />
-            {/* Shift planning routes */}
-            <Route path="/shift-planning" element={<RoleProtectedRoute requireTeamlederOrAbove><ShiftOverview /></RoleProtectedRoute>} />
-            <Route path="/shift-planning/my-schedule" element={<ProtectedRoute><MySchedule /></ProtectedRoute>} />
-            <Route path="/shift-planning/absence" element={<RoleProtectedRoute requireTeamlederOrAbove><AbsenceManagement /></RoleProtectedRoute>} />
-            <Route path="/shift-planning/time-tracking" element={<RoleProtectedRoute requireTeamlederOrAbove><TimeTracking /></RoleProtectedRoute>} />
-            {/* Extra work routes */}
-            <Route path="/extra-work" element={<ProtectedRoute><ExtraWork /></ProtectedRoute>} />
-            <Route path="/extra-work-admin" element={<RoleProtectedRoute requireTeamlederOrAbove><ExtraWorkAdmin /></RoleProtectedRoute>} />
-            {/* Contract routes */}
-            <Route path="/contracts" element={<RoleProtectedRoute requireTeamlederOrAbove><Contracts /></RoleProtectedRoute>} />
-            {/* Pulse survey results - teamleder+ */}
-            <Route path="/pulse-survey-results" element={<RoleProtectedRoute requireTeamlederOrAbove><PulseSurveyResults /></RoleProtectedRoute>} />
-            <Route path="/career-wishes-overview" element={<RoleProtectedRoute requireTeamlederOrAbove><CareerWishesOverview /></RoleProtectedRoute>} />
-            <Route path="/car-quiz-admin" element={<RoleProtectedRoute requireTeamlederOrAbove><CarQuizAdmin /></RoleProtectedRoute>} />
-            <Route path="/code-of-conduct-admin" element={<RoleProtectedRoute requireTeamlederOrAbove><CodeOfConductAdmin /></RoleProtectedRoute>} />
-            {/* Admin route - owner only */}
-            <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<SmartRedirect />} />
+              <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+              <Route path="/onboarding" element={<EmployeeOnboarding />} />
+              {/* Employee accessible routes */}
+              <Route path="/my-schedule" element={<ProtectedRoute><MySchedule /></ProtectedRoute>} />
+              <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
+              <Route path="/my-contracts" element={<ProtectedRoute><MyContracts /></ProtectedRoute>} />
+              <Route path="/pulse-survey" element={<ProtectedRoute><PulseSurvey /></ProtectedRoute>} />
+              <Route path="/career-wishes" element={<ProtectedRoute><CareerWishes /></ProtectedRoute>} />
+              <Route path="/car-quiz" element={<ProtectedRoute><CarQuiz /></ProtectedRoute>} />
+              <Route path="/code-of-conduct" element={<ProtectedRoute><CodeOfConduct /></ProtectedRoute>} />
+              <Route path="/contract/:id" element={<ContractSign />} />
+              {/* Teamleder+ routes */}
+              <Route path="/dashboard" element={<RoleProtectedRoute requireTeamlederOrAbove><Dashboard /></RoleProtectedRoute>} />
+              <Route path="/agents" element={<RoleProtectedRoute requireTeamlederOrAbove><Agents /></RoleProtectedRoute>} />
+              <Route path="/sales" element={<RoleProtectedRoute requireTeamlederOrAbove><Sales /></RoleProtectedRoute>} />
+              <Route path="/codan" element={<RoleProtectedRoute requireTeamlederOrAbove><Codan /></RoleProtectedRoute>} />
+              <Route path="/tdc-erhverv" element={<RoleProtectedRoute requireTeamlederOrAbove><TdcErhverv /></RoleProtectedRoute>} />
+              <Route path="/commission-cpo" element={<RoleProtectedRoute requireTeamlederOrAbove><Commission /></RoleProtectedRoute>} />
+              <Route path="/payroll" element={<RoleProtectedRoute requireTeamlederOrAbove><Payroll /></RoleProtectedRoute>} />
+              <Route path="/wallboard" element={<Wallboard />} />
+              <Route path="/mg-test" element={<RoleProtectedRoute requireTeamlederOrAbove><MgTest /></RoleProtectedRoute>} />
+              <Route path="/km-test" element={<RoleProtectedRoute requireTeamlederOrAbove><KmTest /></RoleProtectedRoute>} />
+              <Route path="/adversus-data" element={<RoleProtectedRoute requireTeamlederOrAbove><AdversusData /></RoleProtectedRoute>} />
+              <Route path="/logikker" element={<RoleProtectedRoute requireTeamlederOrAbove><Logikker /></RoleProtectedRoute>} />
+              <Route path="/employees" element={<RoleProtectedRoute requireTeamlederOrAbove><EmployeeMasterData /></RoleProtectedRoute>} />
+              <Route path="/employees/:id" element={<RoleProtectedRoute requireTeamlederOrAbove><EmployeeDetail /></RoleProtectedRoute>} />
+              <Route path="/teams" element={<RoleProtectedRoute requireTeamlederOrAbove><Teams /></RoleProtectedRoute>} />
+              <Route path="/settings" element={<RoleProtectedRoute requireTeamlederOrAbove><Settings /></RoleProtectedRoute>} />
+              {/* Vagt-flow routes - teamleder+ */}
+              <Route path="/vagt-flow" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtFlowIndex /></RoleProtectedRoute>} />
+              <Route path="/vagt-flow/book-week" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtBookWeek /></RoleProtectedRoute>} />
+              <Route path="/vagt-flow/locations" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtLocations /></RoleProtectedRoute>} />
+              <Route path="/vagt-flow/locations/:id" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtLocationDetail /></RoleProtectedRoute>} />
+              <Route path="/vagt-flow/bookings" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtBookings /></RoleProtectedRoute>} />
+              <Route path="/vagt-flow/min-uge" element={<ProtectedRoute><VagtMinUge /></ProtectedRoute>} />
+              <Route path="/vagt-flow/employees" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtEmployees /></RoleProtectedRoute>} />
+              <Route path="/vagt-flow/vehicles" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtVehicles /></RoleProtectedRoute>} />
+              <Route path="/vagt-flow/time-off" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtTimeOffRequests /></RoleProtectedRoute>} />
+              <Route path="/vagt-flow/billing" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtBilling /></RoleProtectedRoute>} />
+              {/* Shift planning routes */}
+              <Route path="/shift-planning" element={<RoleProtectedRoute requireTeamlederOrAbove><ShiftOverview /></RoleProtectedRoute>} />
+              <Route path="/shift-planning/my-schedule" element={<ProtectedRoute><MySchedule /></ProtectedRoute>} />
+              <Route path="/shift-planning/absence" element={<RoleProtectedRoute requireTeamlederOrAbove><AbsenceManagement /></RoleProtectedRoute>} />
+              <Route path="/shift-planning/time-tracking" element={<RoleProtectedRoute requireTeamlederOrAbove><TimeTracking /></RoleProtectedRoute>} />
+              {/* Extra work routes */}
+              <Route path="/extra-work" element={<ProtectedRoute><ExtraWork /></ProtectedRoute>} />
+              <Route path="/extra-work-admin" element={<RoleProtectedRoute requireTeamlederOrAbove><ExtraWorkAdmin /></RoleProtectedRoute>} />
+              {/* Contract routes */}
+              <Route path="/contracts" element={<RoleProtectedRoute requireTeamlederOrAbove><Contracts /></RoleProtectedRoute>} />
+              {/* Pulse survey results - teamleder+ */}
+              <Route path="/pulse-survey-results" element={<RoleProtectedRoute requireTeamlederOrAbove><PulseSurveyResults /></RoleProtectedRoute>} />
+              <Route path="/career-wishes-overview" element={<RoleProtectedRoute requireTeamlederOrAbove><CareerWishesOverview /></RoleProtectedRoute>} />
+              <Route path="/car-quiz-admin" element={<RoleProtectedRoute requireTeamlederOrAbove><CarQuizAdmin /></RoleProtectedRoute>} />
+              <Route path="/code-of-conduct-admin" element={<RoleProtectedRoute requireTeamlederOrAbove><CodeOfConductAdmin /></RoleProtectedRoute>} />
+              {/* Admin route - owner only */}
+              <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
