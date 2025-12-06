@@ -1,15 +1,17 @@
 import { MainLayout } from "@/components/layout/MainLayout";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Database, Activity, ListOrdered, Link as LinkIcon, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Database, Activity, ListOrdered, Link as LinkIcon, AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
 interface AdversusStats {
@@ -48,7 +50,49 @@ export default function AdversusData() {
     },
   });
 
+  const queryClient = useQueryClient();
   const [showAllEvents, setShowAllEvents] = useState(false);
+  const [isBackfilling, setIsBackfilling] = useState(false);
+  const [backfillStatus, setBackfillStatus] = useState<{ remaining: number; lastProcessed: number } | null>(null);
+
+  // Query for TDC sales missing OPP
+  const { data: missingOppCount } = useQuery({
+    queryKey: ["missing-opp-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("sales")
+        .select("id", { count: "exact", head: true })
+        .is("adversus_opp_number", null)
+        .not("adversus_event_id", "is", null);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
+  const handleBackfillOpp = async () => {
+    setIsBackfilling(true);
+    try {
+      const response = await supabase.functions.invoke("backfill-opp", {});
+      
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+      
+      const data = response.data;
+      if (data.success) {
+        setBackfillStatus({ remaining: data.remaining, lastProcessed: data.successful });
+        toast.success(`Opdaterede ${data.successful} salg med OPP. ${data.remaining} tilbage.`);
+        queryClient.invalidateQueries({ queryKey: ["missing-opp-count"] });
+      } else {
+        throw new Error(data.error || "Ukendt fejl");
+      }
+    } catch (error) {
+      console.error("Backfill error:", error);
+      toast.error("Fejl ved OPP backfill: " + (error instanceof Error ? error.message : "Ukendt fejl"));
+    } finally {
+      setIsBackfilling(false);
+    }
+  };
 
   const { data: recentEvents, isLoading: eventsLoading, error: eventsError } = useQuery({
     queryKey: ["adversus-events-recent", showAllEvents],
@@ -259,6 +303,41 @@ export default function AdversusData() {
               )}
             </CardContent>
           </Card>
+
+          {/* OPP Backfill Card */}
+          {(missingOppCount ?? 0) > 0 && (
+            <Card className="border-amber-500/50">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-500" /> TDC salg mangler OPP nummer
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-bold text-amber-500">{missingOppCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Salg uden OPP nummer (hentes 10 ad gangen pga rate limiting)
+                    </p>
+                    {backfillStatus && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Sidst hentet: {backfillStatus.lastProcessed} | Tilbage: {backfillStatus.remaining}
+                      </p>
+                    )}
+                  </div>
+                  <Button 
+                    onClick={handleBackfillOpp} 
+                    disabled={isBackfilling}
+                    variant="outline"
+                    className="border-amber-500 text-amber-500 hover:bg-amber-500/10"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isBackfilling ? 'animate-spin' : ''}`} />
+                    {isBackfilling ? 'Henter...' : 'Hent OPP numre'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </section>
 
         <Tabs defaultValue="adversus" className="space-y-4">
