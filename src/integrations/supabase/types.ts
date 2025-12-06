@@ -2522,6 +2522,45 @@ export type Database = {
           },
         ]
       }
+      webhook_endpoints: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          endpoint_path: string
+          id: string
+          is_active: boolean | null
+          last_received_at: string | null
+          name: string
+          total_requests: number | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          endpoint_path: string
+          id?: string
+          is_active?: boolean | null
+          last_received_at?: string | null
+          name: string
+          total_requests?: number | null
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          endpoint_path?: string
+          id?: string
+          is_active?: boolean | null
+          last_received_at?: string | null
+          name?: string
+          total_requests?: number | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
