@@ -1,11 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Clock, CheckCircle2, XCircle, Settings, Zap } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Clock, CheckCircle2, XCircle, Settings, Zap, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
+
 const sourceLabels: Record<string, string> = {
   campaigns: "Kampagner",
   sales: "Salg",
@@ -15,6 +20,9 @@ const sourceLabels: Record<string, string> = {
 };
 
 export function CphAdversusApiTab() {
+  const [showAllEvents, setShowAllEvents] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const { data: integration, isLoading } = useQuery({
     queryKey: ["adversus-integration"],
     queryFn: async () => {
@@ -54,14 +62,18 @@ export function CphAdversusApiTab() {
 
   // Fetch recent events for the data table
   const { data: recentEvents } = useQuery({
-    queryKey: ["adversus-events-recent-api-tab"],
+    queryKey: ["adversus-events-recent-api-tab", showAllEvents],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("adversus_events")
         .select("id, external_id, event_type, received_at, processed, payload")
-        .order("received_at", { ascending: false })
-        .limit(20);
+        .order("received_at", { ascending: false });
       
+      if (!showAllEvents) {
+        query = query.limit(25);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -322,8 +334,20 @@ export function CphAdversusApiTab() {
       {/* Seneste events datatabel */}
       <Card>
         <CardContent className="p-0">
-          <div className="p-4 border-b">
-            <h3 className="text-sm font-medium">Seneste 20 events</h3>
+          <div className="p-4 border-b flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-medium">Events</h3>
+              <Badge variant="outline" className="text-xs">
+                {recentEvents?.length ?? 0} {showAllEvents ? "events" : "seneste events"}
+              </Badge>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAllEvents(!showAllEvents)}
+              className="text-sm text-primary hover:underline"
+            >
+              {showAllEvents ? "Vis kun seneste 25" : "Vis alle"}
+            </button>
           </div>
           <Table>
             <TableHeader>
@@ -334,6 +358,7 @@ export function CphAdversusApiTab() {
                 <TableHead>Kunde/Kampagne</TableHead>
                 <TableHead>Modtaget</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Detaljer</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -371,12 +396,25 @@ export function CphAdversusApiTab() {
                           </Badge>
                         )}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedEvent(event);
+                            setDetailOpen(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Vis
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   );
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     Ingen events fundet
                   </TableCell>
                 </TableRow>
@@ -389,6 +427,55 @@ export function CphAdversusApiTab() {
       <p className="text-sm text-muted-foreground">
         Konfigurer API-nøgler og sync-indstillinger under <span className="font-medium">Indstillinger → API-integrationer</span>
       </p>
+
+      {/* Event detail dialog */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Event detaljer</DialogTitle>
+          </DialogHeader>
+          {selectedEvent && (
+            <ScrollArea className="h-[60vh]">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">ID</p>
+                    <p className="font-mono text-sm">{selectedEvent.id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">External ID</p>
+                    <p className="font-mono text-sm">{selectedEvent.external_id || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Type</p>
+                    <p className="text-sm">{selectedEvent.event_type}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Modtaget</p>
+                    <p className="text-sm">
+                      {selectedEvent.received_at
+                        ? format(new Date(selectedEvent.received_at), "dd/MM/yyyy HH:mm:ss", { locale: da })
+                        : "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Status</p>
+                    <Badge variant={selectedEvent.processed ? "default" : "secondary"}>
+                      {selectedEvent.processed ? "Behandlet" : "Afventer"}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Payload (JSON)</p>
+                  <pre className="bg-muted/50 p-4 rounded text-xs overflow-auto border">
+                    {JSON.stringify(selectedEvent.payload, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
