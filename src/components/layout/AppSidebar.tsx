@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, Plus } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,6 +38,7 @@ const teamlederNavigation = [
   { name: "Vagtplan", href: "/shift-planning", icon: ClipboardList },
   { name: "Fravær", href: "/shift-planning/absence", icon: Clock },
   { name: "Tidsregistrering", href: "/shift-planning/time-tracking", icon: Timer },
+  { name: "Ekstra arbejde", href: "/extra-work-admin", icon: Plus },
   { name: "Mit team", href: "/employees", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
@@ -58,6 +59,7 @@ const rekrutteringNavigation = [
 // Navigation items for employees
 const employeeNavigation = [
   { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
+  { name: "Ekstra arbejde", href: "/extra-work", icon: Plus },
   { name: "Min profil", href: "/my-profile", icon: Users },
   { name: "Min kontrakt", href: "/my-contracts", icon: FileText },
   { name: "Teamønsker & karriere", href: "/career-wishes", icon: Sparkles },
