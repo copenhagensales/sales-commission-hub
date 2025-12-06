@@ -573,7 +573,7 @@ export default function Settings() {
                     ) : (
                       <>
                         <div 
-                          className="flex items-center justify-between mb-3 cursor-pointer"
+                          className="flex items-center justify-between cursor-pointer"
                           onClick={() => setExpandedId(expandedId === integration.id ? null : integration.id)}
                         >
                           <div className="flex items-center gap-3">
@@ -581,44 +581,48 @@ export default function Settings() {
                             <Badge variant="outline" className="text-xs font-mono">
                               {integration.type}
                             </Badge>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              onClick={(e) => { e.stopPropagation(); handleStartEdit(integration); }}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              className="text-destructive" 
-                              onClick={(e) => { e.stopPropagation(); handleDeleteIntegration(integration.id); }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                            {expandedId === integration.id ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" />
-                            {formatFrequency(integration.sync_frequency_minutes)}
-                          </div>
-                          {integration.last_sync_at && (
-                            <span>
-                              Sidst synkroniseret: {new Date(integration.last_sync_at).toLocaleString("da-DK")}
+                            <span className="text-xs text-muted-foreground">
+                              {integration.enabled_sources.length} datakilde(r)
                             </span>
-                          )}
-                          <span className="text-xs">
-                            {integration.enabled_sources.length} datakilde(r) aktiveret
-                          </span>
+                          </div>
+                          {expandedId === integration.id ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                         </div>
                         
-                        {/* Data Sources Section */}
+                        {/* Expanded Section */}
                         {expandedId === integration.id && (
                           <div className="mt-4 space-y-4">
+                            {/* Info and Actions Row */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  {formatFrequency(integration.sync_frequency_minutes)}
+                                </div>
+                                {integration.last_sync_at && (
+                                  <span>
+                                    Sidst synkroniseret: {new Date(integration.last_sync_at).toLocaleString("da-DK")}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  onClick={() => handleStartEdit(integration)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="text-destructive" 
+                                  onClick={() => handleDeleteIntegration(integration.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+
                             {availableDataSources[integration.type] && (
                               <div className="space-y-2">
                                 <Label className="text-sm font-medium">Tilgængelige datakilder</Label>
