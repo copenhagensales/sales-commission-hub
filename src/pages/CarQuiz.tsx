@@ -6,11 +6,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useCarQuizCompletion, useCompleteCarQuiz } from "@/hooks/useCarQuiz";
-import { CheckCircle, XCircle, Car, AlertTriangle, Shield } from "lucide-react";
+import { CheckCircle, XCircle, Car, AlertTriangle, Shield, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { format, addMonths } from "date-fns";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 const QUESTIONS = [
   {
@@ -123,7 +125,6 @@ export default function CarQuiz() {
   const [passed, setPassed] = useState(false);
 
   const handleSubmit = () => {
-    // Check all answers
     const allCorrect = QUESTIONS.every(q => answers[q.id] === q.correctAnswer);
     const isValid = allCorrect && gpsAccepted && summaryAccepted;
 
@@ -150,11 +151,16 @@ export default function CarQuiz() {
     setPassed(false);
   };
 
+  // Calculate progress
+  const answeredCount = Object.keys(answers).length + (gpsAccepted ? 1 : 0) + (summaryAccepted ? 1 : 0);
+  const totalItems = QUESTIONS.length + 2; // +2 for GPS and summary checkboxes
+  const progressPercent = Math.round((answeredCount / totalItems) * 100);
+
   if (isLoading) {
     return (
       <MainLayout>
-        <div className="container mx-auto py-8 px-4">
-          <div className="animate-pulse">Indlæser...</div>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-pulse text-muted-foreground">Indlæser...</div>
         </div>
       </MainLayout>
     );
@@ -166,59 +172,67 @@ export default function CarQuiz() {
     
     return (
       <MainLayout>
-        <div className="container mx-auto py-8 px-4 max-w-3xl space-y-6">
-          <div className="flex items-center gap-3">
-            <Car className="h-8 w-8 text-primary" />
+        <div className="container mx-auto py-8 px-4 max-w-3xl space-y-8">
+          {/* Header */}
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+              <Car className="h-7 w-7 text-primary" />
+            </div>
             <div>
-              <h1 className="text-2xl font-bold">Bil-quiz – Brug af firmabiler</h1>
+              <h1 className="text-2xl font-bold tracking-tight">Bil-quiz – Firmabiler</h1>
               <p className="text-muted-foreground">Copenhagen Sales</p>
             </div>
           </div>
 
           {/* Official certificate card */}
-          <Card className="relative border-2 border-green-500 bg-gradient-to-br from-green-50 to-white dark:from-green-950/20 dark:to-background overflow-hidden">
+          <Card className="relative overflow-hidden border-2 border-green-500/50 shadow-lg">
+            {/* Green gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-green-50 via-background to-emerald-50/50 dark:from-green-950/30 dark:via-background dark:to-emerald-950/20" />
+            
             {/* Stamp */}
-            <div className="absolute top-4 right-4 rotate-12">
-              <div className="border-4 border-green-600 rounded-lg px-4 py-2 bg-green-50 dark:bg-green-950/50">
-                <div className="text-green-700 dark:text-green-400 font-bold text-xl tracking-wider">BESTÅET</div>
-                <div className="text-green-600 dark:text-green-500 text-xs text-center font-medium">COPENHAGEN SALES</div>
+            <div className="absolute top-6 right-6 rotate-12 z-10">
+              <div className="border-4 border-green-600 dark:border-green-500 rounded-xl px-5 py-2.5 bg-white/90 dark:bg-background/90 shadow-lg">
+                <div className="text-green-700 dark:text-green-400 font-bold text-2xl tracking-widest">BESTÅET</div>
+                <div className="text-green-600 dark:text-green-500 text-xs text-center font-semibold tracking-wider">COPENHAGEN SALES</div>
               </div>
             </div>
 
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                  <Shield className="h-6 w-6 text-green-600" />
+            <CardHeader className="relative pb-2">
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/40 ring-4 ring-green-200/50 dark:ring-green-800/30">
+                  <Shield className="h-7 w-7 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
-                  <CardTitle className="text-green-700 dark:text-green-400">Godkendt til brug af firmabiler</CardTitle>
-                  <CardDescription>
-                    Bestået den {format(new Date(completion.passed_at), "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
+                  <CardTitle className="text-xl text-green-700 dark:text-green-400">Godkendt til brug af firmabiler</CardTitle>
+                  <CardDescription className="text-base">
+                    Bestået {format(new Date(completion.passed_at), "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-6">
-              <div className="rounded-lg bg-muted/50 p-4">
-                <h3 className="font-semibold mb-3">Du har bekræftet følgende:</h3>
-                <ul className="space-y-2">
+            <CardContent className="relative space-y-6 pt-4">
+              <div className="rounded-xl bg-white/60 dark:bg-muted/30 p-5 border border-green-200/50 dark:border-green-800/30">
+                <h3 className="font-semibold mb-4 text-sm uppercase tracking-wide text-muted-foreground">Du har bekræftet følgende</h3>
+                <ul className="space-y-3">
                   {SUMMARY_POINTS.map((point, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                      <span>{point}</span>
+                    <li key={index} className="flex items-start gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-500 mt-0.5 shrink-0" />
+                      <span className="text-sm leading-relaxed">{point}</span>
                     </li>
                   ))}
                 </ul>
               </div>
 
-              <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <AlertTitle className="text-amber-700 dark:text-amber-400">Fornyelse påkrævet</AlertTitle>
-                <AlertDescription className="text-amber-600 dark:text-amber-500">
-                  Denne godkendelse skal fornyes senest den {format(nextRenewalDate, "d. MMMM yyyy", { locale: da })} (hver 6. måned).
-                </AlertDescription>
-              </Alert>
+              <div className="flex items-center gap-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 p-4 border border-amber-200 dark:border-amber-800/50">
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500 shrink-0" />
+                <div>
+                  <p className="font-medium text-amber-700 dark:text-amber-400">Fornyelse påkrævet</p>
+                  <p className="text-sm text-amber-600 dark:text-amber-500">
+                    Senest {format(nextRenewalDate, "d. MMMM yyyy", { locale: da })} (hver 6. måned)
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -230,27 +244,35 @@ export default function CarQuiz() {
   if (completion?.isExpired) {
     return (
       <MainLayout>
-        <div className="container mx-auto py-8 px-4 max-w-3xl space-y-6">
-          <div className="flex items-center gap-3">
-            <Car className="h-8 w-8 text-primary" />
+        <div className="container mx-auto py-8 px-4 max-w-3xl space-y-8">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+              <Car className="h-7 w-7 text-primary" />
+            </div>
             <div>
-              <h1 className="text-2xl font-bold">Bil-quiz – Brug af firmabiler</h1>
+              <h1 className="text-2xl font-bold tracking-tight">Bil-quiz – Firmabiler</h1>
               <p className="text-muted-foreground">Copenhagen Sales</p>
             </div>
           </div>
 
-          <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
-            <AlertTitle className="text-amber-700 dark:text-amber-400">Fornyelse påkrævet</AlertTitle>
-            <AlertDescription className="text-amber-600 dark:text-amber-500">
-              Din bil-quiz godkendelse er udløbet. Du bestod sidst den {format(new Date(completion.passed_at), "d. MMMM yyyy", { locale: da })}. 
-              Du skal tage quizzen igen for at fortsætte med at bruge Copenhagen Sales' biler.
-            </AlertDescription>
-          </Alert>
-
-          <Button size="lg" onClick={handleRetry}>
-            Tag quizzen igen
-          </Button>
+          <Card className="border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-50 to-background dark:from-amber-950/30 dark:to-background">
+            <CardContent className="flex flex-col items-center text-center py-12 space-y-6">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/40">
+                <AlertTriangle className="h-8 w-8 text-amber-600 dark:text-amber-500" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-xl font-semibold text-amber-700 dark:text-amber-400">Din godkendelse er udløbet</h2>
+                <p className="text-muted-foreground max-w-md">
+                  Du bestod sidst {format(new Date(completion.passed_at), "d. MMMM yyyy", { locale: da })}. 
+                  Tag quizzen igen for at fortsætte med at bruge firmabilerne.
+                </p>
+              </div>
+              <Button size="lg" onClick={handleRetry} className="gap-2">
+                Tag quizzen igen
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </MainLayout>
     );
@@ -261,23 +283,22 @@ export default function CarQuiz() {
     return (
       <MainLayout>
         <div className="container mx-auto py-8 px-4 max-w-3xl">
-          <Card className="border-red-500 bg-red-50 dark:bg-red-950/20">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <XCircle className="h-8 w-8 text-red-600" />
-                <div>
-                  <CardTitle className="text-red-700 dark:text-red-400">Ikke bestået</CardTitle>
-                  <CardDescription>
-                    Du har ikke svaret korrekt på alle spørgsmål
-                  </CardDescription>
-                </div>
+          <Card className="border-red-300 dark:border-red-800 bg-gradient-to-br from-red-50 to-background dark:from-red-950/30 dark:to-background">
+            <CardContent className="flex flex-col items-center text-center py-12 space-y-6">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/40">
+                <XCircle className="h-8 w-8 text-red-600 dark:text-red-500" />
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-muted-foreground">
-                Du har ikke svaret korrekt på alle spørgsmål eller accepteret alle betingelser. Læs reglerne igen og tag testen én gang til.
-              </p>
-              <Button onClick={handleRetry}>Tag testen igen</Button>
+              <div className="space-y-2">
+                <h2 className="text-xl font-semibold text-red-700 dark:text-red-400">Ikke bestået</h2>
+                <p className="text-muted-foreground max-w-md">
+                  Du har ikke svaret korrekt på alle spørgsmål eller accepteret alle betingelser. 
+                  Læs reglerne igen og prøv én gang til.
+                </p>
+              </div>
+              <Button size="lg" onClick={handleRetry} className="gap-2">
+                Prøv igen
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -289,53 +310,117 @@ export default function CarQuiz() {
 
   return (
     <MainLayout>
-      <div className="container mx-auto py-8 px-4 max-w-3xl space-y-6">
-        <div className="flex items-center gap-3">
-          <Car className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold">Bil-quiz – Brug af firmabiler</h1>
-            <p className="text-muted-foreground">Copenhagen Sales</p>
+      <div className="container mx-auto py-8 px-4 max-w-3xl space-y-8">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+              <Car className="h-7 w-7 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Bil-quiz – Firmabiler</h1>
+              <p className="text-muted-foreground">Copenhagen Sales</p>
+            </div>
           </div>
+          <Badge variant="outline" className="text-sm px-3 py-1">
+            {progressPercent}% færdig
+          </Badge>
         </div>
 
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Vigtig information</AlertTitle>
-          <AlertDescription className="space-y-2 mt-2">
-            <p>Denne quiz skal sikre, at du kender og accepterer reglerne for brug af Copenhagen Sales' biler.</p>
-            <p>For at få lov til at bruge bilerne skal du:</p>
-            <ul className="list-disc list-inside ml-2">
-              <li>Overholde Færdselsloven</li>
-              <li>Være indforstået med vores interne regler</li>
-              <li>Forstå, at du selv hæfter for ulovlig kørsel, fartbøder, parkeringsafgifter m.m.</li>
-              <li>Være indforstået med, at hvis bilen konfiskeres pga. vandvidskørsel, hæfter du personligt for bilens værdi</li>
-            </ul>
-            <p className="font-medium">Du skal svare rigtigt på alle spørgsmål for at bestå. Hvis du ikke består, skal du tage testen igen, indtil alle svar er korrekte.</p>
-            <p className="font-medium text-amber-600">Denne godkendelse skal fornyes hver 6. måned.</p>
-          </AlertDescription>
-        </Alert>
+        {/* Progress bar */}
+        <div className="space-y-2">
+          <Progress value={progressPercent} className="h-2" />
+          <p className="text-xs text-muted-foreground text-right">
+            {answeredCount} af {totalItems} besvaret
+          </p>
+        </div>
 
-        <div className="space-y-6">
+        {/* Info alert */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="py-5">
+            <div className="flex gap-4">
+              <div className="shrink-0">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                  <AlertTriangle className="h-5 w-5 text-primary" />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <h3 className="font-semibold">Vigtig information</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Denne quiz sikrer, at du kender og accepterer reglerne for brug af firmabiler.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <ChevronRight className="h-4 w-4 text-primary shrink-0" />
+                    <span>Overhold Færdselsloven</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ChevronRight className="h-4 w-4 text-primary shrink-0" />
+                    <span>Forstå dit personlige ansvar</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ChevronRight className="h-4 w-4 text-primary shrink-0" />
+                    <span>Acceptér interne regler</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ChevronRight className="h-4 w-4 text-primary shrink-0" />
+                    <span>Forny hver 6. måned</span>
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-destructive">
+                  Du skal svare rigtigt på ALLE spørgsmål for at bestå.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Questions */}
+        <div className="space-y-4">
           {QUESTIONS.map((q, index) => (
-            <Card key={q.id}>
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  Spørgsmål {index + 1}
-                </CardTitle>
-                <CardDescription className="text-foreground font-medium">
-                  {q.question}
-                </CardDescription>
+            <Card 
+              key={q.id} 
+              className={`transition-all duration-200 ${
+                answers[q.id] 
+                  ? "border-primary/30 bg-primary/5" 
+                  : "hover:border-muted-foreground/30"
+              }`}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
+                    answers[q.id] 
+                      ? "bg-primary text-primary-foreground" 
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    {index + 1}
+                  </div>
+                  <CardTitle className="text-base font-medium leading-relaxed">
+                    {q.question}
+                  </CardTitle>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0 pl-14">
                 <RadioGroup
                   value={answers[q.id] || ""}
                   onValueChange={(value) => setAnswers(prev => ({ ...prev, [q.id]: value }))}
+                  className="space-y-2"
                 >
                   {q.options.map((option) => (
-                    <div key={option.key} className="flex items-center space-x-2">
-                      <RadioGroupItem value={option.key} id={`q${q.id}-${option.key}`} />
-                      <Label htmlFor={`q${q.id}-${option.key}`} className="cursor-pointer">
-                        {option.key}: {option.text}
+                    <div 
+                      key={option.key} 
+                      className={`flex items-start space-x-3 rounded-lg border p-3 transition-colors cursor-pointer ${
+                        answers[q.id] === option.key 
+                          ? "border-primary bg-primary/5" 
+                          : "border-transparent hover:bg-muted/50"
+                      }`}
+                      onClick={() => setAnswers(prev => ({ ...prev, [q.id]: option.key }))}
+                    >
+                      <RadioGroupItem value={option.key} id={`q${q.id}-${option.key}`} className="mt-0.5" />
+                      <Label htmlFor={`q${q.id}-${option.key}`} className="cursor-pointer text-sm leading-relaxed font-normal">
+                        <span className="font-medium">{option.key}:</span> {option.text}
                       </Label>
                     </div>
                   ))}
@@ -345,85 +430,125 @@ export default function CarQuiz() {
           ))}
 
           {/* GPS Acceptance */}
-          <Card className="border-amber-500">
-            <CardHeader>
-              <CardTitle className="text-lg">Spørgsmål 9 – GPS-overvågning</CardTitle>
+          <Card className={`transition-all duration-200 ${
+            gpsAccepted ? "border-primary/30 bg-primary/5" : "border-amber-300 dark:border-amber-700"
+          }`}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
+                  gpsAccepted 
+                    ? "bg-primary text-primary-foreground" 
+                    : "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400"
+                }`}>
+                  9
+                </div>
+                <CardTitle className="text-base font-medium">GPS-overvågning</CardTitle>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-300">
-                <AlertDescription>
-                  <p className="mb-2">Der sidder en chip/GPS-enhed i Copenhagen Sales' biler, som registrerer bl.a. fart og kørsel.</p>
-                  <p className="mb-2">Det betyder, at Copenhagen Sales kan se, hvor hurtigt bilen er blevet ført, og hvordan den er blevet brugt.</p>
-                  <p>Formålet er sikkerhed, dokumentation og kontrol af, at bilerne bruges forsvarligt og efter virksomhedens regler.</p>
-                </AlertDescription>
-              </Alert>
+            <CardContent className="space-y-4 pl-14">
+              <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 p-4 text-sm space-y-2 border border-amber-200 dark:border-amber-800/50">
+                <p>Der sidder en chip/GPS-enhed i Copenhagen Sales' biler, som registrerer bl.a. fart og kørsel.</p>
+                <p>Copenhagen Sales kan se, hvor hurtigt bilen er blevet ført, og hvordan den er blevet brugt.</p>
+                <p className="font-medium">Formålet er sikkerhed, dokumentation og kontrol.</p>
+              </div>
 
-              <div className="flex items-start space-x-3 pt-2">
+              <div 
+                className={`flex items-start space-x-3 rounded-lg border p-4 cursor-pointer transition-colors ${
+                  gpsAccepted ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                }`}
+                onClick={() => setGpsAccepted(!gpsAccepted)}
+              >
                 <Checkbox
                   id="gps-accept"
                   checked={gpsAccepted}
                   onCheckedChange={(checked) => setGpsAccepted(checked === true)}
                 />
-                <Label htmlFor="gps-accept" className="cursor-pointer leading-relaxed">
-                  Ja, jeg er indforstået og accepterer, at min kørsel i Copenhagen Sales' biler bliver registreret og overvåget via chip/GPS, og at virksomheden kan se disse data.
+                <Label htmlFor="gps-accept" className="cursor-pointer text-sm leading-relaxed">
+                  Ja, jeg accepterer at min kørsel overvåges via chip/GPS, og at virksomheden kan se disse data.
                 </Label>
               </div>
             </CardContent>
           </Card>
 
           {/* Summary and final acceptance */}
-          <Card className="border-2 border-primary">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Shield className="h-5 w-5 text-primary" />
-                Opsummering – Bekræftelse af vilkår
-              </CardTitle>
-              <CardDescription>
-                Ved at acceptere nedenfor bekræfter du, at du har læst, forstået og accepterer følgende:
-              </CardDescription>
+          <Card className={`transition-all duration-200 ${
+            summaryAccepted ? "border-green-500/50 bg-green-50/50 dark:bg-green-950/20" : "border-2 border-primary"
+          }`}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                  summaryAccepted 
+                    ? "bg-green-100 dark:bg-green-900/40" 
+                    : "bg-primary/10"
+                }`}>
+                  <Shield className={`h-5 w-5 ${summaryAccepted ? "text-green-600" : "text-primary"}`} />
+                </div>
+                <div>
+                  <CardTitle className="text-base font-medium">Endelig bekræftelse</CardTitle>
+                  <CardDescription>Læs og acceptér alle vilkår</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-lg bg-muted/50 p-4">
+              <div className="rounded-xl bg-muted/50 p-5 border">
+                <h4 className="font-semibold mb-4 text-sm uppercase tracking-wide text-muted-foreground">Ved at acceptere bekræfter du</h4>
                 <ul className="space-y-3">
                   {SUMMARY_POINTS.map((point, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm">
-                      <span className="font-bold text-primary shrink-0">{index + 1}.</span>
-                      <span>{point}</span>
+                    <li key={index} className="flex items-start gap-3">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary shrink-0">
+                        {index + 1}
+                      </span>
+                      <span className="text-sm leading-relaxed">{point}</span>
                     </li>
                   ))}
                 </ul>
               </div>
 
-              <Alert className="border-destructive bg-destructive/10">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-                <AlertTitle className="text-destructive">Vigtigt om personligt ansvar</AlertTitle>
-                <AlertDescription className="text-destructive/90">
-                  Ved vandvidskørsel, hvor bilen konfiskeres af politiet, hæfter du <strong>personligt</strong> for bilens fulde værdi. 
-                  Dette kan betyde et erstatningsansvar på flere hundrede tusinde kroner.
-                </AlertDescription>
-              </Alert>
+              <div className="rounded-lg bg-destructive/10 p-4 border border-destructive/30">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-semibold text-destructive">Vigtigt</p>
+                    <p className="text-destructive/80">
+                      Ved at acceptere bekræfter du, at du forstår og accepterer dit personlige ansvar, 
+                      herunder at du kan hæfte for bilens fulde værdi ved konfiskering pga. vandvidskørsel.
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-              <div className="flex items-start space-x-3 pt-2 border-t">
+              <div 
+                className={`flex items-start space-x-3 rounded-lg border-2 p-4 cursor-pointer transition-all ${
+                  summaryAccepted 
+                    ? "border-green-500 bg-green-50 dark:bg-green-950/30" 
+                    : "border-dashed border-primary/50 hover:border-primary hover:bg-primary/5"
+                }`}
+                onClick={() => setSummaryAccepted(!summaryAccepted)}
+              >
                 <Checkbox
                   id="summary-accept"
                   checked={summaryAccepted}
                   onCheckedChange={(checked) => setSummaryAccepted(checked === true)}
+                  className="mt-0.5"
                 />
                 <Label htmlFor="summary-accept" className="cursor-pointer leading-relaxed font-medium">
-                  Jeg bekræfter hermed, at jeg har læst og forstået alle ovenstående vilkår. Jeg er indforstået med, at jeg hæfter personligt for bilens værdi ved konfiskering pga. vandvidskørsel, og jeg accepterer at overholde alle regler for brug af Copenhagen Sales' firmabiler.
+                  Jeg har læst, forstået og accepterer alle ovenstående vilkår for brug af Copenhagen Sales' biler
                 </Label>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <div className="flex justify-end pt-4">
+        {/* Submit button */}
+        <div className="sticky bottom-4 flex justify-center pt-4">
           <Button 
             size="lg" 
             onClick={handleSubmit}
             disabled={!allAnswered || completeQuiz.isPending}
+            className="w-full max-w-md shadow-lg gap-2"
           >
-            {completeQuiz.isPending ? "Gemmer..." : "Indsend svar og accepter vilkår"}
+            {completeQuiz.isPending ? "Indsender..." : "Indsend svar"}
+            {!completeQuiz.isPending && <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
       </div>
