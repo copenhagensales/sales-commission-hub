@@ -10,6 +10,7 @@ import { Shield, CheckCircle2, XCircle, AlertTriangle, Search, Users } from "luc
 import { format, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { useState, useMemo } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 interface EmployeeWithStatus {
   id: string;
@@ -153,19 +154,22 @@ export default function CodeOfConductAdmin() {
 
   if (!isTeamlederOrAbove) {
     return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Du har ikke adgang til denne side.</p>
-          </CardContent>
-        </Card>
-      </div>
+      <MainLayout>
+        <div className="container mx-auto">
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">Du har ikke adgang til denne side.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <MainLayout>
+      <div className="container mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
           <Shield className="h-6 w-6 text-primary" />
@@ -327,5 +331,6 @@ export default function CodeOfConductAdmin() {
         </CardContent>
       </Card>
     </div>
+  </MainLayout>
   );
 }
