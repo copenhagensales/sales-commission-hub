@@ -15,8 +15,8 @@ import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
 import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 
-// Navigation items for teamleder and above
-const teamlederNavigation = [
+// Navigation items for owners only (full access)
+const ownerNavigation = [
   { name: "Medarbejdere", href: "/employees", icon: Users },
   { name: "Teams", href: "/teams", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
@@ -31,6 +31,14 @@ const teamlederNavigation = [
   { name: "MG test", href: "/mg-test", icon: Percent },
   { name: "Bil-quiz overblik", href: "/car-quiz-admin", icon: Car },
   { name: "Code of Conduct overblik", href: "/code-of-conduct-admin", icon: Shield },
+];
+
+// Navigation items for teamleder (limited team-related access)
+const teamlederNavigation = [
+  { name: "Mit team", href: "/employees", icon: Users },
+  { name: "Kontrakter", href: "/contracts", icon: FileText },
+  { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
+  { name: "Min profil", href: "/my-profile", icon: User },
 ];
 
 // Navigation items for rekruttering role
@@ -53,10 +61,11 @@ const employeeNavigation = [
   { name: "Pulsmåling", href: "/pulse-survey", icon: HeartHandshake },
 ];
 
-// Teamleder navigation includes pulse survey results and career wishes overview
+// Teamleder extra navigation (pulse survey results, career wishes, code of conduct for their team)
 const teamlederExtraNavigation = [
   { name: "Pulsmåling resultater", href: "/pulse-survey-results", icon: BarChart3 },
   { name: "Karriereønsker", href: "/career-wishes-overview", icon: Sparkles },
+  { name: "Code of Conduct overblik", href: "/code-of-conduct-admin", icon: Shield },
 ];
 
 const shiftPlanningNavigation = [
@@ -87,7 +96,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isTeamlederOrAbove, isOwner, isRekruttering, isRekrutteringOrAbove, isLoading, role } = useCanAccess();
+  const { isTeamlederOrAbove, isOwner, isRekruttering, isRekrutteringOrAbove, isTeamleder, isLoading, role } = useCanAccess();
   const { user } = useAuth();
   const { showMenuItem: showPulseSurvey, showBadge: showPulseBadge } = useShouldShowPulseSurvey();
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
@@ -148,11 +157,13 @@ export function AppSidebar() {
   };
 
   // Select navigation based on role
-  const mainNavigation = isTeamlederOrAbove 
-    ? [...teamlederNavigation, ...teamlederExtraNavigation] 
-    : isRekruttering 
-      ? rekrutteringNavigation
-      : employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey);
+  const mainNavigation = isOwner 
+    ? [...ownerNavigation, ...teamlederExtraNavigation]
+    : isTeamleder
+      ? [...teamlederNavigation, ...teamlederExtraNavigation] 
+      : isRekruttering 
+        ? rekrutteringNavigation
+        : employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey);
   const currentShiftPlanningNav = isTeamlederOrAbove ? shiftPlanningNavigation : employeeShiftPlanningNavigation;
 
   if (isLoading) {
