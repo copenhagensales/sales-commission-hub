@@ -264,7 +264,7 @@ export function AppSidebar() {
             <LogOut className="h-5 w-5" />
             Log ud
           </button>
-          <div className="flex items-center gap-2 px-3 py-1 text-xs text-muted-foreground/60">
+          <div className="flex items-center gap-2 px-3 py-1 text-xs text-sidebar-foreground/70">
             <User className="h-3 w-3" />
             <span className="truncate">{user?.email}</span>
           </div>
