@@ -393,6 +393,8 @@ export type Database = {
             | Database["public"]["Enums"]["leadership_role_type"]
             | null
           other_comments: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           team_change_motivation: string | null
           updated_at: string
           wants_team_change: Database["public"]["Enums"]["team_change_wish"]
@@ -408,6 +410,8 @@ export type Database = {
             | Database["public"]["Enums"]["leadership_role_type"]
             | null
           other_comments?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           team_change_motivation?: string | null
           updated_at?: string
           wants_team_change: Database["public"]["Enums"]["team_change_wish"]
@@ -423,6 +427,8 @@ export type Database = {
             | Database["public"]["Enums"]["leadership_role_type"]
             | null
           other_comments?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           team_change_motivation?: string | null
           updated_at?: string
           wants_team_change?: Database["public"]["Enums"]["team_change_wish"]
