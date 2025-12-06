@@ -379,38 +379,77 @@ export default function ContractSign() {
 
         {/* Sign section */}
         {canSign && (
-          <Card ref={signSectionRef} className="border-primary bg-white">
-            <CardContent className="pt-6 space-y-4">
-              <div className="flex items-start gap-3">
-                <Checkbox
-                  id="accept"
-                  checked={accepted}
-                  onCheckedChange={(checked) => setAccepted(checked === true)}
-                />
-                <label htmlFor="accept" className="text-sm leading-relaxed cursor-pointer text-gray-700">
-                  Jeg har læst og forstået indholdet af denne kontrakt og accepterer hermed betingelserne.
-                </label>
+          <Card ref={signSectionRef} className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-white shadow-lg">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                  <PenLine className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl text-gray-900">Underskriv kontrakt</CardTitle>
+                  <p className="text-sm text-gray-500 mt-0.5">Bekræft din accept af kontraktens betingelser</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div 
+                className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                  accepted 
+                    ? 'border-green-500 bg-green-50' 
+                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                }`}
+                onClick={() => setAccepted(!accepted)}
+              >
+                <div className="flex items-start gap-4">
+                  <div className={`mt-0.5 h-6 w-6 rounded-md border-2 flex items-center justify-center transition-all ${
+                    accepted 
+                      ? 'border-green-500 bg-green-500' 
+                      : 'border-gray-300 bg-white'
+                  }`}>
+                    {accepted && <Check className="h-4 w-4 text-white" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">Jeg accepterer kontraktens betingelser</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Ved at markere denne boks bekræfter jeg, at jeg har læst og forstået indholdet af denne kontrakt og accepterer hermed alle betingelser.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-3">
                 <Button
-                  className="flex-1"
+                  size="lg"
+                  className={`flex-1 h-14 text-base font-semibold transition-all ${
+                    accepted 
+                      ? 'bg-green-600 hover:bg-green-700 shadow-lg shadow-green-200' 
+                      : 'bg-gray-300 cursor-not-allowed'
+                  }`}
                   disabled={!accepted || signMutation.isPending}
                   onClick={() => signMutation.mutate()}
                 >
-                  <Check className="h-4 w-4 mr-2" />
+                  {signMutation.isPending ? (
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  ) : (
+                    <Check className="h-5 w-5 mr-2" />
+                  )}
                   Underskriv kontrakt
                 </Button>
                 <Button
+                  size="lg"
                   variant="outline"
-                  className="border-gray-300 text-gray-700 hover:bg-gray-100"
+                  className="h-14 px-6 border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                   onClick={() => setRejectDialogOpen(true)}
                   disabled={rejectMutation.isPending}
                 >
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-5 w-5 mr-2" />
                   Afvis
                 </Button>
               </div>
+
+              <p className="text-xs text-center text-gray-400">
+                Din underskrift registreres med tidsstempel og IP-adresse
+              </p>
             </CardContent>
           </Card>
         )}
