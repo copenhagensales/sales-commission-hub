@@ -105,7 +105,7 @@ export default function CodeOfConduct() {
   if (completion && !completion.isExpired) {
     const passedDate = new Date(completion.passed_at);
     const nextRenewal = new Date(passedDate);
-    nextRenewal.setDate(nextRenewal.getDate() + 30);
+    nextRenewal.setDate(nextRenewal.getDate() + 60); // 2 months
 
     return (
       <div className="container mx-auto p-6 max-w-3xl">
@@ -144,7 +144,7 @@ export default function CodeOfConduct() {
             </div>
 
             <div className="text-center text-sm text-muted-foreground">
-              <p>Denne test skal gennemføres hver måned.</p>
+              <p>Denne test skal gennemføres hver 2. måned.</p>
               <p>Du vil blive påmindet når det er tid til at tage testen igen.</p>
             </div>
           </CardContent>

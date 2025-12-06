@@ -278,29 +278,49 @@ export const CODE_OF_CONDUCT_QUESTIONS = [
   },
 ];
 
-// Check if quiz has expired (every 30 days)
+// Check if quiz has expired (every 2 months = 60 days)
 function isQuizExpired(passedAt: string): boolean {
   const passedDate = new Date(passedAt);
   const daysSincePassed = differenceInDays(new Date(), passedDate);
-  return daysSincePassed >= 30;
+  return daysSincePassed >= 60; // 2 months
 }
 
-// Get deadline date (7 days after expiry or creation)
-function getDeadlineDate(passedAt: string | null, createdAt: string | null): Date {
+// Check if employee is within initial 14-day grace period
+function isWithinInitialGracePeriod(employmentStartDate: string | null): boolean {
+  if (!employmentStartDate) return false;
+  const startDate = new Date(employmentStartDate);
+  const daysSinceStart = differenceInDays(new Date(), startDate);
+  return daysSinceStart < 14;
+}
+
+// Get deadline date (7 days after the 1st of the month when quiz becomes due)
+function getDeadlineDate(passedAt: string | null, employmentStartDate: string | null): Date {
+  const now = new Date();
+  
+  // For new employees: 14 days from start + 7 days grace
+  if (employmentStartDate) {
+    const startDate = new Date(employmentStartDate);
+    const daysSinceStart = differenceInDays(now, startDate);
+    
+    // If within initial 14 days, deadline is 21 days from start
+    if (daysSinceStart < 14) {
+      const deadlineDate = new Date(startDate);
+      deadlineDate.setDate(deadlineDate.getDate() + 21); // 14 + 7 days
+      return deadlineDate;
+    }
+  }
+  
   if (passedAt) {
     const expiryDate = new Date(passedAt);
-    expiryDate.setDate(expiryDate.getDate() + 30); // 30 days after last pass
+    expiryDate.setDate(expiryDate.getDate() + 60); // 2 months after last pass
     expiryDate.setDate(expiryDate.getDate() + 7); // Plus 7 day grace period
     return expiryDate;
   }
   
-  if (createdAt) {
-    const deadlineDate = new Date(createdAt);
-    deadlineDate.setDate(deadlineDate.getDate() + 7); // 7 days from account creation
-    return deadlineDate;
-  }
-  
-  return new Date(); // Default to now if nothing available
+  // Default: 7 days from now
+  const deadlineDate = new Date();
+  deadlineDate.setDate(deadlineDate.getDate() + 7);
+  return deadlineDate;
 }
 
 export function useCodeOfConductCompletion() {
@@ -314,7 +334,7 @@ export function useCodeOfConductCompletion() {
       // Get employee ID from email
       const { data: employee } = await supabase
         .from("employee_master_data")
-        .select("id")
+        .select("id, employment_start_date")
         .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
         .maybeSingle();
 
@@ -480,6 +500,7 @@ export function useSubmitCodeOfConduct() {
 }
 
 // Check if user should be locked out due to expired/missing Code of Conduct
+// Note: No lock overlay for Code of Conduct - menu stays visible
 export function useCodeOfConductLock() {
   const { user } = useAuth();
 
@@ -490,7 +511,7 @@ export function useCodeOfConductLock() {
 
       const { data: employee } = await supabase
         .from("employee_master_data")
-        .select("id, job_title, created_at")
+        .select("id, job_title, employment_start_date")
         .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
         .maybeSingle();
 
@@ -499,6 +520,18 @@ export function useCodeOfConductLock() {
       // Only applies to Salgskonsulent employees
       if (employee.job_title !== "Salgskonsulent") {
         return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
+      }
+
+      // New employees get 14 days before quiz is required
+      if (isWithinInitialGracePeriod(employee.employment_start_date)) {
+        const startDate = new Date(employee.employment_start_date!);
+        const daysSinceStart = differenceInDays(new Date(), startDate);
+        const daysUntilRequired = 14 - daysSinceStart;
+        return { 
+          isLocked: false, 
+          daysRemaining: daysUntilRequired,
+          isRequired: false 
+        };
       }
 
       // Check completion
@@ -511,10 +544,10 @@ export function useCodeOfConductLock() {
       const hasValidCompletion = completion && !isQuizExpired(completion.passed_at);
 
       if (hasValidCompletion) {
-        // Calculate days until renewal
+        // Calculate days until renewal (2 months = 60 days)
         const passedDate = new Date(completion.passed_at);
         const daysSincePassed = differenceInDays(new Date(), passedDate);
-        const daysUntilRenewal = 30 - daysSincePassed;
+        const daysUntilRenewal = 60 - daysSincePassed;
         
         return { 
           isLocked: false, 
@@ -523,25 +556,20 @@ export function useCodeOfConductLock() {
         };
       }
 
-      // Quiz is required - check if within 7 day grace period
-      const deadlineDate = getDeadlineDate(completion?.passed_at || null, employee.created_at);
+      // Quiz is required - check deadline
+      const deadlineDate = getDeadlineDate(completion?.passed_at || null, employee.employment_start_date);
       const now = new Date();
       const daysRemaining = differenceInDays(deadlineDate, now);
 
-      if (daysRemaining < 0) {
-        // Past deadline - locked!
-        return { isLocked: true, daysRemaining: 0, isRequired: true };
-      }
-
-      // Within grace period
-      return { isLocked: false, daysRemaining, isRequired: true };
+      // No lock for Code of Conduct - just mark as required
+      return { isLocked: false, daysRemaining: Math.max(0, daysRemaining), isRequired: true };
     },
     enabled: !!user,
     refetchInterval: 60000,
   });
 
   return {
-    isLocked: data?.isLocked ?? false,
+    isLocked: false, // Never lock - menu always visible
     daysRemaining: data?.daysRemaining ?? null,
     isRequired: data?.isRequired ?? false,
     isLoading,
