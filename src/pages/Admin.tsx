@@ -9,9 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Shield, Users, Crown, User, Search, Info, Trash2 } from "lucide-react";
+import { Shield, Users, Crown, User, Search, Trash2, Eye, EyeOff, Check, X, ChevronDown, ChevronUp } from "lucide-react";
 import { useCanAccess, SystemRole } from "@/hooks/useSystemRoles";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,10 +37,98 @@ interface EmployeeRole {
   role: SystemRole | null;
 }
 
+interface TeamInfo {
+  id: string;
+  name: string;
+  team_leader_id: string | null;
+  team_leader_name?: string;
+  member_count: number;
+}
+
+// Menu item definitions with permissions
+const menuItems = [
+  { id: "employees", name: "Medarbejdere", icon: "Users", category: "Stamdata" },
+  { id: "teams", name: "Teams", icon: "Users", category: "Stamdata" },
+  { id: "contracts", name: "Kontrakter", icon: "FileText", category: "Stamdata" },
+  { id: "my-contracts", name: "Mine kontrakter", icon: "FileText", category: "Personligt" },
+  { id: "my-profile", name: "Min profil", icon: "User", category: "Personligt" },
+  { id: "my-schedule", name: "Min kalender", icon: "Calendar", category: "Personligt" },
+  { id: "career-wishes", name: "Karriereønsker", icon: "Sparkles", category: "Personligt" },
+  { id: "pulse-survey", name: "Pulsmåling", icon: "HeartHandshake", category: "Personligt" },
+  { id: "sales", name: "Salg", icon: "ShoppingCart", category: "Salgsdata" },
+  { id: "codan", name: "Codan", icon: "Shield", category: "Salgsdata" },
+  { id: "tdc-erhverv", name: "TDC Erhverv", icon: "Building2", category: "Salgsdata" },
+  { id: "payroll", name: "Lønkørsel", icon: "Wallet", category: "Løn" },
+  { id: "shift-planning", name: "Vagtplan", icon: "ClipboardList", category: "Vagtplan" },
+  { id: "absence", name: "Godkend fravær", icon: "Clock", category: "Vagtplan" },
+  { id: "time-tracking", name: "Tidsregistrering", icon: "Timer", category: "Vagtplan" },
+  { id: "extra-work", name: "Ekstra arbejde", icon: "Plus", category: "Vagtplan" },
+  { id: "car-quiz", name: "Bil-quiz", icon: "Car", category: "Compliance" },
+  { id: "code-of-conduct", name: "Code of Conduct", icon: "Shield", category: "Compliance" },
+  { id: "pulse-results", name: "Pulsmåling resultater", icon: "BarChart3", category: "Rapporter" },
+  { id: "car-quiz-admin", name: "Bil-quiz overblik", icon: "Car", category: "Rapporter" },
+  { id: "coc-admin", name: "Code of Conduct overblik", icon: "Shield", category: "Rapporter" },
+  { id: "career-wishes-overview", name: "Karriereønsker overblik", icon: "Sparkles", category: "Rapporter" },
+  { id: "fieldmarketing", name: "Fieldmarketing", icon: "Calendar", category: "Fieldmarketing" },
+  { id: "admin", name: "Administration", icon: "Shield", category: "System" },
+  { id: "settings", name: "Indstillinger", icon: "Settings", category: "System" },
+];
+
+// Role permissions matrix
+const rolePermissions: Record<SystemRole, { 
+  menuItems: string[], 
+  description: string,
+  dataScope: string,
+  canManageTeam: boolean,
+  canManageAllData: boolean,
+  canManageRoles: boolean,
+}> = {
+  medarbejder: {
+    menuItems: ["my-profile", "my-schedule", "my-contracts", "career-wishes", "pulse-survey"],
+    description: "Basalt adgangsniveau til egne data",
+    dataScope: "Kun egne data",
+    canManageTeam: false,
+    canManageAllData: false,
+    canManageRoles: false,
+  },
+  rekruttering: {
+    menuItems: ["employees", "teams", "contracts", "my-contracts", "my-profile", "my-schedule", "career-wishes", "career-wishes-overview"],
+    description: "Kan se alle medarbejdere og sende kontrakter",
+    dataScope: "Alle medarbejdere (kun læsning + kontrakter)",
+    canManageTeam: false,
+    canManageAllData: false,
+    canManageRoles: false,
+  },
+  teamleder: {
+    menuItems: ["shift-planning", "absence", "employees", "contracts", "my-contracts", "my-profile", "pulse-results", "coc-admin", "time-tracking", "extra-work"],
+    description: "Adgang til eget teams data og vagtplan",
+    dataScope: "Eget team (via manager_id)",
+    canManageTeam: true,
+    canManageAllData: false,
+    canManageRoles: false,
+  },
+  ejer: {
+    menuItems: menuItems.map(m => m.id),
+    description: "Fuld systemadgang",
+    dataScope: "Alle data",
+    canManageTeam: true,
+    canManageAllData: true,
+    canManageRoles: true,
+  },
+};
+
+const roleLabels: Record<SystemRole, { label: string, color: string, icon: typeof Crown }> = {
+  medarbejder: { label: "Medarbejder", color: "text-muted-foreground", icon: User },
+  rekruttering: { label: "Rekruttering", color: "text-purple-500", icon: Users },
+  teamleder: { label: "Teamleder", color: "text-blue-500", icon: Users },
+  ejer: { label: "Ejer", color: "text-amber-500", icon: Crown },
+};
+
 export default function Admin() {
   const [searchTerm, setSearchTerm] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<EmployeeRole | null>(null);
+  const [expandedRoles, setExpandedRoles] = useState<SystemRole[]>(["ejer", "teamleder", "rekruttering", "medarbejder"]);
   const queryClient = useQueryClient();
   const { isOwner, isLoading: accessLoading } = useCanAccess();
 
@@ -49,6 +139,48 @@ export default function Admin() {
       const { data, error } = await supabase.rpc("get_employee_roles_for_admin");
       if (error) throw error;
       return data as EmployeeRole[];
+    },
+    enabled: isOwner,
+  });
+
+  // Fetch teams with their members
+  const { data: teams } = useQuery({
+    queryKey: ["admin-teams"],
+    queryFn: async () => {
+      const { data: teamsData, error: teamsError } = await supabase
+        .from("teams")
+        .select("id, name, team_leader_id");
+      
+      if (teamsError) throw teamsError;
+
+      const teamsWithInfo: TeamInfo[] = await Promise.all(
+        (teamsData || []).map(async (team) => {
+          const { count } = await supabase
+            .from("employee_master_data")
+            .select("*", { count: "exact", head: true })
+            .eq("team_id", team.id);
+
+          let teamLeaderName = "";
+          if (team.team_leader_id) {
+            const { data: leader } = await supabase
+              .from("employee_master_data")
+              .select("first_name, last_name")
+              .eq("id", team.team_leader_id)
+              .single();
+            if (leader) {
+              teamLeaderName = `${leader.first_name} ${leader.last_name}`;
+            }
+          }
+
+          return {
+            ...team,
+            team_leader_name: teamLeaderName,
+            member_count: count || 0,
+          };
+        })
+      );
+
+      return teamsWithInfo;
     },
     enabled: isOwner,
   });
@@ -93,7 +225,6 @@ export default function Admin() {
   // Delete employee mutation
   const deleteEmployee = useMutation({
     mutationFn: async (employeeId: string) => {
-      // First delete from employee_master_data (this will cascade to related tables)
       const { error } = await supabase
         .from("employee_master_data")
         .delete()
@@ -123,6 +254,14 @@ export default function Admin() {
     }
   };
 
+  const toggleRole = (role: SystemRole) => {
+    setExpandedRoles(prev => 
+      prev.includes(role) 
+        ? prev.filter(r => r !== role) 
+        : [...prev, role]
+    );
+  };
+
   const filteredUsers = users?.filter((user) => {
     const fullName = `${user.first_name || ""} ${user.last_name || ""}`.toLowerCase();
     const email = user.email?.toLowerCase() || "";
@@ -130,43 +269,37 @@ export default function Admin() {
     return fullName.includes(search) || email.includes(search);
   });
 
+  // Group users by role
+  const usersByRole = {
+    ejer: filteredUsers?.filter(u => u.role === "ejer") || [],
+    teamleder: filteredUsers?.filter(u => u.role === "teamleder") || [],
+    rekruttering: filteredUsers?.filter(u => u.role === "rekruttering") || [],
+    medarbejder: filteredUsers?.filter(u => u.role === "medarbejder" || !u.role) || [],
+  };
+
+  // Group menu items by category
+  const menuByCategory = menuItems.reduce((acc, item) => {
+    if (!acc[item.category]) acc[item.category] = [];
+    acc[item.category].push(item);
+    return acc;
+  }, {} as Record<string, typeof menuItems>);
+
   const getRoleBadge = (role: SystemRole | null) => {
-    switch (role) {
-      case "ejer":
-        return (
-          <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/30">
-            <Crown className="h-3 w-3 mr-1" />
-            Ejer
-          </Badge>
-        );
-      case "teamleder":
-        return (
-          <Badge className="bg-blue-500/20 text-blue-500 border-blue-500/30">
-            <Users className="h-3 w-3 mr-1" />
-            Teamleder
-          </Badge>
-        );
-      case "rekruttering":
-        return (
-          <Badge className="bg-purple-500/20 text-purple-500 border-purple-500/30">
-            <Users className="h-3 w-3 mr-1" />
-            Rekruttering
-          </Badge>
-        );
-      case "medarbejder":
-        return (
-          <Badge variant="secondary">
-            <User className="h-3 w-3 mr-1" />
-            Medarbejder
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="outline" className="text-muted-foreground">
-            Ingen rolle
-          </Badge>
-        );
+    const roleInfo = role ? roleLabels[role] : null;
+    if (!roleInfo) {
+      return (
+        <Badge variant="outline" className="text-muted-foreground">
+          Ingen rolle
+        </Badge>
+      );
     }
+    const Icon = roleInfo.icon;
+    return (
+      <Badge className={`bg-${roleInfo.color.replace('text-', '')}/20 ${roleInfo.color} border-${roleInfo.color.replace('text-', '')}/30`}>
+        <Icon className="h-3 w-3 mr-1" />
+        {roleInfo.label}
+      </Badge>
+    );
   };
 
   if (accessLoading) {
@@ -205,208 +338,379 @@ export default function Admin() {
               Administration
             </h1>
             <p className="text-muted-foreground mt-1">
-              Administrer brugerroller og rettigheder
+              Administrer brugerroller, rettigheder og adgangskontrol
             </p>
           </div>
         </div>
 
-        {/* Role explanation cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <User className="h-5 w-5 text-muted-foreground" />
-                Medarbejder
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Egne vagter og tidsregistrering</li>
-                <li>• Eget stamdatakort</li>
-                <li>• Egen fraværsanmodning</li>
-              </ul>
-            </CardContent>
-          </Card>
+        <Tabs defaultValue="users" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3 max-w-lg">
+            <TabsTrigger value="users">Brugere</TabsTrigger>
+            <TabsTrigger value="permissions">Rettigheder</TabsTrigger>
+            <TabsTrigger value="teams">Teams</TabsTrigger>
+          </TabsList>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Users className="h-5 w-5 text-purple-500" />
-                Rekruttering
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Se alle medarbejdere</li>
-                <li>• Oprette nye medarbejdere</li>
-                <li>• Sende kontrakter (ikke redigere)</li>
-              </ul>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Users className="h-5 w-5 text-blue-500" />
-                Teamleder
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Alt fra Medarbejder</li>
-                <li>• Eget teams vagter og medarbejdere</li>
-                <li>• Eget teams salgsdata</li>
-                <li>• Eget teams lønkørsel</li>
-              </ul>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Crown className="h-5 w-5 text-amber-500" />
-                Ejer
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Fuld adgang til alle moduler</li>
-                <li>• Alle medarbejdere og teams</li>
-                <li>• Administration af roller</li>
-                <li>• Systemindstillinger</li>
-              </ul>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Info alert */}
-        <Alert>
-          <Info className="h-4 w-4" />
-          <AlertTitle>Teamdefinition</AlertTitle>
-          <AlertDescription>
-            Et team defineres via <strong>manager_id</strong> feltet i medarbejderdata. 
-            Teamledere kan se alle medarbejdere hvor de selv er sat som manager.
-          </AlertDescription>
-        </Alert>
-
-        {/* Users table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Brugerroller</CardTitle>
-            <CardDescription>
-              Tildel roller til brugere for at styre deres adgang til systemet.
-              Kun brugere med en aktiv login (auth konto) kan tildeles en rolle.
-            </CardDescription>
-            <div className="relative mt-4">
+          {/* USERS TAB */}
+          <TabsContent value="users" className="space-y-6">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Søg efter navn eller email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
+                className="pl-9 max-w-md"
               />
             </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : error ? (
-              <Alert variant="destructive">
-                <AlertTitle>Fejl</AlertTitle>
-                <AlertDescription>{(error as Error).message}</AlertDescription>
-              </Alert>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Navn</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Stilling</TableHead>
-                    <TableHead>Login status</TableHead>
-                    <TableHead>Nuværende rolle</TableHead>
-                    <TableHead>Handling</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers?.map((user) => (
-                    <TableRow key={user.employee_id}>
-                      <TableCell className="font-medium">
-                        {user.first_name} {user.last_name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {user.email || "-"}
-                      </TableCell>
-                      <TableCell>{user.job_title || "-"}</TableCell>
-                      <TableCell>
-                        {user.auth_user_id ? (
-                          <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30">
-                            Aktiv
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-muted-foreground">
-                            Ingen login
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{getRoleBadge(user.role)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {user.auth_user_id && user.email ? (
-                            <Select
-                              value={user.role || "none"}
-                              onValueChange={(value) => {
-                                if (value === "none") {
-                                  removeRole.mutate(user.email!);
-                                } else {
-                                  assignRole.mutate({
-                                    email: user.email!,
-                                    role: value as SystemRole,
-                                  });
-                                }
-                              }}
-                            >
-                              <SelectTrigger className="w-[140px]">
-                                <SelectValue placeholder="Vælg rolle" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">Ingen rolle</SelectItem>
-                                <SelectItem value="medarbejder">Medarbejder</SelectItem>
-                                <SelectItem value="rekruttering">Rekruttering</SelectItem>
-                                <SelectItem value="teamleder">Teamleder</SelectItem>
-                                <SelectItem value="ejer">Ejer</SelectItem>
-                              </SelectContent>
-                            </Select>
+
+            {/* Users grouped by role */}
+            <div className="space-y-4">
+              {(["ejer", "teamleder", "rekruttering", "medarbejder"] as SystemRole[]).map((role) => {
+                const roleInfo = roleLabels[role];
+                const usersInRole = usersByRole[role];
+                const isExpanded = expandedRoles.includes(role);
+                const Icon = roleInfo.icon;
+
+                return (
+                  <Collapsible key={role} open={isExpanded} onOpenChange={() => toggleRole(role)}>
+                    <Card>
+                      <CollapsibleTrigger asChild>
+                        <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg bg-${roleInfo.color.replace('text-', '')}/10`}>
+                                <Icon className={`h-5 w-5 ${roleInfo.color}`} />
+                              </div>
+                              <div>
+                                <CardTitle className="text-lg">{roleInfo.label}</CardTitle>
+                                <CardDescription>{rolePermissions[role].description}</CardDescription>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Badge variant="secondary" className="text-sm">
+                                {usersInRole.length} brugere
+                              </Badge>
+                              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </div>
+                          </div>
+                        </CardHeader>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <CardContent>
+                          {usersInRole.length === 0 ? (
+                            <p className="text-sm text-muted-foreground py-4 text-center">
+                              Ingen brugere med denne rolle
+                            </p>
                           ) : (
-                            <span className="text-sm text-muted-foreground">
-                              Kræver login
-                            </span>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Navn</TableHead>
+                                  <TableHead>Email</TableHead>
+                                  <TableHead>Stilling</TableHead>
+                                  <TableHead>Login</TableHead>
+                                  <TableHead className="text-right">Handlinger</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {usersInRole.map((user) => (
+                                  <TableRow key={user.employee_id}>
+                                    <TableCell className="font-medium">
+                                      {user.first_name} {user.last_name}
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                      {user.email || "-"}
+                                    </TableCell>
+                                    <TableCell>{user.job_title || "-"}</TableCell>
+                                    <TableCell>
+                                      {user.auth_user_id ? (
+                                        <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30">
+                                          Aktiv
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="text-muted-foreground">
+                                          Ingen
+                                        </Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <div className="flex items-center justify-end gap-2">
+                                        {user.auth_user_id && user.email ? (
+                                          <Select
+                                            value={user.role || "none"}
+                                            onValueChange={(value) => {
+                                              if (value === "none") {
+                                                removeRole.mutate(user.email!);
+                                              } else {
+                                                assignRole.mutate({
+                                                  email: user.email!,
+                                                  role: value as SystemRole,
+                                                });
+                                              }
+                                            }}
+                                          >
+                                            <SelectTrigger className="w-[130px]">
+                                              <SelectValue placeholder="Vælg rolle" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="none">Ingen rolle</SelectItem>
+                                              <SelectItem value="medarbejder">Medarbejder</SelectItem>
+                                              <SelectItem value="rekruttering">Rekruttering</SelectItem>
+                                              <SelectItem value="teamleder">Teamleder</SelectItem>
+                                              <SelectItem value="ejer">Ejer</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        ) : (
+                                          <span className="text-sm text-muted-foreground">
+                                            Kræver login
+                                          </span>
+                                        )}
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                          onClick={() => handleDeleteClick(user)}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => handleDeleteClick(user)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredUsers?.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        Ingen brugere fundet
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                        </CardContent>
+                      </CollapsibleContent>
+                    </Card>
+                  </Collapsible>
+                );
+              })}
+            </div>
+          </TabsContent>
+
+          {/* PERMISSIONS TAB */}
+          <TabsContent value="permissions" className="space-y-6">
+            <Alert>
+              <Shield className="h-4 w-4" />
+              <AlertTitle>Rollebaseret adgangskontrol</AlertTitle>
+              <AlertDescription>
+                Rettigheder er defineret per rolle. Brugere arver automatisk rettigheder baseret på deres tildelte rolle.
+              </AlertDescription>
+            </Alert>
+
+            {/* Permissions matrix */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Rettigheder per rolle</CardTitle>
+                <CardDescription>
+                  Oversigt over hvilke menupunkter og funktioner hver rolle har adgang til
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[200px]">Menupunkt</TableHead>
+                        <TableHead className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <User className="h-4 w-4" />
+                            Medarbejder
+                          </div>
+                        </TableHead>
+                        <TableHead className="text-center">
+                          <div className="flex items-center justify-center gap-1 text-purple-500">
+                            <Users className="h-4 w-4" />
+                            Rekruttering
+                          </div>
+                        </TableHead>
+                        <TableHead className="text-center">
+                          <div className="flex items-center justify-center gap-1 text-blue-500">
+                            <Users className="h-4 w-4" />
+                            Teamleder
+                          </div>
+                        </TableHead>
+                        <TableHead className="text-center">
+                          <div className="flex items-center justify-center gap-1 text-amber-500">
+                            <Crown className="h-4 w-4" />
+                            Ejer
+                          </div>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Object.entries(menuByCategory).map(([category, items]) => (
+                        <>
+                          <TableRow key={category} className="bg-muted/50">
+                            <TableCell colSpan={5} className="font-semibold text-sm uppercase tracking-wide">
+                              {category}
+                            </TableCell>
+                          </TableRow>
+                          {items.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell>{item.name}</TableCell>
+                              {(["medarbejder", "rekruttering", "teamleder", "ejer"] as SystemRole[]).map((role) => {
+                                const hasAccess = rolePermissions[role].menuItems.includes(item.id);
+                                return (
+                                  <TableCell key={role} className="text-center">
+                                    {hasAccess ? (
+                                      <div className="flex justify-center">
+                                        <div className="p-1 rounded-full bg-green-500/10">
+                                          <Check className="h-4 w-4 text-green-500" />
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex justify-center">
+                                        <div className="p-1 rounded-full bg-muted">
+                                          <X className="h-4 w-4 text-muted-foreground" />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          ))}
+                        </>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Data scope cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {(["medarbejder", "rekruttering", "teamleder", "ejer"] as SystemRole[]).map((role) => {
+                const info = rolePermissions[role];
+                const label = roleLabels[role];
+                const Icon = label.icon;
+                return (
+                  <Card key={role}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Icon className={`h-4 w-4 ${label.color}`} />
+                        {label.label}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Datascope</p>
+                        <p className="text-sm font-medium">{info.dataScope}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant={info.canManageTeam ? "default" : "secondary"} className="text-xs">
+                          {info.canManageTeam ? <Eye className="h-3 w-3 mr-1" /> : <EyeOff className="h-3 w-3 mr-1" />}
+                          Team
+                        </Badge>
+                        <Badge variant={info.canManageAllData ? "default" : "secondary"} className="text-xs">
+                          {info.canManageAllData ? <Eye className="h-3 w-3 mr-1" /> : <EyeOff className="h-3 w-3 mr-1" />}
+                          Alle data
+                        </Badge>
+                        <Badge variant={info.canManageRoles ? "default" : "secondary"} className="text-xs">
+                          {info.canManageRoles ? <Check className="h-3 w-3 mr-1" /> : <X className="h-3 w-3 mr-1" />}
+                          Roller
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </TabsContent>
+
+          {/* TEAMS TAB */}
+          <TabsContent value="teams" className="space-y-6">
+            <Alert>
+              <Users className="h-4 w-4" />
+              <AlertTitle>Teamdefinition</AlertTitle>
+              <AlertDescription>
+                Teams defineres via <strong>manager_id</strong> feltet i medarbejderdata. 
+                Teamledere kan se alle medarbejdere hvor de selv er sat som manager.
+                For at ændre teammedlemskab, rediger medarbejderens manager felt.
+              </AlertDescription>
+            </Alert>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {teams?.map((team) => (
+                <Card key={team.id}>
+                  <CardHeader>
+                    <CardTitle className="text-lg">{team.name}</CardTitle>
+                    <CardDescription>
+                      {team.team_leader_name ? (
+                        <span className="flex items-center gap-1">
+                          <Crown className="h-3 w-3 text-amber-500" />
+                          {team.team_leader_name}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">Ingen teamleder</span>
+                      )}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Medlemmer</span>
+                      <Badge variant="secondary">{team.member_count}</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {(!teams || teams.length === 0) && (
+                <Card className="col-span-full">
+                  <CardContent className="py-8 text-center text-muted-foreground">
+                    Ingen teams oprettet endnu
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Users without team assignment */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Brugere med tildelt manager</CardTitle>
+                <CardDescription>
+                  Oversigt over hvilke brugere der er tilknyttet en teamleder via manager_id
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Medarbejder</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Rolle</TableHead>
+                        <TableHead>Manager tildelt</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users?.slice(0, 15).map((user) => (
+                        <TableRow key={user.employee_id}>
+                          <TableCell className="font-medium">
+                            {user.first_name} {user.last_name}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {user.email || "-"}
+                          </TableCell>
+                          <TableCell>{getRoleBadge(user.role)}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-muted-foreground">
+                              Se medarbejderdata
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Delete confirmation dialog */}
