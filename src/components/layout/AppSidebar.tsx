@@ -35,6 +35,7 @@ const ownerNavigation = [
 
 // Navigation items for teamleder (limited team-related access)
 const teamlederNavigation = [
+  { name: "Vagtplan", href: "/shift-planning", icon: ClipboardList },
   { name: "Mit team", href: "/employees", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
@@ -163,7 +164,7 @@ export function AppSidebar() {
       : isRekruttering 
         ? rekrutteringNavigation
         : employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey);
-  const currentShiftPlanningNav = isTeamlederOrAbove ? shiftPlanningNavigation : employeeShiftPlanningNavigation;
+  const currentShiftPlanningNav = isOwner ? shiftPlanningNavigation : employeeShiftPlanningNavigation;
 
   if (isLoading) {
     return (
