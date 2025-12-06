@@ -1310,6 +1310,127 @@ export type Database = {
           },
         ]
       }
+      pulse_survey_completions: {
+        Row: {
+          completed_at: string
+          employee_id: string
+          id: string
+          survey_id: string
+        }
+        Insert: {
+          completed_at?: string
+          employee_id: string
+          id?: string
+          survey_id: string
+        }
+        Update: {
+          completed_at?: string
+          employee_id?: string
+          id?: string
+          survey_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulse_survey_completions_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "pulse_surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pulse_survey_responses: {
+        Row: {
+          created_at: string
+          department: string | null
+          development_score: number
+          energy_score: number
+          id: string
+          improvement_suggestions: string | null
+          leader_availability_score: number
+          leadership_score: number
+          nps_comment: string | null
+          nps_score: number
+          psychological_safety_score: number
+          recognition_score: number
+          seriousness_score: number
+          survey_id: string
+          tenure: string
+          wellbeing_score: number
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          development_score: number
+          energy_score: number
+          id?: string
+          improvement_suggestions?: string | null
+          leader_availability_score: number
+          leadership_score: number
+          nps_comment?: string | null
+          nps_score: number
+          psychological_safety_score: number
+          recognition_score: number
+          seriousness_score: number
+          survey_id: string
+          tenure: string
+          wellbeing_score: number
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          development_score?: number
+          energy_score?: number
+          id?: string
+          improvement_suggestions?: string | null
+          leader_availability_score?: number
+          leadership_score?: number
+          nps_comment?: string | null
+          nps_score?: number
+          psychological_safety_score?: number
+          recognition_score?: number
+          seriousness_score?: number
+          survey_id?: string
+          tenure?: string
+          wellbeing_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulse_survey_responses_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "pulse_surveys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pulse_surveys: {
+        Row: {
+          activated_at: string
+          created_at: string
+          id: string
+          is_active: boolean
+          month: number
+          year: number
+        }
+        Insert: {
+          activated_at?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          month: number
+          year: number
+        }
+        Update: {
+          activated_at?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          month?: number
+          year?: number
+        }
+        Relationships: []
+      }
       sale_items: {
         Row: {
           adversus_external_id: string | null

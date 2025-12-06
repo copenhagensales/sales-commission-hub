@@ -43,6 +43,8 @@ import TimeTracking from "./pages/shift-planning/TimeTracking";
 import Contracts from "./pages/Contracts";
 import MyContracts from "./pages/MyContracts";
 import ContractSign from "./pages/ContractSign";
+import PulseSurvey from "./pages/PulseSurvey";
+import PulseSurveyResults from "./pages/PulseSurveyResults";
 import Admin from "./pages/Admin";
 import MyProfile from "./pages/MyProfile";
 
@@ -80,6 +82,7 @@ const App = () => (
           <Route path="/my-schedule" element={<ProtectedRoute><MySchedule /></ProtectedRoute>} />
           <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
           <Route path="/my-contracts" element={<ProtectedRoute><MyContracts /></ProtectedRoute>} />
+          <Route path="/pulse-survey" element={<ProtectedRoute><PulseSurvey /></ProtectedRoute>} />
           <Route path="/contract/:id" element={<ContractSign />} />
           {/* Teamleder+ routes */}
           <Route path="/dashboard" element={<RoleProtectedRoute requireTeamlederOrAbove><Dashboard /></RoleProtectedRoute>} />
@@ -115,6 +118,8 @@ const App = () => (
           <Route path="/shift-planning/time-tracking" element={<RoleProtectedRoute requireTeamlederOrAbove><TimeTracking /></RoleProtectedRoute>} />
           {/* Contract routes */}
           <Route path="/contracts" element={<RoleProtectedRoute requireTeamlederOrAbove><Contracts /></RoleProtectedRoute>} />
+          {/* Pulse survey results - teamleder+ */}
+          <Route path="/pulse-survey-results" element={<RoleProtectedRoute requireTeamlederOrAbove><PulseSurveyResults /></RoleProtectedRoute>} />
           {/* Admin route - owner only */}
           <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
