@@ -298,8 +298,8 @@ Deno.serve(async (req) => {
         return leadCache.get(leadId) || null
       }
       
-      // Add small delay before fetching lead to avoid rate limits
-      await delay(200)
+      // Add longer delay before fetching lead to avoid rate limits (Adversus has strict rate limiting)
+      await delay(1000)
       
       try {
         const leadResponse = await fetch(`${baseUrl}/leads/${leadId}`, {
