@@ -362,14 +362,14 @@ export default function Teams() {
                 <div className="space-y-2">
                   <Label>Teamleder</Label>
                   <Select
-                    value={formData.team_leader_id}
-                    onValueChange={(value) => setFormData({ ...formData, team_leader_id: value })}
+                    value={formData.team_leader_id || "none"}
+                    onValueChange={(value) => setFormData({ ...formData, team_leader_id: value === "none" ? "" : value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Vælg teamleder" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Ingen</SelectItem>
+                      <SelectItem value="none">Ingen</SelectItem>
                       {teamLeaderCandidates.map((emp) => (
                         <SelectItem key={emp.id} value={emp.id}>
                           {emp.first_name} {emp.last_name}
