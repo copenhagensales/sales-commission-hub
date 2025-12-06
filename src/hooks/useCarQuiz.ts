@@ -48,35 +48,122 @@ export function useCarQuizCompletion() {
   });
 }
 
-export function useCompleteCarQuiz() {
+interface SubmitQuizParams {
+  answers: Record<number, string>;
+  gpsAccepted: boolean;
+  summaryAccepted: boolean;
+}
+
+export function useSubmitCarQuiz() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ answers, gpsAccepted, summaryAccepted }: SubmitQuizParams) => {
       if (!user) throw new Error("Not authenticated");
 
-      // Get employee ID from email
+      // Get employee data from email
       const { data: employee } = await supabase
         .from("employee_master_data")
-        .select("id")
+        .select("id, first_name, last_name, private_email")
         .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
         .maybeSingle();
 
       if (!employee) throw new Error("Employee not found");
 
-      const { error } = await supabase
-        .from("car_quiz_completions")
-        .insert({ employee_id: employee.id });
+      // Get IP address
+      let ipAddress = "Unknown";
+      try {
+        const ipResponse = await fetch("https://api.ipify.org?format=json");
+        const ipData = await ipResponse.json();
+        ipAddress = ipData.ip;
+      } catch (e) {
+        console.warn("Could not fetch IP address");
+      }
 
-      if (error) throw error;
+      const userAgent = navigator.userAgent;
+      const submittedAt = new Date().toISOString();
+      const passed = gpsAccepted && summaryAccepted;
+
+      // Save quiz submission to database
+      const { error: submissionError } = await supabase
+        .from("car_quiz_submissions")
+        .insert({
+          employee_id: employee.id,
+          passed,
+          answers,
+          gps_accepted: gpsAccepted,
+          summary_accepted: summaryAccepted,
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          submitted_at: submittedAt,
+        });
+
+      if (submissionError) throw submissionError;
+
+      // If passed, also update the completions table
+      if (passed) {
+        const { error: completionError } = await supabase
+          .from("car_quiz_completions")
+          .insert({ employee_id: employee.id });
+
+        if (completionError) throw completionError;
+      }
+
+      // Send email with result
+      const employeeName = `${employee.first_name} ${employee.last_name}`;
+      const employeeEmail = employee.private_email;
+
+      if (employeeEmail) {
+        try {
+          await supabase.functions.invoke("send-car-quiz-result", {
+            body: {
+              employeeId: employee.id,
+              employeeName,
+              employeeEmail,
+              passed,
+              answers,
+              gpsAccepted,
+              summaryAccepted,
+              submittedAt,
+              ipAddress,
+            },
+          });
+        } catch (emailError) {
+          console.error("Failed to send quiz result email:", emailError);
+          // Don't throw - the submission was successful, email is secondary
+        }
+      }
+
+      return { passed };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["car-quiz-completion"] });
       queryClient.invalidateQueries({ queryKey: ["car-quiz-all-completions"] });
       queryClient.invalidateQueries({ queryKey: ["car-quiz-lock"] });
+      queryClient.invalidateQueries({ queryKey: ["car-quiz-submissions"] });
     },
   });
+}
+
+// Keep the old hook for backward compatibility
+export function useCompleteCarQuiz() {
+  const submitQuiz = useSubmitCarQuiz();
+  
+  return {
+    ...submitQuiz,
+    mutate: (_, options?: any) => {
+      // Legacy wrapper - assumes all answers correct and accepted
+      submitQuiz.mutate(
+        { 
+          answers: {}, 
+          gpsAccepted: true, 
+          summaryAccepted: true 
+        },
+        options
+      );
+    },
+  };
 }
 
 export function useAllCarQuizCompletions() {
@@ -106,6 +193,41 @@ export function useAllCarQuizCompletions() {
         nextRenewalDate: new Date(new Date(item.passed_at).setMonth(new Date(item.passed_at).getMonth() + 6))
       }));
     },
+  });
+}
+
+export function useCarQuizSubmissions(employeeId?: string) {
+  return useQuery({
+    queryKey: ["car-quiz-submissions", employeeId],
+    queryFn: async () => {
+      let query = supabase
+        .from("car_quiz_submissions")
+        .select(`
+          id,
+          employee_id,
+          passed,
+          answers,
+          gps_accepted,
+          summary_accepted,
+          ip_address,
+          user_agent,
+          submitted_at,
+          employee_master_data (
+            first_name,
+            last_name
+          )
+        `)
+        .order("submitted_at", { ascending: false });
+
+      if (employeeId) {
+        query = query.eq("employee_id", employeeId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+    enabled: true,
   });
 }
 
