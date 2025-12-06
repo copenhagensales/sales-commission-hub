@@ -37,6 +37,7 @@ export function CreateAbsenceDialog({
   const [endTime, setEndTime] = useState("12:00");
   const [comment, setComment] = useState("");
   const [holidayWarning, setHolidayWarning] = useState<string | null>(null);
+  const [shortNoticeWarning, setShortNoticeWarning] = useState<string | null>(null);
 
   const createAbsence = useCreateAbsenceRequest();
   const { data: holidays } = useDanishHolidays();
@@ -51,6 +52,25 @@ export function CreateAbsenceDialog({
   useEffect(() => {
     setType(defaultType);
   }, [defaultType]);
+
+  // Check for short notice (less than 14 days)
+  useEffect(() => {
+    if (type === "vacation" && startDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const daysUntilStart = differenceInDays(startDate, today);
+      
+      if (daysUntilStart < 14) {
+        setShortNoticeWarning(
+          `Ferie skal søges med minimum 14 dages varsel. Du kan ikke søge ferie med så kort varsel. Kontakt din teamleder, som kan godkende ferien manuelt.`
+        );
+      } else {
+        setShortNoticeWarning(null);
+      }
+    } else {
+      setShortNoticeWarning(null);
+    }
+  }, [type, startDate]);
 
   // Check for holiday conflicts
   useEffect(() => {
@@ -82,8 +102,8 @@ export function CreateAbsenceDialog({
   const handleSubmit = () => {
     if (!startDate || !endDate) return;
 
-    // Block if holiday warning exists
-    if (holidayWarning) return;
+    // Block if holiday warning or short notice warning exists
+    if (holidayWarning || shortNoticeWarning) return;
 
     createAbsence.mutate({
       employee_id: employeeId,
@@ -183,6 +203,14 @@ export function CreateAbsenceDialog({
             </div>
           </div>
 
+          {/* Short Notice Warning */}
+          {shortNoticeWarning && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{shortNoticeWarning}</AlertDescription>
+            </Alert>
+          )}
+
           {/* Holiday Warning */}
           {holidayWarning && (
             <Alert variant="destructive">
@@ -240,7 +268,7 @@ export function CreateAbsenceDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!startDate || !endDate || !!holidayWarning || createAbsence.isPending}
+            disabled={!startDate || !endDate || !!holidayWarning || !!shortNoticeWarning || createAbsence.isPending}
           >
             {createAbsence.isPending ? "Sender..." : "Send anmodning"}
           </Button>

@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ListChecks, Info, RefreshCw, Layers3, UserX, Thermometer, Trash2, FileWarning } from "lucide-react";
+import { ListChecks, Info, RefreshCw, Layers3, UserX, Thermometer, Trash2, FileWarning, CalendarDays } from "lucide-react";
 
 export default function Logikker() {
   return (
@@ -166,6 +166,26 @@ export default function Logikker() {
                 <li>Efter 5 dage uden underskrift <strong>låses systemet</strong> for medarbejderen.</li>
                 <li>Medarbejderen kan <strong>kun tilgå underskriftssiden</strong> indtil kontrakten er underskrevet.</li>
                 <li>Når kontrakten er underskrevet, får medarbejderen <strong>fuld adgang igen</strong>.</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarDays className="h-5 w-5" />
+                Ferieansøgning & varsel
+              </CardTitle>
+              <CardDescription>
+                Regler for hvornår ferie kan ansøges.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Ferie skal søges med <strong>minimum 14 dages varsel</strong>.</li>
+                <li>Ved kortere varsel kan systemet <strong>ikke godkende ferien</strong>.</li>
+                <li>Medarbejderen skal i stedet <strong>kontakte sin teamleder</strong>, som kan godkende ferien manuelt.</li>
+                <li>Helligdage kræver særskilt <strong>7 dages varsel</strong> for at holde fri.</li>
               </ul>
             </CardContent>
           </Card>
