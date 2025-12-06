@@ -23,6 +23,7 @@ export type Database = {
           end_time: string | null
           id: string
           is_full_day: boolean | null
+          postponed_until: string | null
           rejection_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
@@ -40,6 +41,7 @@ export type Database = {
           end_time?: string | null
           id?: string
           is_full_day?: boolean | null
+          postponed_until?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -57,6 +59,7 @@ export type Database = {
           end_time?: string | null
           id?: string
           is_full_day?: boolean | null
+          postponed_until?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null

@@ -5,6 +5,7 @@ import { CarQuizLockOverlay } from "./CarQuizLockOverlay";
 import { usePendingContractLock } from "@/hooks/usePendingContractLock";
 import { useCarQuizLock } from "@/hooks/useCarQuiz";
 import { useLocation } from "react-router-dom";
+import { PendingAbsencePopup } from "@/components/absence/PendingAbsencePopup";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -35,6 +36,9 @@ export function MainLayout({ children }: MainLayoutProps) {
           {children}
         </div>
       </main>
+      
+      {/* Popup for pending absence requests - shown to team leaders */}
+      <PendingAbsencePopup />
     </div>
   );
 }
