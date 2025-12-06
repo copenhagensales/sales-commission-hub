@@ -320,11 +320,6 @@ export default function MySchedule() {
           selectedDate={selectedDate}
           defaultType="vacation"
         />
-        
-        {/* Discrete login info */}
-        <p className="mt-6 text-center text-xs text-muted-foreground/60">
-          Logget ind som: {employee.first_name} {employee.last_name}
-        </p>
       </div>
     </MainLayout>
   );
