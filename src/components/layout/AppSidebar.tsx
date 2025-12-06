@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useCanAccess } from "@/hooks/useSystemRoles";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/useAuth";
 
 // Navigation items for teamleder and above
 const teamlederNavigation = [
@@ -65,6 +66,7 @@ export function AppSidebar() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isTeamlederOrAbove, isOwner, isLoading, role } = useCanAccess();
+  const { user } = useAuth();
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
 
@@ -257,11 +259,15 @@ export function AppSidebar() {
             </NavLink>
           )}
         </nav>
-        <div className="border-t border-sidebar-border p-4">
+        <div className="border-t border-sidebar-border p-4 space-y-2">
           <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50">
             <LogOut className="h-5 w-5" />
             Log ud
           </button>
+          <div className="flex items-center gap-2 px-3 py-1 text-xs text-muted-foreground/60">
+            <User className="h-3 w-3" />
+            <span className="truncate">{user?.email}</span>
+          </div>
         </div>
       </div>
     </aside>
