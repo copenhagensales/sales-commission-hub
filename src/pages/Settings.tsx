@@ -1023,47 +1023,80 @@ export default function Settings() {
           </DialogContent>
         </Dialog>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card className="md:col-span-2 border-dashed border-secondary/60 bg-secondary/5">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2">
-                  <Upload className="h-5 w-5" />
-                  Excel-datakilde: TDC annulleringer ("tdc ann")
-                </span>
-                {tdcLastImport && (
-                  <span className="text-xs text-muted-foreground">
-                    Seneste import:{" "}
-                    {new Date(tdcLastImport.uploaded_at).toLocaleString("da-DK", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    })}
-                  </span>
-                )}
-              </CardTitle>
-              <CardDescription>
-                Upload den nyeste Excel-fil <code>tdc ann</code>. Den erstatter den tidligere import og bruges til
-                TDC-annulleringer.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="tdcExcel">Excel-fil (.xlsx)</Label>
-                <Input
-                  id="tdcExcel"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={(e) => setTdcFile(e.target.files?.[0] ?? null)}
-                />
+        {/* Other Data Sources Section */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  Andre datakilder
+                </CardTitle>
+                <CardDescription>
+                  Administrer filbaserede datakilder og manuelle imports
+                </CardDescription>
               </div>
-              <Button onClick={handleTdcUpload} disabled={!tdcFile || tdcUploadLoading} className="w-full">
-                {tdcUploadLoading && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-                Upload & gem som nyeste TDC-ann fil
-              </Button>
-            </CardContent>
-          </Card>
-
-        </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* TDC Annulleringer */}
+            <Card className="bg-muted/30">
+              <CardContent className="p-4">
+                <div 
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => setExpandedId(expandedId === "tdc-ann" ? null : "tdc-ann")}
+                >
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-semibold">TDC annulleringer</h3>
+                    <Badge variant="outline" className="text-xs font-mono">
+                      excel
+                    </Badge>
+                    {tdcLastImport && (
+                      <Badge variant="default" className="text-xs">
+                        Aktiv
+                      </Badge>
+                    )}
+                  </div>
+                  {expandedId === "tdc-ann" ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                </div>
+                
+                {expandedId === "tdc-ann" && (
+                  <div className="mt-4 space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Upload den nyeste Excel-fil <code className="bg-background/50 px-1 rounded">tdc ann</code>. Den erstatter den tidligere import og bruges til TDC-annulleringer i lønkørsel.
+                    </p>
+                    
+                    {tdcLastImport && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>
+                          Seneste import: {new Date(tdcLastImport.uploaded_at).toLocaleString("da-DK", {
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="tdcExcel">Excel-fil (.xlsx)</Label>
+                      <Input
+                        id="tdcExcel"
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={(e) => setTdcFile(e.target.files?.[0] ?? null)}
+                      />
+                    </div>
+                    <Button onClick={handleTdcUpload} disabled={!tdcFile || tdcUploadLoading} className="w-full">
+                      {tdcUploadLoading && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+                      Upload & gem som nyeste TDC-ann fil
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </CardContent>
+        </Card>
 
         {results && (
           <Card>
