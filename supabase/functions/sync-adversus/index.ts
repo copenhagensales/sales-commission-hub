@@ -299,7 +299,7 @@ Deno.serve(async (req) => {
       }
       
       // Add longer delay before fetching lead to avoid rate limits (Adversus has strict rate limiting)
-      await delay(1000)
+      await delay(3000)
       
       try {
         const leadResponse = await fetch(`${baseUrl}/leads/${leadId}`, {
