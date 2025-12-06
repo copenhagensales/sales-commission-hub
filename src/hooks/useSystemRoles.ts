@@ -14,7 +14,7 @@ export interface SystemRoleRecord {
 }
 
 export function useCurrentUserRole() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const previousUserId = useRef<string | undefined>();
 
@@ -31,18 +31,27 @@ export function useCurrentUserRole() {
     queryFn: async () => {
       if (!user) return null;
 
-      const { data, error } = await supabase
-        .from("system_roles")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from("system_roles")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-      if (error) throw error;
-      return data as SystemRoleRecord | null;
+        if (error) {
+          console.error("Error fetching system role:", error);
+          return null;
+        }
+        return data as SystemRoleRecord | null;
+      } catch (error) {
+        console.error("Error in useCurrentUserRole:", error);
+        return null;
+      }
     },
-    enabled: !!user,
+    enabled: !!user && !authLoading,
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
     gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
+    retry: 1,
   });
 }
 
@@ -153,11 +162,11 @@ export function useRemoveRole() {
 
 // Helper to check permissions
 export function useCanAccess() {
-  const { user } = useAuth();
-  const { data: roleData, isPending, isLoading } = useCurrentUserRole();
+  const { user, loading: authLoading } = useAuth();
+  const { data: roleData, isPending, isLoading: queryLoading } = useCurrentUserRole();
 
   // Show loading if no user yet, or if query is still loading
-  const isRoleLoading = !user || isPending || isLoading;
+  const isRoleLoading = authLoading || (!user ? false : (isPending || queryLoading));
 
   // Only trust the role data if we have a user and the data's user_id matches
   const isValidData = roleData && user && roleData.user_id === user.id;

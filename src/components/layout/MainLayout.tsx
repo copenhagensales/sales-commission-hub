@@ -12,12 +12,21 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  const { isLocked: isContractLocked, contract } = usePendingContractLock();
-  const { isLocked: isQuizLocked } = useCarQuizLock();
+  const { isLocked: isContractLocked, contract, isLoading: contractLoading } = usePendingContractLock();
+  const { isLocked: isQuizLocked, isLoading: quizLoading } = useCarQuizLock();
   const location = useLocation();
 
   // Don't show car quiz lock if we're already on the car-quiz page
   const showQuizLock = isQuizLocked && location.pathname !== "/car-quiz";
+
+  // Show loading state while checking locks
+  if (contractLoading || quizLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Indlæser...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
