@@ -240,8 +240,10 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     const authHeader = btoa(`${adversusUsername}:${adversusPassword}`)
     const baseUrl = 'https://api.adversus.io/v1'
+    
+    // Helper to delay between requests to avoid rate limiting
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-    // Cache for lead data to avoid duplicate fetches (module-level for all actions)
     const leadCache = new Map<number, AdversusLead | null>()
     
     // Cache for Adversus sales data by leadId
@@ -1439,9 +1441,6 @@ Deno.serve(async (req) => {
     } else {
       console.warn('Could not fetch campaigns from Adversus:', await campaignsResponse.text())
     }
-
-    // Helper to delay between requests to avoid rate limiting
-    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
     // Step 2: Sync users/agents from Adversus (with retry logic)
     console.log('Fetching users from Adversus...')
