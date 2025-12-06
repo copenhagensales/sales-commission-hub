@@ -13,16 +13,11 @@ import { cn } from "@/lib/utils";
 import VagtMinUge from "@/pages/vagt-flow/MinUge";
 
 export default function MySchedule() {
-  const { data: employee, isLoading: employeeLoading } = useCurrentEmployee();
-  
-  // If employee is Fieldmarketing, show the vagt-flow calendar instead
-  if (!employeeLoading && employee?.job_title === "Fieldmarketing") {
-    return <VagtMinUge />;
-  }
-  
   const [currentDate, setCurrentDate] = useState(new Date());
   const [absenceDialogOpen, setAbsenceDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  
+  const { data: employee, isLoading: employeeLoading } = useCurrentEmployee();
   
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -99,6 +94,11 @@ export default function MySchedule() {
         <div className="p-6">Indlæser...</div>
       </MainLayout>
     );
+  }
+
+  // If employee is Fieldmarketing, show the vagt-flow calendar instead
+  if (employee?.job_title === "Fieldmarketing") {
+    return <VagtMinUge />;
   }
 
   if (!employee) {
