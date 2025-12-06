@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X, History, Phone, Mail, Pencil, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, TrendingUp, AlertTriangle, AlarmClock, FileText, Send } from "lucide-react";
 import { SendContractDialog } from "@/components/contracts/SendContractDialog";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
+import { TeamLeaderTeams } from "@/components/employees/TeamLeaderTeams";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -1121,6 +1122,14 @@ export default function EmployeeDetail() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Team Leader Teams Section - only show for Teamleder or Ejer */}
+              {(employee.job_title === "Teamleder" || employee.job_title === "Ejer" || employee.job_title === "Assisterende Teamleder") && (
+                <TeamLeaderTeams 
+                  employeeId={employee.id} 
+                  employeeName={`${employee.first_name} ${employee.last_name}`} 
+                />
+              )}
             </div>
           </TabsContent>
 
