@@ -34,7 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, Users, Pencil, Trash2, ChevronDown, ChevronRight, UserPlus, X, User, Building2 } from "lucide-react";
+import { Plus, Users, Pencil, Trash2, ChevronDown, ChevronRight, UserPlus, X, User, Building2, GripVertical } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 
@@ -76,7 +76,32 @@ export default function Teams() {
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
   const [addingMemberToTeam, setAddingMemberToTeam] = useState<string | null>(null);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [dragOverTeamId, setDragOverTeamId] = useState<string | null>(null);
 
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, employeeId: string) => {
+    e.dataTransfer.setData("employeeId", employeeId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, teamId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverTeamId(teamId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverTeamId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, teamId: string) => {
+    e.preventDefault();
+    const employeeId = e.dataTransfer.getData("employeeId");
+    setDragOverTeamId(null);
+    if (employeeId) {
+      addMemberMutation.mutate({ employeeId, teamId });
+    }
+  };
   // Fetch teams
   const { data: teams = [], isLoading: loadingTeams } = useQuery({
     queryKey: ["teams"],
@@ -507,7 +532,13 @@ export default function Teams() {
               const teamClientsList = getTeamClients(team.id);
 
               return (
-                <Card key={team.id}>
+                <Card 
+                  key={team.id}
+                  className={`transition-all duration-200 ${dragOverTeamId === team.id ? 'ring-2 ring-primary ring-offset-2 bg-primary/5' : ''}`}
+                  onDragOver={(e) => handleDragOver(e, team.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, team.id)}
+                >
                   <Collapsible open={isExpanded} onOpenChange={() => toggleTeam(team.id)}>
                     <CollapsibleTrigger asChild>
                       <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
@@ -674,23 +705,32 @@ export default function Teams() {
                   <Users className="h-5 w-5" />
                   Medarbejdere uden team ({getUnassignedEmployees().length})
                 </CardTitle>
+                <p className="text-sm text-muted-foreground">Træk en medarbejder til et team ovenfor</p>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
                   {getUnassignedEmployees().map((emp) => (
-                    <Link
+                    <div
                       key={emp.id}
-                      to={`/employees/${emp.id}`}
-                      className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, emp.id)}
+                      className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors cursor-grab active:cursor-grabbing group"
                     >
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">
-                        {emp.first_name} {emp.last_name}
-                      </span>
-                      {emp.job_title && (
-                        <span className="text-xs text-muted-foreground">({emp.job_title})</span>
-                      )}
-                    </Link>
+                      <GripVertical className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground" />
+                      <Link
+                        to={`/employees/${emp.id}`}
+                        className="flex items-center gap-2 flex-1 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">
+                          {emp.first_name} {emp.last_name}
+                        </span>
+                        {emp.job_title && (
+                          <span className="text-xs text-muted-foreground">({emp.job_title})</span>
+                        )}
+                      </Link>
+                    </div>
                   ))}
                 </div>
               </CardContent>
