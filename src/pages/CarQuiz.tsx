@@ -28,7 +28,7 @@ const QUESTIONS = [
     question: "Hvad sker der, hvis du kører vandvidskørsel i en Copenhagen Sales-bil?",
     options: [
       { key: "A", text: "Virksomheden betaler alle omkostninger, inkl. hvis bilen konfiskeres" },
-      { key: "B", text: "Du risikerer, at bilen konfiskeres, og du kan hæfte personligt for bilens værdi" },
+      { key: "B", text: "Bilen kan blive konfiskeret, og du hæfter personligt for bilens værdi" },
       { key: "C", text: "Der sker ikke noget særligt – det er 'kun' en bøde" },
       { key: "D", text: "Kun din førerret påvirkes, ikke noget økonomisk" },
     ],
@@ -220,6 +220,7 @@ export default function CarQuiz() {
             <li>Overholde Færdselsloven</li>
             <li>Være indforstået med vores interne regler</li>
             <li>Forstå, at du selv hæfter for ulovlig kørsel, fartbøder, parkeringsafgifter m.m.</li>
+            <li>Være indforstået med, at hvis bilen konfiskeres pga. vandvidskørsel, hæfter du personligt for bilens værdi</li>
           </ul>
           <p className="font-medium">Du skal svare rigtigt på alle spørgsmål for at bestå. Hvis du ikke består, skal du tage testen igen, indtil alle svar er korrekte.</p>
         </AlertDescription>
