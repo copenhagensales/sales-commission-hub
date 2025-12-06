@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +34,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, Users, Pencil, Trash2, ChevronDown, ChevronRight, UserPlus, X, User } from "lucide-react";
+import { Plus, Users, Pencil, Trash2, ChevronDown, ChevronRight, UserPlus, X, User, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 
@@ -54,12 +55,24 @@ interface Employee {
   is_active: boolean;
 }
 
+interface Client {
+  id: string;
+  name: string;
+}
+
+interface TeamClient {
+  id: string;
+  team_id: string;
+  client_id: string;
+}
+
 export default function Teams() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [formData, setFormData] = useState({ name: "", description: "", team_leader_id: "" });
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
   const [addingMemberToTeam, setAddingMemberToTeam] = useState<string | null>(null);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
@@ -74,6 +87,31 @@ export default function Teams() {
         .order("name");
       if (error) throw error;
       return data as Team[];
+    },
+  });
+
+  // Fetch clients
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data as Client[];
+    },
+  });
+
+  // Fetch team-client associations
+  const { data: teamClients = [] } = useQuery({
+    queryKey: ["team-clients"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_clients")
+        .select("*");
+      if (error) throw error;
+      return data as TeamClient[];
     },
   });
 
@@ -93,27 +131,45 @@ export default function Teams() {
 
   // Create/update team
   const saveMutation = useMutation({
-    mutationFn: async (data: { name: string; description: string; team_leader_id: string; id?: string }) => {
+    mutationFn: async (data: { name: string; description: string; team_leader_id: string; id?: string; clientIds: string[] }) => {
       const payload = {
         name: data.name,
         description: data.description || null,
         team_leader_id: data.team_leader_id || null,
       };
 
+      let teamId: string;
+
       if (data.id) {
         const { error } = await supabase.from("teams").update(payload).eq("id", data.id);
         if (error) throw error;
+        teamId = data.id;
       } else {
-        const { error } = await supabase.from("teams").insert(payload);
+        const { data: newTeam, error } = await supabase.from("teams").insert(payload).select().single();
         if (error) throw error;
+        teamId = newTeam.id;
+      }
+
+      // Update client associations
+      // First, delete existing associations for this team
+      await supabase.from("team_clients").delete().eq("team_id", teamId);
+      
+      // Then insert new ones
+      if (data.clientIds.length > 0) {
+        const { error: clientError } = await supabase.from("team_clients").insert(
+          data.clientIds.map(clientId => ({ team_id: teamId, client_id: clientId }))
+        );
+        if (clientError) throw clientError;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["teams"] });
+      queryClient.invalidateQueries({ queryKey: ["team-clients"] });
       toast({ title: editingTeam ? "Team opdateret" : "Team oprettet" });
       setDialogOpen(false);
       setEditingTeam(null);
       setFormData({ name: "", description: "", team_leader_id: "" });
+      setSelectedClientIds([]);
     },
     onError: (error) => {
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
@@ -130,6 +186,7 @@ export default function Teams() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["teams"] });
       queryClient.invalidateQueries({ queryKey: ["employees-for-teams"] });
+      queryClient.invalidateQueries({ queryKey: ["team-clients"] });
       toast({ title: "Team slettet" });
     },
     onError: (error) => {
@@ -182,6 +239,11 @@ export default function Teams() {
       description: team.description || "",
       team_leader_id: team.team_leader_id || "",
     });
+    // Load existing client associations
+    const existingClientIds = teamClients
+      .filter(tc => tc.team_id === team.id)
+      .map(tc => tc.client_id);
+    setSelectedClientIds(existingClientIds);
     setDialogOpen(true);
   };
 
@@ -190,7 +252,11 @@ export default function Teams() {
       toast({ title: "Angiv et teamnavn", variant: "destructive" });
       return;
     }
-    saveMutation.mutate(editingTeam ? { ...formData, id: editingTeam.id } : formData);
+    saveMutation.mutate(
+      editingTeam 
+        ? { ...formData, id: editingTeam.id, clientIds: selectedClientIds } 
+        : { ...formData, clientIds: selectedClientIds }
+    );
   };
 
   const toggleTeam = (teamId: string) => {
@@ -203,6 +269,14 @@ export default function Teams() {
     setExpandedTeams(newExpanded);
   };
 
+  const toggleClientSelection = (clientId: string) => {
+    setSelectedClientIds(prev => 
+      prev.includes(clientId)
+        ? prev.filter(id => id !== clientId)
+        : [...prev, clientId]
+    );
+  };
+
   const getTeamLeader = (leaderId: string | null) => {
     if (!leaderId) return null;
     return employees.find((e) => e.id === leaderId);
@@ -212,8 +286,18 @@ export default function Teams() {
     return employees.filter((e) => e.team_id === teamId);
   };
 
+  const getTeamClients = (teamId: string) => {
+    const clientIds = teamClients.filter(tc => tc.team_id === teamId).map(tc => tc.client_id);
+    return clients.filter(c => clientIds.includes(c.id));
+  };
+
   const getUnassignedEmployees = () => {
     return employees.filter((e) => !e.team_id);
+  };
+
+  const getUnassignedClients = () => {
+    const assignedClientIds = new Set(teamClients.map(tc => tc.client_id));
+    return clients.filter(c => !assignedClientIds.has(c.id));
   };
 
   const teamLeaderCandidates = employees.filter(
@@ -236,7 +320,7 @@ export default function Teams() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Teams</h1>
-            <p className="text-muted-foreground">Organisér medarbejdere i teams</p>
+            <p className="text-muted-foreground">Organisér medarbejdere i teams med kunde-tilknytning</p>
           </div>
           <Dialog
             open={dialogOpen}
@@ -245,6 +329,7 @@ export default function Teams() {
               if (!open) {
                 setEditingTeam(null);
                 setFormData({ name: "", description: "", team_leader_id: "" });
+                setSelectedClientIds([]);
               }
             }}
           >
@@ -253,7 +338,7 @@ export default function Teams() {
                 <Plus className="mr-2 h-4 w-4" /> Opret team
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>{editingTeam ? "Rediger team" : "Opret nyt team"}</DialogTitle>
               </DialogHeader>
@@ -263,7 +348,7 @@ export default function Teams() {
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="F.eks. Team Yousee"
+                    placeholder="F.eks. Team TDC Erhverv"
                   />
                 </div>
                 <div className="space-y-2">
@@ -293,6 +378,37 @@ export default function Teams() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Kunder tilknyttet dette team
+                  </Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Vælg hvilke kunder dette team arbejder med. Små kunder kan samles under ét team.
+                  </p>
+                  <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+                    {clients.map((client) => (
+                      <div key={client.id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`client-${client.id}`}
+                          checked={selectedClientIds.includes(client.id)}
+                          onCheckedChange={() => toggleClientSelection(client.id)}
+                        />
+                        <label
+                          htmlFor={`client-${client.id}`}
+                          className="text-sm cursor-pointer flex-1"
+                        >
+                          {client.name}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedClientIds.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedClientIds.length} kunde{selectedClientIds.length !== 1 ? 'r' : ''} valgt
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
@@ -307,7 +423,7 @@ export default function Teams() {
         </div>
 
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
@@ -315,6 +431,17 @@ export default function Teams() {
                 <div>
                   <p className="text-2xl font-bold">{teams.length}</p>
                   <p className="text-sm text-muted-foreground">Teams</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <Building2 className="h-8 w-8 text-blue-500" />
+                <div>
+                  <p className="text-2xl font-bold">{clients.length - getUnassignedClients().length}</p>
+                  <p className="text-sm text-muted-foreground">Tildelte kunder</p>
                 </div>
               </div>
             </CardContent>
@@ -343,6 +470,25 @@ export default function Teams() {
           </Card>
         </div>
 
+        {/* Unassigned clients alert */}
+        {getUnassignedClients().length > 0 && (
+          <Card className="border-amber-500/50 bg-amber-500/5">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <Building2 className="h-5 w-5 text-amber-500 mt-0.5" />
+                <div>
+                  <p className="font-medium text-amber-700 dark:text-amber-400">
+                    {getUnassignedClients().length} kunde{getUnassignedClients().length !== 1 ? 'r' : ''} uden team
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {getUnassignedClients().map(c => c.name).join(", ")}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Teams List */}
         <div className="space-y-4">
           {teams.length === 0 ? (
@@ -358,6 +504,7 @@ export default function Teams() {
               const isExpanded = expandedTeams.has(team.id);
               const members = getTeamMembers(team.id);
               const leader = getTeamLeader(team.team_leader_id);
+              const teamClientsList = getTeamClients(team.id);
 
               return (
                 <Card key={team.id}>
@@ -375,6 +522,16 @@ export default function Teams() {
                               <CardTitle className="text-lg">{team.name}</CardTitle>
                               {team.description && (
                                 <p className="text-sm text-muted-foreground">{team.description}</p>
+                              )}
+                              {teamClientsList.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {teamClientsList.map(client => (
+                                    <Badge key={client.id} variant="outline" className="text-xs">
+                                      <Building2 className="h-3 w-3 mr-1" />
+                                      {client.name}
+                                    </Badge>
+                                  ))}
+                                </div>
                               )}
                             </div>
                           </div>
