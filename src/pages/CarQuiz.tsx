@@ -5,8 +5,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useCarQuizCompletion, useCompleteCarQuiz } from "@/hooks/useCarQuiz";
-import { CheckCircle, XCircle, Car, AlertTriangle, Shield, ChevronRight } from "lucide-react";
+import { useCarQuizCompletion, useSubmitCarQuiz } from "@/hooks/useCarQuiz";
+import { CheckCircle, XCircle, Car, AlertTriangle, Shield, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { format, addMonths } from "date-fns";
 import { da } from "date-fns/locale";
@@ -117,7 +117,7 @@ const SUMMARY_POINTS = [
 
 export default function CarQuiz() {
   const { data: completion, isLoading } = useCarQuizCompletion();
-  const completeQuiz = useCompleteCarQuiz();
+  const submitQuiz = useSubmitCarQuiz();
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [gpsAccepted, setGpsAccepted] = useState(false);
   const [summaryAccepted, setSummaryAccepted] = useState(false);
@@ -131,16 +131,22 @@ export default function CarQuiz() {
     setPassed(isValid);
     setShowResults(true);
 
-    if (isValid) {
-      completeQuiz.mutate(undefined, {
-        onSuccess: () => {
-          toast.success("Tillykke! Du har bestået bil-quizzen.");
+    // Submit quiz with all answers and acceptance states
+    submitQuiz.mutate(
+      { answers, gpsAccepted, summaryAccepted },
+      {
+        onSuccess: (result) => {
+          if (result.passed) {
+            toast.success("Tillykke! Du har bestået bil-quizzen. Resultatet er sendt til din email.");
+          } else {
+            toast.info("Dit svar er registreret. Resultatet er sendt til din email.");
+          }
         },
         onError: () => {
           toast.error("Der opstod en fejl. Prøv igen.");
         },
-      });
-    }
+      }
+    );
   };
 
   const handleRetry = () => {
@@ -544,11 +550,20 @@ export default function CarQuiz() {
           <Button 
             size="lg" 
             onClick={handleSubmit}
-            disabled={!allAnswered || completeQuiz.isPending}
+            disabled={!allAnswered || submitQuiz.isPending}
             className="w-full max-w-md shadow-lg gap-2"
           >
-            {completeQuiz.isPending ? "Indsender..." : "Indsend svar"}
-            {!completeQuiz.isPending && <ChevronRight className="h-4 w-4" />}
+            {submitQuiz.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Indsender...
+              </>
+            ) : (
+              <>
+                Indsend svar
+                <ChevronRight className="h-4 w-4" />
+              </>
+            )}
           </Button>
         </div>
       </div>

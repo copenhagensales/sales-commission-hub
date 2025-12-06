@@ -410,6 +410,53 @@ export type Database = {
           },
         ]
       }
+      car_quiz_submissions: {
+        Row: {
+          answers: Json
+          created_at: string
+          employee_id: string
+          gps_accepted: boolean
+          id: string
+          ip_address: string | null
+          passed: boolean
+          submitted_at: string
+          summary_accepted: boolean
+          user_agent: string | null
+        }
+        Insert: {
+          answers: Json
+          created_at?: string
+          employee_id: string
+          gps_accepted?: boolean
+          id?: string
+          ip_address?: string | null
+          passed?: boolean
+          submitted_at?: string
+          summary_accepted?: boolean
+          user_agent?: string | null
+        }
+        Update: {
+          answers?: Json
+          created_at?: string
+          employee_id?: string
+          gps_accepted?: boolean
+          id?: string
+          ip_address?: string | null
+          passed?: boolean
+          submitted_at?: string
+          summary_accepted?: boolean
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "car_quiz_submissions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       career_wishes: {
         Row: {
           created_at: string

@@ -41,3 +41,12 @@ verify_jwt = false
 
 [functions.send-contract-signed-confirmation]
 verify_jwt = true
+
+[functions.send-car-quiz-result]
+verify_jwt = true
+
+[functions.activate-pulse-survey]
+verify_jwt = false
+
+[functions.send-career-wish-notification]
+verify_jwt = true
