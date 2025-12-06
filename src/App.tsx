@@ -24,9 +24,7 @@ const KmTest = lazyWithRetry(() => import("./pages/KmTest"));
 const Codan = lazyWithRetry(() => import("./pages/Codan"));
 const TdcErhverv = lazyWithRetry(() => import("./pages/TdcErhverv"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
-// AdversusData imported directly to bypass Vite cache issue
-import AdversusDataPage from "./pages/AdversusData";
-const AdversusData = () => <AdversusDataPage />;
+const AdversusData = lazy(() => import("./pages/AdversusData"));
 const Logikker = lazyWithRetry(() => import("./pages/Logikker"));
 const EmployeeMasterData = lazyWithRetry(() => import("./pages/EmployeeMasterData"));
 const EmployeeDetail = lazyWithRetry(() => import("./pages/EmployeeDetail"));
