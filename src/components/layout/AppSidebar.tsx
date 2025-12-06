@@ -70,20 +70,19 @@ export function AppSidebar() {
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
 
-  // Fetch pending contracts count
-  const { data: pendingContractsCount = 0 } = useQuery({
-    queryKey: ["pending-contracts-count"],
+  // Fetch employee name and pending contracts count
+  const { data: employeeData } = useQuery({
+    queryKey: ["sidebar-employee-data", user?.email],
     queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return 0;
+      if (!user?.email) return { name: null, pendingContracts: 0 };
 
       const { data: employee } = await supabase
         .from("employee_master_data")
-        .select("id")
-        .eq("private_email", userData.user.email)
+        .select("id, first_name, last_name")
+        .eq("private_email", user.email)
         .maybeSingle();
 
-      if (!employee) return 0;
+      if (!employee) return { name: null, pendingContracts: 0 };
 
       const { count } = await supabase
         .from("contracts")
@@ -91,10 +90,17 @@ export function AppSidebar() {
         .eq("employee_id", employee.id)
         .eq("status", "pending_employee");
 
-      return count || 0;
+      return {
+        name: `${employee.first_name} ${employee.last_name}`,
+        pendingContracts: count || 0
+      };
     },
+    enabled: !!user?.email,
     staleTime: 30000,
   });
+
+  const pendingContractsCount = employeeData?.pendingContracts ?? 0;
+  const employeeName = employeeData?.name;
 
   const handleLogout = async () => {
     // Clear all query cache first
@@ -266,7 +272,7 @@ export function AppSidebar() {
           </button>
           <div className="flex items-center gap-2 px-3 py-1 text-xs text-sidebar-foreground/70">
             <User className="h-3 w-3" />
-            <span className="truncate">{user?.email}</span>
+            <span className="truncate">{employeeName || user?.email}</span>
           </div>
         </div>
       </div>
