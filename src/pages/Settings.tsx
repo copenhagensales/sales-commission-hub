@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 
 interface ApiIntegration {
   id: string;
@@ -297,19 +298,45 @@ export default function Settings() {
   };
 
   const handleSaveEdit = async (id: string) => {
+    const integration = integrations.find(i => i.id === id);
+    const frequencyMinutes = editForm.sync_frequency_minutes === "null" ? null : parseInt(editForm.sync_frequency_minutes);
+    
     const { error } = await supabase.from("api_integrations").update({
       name: editForm.name,
-      sync_frequency_minutes: editForm.sync_frequency_minutes === "null" ? null : parseInt(editForm.sync_frequency_minutes),
+      sync_frequency_minutes: frequencyMinutes,
     }).eq("id", id);
 
     if (error) {
       console.error("Error updating integration:", error);
       toast.error("Kunne ikke opdatere integration");
-    } else {
-      toast.success("Integration opdateret");
-      setEditingId(null);
-      fetchIntegrations();
+      return;
     }
+
+    // Update the cron job schedule
+    if (integration) {
+      try {
+        const { error: cronError } = await supabase.functions.invoke("update-cron-schedule", {
+          body: {
+            integration_type: integration.type,
+            frequency_minutes: frequencyMinutes,
+            is_active: integration.is_active,
+          },
+        });
+        
+        if (cronError) {
+          console.error("Error updating cron schedule:", cronError);
+          toast.warning("Integration opdateret, men cron-job kunne ikke opdateres");
+        } else {
+          toast.success("Integration og automatisk synkronisering opdateret");
+        }
+      } catch (cronErr) {
+        console.error("Error calling cron update:", cronErr);
+        toast.warning("Integration opdateret, men cron-job kunne ikke opdateres");
+      }
+    }
+
+    setEditingId(null);
+    fetchIntegrations();
   };
 
   const handleDeleteIntegration = async (id: string) => {
@@ -345,6 +372,46 @@ export default function Settings() {
       ));
       toast.success("Datakilde opdateret");
     }
+  };
+
+  const handleToggleIntegrationActive = async (integration: ApiIntegration) => {
+    const newActiveState = !integration.is_active;
+    
+    const { error } = await supabase
+      .from("api_integrations")
+      .update({ is_active: newActiveState })
+      .eq("id", integration.id);
+
+    if (error) {
+      console.error("Error toggling integration:", error);
+      toast.error("Kunne ikke opdatere integration");
+      return;
+    }
+
+    // Update cron job based on new active state
+    try {
+      const { error: cronError } = await supabase.functions.invoke("update-cron-schedule", {
+        body: {
+          integration_type: integration.type,
+          frequency_minutes: integration.sync_frequency_minutes,
+          is_active: newActiveState,
+        },
+      });
+      
+      if (cronError) {
+        console.error("Error updating cron schedule:", cronError);
+        toast.warning("Status opdateret, men cron-job kunne ikke opdateres");
+      } else {
+        toast.success(newActiveState ? "Integration og automatisk synkronisering aktiveret" : "Integration og automatisk synkronisering deaktiveret");
+      }
+    } catch (cronErr) {
+      console.error("Error calling cron update:", cronErr);
+      toast.warning("Status opdateret, men cron-job kunne ikke opdateres");
+    }
+
+    setIntegrations(prev => prev.map(i => 
+      i.id === integration.id ? { ...i, is_active: newActiveState } : i
+    ));
   };
 
   const formatFrequency = (minutes: number | null) => {
@@ -587,7 +654,15 @@ export default function Settings() {
                           onClick={() => setExpandedId(expandedId === integration.id ? null : integration.id)}
                         >
                           <div className="flex items-center gap-3">
+                            <Switch
+                              checked={integration.is_active}
+                              onCheckedChange={() => handleToggleIntegrationActive(integration)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
                             <h3 className="font-semibold">{integration.name}</h3>
+                            <Badge variant={integration.is_active ? "default" : "secondary"} className="text-xs">
+                              {integration.is_active ? "Aktiv" : "Inaktiv"}
+                            </Badge>
                             <Badge variant="outline" className="text-xs font-mono">
                               {integration.type}
                             </Badge>
