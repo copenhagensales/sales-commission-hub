@@ -25,7 +25,7 @@ interface AdversusStats {
 export default function AdversusData() {
   useEffect(() => {
     document.title = "Datakilder info | CPH Sales";
-  }, []);
+  }, []); // Force rebuild
 
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<AdversusStats>({
     queryKey: ["adversus-stats"],
