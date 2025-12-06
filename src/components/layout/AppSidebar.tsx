@@ -22,15 +22,19 @@ const ownerNavigation = [
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
   { name: "Salg", href: "/sales", icon: ShoppingCart },
-  { name: "Codan", href: "/codan", icon: Shield },
-  { name: "TDC Erhverv", href: "/tdc-erhverv", icon: Building2 },
   { name: "Provision og CPO", href: "/commission-cpo", icon: Percent },
-  { name: "Lønkørsel", href: "/payroll", icon: Wallet },
-  { name: "Datakilder info", href: "/adversus-data", icon: Database },
   { name: "Logikker", href: "/logikker", icon: ListChecks },
-  { name: "MG test", href: "/mg-test", icon: Percent },
   { name: "Bil-quiz overblik", href: "/car-quiz-admin", icon: Car },
   { name: "Code of Conduct overblik", href: "/code-of-conduct-admin", icon: Shield },
+];
+
+// MG submenu navigation
+const mgNavigation = [
+  { name: "Lønkørsel", href: "/payroll", icon: Wallet },
+  { name: "TDC Erhverv", href: "/tdc-erhverv", icon: Building2 },
+  { name: "Codan", href: "/codan", icon: Shield },
+  { name: "MG test", href: "/mg-test", icon: Percent },
+  { name: "Datakilder info", href: "/adversus-data", icon: Database },
 ];
 
 // Navigation items for teamleder (limited team-related access)
@@ -106,6 +110,9 @@ export function AppSidebar() {
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
+  const [mgOpen, setMgOpen] = useState(
+    ["/payroll", "/tdc-erhverv", "/codan", "/mg-test", "/adversus-data"].includes(location.pathname)
+  );
   const [timeTrackingOpen, setTimeTrackingOpen] = useState(
     location.pathname === "/shift-planning/time-tracking" || 
     location.pathname === "/extra-work" || 
@@ -367,6 +374,40 @@ export function AppSidebar() {
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
                 {vagtFlowNavigation.map((item) => {
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                        isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.name}
+                    </NavLink>
+                  );
+                })}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* MG menu - only for owners */}
+          {isOwner && (
+            <Collapsible open={mgOpen} onOpenChange={setMgOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                ["/payroll", "/tdc-erhverv", "/codan", "/mg-test", "/adversus-data"].includes(location.pathname) ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <Percent className="h-5 w-5" />
+                  MG
+                </div>
+                {mgOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {mgNavigation.map((item) => {
                   const isActive = location.pathname === item.href;
                   return (
                     <NavLink
