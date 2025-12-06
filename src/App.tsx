@@ -47,6 +47,7 @@ import PulseSurvey from "./pages/PulseSurvey";
 import PulseSurveyResults from "./pages/PulseSurveyResults";
 import Admin from "./pages/Admin";
 import MyProfile from "./pages/MyProfile";
+import CareerWishes from "./pages/CareerWishes";
 
 const queryClient = new QueryClient();
 
@@ -83,6 +84,7 @@ const App = () => (
           <Route path="/my-profile" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
           <Route path="/my-contracts" element={<ProtectedRoute><MyContracts /></ProtectedRoute>} />
           <Route path="/pulse-survey" element={<ProtectedRoute><PulseSurvey /></ProtectedRoute>} />
+          <Route path="/career-wishes" element={<ProtectedRoute><CareerWishes /></ProtectedRoute>} />
           <Route path="/contract/:id" element={<ContractSign />} />
           {/* Teamleder+ routes */}
           <Route path="/dashboard" element={<RoleProtectedRoute requireTeamlederOrAbove><Dashboard /></RoleProtectedRoute>} />

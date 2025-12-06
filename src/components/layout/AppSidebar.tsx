@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +41,7 @@ const employeeNavigation = [
   { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
   { name: "Min profil", href: "/my-profile", icon: Users },
   { name: "Min kontrakt", href: "/my-contracts", icon: FileText },
+  { name: "Teamønsker & karriere", href: "/career-wishes", icon: Sparkles },
   { name: "Pulsmåling", href: "/pulse-survey", icon: HeartHandshake },
 ];
 
