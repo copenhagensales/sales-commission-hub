@@ -117,10 +117,8 @@ export default function MySchedule() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Min vagtplan</h1>
-            <p className="text-muted-foreground">
-              {employee.first_name} {employee.last_name}
-            </p>
+            <h1 className="text-3xl font-bold">Min kalender</h1>
+            <p className="text-muted-foreground">Se dine vagter og anmod om ferie</p>
           </div>
           <Button 
             size="lg"
