@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -9,11 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Shield, Users, Crown, User, Search, Trash2, Eye, EyeOff, Check, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Shield, Users, Crown, User, Search, Trash2, Eye, EyeOff, Check, X, ChevronDown, ChevronUp, Save, RotateCcw } from "lucide-react";
 import { useCanAccess, SystemRole } from "@/hooks/useSystemRoles";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,8 +75,8 @@ const menuItems = [
   { id: "settings", name: "Indstillinger", icon: "Settings", category: "System" },
 ];
 
-// Role permissions matrix
-const rolePermissions: Record<SystemRole, { 
+// Default role permissions matrix (used as fallback if no DB config)
+const defaultRolePermissions: Record<SystemRole, { 
   menuItems: string[], 
   description: string,
   dataScope: string,
@@ -129,8 +130,90 @@ export default function Admin() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<EmployeeRole | null>(null);
   const [expandedRoles, setExpandedRoles] = useState<SystemRole[]>(["ejer", "teamleder", "rekruttering", "medarbejder"]);
+  const [editedPermissions, setEditedPermissions] = useState<Record<SystemRole, string[]>>({
+    medarbejder: [...defaultRolePermissions.medarbejder.menuItems],
+    rekruttering: [...defaultRolePermissions.rekruttering.menuItems],
+    teamleder: [...defaultRolePermissions.teamleder.menuItems],
+    ejer: [...defaultRolePermissions.ejer.menuItems],
+  });
+  const [hasChanges, setHasChanges] = useState(false);
   const queryClient = useQueryClient();
   const { isOwner, isLoading: accessLoading } = useCanAccess();
+
+  // Toggle menu access for a role
+  const toggleMenuAccess = (role: SystemRole, menuId: string) => {
+    // Ejer always has access to everything
+    if (role === "ejer") return;
+    
+    setEditedPermissions(prev => {
+      const current = prev[role] || [];
+      const updated = current.includes(menuId)
+        ? current.filter(id => id !== menuId)
+        : [...current, menuId];
+      return { ...prev, [role]: updated };
+    });
+    setHasChanges(true);
+  };
+
+  // Reset to defaults
+  const resetPermissions = () => {
+    setEditedPermissions({
+      medarbejder: [...defaultRolePermissions.medarbejder.menuItems],
+      rekruttering: [...defaultRolePermissions.rekruttering.menuItems],
+      teamleder: [...defaultRolePermissions.teamleder.menuItems],
+      ejer: [...defaultRolePermissions.ejer.menuItems],
+    });
+    setHasChanges(false);
+    toast.info("Rettigheder nulstillet til standard");
+  };
+
+  // Save permissions (for now just local - can be extended to save to DB)
+  const savePermissions = () => {
+    // Store in localStorage for persistence
+    localStorage.setItem("admin_role_permissions", JSON.stringify(editedPermissions));
+    setHasChanges(false);
+    toast.success("Rettigheder gemt");
+  };
+
+  // Load saved permissions on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("admin_role_permissions");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setEditedPermissions(prev => ({ ...prev, ...parsed }));
+      } catch (e) {
+        console.error("Failed to parse saved permissions", e);
+      }
+    }
+  }, []);
+
+  // Create working rolePermissions based on edited state
+  const rolePermissions: Record<SystemRole, { 
+    menuItems: string[], 
+    description: string,
+    dataScope: string,
+    canManageTeam: boolean,
+    canManageAllData: boolean,
+    canManageRoles: boolean,
+  }> = {
+    medarbejder: {
+      ...defaultRolePermissions.medarbejder,
+      menuItems: editedPermissions.medarbejder,
+    },
+    rekruttering: {
+      ...defaultRolePermissions.rekruttering,
+      menuItems: editedPermissions.rekruttering,
+    },
+    teamleder: {
+      ...defaultRolePermissions.teamleder,
+      menuItems: editedPermissions.teamleder,
+    },
+    ejer: {
+      ...defaultRolePermissions.ejer,
+      menuItems: editedPermissions.ejer,
+    },
+  };
 
   // Fetch users with their roles using the secure RPC function
   const { data: users, isLoading, error } = useQuery({
@@ -490,20 +573,43 @@ export default function Admin() {
 
           {/* PERMISSIONS TAB */}
           <TabsContent value="permissions" className="space-y-6">
-            <Alert>
-              <Shield className="h-4 w-4" />
-              <AlertTitle>Rollebaseret adgangskontrol</AlertTitle>
-              <AlertDescription>
-                Rettigheder er defineret per rolle. Brugere arver automatisk rettigheder baseret på deres tildelte rolle.
-              </AlertDescription>
-            </Alert>
+            <div className="flex items-center justify-between">
+              <Alert className="flex-1">
+                <Shield className="h-4 w-4" />
+                <AlertTitle>Rollebaseret adgangskontrol</AlertTitle>
+                <AlertDescription>
+                  Klik på switchene for at tildele eller fjerne adgang til menupunkter. Ejer har altid fuld adgang.
+                </AlertDescription>
+              </Alert>
+              <div className="flex items-center gap-2 ml-4">
+                {hasChanges && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={resetPermissions}>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Nulstil
+                    </Button>
+                    <Button size="sm" onClick={savePermissions}>
+                      <Save className="h-4 w-4 mr-2" />
+                      Gem ændringer
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
 
             {/* Permissions matrix */}
             <Card>
               <CardHeader>
-                <CardTitle>Rettigheder per rolle</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Rettigheder per rolle</span>
+                  {hasChanges && (
+                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
+                      Ikke gemt
+                    </Badge>
+                  )}
+                </CardTitle>
                 <CardDescription>
-                  Oversigt over hvilke menupunkter og funktioner hver rolle har adgang til
+                  Klik på en switch for at ændre adgang. Ejer kan ikke redigeres.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -547,25 +653,21 @@ export default function Admin() {
                             </TableCell>
                           </TableRow>
                           {items.map((item) => (
-                            <TableRow key={item.id}>
-                              <TableCell>{item.name}</TableCell>
+                            <TableRow key={item.id} className="hover:bg-muted/30">
+                              <TableCell className="font-medium">{item.name}</TableCell>
                               {(["medarbejder", "rekruttering", "teamleder", "ejer"] as SystemRole[]).map((role) => {
-                                const hasAccess = rolePermissions[role].menuItems.includes(item.id);
+                                const hasAccess = editedPermissions[role]?.includes(item.id) || false;
+                                const isDisabled = role === "ejer"; // Ejer always has access
                                 return (
                                   <TableCell key={role} className="text-center">
-                                    {hasAccess ? (
-                                      <div className="flex justify-center">
-                                        <div className="p-1 rounded-full bg-green-500/10">
-                                          <Check className="h-4 w-4 text-green-500" />
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="flex justify-center">
-                                        <div className="p-1 rounded-full bg-muted">
-                                          <X className="h-4 w-4 text-muted-foreground" />
-                                        </div>
-                                      </div>
-                                    )}
+                                    <div className="flex justify-center">
+                                      <Switch
+                                        checked={hasAccess}
+                                        disabled={isDisabled}
+                                        onCheckedChange={() => toggleMenuAccess(role, item.id)}
+                                        className={isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                                      />
+                                    </div>
                                   </TableCell>
                                 );
                               })}
