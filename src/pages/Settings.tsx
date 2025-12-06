@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, RefreshCw, Send, Database, Download, Upload, Key, CheckCircle2, Plus, Pencil, Trash2, Clock, Save, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Settings as SettingsIcon, RefreshCw, Send, Database, Download, Upload, Key, CheckCircle2, Plus, Pencil, Trash2, Clock, Save, X, ChevronDown, ChevronUp, History, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -108,6 +108,10 @@ export default function Settings() {
   const [newWebhook, setNewWebhook] = useState({ name: "", type: "", endpoint_path: "", description: "" });
   const [expandedWebhookId, setExpandedWebhookId] = useState<string | null>(null);
 
+  // Webhook events state
+  const [webhookEvents, setWebhookEvents] = useState<Record<string, any[]>>({});
+  const [loadingWebhookEvents, setLoadingWebhookEvents] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
   useEffect(() => {
     fetchIntegrations();
     fetchWebhooks();
@@ -224,6 +228,39 @@ export default function Settings() {
         w.id === id ? { ...w, is_active: !currentState } : w
       ));
       toast.success(!currentState ? "Webhook aktiveret" : "Webhook deaktiveret");
+    }
+  };
+
+  const fetchWebhookEvents = async (webhookType: string) => {
+    setLoadingWebhookEvents(webhookType);
+    try {
+      if (webhookType === 'adversus') {
+        const { data, error } = await supabase
+          .from("adversus_events")
+          .select("*")
+          .order("received_at", { ascending: false })
+          .limit(25);
+        
+        if (error) throw error;
+        setWebhookEvents(prev => ({ ...prev, [webhookType]: data || [] }));
+      } else if (webhookType === 'economic') {
+        const { data, error } = await supabase
+          .from("economic_events")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(25);
+        
+        if (error) throw error;
+        setWebhookEvents(prev => ({ ...prev, [webhookType]: data || [] }));
+      } else {
+        setWebhookEvents(prev => ({ ...prev, [webhookType]: [] }));
+      }
+      toast.success("Webhook-data hentet");
+    } catch (error: any) {
+      console.error("Error fetching webhook events:", error);
+      toast.error("Kunne ikke hente webhook-data");
+    } finally {
+      setLoadingWebhookEvents(null);
     }
   };
 
@@ -889,6 +926,19 @@ export default function Settings() {
                               <Button 
                                 size="sm" 
                                 variant="outline"
+                                className="gap-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  fetchWebhookEvents(webhook.type);
+                                }}
+                                disabled={loadingWebhookEvents === webhook.type}
+                              >
+                                <History className={`h-4 w-4 ${loadingWebhookEvents === webhook.type ? "animate-spin" : ""}`} />
+                                Hent historik
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleToggleWebhookActive(webhook.id, webhook.is_active);
@@ -918,6 +968,47 @@ export default function Settings() {
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
+
+                            {/* Webhook Events History */}
+                            {webhookEvents[webhook.type] && webhookEvents[webhook.type].length > 0 && (
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Seneste modtagne data ({webhookEvents[webhook.type].length})</Label>
+                                <div className="max-h-64 overflow-y-auto space-y-2">
+                                  {webhookEvents[webhook.type].map((event: any) => (
+                                    <div
+                                      key={event.id}
+                                      className="flex items-center justify-between p-3 rounded-lg bg-background/50 border text-sm cursor-pointer hover:bg-background/70"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedEvent(event);
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <Badge variant="outline" className="text-xs">
+                                          {event.event_type || 'event'}
+                                        </Badge>
+                                        <span className="text-muted-foreground">
+                                          ID: {event.external_id || event.id.slice(0, 8)}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {new Date(event.received_at || event.created_at).toLocaleString("da-DK")}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant={event.processed ? "default" : "secondary"} className="text-xs">
+                                          {event.processed ? "Behandlet" : "Afventer"}
+                                        </Badge>
+                                        <Eye className="h-4 w-4 text-muted-foreground" />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {webhookEvents[webhook.type] && webhookEvents[webhook.type].length === 0 && (
+                              <p className="text-sm text-muted-foreground">Ingen webhook-data fundet for denne type.</p>
+                            )}
                           </div>
                         )}
                       </>
@@ -929,6 +1020,37 @@ export default function Settings() {
           </CardContent>
         </Card>
 
+        {/* Event Detail Dialog */}
+        <Dialog open={!!selectedEvent} onOpenChange={() => setSelectedEvent(null)}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Webhook Event Detaljer
+              </DialogTitle>
+              <DialogDescription>
+                {selectedEvent && (
+                  <span>
+                    ID: {selectedEvent.external_id || selectedEvent.id} • 
+                    Modtaget: {new Date(selectedEvent.received_at || selectedEvent.created_at).toLocaleString("da-DK")}
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto">
+              {selectedEvent && (
+                <pre className="bg-muted/50 p-4 rounded-lg text-xs overflow-auto max-h-[50vh]">
+                  {JSON.stringify(selectedEvent.payload, null, 2)}
+                </pre>
+              )}
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline">Luk</Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className="grid gap-6 md:grid-cols-2">
           <Card className="border-green-500/50 bg-green-500/5">
