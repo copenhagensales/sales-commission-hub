@@ -49,6 +49,9 @@ interface EmployeeMasterDataRecord {
   has_parking: boolean;
   parking_spot_id: string | null;
   parking_monthly_cost: number | null;
+  referral_bonus: number | null;
+  salary_deduction: number | null;
+  salary_deduction_note: string | null;
   working_hours_model: string | null;
   weekly_hours: number | null;
   standard_start_time: string | null;
@@ -1092,30 +1095,53 @@ export default function EmployeeDetail() {
                         </div>
                       )}
                       <div className="pt-3">
-                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Parkering</h4>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Har parkering</span>
-                          <Switch checked={employee.has_parking} onCheckedChange={(checked) => handleSave("has_parking", checked)} />
-                        </div>
-                        {employee.has_parking && (
-                          <div className="mt-3 space-y-2">
+                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Løntillæg & fradrag</h4>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Parkering (månedlig)</label>
+                            <EditableField 
+                              label="" 
+                              value={employee.parking_monthly_cost} 
+                              field="parking_monthly_cost" 
+                              type="number" 
+                              onSave={handleSave}
+                              displayValue={employee.parking_monthly_cost ? `${employee.parking_monthly_cost} DKK/md` : null}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Henvisningsbonus (éngangs)</label>
+                            <EditableField 
+                              label="" 
+                              value={employee.referral_bonus} 
+                              field="referral_bonus" 
+                              type="number" 
+                              onSave={handleSave}
+                              displayValue={employee.referral_bonus ? `${employee.referral_bonus} DKK` : null}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Regulering (månedlig)</label>
+                            <EditableField 
+                              label="" 
+                              value={employee.salary_deduction} 
+                              field="salary_deduction" 
+                              type="number" 
+                              onSave={handleSave}
+                              displayValue={employee.salary_deduction ? `${employee.salary_deduction} DKK/md` : null}
+                            />
+                          </div>
+                          {employee.salary_deduction && (
                             <div>
-                              <label className="text-xs text-muted-foreground">P-plads ID</label>
-                              <EditableField label="" value={employee.parking_spot_id} field="parking_spot_id" onSave={handleSave} />
-                            </div>
-                            <div>
-                              <label className="text-xs text-muted-foreground">Månedlig udgift</label>
+                              <label className="text-xs text-muted-foreground">Note til regulering</label>
                               <EditableField 
                                 label="" 
-                                value={employee.parking_monthly_cost} 
-                                field="parking_monthly_cost" 
-                                type="number" 
+                                value={employee.salary_deduction_note} 
+                                field="salary_deduction_note" 
                                 onSave={handleSave}
-                                displayValue={employee.parking_monthly_cost ? `${employee.parking_monthly_cost} DKK` : null}
                               />
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
