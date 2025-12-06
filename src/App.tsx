@@ -51,6 +51,7 @@ import CareerWishes from "./pages/CareerWishes";
 import CareerWishesOverview from "./pages/CareerWishesOverview";
 import CarQuiz from "./pages/CarQuiz";
 import CarQuizAdmin from "./pages/CarQuizAdmin";
+import CodeOfConduct from "./pages/CodeOfConduct";
 
 const queryClient = new QueryClient();
 
@@ -89,6 +90,7 @@ const App = () => (
           <Route path="/pulse-survey" element={<ProtectedRoute><PulseSurvey /></ProtectedRoute>} />
           <Route path="/career-wishes" element={<ProtectedRoute><CareerWishes /></ProtectedRoute>} />
           <Route path="/car-quiz" element={<ProtectedRoute><CarQuiz /></ProtectedRoute>} />
+          <Route path="/code-of-conduct" element={<ProtectedRoute><CodeOfConduct /></ProtectedRoute>} />
           <Route path="/contract/:id" element={<ContractSign />} />
           {/* Teamleder+ routes */}
           <Route path="/dashboard" element={<RoleProtectedRoute requireTeamlederOrAbove><Dashboard /></RoleProtectedRoute>} />
