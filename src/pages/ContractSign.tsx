@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { Check, X, FileText, ArrowLeft, Clock, Download, Loader2 } from "lucide-react";
+import { Check, X, FileText, ArrowLeft, Clock, Download, Loader2, PenLine } from "lucide-react";
+import { useRef } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
@@ -33,6 +34,11 @@ export default function ContractSign() {
   const [accepted, setAccepted] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const signSectionRef = useRef<HTMLDivElement>(null);
+
+  const scrollToSignSection = () => {
+    signSectionRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   // Download PDF function
   const handleDownloadPdf = async () => {
@@ -256,6 +262,16 @@ export default function ContractSign() {
             <div />
           )}
           <div className="flex items-center gap-2">
+            {canSign && (
+              <Button
+                size="sm"
+                onClick={scrollToSignSection}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <PenLine className="h-4 w-4 mr-2" />
+                Underskriv nu
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -363,7 +379,7 @@ export default function ContractSign() {
 
         {/* Sign section */}
         {canSign && (
-          <Card className="border-primary bg-white">
+          <Card ref={signSectionRef} className="border-primary bg-white">
             <CardContent className="pt-6 space-y-4">
               <div className="flex items-start gap-3">
                 <Checkbox
