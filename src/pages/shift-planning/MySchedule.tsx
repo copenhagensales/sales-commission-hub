@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format, startOfMonth, endOfMonth, isToday, isSameDay, addMonths, subMonths, startOfWeek, addDays, addWeeks } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Briefcase, Thermometer, Palmtree, CalendarPlus, Umbrella } from "lucide-react";
+import { ChevronLeft, ChevronRight, Briefcase, Thermometer, Palmtree, CalendarPlus } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -122,8 +122,12 @@ export default function MySchedule() {
               {employee.first_name} {employee.last_name}
             </p>
           </div>
-          <Button variant="outline" onClick={() => { setSelectedDate(new Date()); setAbsenceDialogOpen(true); }}>
-            <Umbrella className="h-4 w-4 mr-2" />
+          <Button 
+            size="lg"
+            className="bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-200 font-semibold"
+            onClick={() => { setSelectedDate(new Date()); setAbsenceDialogOpen(true); }}
+          >
+            <Palmtree className="h-5 w-5 mr-2" />
             Anmod ferie
           </Button>
         </div>
