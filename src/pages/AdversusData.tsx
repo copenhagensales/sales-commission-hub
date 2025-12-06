@@ -71,24 +71,44 @@ export default function AdversusData() {
 
   const handleBackfillOpp = async () => {
     setIsBackfilling(true);
+    let totalProcessed = 0;
+    let remaining = 0;
+    
     try {
-      const response = await supabase.functions.invoke("backfill-opp", {});
-      
-      if (response.error) {
-        throw new Error(response.error.message);
+      // Keep running until no more remaining
+      while (true) {
+        const response = await supabase.functions.invoke("backfill-opp", {});
+        
+        if (response.error) {
+          throw new Error(response.error.message);
+        }
+        
+        const data = response.data;
+        if (!data.success) {
+          throw new Error(data.error || "Ukendt fejl");
+        }
+        
+        totalProcessed += data.successful;
+        remaining = data.remaining;
+        setBackfillStatus({ remaining, lastProcessed: totalProcessed });
+        
+        // Stop if no more to process or nothing was processed this round
+        if (remaining === 0 || data.processed === 0) {
+          break;
+        }
+        
+        // Small delay between batches
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
       
-      const data = response.data;
-      if (data.success) {
-        setBackfillStatus({ remaining: data.remaining, lastProcessed: data.successful });
-        toast.success(`Opdaterede ${data.successful} salg med OPP. ${data.remaining} tilbage.`);
-        queryClient.invalidateQueries({ queryKey: ["missing-opp-count"] });
-      } else {
-        throw new Error(data.error || "Ukendt fejl");
-      }
+      toast.success(`Færdig! Opdaterede ${totalProcessed} salg med OPP.`);
+      queryClient.invalidateQueries({ queryKey: ["missing-opp-count"] });
     } catch (error) {
       console.error("Backfill error:", error);
       toast.error("Fejl ved OPP backfill: " + (error instanceof Error ? error.message : "Ukendt fejl"));
+      if (totalProcessed > 0) {
+        toast.info(`Nåede at opdatere ${totalProcessed} salg før fejlen.`);
+      }
     } finally {
       setIsBackfilling(false);
     }
