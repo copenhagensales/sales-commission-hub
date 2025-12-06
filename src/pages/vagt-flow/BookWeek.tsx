@@ -1,5 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useState, useMemo } from "react";
+import { getWeekStartDate } from "@/lib/vagt-flow-date-utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -96,7 +97,7 @@ export default function VagtBookWeek() {
 
   const createBookingMutation = useMutation({
     mutationFn: async ({ locationId, brandId }: { locationId: string; brandId: string }) => {
-      const weekStart = startOfWeek(new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7), { weekStartsOn: 1 });
+      const weekStart = getWeekStartDate(selectedYear, selectedWeek);
       
       const sortedDays = [...selectedDays].sort((a, b) => a - b);
       const firstDay = sortedDays[0];
@@ -134,7 +135,7 @@ export default function VagtBookWeek() {
   });
 
   const selectedBrand = brands?.find((b) => b.id === selectedBrandId);
-  const weekStartDate = startOfWeek(new Date(selectedYear, 0, 1 + (selectedWeek - 1) * 7), { weekStartsOn: 1 });
+  const weekStartDate = getWeekStartDate(selectedYear, selectedWeek);
 
   // Process locations into categories
   const processedLocations = useMemo(() => {

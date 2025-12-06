@@ -14,9 +14,11 @@ export function formatWeekRange(startDate: Date, endDate: Date): string {
 }
 
 export function getWeekStartDate(year: number, weekNumber: number): Date {
-  const firstDayOfYear = new Date(year, 0, 1);
-  const firstMonday = startOfWeek(firstDayOfYear, { weekStartsOn: 1 });
-  return addDays(firstMonday, (weekNumber - 1) * 7);
+  // Use ISO week calculation: Start from Jan 4th of the year (always in week 1)
+  // and find the Monday of that week, then add the required number of weeks
+  const jan4 = new Date(year, 0, 4);
+  const firstWeekStart = startOfWeek(jan4, { weekStartsOn: 1 });
+  return addDays(firstWeekStart, (weekNumber - 1) * 7);
 }
 
 export function getWeekEndDate(year: number, weekNumber: number): Date {
