@@ -390,15 +390,10 @@ export default function MyProfile() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {employee.first_name} {employee.last_name}
-          </h1>
-          <div className="flex items-center gap-2 mt-1">
-            {employee.job_title && <span className="text-muted-foreground">{employee.job_title}</span>}
-            <Badge variant={employee.is_active ? "default" : "secondary"}>
-              {employee.is_active ? "Aktiv" : "Inaktiv"}
-            </Badge>
-          </div>
+          <h1 className="text-3xl font-bold">Min profil</h1>
+          <p className="text-muted-foreground">
+            {employee.first_name} {employee.last_name} {employee.job_title && `· ${employee.job_title}`}
+          </p>
         </div>
 
         <Tabs defaultValue="stamdata" className="w-full">
