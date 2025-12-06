@@ -36,7 +36,7 @@ const ownerNavigation = [
 // Navigation items for teamleder (limited team-related access)
 const teamlederNavigation = [
   { name: "Vagtplan", href: "/shift-planning", icon: ClipboardList },
-  { name: "Fravær", href: "/shift-planning/absence", icon: Clock },
+  { name: "Godkend fravær", href: "/shift-planning/absence", icon: Clock },
   { name: "Mit team", href: "/employees", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
