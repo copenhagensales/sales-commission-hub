@@ -249,13 +249,13 @@ export function PendingAbsencePopup() {
           )}
         </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 flex-wrap">
           {showRejectForm ? (
             <>
               <Button 
                 variant="outline" 
                 onClick={() => setShowRejectForm(false)}
-                className="w-full sm:w-auto"
+                className="flex-1 sm:flex-none"
               >
                 Annuller
               </Button>
@@ -263,7 +263,7 @@ export function PendingAbsencePopup() {
                 variant="destructive" 
                 onClick={handleReject}
                 disabled={updateMutation.isPending}
-                className="w-full sm:w-auto"
+                className="flex-1 sm:flex-none"
               >
                 <X className="h-4 w-4 mr-2" />
                 Afvis
@@ -276,7 +276,7 @@ export function PendingAbsencePopup() {
                   variant="outline" 
                   onClick={handlePostpone}
                   disabled={updateMutation.isPending}
-                  className="w-full sm:w-auto"
+                  className="flex-1 sm:flex-none"
                 >
                   <Clock className="h-4 w-4 mr-2" />
                   Udskyd 24 timer
@@ -285,7 +285,7 @@ export function PendingAbsencePopup() {
               <Button 
                 variant="outline" 
                 onClick={() => setShowRejectForm(true)}
-                className="w-full sm:w-auto text-destructive hover:text-destructive"
+                className="flex-1 sm:flex-none text-destructive hover:text-destructive"
               >
                 <X className="h-4 w-4 mr-2" />
                 Afvis
@@ -293,7 +293,7 @@ export function PendingAbsencePopup() {
               <Button 
                 onClick={handleApprove}
                 disabled={updateMutation.isPending}
-                className="w-full sm:w-auto"
+                className="flex-1 sm:flex-none"
               >
                 <Check className="h-4 w-4 mr-2" />
                 Godkend
