@@ -14,8 +14,6 @@ import { useShouldShowPulseSurvey } from "@/hooks/usePulseSurvey";
 
 // Navigation items for teamleder and above
 const teamlederNavigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Agenter", href: "/agents", icon: Users },
   { name: "Medarbejdere", href: "/employees", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
@@ -24,11 +22,9 @@ const teamlederNavigation = [
   { name: "TDC Erhverv", href: "/tdc-erhverv", icon: Building2 },
   { name: "Provision og CPO", href: "/commission-cpo", icon: Percent },
   { name: "Lønkørsel", href: "/payroll", icon: Wallet },
-  { name: "Wallboard", href: "/wallboard", icon: Tv },
   { name: "Datakilder info", href: "/adversus-data", icon: Database },
   { name: "Logikker", href: "/logikker", icon: ListChecks },
   { name: "MG test", href: "/mg-test", icon: Percent },
-  { name: "KM test", href: "/km-test", icon: Percent },
 ];
 
 // Navigation items for employees
