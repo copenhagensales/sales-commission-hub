@@ -387,35 +387,6 @@ export default function Settings() {
     }
   };
 
-  const testWebhook = async () => {
-    setLoading("webhook");
-    try {
-      const mockPayload = {
-        type: "result",
-        event_time: new Date().toISOString(),
-        payload: {
-          result_id: Date.now(),
-          campaign: { id: "1234", name: "TDC Erhverv Test" },
-          user: { id: "55", name: "Test Agent", email: "test@company.com" },
-          lead: { id: 400500, phone: "88888888", company: "Test Company ApS" },
-          products: [
-            { id: 1, externalId: "42", title: "Test Produkt", quantity: 1, unitPrice: 500 },
-          ],
-        },
-      };
-      const { data, error } = await supabase.functions.invoke("adversus-webhook", {
-        body: mockPayload,
-      });
-      if (error) throw error;
-      setResults({ type: "webhook", data });
-      toast.success("Webhook test successful!");
-    } catch (err: any) {
-      toast.error(err.message || "Webhook fejlede");
-    } finally {
-      setLoading(null);
-    }
-  };
-
   const loadLastTdcImport = async () => {
     try {
       const { data, error } = await supabase
@@ -1053,22 +1024,6 @@ export default function Settings() {
         </Dialog>
 
         <div className="grid gap-6 md:grid-cols-2">
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Send className="h-5 w-5" />
-                Test Webhook
-              </CardTitle>
-              <CardDescription>Send en mock webhook payload for at teste flowet</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={testWebhook} disabled={loading === "webhook"} variant="outline">
-                {loading === "webhook" && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-                Send Test Webhook
-              </Button>
-            </CardContent>
-          </Card>
-
           <Card className="md:col-span-2 border-dashed border-secondary/60 bg-secondary/5">
             <CardHeader>
               <CardTitle className="flex items-center justify-between gap-2">
