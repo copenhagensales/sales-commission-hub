@@ -572,27 +572,33 @@ export default function Settings() {
                       </div>
                     ) : (
                       <>
-                        <div className="flex items-center justify-between mb-3">
+                        <div 
+                          className="flex items-center justify-between mb-3 cursor-pointer"
+                          onClick={() => setExpandedId(expandedId === integration.id ? null : integration.id)}
+                        >
                           <div className="flex items-center gap-3">
                             <h3 className="font-semibold">{integration.name}</h3>
                             <Badge variant="outline" className="text-xs font-mono">
                               {integration.type}
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
                             <Button 
                               size="icon" 
                               variant="ghost" 
-                              onClick={() => setExpandedId(expandedId === integration.id ? null : integration.id)}
+                              onClick={(e) => { e.stopPropagation(); handleStartEdit(integration); }}
                             >
-                              {expandedId === integration.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                            </Button>
-                            <Button size="icon" variant="ghost" onClick={() => handleStartEdit(integration)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDeleteIntegration(integration.id)}>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="text-destructive" 
+                              onClick={(e) => { e.stopPropagation(); handleDeleteIntegration(integration.id); }}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
+                            {expandedId === integration.id ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                           </div>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
