@@ -265,7 +265,7 @@ export function AppSidebar() {
               )}>
                 <div className="flex items-center gap-3">
                   <ClipboardList className="h-5 w-5" />
-                  Intern vagtplan
+                  Vagtplan
                 </div>
                 {shiftPlanningOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
