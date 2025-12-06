@@ -650,18 +650,6 @@ export default function Settings() {
                                   <RefreshCw className={`h-4 w-4 ${loading === "sync" ? "animate-spin" : ""}`} />
                                   Hent data
                                 </Button>
-                                {integration.type === 'adversus' && (
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    className="gap-2"
-                                    onClick={backfillOpp}
-                                    disabled={loading === "backfill-opp"}
-                                  >
-                                    <Download className={`h-4 w-4 ${loading === "backfill-opp" ? "animate-spin" : ""}`} />
-                                    Hent OPP
-                                  </Button>
-                                )}
                                 <Button 
                                   size="icon" 
                                   variant="ghost" 
