@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import { useCanAccess } from "@/hooks/useSystemRoles";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
+import { useShouldShowPulseSurvey } from "@/hooks/usePulseSurvey";
 
 // Navigation items for teamleder and above
 const teamlederNavigation = [
@@ -35,6 +36,12 @@ const employeeNavigation = [
   { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
   { name: "Min profil", href: "/my-profile", icon: Users },
   { name: "Min kontrakt", href: "/my-contracts", icon: FileText },
+  { name: "Pulsmåling", href: "/pulse-survey", icon: HeartHandshake },
+];
+
+// Teamleder navigation includes pulse survey results
+const teamlederExtraNavigation = [
+  { name: "Pulsmåling resultater", href: "/pulse-survey-results", icon: BarChart3 },
 ];
 
 const shiftPlanningNavigation = [
@@ -67,6 +74,7 @@ export function AppSidebar() {
   const queryClient = useQueryClient();
   const { isTeamlederOrAbove, isOwner, isLoading, role } = useCanAccess();
   const { user } = useAuth();
+  const { showMenuItem: showPulseSurvey, showBadge: showPulseBadge } = useShouldShowPulseSurvey();
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
 
@@ -121,7 +129,9 @@ export function AppSidebar() {
   };
 
   // Select navigation based on role
-  const mainNavigation = isTeamlederOrAbove ? teamlederNavigation : employeeNavigation;
+  const mainNavigation = isTeamlederOrAbove 
+    ? [...teamlederNavigation, ...teamlederExtraNavigation] 
+    : employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey);
   const currentShiftPlanningNav = isTeamlederOrAbove ? shiftPlanningNavigation : employeeShiftPlanningNavigation;
 
   if (isLoading) {
@@ -148,7 +158,9 @@ export function AppSidebar() {
         <nav className="flex-1 space-y-1 p-4">
           {mainNavigation.map((item) => {
             const isActive = location.pathname === item.href;
-            const showBadge = item.href === "/my-contracts" && pendingContractsCount > 0;
+            const showBadge = (item.href === "/my-contracts" && pendingContractsCount > 0) || 
+                              (item.href === "/pulse-survey" && showPulseBadge);
+            const badgeCount = item.href === "/my-contracts" ? pendingContractsCount : 1;
             return (
               <NavLink
                 key={item.name}
@@ -163,8 +175,8 @@ export function AppSidebar() {
                   {item.name}
                 </div>
                 {showBadge && (
-                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
-                    {pendingContractsCount}
+                  <Badge variant={item.href === "/pulse-survey" ? "default" : "destructive"} className="h-5 min-w-5 px-1.5 text-xs">
+                    {item.href === "/pulse-survey" ? "Ny" : badgeCount}
                   </Badge>
                 )}
               </NavLink>
