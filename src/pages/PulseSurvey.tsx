@@ -25,7 +25,8 @@ const SCALE_QUESTIONS = [
     key: 'nps_score',
     title: '1. NPS / anbefaling',
     question: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?',
-    helpText: '1 = Slet ikke sandsynligt, 10 = Meget sandsynligt'
+    helpText: '0 = Slet ikke sandsynligt, 10 = Meget sandsynligt',
+    isNps: true
   },
   {
     key: 'development_score',
@@ -77,17 +78,25 @@ const SCALE_QUESTIONS = [
   },
 ];
 
-function ScaleSelector({ value, onChange }: { value: number | undefined; onChange: (v: number) => void }) {
+function ScaleSelector({ value, onChange, isNps = false }: { value: number | undefined; onChange: (v: number) => void; isNps?: boolean }) {
+  const scale = isNps ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  
+  const getNpsColor = (num: number) => {
+    if (num <= 6) return 'bg-red-500 text-white'; // Detractor
+    if (num <= 8) return 'bg-amber-500 text-white'; // Passive
+    return 'bg-green-500 text-white'; // Promoter
+  };
+  
   return (
     <div className="flex flex-wrap gap-2 mt-2">
-      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+      {scale.map((num) => (
         <button
           key={num}
           type="button"
           onClick={() => onChange(num)}
           className={`w-10 h-10 rounded-lg font-medium transition-all ${
             value === num
-              ? 'bg-primary text-primary-foreground shadow-lg scale-110'
+              ? isNps ? `${getNpsColor(num)} shadow-lg scale-110` : 'bg-primary text-primary-foreground shadow-lg scale-110'
               : 'bg-muted hover:bg-muted/80 text-foreground'
           }`}
         >
@@ -245,7 +254,7 @@ export default function PulseSurvey() {
               <br /><br />
               Svarene er anonyme og bliver kun brugt til at forbedre vores måde at arbejde og lede på – ikke til at vurdere dig som medarbejder.
               <br /><br />
-              <strong>Skalaen går fra 1–10, hvor 1 er lavest og 10 er højest.</strong>
+              <strong>NPS-spørgsmålet bruger skala 0-10. Øvrige spørgsmål bruger skala 1-10.</strong>
             </CardDescription>
           </CardHeader>
         </Card>
@@ -256,10 +265,16 @@ export default function PulseSurvey() {
             <CardTitle className="text-lg">{SCALE_QUESTIONS[0].title}</CardTitle>
             <CardDescription>{SCALE_QUESTIONS[0].question}</CardDescription>
             <p className="text-sm text-muted-foreground">{SCALE_QUESTIONS[0].helpText}</p>
+            <div className="flex gap-4 text-xs mt-2">
+              <span className="text-red-500">0-6: Kritiker</span>
+              <span className="text-amber-500">7-8: Passiv</span>
+              <span className="text-green-500">9-10: Promoter</span>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <ScaleSelector 
-              value={formData.nps_score} 
+              value={formData.nps_score}
+              isNps={true}
               onChange={(v) => handleScaleChange('nps_score', v)} 
             />
           </CardContent>
