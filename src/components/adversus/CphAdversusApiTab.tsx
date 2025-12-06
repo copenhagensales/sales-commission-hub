@@ -2,10 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Clock, CheckCircle2, XCircle, Settings, Zap } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-
 const sourceLabels: Record<string, string> = {
   campaigns: "Kampagner",
   sales: "Salg",
@@ -182,59 +182,131 @@ export function CphAdversusApiTab() {
         </Card>
       </div>
 
+      {/* Konfigurationstabel */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <p className="text-sm font-medium">API Endpoint</p>
-                <code className="block bg-muted/50 p-3 rounded text-xs break-all border">
-                  https://api.adversus.io/
-                </code>
-              </div>
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Webhook URL</p>
-                <code className="block bg-muted/50 p-3 rounded text-xs break-all border">
-                  https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/adversus-webhook
-                </code>
-              </div>
-            </div>
-            
-            <div className="border-t pt-4">
-              <p className="text-sm font-medium mb-2">Aktiverede datakilder</p>
-              <div className="flex flex-wrap gap-2">
-                {enabledSources.length > 0 ? (
-                  enabledSources.map((source) => (
-                    <Badge key={source} variant="secondary">
-                      {sourceLabels[source] ?? source}
-                    </Badge>
-                  ))
-                ) : (
-                  <>
-                    <Badge variant="outline" className="text-muted-foreground">Ingen aktiveret</Badge>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="border-t pt-4">
-              <p className="text-sm font-medium mb-2">Edge funktioner</p>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• <code className="font-mono text-xs bg-muted/50 px-1 rounded">sync-adversus</code> - Synkroniserer salgsdata til database</li>
-                <li>• <code className="font-mono text-xs bg-muted/50 px-1 rounded">adversus-webhook</code> - Modtager realtime events fra Adversus</li>
-                <li>• <code className="font-mono text-xs bg-muted/50 px-1 rounded">backfill-opp</code> - Henter manglende OPP numre for TDC salg</li>
-                <li>• <code className="font-mono text-xs bg-muted/50 px-1 rounded">fetch-single-opp</code> - Henter enkelt OPP nummer via lead ID</li>
-              </ul>
-            </div>
-
-            <div className="border-t pt-4">
-              <p className="text-sm text-muted-foreground">
-                Konfigurer API-nøgler og sync-indstillinger under <span className="font-medium">Indstillinger → API-integrationer</span>
-              </p>
-            </div>
-          </div>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Felt</TableHead>
+                <TableHead>Værdi</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell className="font-medium">API Endpoint</TableCell>
+                <TableCell className="font-mono text-xs">https://api.adversus.io/</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="text-green-400">Aktiv</Badge>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Webhook URL</TableCell>
+                <TableCell className="font-mono text-xs">https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/adversus-webhook</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="text-green-400">Aktiv</Badge>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Sync frekvens</TableCell>
+                <TableCell>{integration?.sync_frequency_minutes ?? 60} minutter</TableCell>
+                <TableCell>-</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Sidst synket</TableCell>
+                <TableCell>
+                  {integration?.last_sync_at 
+                    ? format(new Date(integration.last_sync_at), "dd/MM/yyyy HH:mm", { locale: da })
+                    : "Aldrig"
+                  }
+                </TableCell>
+                <TableCell>
+                  {integration?.last_sync_at ? (
+                    <Badge variant="outline" className="text-green-400">Synkroniseret</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-amber-400">Afventer</Badge>
+                  )}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Events total</TableCell>
+                <TableCell>{webhookStats?.total ?? 0}</TableCell>
+                <TableCell>-</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Events sidste 24 timer</TableCell>
+                <TableCell>{webhookStats?.last24h ?? 0}</TableCell>
+                <TableCell>-</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Seneste event</TableCell>
+                <TableCell>
+                  {webhookStats?.lastReceived 
+                    ? format(new Date(webhookStats.lastReceived), "dd/MM/yyyy HH:mm", { locale: da })
+                    : "-"
+                  }
+                </TableCell>
+                <TableCell>-</TableCell>
+              </TableRow>
+              {enabledSources.length > 0 ? (
+                enabledSources.map((source) => (
+                  <TableRow key={source}>
+                    <TableCell className="font-medium">Datakilde: {sourceLabels[source] ?? source}</TableCell>
+                    <TableCell>Aktiveret</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-green-400">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Aktiv
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell className="font-medium">Datakilder</TableCell>
+                  <TableCell>Ingen aktiveret</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-amber-400">Afventer</Badge>
+                  </TableCell>
+                </TableRow>
+              )}
+              <TableRow>
+                <TableCell className="font-medium">Edge funktion</TableCell>
+                <TableCell className="font-mono text-xs">sync-adversus</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="text-green-400">Aktiv</Badge>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Edge funktion</TableCell>
+                <TableCell className="font-mono text-xs">adversus-webhook</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="text-green-400">Aktiv</Badge>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Edge funktion</TableCell>
+                <TableCell className="font-mono text-xs">backfill-opp</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="text-green-400">Aktiv</Badge>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Edge funktion</TableCell>
+                <TableCell className="font-mono text-xs">fetch-single-opp</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="text-green-400">Aktiv</Badge>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
+
+      <p className="text-sm text-muted-foreground">
+        Konfigurer API-nøgler og sync-indstillinger under <span className="font-medium">Indstillinger → API-integrationer</span>
+      </p>
     </section>
   );
 }
