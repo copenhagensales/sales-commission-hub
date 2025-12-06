@@ -35,7 +35,7 @@ const KmTest = lazyWithRetry(() => import("./pages/KmTest"));
 const Codan = lazyWithRetry(() => import("./pages/Codan"));
 const TdcErhverv = lazyWithRetry(() => import("./pages/TdcErhverv"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
-const AdversusData = lazyWithRetry(() => import("./pages/AdversusData"));
+const AdversusData = lazyWithRetry(() => import("./pages/AdversusData" /* force-rebuild-v2 */));
 const Logikker = lazyWithRetry(() => import("./pages/Logikker"));
 const EmployeeMasterData = lazyWithRetry(() => import("./pages/EmployeeMasterData"));
 const EmployeeDetail = lazyWithRetry(() => import("./pages/EmployeeDetail"));
