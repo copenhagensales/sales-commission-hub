@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Mail, Lock, User, Wifi, WifiOff, RefreshCw } from "lucide-react";
+import { Mail, Lock, User, Wifi, WifiOff, RefreshCw } from "lucide-react";
+import cphSalesLogo from "@/assets/cph-sales-logo-dark.png";
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -113,14 +114,16 @@ export default function Auth() {
       <div className="w-full max-w-md space-y-8 animate-fade-in">
         {/* Logo */}
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/20">
-            <TrendingUp className="h-8 w-8 text-primary-foreground" />
-          </div>
+          <img 
+            src={cphSalesLogo} 
+            alt="CPH Sales" 
+            className="mx-auto h-24 w-auto"
+          />
           <h1 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
-            PayTrack
+            Copenhagen Sales
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Løn- og provisionssystem til callcentre
+            Løn- og performance-system
           </p>
         </div>
 
