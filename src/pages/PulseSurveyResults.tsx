@@ -29,10 +29,31 @@ const TENURE_LABELS: Record<string, string> = {
   'over_6_months': 'Over 6 måneder',
 };
 
+function calculateNpsScore(responses: any[]) {
+  if (!responses || responses.length === 0) return null;
+  
+  const npsValues = responses.map(r => r.nps_score).filter(v => typeof v === 'number');
+  if (npsValues.length === 0) return null;
+  
+  const promoters = npsValues.filter(v => v >= 9).length;
+  const detractors = npsValues.filter(v => v <= 6).length;
+  const total = npsValues.length;
+  
+  const nps = Math.round(((promoters / total) - (detractors / total)) * 100);
+  
+  return {
+    nps,
+    promoters: Math.round((promoters / total) * 100),
+    passives: Math.round(((total - promoters - detractors) / total) * 100),
+    detractors: Math.round((detractors / total) * 100),
+    totalResponses: total
+  };
+}
+
 function calculateAverages(responses: any[]) {
   if (!responses || responses.length === 0) return null;
 
-  const scoreKeys = Object.keys(QUESTION_LABELS);
+  const scoreKeys = Object.keys(QUESTION_LABELS).filter(k => k !== 'nps_score');
   const averages: Record<string, number> = {};
 
   scoreKeys.forEach(key => {
@@ -91,6 +112,7 @@ export default function PulseSurveyResults() {
 
   // Calculate averages
   const averages = useMemo(() => calculateAverages(filteredResponses), [filteredResponses]);
+  const npsData = useMemo(() => calculateNpsScore(filteredResponses), [filteredResponses]);
 
   // Calculate tenure distribution
   const tenureDistribution = useMemo(() => {
@@ -226,8 +248,12 @@ export default function PulseSurveyResults() {
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{averages?.nps_score || '-'}</div>
-                  <p className="text-xs text-muted-foreground">Gennemsnit</p>
+                  <div className={`text-2xl font-bold ${npsData ? (npsData.nps >= 50 ? 'text-green-500' : npsData.nps >= 0 ? 'text-amber-500' : 'text-red-500') : ''}`}>
+                    {npsData?.nps ?? '-'}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {npsData ? `${npsData.promoters}% promoters - ${npsData.detractors}% detractors` : 'NPS score'}
+                  </p>
                 </CardContent>
               </Card>
 
