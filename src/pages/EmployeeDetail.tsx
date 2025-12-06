@@ -702,9 +702,15 @@ export default function EmployeeDetail() {
               </h1>
               <div className="flex items-center gap-2 mt-1">
                 {employee.job_title && <span className="text-muted-foreground">{employee.job_title}</span>}
-                <Badge variant={employee.is_active ? "default" : "secondary"}>
-                  {employee.is_active ? "Aktiv" : "Inaktiv"}
-                </Badge>
+                <div className="flex items-center gap-2 ml-2">
+                  <Switch 
+                    checked={employee.is_active} 
+                    onCheckedChange={(checked) => handleSave("is_active", checked)} 
+                  />
+                  <Badge variant={employee.is_active ? "default" : "secondary"}>
+                    {employee.is_active ? "Aktiv" : "Inaktiv"}
+                  </Badge>
+                </div>
               </div>
             </div>
           </div>
@@ -972,13 +978,6 @@ export default function EmployeeDetail() {
                       <div>
                         <label className="text-xs text-muted-foreground">Slutdato</label>
                         <EditableField label="" value={employee.employment_end_date} field="employment_end_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_end_date)} />
-                      </div>
-                      <div className="pt-2">
-                        <label className="text-xs text-muted-foreground">Status</label>
-                        <div className="flex items-center justify-between py-2">
-                          <span className="font-medium">{employee.is_active ? "Aktiv" : "Inaktiv"}</span>
-                          <Switch checked={employee.is_active} onCheckedChange={(checked) => handleSave("is_active", checked)} />
-                        </div>
                       </div>
                     </div>
 
