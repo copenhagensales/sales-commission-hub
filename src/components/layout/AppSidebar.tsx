@@ -27,6 +27,15 @@ const teamlederNavigation = [
   { name: "MG test", href: "/mg-test", icon: Percent },
 ];
 
+// Navigation items for rekruttering role
+const rekrutteringNavigation = [
+  { name: "Medarbejdere", href: "/employees", icon: Users },
+  { name: "Kontrakter", href: "/contracts", icon: FileText },
+  { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
+  { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
+  { name: "Min profil", href: "/my-profile", icon: User },
+];
+
 // Navigation items for employees
 const employeeNavigation = [
   { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
@@ -68,7 +77,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isTeamlederOrAbove, isOwner, isLoading, role } = useCanAccess();
+  const { isTeamlederOrAbove, isOwner, isRekruttering, isRekrutteringOrAbove, isLoading, role } = useCanAccess();
   const { user } = useAuth();
   const { showMenuItem: showPulseSurvey, showBadge: showPulseBadge } = useShouldShowPulseSurvey();
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
@@ -127,7 +136,9 @@ export function AppSidebar() {
   // Select navigation based on role
   const mainNavigation = isTeamlederOrAbove 
     ? [...teamlederNavigation, ...teamlederExtraNavigation] 
-    : employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey);
+    : isRekruttering 
+      ? rekrutteringNavigation
+      : employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey);
   const currentShiftPlanningNav = isTeamlederOrAbove ? shiftPlanningNavigation : employeeShiftPlanningNavigation;
 
   if (isLoading) {

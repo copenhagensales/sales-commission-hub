@@ -100,6 +100,13 @@ export default function Admin() {
             Teamleder
           </Badge>
         );
+      case "rekruttering":
+        return (
+          <Badge className="bg-purple-500/20 text-purple-500 border-purple-500/30">
+            <Users className="h-3 w-3 mr-1" />
+            Rekruttering
+          </Badge>
+        );
       case "medarbejder":
         return (
           <Badge variant="secondary">
@@ -158,7 +165,7 @@ export default function Admin() {
         </div>
 
         {/* Role explanation cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -171,6 +178,22 @@ export default function Admin() {
                 <li>• Egne vagter og tidsregistrering</li>
                 <li>• Eget stamdatakort</li>
                 <li>• Egen fraværsanmodning</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="h-5 w-5 text-purple-500" />
+                Rekruttering
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Se alle medarbejdere</li>
+                <li>• Oprette nye medarbejdere</li>
+                <li>• Sende kontrakter (ikke redigere)</li>
               </ul>
             </CardContent>
           </Card>
@@ -303,6 +326,7 @@ export default function Admin() {
                             <SelectContent>
                               <SelectItem value="none">Ingen rolle</SelectItem>
                               <SelectItem value="medarbejder">Medarbejder</SelectItem>
+                              <SelectItem value="rekruttering">Rekruttering</SelectItem>
                               <SelectItem value="teamleder">Teamleder</SelectItem>
                               <SelectItem value="ejer">Ejer</SelectItem>
                             </SelectContent>

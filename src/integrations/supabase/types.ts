@@ -2054,6 +2054,7 @@ export type Database = {
       }
       is_manager_or_above: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_rekruttering: { Args: { _user_id: string }; Returns: boolean }
       is_teamleder_or_above: { Args: { _user_id: string }; Returns: boolean }
       is_vagt_admin_or_planner: { Args: { _user_id: string }; Returns: boolean }
       remove_role_by_email: { Args: { _email: string }; Returns: undefined }
