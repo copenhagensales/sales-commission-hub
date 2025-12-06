@@ -88,9 +88,6 @@ export default function Settings() {
   const [salesDays, setSalesDays] = useState(7);
   const [syncDays, setSyncDays] = useState(30);
   const [results, setResults] = useState<any>(null);
-  const [tdcMonthlyData, setTdcMonthlyData] = useState<{ month: string; count: number }[] | null>(null);
-  const [tdcMonthlyLoading, setTdcMonthlyLoading] = useState(false);
-  const [tdcMonthlyError, setTdcMonthlyError] = useState<string | null>(null);
   const [tdcFile, setTdcFile] = useState<File | null>(null);
   const [tdcUploadLoading, setTdcUploadLoading] = useState(false);
   const [tdcLastImport, setTdcLastImport] = useState<{ uploaded_at: string; uploaded_by: string | null } | null>(null);
@@ -369,22 +366,6 @@ export default function Settings() {
     }
   };
 
-  const syncTdcOctober2025 = async () => {
-    setLoading("sync-tdc-october-2025");
-    try {
-      const { data, error } = await supabase.functions.invoke("sync-adversus", {
-        body: { action: "sync-tdc-october-2025" },
-      });
-      if (error) throw error;
-      setResults({ type: "sync-tdc-october-2025", data });
-      toast.success(data?.message || "Sync af TDC Erhverv (oktober 2025) gennemført");
-    } catch (err: any) {
-      toast.error(err.message || "Sync af TDC Erhverv (oktober 2025) fejlede");
-    } finally {
-      setLoading(null);
-    }
-  };
-
   const backfillOpp = async () => {
     setLoading("backfill-opp");
     try {
@@ -429,86 +410,6 @@ export default function Settings() {
       toast.error(err.message || "Webhook fejlede");
     } finally {
       setLoading(null);
-    }
-  };
-
-  const loadTdcMonthlyData = async () => {
-    setTdcMonthlyLoading(true);
-    setTdcMonthlyError(null);
-    try {
-      const { data: clients, error: clientsError } = await supabase
-        .from("clients")
-        .select("id")
-        .ilike("name", "%tdc erhverv%")
-        .limit(1);
-
-      if (clientsError) throw clientsError;
-
-      const tdcClientId = clients?.[0]?.id as string | undefined;
-
-      if (!tdcClientId) {
-        setTdcMonthlyData([]);
-        toast.info("Ingen klient fundet med navnet 'TDC Erhverv'");
-        return;
-      }
-
-      const { data: campaigns, error: campaignsError } = await supabase
-        .from("client_campaigns")
-        .select("id")
-        .eq("client_id", tdcClientId);
-
-      if (campaignsError) throw campaignsError;
-
-      const campaignIds = (campaigns || []).map((c) => c.id as string);
-
-      if (!campaignIds.length) {
-        setTdcMonthlyData([]);
-        toast.info("Ingen kampagner fundet for TDC Erhverv");
-        return;
-      }
-
-      type SaleWithItems = {
-        id: string;
-        sale_datetime: string;
-        sale_items: { quantity: number | null }[];
-      };
-
-      const { data: sales, error: salesError } = await supabase
-        .from("sales")
-        .select("id, sale_datetime, sale_items ( quantity )")
-        .in("client_campaign_id", campaignIds);
-
-      if (salesError) throw salesError;
-
-      const typedSales = (sales || []) as unknown as SaleWithItems[];
-
-      const monthlyMap = new Map<string, number>();
-
-      typedSales.forEach((sale) => {
-        const date = new Date(sale.sale_datetime);
-        if (Number.isNaN(date.getTime())) return;
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-        const units =
-          sale.sale_items?.reduce((sum, item) => {
-            const qty = Number(item.quantity ?? 0);
-            return sum + (qty || 0);
-          }, 0) ?? 0;
-        monthlyMap.set(key, (monthlyMap.get(key) || 0) + units);
-      });
-
-      const monthlyArray = Array.from(monthlyMap.entries())
-        .map(([month, count]) => ({ month, count }))
-        .sort((a, b) => a.month.localeCompare(b.month));
-
-      setTdcMonthlyData(monthlyArray);
-      toast.success("TDC Erhverv månedsoversigt opdateret");
-    } catch (error: any) {
-      console.error("Fejl ved hentning af TDC Erhverv månedsdata", error);
-      const message = error?.message || "Kunne ikke hente TDC Erhverv månedsdata";
-      setTdcMonthlyError(message);
-      toast.error(message);
-    } finally {
-      setTdcMonthlyLoading(false);
     }
   };
 
@@ -1140,15 +1041,6 @@ export default function Settings() {
                 {loading === "sync" && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
                 Sync til Database
               </Button>
-              <Button
-                onClick={syncTdcOctober2025}
-                disabled={loading === "sync-tdc-october-2025"}
-                variant="outline"
-                className="w-full mt-2"
-              >
-                {loading === "sync-tdc-october-2025" && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-                Sync kun TDC Erhverv (oktober 2025)
-              </Button>
             </CardContent>
           </Card>
 
@@ -1207,58 +1099,6 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          <Card className="md:col-span-2 border-dashed border-primary/40 bg-primary/5">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2">
-                  <SettingsIcon className="h-5 w-5" />
-                  Debug: TDC Erhverv salg pr. måned
-                </span>
-                <Button size="sm" onClick={loadTdcMonthlyData} disabled={tdcMonthlyLoading}>
-                  {tdcMonthlyLoading && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-                  Opdater
-                </Button>
-              </CardTitle>
-              <CardDescription>
-                Viser samlet antal solgte produkter (sale_items.quantity) pr. måned for TDC Erhverv.
-                Oktober 2025 vil være nøglen <code>2025-10</code>.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {tdcMonthlyError && (
-                <p className="text-sm text-destructive">{tdcMonthlyError}</p>
-              )}
-              {!tdcMonthlyError && (!tdcMonthlyData || tdcMonthlyData.length === 0) && !tdcMonthlyLoading && (
-                <p className="text-sm text-muted-foreground">
-                  Ingen data endnu. Klik "Opdater" for at hente TDC Erhverv-salg.
-                </p>
-              )}
-              {tdcMonthlyData && tdcMonthlyData.length > 0 && (
-                <div className="rounded-md border bg-muted/40">
-                  <div className="grid grid-cols-2 border-b px-3 py-2 text-xs font-medium text-muted-foreground">
-                    <span>Måned (ÅÅÅÅ-MM)</span>
-                    <span className="text-right">Antal salg (stk.)</span>
-                  </div>
-                  <div className="max-h-64 overflow-auto text-sm">
-                    {tdcMonthlyData.map((row) => {
-                      const isOctober2025 = row.month === "2025-10";
-                      return (
-                        <div
-                          key={row.month}
-                          className={`grid grid-cols-2 items-center px-3 py-1.5 border-b last:border-b-0 ${
-                            isOctober2025 ? "bg-primary/10 font-medium" : ""
-                          }`}
-                        >
-                          <span>{row.month}</span>
-                          <span className="text-right tabular-nums">{row.count.toLocaleString("da-DK")}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
 
         {results && (
