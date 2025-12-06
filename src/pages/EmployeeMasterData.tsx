@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useCanAccess } from "@/hooks/useSystemRoles";
+import { TeamManagement } from "@/components/employees/TeamManagement";
 
 interface EmployeeMasterDataRecord {
   id: string;
@@ -399,6 +400,9 @@ export default function EmployeeMasterData() {
   return (
     <MainLayout>
       <div className="space-y-6">
+        {/* Team Management Section */}
+        <TeamManagement />
+        
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Medarbejdere</h1>

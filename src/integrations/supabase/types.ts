@@ -1153,6 +1153,7 @@ export type Database = {
           salary_type: Database["public"]["Enums"]["salary_type"] | null
           standard_start_time: string | null
           system_role_id: string | null
+          team_id: string | null
           updated_at: string | null
           vacation_bonus_percent: number | null
           vacation_type: Database["public"]["Enums"]["vacation_type"] | null
@@ -1190,6 +1191,7 @@ export type Database = {
           salary_type?: Database["public"]["Enums"]["salary_type"] | null
           standard_start_time?: string | null
           system_role_id?: string | null
+          team_id?: string | null
           updated_at?: string | null
           vacation_bonus_percent?: number | null
           vacation_type?: Database["public"]["Enums"]["vacation_type"] | null
@@ -1227,6 +1229,7 @@ export type Database = {
           salary_type?: Database["public"]["Enums"]["salary_type"] | null
           standard_start_time?: string | null
           system_role_id?: string | null
+          team_id?: string | null
           updated_at?: string | null
           vacation_bonus_percent?: number | null
           vacation_type?: Database["public"]["Enums"]["vacation_type"] | null
@@ -1248,6 +1251,13 @@ export type Database = {
             columns: ["system_role_id"]
             isOneToOne: false
             referencedRelation: "user_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_master_data_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -1958,6 +1968,41 @@ export type Database = {
           uploaded_by?: string | null
         }
         Relationships: []
+      }
+      teams: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          team_leader_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          team_leader_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          team_leader_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_team_leader_id_fkey"
+            columns: ["team_leader_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       time_entry: {
         Row: {
