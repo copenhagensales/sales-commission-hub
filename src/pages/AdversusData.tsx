@@ -289,6 +289,7 @@ export default function AdversusData() {
                             <TableHead>ID</TableHead>
                             <TableHead>External ID</TableHead>
                             <TableHead>Type</TableHead>
+                            <TableHead>Kunde</TableHead>
                             <TableHead>Modtaget</TableHead>
                             <TableHead>Oprettet</TableHead>
                             <TableHead className="text-right">Status</TableHead>
@@ -296,7 +297,12 @@ export default function AdversusData() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {recentEvents.map((event: any) => (
+                          {recentEvents.map((event: any) => {
+                            // Extract campaign name from payload
+                            const campaignName = event.payload?.payload?.campaign?.name || 
+                                                 event.payload?.campaign?.name || 
+                                                 "-";
+                            return (
                             <TableRow key={event.id}>
                               <TableCell className="font-mono text-xs">
                                 {String(event.id).slice(0, 8)}
@@ -305,6 +311,9 @@ export default function AdversusData() {
                                 {event.external_id || "-"}
                               </TableCell>
                               <TableCell>{event.event_type}</TableCell>
+                              <TableCell className="max-w-[150px] truncate" title={campaignName}>
+                                {campaignName}
+                              </TableCell>
                               <TableCell>
                                 {event.received_at
                                   ? format(new Date(event.received_at), "dd.MM.yyyy HH:mm", { locale: da })
@@ -339,7 +348,8 @@ export default function AdversusData() {
                                 </button>
                               </TableCell>
                             </TableRow>
-                          ))}
+                            );
+                          })}
                         </TableBody>
                       </Table>
 
