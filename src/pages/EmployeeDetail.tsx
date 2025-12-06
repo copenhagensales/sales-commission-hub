@@ -702,19 +702,10 @@ export default function EmployeeDetail() {
               </h1>
               <div className="flex items-center gap-2 mt-1">
                 {employee.job_title && <span className="text-muted-foreground">{employee.job_title}</span>}
-                <div className="flex items-center gap-2 ml-2">
-                  <Switch 
-                    checked={employee.is_active} 
-                    onCheckedChange={(checked) => handleSave("is_active", checked)} 
-                  />
-                  <Badge variant={employee.is_active ? "default" : "secondary"}>
-                    {employee.is_active ? "Aktiv" : "Inaktiv"}
-                  </Badge>
-                </div>
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {employee.private_phone && (
               <>
                 <Button variant="outline" size="sm" asChild>
@@ -766,6 +757,15 @@ export default function EmployeeDetail() {
               <KeyRound className="h-4 w-4 mr-2" />
               Nulstil kode
             </Button>
+            <div className="flex items-center gap-2 ml-2 border-l pl-4">
+              <Switch 
+                checked={employee.is_active} 
+                onCheckedChange={(checked) => handleSave("is_active", checked)} 
+              />
+              <Badge variant={employee.is_active ? "default" : "secondary"}>
+                {employee.is_active ? "Aktiv" : "Inaktiv"}
+              </Badge>
+            </div>
             <Button 
               variant="outline" 
               size="sm"
