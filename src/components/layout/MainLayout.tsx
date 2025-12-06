@@ -1,22 +1,33 @@
 import { ReactNode } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { ContractLockOverlay } from "./ContractLockOverlay";
+import { CarQuizLockOverlay } from "./CarQuizLockOverlay";
 import { usePendingContractLock } from "@/hooks/usePendingContractLock";
+import { useCarQuizLock } from "@/hooks/useCarQuiz";
+import { useLocation } from "react-router-dom";
 
 interface MainLayoutProps {
   children: ReactNode;
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  const { isLocked, contract } = usePendingContractLock();
+  const { isLocked: isContractLocked, contract } = usePendingContractLock();
+  const { isLocked: isQuizLocked } = useCarQuizLock();
+  const location = useLocation();
+
+  // Don't show car quiz lock if we're already on the car-quiz page
+  const showQuizLock = isQuizLocked && location.pathname !== "/car-quiz";
 
   return (
     <div className="min-h-screen bg-background">
-      {isLocked && contract && (
+      {isContractLocked && contract && (
         <ContractLockOverlay 
           contractId={contract.id} 
           contractTitle={contract.title} 
         />
+      )}
+      {showQuizLock && !isContractLocked && (
+        <CarQuizLockOverlay />
       )}
       <AppSidebar />
       <main className="ml-64 min-h-screen">
