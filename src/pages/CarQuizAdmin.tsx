@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { CheckCircle, XCircle, Car } from "lucide-react";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 export default function CarQuizAdmin() {
   const { data: completions, isLoading: loadingCompletions } = useAllCarQuizCompletions();
@@ -35,7 +36,8 @@ export default function CarQuizAdmin() {
   const totalFieldmarketing = fieldmarketingEmployees?.length || 0;
 
   return (
-    <div className="container mx-auto py-8 px-4 space-y-6">
+    <MainLayout>
+      <div className="container mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <Car className="h-8 w-8 text-primary" />
         <div>
@@ -149,5 +151,6 @@ export default function CarQuizAdmin() {
         </Card>
       </div>
     </div>
+  </MainLayout>
   );
 }
