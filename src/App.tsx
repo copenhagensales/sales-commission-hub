@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import React from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute, RoleProtectedRoute } from "@/components/RoleProtectedRoute";
 import Auth from "./pages/Auth";
@@ -75,6 +76,46 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Smart redirect based on role
+function SmartRedirect() {
+  const { user, loading } = useAuth();
+  const [redirectPath, setRedirectPath] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    async function checkRole() {
+      if (!user) {
+        setRedirectPath("/auth");
+        return;
+      }
+      
+      // Check if user is teamleder or owner
+      const { data } = await import("@/integrations/supabase/client").then(m => 
+        m.supabase.from("system_roles").select("role").eq("user_id", user.id).maybeSingle()
+      );
+      
+      if (data?.role === "teamleder" || data?.role === "ejer") {
+        setRedirectPath("/shift-planning");
+      } else {
+        setRedirectPath("/my-schedule");
+      }
+    }
+    
+    if (!loading) {
+      checkRole();
+    }
+  }, [user, loading]);
+
+  if (loading || !redirectPath) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Indlæser...</div>
+      </div>
+    );
+  }
+
+  return <Navigate to={redirectPath} replace />;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -82,7 +123,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/my-schedule" replace />} />
+          <Route path="/" element={<SmartRedirect />} />
           <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
           <Route path="/onboarding" element={<EmployeeOnboarding />} />
           {/* Employee accessible routes */}
