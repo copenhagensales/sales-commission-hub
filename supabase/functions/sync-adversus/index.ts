@@ -241,6 +241,217 @@ Deno.serve(async (req) => {
     const authHeader = btoa(`${adversusUsername}:${adversusPassword}`)
     const baseUrl = 'https://api.adversus.io/v1'
 
+    // Cache for lead data to avoid duplicate fetches (module-level for all actions)
+    const leadCache = new Map<number, AdversusLead | null>()
+    
+    // Cache for Adversus sales data by leadId
+    const salesCache = new Map<number, { productTitles: string[], totalPrice: number } | null>()
+    
+    // Track fetched leads count
+    let leadsFetched = 0
+
+    // Helper function to extract OPP number (e.g. "OPP-1067162") from any Adversus sale/lead object
+    function extractOppNumberFromObject(obj: unknown): string | null {
+      if (!obj || typeof obj !== 'object') return null
+
+      const visited = new Set<unknown>()
+
+      const search = (current: any): string | null => {
+        if (!current || typeof current !== 'object') return null
+        if (visited.has(current)) return null
+        visited.add(current)
+
+        for (const [key, value] of Object.entries(current)) {
+          if (typeof value === 'string') {
+            const trimmed = value.trim()
+            if (!trimmed) continue
+
+            // Direct match like "OPP-1067162" or "opp 1067162"
+            const oppMatch = trimmed.match(/opp[-\s:]?(\d{4,})/i)
+            if (oppMatch) {
+              const normalized = `OPP-${oppMatch[1]}`
+              return normalized
+            }
+
+            // Values that are only digits but the key mentions OPP
+            if (/^\d{4,}$/.test(trimmed) && key.toLowerCase().includes('opp')) {
+              const normalized = `OPP-${trimmed}`
+              return normalized
+            }
+          } else if (value && typeof value === 'object') {
+            const nested = search(value as any)
+            if (nested) return nested
+          }
+        }
+
+        return null
+      }
+
+      return search(obj as any)
+    }
+
+    // Helper function to fetch lead data
+    async function fetchLead(leadId: number, campaignId?: number): Promise<AdversusLead | null> {
+      if (leadCache.has(leadId)) {
+        return leadCache.get(leadId) || null
+      }
+      
+      // Add small delay before fetching lead to avoid rate limits
+      await delay(200)
+      
+      try {
+        const leadResponse = await fetch(`${baseUrl}/leads/${leadId}`, {
+          headers: {
+            'Authorization': `Basic ${authHeader}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (leadResponse.ok) {
+          const lead = await leadResponse.json() as AdversusLead
+          leadCache.set(leadId, lead)
+          leadsFetched++
+          return lead
+        } else {
+          console.warn(`Could not fetch lead ${leadId}: ${leadResponse.status}`)
+          leadCache.set(leadId, null)
+          return null
+        }
+      } catch (err) {
+        console.warn(`Error fetching lead ${leadId}:`, err)
+        leadCache.set(leadId, null)
+        return null
+      }
+    }
+
+    // Helper function to fetch OPP number ("OPP nr") for a sale via its lead/result data
+    async function fetchOppNumberForSale(sale: any, externalId: string): Promise<string | null> {
+      try {
+        if (!sale || !sale.leadId) {
+          return extractOppNumberFromObject(sale)
+        }
+
+        const lead = await fetchLead(sale.leadId, sale.campaignId)
+
+        if (!lead) {
+          return extractOppNumberFromObject(sale)
+        }
+
+        const leadAny = lead as any
+        const resultData = Array.isArray(leadAny.resultData) ? leadAny.resultData : []
+        const OPP_FIELD_ID = 80862
+
+        if (resultData.length > 0) {
+          // 1) Exact match on result field id 80862 ("OPP nr")
+          const byId = resultData.find(
+            (rd: any) => rd && rd.id === OPP_FIELD_ID && typeof rd.value === 'string' && rd.value.trim(),
+          )
+
+          if (byId) {
+            const value = (byId.value as string).trim()
+            return value
+          }
+
+          // 2) Fallback: match on label containing "opp"
+          const byLabel = resultData.find(
+            (rd: any) =>
+              rd &&
+              typeof rd.label === 'string' &&
+              String(rd.label).toLowerCase().includes('opp') &&
+              typeof rd.value === 'string' &&
+              rd.value.trim(),
+          )
+
+          if (byLabel) {
+            const value = (byLabel.value as string).trim()
+            return value
+          }
+        }
+
+        // 3) Fallbacks: generic search in lead/sale objects
+        const fromLead = extractOppNumberFromObject(lead)
+        if (fromLead) {
+          return fromLead
+        }
+
+        const fromSale = extractOppNumberFromObject(sale)
+        if (fromSale) {
+          return fromSale
+        }
+
+        return null
+      } catch (err) {
+        console.warn(`Error while extracting OPP nr for sale ${externalId}:`, err)
+        return null
+      }
+    }
+
+    // Helper function to fetch sales for a lead from Adversus /sales endpoint
+    async function fetchSalesForLead(leadId: number): Promise<{ productTitles: string[], totalPrice: number } | null> {
+      if (salesCache.has(leadId)) {
+        return salesCache.get(leadId) || null
+      }
+      
+      await delay(200)
+      
+      try {
+        // Try multiple filter formats for leadId (Adversus API can be inconsistent)
+        const filterFormats = [
+          { leadid: { $eq: leadId } },
+          { lead: { $eq: leadId } },
+          { leadId: { $eq: leadId } }
+        ]
+        
+        for (const filterObj of filterFormats) {
+          const filterStr = encodeURIComponent(JSON.stringify(filterObj))
+          const url = `${baseUrl}/sales?pageSize=10&filters=${filterStr}`
+          
+          const response = await fetch(url, {
+            headers: {
+              'Authorization': `Basic ${authHeader}`,
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          if (response.ok) {
+            const data = await response.json()
+            const sales = Array.isArray(data) ? data : (data.sales || [])
+            
+            if (sales.length > 0) {
+              const productTitles: string[] = []
+              
+              for (const sale of sales) {
+                if (sale.lines && Array.isArray(sale.lines)) {
+                  for (const line of sale.lines) {
+                    if (line.title) productTitles.push(line.title)
+                  }
+                }
+                if (sale.product && typeof sale.product === 'string') {
+                  productTitles.push(sale.product)
+                }
+                if (sale.productName) {
+                  productTitles.push(sale.productName)
+                }
+                
+                if (productTitles.length > 0) {
+                  const result = { productTitles, totalPrice: sale.totalNetPrice || sale.totalPrice || 0 }
+                  salesCache.set(leadId, result)
+                  return result
+                }
+              }
+            }
+          }
+        }
+        
+        salesCache.set(leadId, null)
+        return null
+      } catch (err) {
+        console.warn(`Error fetching sales for lead ${leadId}:`, err)
+        salesCache.set(leadId, null)
+        return null
+      }
+    }
+
     console.log('Starting Adversus sync...')
 
     // Parse request body for date range or debug action
@@ -1363,7 +1574,7 @@ Deno.serve(async (req) => {
     let salesUpdated = 0
     let unmatchedSales = 0
     let newMappingsCreated = 0
-    let leadsFetched = 0
+    let localLeadsFetched = 0
     const productMatchStats: Record<string, number> = {}
     const outcomeStats: Record<string, number> = {}
 
@@ -1377,260 +1588,6 @@ Deno.serve(async (req) => {
 
     // Track which campaign+outcome combinations we've already created in this sync
     const createdMappingsThisSync = new Set<string>()
-    
-    // Cache for lead data to avoid duplicate fetches
-    const leadCache = new Map<number, AdversusLead | null>()
-    
-    // Cache for Adversus sales data by leadId
-    const salesCache = new Map<number, { productTitles: string[], totalPrice: number } | null>()
-
-    // Helper function to fetch sales for a lead from Adversus /sales endpoint
-    async function fetchSalesForLead(leadId: number): Promise<{ productTitles: string[], totalPrice: number } | null> {
-      if (salesCache.has(leadId)) {
-        return salesCache.get(leadId) || null
-      }
-      
-      await delay(200)
-      
-      try {
-        // Try multiple filter formats for leadId (Adversus API can be inconsistent)
-        const filterFormats = [
-          { leadid: { $eq: leadId } },
-          { lead: { $eq: leadId } },
-          { leadId: { $eq: leadId } }
-        ]
-        
-        for (const filter of filterFormats) {
-          const salesResponse = await fetch(`${baseUrl}/sales?filters=${encodeURIComponent(JSON.stringify(filter))}`, {
-            headers: {
-              'Authorization': `Basic ${authHeader}`,
-              'Content-Type': 'application/json'
-            }
-          })
-          
-          if (salesResponse.ok) {
-            const salesData = await salesResponse.json()
-            const sales = Array.isArray(salesData) ? salesData : (salesData.sales || [])
-            
-            if (sales.length > 0) {
-              // Get the most recent sale
-              const sale = sales[0]
-              const productTitles: string[] = []
-              
-              // Extract product titles from sale lines
-              if (sale.lines && Array.isArray(sale.lines)) {
-                for (const line of sale.lines) {
-                  if (line.title) {
-                    productTitles.push(line.title)
-                  }
-                }
-              }
-              
-              // Also check for product field directly on sale
-              if (sale.product && typeof sale.product === 'string') {
-                productTitles.push(sale.product)
-              }
-              if (sale.productName) {
-                productTitles.push(sale.productName)
-              }
-              
-              if (productTitles.length > 0) {
-                console.log(`✓ Found Adversus sale for lead ${leadId}: ${productTitles.join(', ')}`)
-                const result = { productTitles, totalPrice: sale.totalNetPrice || sale.totalPrice || 0 }
-                salesCache.set(leadId, result)
-                return result
-              }
-            }
-          }
-        }
-        
-        // Log when no sales found for debugging
-        console.log(`⚠ No Adversus sales found for lead ${leadId}`)
-        salesCache.set(leadId, null)
-        return null
-      } catch (err) {
-        console.warn(`Error fetching sales for lead ${leadId}:`, err)
-        salesCache.set(leadId, null)
-        return null
-      }
-    }
-
-    // Helper function to extract OPP number (e.g. "OPP-1067162") from any Adversus sale/lead object
-    function extractOppNumberFromObject(obj: unknown): string | null {
-      if (!obj || typeof obj !== 'object') return null
-
-      const visited = new Set<unknown>()
-
-      const search = (current: any): string | null => {
-        if (!current || typeof current !== 'object') return null
-        if (visited.has(current)) return null
-        visited.add(current)
-
-        for (const [key, value] of Object.entries(current)) {
-          if (typeof value === 'string') {
-            const trimmed = value.trim()
-            if (!trimmed) continue
-
-            // Direct match like "OPP-1067162" or "opp 1067162"
-            const oppMatch = trimmed.match(/opp[-\s:]?(\d{4,})/i)
-            if (oppMatch) {
-              const normalized = `OPP-${oppMatch[1]}`
-              console.log(`✓ Found OPP number "${normalized}" on key "${key}"`)
-              return normalized
-            }
-
-            // Values that are only digits but the key mentions OPP
-            if (/^\d{4,}$/.test(trimmed) && key.toLowerCase().includes('opp')) {
-              const normalized = `OPP-${trimmed}`
-              console.log(`✓ Found OPP number "${normalized}" on key "${key}" (digits only)`)
-              return normalized
-            }
-          } else if (value && typeof value === 'object') {
-            const nested = search(value as any)
-            if (nested) return nested
-          }
-        }
-
-        return null
-      }
-
-      return search(obj as any)
-    }
-
-    // Helper function to fetch lead data
-    async function fetchLead(leadId: number, campaignId?: number): Promise<AdversusLead | null> {
-      if (leadCache.has(leadId)) {
-        return leadCache.get(leadId) || null
-      }
-      
-      // Add small delay before fetching lead to avoid rate limits
-      await delay(200)
-      
-      try {
-        const leadResponse = await fetch(`${baseUrl}/leads/${leadId}`, {
-          headers: {
-            'Authorization': `Basic ${authHeader}`,
-            'Content-Type': 'application/json'
-          }
-        })
-        
-        if (leadResponse.ok) {
-          const leadData = await leadResponse.json()
-          // Handle both direct object and array response
-          const lead = Array.isArray(leadData) ? leadData[0] : (leadData.leads ? leadData.leads[0] : leadData)
-          
-          // Log first 5 leads with ALL fields to find product selection
-          if (leadsFetched < 5) {
-            console.log(`=== FULL LEAD DATA ${leadId} (Campaign: ${campaignId}) ===`)
-            console.log('Lead keys:', Object.keys(lead || {}))
-            console.log('status:', lead?.status)
-            console.log('result:', lead?.result)
-            console.log('outcome:', lead?.outcome)
-            console.log('closingCode:', lead?.closingCode)
-            console.log('product:', lead?.product)
-            // Log any field that might contain product info
-            for (const key of Object.keys(lead || {})) {
-              if (key !== 'resultData' && key !== 'contactData') {
-                console.log(`  ${key}:`, JSON.stringify(lead[key]))
-              }
-            }
-            console.log('resultData:', JSON.stringify(lead?.resultData || [], null, 2))
-            console.log(`=== END FULL LEAD ${leadId} ===`)
-          }
-          
-          leadCache.set(leadId, lead)
-          leadsFetched++
-          return lead
-        } else {
-          console.warn(`Could not fetch lead ${leadId}: ${leadResponse.status}`)
-          leadCache.set(leadId, null)
-          return null
-        }
-      } catch (err) {
-        console.warn(`Error fetching lead ${leadId}:`, err)
-        leadCache.set(leadId, null)
-        return null
-      }
-    }
-
-    // Helper function to fetch OPP number ("OPP nr") for a sale via its lead/result data
-    async function fetchOppNumberForSale(sale: any, externalId: string): Promise<string | null> {
-      try {
-        if (!sale || !sale.leadId) {
-          console.log(`Sale ${externalId} has no leadId, skipping OPP nr lookup`)
-          return extractOppNumberFromObject(sale)
-        }
-
-        const lead = await fetchLead(sale.leadId, sale.campaignId)
-
-        if (!lead) {
-          console.log(`No lead data for sale ${externalId} (leadId ${sale.leadId}), falling back to sale object`)
-          return extractOppNumberFromObject(sale)
-        }
-
-        const leadAny = lead as any
-        const resultData = Array.isArray(leadAny.resultData) ? leadAny.resultData : []
-        const OPP_FIELD_ID = 80862
-
-        if (resultData.length > 0) {
-          // 1) Exact match on result field id 80862 ("OPP nr")
-          const byId = resultData.find(
-            (rd: any) => rd && rd.id === OPP_FIELD_ID && typeof rd.value === 'string' && rd.value.trim(),
-          )
-
-          if (byId) {
-            const value = (byId.value as string).trim()
-            console.log(
-              ` Found OPP nr for sale ${externalId} via resultData id ${OPP_FIELD_ID}: "${value}"`,
-            )
-            return value
-          }
-
-          // 2) Fallback: match on label containing "opp"
-          const byLabel = resultData.find(
-            (rd: any) =>
-              rd &&
-              typeof rd.label === 'string' &&
-              String(rd.label).toLowerCase().includes('opp') &&
-              typeof rd.value === 'string' &&
-              rd.value.trim(),
-          )
-
-          if (byLabel) {
-            const value = (byLabel.value as string).trim()
-            console.log(
-              ` Found OPP nr for sale ${externalId} via resultData label "${byLabel.label}": "${value}"`,
-            )
-            return value
-          }
-        } else {
-          console.log(`Lead ${sale.leadId} has no resultData, cannot extract OPP nr`)
-        }
-
-        // 3) Fallbacks: generic search in lead/sale objects
-        const fromLead = extractOppNumberFromObject(lead)
-        if (fromLead) {
-          console.log(
-            ` Found OPP nr for sale ${externalId} via generic search in lead: "${fromLead}"`,
-          )
-          return fromLead
-        }
-
-        const fromSale = extractOppNumberFromObject(sale)
-        if (fromSale) {
-          console.log(
-            ` Found OPP nr for sale ${externalId} via generic search in sale: "${fromSale}"`,
-          )
-          return fromSale
-        }
-
-        console.log(` Could not find OPP nr for sale ${externalId} (leadId ${sale.leadId})`)
-        return null
-      } catch (err) {
-        console.warn(`Error while extracting OPP nr for sale ${externalId}:`, err)
-        return null
-      }
-    }
 
     // Helper function to extract outcome from lead resultData
     function extractOutcome(lead: AdversusLead | null, campaignId: number): string | null {
