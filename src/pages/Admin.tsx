@@ -7,10 +7,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Shield, Users, Crown, User, Search, Info } from "lucide-react";
+import { Shield, Users, Crown, User, Search, Info, Trash2 } from "lucide-react";
 import { useCanAccess, SystemRole } from "@/hooks/useSystemRoles";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface EmployeeRole {
   employee_id: string;
@@ -26,6 +37,8 @@ interface EmployeeRole {
 
 export default function Admin() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<EmployeeRole | null>(null);
   const queryClient = useQueryClient();
   const { isOwner, isLoading: accessLoading } = useCanAccess();
 
@@ -76,6 +89,39 @@ export default function Admin() {
       toast.error("Kunne ikke fjerne rolle: " + error.message);
     },
   });
+
+  // Delete employee mutation
+  const deleteEmployee = useMutation({
+    mutationFn: async (employeeId: string) => {
+      // First delete from employee_master_data (this will cascade to related tables)
+      const { error } = await supabase
+        .from("employee_master_data")
+        .delete()
+        .eq("id", employeeId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-employee-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("Medarbejder slettet");
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast.error("Kunne ikke slette medarbejder: " + error.message);
+    },
+  });
+
+  const handleDeleteClick = (user: EmployeeRole) => {
+    setUserToDelete(user);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (userToDelete) {
+      deleteEmployee.mutate(userToDelete.employee_id);
+    }
+  };
 
   const filteredUsers = users?.filter((user) => {
     const fullName = `${user.first_name || ""} ${user.last_name || ""}`.toLowerCase();
@@ -306,36 +352,46 @@ export default function Admin() {
                       </TableCell>
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
                       <TableCell>
-                        {user.auth_user_id && user.email ? (
-                          <Select
-                            value={user.role || "none"}
-                            onValueChange={(value) => {
-                              if (value === "none") {
-                                removeRole.mutate(user.email!);
-                              } else {
-                                assignRole.mutate({
-                                  email: user.email!,
-                                  role: value as SystemRole,
-                                });
-                              }
-                            }}
+                        <div className="flex items-center gap-2">
+                          {user.auth_user_id && user.email ? (
+                            <Select
+                              value={user.role || "none"}
+                              onValueChange={(value) => {
+                                if (value === "none") {
+                                  removeRole.mutate(user.email!);
+                                } else {
+                                  assignRole.mutate({
+                                    email: user.email!,
+                                    role: value as SystemRole,
+                                  });
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="w-[140px]">
+                                <SelectValue placeholder="Vælg rolle" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Ingen rolle</SelectItem>
+                                <SelectItem value="medarbejder">Medarbejder</SelectItem>
+                                <SelectItem value="rekruttering">Rekruttering</SelectItem>
+                                <SelectItem value="teamleder">Teamleder</SelectItem>
+                                <SelectItem value="ejer">Ejer</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              Kræver login
+                            </span>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteClick(user)}
                           >
-                            <SelectTrigger className="w-[160px]">
-                              <SelectValue placeholder="Vælg rolle" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Ingen rolle</SelectItem>
-                              <SelectItem value="medarbejder">Medarbejder</SelectItem>
-                              <SelectItem value="rekruttering">Rekruttering</SelectItem>
-                              <SelectItem value="teamleder">Teamleder</SelectItem>
-                              <SelectItem value="ejer">Ejer</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            Kræver login
-                          </span>
-                        )}
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -352,6 +408,30 @@ export default function Admin() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slet medarbejder?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Er du sikker på, at du vil slette{" "}
+              <strong>{userToDelete?.first_name} {userToDelete?.last_name}</strong>?
+              <br /><br />
+              Denne handling kan ikke fortrydes. Alle data tilknyttet medarbejderen vil blive slettet.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteEmployee.isPending ? "Sletter..." : "Slet medarbejder"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
