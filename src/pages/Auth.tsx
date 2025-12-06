@@ -4,22 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, User, Wifi, WifiOff, RefreshCw } from "lucide-react";
+import { Mail, Lock, Wifi, WifiOff, RefreshCw, ArrowLeft } from "lucide-react";
 import cphSalesLogo from "@/assets/cph-sales-logo-dark.png";
 
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isResetMode, setIsResetMode] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const { toast } = useToast();
 
   const testConnection = async () => {
     setConnectionStatus('checking');
     try {
-      // Simple health check - just get the session (doesn't require auth)
       const { error } = await supabase.auth.getSession();
       if (error) throw error;
       setConnectionStatus('connected');
@@ -39,7 +37,6 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
 
-    // Test connection first
     const isConnected = await testConnection();
     if (!isConnected) {
       toast({
@@ -52,7 +49,17 @@ export default function Auth() {
     }
 
     try {
-      if (isLogin) {
+      if (isResetMode) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth`,
+        });
+        if (error) throw error;
+        toast({
+          title: "Email sendt",
+          description: "Tjek din indbakke for at nulstille din adgangskode.",
+        });
+        setIsResetMode(false);
+      } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -62,22 +69,6 @@ export default function Auth() {
           title: "Velkommen tilbage!",
           description: "Du er nu logget ind.",
         });
-      } else {
-        const redirectUrl = `${window.location.origin}/`;
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: redirectUrl,
-            data: { name },
-          },
-        });
-        if (error) throw error;
-        toast({
-          title: "Konto oprettet!",
-          description: "Du kan nu logge ind.",
-        });
-        setIsLogin(true);
       }
     } catch (error: any) {
       const message = error.message === "Failed to fetch" 
@@ -119,10 +110,7 @@ export default function Auth() {
             alt="CPH Sales" 
             className="mx-auto h-24 w-auto"
           />
-          <h1 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
-            Copenhagen Sales
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-4 text-sm text-muted-foreground">
             Løn- og performance-system
           </p>
         </div>
@@ -167,28 +155,10 @@ export default function Auth() {
         {/* Form Card */}
         <div className="rounded-xl border border-border bg-card p-8 shadow-xl">
           <h2 className="text-xl font-semibold text-foreground mb-6">
-            {isLogin ? "Log ind" : "Opret konto"}
+            {isResetMode ? "Nulstil adgangskode" : "Log ind"}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="name">Navn</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="Dit fulde navn"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="pl-10"
-                    required={!isLogin}
-                  />
-                </div>
-              </div>
-            )}
-
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
@@ -205,42 +175,53 @@ export default function Auth() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Adgangskode</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10"
-                  required
-                  minLength={6}
-                />
+            {!isResetMode && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Adgangskode</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10"
+                    required
+                    minLength={6}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             <Button 
               type="submit" 
               className="w-full" 
               disabled={loading || connectionStatus === 'error'}
             >
-              {loading ? "Vent venligst..." : isLogin ? "Log ind" : "Opret konto"}
+              {loading ? "Vent venligst..." : isResetMode ? "Send nulstillingslink" : "Log ind"}
             </Button>
           </form>
 
           <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-primary hover:underline"
-            >
-              {isLogin
-                ? "Har du ikke en konto? Opret en her"
-                : "Har du allerede en konto? Log ind"}
-            </button>
+            {isResetMode ? (
+              <button
+                type="button"
+                onClick={() => setIsResetMode(false)}
+                className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+              >
+                <ArrowLeft className="h-3 w-3" />
+                Tilbage til login
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsResetMode(true)}
+                className="text-sm text-muted-foreground hover:text-primary hover:underline"
+              >
+                Glemt adgangskode?
+              </button>
+            )}
           </div>
         </div>
       </div>
