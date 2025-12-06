@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.backfill-opp]
 verify_jwt = false
+
+[functions.update-cron-schedule]
+verify_jwt = true
