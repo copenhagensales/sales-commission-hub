@@ -16,14 +16,19 @@ export function useCarQuizCompletion() {
   return useQuery({
     queryKey: ["car-quiz-completion", user?.id],
     queryFn: async () => {
-      if (!user) return null;
+      if (!user?.email) return null;
 
       // Get employee ID from email
-      const { data: employee } = await supabase
+      const { data: employee, error: employeeError } = await supabase
         .from("employee_master_data")
         .select("id")
         .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
         .maybeSingle();
+
+      if (employeeError) {
+        console.error("Error fetching employee:", employeeError);
+        return null;
+      }
 
       if (!employee) return null;
 
@@ -60,15 +65,16 @@ export function useSubmitCarQuiz() {
 
   return useMutation({
     mutationFn: async ({ answers, gpsAccepted, summaryAccepted }: SubmitQuizParams) => {
-      if (!user) throw new Error("Not authenticated");
+      if (!user?.email) throw new Error("Not authenticated");
 
       // Get employee data from email
-      const { data: employee } = await supabase
+      const { data: employee, error: employeeError } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, private_email")
         .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
         .maybeSingle();
 
+      if (employeeError) throw new Error("Error finding employee");
       if (!employee) throw new Error("Employee not found");
 
       // Get IP address
@@ -238,7 +244,7 @@ export function useCarQuizLock() {
   const { data, isLoading: queryLoading } = useQuery({
     queryKey: ["car-quiz-lock", user?.id],
     queryFn: async () => {
-      if (!user) return { isLocked: false, daysRemaining: null as number | null };
+      if (!user?.email) return { isLocked: false, daysRemaining: null as number | null };
 
       try {
         // Get employee data
