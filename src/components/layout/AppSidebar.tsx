@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useShouldShowPulseSurvey } from "@/hooks/usePulseSurvey";
 import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
 import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
+import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 
 // Navigation items for teamleder and above
 const teamlederNavigation = [
@@ -88,6 +89,8 @@ export function AppSidebar() {
   const { showMenuItem: showPulseSurvey, showBadge: showPulseBadge } = useShouldShowPulseSurvey();
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
   const { data: carQuizCompletion } = useCarQuizCompletion();
+  const { data: isSalgskonsulent } = useIsSalgskonsulent();
+  const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
 
@@ -212,6 +215,27 @@ export function AppSidebar() {
                 Firmabil
               </div>
               {!carQuizCompletion && (
+                <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
+                  !
+                </Badge>
+              )}
+            </NavLink>
+          )}
+
+          {/* Code of Conduct menu item for Salgskonsulenter and owners */}
+          {(isSalgskonsulent || isOwner) && (
+            <NavLink
+              to="/code-of-conduct"
+              className={cn(
+                "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/code-of-conduct" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <Shield className="h-5 w-5" />
+                Code of Conduct
+              </div>
+              {codeOfConductRequired && (
                 <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
                   !
                 </Badge>

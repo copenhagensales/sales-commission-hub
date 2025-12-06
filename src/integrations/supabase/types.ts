@@ -575,6 +575,82 @@ export type Database = {
         }
         Relationships: []
       }
+      code_of_conduct_attempts: {
+        Row: {
+          answers: Json
+          attempt_number: number
+          created_at: string
+          employee_id: string
+          id: string
+          ip_address: string | null
+          passed: boolean
+          submitted_at: string
+          user_agent: string | null
+          wrong_question_numbers: number[]
+        }
+        Insert: {
+          answers: Json
+          attempt_number?: number
+          created_at?: string
+          employee_id: string
+          id?: string
+          ip_address?: string | null
+          passed?: boolean
+          submitted_at?: string
+          user_agent?: string | null
+          wrong_question_numbers?: number[]
+        }
+        Update: {
+          answers?: Json
+          attempt_number?: number
+          created_at?: string
+          employee_id?: string
+          id?: string
+          ip_address?: string | null
+          passed?: boolean
+          submitted_at?: string
+          user_agent?: string | null
+          wrong_question_numbers?: number[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "code_of_conduct_attempts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      code_of_conduct_completions: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          passed_at: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          passed_at?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          passed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "code_of_conduct_completions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       communication_log: {
         Row: {
           booking_id: string | null
