@@ -230,12 +230,12 @@ export default function ExtraWorkAdmin() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label>Medarbejder</Label>
-                <Select value={employeeId} onValueChange={setEmployeeId}>
+              <Select value={employeeId || "all"} onValueChange={(v) => setEmployeeId(v === "all" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Alle medarbejdere" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Alle medarbejdere</SelectItem>
+                    <SelectItem value="all">Alle medarbejdere</SelectItem>
                     {teamEmployees?.map((emp) => (
                       <SelectItem key={emp.id} value={emp.id}>
                         {emp.first_name} {emp.last_name}
@@ -262,12 +262,12 @@ export default function ExtraWorkAdmin() {
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Alle statusser" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Alle statusser</SelectItem>
+                    <SelectItem value="all">Alle statusser</SelectItem>
                     <SelectItem value="pending">Afventer</SelectItem>
                     <SelectItem value="approved">Godkendt</SelectItem>
                     <SelectItem value="rejected">Afvist</SelectItem>
