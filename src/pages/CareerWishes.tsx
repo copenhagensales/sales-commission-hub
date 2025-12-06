@@ -382,19 +382,6 @@ export default function CareerWishes() {
               </div>
             )}
 
-            {/* Other Comments - only show when purpose is selected */}
-            {formPurpose && (
-              <div className="space-y-2">
-                <Label htmlFor="other-comments">Andet, vi bør vide? (valgfri)</Label>
-                <Textarea
-                  id="other-comments"
-                  placeholder="Her kan du skrive alt andet, der kan være relevant."
-                  value={otherComments}
-                  onChange={(e) => setOtherComments(e.target.value)}
-                  rows={3}
-                />
-              </div>
-            )}
 
             {/* Submit Button */}
             {formPurpose && (
