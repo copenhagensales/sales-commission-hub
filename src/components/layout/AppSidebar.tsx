@@ -37,8 +37,6 @@ const ownerNavigation = [
 const teamlederNavigation = [
   { name: "Vagtplan", href: "/shift-planning", icon: ClipboardList },
   { name: "Fravær", href: "/shift-planning/absence", icon: Clock },
-  { name: "Tidsregistrering", href: "/shift-planning/time-tracking", icon: Timer },
-  { name: "Ekstra arbejde", href: "/extra-work-admin", icon: Plus },
   { name: "Mit team", href: "/employees", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
@@ -59,7 +57,6 @@ const rekrutteringNavigation = [
 // Navigation items for employees
 const employeeNavigation = [
   { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
-  { name: "Ekstra arbejde", href: "/extra-work", icon: Plus },
   { name: "Min profil", href: "/my-profile", icon: Users },
   { name: "Min kontrakt", href: "/my-contracts", icon: FileText },
   { name: "Teamønsker & karriere", href: "/career-wishes", icon: Sparkles },
@@ -109,6 +106,11 @@ export function AppSidebar() {
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
+  const [timeTrackingOpen, setTimeTrackingOpen] = useState(
+    location.pathname === "/shift-planning/time-tracking" || 
+    location.pathname === "/extra-work" || 
+    location.pathname === "/extra-work-admin"
+  );
 
   // Fetch employee name and pending contracts count
   const { data: employeeData } = useQuery({
@@ -356,6 +358,46 @@ export function AppSidebar() {
           )}
         </nav>
         <div className="border-t border-sidebar-border p-4 space-y-2">
+          {/* Tidsregistrering with Ekstra arbejde submenu */}
+          <Collapsible open={timeTrackingOpen} onOpenChange={setTimeTrackingOpen}>
+            <CollapsibleTrigger className={cn(
+              "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              (location.pathname === "/shift-planning/time-tracking" || location.pathname === "/extra-work" || location.pathname === "/extra-work-admin") 
+                ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}>
+              <div className="flex items-center gap-3">
+                <Timer className="h-5 w-5" />
+                Tidsregistrering
+              </div>
+              {timeTrackingOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pl-4 space-y-1 mt-1">
+              {isTeamlederOrAbove && (
+                <NavLink
+                  to="/shift-planning/time-tracking"
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/shift-planning/time-tracking" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <Clock className="h-4 w-4" />
+                  Oversigt
+                </NavLink>
+              )}
+              <NavLink
+                to={isTeamlederOrAbove ? "/extra-work-admin" : "/extra-work"}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  (location.pathname === "/extra-work" || location.pathname === "/extra-work-admin") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}
+              >
+                <Plus className="h-4 w-4" />
+                Ekstra arbejde
+              </NavLink>
+            </CollapsibleContent>
+          </Collapsible>
+
           <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50">
             <LogOut className="h-5 w-5" />
             Log ud
