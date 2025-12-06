@@ -43,10 +43,27 @@ export default function VagtMinUge() {
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
-  const { data: assignments, isLoading } = useQuery({
-    queryKey: ["vagt-my-assignments", user?.id, format(calendarStart, "yyyy-MM-dd"), format(calendarEnd, "yyyy-MM-dd")],
+  // First, get the employee record for this user by email
+  const { data: vagtEmployee } = useQuery({
+    queryKey: ["vagt-employee-by-email", user?.email],
     queryFn: async () => {
-      if (!user) return [];
+      if (!user?.email) return null;
+      const { data, error } = await supabase
+        .from("employee")
+        .select("id, full_name, email")
+        .eq("email", user.email)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.email,
+  });
+
+  const { data: assignments, isLoading } = useQuery({
+    queryKey: ["vagt-my-assignments", vagtEmployee?.id, format(calendarStart, "yyyy-MM-dd"), format(calendarEnd, "yyyy-MM-dd")],
+    queryFn: async () => {
+      if (!vagtEmployee?.id) return [];
 
       const { data, error } = await supabase
         .from("booking_assignment")
@@ -58,7 +75,7 @@ export default function VagtMinUge() {
             brand (name, color_hex)
           )
         `)
-        .eq("employee_id", user.id)
+        .eq("employee_id", vagtEmployee.id)
         .gte("date", format(calendarStart, "yyyy-MM-dd"))
         .lte("date", format(calendarEnd, "yyyy-MM-dd"))
         .order("date")
@@ -67,7 +84,7 @@ export default function VagtMinUge() {
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
+    enabled: !!vagtEmployee?.id,
   });
 
   const onMyWayMutation = useMutation({
