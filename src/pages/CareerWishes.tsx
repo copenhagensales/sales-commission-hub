@@ -363,7 +363,6 @@ export default function CareerWishes() {
                           <SelectItem value="junior_teamleder">Junior teamleder</SelectItem>
                           <SelectItem value="teamleder">Teamleder</SelectItem>
                           <SelectItem value="coach">Coach/træner</SelectItem>
-                          <SelectItem value="other">Andet (skriv i kommentarfeltet)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
