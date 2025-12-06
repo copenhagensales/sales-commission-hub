@@ -65,13 +65,19 @@
 
     /* Sidebar */
     --sidebar-background: 222 47% 9%;
-    --sidebar-foreground: 0 0% 9%;
+    --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 161 93% 30%;
     --sidebar-primary-foreground: 151 80% 95%;
     --sidebar-accent: 0 0% 32%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 0 0% 83%;
     --sidebar-ring: 161 93% 30%;
+    
+    /* Main content background matching sidebar */
+    --background: 222 47% 9%;
+    --foreground: 0 0% 98%;
+    --card: 222 47% 12%;
+    --card-foreground: 0 0% 98%;
     --sidebar-hover: 240 5% 15%;
     --chart-1: 158 64% 51%;
     --chart-2: 141 69% 58%;
