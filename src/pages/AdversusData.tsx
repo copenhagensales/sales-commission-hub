@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import { CphAdversusApiTab } from "@/components/adversus/CphAdversusApiTab";
 
 interface AdversusStats {
   eventsTotal: number;
@@ -736,58 +737,7 @@ export default function AdversusData() {
           </TabsContent>
 
           <TabsContent value="cph-api">
-            <section aria-label="CPH Adversus API" className="space-y-3">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold">CPH Adversus API</h2>
-                <Badge variant="outline" className="text-xs">
-                  API Integration
-                </Badge>
-              </div>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">API Endpoint</p>
-                        <code className="block bg-muted/50 p-3 rounded text-xs break-all border">
-                          https://api.adversus.io/
-                        </code>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Autentificering</p>
-                        <p className="text-sm text-muted-foreground">
-                          Basic Auth med brugernavn og adgangskode (konfigureret i Indstillinger)
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="border-t pt-4">
-                      <p className="text-sm font-medium mb-2">Aktiverede datakilder</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="secondary">Salg</Badge>
-                        <Badge variant="secondary">Kampagner</Badge>
-                        <Badge variant="secondary">Produkter</Badge>
-                      </div>
-                    </div>
-
-                    <div className="border-t pt-4">
-                      <p className="text-sm font-medium mb-2">Sync funktioner</p>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• <code className="font-mono text-xs">sync-adversus</code> - Synkroniserer salgsdata til database</li>
-                        <li>• <code className="font-mono text-xs">adversus-webhook</code> - Modtager realtime events fra Adversus</li>
-                        <li>• <code className="font-mono text-xs">backfill-opp</code> - Henter manglende OPP numre for TDC salg</li>
-                      </ul>
-                    </div>
-
-                    <div className="border-t pt-4">
-                      <p className="text-sm text-muted-foreground">
-                        Konfigurer API-nøgler og sync-indstillinger under <span className="font-medium">Indstillinger → API-integrationer</span>
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </section>
+            <CphAdversusApiTab />
           </TabsContent>
         </Tabs>
       </div>
