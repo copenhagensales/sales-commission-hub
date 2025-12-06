@@ -750,43 +750,12 @@ Deno.serve(async (req) => {
       }
 
       let created = 0,
-        skipped = 0,
+        updated = 0,
         errors = 0
 
       for (const sale of allSalesSync) {
         const externalId = String(sale.id)
-
-        if (existingIds.has(externalId)) {
-          // Existing sale: ensure OPP nr is filled via lead/resultData
-          try {
-            const oppNumber = await fetchOppNumberForSale(sale, externalId)
-            if (oppNumber) {
-              const { error: oppUpdateError } = await supabase
-                .from('sales')
-                .update({ adversus_opp_number: oppNumber })
-                .eq('adversus_external_id', externalId)
-
-              if (oppUpdateError) {
-                console.warn(
-                  `Could not update OPP nr for existing TDC October sale ${externalId}:`,
-                  oppUpdateError.message,
-                )
-              } else {
-                console.log(
-                  `Updated OPP nr for existing TDC October sale ${externalId} to "${oppNumber}"`,
-                )
-              }
-            }
-          } catch (err) {
-            console.warn(
-              `Error while ensuring OPP nr for existing TDC October sale ${externalId}:`,
-              err,
-            )
-          }
-
-          skipped++
-          continue
-        }
+        const isExisting = existingIds.has(externalId)
 
         try {
           const campaignName = campaignLookup[sale.campaignId] || `Campaign ${sale.campaignId}`
@@ -796,44 +765,15 @@ Deno.serve(async (req) => {
               email: '',
             }
 
-          const payload = {
-            type: 'sale',
-            event_time: sale.closedTime || sale.createdTime,
-            payload: {
-              result_id: sale.id,
-              campaign: { id: String(sale.campaignId), name: campaignName },
-              user: {
-                id: String(sale.ownedBy || sale.createdBy),
-                name: user.name,
-                email: user.email,
-              },
-              lead: { id: sale.leadId, phone: '', company: '' },
-              products: (sale.lines || []).map(
-                (line: { productId: number; title: string; quantity: number; unitPrice: number }) => ({
-                  id: line.productId,
-                  externalId: String(line.productId),
-                  title: line.title,
-                  quantity: line.quantity || 1,
-                  unitPrice: line.unitPrice || 0,
-                })
-              ),
-            },
+          // Fetch OPP number for all sales
+          let oppNumber: string | null = null
+          try {
+            oppNumber = await fetchOppNumberForSale(sale, externalId)
+          } catch (err) {
+            console.warn(`Error while fetching OPP nr for TDC October sale ${externalId}:`, err)
           }
 
-          const { data: eventData, error: eventError } = await supabase
-            .from('adversus_events')
-            .insert({
-              external_id: externalId,
-              event_type: 'sale',
-              payload,
-              processed: false,
-              received_at: new Date().toISOString(),
-            })
-            .select()
-            .single()
-
-          if (eventError) throw eventError
-
+          // Get campaign mapping
           const { data: campaignMapping } = await supabase
             .from('adversus_campaign_mappings')
             .select('client_campaign_id')
@@ -851,63 +791,183 @@ Deno.serve(async (req) => {
             )
           }
 
-          let oppNumber: string | null = null
-          try {
-            oppNumber = await fetchOppNumberForSale(sale, externalId)
-          } catch (err) {
-            console.warn(`Error while fetching OPP nr for TDC October sale ${externalId}:`, err)
+          if (isExisting) {
+            // API PRIORITY: Update existing sale with authoritative data from API
+            console.log(`Updating existing TDC October sale ${externalId} with API data`)
+
+            const { data: existingSale } = await supabase
+              .from('sales')
+              .select('id, adversus_event_id')
+              .eq('adversus_external_id', externalId)
+              .maybeSingle()
+
+            if (existingSale) {
+              // Delete existing sale_items
+              await supabase
+                .from('sale_items')
+                .delete()
+                .eq('sale_id', existingSale.id)
+
+              // Update sale record
+              await supabase
+                .from('sales')
+                .update({
+                  client_campaign_id: campaignMapping?.client_campaign_id || null,
+                  agent_name: user.name,
+                  agent_external_id: String(sale.ownedBy || sale.createdBy),
+                  sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString(),
+                  adversus_opp_number: oppNumber,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existingSale.id)
+
+              // Update event payload
+              const payload = {
+                type: 'sale',
+                event_time: sale.closedTime || sale.createdTime,
+                payload: {
+                  result_id: sale.id,
+                  campaign: { id: String(sale.campaignId), name: campaignName },
+                  user: { id: String(sale.ownedBy || sale.createdBy), name: user.name, email: user.email },
+                  lead: { id: sale.leadId, phone: '', company: '' },
+                  products: (sale.lines || []).map(
+                    (line: { productId: number; title: string; quantity: number; unitPrice: number }) => ({
+                      id: line.productId,
+                      externalId: String(line.productId),
+                      title: line.title,
+                      quantity: line.quantity || 1,
+                      unitPrice: line.unitPrice || 0,
+                    })
+                  ),
+                },
+              }
+
+              if (existingSale.adversus_event_id) {
+                await supabase
+                  .from('adversus_events')
+                  .update({ payload, processed: true })
+                  .eq('id', existingSale.adversus_event_id)
+              }
+
+              // Re-create sale_items
+              const saleItems = []
+              for (const line of sale.lines || []) {
+                const matchedProduct = productsByName[line.title?.toLowerCase()]
+                const commission = matchedProduct?.commission_dkk || 0
+                const revenue = matchedProduct?.revenue_dkk || 0
+                const quantity = line.quantity || 1
+
+                saleItems.push({
+                  sale_id: existingSale.id,
+                  product_id: matchedProduct?.id || null,
+                  adversus_external_id: String(line.productId),
+                  adversus_product_title: line.title,
+                  quantity,
+                  unit_price: line.unitPrice || 0,
+                  mapped_commission: commission * quantity,
+                  mapped_revenue: revenue * quantity,
+                  needs_mapping: !matchedProduct,
+                  raw_data: line,
+                })
+              }
+
+              if (saleItems.length > 0) {
+                await supabase.from('sale_items').insert(saleItems)
+              }
+
+              updated++
+            }
+          } else {
+            // New sale: create fresh records
+            const payload = {
+              type: 'sale',
+              event_time: sale.closedTime || sale.createdTime,
+              payload: {
+                result_id: sale.id,
+                campaign: { id: String(sale.campaignId), name: campaignName },
+                user: {
+                  id: String(sale.ownedBy || sale.createdBy),
+                  name: user.name,
+                  email: user.email,
+                },
+                lead: { id: sale.leadId, phone: '', company: '' },
+                products: (sale.lines || []).map(
+                  (line: { productId: number; title: string; quantity: number; unitPrice: number }) => ({
+                    id: line.productId,
+                    externalId: String(line.productId),
+                    title: line.title,
+                    quantity: line.quantity || 1,
+                    unitPrice: line.unitPrice || 0,
+                  })
+                ),
+              },
+            }
+
+            const { data: eventData, error: eventError } = await supabase
+              .from('adversus_events')
+              .insert({
+                external_id: externalId,
+                event_type: 'sale',
+                payload,
+                processed: false,
+                received_at: new Date().toISOString(),
+              })
+              .select()
+              .single()
+
+            if (eventError) throw eventError
+
+            const { data: saleData, error: saleError } = await supabase
+              .from('sales')
+              .insert({
+                adversus_event_id: eventData.id,
+                client_campaign_id: campaignMapping?.client_campaign_id || null,
+                agent_name: user.name,
+                agent_external_id: String(sale.ownedBy || sale.createdBy),
+                customer_company: '',
+                customer_phone: '',
+                sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString(),
+                adversus_external_id: externalId,
+                adversus_opp_number: oppNumber,
+              })
+              .select()
+              .single()
+
+            if (saleError) throw saleError
+
+            const saleItems = []
+            for (const line of sale.lines || []) {
+              const matchedProduct = productsByName[line.title?.toLowerCase()]
+              const commission = matchedProduct?.commission_dkk || 0
+              const revenue = matchedProduct?.revenue_dkk || 0
+              const quantity = line.quantity || 1
+
+              saleItems.push({
+                sale_id: saleData.id,
+                product_id: matchedProduct?.id || null,
+                adversus_external_id: String(line.productId),
+                adversus_product_title: line.title,
+                quantity,
+                unit_price: line.unitPrice || 0,
+                mapped_commission: commission * quantity,
+                mapped_revenue: revenue * quantity,
+                needs_mapping: !matchedProduct,
+                raw_data: line,
+              })
+            }
+
+            if (saleItems.length > 0) {
+              await supabase.from('sale_items').insert(saleItems)
+            }
+
+            await supabase
+              .from('adversus_events')
+              .update({ processed: true })
+              .eq('id', eventData.id)
+
+            created++
+            existingIds.add(externalId)
           }
-
-          const { data: saleData, error: saleError } = await supabase
-            .from('sales')
-            .insert({
-              adversus_event_id: eventData.id,
-              client_campaign_id: campaignMapping?.client_campaign_id || null,
-              agent_name: user.name,
-              agent_external_id: String(sale.ownedBy || sale.createdBy),
-              customer_company: '',
-              customer_phone: '',
-              sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString(),
-              adversus_external_id: externalId,
-              adversus_opp_number: oppNumber,
-            })
-            .select()
-            .single()
-
-          if (saleError) throw saleError
-
-          const saleItems = []
-          for (const line of sale.lines || []) {
-            const matchedProduct = productsByName[line.title?.toLowerCase()]
-            const commission = matchedProduct?.commission_dkk || 0
-            const revenue = matchedProduct?.revenue_dkk || 0
-            const quantity = line.quantity || 1
-
-            saleItems.push({
-              sale_id: saleData.id,
-              product_id: matchedProduct?.id || null,
-              adversus_external_id: String(line.productId),
-              adversus_product_title: line.title,
-              quantity,
-              unit_price: line.unitPrice || 0,
-              mapped_commission: commission * quantity,
-              mapped_revenue: revenue * quantity,
-              needs_mapping: !matchedProduct,
-              raw_data: line,
-            })
-          }
-
-          if (saleItems.length > 0) {
-            await supabase.from('sale_items').insert(saleItems)
-          }
-
-          await supabase
-            .from('adversus_events')
-            .update({ processed: true })
-            .eq('id', eventData.id)
-
-          created++
-          existingIds.add(externalId)
         } catch (err) {
           console.error(`Error syncing TDC October 2025 sale ${externalId}:`, err)
           errors++
@@ -920,9 +980,9 @@ Deno.serve(async (req) => {
           scope: 'tdc-october-2025',
           fetched: allSalesSync.length,
           created,
-          skipped,
+          updated,
           errors,
-          message: `Synced ${created} new TDC Erhverv sales for October 2025, skipped ${skipped} existing, ${errors} errors`,
+          message: `Synced ${created} new, updated ${updated} existing TDC Erhverv sales for October 2025, ${errors} errors`,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -1003,79 +1063,25 @@ Deno.serve(async (req) => {
         productsByName[p.name.toLowerCase()] = p
       }
 
-      let created = 0, skipped = 0, errors = 0
+      let created = 0, updated = 0, errors = 0
 
       for (const sale of allSalesSync) {
         const externalId = String(sale.id)
-        
-        if (existingIds.has(externalId)) {
-          // Existing sale: ensure OPP nr is filled via lead/resultData
-          try {
-            const oppNumber = await fetchOppNumberForSale(sale, externalId)
-            if (oppNumber) {
-              const { error: oppUpdateError } = await supabase
-                .from('sales')
-                .update({ adversus_opp_number: oppNumber })
-                .eq('adversus_external_id', externalId)
-
-              if (oppUpdateError) {
-                console.warn(
-                  `Could not update OPP nr for existing sale ${externalId}:`,
-                  oppUpdateError.message,
-                )
-              } else {
-                console.log(
-                  `Updated OPP nr for existing sale ${externalId} to "${oppNumber}"`,
-                )
-              }
-            }
-          } catch (err) {
-            console.warn(
-              `Error while ensuring OPP nr for existing sale ${externalId}:`,
-              err,
-            )
-          }
-
-          skipped++
-          continue
-        }
+        const isExisting = existingIds.has(externalId)
 
         try {
           const campaignName = campaignLookup[sale.campaignId] || `Campaign ${sale.campaignId}`
           const user = userLookup[sale.ownedBy] || userLookup[sale.createdBy] || { name: 'Unknown', email: '' }
           
-          const payload = {
-            type: 'sale',
-            event_time: sale.closedTime || sale.createdTime,
-            payload: {
-              result_id: sale.id,
-              campaign: { id: String(sale.campaignId), name: campaignName },
-              user: { id: String(sale.ownedBy || sale.createdBy), name: user.name, email: user.email },
-              lead: { id: sale.leadId, phone: '', company: '' },
-              products: (sale.lines || []).map((line: { productId: number; title: string; quantity: number; unitPrice: number }) => ({
-                id: line.productId,
-                externalId: String(line.productId),
-                title: line.title,
-                quantity: line.quantity || 1,
-                unitPrice: line.unitPrice || 0
-              }))
-            }
+          // Fetch OPP number for all sales
+          let oppNumber: string | null = null
+          try {
+            oppNumber = await fetchOppNumberForSale(sale, externalId)
+          } catch (err) {
+            console.warn(`Error while fetching OPP nr for sale ${externalId}:`, err)
           }
 
-          const { data: eventData, error: eventError } = await supabase
-            .from('adversus_events')
-            .insert({
-              external_id: externalId,
-              event_type: 'sale',
-              payload,
-              processed: false,
-              received_at: new Date().toISOString()
-            })
-            .select()
-            .single()
-
-          if (eventError) throw eventError
-
+          // Get campaign mapping
           const { data: campaignMapping } = await supabase
             .from('adversus_campaign_mappings')
             .select('client_campaign_id')
@@ -1092,63 +1098,177 @@ Deno.serve(async (req) => {
               }, { onConflict: 'adversus_campaign_id' })
           }
 
-          let oppNumber: string | null = null
-          try {
-            oppNumber = await fetchOppNumberForSale(sale, externalId)
-          } catch (err) {
-            console.warn(`Error while fetching OPP nr for sale ${externalId}:`, err)
+          if (isExisting) {
+            // API PRIORITY: Update existing sale with authoritative data from API
+            console.log(`Updating existing sale ${externalId} with API data (API has priority)`)
+
+            // 1. Find existing sale record
+            const { data: existingSale } = await supabase
+              .from('sales')
+              .select('id, adversus_event_id')
+              .eq('adversus_external_id', externalId)
+              .maybeSingle()
+
+            if (existingSale) {
+              // 2. Delete existing sale_items
+              await supabase
+                .from('sale_items')
+                .delete()
+                .eq('sale_id', existingSale.id)
+
+              // 3. Update sale record with fresh API data
+              await supabase
+                .from('sales')
+                .update({
+                  client_campaign_id: campaignMapping?.client_campaign_id || null,
+                  agent_name: user.name,
+                  agent_external_id: String(sale.ownedBy || sale.createdBy),
+                  sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString(),
+                  adversus_opp_number: oppNumber,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existingSale.id)
+
+              // 4. Update adversus_event with latest payload
+              const payload = {
+                type: 'sale',
+                event_time: sale.closedTime || sale.createdTime,
+                payload: {
+                  result_id: sale.id,
+                  campaign: { id: String(sale.campaignId), name: campaignName },
+                  user: { id: String(sale.ownedBy || sale.createdBy), name: user.name, email: user.email },
+                  lead: { id: sale.leadId, phone: '', company: '' },
+                  products: (sale.lines || []).map((line: { productId: number; title: string; quantity: number; unitPrice: number }) => ({
+                    id: line.productId,
+                    externalId: String(line.productId),
+                    title: line.title,
+                    quantity: line.quantity || 1,
+                    unitPrice: line.unitPrice || 0
+                  }))
+                }
+              }
+
+              if (existingSale.adversus_event_id) {
+                await supabase
+                  .from('adversus_events')
+                  .update({ payload, processed: true })
+                  .eq('id', existingSale.adversus_event_id)
+              }
+
+              // 5. Re-create sale_items with fresh data
+              const saleItems = []
+              for (const line of sale.lines || []) {
+                const matchedProduct = productsByName[line.title?.toLowerCase()]
+                const commission = matchedProduct?.commission_dkk || 0
+                const revenue = matchedProduct?.revenue_dkk || 0
+                const quantity = line.quantity || 1
+
+                saleItems.push({
+                  sale_id: existingSale.id,
+                  product_id: matchedProduct?.id || null,
+                  adversus_external_id: String(line.productId),
+                  adversus_product_title: line.title,
+                  quantity,
+                  unit_price: line.unitPrice || 0,
+                  mapped_commission: commission * quantity,
+                  mapped_revenue: revenue * quantity,
+                  needs_mapping: !matchedProduct,
+                  raw_data: line
+                })
+              }
+
+              if (saleItems.length > 0) {
+                await supabase.from('sale_items').insert(saleItems)
+              }
+
+              updated++
+              console.log(`Updated sale ${externalId} with ${saleItems.length} items, OPP: ${oppNumber}`)
+            }
+          } else {
+            // New sale: create fresh records
+            const payload = {
+              type: 'sale',
+              event_time: sale.closedTime || sale.createdTime,
+              payload: {
+                result_id: sale.id,
+                campaign: { id: String(sale.campaignId), name: campaignName },
+                user: { id: String(sale.ownedBy || sale.createdBy), name: user.name, email: user.email },
+                lead: { id: sale.leadId, phone: '', company: '' },
+                products: (sale.lines || []).map((line: { productId: number; title: string; quantity: number; unitPrice: number }) => ({
+                  id: line.productId,
+                  externalId: String(line.productId),
+                  title: line.title,
+                  quantity: line.quantity || 1,
+                  unitPrice: line.unitPrice || 0
+                }))
+              }
+            }
+
+            const { data: eventData, error: eventError } = await supabase
+              .from('adversus_events')
+              .insert({
+                external_id: externalId,
+                event_type: 'sale',
+                payload,
+                processed: false,
+                received_at: new Date().toISOString()
+              })
+              .select()
+              .single()
+
+            if (eventError) throw eventError
+
+            const { data: saleData, error: saleError } = await supabase
+              .from('sales')
+              .insert({
+                adversus_event_id: eventData.id,
+                client_campaign_id: campaignMapping?.client_campaign_id || null,
+                agent_name: user.name,
+                agent_external_id: String(sale.ownedBy || sale.createdBy),
+                customer_company: '',
+                customer_phone: '',
+                sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString(),
+                adversus_external_id: externalId,
+                adversus_opp_number: oppNumber,
+              })
+              .select()
+              .single()
+
+            if (saleError) throw saleError
+
+            const saleItems = []
+            for (const line of sale.lines || []) {
+              const matchedProduct = productsByName[line.title?.toLowerCase()]
+              const commission = matchedProduct?.commission_dkk || 0
+              const revenue = matchedProduct?.revenue_dkk || 0
+              const quantity = line.quantity || 1
+
+              saleItems.push({
+                sale_id: saleData.id,
+                product_id: matchedProduct?.id || null,
+                adversus_external_id: String(line.productId),
+                adversus_product_title: line.title,
+                quantity,
+                unit_price: line.unitPrice || 0,
+                mapped_commission: commission * quantity,
+                mapped_revenue: revenue * quantity,
+                needs_mapping: !matchedProduct,
+                raw_data: line
+              })
+            }
+
+            if (saleItems.length > 0) {
+              await supabase.from('sale_items').insert(saleItems)
+            }
+
+            await supabase
+              .from('adversus_events')
+              .update({ processed: true })
+              .eq('id', eventData.id)
+
+            created++
+            existingIds.add(externalId)
           }
-
-          const { data: saleData, error: saleError } = await supabase
-            .from('sales')
-            .insert({
-              adversus_event_id: eventData.id,
-              client_campaign_id: campaignMapping?.client_campaign_id || null,
-              agent_name: user.name,
-              agent_external_id: String(sale.ownedBy || sale.createdBy),
-              customer_company: '',
-              customer_phone: '',
-              sale_datetime: sale.closedTime || sale.createdTime || new Date().toISOString(),
-              adversus_external_id: externalId,
-              adversus_opp_number: oppNumber,
-            })
-            .select()
-            .single()
-
-          if (saleError) throw saleError
-
-          const saleItems = []
-          for (const line of sale.lines || []) {
-            const matchedProduct = productsByName[line.title?.toLowerCase()]
-            const commission = matchedProduct?.commission_dkk || 0
-            const revenue = matchedProduct?.revenue_dkk || 0
-            const quantity = line.quantity || 1
-
-            saleItems.push({
-              sale_id: saleData.id,
-              product_id: matchedProduct?.id || null,
-              adversus_external_id: String(line.productId),
-              adversus_product_title: line.title,
-              quantity,
-              unit_price: line.unitPrice || 0,
-              mapped_commission: commission * quantity,
-              mapped_revenue: revenue * quantity,
-              needs_mapping: !matchedProduct,
-              raw_data: line
-            })
-          }
-
-          if (saleItems.length > 0) {
-            await supabase.from('sale_items').insert(saleItems)
-          }
-
-          await supabase
-            .from('adversus_events')
-            .update({ processed: true })
-            .eq('id', eventData.id)
-
-          created++
-          existingIds.add(externalId)
         } catch (err) {
           console.error(`Error syncing sale ${externalId}:`, err)
           errors++
@@ -1160,9 +1280,9 @@ Deno.serve(async (req) => {
           success: true,
           fetched: allSalesSync.length,
           created,
-          skipped,
+          updated,
           errors,
-          message: `Synced ${created} new sales, skipped ${skipped} existing, ${errors} errors`
+          message: `Synced ${created} new sales, updated ${updated} existing, ${errors} errors`
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
