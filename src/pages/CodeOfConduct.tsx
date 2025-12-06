@@ -16,6 +16,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 export default function CodeOfConduct() {
   const { toast } = useToast();
@@ -93,11 +94,13 @@ export default function CodeOfConduct() {
 
   if (completionLoading || attemptLoading) {
     return (
-      <div className="container mx-auto p-6 max-w-3xl">
-        <div className="animate-pulse text-center text-muted-foreground py-12">
-          Indlæser...
+      <MainLayout>
+        <div className="container mx-auto max-w-3xl">
+          <div className="animate-pulse text-center text-muted-foreground py-12">
+            Indlæser...
+          </div>
         </div>
-      </div>
+      </MainLayout>
     );
   }
 
@@ -108,108 +111,113 @@ export default function CodeOfConduct() {
     nextRenewal.setDate(nextRenewal.getDate() + 60); // 2 months
 
     return (
-      <div className="container mx-auto p-6 max-w-3xl">
-        <Card className="border-green-500/50 bg-green-50/30 dark:bg-green-950/10">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-              <Trophy className="h-10 w-10 text-green-600" />
-            </div>
-            <CardTitle className="text-2xl">Code of Conduct & GDPR</CardTitle>
-            <CardDescription className="text-base">
-              Salgskonsulenter
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="relative rounded-lg border-2 border-green-500 bg-white dark:bg-background p-6 text-center">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <Badge className="bg-green-600 text-white text-lg px-4 py-1">BESTÅET</Badge>
+      <MainLayout>
+        <div className="container mx-auto max-w-3xl">
+          <Card className="border-green-500/50 bg-green-50/30 dark:bg-green-950/10">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                <Trophy className="h-10 w-10 text-green-600" />
               </div>
-              
-              <div className="mt-4 space-y-2">
-                <p className="text-lg font-semibold">Du har gennemført testen</p>
-                <p className="text-muted-foreground">
-                  Bestået: {format(passedDate, "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
-                </p>
-              </div>
-              
-              <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm text-muted-foreground">Næste fornyelse:</p>
-                <p className="font-medium">{format(nextRenewal, "d. MMMM yyyy", { locale: da })}</p>
-                {daysRemaining !== null && daysRemaining > 0 && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    ({daysRemaining} dage tilbage)
+              <CardTitle className="text-2xl">Code of Conduct & GDPR</CardTitle>
+              <CardDescription className="text-base">
+                Salgskonsulenter
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="relative rounded-lg border-2 border-green-500 bg-white dark:bg-background p-6 text-center">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-green-600 text-white text-lg px-4 py-1">BESTÅET</Badge>
+                </div>
+                
+                <div className="mt-4 space-y-2">
+                  <p className="text-lg font-semibold">Du har gennemført testen</p>
+                  <p className="text-muted-foreground">
+                    Bestået: {format(passedDate, "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
                   </p>
-                )}
+                </div>
+                
+                <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground">Næste fornyelse:</p>
+                  <p className="font-medium">{format(nextRenewal, "d. MMMM yyyy", { locale: da })}</p>
+                  {daysRemaining !== null && daysRemaining > 0 && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      ({daysRemaining} dage tilbage)
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="text-center text-sm text-muted-foreground">
-              <p>Denne test skal gennemføres hver 2. måned.</p>
-              <p>Du vil blive påmindet når det er tid til at tage testen igen.</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              <div className="text-center text-sm text-muted-foreground">
+                <p>Denne test skal gennemføres hver 2. måned.</p>
+                <p>Du vil blive påmindet når det er tid til at tage testen igen.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
     );
   }
 
   // Show result if just submitted
   if (showResult && wrongQuestions.length > 0) {
     return (
-      <div className="container mx-auto p-6 max-w-3xl">
-        <Card className="border-destructive/50">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
-              <XCircle className="h-8 w-8 text-destructive" />
-            </div>
-            <CardTitle className="text-xl">Ikke bestået</CardTitle>
-            <CardDescription className="text-base">
-              Du svarede forkert på {wrongQuestions.length} spørgsmål
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="rounded-lg bg-muted p-4">
-              <h3 className="font-medium mb-3">Følgende spørgsmål var forkerte:</h3>
-              <ul className="space-y-2">
-                {wrongQuestions.map(qNum => {
-                  const question = CODE_OF_CONDUCT_QUESTIONS.find(q => q.id === qNum);
-                  return (
-                    <li key={qNum} className="flex items-start gap-2 text-sm">
-                      <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                      <span className="line-clamp-2">
-                        Spørgsmål {qNum}: {question?.question.substring(0, 60)}...
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+      <MainLayout>
+        <div className="container mx-auto max-w-3xl">
+          <Card className="border-destructive/50">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
+                <XCircle className="h-8 w-8 text-destructive" />
+              </div>
+              <CardTitle className="text-xl">Ikke bestået</CardTitle>
+              <CardDescription className="text-base">
+                Du svarede forkert på {wrongQuestions.length} spørgsmål
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="rounded-lg bg-muted p-4">
+                <h3 className="font-medium mb-3">Følgende spørgsmål var forkerte:</h3>
+                <ul className="space-y-2">
+                  {wrongQuestions.map(qNum => {
+                    const question = CODE_OF_CONDUCT_QUESTIONS.find(q => q.id === qNum);
+                    return (
+                      <li key={qNum} className="flex items-start gap-2 text-sm">
+                        <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                        <span className="line-clamp-2">
+                          Spørgsmål {qNum}: {question?.question.substring(0, 60)}...
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
 
-            <div className="text-center text-muted-foreground text-sm">
-              <p>Ved næste forsøg skal du kun besvare de spørgsmål, der var forkerte.</p>
-            </div>
+              <div className="text-center text-muted-foreground text-sm">
+                <p>Ved næste forsøg skal du kun besvare de spørgsmål, der var forkerte.</p>
+              </div>
 
-            <Button onClick={handleRetry} className="w-full" size="lg">
-              Prøv igen med de forkerte spørgsmål
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+              <Button onClick={handleRetry} className="w-full" size="lg">
+                Prøv igen med de forkerte spørgsmål
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-3xl">
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Shield className="h-6 w-6 text-primary" />
+    <MainLayout>
+      <div className="container mx-auto max-w-3xl">
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Shield className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">Code of Conduct & GDPR</h1>
+              <p className="text-muted-foreground">Salgskonsulenter</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">Code of Conduct & GDPR</h1>
-            <p className="text-muted-foreground">Salgskonsulenter</p>
-          </div>
-        </div>
 
         {isRequired && daysRemaining !== null && daysRemaining > 0 && (
           <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-200 mb-4">
@@ -313,22 +321,23 @@ export default function CodeOfConduct() {
         ))}
       </div>
 
-      {/* Submit button */}
-      <div className="sticky bottom-0 bg-background/95 backdrop-blur py-4 mt-6 border-t">
-        <Button
-          onClick={handleSubmit}
-          disabled={!allQuestionsAnswered || submitQuiz.isPending}
-          className="w-full"
-          size="lg"
-        >
-          {submitQuiz.isPending ? "Afleverer..." : "Aflever test"}
-        </Button>
-        {!allQuestionsAnswered && (
-          <p className="text-center text-sm text-muted-foreground mt-2">
-            Besvar alle spørgsmål for at kunne aflevere
-          </p>
-        )}
+        {/* Submit button */}
+        <div className="sticky bottom-0 bg-background/95 backdrop-blur py-4 mt-6 border-t">
+          <Button
+            onClick={handleSubmit}
+            disabled={!allQuestionsAnswered || submitQuiz.isPending}
+            className="w-full"
+            size="lg"
+          >
+            {submitQuiz.isPending ? "Afleverer..." : "Aflever test"}
+          </Button>
+          {!allQuestionsAnswered && (
+            <p className="text-center text-sm text-muted-foreground mt-2">
+              Besvar alle spørgsmål for at kunne aflevere
+            </p>
+          )}
+        </div>
       </div>
-    </div>
+    </MainLayout>
   );
 }
