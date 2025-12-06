@@ -32,6 +32,7 @@ const rekrutteringNavigation = [
   { name: "Medarbejdere", href: "/employees", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
+  { name: "Karriereønsker", href: "/career-wishes-overview", icon: Sparkles },
   { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
   { name: "Min profil", href: "/my-profile", icon: User },
 ];
@@ -45,9 +46,10 @@ const employeeNavigation = [
   { name: "Pulsmåling", href: "/pulse-survey", icon: HeartHandshake },
 ];
 
-// Teamleder navigation includes pulse survey results
+// Teamleder navigation includes pulse survey results and career wishes overview
 const teamlederExtraNavigation = [
   { name: "Pulsmåling resultater", href: "/pulse-survey-results", icon: BarChart3 },
+  { name: "Karriereønsker", href: "/career-wishes-overview", icon: Sparkles },
 ];
 
 const shiftPlanningNavigation = [
