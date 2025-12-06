@@ -74,6 +74,26 @@ export default function CareerWishes() {
       });
 
       if (error) throw error;
+
+      // Send email notification to HR/owners
+      try {
+        await supabase.functions.invoke("send-career-wish-notification", {
+          body: {
+            employeeName: `${employee.first_name} ${employee.last_name}`,
+            employeeDepartment: employee.department || employee.job_title,
+            wantsTeamChange,
+            desiredTeam: wantsTeamChange === "yes" ? desiredTeam : null,
+            teamChangeMotivation: wantsTeamChange === "yes" ? teamChangeMotivation : null,
+            leadershipInterest,
+            leadershipRoleType: leadershipInterest === "yes" || leadershipInterest === "maybe" ? leadershipRoleType : null,
+            leadershipMotivation: leadershipInterest === "yes" || leadershipInterest === "maybe" ? leadershipMotivation : null,
+            otherComments: otherComments || null,
+          },
+        });
+      } catch (notificationError) {
+        console.error("Failed to send notification:", notificationError);
+        // Don't fail the submission if notification fails
+      }
     },
     onSuccess: () => {
       setIsSubmitted(true);
