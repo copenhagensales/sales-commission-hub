@@ -48,14 +48,21 @@ export default function AdversusData() {
     },
   });
 
+  const [showAllEvents, setShowAllEvents] = useState(false);
+
   const { data: recentEvents, isLoading: eventsLoading, error: eventsError } = useQuery({
-    queryKey: ["adversus-events-recent"],
+    queryKey: ["adversus-events-recent", showAllEvents],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("adversus_events")
         .select("id, external_id, event_type, received_at, created_at, processed, payload")
-        .order("received_at", { ascending: false })
-        .limit(25);
+        .order("received_at", { ascending: false });
+
+      if (!showAllEvents) {
+        query = query.limit(25);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data;
@@ -262,11 +269,20 @@ export default function AdversusData() {
 
           <TabsContent value="adversus">
             <section aria-label="Seneste Adversus events" className="space-y-3">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold">Seneste Adversus-events</h2>
-                <Badge variant="outline" className="text-xs">
-                  {recentEvents?.length ?? 0} seneste events
-                </Badge>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold">Adversus-events</h2>
+                  <Badge variant="outline" className="text-xs">
+                    {recentEvents?.length ?? 0} {showAllEvents ? "events" : "seneste events"}
+                  </Badge>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAllEvents(!showAllEvents)}
+                  className="text-sm text-primary hover:underline"
+                >
+                  {showAllEvents ? "Vis kun seneste 25" : "Vis alle"}
+                </button>
               </div>
               <Card>
                 <CardContent className="pt-6">
