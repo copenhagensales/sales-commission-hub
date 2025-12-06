@@ -7,58 +7,72 @@ import React, { Component, ErrorInfo, ReactNode, Suspense, lazy } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute, RoleProtectedRoute } from "@/components/RoleProtectedRoute";
 
-// Lazy load all pages to prevent import errors from breaking the entire app
-const Auth = lazy(() => import("./pages/Auth"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Agents = lazy(() => import("./pages/Agents"));
-const Sales = lazy(() => import("./pages/Sales"));
-const Payroll = lazy(() => import("./pages/Payroll"));
-const Wallboard = lazy(() => import("./pages/Wallboard"));
-const Settings = lazy(() => import("./pages/Settings"));
-const Commission = lazy(() => import("./pages/Commission"));
-const MgTest = lazy(() => import("./pages/MgTest"));
-const KmTest = lazy(() => import("./pages/KmTest"));
-const Codan = lazy(() => import("./pages/Codan"));
-const TdcErhverv = lazy(() => import("./pages/TdcErhverv"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const AdversusData = lazy(() => import("./pages/AdversusData"));
-const Logikker = lazy(() => import("./pages/Logikker"));
-const EmployeeMasterData = lazy(() => import("./pages/EmployeeMasterData"));
-const EmployeeDetail = lazy(() => import("./pages/EmployeeDetail"));
-const EmployeeOnboarding = lazy(() => import("./pages/EmployeeOnboarding"));
-const Teams = lazy(() => import("./pages/Teams"));
+// Helper to create lazy imports with error handling
+const lazyWithRetry = (importFn: () => Promise<any>) => {
+  return lazy(async () => {
+    try {
+      return await importFn();
+    } catch (error) {
+      console.error("Failed to load module:", error);
+      // Force page reload on chunk load failure
+      window.location.reload();
+      throw error;
+    }
+  });
+};
+
+// Lazy load all pages
+const Auth = lazyWithRetry(() => import("./pages/Auth"));
+const Dashboard = lazyWithRetry(() => import("./pages/Dashboard"));
+const Agents = lazyWithRetry(() => import("./pages/Agents"));
+const Sales = lazyWithRetry(() => import("./pages/Sales"));
+const Payroll = lazyWithRetry(() => import("./pages/Payroll"));
+const Wallboard = lazyWithRetry(() => import("./pages/Wallboard"));
+const Settings = lazyWithRetry(() => import("./pages/Settings"));
+const Commission = lazyWithRetry(() => import("./pages/Commission"));
+const MgTest = lazyWithRetry(() => import("./pages/MgTest"));
+const KmTest = lazyWithRetry(() => import("./pages/KmTest"));
+const Codan = lazyWithRetry(() => import("./pages/Codan"));
+const TdcErhverv = lazyWithRetry(() => import("./pages/TdcErhverv"));
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
+const AdversusData = lazyWithRetry(() => import("./pages/AdversusData"));
+const Logikker = lazyWithRetry(() => import("./pages/Logikker"));
+const EmployeeMasterData = lazyWithRetry(() => import("./pages/EmployeeMasterData"));
+const EmployeeDetail = lazyWithRetry(() => import("./pages/EmployeeDetail"));
+const EmployeeOnboarding = lazyWithRetry(() => import("./pages/EmployeeOnboarding"));
+const Teams = lazyWithRetry(() => import("./pages/Teams"));
 // Vagt-flow pages
-const VagtFlowIndex = lazy(() => import("./pages/vagt-flow/Index"));
-const VagtBookWeek = lazy(() => import("./pages/vagt-flow/BookWeek"));
-const VagtLocations = lazy(() => import("./pages/vagt-flow/Locations"));
-const VagtBookings = lazy(() => import("./pages/vagt-flow/Bookings"));
-const VagtMinUge = lazy(() => import("./pages/vagt-flow/MinUge"));
-const VagtEmployees = lazy(() => import("./pages/vagt-flow/Employees"));
-const VagtVehicles = lazy(() => import("./pages/vagt-flow/Vehicles"));
-const VagtTimeOffRequests = lazy(() => import("./pages/vagt-flow/TimeOffRequests"));
-const VagtLocationDetail = lazy(() => import("./pages/vagt-flow/LocationDetail"));
-const VagtBilling = lazy(() => import("./pages/vagt-flow/Billing"));
+const VagtFlowIndex = lazyWithRetry(() => import("./pages/vagt-flow/Index"));
+const VagtBookWeek = lazyWithRetry(() => import("./pages/vagt-flow/BookWeek"));
+const VagtLocations = lazyWithRetry(() => import("./pages/vagt-flow/Locations"));
+const VagtBookings = lazyWithRetry(() => import("./pages/vagt-flow/Bookings"));
+const VagtMinUge = lazyWithRetry(() => import("./pages/vagt-flow/MinUge"));
+const VagtEmployees = lazyWithRetry(() => import("./pages/vagt-flow/Employees"));
+const VagtVehicles = lazyWithRetry(() => import("./pages/vagt-flow/Vehicles"));
+const VagtTimeOffRequests = lazyWithRetry(() => import("./pages/vagt-flow/TimeOffRequests"));
+const VagtLocationDetail = lazyWithRetry(() => import("./pages/vagt-flow/LocationDetail"));
+const VagtBilling = lazyWithRetry(() => import("./pages/vagt-flow/Billing"));
 // Shift planning pages (internal)
-const ShiftOverview = lazy(() => import("./pages/shift-planning/ShiftOverview"));
-const MySchedule = lazy(() => import("./pages/shift-planning/MySchedule"));
-const AbsenceManagement = lazy(() => import("./pages/shift-planning/AbsenceManagement"));
-const TimeTracking = lazy(() => import("./pages/shift-planning/TimeTracking"));
+const ShiftOverview = lazyWithRetry(() => import("./pages/shift-planning/ShiftOverview"));
+const MySchedule = lazyWithRetry(() => import("./pages/shift-planning/MySchedule"));
+const AbsenceManagement = lazyWithRetry(() => import("./pages/shift-planning/AbsenceManagement"));
+const TimeTracking = lazyWithRetry(() => import("./pages/shift-planning/TimeTracking"));
 // Contract pages
-const Contracts = lazy(() => import("./pages/Contracts"));
-const MyContracts = lazy(() => import("./pages/MyContracts"));
-const ContractSign = lazy(() => import("./pages/ContractSign"));
-const PulseSurvey = lazy(() => import("./pages/PulseSurvey"));
-const PulseSurveyResults = lazy(() => import("./pages/PulseSurveyResults"));
-const Admin = lazy(() => import("./pages/Admin"));
-const MyProfile = lazy(() => import("./pages/MyProfile"));
-const CareerWishes = lazy(() => import("./pages/CareerWishes"));
-const CareerWishesOverview = lazy(() => import("./pages/CareerWishesOverview"));
-const CarQuiz = lazy(() => import("./pages/CarQuiz"));
-const CarQuizAdmin = lazy(() => import("./pages/CarQuizAdmin"));
-const CodeOfConduct = lazy(() => import("./pages/CodeOfConduct"));
-const CodeOfConductAdmin = lazy(() => import("./pages/CodeOfConductAdmin"));
-const ExtraWork = lazy(() => import("./pages/ExtraWork"));
-const ExtraWorkAdmin = lazy(() => import("./pages/ExtraWorkAdmin"));
+const Contracts = lazyWithRetry(() => import("./pages/Contracts"));
+const MyContracts = lazyWithRetry(() => import("./pages/MyContracts"));
+const ContractSign = lazyWithRetry(() => import("./pages/ContractSign"));
+const PulseSurvey = lazyWithRetry(() => import("./pages/PulseSurvey"));
+const PulseSurveyResults = lazyWithRetry(() => import("./pages/PulseSurveyResults"));
+const Admin = lazyWithRetry(() => import("./pages/Admin"));
+const MyProfile = lazyWithRetry(() => import("./pages/MyProfile"));
+const CareerWishes = lazyWithRetry(() => import("./pages/CareerWishes"));
+const CareerWishesOverview = lazyWithRetry(() => import("./pages/CareerWishesOverview"));
+const CarQuiz = lazyWithRetry(() => import("./pages/CarQuiz"));
+const CarQuizAdmin = lazyWithRetry(() => import("./pages/CarQuizAdmin"));
+const CodeOfConduct = lazyWithRetry(() => import("./pages/CodeOfConduct"));
+const CodeOfConductAdmin = lazyWithRetry(() => import("./pages/CodeOfConductAdmin"));
+const ExtraWork = lazyWithRetry(() => import("./pages/ExtraWork"));
+const ExtraWorkAdmin = lazyWithRetry(() => import("./pages/ExtraWorkAdmin"));
 
 const queryClient = new QueryClient();
 
