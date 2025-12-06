@@ -381,6 +381,62 @@ export type Database = {
         }
         Relationships: []
       }
+      career_wishes: {
+        Row: {
+          created_at: string
+          desired_team: string | null
+          employee_id: string
+          id: string
+          leadership_interest: Database["public"]["Enums"]["leadership_interest"]
+          leadership_motivation: string | null
+          leadership_role_type:
+            | Database["public"]["Enums"]["leadership_role_type"]
+            | null
+          other_comments: string | null
+          team_change_motivation: string | null
+          updated_at: string
+          wants_team_change: Database["public"]["Enums"]["team_change_wish"]
+        }
+        Insert: {
+          created_at?: string
+          desired_team?: string | null
+          employee_id: string
+          id?: string
+          leadership_interest: Database["public"]["Enums"]["leadership_interest"]
+          leadership_motivation?: string | null
+          leadership_role_type?:
+            | Database["public"]["Enums"]["leadership_role_type"]
+            | null
+          other_comments?: string | null
+          team_change_motivation?: string | null
+          updated_at?: string
+          wants_team_change: Database["public"]["Enums"]["team_change_wish"]
+        }
+        Update: {
+          created_at?: string
+          desired_team?: string | null
+          employee_id?: string
+          id?: string
+          leadership_interest?: Database["public"]["Enums"]["leadership_interest"]
+          leadership_motivation?: string | null
+          leadership_role_type?:
+            | Database["public"]["Enums"]["leadership_role_type"]
+            | null
+          other_comments?: string | null
+          team_change_motivation?: string | null
+          updated_at?: string
+          wants_team_change?: Database["public"]["Enums"]["team_change_wish"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "career_wishes_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_campaigns: {
         Row: {
           client_id: string
@@ -2083,6 +2139,8 @@ export type Database = {
         | "termination"
         | "other"
       employment_type: "hourly" | "monthly"
+      leadership_interest: "yes" | "maybe" | "no"
+      leadership_role_type: "junior_teamleder" | "teamleder" | "coach" | "other"
       location_status: "Ny" | "Aktiv" | "Pause" | "Sortlistet"
       payroll_status: "draft" | "approved" | "exported"
       salary_type: "provision" | "fixed" | "hourly"
@@ -2094,6 +2152,7 @@ export type Database = {
         | "deleted_shift"
         | "week_confirmation"
       system_role: "medarbejder" | "teamleder" | "ejer" | "rekruttering"
+      team_change_wish: "yes" | "no"
       vacation_type: "vacation_pay" | "vacation_bonus"
       vagt_absence_reason: "Ferie" | "Syg" | "Barn syg" | "Andet"
       vagt_flow_role: "admin" | "planner" | "employee" | "brand_viewer"
@@ -2249,6 +2308,8 @@ export const Constants = {
         "other",
       ],
       employment_type: ["hourly", "monthly"],
+      leadership_interest: ["yes", "maybe", "no"],
+      leadership_role_type: ["junior_teamleder", "teamleder", "coach", "other"],
       location_status: ["Ny", "Aktiv", "Pause", "Sortlistet"],
       payroll_status: ["draft", "approved", "exported"],
       salary_type: ["provision", "fixed", "hourly"],
@@ -2261,6 +2322,7 @@ export const Constants = {
         "week_confirmation",
       ],
       system_role: ["medarbejder", "teamleder", "ejer", "rekruttering"],
+      team_change_wish: ["yes", "no"],
       vacation_type: ["vacation_pay", "vacation_bonus"],
       vagt_absence_reason: ["Ferie", "Syg", "Barn syg", "Andet"],
       vagt_flow_role: ["admin", "planner", "employee", "brand_viewer"],
