@@ -23,6 +23,7 @@ import Logikker from "./pages/Logikker";
 import EmployeeMasterData from "./pages/EmployeeMasterData";
 import EmployeeDetail from "./pages/EmployeeDetail";
 import EmployeeOnboarding from "./pages/EmployeeOnboarding";
+import Teams from "./pages/Teams";
 // Vagt-flow pages
 import VagtFlowIndex from "./pages/vagt-flow/Index";
 import VagtBookWeek from "./pages/vagt-flow/BookWeek";
@@ -108,6 +109,7 @@ const App = () => (
           <Route path="/logikker" element={<RoleProtectedRoute requireTeamlederOrAbove><Logikker /></RoleProtectedRoute>} />
           <Route path="/employees" element={<RoleProtectedRoute requireTeamlederOrAbove><EmployeeMasterData /></RoleProtectedRoute>} />
           <Route path="/employees/:id" element={<RoleProtectedRoute requireTeamlederOrAbove><EmployeeDetail /></RoleProtectedRoute>} />
+          <Route path="/teams" element={<RoleProtectedRoute requireTeamlederOrAbove><Teams /></RoleProtectedRoute>} />
           <Route path="/settings" element={<RoleProtectedRoute requireTeamlederOrAbove><Settings /></RoleProtectedRoute>} />
           {/* Vagt-flow routes - teamleder+ */}
           <Route path="/vagt-flow" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtFlowIndex /></RoleProtectedRoute>} />

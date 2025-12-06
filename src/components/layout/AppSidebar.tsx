@@ -18,6 +18,7 @@ import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfCond
 // Navigation items for teamleder and above
 const teamlederNavigation = [
   { name: "Medarbejdere", href: "/employees", icon: Users },
+  { name: "Teams", href: "/teams", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
   { name: "Salg", href: "/sales", icon: ShoppingCart },
@@ -35,6 +36,7 @@ const teamlederNavigation = [
 // Navigation items for rekruttering role
 const rekrutteringNavigation = [
   { name: "Medarbejdere", href: "/employees", icon: Users },
+  { name: "Teams", href: "/teams", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
   { name: "Karriereønsker", href: "/career-wishes-overview", icon: Sparkles },
