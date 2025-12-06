@@ -580,8 +580,8 @@ export default function VagtBookings() {
                               {DAYS.map((day, idx) => {
                                 const assignments = getAssignmentsForDay(booking, idx);
                                 const targetDate = format(addDays(weekStart, idx), "yyyy-MM-dd");
-                                const isBooked = new Date(booking.start_date) <= addDays(weekStart, idx) && 
-                                                 new Date(booking.end_date) >= addDays(weekStart, idx);
+                                // Compare dates as strings to avoid timezone issues
+                                const isBooked = booking.start_date <= targetDate && booking.end_date >= targetDate;
                                 const popoverKey = `${booking.id}-${idx}`;
                                 const hasAssignments = assignments.length > 0;
                                 
