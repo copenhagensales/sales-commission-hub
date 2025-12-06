@@ -604,7 +604,23 @@ export default function Settings() {
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-2">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  className="gap-2"
+                                  onClick={() => {
+                                    if (integration.type === 'adversus') {
+                                      syncSalesToDb();
+                                    } else {
+                                      toast.info(`Sync for ${integration.name} er ikke implementeret endnu`);
+                                    }
+                                  }}
+                                  disabled={loading === "sync"}
+                                >
+                                  <RefreshCw className={`h-4 w-4 ${loading === "sync" ? "animate-spin" : ""}`} />
+                                  Hent data
+                                </Button>
                                 <Button 
                                   size="icon" 
                                   variant="ghost" 
