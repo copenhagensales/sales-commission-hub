@@ -381,6 +381,35 @@ export type Database = {
         }
         Relationships: []
       }
+      car_quiz_completions: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          passed_at: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          passed_at?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          passed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "car_quiz_completions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       career_wishes: {
         Row: {
           created_at: string
