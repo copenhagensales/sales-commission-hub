@@ -2092,7 +2092,7 @@ export type Database = {
         | "updated_shift"
         | "deleted_shift"
         | "week_confirmation"
-      system_role: "medarbejder" | "teamleder" | "ejer"
+      system_role: "medarbejder" | "teamleder" | "ejer" | "rekruttering"
       vacation_type: "vacation_pay" | "vacation_bonus"
       vagt_absence_reason: "Ferie" | "Syg" | "Barn syg" | "Andet"
       vagt_flow_role: "admin" | "planner" | "employee" | "brand_viewer"
@@ -2259,7 +2259,7 @@ export const Constants = {
         "deleted_shift",
         "week_confirmation",
       ],
-      system_role: ["medarbejder", "teamleder", "ejer"],
+      system_role: ["medarbejder", "teamleder", "ejer", "rekruttering"],
       vacation_type: ["vacation_pay", "vacation_bonus"],
       vagt_absence_reason: ["Ferie", "Syg", "Barn syg", "Andet"],
       vagt_flow_role: ["admin", "planner", "employee", "brand_viewer"],
