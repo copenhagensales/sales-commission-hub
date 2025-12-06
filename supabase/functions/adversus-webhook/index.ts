@@ -42,6 +42,116 @@ const getDateOnly = (dateStr: string) => {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 };
 
+// Helper function to extract OPP number from any object recursively
+function extractOppNumberFromObject(obj: unknown): string | null {
+  if (!obj || typeof obj !== 'object') return null;
+
+  function search(current: Record<string, unknown>): string | null {
+    for (const [key, val] of Object.entries(current)) {
+      if (typeof val === 'string') {
+        const trimmed = val.trim();
+        // Direct match like "OPP-1067162" or "opp 1067162"
+        const oppMatch = trimmed.match(/opp[-\s:]?(\d{4,})/i);
+        if (oppMatch) {
+          const normalized = `OPP-${oppMatch[1]}`;
+          console.log(`✓ Found OPP number "${normalized}" on key "${key}"`);
+          return normalized;
+        }
+        // Values that are only digits but the key mentions OPP
+        if (/^\d{4,}$/.test(trimmed) && key.toLowerCase().includes('opp')) {
+          const normalized = `OPP-${trimmed}`;
+          console.log(`✓ Found OPP number "${normalized}" on key "${key}" (digits only)`);
+          return normalized;
+        }
+      } else if (val && typeof val === 'object') {
+        const found = search(val as Record<string, unknown>);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  return search(obj as Record<string, unknown>);
+}
+
+// Helper function to fetch OPP number via Adversus leads API
+async function fetchOppNumber(
+  leadId: number,
+  authHeader: string,
+  baseUrl: string
+): Promise<string | null> {
+  const OPP_FIELD_ID = 80862;
+
+  try {
+    console.log(`Fetching lead ${leadId} for OPP number...`);
+    
+    const leadResponse = await fetch(`${baseUrl}/leads/${leadId}`, {
+      headers: {
+        'Authorization': `Basic ${authHeader}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!leadResponse.ok) {
+      console.warn(`Could not fetch lead ${leadId}: ${leadResponse.status}`);
+      return null;
+    }
+
+    const leadData = await leadResponse.json();
+    const lead = Array.isArray(leadData) ? leadData[0] : (leadData.leads ? leadData.leads[0] : leadData);
+
+    if (!lead) {
+      console.log(`No lead data returned for ${leadId}`);
+      return null;
+    }
+
+    const resultData = Array.isArray(lead.resultData) ? lead.resultData : [];
+
+    if (resultData.length > 0) {
+      // 1) Exact match on result field id 80862 ("OPP nr")
+      const byId = resultData.find(
+        (rd: { id?: number; value?: string }) => 
+          rd && rd.id === OPP_FIELD_ID && typeof rd.value === 'string' && rd.value.trim()
+      );
+
+      if (byId) {
+        const value = (byId.value as string).trim();
+        console.log(`✓ Found OPP nr for lead ${leadId} via resultData id ${OPP_FIELD_ID}: "${value}"`);
+        return value;
+      }
+
+      // 2) Fallback: match on label containing "opp"
+      const byLabel = resultData.find(
+        (rd: { label?: string; value?: string }) =>
+          rd &&
+          typeof rd.label === 'string' &&
+          String(rd.label).toLowerCase().includes('opp') &&
+          typeof rd.value === 'string' &&
+          rd.value.trim()
+      );
+
+      if (byLabel) {
+        const value = (byLabel.value as string).trim();
+        console.log(`✓ Found OPP nr for lead ${leadId} via resultData label "${byLabel.label}": "${value}"`);
+        return value;
+      }
+    }
+
+    // 3) Fallback: generic search in lead object
+    const fromLead = extractOppNumberFromObject(lead);
+    if (fromLead) {
+      console.log(`✓ Found OPP nr for lead ${leadId} via generic search: "${fromLead}"`);
+      return fromLead;
+    }
+
+    console.log(`Could not find OPP nr for lead ${leadId}`);
+    return null;
+  } catch (err) {
+    console.warn(`Error fetching OPP nr for lead ${leadId}:`, err);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -50,12 +160,25 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const adversusUsername = Deno.env.get('ADVERSUS_API_USERNAME');
+    const adversusPassword = Deno.env.get('ADVERSUS_API_PASSWORD');
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body: AdversusPayload = await req.json();
     console.log('Received webhook:', JSON.stringify(body, null, 2));
 
     const externalId = String(body.payload.result_id);
+    const leadId = body.payload.lead?.id;
+
+    // Fetch OPP number via Adversus API if credentials are available
+    let oppNumber: string | null = null;
+    if (adversusUsername && adversusPassword && leadId) {
+      const authHeader = btoa(`${adversusUsername}:${adversusPassword}`);
+      const baseUrl = 'https://api.adversus.io/v1';
+      oppNumber = await fetchOppNumber(leadId, authHeader, baseUrl);
+    } else {
+      console.log('Adversus credentials not available or no leadId, skipping OPP lookup');
+    }
 
     // 1. Find existing events & sales for this result to handle corrections
     const newEventDate = body.event_time
@@ -189,7 +312,7 @@ serve(async (req) => {
       console.log('Created unmapped campaign mapping for:', adversusCampaignName);
     }
 
-    // 4. Create sale record
+    // 4. Create sale record with OPP number
     const { data: saleData, error: saleError } = await supabase
       .from('sales')
       .insert({
@@ -201,6 +324,7 @@ serve(async (req) => {
         customer_phone: body.payload.lead.phone,
         sale_datetime: body.event_time || new Date().toISOString(),
         adversus_external_id: externalId,
+        adversus_opp_number: oppNumber,
       })
       .select()
       .single();
@@ -210,7 +334,7 @@ serve(async (req) => {
       throw saleError;
     }
 
-    console.log('Created sale:', saleData.id);
+    console.log('Created sale:', saleData.id, 'with OPP:', oppNumber);
 
     // 5. Process each product in the sale
     const saleItems = [];
@@ -315,13 +439,14 @@ serve(async (req) => {
       .update({ processed: true })
       .eq('id', eventData.id);
 
-    console.log('Webhook processed successfully');
+    console.log('Webhook processed successfully with OPP:', oppNumber);
 
     return new Response(
       JSON.stringify({
         success: true,
         event_id: eventData.id,
         sale_id: saleData.id,
+        opp_number: oppNumber,
         items_created: saleItems.length,
         items_needing_mapping: saleItems.filter(i => i.needs_mapping).length,
       }),
