@@ -61,10 +61,9 @@ const employeeNavigation = [
   { name: "Pulsmåling", href: "/pulse-survey", icon: HeartHandshake },
 ];
 
-// Teamleder extra navigation (pulse survey results, career wishes, code of conduct for their team)
+// Teamleder extra navigation (pulse survey results, code of conduct for their team)
 const teamlederExtraNavigation = [
   { name: "Pulsmåling resultater", href: "/pulse-survey-results", icon: BarChart3 },
-  { name: "Karriereønsker", href: "/career-wishes-overview", icon: Sparkles },
   { name: "Code of Conduct overblik", href: "/code-of-conduct-admin", icon: Shield },
 ];
 
@@ -291,8 +290,8 @@ export function AppSidebar() {
             </Collapsible>
           )}
 
-          {/* Fieldmarketing menu - only for teamleder and above */}
-          {isTeamlederOrAbove && (
+          {/* Fieldmarketing menu - only for owners */}
+          {isOwner && (
             <Collapsible open={vagtFlowOpen} onOpenChange={setVagtFlowOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
@@ -338,7 +337,7 @@ export function AppSidebar() {
             </NavLink>
           )}
 
-          {isTeamlederOrAbove && (
+          {isOwner && (
             <NavLink
               to="/settings"
               className={cn(
