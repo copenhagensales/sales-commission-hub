@@ -137,6 +137,9 @@ export default function Admin() {
     ejer: [...defaultRolePermissions.ejer.menuItems],
   });
   const [hasChanges, setHasChanges] = useState(false);
+  const [userPermissionSearch, setUserPermissionSearch] = useState("");
+  const [showOnlyWithExtras, setShowOnlyWithExtras] = useState(false);
+  const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<EmployeeRole | null>(null);
   const queryClient = useQueryClient();
   const { isOwner, isLoading: accessLoading } = useCanAccess();
 
@@ -224,6 +227,69 @@ export default function Admin() {
       return data as EmployeeRole[];
     },
     enabled: isOwner,
+  });
+
+  // Fetch individual user permissions from database
+  const { data: individualPermissions } = useQuery({
+    queryKey: ["user-menu-permissions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_menu_permissions")
+        .select("*");
+      if (error) throw error;
+      return data;
+    },
+    enabled: isOwner,
+  });
+
+  // Filter users for the individual permissions table
+  const filteredUsersForPermissions = users?.filter((user) => {
+    const fullName = `${user.first_name || ""} ${user.last_name || ""}`.toLowerCase();
+    const email = user.email?.toLowerCase() || "";
+    const search = userPermissionSearch.toLowerCase();
+    const matchesSearch = fullName.includes(search) || email.includes(search);
+    
+    if (showOnlyWithExtras) {
+      const hasExtras = individualPermissions?.some(p => p.user_id === user.auth_user_id);
+      return matchesSearch && hasExtras;
+    }
+    return matchesSearch;
+  });
+
+  // Add individual permission mutation
+  const addIndividualPermission = useMutation({
+    mutationFn: async ({ userId, menuItemId }: { userId: string; menuItemId: string }) => {
+      const { error } = await supabase
+        .from("user_menu_permissions")
+        .insert({ user_id: userId, menu_item_id: menuItemId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-menu-permissions"] });
+      toast.success("Rettighed tilføjet");
+    },
+    onError: (error: Error) => {
+      toast.error("Kunne ikke tilføje rettighed: " + error.message);
+    },
+  });
+
+  // Remove individual permission mutation
+  const removeIndividualPermission = useMutation({
+    mutationFn: async ({ userId, menuItemId }: { userId: string; menuItemId: string }) => {
+      const { error } = await supabase
+        .from("user_menu_permissions")
+        .delete()
+        .eq("user_id", userId)
+        .eq("menu_item_id", menuItemId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-menu-permissions"] });
+      toast.success("Rettighed fjernet");
+    },
+    onError: (error: Error) => {
+      toast.error("Kunne ikke fjerne rettighed: " + error.message);
+    },
   });
 
   // Fetch teams with their members
@@ -681,6 +747,104 @@ export default function Admin() {
               </CardContent>
             </Card>
 
+            {/* Individual user permissions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Individuelle tilføjelser
+                </CardTitle>
+                <CardDescription>
+                  Giv specifikke brugere ekstra adgang ud over deres rolle. Klik på en bruger for at redigere.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Filter for users with individual permissions */}
+                    <div className="flex items-center gap-4">
+                      <Input
+                        placeholder="Søg efter bruger..."
+                        className="max-w-xs"
+                        value={userPermissionSearch}
+                        onChange={(e) => setUserPermissionSearch(e.target.value)}
+                      />
+                      <label className="flex items-center gap-2 text-sm">
+                        <Switch
+                          checked={showOnlyWithExtras}
+                          onCheckedChange={setShowOnlyWithExtras}
+                        />
+                        Vis kun brugere med ekstra rettigheder
+                      </label>
+                    </div>
+                    
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Bruger</TableHead>
+                          <TableHead>Rolle</TableHead>
+                          <TableHead>Ekstra adgang</TableHead>
+                          <TableHead className="text-right">Handling</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredUsersForPermissions?.map((user) => {
+                          const userExtras = individualPermissions?.filter(p => p.user_id === user.auth_user_id) || [];
+                          const extraMenuNames = userExtras.map(p => menuItems.find(m => m.id === p.menu_item_id)?.name).filter(Boolean);
+                          
+                          return (
+                            <TableRow 
+                              key={user.employee_id}
+                              className={selectedUserForPermissions?.employee_id === user.employee_id ? "bg-muted" : "hover:bg-muted/50 cursor-pointer"}
+                              onClick={() => user.auth_user_id && setSelectedUserForPermissions(user)}
+                            >
+                              <TableCell className="font-medium">
+                                {user.first_name} {user.last_name}
+                              </TableCell>
+                              <TableCell>{getRoleBadge(user.role)}</TableCell>
+                              <TableCell>
+                                {extraMenuNames.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {extraMenuNames.map((name, i) => (
+                                      <Badge key={i} variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30">
+                                        + {name}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">Ingen</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {user.auth_user_id ? (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedUserForPermissions(user);
+                                    }}
+                                  >
+                                    Rediger
+                                  </Button>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">Kræver login</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Data scope cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {(["medarbejder", "rekruttering", "teamleder", "ejer"] as SystemRole[]).map((role) => {
@@ -835,6 +999,100 @@ export default function Admin() {
             >
               {deleteEmployee.isPending ? "Sletter..." : "Slet medarbejder"}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Individual permissions dialog */}
+      <AlertDialog 
+        open={!!selectedUserForPermissions} 
+        onOpenChange={(open) => !open && setSelectedUserForPermissions(null)}
+      >
+        <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Rediger rettigheder for {selectedUserForPermissions?.first_name} {selectedUserForPermissions?.last_name}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Rolle: {getRoleBadge(selectedUserForPermissions?.role || null)}
+              <br />
+              Tilføj ekstra menupunkter som denne bruger skal have adgang til ud over sin rolle.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="overflow-y-auto flex-1 py-4">
+            <div className="space-y-4">
+              {Object.entries(menuByCategory).map(([category, items]) => {
+                const userRole = selectedUserForPermissions?.role || "medarbejder";
+                const roleMenus = editedPermissions[userRole] || [];
+                const userExtras = individualPermissions?.filter(
+                  p => p.user_id === selectedUserForPermissions?.auth_user_id
+                ).map(p => p.menu_item_id) || [];
+                
+                return (
+                  <div key={category}>
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                      {category}
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {items.map((item) => {
+                        const isInRole = roleMenus.includes(item.id);
+                        const isExtraPermission = userExtras.includes(item.id);
+                        const hasAccess = isInRole || isExtraPermission;
+                        
+                        return (
+                          <div 
+                            key={item.id} 
+                            className={`flex items-center justify-between p-2 rounded-lg border ${
+                              isInRole ? "bg-muted/50 border-muted" : 
+                              isExtraPermission ? "bg-blue-500/10 border-blue-500/30" : 
+                              "border-border"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm">{item.name}</span>
+                              {isInRole && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Fra rolle
+                                </Badge>
+                              )}
+                              {isExtraPermission && (
+                                <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30 text-xs">
+                                  Tilføjet
+                                </Badge>
+                              )}
+                            </div>
+                            {!isInRole && selectedUserForPermissions?.auth_user_id && (
+                              <Switch
+                                checked={isExtraPermission}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    addIndividualPermission.mutate({
+                                      userId: selectedUserForPermissions.auth_user_id!,
+                                      menuItemId: item.id,
+                                    });
+                                  } else {
+                                    removeIndividualPermission.mutate({
+                                      userId: selectedUserForPermissions.auth_user_id!,
+                                      menuItemId: item.id,
+                                    });
+                                  }
+                                }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel>Luk</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

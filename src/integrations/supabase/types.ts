@@ -2360,6 +2360,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_menu_permissions: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          menu_item_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          menu_item_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          menu_item_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
