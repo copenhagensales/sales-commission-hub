@@ -10,8 +10,10 @@ import cphSalesLogo from "@/assets/cph-sales-logo-dark.png";
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
+  const [isNewPasswordMode, setIsNewPasswordMode] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const { toast } = useToast();
 
@@ -31,6 +33,16 @@ export default function Auth() {
 
   useEffect(() => {
     testConnection();
+
+    // Listen for password recovery event
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsNewPasswordMode(true);
+        setIsResetMode(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,7 +61,27 @@ export default function Auth() {
     }
 
     try {
-      if (isResetMode) {
+      if (isNewPasswordMode) {
+        // Validate passwords match
+        if (password !== confirmPassword) {
+          toast({
+            title: "Fejl",
+            description: "Adgangskoderne matcher ikke.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        
+        toast({
+          title: "Adgangskode opdateret",
+          description: "Din adgangskode er blevet ændret. Du er nu logget ind.",
+        });
+        setIsNewPasswordMode(false);
+      } else if (isResetMode) {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/auth`,
         });
@@ -98,6 +130,19 @@ export default function Auth() {
         variant: "destructive",
       });
     }
+  };
+
+  const getTitle = () => {
+    if (isNewPasswordMode) return "Vælg ny adgangskode";
+    if (isResetMode) return "Nulstil adgangskode";
+    return "Log ind";
+  };
+
+  const getButtonText = () => {
+    if (loading) return "Vent venligst...";
+    if (isNewPasswordMode) return "Gem ny adgangskode";
+    if (isResetMode) return "Send nulstillingslink";
+    return "Log ind";
   };
 
   return (
@@ -155,29 +200,35 @@ export default function Auth() {
         {/* Form Card */}
         <div className="rounded-xl border border-border bg-card p-8 shadow-xl">
           <h2 className="text-xl font-semibold text-foreground mb-6">
-            {isResetMode ? "Nulstil adgangskode" : "Log ind"}
+            {getTitle()}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="din@email.dk"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
-
-            {!isResetMode && (
+            {/* Email field - only show for login and reset request */}
+            {!isNewPasswordMode && (
               <div className="space-y-2">
-                <Label htmlFor="password">Adgangskode</Label>
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="din@email.dk"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Password field - show for login and new password mode */}
+            {(!isResetMode || isNewPasswordMode) && (
+              <div className="space-y-2">
+                <Label htmlFor="password">
+                  {isNewPasswordMode ? "Ny adgangskode" : "Adgangskode"}
+                </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -194,35 +245,58 @@ export default function Auth() {
               </div>
             )}
 
+            {/* Confirm password - only for new password mode */}
+            {isNewPasswordMode && (
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Bekræft adgangskode</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="pl-10"
+                    required
+                    minLength={6}
+                  />
+                </div>
+              </div>
+            )}
+
             <Button 
               type="submit" 
               className="w-full" 
               disabled={loading || connectionStatus === 'error'}
             >
-              {loading ? "Vent venligst..." : isResetMode ? "Send nulstillingslink" : "Log ind"}
+              {getButtonText()}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            {isResetMode ? (
-              <button
-                type="button"
-                onClick={() => setIsResetMode(false)}
-                className="text-sm text-primary hover:underline inline-flex items-center gap-1"
-              >
-                <ArrowLeft className="h-3 w-3" />
-                Tilbage til login
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIsResetMode(true)}
-                className="text-sm text-muted-foreground hover:text-primary hover:underline"
-              >
-                Glemt adgangskode?
-              </button>
-            )}
-          </div>
+          {/* Footer links */}
+          {!isNewPasswordMode && (
+            <div className="mt-6 text-center">
+              {isResetMode ? (
+                <button
+                  type="button"
+                  onClick={() => setIsResetMode(false)}
+                  className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  Tilbage til login
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsResetMode(true)}
+                  className="text-sm text-muted-foreground hover:text-primary hover:underline"
+                >
+                  Glemt adgangskode?
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
