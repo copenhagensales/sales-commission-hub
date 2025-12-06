@@ -233,65 +233,82 @@ export function useCarQuizSubmissions(employeeId?: string) {
 
 // Hook for checking if car quiz lock should be shown (for new Fieldmarketing employees)
 export function useCarQuizLock() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading: queryLoading } = useQuery({
     queryKey: ["car-quiz-lock", user?.id],
     queryFn: async () => {
       if (!user) return { isLocked: false, daysRemaining: null as number | null };
 
-      // Get employee data
-      const { data: employee } = await supabase
-        .from("employee_master_data")
-        .select("id, job_title, employment_start_date")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
-        .maybeSingle();
+      try {
+        // Get employee data
+        const { data: employee, error: employeeError } = await supabase
+          .from("employee_master_data")
+          .select("id, job_title, employment_start_date")
+          .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+          .maybeSingle();
 
-      if (!employee) return { isLocked: false, daysRemaining: null as number | null };
-
-      // Only applies to Fieldmarketing employees
-      if (employee.job_title !== "Fieldmarketing") {
-        return { isLocked: false, daysRemaining: null as number | null };
-      }
-
-      // Check if quiz has been completed (and not expired)
-      const { data: completion } = await supabase
-        .from("car_quiz_completions")
-        .select("passed_at")
-        .eq("employee_id", employee.id)
-        .order("passed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      // If completed and not expired, not locked
-      if (completion && !isQuizExpired(completion.passed_at)) {
-        return { isLocked: false, daysRemaining: null as number | null };
-      }
-
-      // Check if within 14 day grace period from employment start
-      if (employee.employment_start_date) {
-        const startDate = new Date(employee.employment_start_date);
-        const daysSinceStart = differenceInDays(new Date(), startDate);
-        
-        if (daysSinceStart > 14) {
-          // Past 14 days and no valid completion - locked!
-          return { isLocked: true, daysRemaining: 0 };
-        } else {
-          // Within grace period - show remaining days
-          return { isLocked: false, daysRemaining: 14 - daysSinceStart };
+        if (employeeError) {
+          console.error("Error fetching employee for car quiz lock:", employeeError);
+          return { isLocked: false, daysRemaining: null as number | null };
         }
-      }
 
-      // No start date - assume locked after 14 days by default
-      return { isLocked: true, daysRemaining: 0 };
+        if (!employee) return { isLocked: false, daysRemaining: null as number | null };
+
+        // Only applies to Fieldmarketing employees
+        if (employee.job_title !== "Fieldmarketing") {
+          return { isLocked: false, daysRemaining: null as number | null };
+        }
+
+        // Check if quiz has been completed (and not expired)
+        const { data: completion, error: completionError } = await supabase
+          .from("car_quiz_completions")
+          .select("passed_at")
+          .eq("employee_id", employee.id)
+          .order("passed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (completionError) {
+          console.error("Error fetching car quiz completion:", completionError);
+          return { isLocked: false, daysRemaining: null as number | null };
+        }
+
+        // If completed and not expired, not locked
+        if (completion && !isQuizExpired(completion.passed_at)) {
+          return { isLocked: false, daysRemaining: null as number | null };
+        }
+
+        // Check if within 14 day grace period from employment start
+        if (employee.employment_start_date) {
+          const startDate = new Date(employee.employment_start_date);
+          const daysSinceStart = differenceInDays(new Date(), startDate);
+          
+          if (daysSinceStart > 14) {
+            // Past 14 days and no valid completion - locked!
+            return { isLocked: true, daysRemaining: 0 };
+          } else {
+            // Within grace period - show remaining days
+            return { isLocked: false, daysRemaining: 14 - daysSinceStart };
+          }
+        }
+
+        // No start date - assume locked after 14 days by default
+        return { isLocked: true, daysRemaining: 0 };
+      } catch (error) {
+        console.error("Error in useCarQuizLock:", error);
+        return { isLocked: false, daysRemaining: null as number | null };
+      }
     },
-    enabled: !!user,
+    enabled: !!user && !authLoading,
     refetchInterval: 60000,
+    retry: 1,
+    staleTime: 30000,
   });
 
   return {
     isLocked: data?.isLocked ?? false,
     daysRemaining: data?.daysRemaining ?? null,
-    isLoading,
+    isLoading: authLoading || (!!user && queryLoading),
   };
 }
