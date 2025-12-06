@@ -4,12 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, RefreshCw, Send, Database, Download, Upload, Key, CheckCircle2, Plus, Pencil, Trash2, Clock, Save, X } from "lucide-react";
+import { Settings as SettingsIcon, RefreshCw, Send, Database, Download, Upload, Key, CheckCircle2, Plus, Pencil, Trash2, Clock, Save, X, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ApiIntegration {
   id: string;
@@ -18,6 +19,7 @@ interface ApiIntegration {
   sync_frequency_minutes: number | null;
   is_active: boolean;
   secrets: string[];
+  enabled_sources: string[];
   last_sync_at: string | null;
   created_at: string;
   updated_at: string;
@@ -32,6 +34,28 @@ const secretLabels: Record<string, string> = {
   "M365_CLIENT_ID": "Client ID",
   "M365_CLIENT_SECRET": "Client Secret",
   "M365_SENDER_EMAIL": "Afsender email",
+};
+
+// Available data sources for each API type
+const availableDataSources: Record<string, { key: string; label: string; description: string }[]> = {
+  adversus: [
+    { key: "campaigns", label: "Kampagner", description: "Hent kampagneliste fra Adversus" },
+    { key: "sales", label: "Salg", description: "Synkroniser salgsdata og ordrer" },
+    { key: "users", label: "Brugere", description: "Hent agenter og medarbejdere" },
+    { key: "leads", label: "Leads", description: "Synkroniser lead-data" },
+    { key: "products", label: "Produkter", description: "Hent produktkatalog" },
+  ],
+  economic: [
+    { key: "journal_entries", label: "Bogføringsposter", description: "Synkroniser bogføringsposter" },
+    { key: "accounts", label: "Konti", description: "Hent kontoplan" },
+    { key: "invoices", label: "Fakturaer", description: "Synkroniser fakturaer" },
+    { key: "customers", label: "Kunder", description: "Hent kundedata" },
+  ],
+  m365: [
+    { key: "send_emails", label: "Send emails", description: "Aktiver email-afsendelse" },
+    { key: "calendar", label: "Kalender", description: "Synkroniser kalenderbegivenheder" },
+    { key: "contacts", label: "Kontakter", description: "Hent kontaktdata" },
+  ],
 };
 
 const frequencyOptions = [
@@ -65,6 +89,7 @@ export default function Settings() {
   const [editForm, setEditForm] = useState<{ name: string; sync_frequency_minutes: string }>({ name: "", sync_frequency_minutes: "60" });
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newIntegration, setNewIntegration] = useState({ name: "", type: "", sync_frequency_minutes: "60" });
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchIntegrations();
@@ -83,7 +108,8 @@ export default function Settings() {
     } else {
       setIntegrations((data || []).map(d => ({
         ...d,
-        secrets: Array.isArray(d.secrets) ? d.secrets : []
+        secrets: Array.isArray(d.secrets) ? d.secrets : [],
+        enabled_sources: Array.isArray(d.enabled_sources) ? d.enabled_sources : []
       })) as ApiIntegration[]);
     }
     setLoadingIntegrations(false);
@@ -148,6 +174,27 @@ export default function Settings() {
     } else {
       toast.success("Integration slettet");
       fetchIntegrations();
+    }
+  };
+
+  const handleToggleSource = async (integrationId: string, sourceKey: string, currentSources: string[]) => {
+    const newSources = currentSources.includes(sourceKey)
+      ? currentSources.filter(s => s !== sourceKey)
+      : [...currentSources, sourceKey];
+
+    const { error } = await supabase
+      .from("api_integrations")
+      .update({ enabled_sources: newSources })
+      .eq("id", integrationId);
+
+    if (error) {
+      console.error("Error updating sources:", error);
+      toast.error("Kunne ikke opdatere datakilder");
+    } else {
+      setIntegrations(prev => prev.map(i => 
+        i.id === integrationId ? { ...i, enabled_sources: newSources } : i
+      ));
+      toast.success("Datakilde opdateret");
     }
   };
 
@@ -533,6 +580,13 @@ export default function Settings() {
                             </Badge>
                           </div>
                           <div className="flex items-center gap-2">
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              onClick={() => setExpandedId(expandedId === integration.id ? null : integration.id)}
+                            >
+                              {expandedId === integration.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </Button>
                             <Button size="icon" variant="ghost" onClick={() => handleStartEdit(integration)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -551,21 +605,76 @@ export default function Settings() {
                               Sidst synkroniseret: {new Date(integration.last_sync_at).toLocaleString("da-DK")}
                             </span>
                           )}
+                          <span className="text-xs">
+                            {integration.enabled_sources.length} datakilde(r) aktiveret
+                          </span>
                         </div>
-                        {integration.secrets.length > 0 && (
-                          <div className="grid gap-2">
-                            {integration.secrets.map((secret) => (
-                              <div
-                                key={secret}
-                                className="flex items-center justify-between p-2 rounded bg-background/50 border text-sm"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                                  <span>{secretLabels[secret] || secret}</span>
+                        
+                        {/* Data Sources Section */}
+                        {expandedId === integration.id && (
+                          <div className="mt-4 space-y-4">
+                            {availableDataSources[integration.type] && (
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Tilgængelige datakilder</Label>
+                                <div className="grid gap-2">
+                                  {availableDataSources[integration.type].map((source) => (
+                                    <div
+                                      key={source.key}
+                                      className="flex items-center justify-between p-3 rounded-lg bg-background/50 border"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <Checkbox
+                                          id={`${integration.id}-${source.key}`}
+                                          checked={integration.enabled_sources.includes(source.key)}
+                                          onCheckedChange={() => handleToggleSource(integration.id, source.key, integration.enabled_sources)}
+                                        />
+                                        <div>
+                                          <label 
+                                            htmlFor={`${integration.id}-${source.key}`}
+                                            className="text-sm font-medium cursor-pointer"
+                                          >
+                                            {source.label}
+                                          </label>
+                                          <p className="text-xs text-muted-foreground">{source.description}</p>
+                                        </div>
+                                      </div>
+                                      {integration.enabled_sources.includes(source.key) && (
+                                        <Badge variant="default" className="text-xs">
+                                          Aktiv
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  ))}
                                 </div>
-                                <span className="font-mono text-xs text-muted-foreground">{secret}</span>
                               </div>
-                            ))}
+                            )}
+                            
+                            {!availableDataSources[integration.type] && (
+                              <p className="text-sm text-muted-foreground">
+                                Ingen foruddefinerede datakilder for denne API-type. Du kan tilføje dem manuelt.
+                              </p>
+                            )}
+                            
+                            {/* Secrets Section */}
+                            {integration.secrets.length > 0 && (
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">API-nøgler</Label>
+                                <div className="grid gap-2">
+                                  {integration.secrets.map((secret) => (
+                                    <div
+                                      key={secret}
+                                      className="flex items-center justify-between p-2 rounded bg-background/50 border text-sm"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                                        <span>{secretLabels[secret] || secret}</span>
+                                      </div>
+                                      <span className="font-mono text-xs text-muted-foreground">{secret}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </>
