@@ -11,6 +11,8 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useShouldShowPulseSurvey } from "@/hooks/usePulseSurvey";
+import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
+import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 
 // Navigation items for teamleder and above
 const teamlederNavigation = [
@@ -25,6 +27,7 @@ const teamlederNavigation = [
   { name: "Datakilder info", href: "/adversus-data", icon: Database },
   { name: "Logikker", href: "/logikker", icon: ListChecks },
   { name: "MG test", href: "/mg-test", icon: Percent },
+  { name: "Bil-quiz overblik", href: "/car-quiz-admin", icon: Car },
 ];
 
 // Navigation items for rekruttering role
@@ -83,6 +86,8 @@ export function AppSidebar() {
   const { isTeamlederOrAbove, isOwner, isRekruttering, isRekrutteringOrAbove, isLoading, role } = useCanAccess();
   const { user } = useAuth();
   const { showMenuItem: showPulseSurvey, showBadge: showPulseBadge } = useShouldShowPulseSurvey();
+  const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
+  const { data: carQuizCompletion } = useCarQuizCompletion();
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
 
@@ -192,6 +197,27 @@ export function AppSidebar() {
               </NavLink>
             );
           })}
+
+          {/* Firmabil menu item for Fieldmarketing employees */}
+          {isFieldmarketing && !isTeamlederOrAbove && (
+            <NavLink
+              to="/car-quiz"
+              className={cn(
+                "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/car-quiz" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <Car className="h-5 w-5" />
+                Firmabil
+              </div>
+              {!carQuizCompletion && (
+                <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
+                  !
+                </Badge>
+              )}
+            </NavLink>
+          )}
 
           {/* Intern Vagtplan menu */}
           {currentShiftPlanningNav.length > 0 && (

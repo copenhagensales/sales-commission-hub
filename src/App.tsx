@@ -49,6 +49,8 @@ import Admin from "./pages/Admin";
 import MyProfile from "./pages/MyProfile";
 import CareerWishes from "./pages/CareerWishes";
 import CareerWishesOverview from "./pages/CareerWishesOverview";
+import CarQuiz from "./pages/CarQuiz";
+import CarQuizAdmin from "./pages/CarQuizAdmin";
 
 const queryClient = new QueryClient();
 
@@ -86,6 +88,7 @@ const App = () => (
           <Route path="/my-contracts" element={<ProtectedRoute><MyContracts /></ProtectedRoute>} />
           <Route path="/pulse-survey" element={<ProtectedRoute><PulseSurvey /></ProtectedRoute>} />
           <Route path="/career-wishes" element={<ProtectedRoute><CareerWishes /></ProtectedRoute>} />
+          <Route path="/car-quiz" element={<ProtectedRoute><CarQuiz /></ProtectedRoute>} />
           <Route path="/contract/:id" element={<ContractSign />} />
           {/* Teamleder+ routes */}
           <Route path="/dashboard" element={<RoleProtectedRoute requireTeamlederOrAbove><Dashboard /></RoleProtectedRoute>} />
@@ -124,6 +127,7 @@ const App = () => (
           {/* Pulse survey results - teamleder+ */}
           <Route path="/pulse-survey-results" element={<RoleProtectedRoute requireTeamlederOrAbove><PulseSurveyResults /></RoleProtectedRoute>} />
           <Route path="/career-wishes-overview" element={<RoleProtectedRoute requireTeamlederOrAbove><CareerWishesOverview /></RoleProtectedRoute>} />
+          <Route path="/car-quiz-admin" element={<RoleProtectedRoute requireTeamlederOrAbove><CarQuizAdmin /></RoleProtectedRoute>} />
           {/* Admin route - owner only */}
           <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
