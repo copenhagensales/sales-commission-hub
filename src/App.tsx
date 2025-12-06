@@ -7,19 +7,8 @@ import React, { Component, ErrorInfo, ReactNode, Suspense, lazy } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { ProtectedRoute, RoleProtectedRoute } from "@/components/RoleProtectedRoute";
 
-// Helper to create lazy imports with error handling
-const lazyWithRetry = (importFn: () => Promise<any>) => {
-  return lazy(async () => {
-    try {
-      return await importFn();
-    } catch (error) {
-      console.error("Failed to load module:", error);
-      // Force page reload on chunk load failure
-      window.location.reload();
-      throw error;
-    }
-  });
-};
+// Simple lazy import wrapper - no auto-reload to prevent infinite loops
+const lazyWithRetry = (importFn: () => Promise<any>) => lazy(importFn);
 
 // Lazy load all pages
 const Auth = lazyWithRetry(() => import("./pages/Auth"));
