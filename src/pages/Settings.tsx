@@ -605,6 +605,17 @@ export default function Settings() {
                                 )}
                               </div>
                               <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    max="120"
+                                    className="w-16 h-8 text-center"
+                                    value={syncDays}
+                                    onChange={(e) => setSyncDays(Math.min(120, Math.max(1, parseInt(e.target.value) || 30)))}
+                                  />
+                                  <span className="text-sm text-muted-foreground">dage</span>
+                                </div>
                                 <Button 
                                   size="sm" 
                                   variant="outline"
