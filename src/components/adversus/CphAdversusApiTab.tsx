@@ -52,6 +52,21 @@ export function CphAdversusApiTab() {
     },
   });
 
+  // Fetch recent events for the data table
+  const { data: recentEvents } = useQuery({
+    queryKey: ["adversus-events-recent-api-tab"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("adversus_events")
+        .select("id, external_id, event_type, received_at, processed, payload")
+        .order("received_at", { ascending: false })
+        .limit(20);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
   if (isLoading) {
     return (
       <section className="space-y-3">
@@ -299,6 +314,73 @@ export function CphAdversusApiTab() {
                   <Badge variant="outline" className="text-green-400">Aktiv</Badge>
                 </TableCell>
               </TableRow>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Seneste events datatabel */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="p-4 border-b">
+            <h3 className="text-sm font-medium">Seneste 20 events</h3>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>External ID</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Kunde/Kampagne</TableHead>
+                <TableHead>Modtaget</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recentEvents && recentEvents.length > 0 ? (
+                recentEvents.map((event: any) => {
+                  const campaignName = event.payload?.payload?.campaign?.name || 
+                                       event.payload?.campaign?.name || 
+                                       "-";
+                  return (
+                    <TableRow key={event.id}>
+                      <TableCell className="font-mono text-xs">
+                        {String(event.id).slice(0, 8)}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {event.external_id || "-"}
+                      </TableCell>
+                      <TableCell>{event.event_type}</TableCell>
+                      <TableCell className="max-w-[150px] truncate" title={campaignName}>
+                        {campaignName}
+                      </TableCell>
+                      <TableCell>
+                        {event.received_at
+                          ? format(new Date(event.received_at), "dd/MM/yyyy HH:mm", { locale: da })
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {event.processed ? (
+                          <Badge variant="outline" className="text-green-400">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Behandlet
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-amber-400">
+                            Afventer
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    Ingen events fundet
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
