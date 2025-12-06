@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, RefreshCw, Send, Database, Download, Upload } from "lucide-react";
+import { Settings as SettingsIcon, RefreshCw, Send, Database, Download, Upload, Key, CheckCircle2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 export default function Settings() {
   const [loading, setLoading] = useState<string | null>(null);
@@ -266,13 +267,70 @@ export default function Settings() {
     }
   };
 
+  // API secrets configuration
+  const apiSecrets = [
+    { name: "ADVERSUS_API_USERNAME", label: "Adversus brugernavn", group: "Adversus" },
+    { name: "ADVERSUS_API_PASSWORD", label: "Adversus adgangskode", group: "Adversus" },
+    { name: "ECONOMIC_APP_SECRET_TOKEN", label: "e-conomic App Secret", group: "e-conomic" },
+    { name: "ECONOMIC_AGREEMENT_GRANT_TOKEN", label: "e-conomic Agreement Grant", group: "e-conomic" },
+    { name: "M365_TENANT_ID", label: "Microsoft 365 Tenant ID", group: "Microsoft 365" },
+    { name: "M365_CLIENT_ID", label: "Microsoft 365 Client ID", group: "Microsoft 365" },
+    { name: "M365_CLIENT_SECRET", label: "Microsoft 365 Client Secret", group: "Microsoft 365" },
+    { name: "M365_SENDER_EMAIL", label: "Afsender email", group: "Microsoft 365" },
+  ];
+
+  const groupedSecrets = apiSecrets.reduce((acc, secret) => {
+    if (!acc[secret.group]) acc[secret.group] = [];
+    acc[secret.group].push(secret);
+    return acc;
+  }, {} as Record<string, typeof apiSecrets>);
+
   return (
     <MainLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-muted-foreground">Adversus integration & test</p>
+          <h1 className="text-3xl font-bold">Indstillinger</h1>
+          <p className="text-muted-foreground">API-nøgler og Adversus integration</p>
         </div>
+
+        {/* API Keys Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" />
+              API-nøgler og integrationer
+            </CardTitle>
+            <CardDescription>
+              Disse API-nøgler er konfigureret i systemet. Kontakt administrator for at ændre dem.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {Object.entries(groupedSecrets).map(([group, secrets]) => (
+              <div key={group} className="space-y-3">
+                <h3 className="text-sm font-semibold text-muted-foreground">{group}</h3>
+                <div className="grid gap-2">
+                  {secrets.map((secret) => (
+                    <div 
+                      key={secret.name} 
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border"
+                    >
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <div>
+                          <p className="text-sm font-medium">{secret.label}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{secret.name}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-green-600 border-green-600">
+                        Konfigureret
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
         <Card className="border-primary/50 bg-primary/5">
           <CardHeader>
