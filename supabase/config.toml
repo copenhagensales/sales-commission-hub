@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.send-career-wish-notification]
 verify_jwt = true
+
+[functions.fetch-single-opp]
+verify_jwt = false
