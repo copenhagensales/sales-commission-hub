@@ -223,8 +223,8 @@ export function AppSidebar() {
             </NavLink>
           )}
 
-          {/* Code of Conduct menu item for Salgskonsulenter and owners */}
-          {(isSalgskonsulent || isOwner) && (
+          {/* Code of Conduct menu item for Salgskonsulenter (not owners - they only see admin view) */}
+          {isSalgskonsulent && !isOwner && (
             <NavLink
               to="/code-of-conduct"
               className={cn(
