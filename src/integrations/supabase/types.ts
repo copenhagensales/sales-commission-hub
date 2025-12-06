@@ -1301,6 +1301,94 @@ export type Database = {
         }
         Relationships: []
       }
+      gdpr_consents: {
+        Row: {
+          consent_type: string
+          consented_at: string
+          created_at: string
+          employee_id: string
+          id: string
+          ip_address: string | null
+          revoked_at: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          consent_type: string
+          consented_at?: string
+          created_at?: string
+          employee_id: string
+          id?: string
+          ip_address?: string | null
+          revoked_at?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          consent_type?: string
+          consented_at?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+          ip_address?: string | null
+          revoked_at?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gdpr_consents_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gdpr_data_requests: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          employee_id: string
+          export_data: Json | null
+          id: string
+          notes: string | null
+          processed_by: string | null
+          request_type: string
+          requested_at: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          employee_id: string
+          export_data?: Json | null
+          id?: string
+          notes?: string | null
+          processed_by?: string | null
+          request_type: string
+          requested_at?: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          employee_id?: string
+          export_data?: Json | null
+          id?: string
+          notes?: string | null
+          processed_by?: string | null
+          request_type?: string
+          requested_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gdpr_data_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lateness_record: {
         Row: {
           created_at: string
