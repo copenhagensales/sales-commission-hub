@@ -105,10 +105,10 @@ export default function CodeOfConductAdmin() {
         if (completion) {
           const passedDate = new Date(completion.passed_at);
           const daysSincePassed = differenceInDays(new Date(), passedDate);
-          const daysUntilExpiry = 30 - daysSincePassed;
+          const daysUntilExpiry = 60 - daysSincePassed; // 2 months
           completionStatus = {
             passed_at: completion.passed_at,
-            isExpired: daysSincePassed >= 30,
+            isExpired: daysSincePassed >= 60, // 2 months
             daysUntilExpiry: Math.max(0, daysUntilExpiry),
           };
         }
