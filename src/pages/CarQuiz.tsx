@@ -10,6 +10,7 @@ import { CheckCircle, XCircle, Car, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 const QUESTIONS = [
   {
@@ -139,159 +140,167 @@ export default function CarQuiz() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="animate-pulse">Indlæser...</div>
-      </div>
+      <MainLayout>
+        <div className="container mx-auto py-8 px-4">
+          <div className="animate-pulse">Indlæser...</div>
+        </div>
+      </MainLayout>
     );
   }
 
   // Already passed
   if (completion) {
     return (
-      <div className="container mx-auto py-8 px-4 max-w-3xl">
-        <Card className="border-green-500 bg-green-50 dark:bg-green-950/20">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-              <div>
-                <CardTitle className="text-green-700 dark:text-green-400">Quiz bestået</CardTitle>
-                <CardDescription>
-                  Du har bestået bil-quizzen den {format(new Date(completion.passed_at), "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
-                </CardDescription>
+      <MainLayout>
+        <div className="container mx-auto py-8 px-4 max-w-3xl">
+          <Card className="border-green-500 bg-green-50 dark:bg-green-950/20">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-8 w-8 text-green-600" />
+                <div>
+                  <CardTitle className="text-green-700 dark:text-green-400">Quiz bestået</CardTitle>
+                  <CardDescription>
+                    Du har bestået bil-quizzen den {format(new Date(completion.passed_at), "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
+                  </CardDescription>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              Du er nu godkendt til at bruge Copenhagen Sales' firmabiler. Husk altid at overholde færdselsloven og virksomhedens regler.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Du er nu godkendt til at bruge Copenhagen Sales' firmabiler. Husk altid at overholde færdselsloven og virksomhedens regler.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
     );
   }
 
   // Show failed result
   if (showResults && !passed) {
     return (
-      <div className="container mx-auto py-8 px-4 max-w-3xl">
-        <Card className="border-red-500 bg-red-50 dark:bg-red-950/20">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <XCircle className="h-8 w-8 text-red-600" />
-              <div>
-                <CardTitle className="text-red-700 dark:text-red-400">Ikke bestået</CardTitle>
-                <CardDescription>
-                  Du har ikke svaret korrekt på alle spørgsmål
-                </CardDescription>
+      <MainLayout>
+        <div className="container mx-auto py-8 px-4 max-w-3xl">
+          <Card className="border-red-500 bg-red-50 dark:bg-red-950/20">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <XCircle className="h-8 w-8 text-red-600" />
+                <div>
+                  <CardTitle className="text-red-700 dark:text-red-400">Ikke bestået</CardTitle>
+                  <CardDescription>
+                    Du har ikke svaret korrekt på alle spørgsmål
+                  </CardDescription>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground">
-              Du har ikke svaret korrekt på alle spørgsmål eller accepteret GPS-overvågningen. Læs reglerne igen og tag testen én gang til.
-            </p>
-            <Button onClick={handleRetry}>Tag testen igen</Button>
-          </CardContent>
-        </Card>
-      </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground">
+                Du har ikke svaret korrekt på alle spørgsmål eller accepteret GPS-overvågningen. Læs reglerne igen og tag testen én gang til.
+              </p>
+              <Button onClick={handleRetry}>Tag testen igen</Button>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
     );
   }
 
   const allAnswered = QUESTIONS.every(q => answers[q.id]) && gpsAccepted;
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-3xl space-y-6">
-      <div className="flex items-center gap-3">
-        <Car className="h-8 w-8 text-primary" />
-        <div>
-          <h1 className="text-2xl font-bold">Bil-quiz – Brug af firmabiler</h1>
-          <p className="text-muted-foreground">Copenhagen Sales</p>
+    <MainLayout>
+      <div className="container mx-auto py-8 px-4 max-w-3xl space-y-6">
+        <div className="flex items-center gap-3">
+          <Car className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold">Bil-quiz – Brug af firmabiler</h1>
+            <p className="text-muted-foreground">Copenhagen Sales</p>
+          </div>
         </div>
-      </div>
 
-      <Alert>
-        <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Vigtig information</AlertTitle>
-        <AlertDescription className="space-y-2 mt-2">
-          <p>Denne quiz skal sikre, at du kender og accepterer reglerne for brug af Copenhagen Sales' biler.</p>
-          <p>For at få lov til at bruge bilerne skal du:</p>
-          <ul className="list-disc list-inside ml-2">
-            <li>Overholde Færdselsloven</li>
-            <li>Være indforstået med vores interne regler</li>
-            <li>Forstå, at du selv hæfter for ulovlig kørsel, fartbøder, parkeringsafgifter m.m.</li>
-            <li>Være indforstået med, at hvis bilen konfiskeres pga. vandvidskørsel, hæfter du personligt for bilens værdi</li>
-          </ul>
-          <p className="font-medium">Du skal svare rigtigt på alle spørgsmål for at bestå. Hvis du ikke består, skal du tage testen igen, indtil alle svar er korrekte.</p>
-        </AlertDescription>
-      </Alert>
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Vigtig information</AlertTitle>
+          <AlertDescription className="space-y-2 mt-2">
+            <p>Denne quiz skal sikre, at du kender og accepterer reglerne for brug af Copenhagen Sales' biler.</p>
+            <p>For at få lov til at bruge bilerne skal du:</p>
+            <ul className="list-disc list-inside ml-2">
+              <li>Overholde Færdselsloven</li>
+              <li>Være indforstået med vores interne regler</li>
+              <li>Forstå, at du selv hæfter for ulovlig kørsel, fartbøder, parkeringsafgifter m.m.</li>
+              <li>Være indforstået med, at hvis bilen konfiskeres pga. vandvidskørsel, hæfter du personligt for bilens værdi</li>
+            </ul>
+            <p className="font-medium">Du skal svare rigtigt på alle spørgsmål for at bestå. Hvis du ikke består, skal du tage testen igen, indtil alle svar er korrekte.</p>
+          </AlertDescription>
+        </Alert>
 
-      <div className="space-y-6">
-        {QUESTIONS.map((q, index) => (
-          <Card key={q.id}>
+        <div className="space-y-6">
+          {QUESTIONS.map((q, index) => (
+            <Card key={q.id}>
+              <CardHeader>
+                <CardTitle className="text-lg">
+                  Spørgsmål {index + 1}
+                </CardTitle>
+                <CardDescription className="text-foreground font-medium">
+                  {q.question}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup
+                  value={answers[q.id] || ""}
+                  onValueChange={(value) => setAnswers(prev => ({ ...prev, [q.id]: value }))}
+                >
+                  {q.options.map((option) => (
+                    <div key={option.key} className="flex items-center space-x-2">
+                      <RadioGroupItem value={option.key} id={`q${q.id}-${option.key}`} />
+                      <Label htmlFor={`q${q.id}-${option.key}`} className="cursor-pointer">
+                        {option.key}: {option.text}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* GPS Acceptance */}
+          <Card className="border-amber-500">
             <CardHeader>
-              <CardTitle className="text-lg">
-                Spørgsmål {index + 1}
-              </CardTitle>
-              <CardDescription className="text-foreground font-medium">
-                {q.question}
-              </CardDescription>
+              <CardTitle className="text-lg">Spørgsmål 9 – GPS-overvågning</CardTitle>
             </CardHeader>
-            <CardContent>
-              <RadioGroup
-                value={answers[q.id] || ""}
-                onValueChange={(value) => setAnswers(prev => ({ ...prev, [q.id]: value }))}
-              >
-                {q.options.map((option) => (
-                  <div key={option.key} className="flex items-center space-x-2">
-                    <RadioGroupItem value={option.key} id={`q${q.id}-${option.key}`} />
-                    <Label htmlFor={`q${q.id}-${option.key}`} className="cursor-pointer">
-                      {option.key}: {option.text}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
+            <CardContent className="space-y-4">
+              <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-300">
+                <AlertDescription>
+                  <p className="mb-2">Der sidder en chip/GPS-enhed i Copenhagen Sales' biler, som registrerer bl.a. fart og kørsel.</p>
+                  <p className="mb-2">Det betyder, at Copenhagen Sales kan se, hvor hurtigt bilen er blevet ført, og hvordan den er blevet brugt.</p>
+                  <p>Formålet er sikkerhed, dokumentation og kontrol af, at bilerne bruges forsvarligt og efter virksomhedens regler.</p>
+                </AlertDescription>
+              </Alert>
+
+              <div className="flex items-start space-x-3 pt-2">
+                <Checkbox
+                  id="gps-accept"
+                  checked={gpsAccepted}
+                  onCheckedChange={(checked) => setGpsAccepted(checked === true)}
+                />
+                <Label htmlFor="gps-accept" className="cursor-pointer leading-relaxed">
+                  Ja, jeg er indforstået og accepterer, at min kørsel i Copenhagen Sales' biler bliver registreret og overvåget via chip/GPS, og at virksomheden kan se disse data.
+                </Label>
+              </div>
             </CardContent>
           </Card>
-        ))}
+        </div>
 
-        {/* GPS Acceptance */}
-        <Card className="border-amber-500">
-          <CardHeader>
-            <CardTitle className="text-lg">Spørgsmål 9 – GPS-overvågning</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-300">
-              <AlertDescription>
-                <p className="mb-2">Der sidder en chip/GPS-enhed i Copenhagen Sales' biler, som registrerer bl.a. fart og kørsel.</p>
-                <p className="mb-2">Det betyder, at Copenhagen Sales kan se, hvor hurtigt bilen er blevet ført, og hvordan den er blevet brugt.</p>
-                <p>Formålet er sikkerhed, dokumentation og kontrol af, at bilerne bruges forsvarligt og efter virksomhedens regler.</p>
-              </AlertDescription>
-            </Alert>
-
-            <div className="flex items-start space-x-3 pt-2">
-              <Checkbox
-                id="gps-accept"
-                checked={gpsAccepted}
-                onCheckedChange={(checked) => setGpsAccepted(checked === true)}
-              />
-              <Label htmlFor="gps-accept" className="cursor-pointer leading-relaxed">
-                Ja, jeg er indforstået og accepterer, at min kørsel i Copenhagen Sales' biler bliver registreret og overvåget via chip/GPS, og at virksomheden kan se disse data.
-              </Label>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex justify-end pt-4">
+          <Button 
+            size="lg" 
+            onClick={handleSubmit}
+            disabled={!allAnswered || completeQuiz.isPending}
+          >
+            {completeQuiz.isPending ? "Gemmer..." : "Indsend svar"}
+          </Button>
+        </div>
       </div>
-
-      <div className="flex justify-end pt-4">
-        <Button 
-          size="lg" 
-          onClick={handleSubmit}
-          disabled={!allAnswered || completeQuiz.isPending}
-        >
-          {completeQuiz.isPending ? "Gemmer..." : "Indsend svar"}
-        </Button>
-      </div>
-    </div>
+    </MainLayout>
   );
 }
