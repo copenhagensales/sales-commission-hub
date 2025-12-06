@@ -1053,33 +1053,6 @@ export default function Settings() {
         </Dialog>
 
         <div className="grid gap-6 md:grid-cols-2">
-          <Card className="border-green-500/50 bg-green-500/5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Download className="h-5 w-5 text-green-600" />
-                Sync Salg til Database
-              </CardTitle>
-              <CardDescription>Hent salg fra Adversus og gem i databasen</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="syncDays">Antal dage tilbage</Label>
-                <Input
-                  id="syncDays"
-                  type="number"
-                  value={syncDays}
-                  onChange={(e) => setSyncDays(Number(e.target.value))}
-                  min={1}
-                  max={370}
-                />
-              </div>
-              <Button onClick={syncSalesToDb} disabled={loading === "sync"} className="w-full bg-green-600 hover:bg-green-700">
-                {loading === "sync" && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-                Sync til Database
-              </Button>
-            </CardContent>
-          </Card>
-
           <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
