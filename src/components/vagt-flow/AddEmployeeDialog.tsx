@@ -177,8 +177,9 @@ export function AddEmployeeDialog({
 
   const isDayInBookingRange = (dayIndex: number) => {
     if (!booking) return false;
-    const dayDate = addDays(weekStart, dayIndex);
-    return dayDate >= new Date(booking.start_date) && dayDate <= new Date(booking.end_date);
+    const dayDateStr = format(addDays(weekStart, dayIndex), "yyyy-MM-dd");
+    // Compare dates as strings to avoid timezone issues
+    return dayDateStr >= booking.start_date && dayDateStr <= booking.end_date;
   };
 
   const getDateForDay = (dayIndex: number) => {
