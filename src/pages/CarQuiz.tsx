@@ -6,9 +6,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useCarQuizCompletion, useCompleteCarQuiz } from "@/hooks/useCarQuiz";
-import { CheckCircle, XCircle, Car, AlertTriangle } from "lucide-react";
+import { CheckCircle, XCircle, Car, AlertTriangle, Shield } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, addMonths } from "date-fns";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
 
@@ -103,18 +103,29 @@ const QUESTIONS = [
   },
 ];
 
+const SUMMARY_POINTS = [
+  "Færdselsloven gælder ALTID, når du kører i Copenhagen Sales' biler",
+  "Ved vandvidskørsel kan bilen blive konfiskeret, og du hæfter PERSONLIGT for bilens fulde værdi",
+  "Privat brug af firmabiler er FORBUDT og kan medføre skattepligt og ansættelsesmæssige konsekvenser",
+  "Du betaler SELV alle fartbøder og parkeringsafgifter ved ulovlig parkering",
+  "Uforsvarlig kørsel kan medføre BORTVISNING fra Copenhagen Sales",
+  "Copenhagen Sales betaler kun for lovlig parkering – du har ansvaret for at parkere korrekt",
+  "Din kørsel overvåges via GPS/chip til sikkerhed og dokumentation",
+];
+
 export default function CarQuiz() {
   const { data: completion, isLoading } = useCarQuizCompletion();
   const completeQuiz = useCompleteCarQuiz();
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [gpsAccepted, setGpsAccepted] = useState(false);
+  const [summaryAccepted, setSummaryAccepted] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [passed, setPassed] = useState(false);
 
   const handleSubmit = () => {
     // Check all answers
     const allCorrect = QUESTIONS.every(q => answers[q.id] === q.correctAnswer);
-    const isValid = allCorrect && gpsAccepted;
+    const isValid = allCorrect && gpsAccepted && summaryAccepted;
 
     setPassed(isValid);
     setShowResults(true);
@@ -134,6 +145,7 @@ export default function CarQuiz() {
   const handleRetry = () => {
     setAnswers({});
     setGpsAccepted(false);
+    setSummaryAccepted(false);
     setShowResults(false);
     setPassed(false);
   };
@@ -148,29 +160,97 @@ export default function CarQuiz() {
     );
   }
 
-  // Already passed
-  if (completion) {
+  // Already passed and not expired - show certificate
+  if (completion && !completion.isExpired) {
+    const nextRenewalDate = addMonths(new Date(completion.passed_at), 6);
+    
     return (
       <MainLayout>
-        <div className="container mx-auto py-8 px-4 max-w-3xl">
-          <Card className="border-green-500 bg-green-50 dark:bg-green-950/20">
+        <div className="container mx-auto py-8 px-4 max-w-3xl space-y-6">
+          <div className="flex items-center gap-3">
+            <Car className="h-8 w-8 text-primary" />
+            <div>
+              <h1 className="text-2xl font-bold">Bil-quiz – Brug af firmabiler</h1>
+              <p className="text-muted-foreground">Copenhagen Sales</p>
+            </div>
+          </div>
+
+          {/* Official certificate card */}
+          <Card className="relative border-2 border-green-500 bg-gradient-to-br from-green-50 to-white dark:from-green-950/20 dark:to-background overflow-hidden">
+            {/* Stamp */}
+            <div className="absolute top-4 right-4 rotate-12">
+              <div className="border-4 border-green-600 rounded-lg px-4 py-2 bg-green-50 dark:bg-green-950/50">
+                <div className="text-green-700 dark:text-green-400 font-bold text-xl tracking-wider">BESTÅET</div>
+                <div className="text-green-600 dark:text-green-500 text-xs text-center font-medium">COPENHAGEN SALES</div>
+              </div>
+            </div>
+
             <CardHeader>
               <div className="flex items-center gap-3">
-                <CheckCircle className="h-8 w-8 text-green-600" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                  <Shield className="h-6 w-6 text-green-600" />
+                </div>
                 <div>
-                  <CardTitle className="text-green-700 dark:text-green-400">Quiz bestået</CardTitle>
+                  <CardTitle className="text-green-700 dark:text-green-400">Godkendt til brug af firmabiler</CardTitle>
                   <CardDescription>
-                    Du har bestået bil-quizzen den {format(new Date(completion.passed_at), "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
+                    Bestået den {format(new Date(completion.passed_at), "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Du er nu godkendt til at bruge Copenhagen Sales' firmabiler. Husk altid at overholde færdselsloven og virksomhedens regler.
-              </p>
+
+            <CardContent className="space-y-6">
+              <div className="rounded-lg bg-muted/50 p-4">
+                <h3 className="font-semibold mb-3">Du har bekræftet følgende:</h3>
+                <ul className="space-y-2">
+                  {SUMMARY_POINTS.map((point, index) => (
+                    <li key={index} className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertTitle className="text-amber-700 dark:text-amber-400">Fornyelse påkrævet</AlertTitle>
+                <AlertDescription className="text-amber-600 dark:text-amber-500">
+                  Denne godkendelse skal fornyes senest den {format(nextRenewalDate, "d. MMMM yyyy", { locale: da })} (hver 6. måned).
+                </AlertDescription>
+              </Alert>
             </CardContent>
           </Card>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // Quiz expired - show renewal notice
+  if (completion?.isExpired) {
+    return (
+      <MainLayout>
+        <div className="container mx-auto py-8 px-4 max-w-3xl space-y-6">
+          <div className="flex items-center gap-3">
+            <Car className="h-8 w-8 text-primary" />
+            <div>
+              <h1 className="text-2xl font-bold">Bil-quiz – Brug af firmabiler</h1>
+              <p className="text-muted-foreground">Copenhagen Sales</p>
+            </div>
+          </div>
+
+          <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-700 dark:text-amber-400">Fornyelse påkrævet</AlertTitle>
+            <AlertDescription className="text-amber-600 dark:text-amber-500">
+              Din bil-quiz godkendelse er udløbet. Du bestod sidst den {format(new Date(completion.passed_at), "d. MMMM yyyy", { locale: da })}. 
+              Du skal tage quizzen igen for at fortsætte med at bruge Copenhagen Sales' biler.
+            </AlertDescription>
+          </Alert>
+
+          <Button size="lg" onClick={handleRetry}>
+            Tag quizzen igen
+          </Button>
         </div>
       </MainLayout>
     );
@@ -195,7 +275,7 @@ export default function CarQuiz() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                Du har ikke svaret korrekt på alle spørgsmål eller accepteret GPS-overvågningen. Læs reglerne igen og tag testen én gang til.
+                Du har ikke svaret korrekt på alle spørgsmål eller accepteret alle betingelser. Læs reglerne igen og tag testen én gang til.
               </p>
               <Button onClick={handleRetry}>Tag testen igen</Button>
             </CardContent>
@@ -205,7 +285,7 @@ export default function CarQuiz() {
     );
   }
 
-  const allAnswered = QUESTIONS.every(q => answers[q.id]) && gpsAccepted;
+  const allAnswered = QUESTIONS.every(q => answers[q.id]) && gpsAccepted && summaryAccepted;
 
   return (
     <MainLayout>
@@ -231,6 +311,7 @@ export default function CarQuiz() {
               <li>Være indforstået med, at hvis bilen konfiskeres pga. vandvidskørsel, hæfter du personligt for bilens værdi</li>
             </ul>
             <p className="font-medium">Du skal svare rigtigt på alle spørgsmål for at bestå. Hvis du ikke består, skal du tage testen igen, indtil alle svar er korrekte.</p>
+            <p className="font-medium text-amber-600">Denne godkendelse skal fornyes hver 6. måned.</p>
           </AlertDescription>
         </Alert>
 
@@ -289,6 +370,51 @@ export default function CarQuiz() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Summary and final acceptance */}
+          <Card className="border-2 border-primary">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                Opsummering – Bekræftelse af vilkår
+              </CardTitle>
+              <CardDescription>
+                Ved at acceptere nedenfor bekræfter du, at du har læst, forstået og accepterer følgende:
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg bg-muted/50 p-4">
+                <ul className="space-y-3">
+                  {SUMMARY_POINTS.map((point, index) => (
+                    <li key={index} className="flex items-start gap-2 text-sm">
+                      <span className="font-bold text-primary shrink-0">{index + 1}.</span>
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <Alert className="border-destructive bg-destructive/10">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <AlertTitle className="text-destructive">Vigtigt om personligt ansvar</AlertTitle>
+                <AlertDescription className="text-destructive/90">
+                  Ved vandvidskørsel, hvor bilen konfiskeres af politiet, hæfter du <strong>personligt</strong> for bilens fulde værdi. 
+                  Dette kan betyde et erstatningsansvar på flere hundrede tusinde kroner.
+                </AlertDescription>
+              </Alert>
+
+              <div className="flex items-start space-x-3 pt-2 border-t">
+                <Checkbox
+                  id="summary-accept"
+                  checked={summaryAccepted}
+                  onCheckedChange={(checked) => setSummaryAccepted(checked === true)}
+                />
+                <Label htmlFor="summary-accept" className="cursor-pointer leading-relaxed font-medium">
+                  Jeg bekræfter hermed, at jeg har læst og forstået alle ovenstående vilkår. Jeg er indforstået med, at jeg hæfter personligt for bilens værdi ved konfiskering pga. vandvidskørsel, og jeg accepterer at overholde alle regler for brug af Copenhagen Sales' firmabiler.
+                </Label>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="flex justify-end pt-4">
@@ -297,7 +423,7 @@ export default function CarQuiz() {
             onClick={handleSubmit}
             disabled={!allAnswered || completeQuiz.isPending}
           >
-            {completeQuiz.isPending ? "Gemmer..." : "Indsend svar"}
+            {completeQuiz.isPending ? "Gemmer..." : "Indsend svar og accepter vilkår"}
           </Button>
         </div>
       </div>
