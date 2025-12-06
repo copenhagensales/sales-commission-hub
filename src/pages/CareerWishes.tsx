@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -9,13 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, CheckCircle, Sparkles, Users, Crown, ArrowRight } from "lucide-react";
+import { Loader2, CheckCircle, Sparkles, Users, Crown, ArrowRight, ArrowLeft } from "lucide-react";
 
 type LeadershipInterest = "yes" | "maybe" | "no";
 type LeadershipRoleType = "junior_teamleder" | "teamleder" | "coach" | "other";
 type FormPurpose = "team_change" | "leadership" | "both";
 
 export default function CareerWishes() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -183,6 +185,15 @@ export default function CareerWishes() {
 
   return (
     <div className="container max-w-2xl mx-auto py-8 px-4">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => navigate(-1)}
+        className="mb-4"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Tilbage
+      </Button>
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
