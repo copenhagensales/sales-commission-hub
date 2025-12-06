@@ -36,7 +36,7 @@ const ownerNavigation = [
 // Navigation items for teamleder (limited team-related access)
 const teamlederNavigation = [
   { name: "Vagtplan", href: "/shift-planning", icon: ClipboardList },
-  { name: "Godkend fravær", href: "/shift-planning/absence", icon: Clock },
+  { name: "Godkend fravær", href: "/shift-planning/absence", icon: Clock, badgeKey: "pendingAbsence" },
   { name: "Mit team", href: "/employees", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
@@ -141,6 +141,55 @@ export function AppSidebar() {
     staleTime: 30000,
   });
 
+  // Fetch pending absence requests count for teamleders
+  const { data: pendingAbsenceCount = 0 } = useQuery({
+    queryKey: ["pending-absence-count", user?.email],
+    queryFn: async () => {
+      if (!user?.email) return 0;
+
+      const { data: currentEmployee } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .eq("private_email", user.email)
+        .maybeSingle();
+
+      if (!currentEmployee) return 0;
+
+      const now = new Date().toISOString();
+
+      // If owner, get all pending requests
+      if (isOwner) {
+        const { count } = await supabase
+          .from("absence_request_v2")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "pending")
+          .or(`postponed_until.is.null,postponed_until.lt.${now}`);
+        return count || 0;
+      }
+
+      // For teamleders, only get team members' requests
+      const { data: teamMembers } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .eq("manager_id", currentEmployee.id);
+
+      const teamIds = teamMembers?.map(m => m.id) || [];
+      if (teamIds.length === 0) return 0;
+
+      const { count } = await supabase
+        .from("absence_request_v2")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending")
+        .or(`postponed_until.is.null,postponed_until.lt.${now}`)
+        .in("employee_id", teamIds);
+
+      return count || 0;
+    },
+    enabled: !!user?.email && isTeamlederOrAbove,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
+  });
+
   const pendingContractsCount = employeeData?.pendingContracts ?? 0;
   const employeeName = employeeData?.name;
 
@@ -196,9 +245,15 @@ export function AppSidebar() {
         <nav className="flex-1 space-y-1 p-4">
           {mainNavigation.map((item) => {
             const isActive = location.pathname === item.href;
+            const hasPendingAbsenceBadge = 'badgeKey' in item && item.badgeKey === 'pendingAbsence' && pendingAbsenceCount > 0;
             const showBadge = (item.href === "/my-contracts" && pendingContractsCount > 0) || 
-                              (item.href === "/pulse-survey" && showPulseBadge);
-            const badgeCount = item.href === "/my-contracts" ? pendingContractsCount : 1;
+                              (item.href === "/pulse-survey" && showPulseBadge) ||
+                              hasPendingAbsenceBadge;
+            const badgeCount = hasPendingAbsenceBadge 
+              ? pendingAbsenceCount 
+              : item.href === "/my-contracts" 
+                ? pendingContractsCount 
+                : 1;
             return (
               <NavLink
                 key={item.name}
