@@ -240,6 +240,42 @@ export type Database = {
         }
         Relationships: []
       }
+      api_integrations: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          last_sync_at: string | null
+          name: string
+          secrets: Json | null
+          sync_frequency_minutes: number | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          name: string
+          secrets?: Json | null
+          sync_frequency_minutes?: number | null
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          name?: string
+          secrets?: Json | null
+          sync_frequency_minutes?: number | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       booking: {
         Row: {
           brand_id: string
