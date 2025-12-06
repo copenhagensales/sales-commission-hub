@@ -268,6 +268,24 @@ export default function Settings() {
     }
   };
 
+  const backfillOpp = async () => {
+    setLoading("backfill-opp");
+    try {
+      const { data, error } = await supabase.functions.invoke("backfill-opp");
+      if (error) throw error;
+      setResults({ type: "backfill-opp", data });
+      if (data.remaining > 0) {
+        toast.success(`Opdaterede ${data.successful} OPP-numre. ${data.remaining} mangler stadig.`);
+      } else {
+        toast.success(`Alle OPP-numre er nu hentet!`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Backfill af OPP fejlede");
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const testWebhook = async () => {
     setLoading("webhook");
     try {
@@ -632,6 +650,18 @@ export default function Settings() {
                                   <RefreshCw className={`h-4 w-4 ${loading === "sync" ? "animate-spin" : ""}`} />
                                   Hent data
                                 </Button>
+                                {integration.type === 'adversus' && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    className="gap-2"
+                                    onClick={backfillOpp}
+                                    disabled={loading === "backfill-opp"}
+                                  >
+                                    <Download className={`h-4 w-4 ${loading === "backfill-opp" ? "animate-spin" : ""}`} />
+                                    Hent OPP
+                                  </Button>
+                                )}
                                 <Button 
                                   size="icon" 
                                   variant="ghost" 
