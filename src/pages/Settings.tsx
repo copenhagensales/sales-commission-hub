@@ -25,6 +25,19 @@ interface ApiIntegration {
   updated_at: string;
 }
 
+interface WebhookEndpoint {
+  id: string;
+  name: string;
+  type: string;
+  endpoint_path: string;
+  is_active: boolean;
+  description: string | null;
+  last_received_at: string | null;
+  total_requests: number;
+  created_at: string;
+  updated_at: string;
+}
+
 const secretLabels: Record<string, string> = {
   "ADVERSUS_API_USERNAME": "Brugernavn",
   "ADVERSUS_API_PASSWORD": "Adgangskode",
@@ -91,8 +104,18 @@ export default function Settings() {
   const [newIntegration, setNewIntegration] = useState({ name: "", type: "", sync_frequency_minutes: "60" });
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // Webhook Endpoints state
+  const [webhooks, setWebhooks] = useState<WebhookEndpoint[]>([]);
+  const [loadingWebhooks, setLoadingWebhooks] = useState(true);
+  const [editingWebhookId, setEditingWebhookId] = useState<string | null>(null);
+  const [editWebhookForm, setEditWebhookForm] = useState<{ name: string; description: string }>({ name: "", description: "" });
+  const [addWebhookDialogOpen, setAddWebhookDialogOpen] = useState(false);
+  const [newWebhook, setNewWebhook] = useState({ name: "", type: "", endpoint_path: "", description: "" });
+  const [expandedWebhookId, setExpandedWebhookId] = useState<string | null>(null);
+
   useEffect(() => {
     fetchIntegrations();
+    fetchWebhooks();
     loadLastTdcImport();
   }, []);
 
@@ -113,6 +136,100 @@ export default function Settings() {
       })) as ApiIntegration[]);
     }
     setLoadingIntegrations(false);
+  };
+
+  const fetchWebhooks = async () => {
+    setLoadingWebhooks(true);
+    const { data, error } = await supabase
+      .from("webhook_endpoints")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching webhooks:", error);
+    } else {
+      setWebhooks((data || []) as WebhookEndpoint[]);
+    }
+    setLoadingWebhooks(false);
+  };
+
+  const handleAddWebhook = async () => {
+    if (!newWebhook.name.trim() || !newWebhook.type.trim() || !newWebhook.endpoint_path.trim()) {
+      toast.error("Navn, type og endpoint er påkrævet");
+      return;
+    }
+
+    const { error } = await supabase.from("webhook_endpoints").insert({
+      name: newWebhook.name,
+      type: newWebhook.type,
+      endpoint_path: newWebhook.endpoint_path,
+      description: newWebhook.description || null,
+    });
+
+    if (error) {
+      console.error("Error adding webhook:", error);
+      toast.error("Kunne ikke tilføje webhook");
+    } else {
+      toast.success("Webhook tilføjet");
+      setAddWebhookDialogOpen(false);
+      setNewWebhook({ name: "", type: "", endpoint_path: "", description: "" });
+      fetchWebhooks();
+    }
+  };
+
+  const handleStartEditWebhook = (webhook: WebhookEndpoint) => {
+    setEditingWebhookId(webhook.id);
+    setEditWebhookForm({
+      name: webhook.name,
+      description: webhook.description || "",
+    });
+  };
+
+  const handleSaveEditWebhook = async (id: string) => {
+    const { error } = await supabase.from("webhook_endpoints").update({
+      name: editWebhookForm.name,
+      description: editWebhookForm.description || null,
+    }).eq("id", id);
+
+    if (error) {
+      console.error("Error updating webhook:", error);
+      toast.error("Kunne ikke opdatere webhook");
+    } else {
+      toast.success("Webhook opdateret");
+      setEditingWebhookId(null);
+      fetchWebhooks();
+    }
+  };
+
+  const handleDeleteWebhook = async (id: string) => {
+    if (!confirm("Er du sikker på at du vil slette denne webhook?")) return;
+
+    const { error } = await supabase.from("webhook_endpoints").delete().eq("id", id);
+
+    if (error) {
+      console.error("Error deleting webhook:", error);
+      toast.error("Kunne ikke slette webhook");
+    } else {
+      toast.success("Webhook slettet");
+      fetchWebhooks();
+    }
+  };
+
+  const handleToggleWebhookActive = async (id: string, currentState: boolean) => {
+    const { error } = await supabase
+      .from("webhook_endpoints")
+      .update({ is_active: !currentState })
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error toggling webhook:", error);
+      toast.error("Kunne ikke opdatere webhook");
+    } else {
+      setWebhooks(prev => prev.map(w => 
+        w.id === id ? { ...w, is_active: !currentState } : w
+      ));
+      toast.success(!currentState ? "Webhook aktiveret" : "Webhook deaktiveret");
+    }
   };
 
   const handleAddIntegration = async () => {
@@ -741,32 +858,210 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/50 bg-primary/5">
+        {/* Webhooks Section */}
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Send className="h-5 w-5" />
-              Webhook URL (til Adversus)
-            </CardTitle>
-            <CardDescription>Kopier denne URL til Adversus webhook-konfiguration</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-muted p-3 rounded text-sm break-all">
-                https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/adversus-webhook
-              </code>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText("https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/adversus-webhook");
-                  toast.success("Kopieret!");
-                }}
-              >
-                Kopier
-              </Button>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Send className="h-5 w-5" />
+                  Webhooks
+                </CardTitle>
+                <CardDescription>
+                  Administrer indgående webhooks fra eksterne systemer
+                </CardDescription>
+              </div>
+              <Dialog open={addWebhookDialogOpen} onOpenChange={setAddWebhookDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Tilføj Webhook
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Tilføj ny webhook</DialogTitle>
+                    <DialogDescription>
+                      Opret et nyt webhook-endpoint til at modtage data fra eksterne systemer
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Navn</Label>
+                      <Input
+                        placeholder="f.eks. Min Webhook"
+                        value={newWebhook.name}
+                        onChange={(e) => setNewWebhook({ ...newWebhook, name: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Type (teknisk identifikator)</Label>
+                      <Input
+                        placeholder="f.eks. adversus"
+                        value={newWebhook.type}
+                        onChange={(e) => setNewWebhook({ ...newWebhook, type: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Endpoint sti</Label>
+                      <Input
+                        placeholder="f.eks. adversus-webhook"
+                        value={newWebhook.endpoint_path}
+                        onChange={(e) => setNewWebhook({ ...newWebhook, endpoint_path: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Beskrivelse (valgfri)</Label>
+                      <Input
+                        placeholder="f.eks. Modtager salgsdata"
+                        value={newWebhook.description}
+                        onChange={(e) => setNewWebhook({ ...newWebhook, description: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="outline">Annuller</Button>
+                    </DialogClose>
+                    <Button onClick={handleAddWebhook}>Tilføj</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {loadingWebhooks ? (
+              <p className="text-sm text-muted-foreground">Indlæser...</p>
+            ) : webhooks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Ingen webhooks fundet</p>
+            ) : (
+              webhooks.map((webhook) => (
+                <Card key={webhook.id} className="bg-muted/30">
+                  <CardContent className="p-4">
+                    {editingWebhookId === webhook.id ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={editWebhookForm.name}
+                            onChange={(e) => setEditWebhookForm({ ...editWebhookForm, name: e.target.value })}
+                            className="flex-1"
+                            placeholder="Navn"
+                          />
+                          <Button size="icon" variant="ghost" onClick={() => handleSaveEditWebhook(webhook.id)}>
+                            <Save className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => setEditingWebhookId(null)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Input
+                          value={editWebhookForm.description}
+                          onChange={(e) => setEditWebhookForm({ ...editWebhookForm, description: e.target.value })}
+                          placeholder="Beskrivelse"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <div 
+                          className="flex items-center justify-between cursor-pointer"
+                          onClick={() => setExpandedWebhookId(expandedWebhookId === webhook.id ? null : webhook.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <h3 className="font-semibold">{webhook.name}</h3>
+                            <Badge variant="outline" className="text-xs font-mono">
+                              {webhook.type}
+                            </Badge>
+                            <Badge variant={webhook.is_active ? "default" : "secondary"} className="text-xs">
+                              {webhook.is_active ? "Aktiv" : "Inaktiv"}
+                            </Badge>
+                          </div>
+                          {expandedWebhookId === webhook.id ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                        </div>
+                        
+                        {/* Expanded Section */}
+                        {expandedWebhookId === webhook.id && (
+                          <div className="mt-4 space-y-4">
+                            {/* Description */}
+                            {webhook.description && (
+                              <p className="text-sm text-muted-foreground">{webhook.description}</p>
+                            )}
+                            
+                            {/* Webhook URL */}
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium">Webhook URL</Label>
+                              <div className="flex items-center gap-2">
+                                <code className="flex-1 bg-background/50 p-3 rounded text-sm break-all border">
+                                  https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/{webhook.endpoint_path}
+                                </code>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(`https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/${webhook.endpoint_path}`);
+                                    toast.success("Kopieret!");
+                                  }}
+                                >
+                                  Kopier
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Stats */}
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <span>Anmodninger: {webhook.total_requests}</span>
+                              {webhook.last_received_at && (
+                                <span>
+                                  Sidst modtaget: {new Date(webhook.last_received_at).toLocaleString("da-DK")}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-2">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleWebhookActive(webhook.id, webhook.is_active);
+                                }}
+                              >
+                                {webhook.is_active ? "Deaktiver" : "Aktiver"}
+                              </Button>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartEditWebhook(webhook);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="text-destructive" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteWebhook(webhook.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </CardContent>
         </Card>
+
 
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
