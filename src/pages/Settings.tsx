@@ -4,10 +4,46 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, RefreshCw, Send, Database, Download, Upload, Key, CheckCircle2, AlertCircle } from "lucide-react";
+import { Settings as SettingsIcon, RefreshCw, Send, Database, Download, Upload, Key, CheckCircle2, Plus, Pencil, Trash2, Clock, Save, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface ApiIntegration {
+  id: string;
+  name: string;
+  type: string;
+  sync_frequency_minutes: number | null;
+  is_active: boolean;
+  secrets: string[];
+  last_sync_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+const secretLabels: Record<string, string> = {
+  "ADVERSUS_API_USERNAME": "Brugernavn",
+  "ADVERSUS_API_PASSWORD": "Adgangskode",
+  "ECONOMIC_APP_SECRET_TOKEN": "App Secret Token",
+  "ECONOMIC_AGREEMENT_GRANT_TOKEN": "Agreement Grant Token",
+  "M365_TENANT_ID": "Tenant ID",
+  "M365_CLIENT_ID": "Client ID",
+  "M365_CLIENT_SECRET": "Client Secret",
+  "M365_SENDER_EMAIL": "Afsender email",
+};
+
+const frequencyOptions = [
+  { value: "15", label: "Hvert 15. minut" },
+  { value: "30", label: "Hvert 30. minut" },
+  { value: "60", label: "Hver time" },
+  { value: "120", label: "Hver 2. time" },
+  { value: "360", label: "Hver 6. time" },
+  { value: "720", label: "Hver 12. time" },
+  { value: "1440", label: "Dagligt" },
+  { value: "null", label: "Manuel (ingen automatik)" },
+];
 
 export default function Settings() {
   const [loading, setLoading] = useState<string | null>(null);
@@ -21,6 +57,106 @@ export default function Settings() {
   const [tdcFile, setTdcFile] = useState<File | null>(null);
   const [tdcUploadLoading, setTdcUploadLoading] = useState(false);
   const [tdcLastImport, setTdcLastImport] = useState<{ uploaded_at: string; uploaded_by: string | null } | null>(null);
+  
+  // API Integrations state
+  const [integrations, setIntegrations] = useState<ApiIntegration[]>([]);
+  const [loadingIntegrations, setLoadingIntegrations] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{ name: string; sync_frequency_minutes: string }>({ name: "", sync_frequency_minutes: "60" });
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newIntegration, setNewIntegration] = useState({ name: "", type: "", sync_frequency_minutes: "60" });
+
+  useEffect(() => {
+    fetchIntegrations();
+    loadLastTdcImport();
+  }, []);
+
+  const fetchIntegrations = async () => {
+    setLoadingIntegrations(true);
+    const { data, error } = await supabase
+      .from("api_integrations")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching integrations:", error);
+    } else {
+      setIntegrations((data || []).map(d => ({
+        ...d,
+        secrets: Array.isArray(d.secrets) ? d.secrets : []
+      })) as ApiIntegration[]);
+    }
+    setLoadingIntegrations(false);
+  };
+
+  const handleAddIntegration = async () => {
+    if (!newIntegration.name.trim() || !newIntegration.type.trim()) {
+      toast.error("Navn og type er påkrævet");
+      return;
+    }
+
+    const { error } = await supabase.from("api_integrations").insert({
+      name: newIntegration.name,
+      type: newIntegration.type,
+      sync_frequency_minutes: newIntegration.sync_frequency_minutes === "null" ? null : parseInt(newIntegration.sync_frequency_minutes),
+      secrets: [],
+    });
+
+    if (error) {
+      console.error("Error adding integration:", error);
+      toast.error("Kunne ikke tilføje integration");
+    } else {
+      toast.success("Integration tilføjet");
+      setAddDialogOpen(false);
+      setNewIntegration({ name: "", type: "", sync_frequency_minutes: "60" });
+      fetchIntegrations();
+    }
+  };
+
+  const handleStartEdit = (integration: ApiIntegration) => {
+    setEditingId(integration.id);
+    setEditForm({
+      name: integration.name,
+      sync_frequency_minutes: integration.sync_frequency_minutes?.toString() || "null",
+    });
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    const { error } = await supabase.from("api_integrations").update({
+      name: editForm.name,
+      sync_frequency_minutes: editForm.sync_frequency_minutes === "null" ? null : parseInt(editForm.sync_frequency_minutes),
+    }).eq("id", id);
+
+    if (error) {
+      console.error("Error updating integration:", error);
+      toast.error("Kunne ikke opdatere integration");
+    } else {
+      toast.success("Integration opdateret");
+      setEditingId(null);
+      fetchIntegrations();
+    }
+  };
+
+  const handleDeleteIntegration = async (id: string) => {
+    if (!confirm("Er du sikker på at du vil slette denne integration?")) return;
+
+    const { error } = await supabase.from("api_integrations").delete().eq("id", id);
+
+    if (error) {
+      console.error("Error deleting integration:", error);
+      toast.error("Kunne ikke slette integration");
+    } else {
+      toast.success("Integration slettet");
+      fetchIntegrations();
+    }
+  };
+
+  const formatFrequency = (minutes: number | null) => {
+    if (minutes === null) return "Manuel";
+    const option = frequencyOptions.find(o => o.value === minutes.toString());
+    return option?.label || `${minutes} min`;
+  };
+
   const testFetchCampaigns = async () => {
     setLoading("campaigns");
     try {
@@ -212,10 +348,6 @@ export default function Settings() {
     }
   };
 
-  useEffect(() => {
-    loadLastTdcImport();
-  }, []);
-
   const handleTdcUpload = async () => {
     if (!tdcFile) {
       toast.error("Vælg først en Excel-fil");
@@ -267,68 +399,181 @@ export default function Settings() {
     }
   };
 
-  // API secrets configuration
-  const apiSecrets = [
-    { name: "ADVERSUS_API_USERNAME", label: "Adversus brugernavn", group: "Adversus" },
-    { name: "ADVERSUS_API_PASSWORD", label: "Adversus adgangskode", group: "Adversus" },
-    { name: "ECONOMIC_APP_SECRET_TOKEN", label: "e-conomic App Secret", group: "e-conomic" },
-    { name: "ECONOMIC_AGREEMENT_GRANT_TOKEN", label: "e-conomic Agreement Grant", group: "e-conomic" },
-    { name: "M365_TENANT_ID", label: "Microsoft 365 Tenant ID", group: "Microsoft 365" },
-    { name: "M365_CLIENT_ID", label: "Microsoft 365 Client ID", group: "Microsoft 365" },
-    { name: "M365_CLIENT_SECRET", label: "Microsoft 365 Client Secret", group: "Microsoft 365" },
-    { name: "M365_SENDER_EMAIL", label: "Afsender email", group: "Microsoft 365" },
-  ];
-
-  const groupedSecrets = apiSecrets.reduce((acc, secret) => {
-    if (!acc[secret.group]) acc[secret.group] = [];
-    acc[secret.group].push(secret);
-    return acc;
-  }, {} as Record<string, typeof apiSecrets>);
-
   return (
     <MainLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Indstillinger</h1>
-          <p className="text-muted-foreground">API-nøgler og Adversus integration</p>
+          <p className="text-muted-foreground">API-integrationer og Adversus sync</p>
         </div>
 
-        {/* API Keys Section */}
+        {/* API Integrations Section */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5" />
-              API-nøgler og integrationer
-            </CardTitle>
-            <CardDescription>
-              Disse API-nøgler er konfigureret i systemet. Kontakt administrator for at ændre dem.
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Key className="h-5 w-5" />
+                  API-integrationer
+                </CardTitle>
+                <CardDescription>
+                  Administrer API-forbindelser og synkroniseringsfrekvens
+                </CardDescription>
+              </div>
+              <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Tilføj API
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Tilføj ny API-integration</DialogTitle>
+                    <DialogDescription>
+                      Opret en ny API-integration med navn og synkroniseringsfrekvens
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Navn</Label>
+                      <Input
+                        placeholder="f.eks. Min API"
+                        value={newIntegration.name}
+                        onChange={(e) => setNewIntegration({ ...newIntegration, name: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Type (teknisk identifikator)</Label>
+                      <Input
+                        placeholder="f.eks. my-api"
+                        value={newIntegration.type}
+                        onChange={(e) => setNewIntegration({ ...newIntegration, type: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Synkroniseringsfrekvens</Label>
+                      <Select
+                        value={newIntegration.sync_frequency_minutes}
+                        onValueChange={(value) => setNewIntegration({ ...newIntegration, sync_frequency_minutes: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {frequencyOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="outline">Annuller</Button>
+                    </DialogClose>
+                    <Button onClick={handleAddIntegration}>Tilføj</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {Object.entries(groupedSecrets).map(([group, secrets]) => (
-              <div key={group} className="space-y-3">
-                <h3 className="text-sm font-semibold text-muted-foreground">{group}</h3>
-                <div className="grid gap-2">
-                  {secrets.map((secret) => (
-                    <div 
-                      key={secret.name} 
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border"
-                    >
-                      <div className="flex items-center gap-3">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <div>
-                          <p className="text-sm font-medium">{secret.label}</p>
-                          <p className="text-xs text-muted-foreground font-mono">{secret.name}</p>
+          <CardContent className="space-y-4">
+            {loadingIntegrations ? (
+              <p className="text-sm text-muted-foreground">Indlæser...</p>
+            ) : integrations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Ingen integrationer fundet</p>
+            ) : (
+              integrations.map((integration) => (
+                <Card key={integration.id} className="bg-muted/30">
+                  <CardContent className="p-4">
+                    {editingId === integration.id ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={editForm.name}
+                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                            className="flex-1"
+                          />
+                          <Button size="icon" variant="ghost" onClick={() => handleSaveEdit(integration.id)}>
+                            <Save className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <Select
+                            value={editForm.sync_frequency_minutes}
+                            onValueChange={(value) => setEditForm({ ...editForm, sync_frequency_minutes: value })}
+                          >
+                            <SelectTrigger className="w-[200px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {frequencyOptions.map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                      <Badge variant="outline" className="text-green-600 border-green-600">
-                        Konfigureret
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <h3 className="font-semibold">{integration.name}</h3>
+                            <Badge variant="outline" className="text-xs font-mono">
+                              {integration.type}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button size="icon" variant="ghost" onClick={() => handleStartEdit(integration)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDeleteIntegration(integration.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            {formatFrequency(integration.sync_frequency_minutes)}
+                          </div>
+                          {integration.last_sync_at && (
+                            <span>
+                              Sidst synkroniseret: {new Date(integration.last_sync_at).toLocaleString("da-DK")}
+                            </span>
+                          )}
+                        </div>
+                        {integration.secrets.length > 0 && (
+                          <div className="grid gap-2">
+                            {integration.secrets.map((secret) => (
+                              <div
+                                key={secret}
+                                className="flex items-center justify-between p-2 rounded bg-background/50 border text-sm"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                                  <span>{secretLabels[secret] || secret}</span>
+                                </div>
+                                <span className="font-mono text-xs text-muted-foreground">{secret}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </CardContent>
         </Card>
 
