@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -8,7 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail } from "lucide-react";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield } from "lucide-react";
+import { GdprSettingsCard } from "@/components/gdpr/GdprSettingsCard";
+import { GdprConsentDialog } from "@/components/gdpr/GdprConsentDialog";
+import { useHasDataProcessingConsent } from "@/hooks/useGdpr";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
@@ -106,6 +109,8 @@ export default function MyProfile() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
+  const [showConsentDialog, setShowConsentDialog] = useState(false);
+  const { hasConsent, isLoading: consentLoading } = useHasDataProcessingConsent();
 
   // Fetch current user's employee data
   const { data: employee, isLoading } = useQuery({
@@ -361,7 +366,14 @@ export default function MyProfile() {
     return <Badge variant={variant}>{label}</Badge>;
   };
 
-  if (isLoading) {
+  // Check if consent is needed
+  useEffect(() => {
+    if (!consentLoading && employee && !hasConsent) {
+      setShowConsentDialog(true);
+    }
+  }, [consentLoading, hasConsent, employee]);
+
+  if (isLoading || consentLoading) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-64">
@@ -387,6 +399,12 @@ export default function MyProfile() {
 
   return (
     <MainLayout>
+      {/* GDPR Consent Dialog */}
+      <GdprConsentDialog 
+        open={showConsentDialog} 
+        onConsent={() => setShowConsentDialog(false)} 
+      />
+
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -406,6 +424,10 @@ export default function MyProfile() {
             <TabsTrigger value="fravaer">
               <CalendarX className="h-4 w-4 mr-2" />
               Fravær
+            </TabsTrigger>
+            <TabsTrigger value="gdpr">
+              <Shield className="h-4 w-4 mr-2" />
+              GDPR
             </TabsTrigger>
           </TabsList>
 
@@ -796,6 +818,10 @@ export default function MyProfile() {
               absences={absences.map(a => ({ id: a.id, type: a.type, start_date: a.start_date, end_date: a.end_date }))}
               latenessRecords={latenessRecords.map(l => ({ id: l.id, date: l.date, minutes: l.minutes }))}
             />
+          </TabsContent>
+
+          <TabsContent value="gdpr" className="mt-6">
+            <GdprSettingsCard />
           </TabsContent>
         </Tabs>
       </div>
