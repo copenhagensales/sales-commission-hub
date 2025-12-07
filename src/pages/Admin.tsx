@@ -906,11 +906,11 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Role Permissions matrix */}
+            {/* Combined Permissions matrix */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>Rettigheder per rolle</span>
+                  <span>Rettigheder</span>
                   {hasChanges && (
                     <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
                       Ikke gemt
@@ -926,11 +926,17 @@ export default function Admin() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[200px]">Menupunkt</TableHead>
+                        <TableHead className="w-[180px]">Menupunkt</TableHead>
                         <TableHead className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <User className="h-4 w-4" />
-                            Medarbejder
+                          <div className="flex items-center justify-center gap-1 text-blue-500">
+                            <span className="w-2 h-2 rounded-full bg-blue-500" />
+                            Salgskonsulent
+                          </div>
+                        </TableHead>
+                        <TableHead className="text-center">
+                          <div className="flex items-center justify-center gap-1 text-emerald-500">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                            Fieldmarketing
                           </div>
                         </TableHead>
                         <TableHead className="text-center">
@@ -957,16 +963,37 @@ export default function Admin() {
                       {Object.entries(menuByCategory).map(([category, items]) => (
                         <>
                           <TableRow key={category} className="bg-muted/50">
-                            <TableCell colSpan={5} className="font-semibold text-sm uppercase tracking-wide">
+                            <TableCell colSpan={6} className="font-semibold text-sm uppercase tracking-wide">
                               {category}
                             </TableCell>
                           </TableRow>
                           {items.map((item) => (
                             <TableRow key={item.id} className="hover:bg-muted/30">
                               <TableCell className="font-medium">{item.name}</TableCell>
-                              {(["medarbejder", "rekruttering", "teamleder", "ejer"] as SystemRole[]).map((role) => {
+                              {/* Salgskonsulent */}
+                              <TableCell className="text-center">
+                                <div className="flex justify-center">
+                                  <Switch
+                                    checked={editedJobTypePermissions.salgskonsulent?.includes(item.id) || false}
+                                    onCheckedChange={() => toggleJobTypeMenuAccess("salgskonsulent", item.id)}
+                                    className="cursor-pointer"
+                                  />
+                                </div>
+                              </TableCell>
+                              {/* Fieldmarketing */}
+                              <TableCell className="text-center">
+                                <div className="flex justify-center">
+                                  <Switch
+                                    checked={editedJobTypePermissions.fieldmarketing?.includes(item.id) || false}
+                                    onCheckedChange={() => toggleJobTypeMenuAccess("fieldmarketing", item.id)}
+                                    className="cursor-pointer"
+                                  />
+                                </div>
+                              </TableCell>
+                              {/* Rekruttering, Teamleder, Ejer */}
+                              {(["rekruttering", "teamleder", "ejer"] as SystemRole[]).map((role) => {
                                 const hasAccess = editedPermissions[role]?.includes(item.id) || false;
-                                const isDisabled = role === "ejer"; // Ejer always has access
+                                const isDisabled = role === "ejer";
                                 return (
                                   <TableCell key={role} className="text-center">
                                     <div className="flex justify-center">
@@ -975,76 +1002,6 @@ export default function Admin() {
                                         disabled={isDisabled}
                                         onCheckedChange={() => toggleMenuAccess(role, item.id)}
                                         className={isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-                                      />
-                                    </div>
-                                  </TableCell>
-                                );
-                              })}
-                            </TableRow>
-                          ))}
-                        </>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Job Type Permissions matrix */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Rettigheder per medarbejdertype</span>
-                  {hasChanges && (
-                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
-                      Ikke gemt
-                    </Badge>
-                  )}
-                </CardTitle>
-                <CardDescription>
-                  Ekstra rettigheder baseret på medarbejderens stilling (Salgskonsulent eller Fieldmarketing).
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[200px]">Menupunkt</TableHead>
-                        <TableHead className="text-center">
-                          <div className="flex items-center justify-center gap-1 text-blue-500">
-                            <span className="w-2 h-2 rounded-full bg-blue-500" />
-                            Salgskonsulent
-                          </div>
-                        </TableHead>
-                        <TableHead className="text-center">
-                          <div className="flex items-center justify-center gap-1 text-emerald-500">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                            Fieldmarketing
-                          </div>
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {Object.entries(menuByCategory).map(([category, items]) => (
-                        <>
-                          <TableRow key={`jt-${category}`} className="bg-muted/50">
-                            <TableCell colSpan={3} className="font-semibold text-sm uppercase tracking-wide">
-                              {category}
-                            </TableCell>
-                          </TableRow>
-                          {items.map((item) => (
-                            <TableRow key={`jt-${item.id}`} className="hover:bg-muted/30">
-                              <TableCell className="font-medium">{item.name}</TableCell>
-                              {(["salgskonsulent", "fieldmarketing"] as EmployeeType[]).map((jobType) => {
-                                const hasAccess = editedJobTypePermissions[jobType]?.includes(item.id) || false;
-                                return (
-                                  <TableCell key={jobType} className="text-center">
-                                    <div className="flex justify-center">
-                                      <Switch
-                                        checked={hasAccess}
-                                        onCheckedChange={() => toggleJobTypeMenuAccess(jobType, item.id)}
-                                        className="cursor-pointer"
                                       />
                                     </div>
                                   </TableCell>
