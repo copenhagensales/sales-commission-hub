@@ -134,36 +134,63 @@ async function syncCampaigns({ supabase, baseUrl, authHeader }: any) {
   return { success: true, upserted, errors }
 }
 
-// 3. SINCRONIZAR USUARIOS
+// 2. SINCRONIZAR USUARIOS (AGENTES) - Versión Segura (Sin Upsert)
 async function syncUsers({ supabase, baseUrl, authHeader }: any) {
+  log('INFO', 'Iniciando sync de usuarios...')
   const data = await fetchAdversus(`${baseUrl}/users`, authHeader)
   const users = data.users || data || []
   
-  let upserted = 0
+  let processed = 0
+  let errors = 0
   
   for (const user of users) {
-    if (!user.active) continue // Solo activos
+    if (!user.active) continue
 
-    const { error } = await supabase.from('agents').upsert({
-      external_adversus_id: String(user.id),
+    const externalId = String(user.id)
+    const agentData = {
+      external_adversus_id: externalId,
       name: user.name || user.displayName,
       email: user.email || `agent-${user.id}@adversus.local`,
       is_active: true
-    }, { onConflict: 'external_adversus_id' })
+    }
 
-    if (error) log('ERROR', 'Error guardando agente', { id: user.id, error })
-    else upserted++
+    try {
+      // Paso 1: Buscar si existe
+      const { data: existing } = await supabase
+        .from('agents')
+        .select('id')
+        .eq('external_adversus_id', externalId)
+        .maybeSingle()
+
+      if (existing) {
+        // Paso 2A: Actualizar
+        const { error } = await supabase
+          .from('agents')
+          .update(agentData)
+          .eq('id', existing.id)
+        if (error) throw error
+      } else {
+        // Paso 2B: Insertar
+        const { error } = await supabase
+          .from('agents')
+          .insert(agentData)
+        if (error) throw error
+      }
+      processed++
+    } catch (err: any) {
+      log('ERROR', 'Error procesando agente', { id: user.id, error: err.message })
+      errors++
+    }
   }
 
-  return { success: true, upserted }
+  return { success: true, processed, errors }
 }
 
-// 4. SINCRONIZAR VENTAS (La lógica compleja)
+// 4. SINCRONIZAR VENTAS - Versión Segura (Sin Upsert)
 async function syncSales({ supabase, baseUrl, authHeader }: any, days: number) {
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - days)
   
-  // Filtro de fecha para la API
   const filterStr = encodeURIComponent(JSON.stringify({ created: { $gt: startDate.toISOString() } }))
   
   let page = 1
@@ -172,7 +199,7 @@ async function syncSales({ supabase, baseUrl, authHeader }: any, days: number) {
   
   log('INFO', 'Iniciando descarga de ventas', { since: startDate.toISOString() })
 
-  // 4.1 Descargar todas las ventas (Paginación)
+  // 4.1 Descargar todas las ventas
   while (hasMore && page <= 50) {
     const url = `${baseUrl}/sales?pageSize=100&page=${page}&filters=${filterStr}`
     const data = await fetchAdversus(url, authHeader)
@@ -183,72 +210,88 @@ async function syncSales({ supabase, baseUrl, authHeader }: any, days: number) {
       allSales = [...allSales, ...salesPage]
       page++
     }
-    // Pequeño delay para no saturar
     await new Promise(r => setTimeout(r, 100))
   }
 
   log('INFO', `Ventas descargadas: ${allSales.length}`)
 
-  // 4.2 Cargar datos de referencia de Supabase (Productos y Mapeos)
+  // 4.2 Cargar datos de referencia
   const { data: products } = await supabase.from('products').select('id, name, commission_dkk, revenue_dkk')
   const { data: prodMappings } = await supabase.from('adversus_product_mappings').select('*')
   
-  // Mapas para búsqueda rápida
-  const mapByExtId = new Map<string, string>(prodMappings?.map((m: any) => [m.adversus_external_id, m.product_id]))
-  // Mapa de productos por nombre (lowercase)
-  type ProductRef = { id: string; name: string; commission_dkk: number | null; revenue_dkk: number | null }
-  const mapByName = new Map<string, ProductRef>(products?.map((p: ProductRef) => [p.name.toLowerCase(), p]))
+  const mapByExtId = new Map(prodMappings?.map((m: any) => [m.adversus_external_id, m.product_id]))
+  const mapByName = new Map(products?.map((p: any) => [p.name.toLowerCase(), p]))
 
   let processed = 0
   let errors = 0
 
-  // 4.3 Procesar cada venta
+  // 4.3 Procesar cada venta MANUALMENTE (Sin Upsert)
   for (const sale of allSales) {
     try {
       const externalId = String(sale.id)
       
-      // Upsert Venta
       const saleData = {
         adversus_external_id: externalId,
         sale_datetime: sale.closedTime || sale.createdTime,
         agent_external_id: String(sale.ownedBy || sale.createdBy),
         agent_name: sale.ownedBy?.name || 'Desconocido', 
         updated_at: new Date().toISOString()
-        // NOTA: NO buscamos OPP aquí. Usar 'backfill-opp' para eso.
       }
 
-      const { data: saleRecord, error: saleError } = await supabase
+      // --- CAMBIO CLAVE: MANUAL CHECK ---
+      let saleId = null
+      
+      const { data: existingSale, error: findError } = await supabase
         .from('sales')
-        .upsert(saleData, { onConflict: 'adversus_external_id' })
         .select('id')
-        .single()
+        .eq('adversus_external_id', externalId)
+        .maybeSingle()
 
-      if (saleError) throw saleError
+      if (findError) throw findError
 
-      // Limpiar items antiguos para re-insertar (evita duplicados lógicos)
-      await supabase.from('sale_items').delete().eq('sale_id', saleRecord.id)
+      if (existingSale) {
+        // UPDATE
+        const { error: updateError } = await supabase
+          .from('sales')
+          .update(saleData)
+          .eq('id', existingSale.id)
+        
+        if (updateError) throw updateError
+        saleId = existingSale.id
+        
+        // Limpiar items viejos para regenerarlos
+        await supabase.from('sale_items').delete().eq('sale_id', saleId)
+      } else {
+        // INSERT
+        const { data: newSale, error: insertError } = await supabase
+          .from('sales')
+          .insert(saleData)
+          .select('id')
+          .single()
+        
+        if (insertError) throw insertError
+        saleId = newSale.id
+      }
+      // ----------------------------------
 
       const itemsToInsert = []
 
-      // Procesar líneas de producto
       for (const line of (sale.lines || [])) {
         const extProdId = String(line.productId)
         const title = line.title || 'Producto desconocido'
         const quantity = line.quantity || 1
         
-        // Estrategia de Mapeo: 1. ID Externo -> 2. Nombre exacto
-        let productId: string | undefined = mapByExtId.get(extProdId)
+        let productId = mapByExtId.get(extProdId)
         let commission = 0
         let revenue = 0
         
         if (!productId && title) {
-           const p = mapByName.get(title.toLowerCase())
+           const p = mapByName.get(title.toLowerCase()) as any
            if (p) productId = p.id
         }
 
-        // Si tenemos producto interno, calculamos finanzas
         if (productId) {
-           const prod = products?.find((p: any) => p.id === productId)
+           const prod = products?.find((p:any) => p.id === productId)
            if (prod) {
              commission = (prod.commission_dkk || 0) * quantity
              revenue = (prod.revenue_dkk || 0) * quantity
@@ -256,7 +299,7 @@ async function syncSales({ supabase, baseUrl, authHeader }: any, days: number) {
         }
 
         itemsToInsert.push({
-          sale_id: saleRecord.id,
+          sale_id: saleId,
           product_id: productId || null,
           adversus_external_id: extProdId,
           adversus_product_title: title,
@@ -264,7 +307,7 @@ async function syncSales({ supabase, baseUrl, authHeader }: any, days: number) {
           unit_price: line.unitPrice || 0,
           mapped_commission: commission,
           mapped_revenue: revenue,
-          needs_mapping: !productId, // Flag importante para el frontend
+          needs_mapping: !productId,
           raw_data: line
         })
       }
@@ -278,8 +321,7 @@ async function syncSales({ supabase, baseUrl, authHeader }: any, days: number) {
 
     } catch (err: any) {
       errors++
-      // Logueamos solo errores individuales, pero no detenemos el proceso
-      log('ERROR', `Fallo en venta ID ${sale.id}`, { msg: err.message })
+      log('ERROR', `Fallo en venta ID ${sale.id}`, { msg: err.message, code: err.code })
     }
   }
 
