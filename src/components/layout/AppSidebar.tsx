@@ -250,8 +250,13 @@ export function AppSidebar() {
     return (
       <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto">
         <div className="flex h-full flex-col">
-          <div className="flex h-20 items-center border-b border-sidebar-border px-4">
-            <img src={cphSalesLogo} alt="CPH Sales" className="h-14 w-auto object-contain cursor-pointer" onClick={() => navigate("/")} />
+        <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-4">
+            <div 
+              onClick={() => navigate("/")} 
+              className="flex items-center justify-center px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
+            >
+              <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
+            </div>
           </div>
           <div className="flex-1 flex items-center justify-center">
             <div className="animate-pulse text-muted-foreground">Indlæser...</div>
@@ -264,8 +269,13 @@ export function AppSidebar() {
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto">
       <div className="flex h-full flex-col">
-        <div className="flex h-20 items-center border-b border-sidebar-border px-4">
-          <img src={cphSalesLogo} alt="CPH Sales" className="h-14 w-auto object-contain cursor-pointer" onClick={() => navigate("/")} />
+        <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-4">
+          <div 
+            onClick={() => navigate("/")} 
+            className="flex items-center justify-center px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
+          >
+            <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
+          </div>
         </div>
         <nav className="flex-1 space-y-1 p-4">
           {mainNavigation.map((item) => {
