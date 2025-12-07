@@ -79,7 +79,7 @@ export default function RecruitmentDashboard() {
 
   return (
     <MainLayout>
-    <div className="space-y-6">
+      <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Rekruttering Dashboard</h1>
         <p className="text-muted-foreground">Overblik over rekrutteringsaktiviteter</p>
@@ -235,7 +235,7 @@ export default function RecruitmentDashboard() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
     </MainLayout>
   );
 }

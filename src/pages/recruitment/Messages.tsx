@@ -107,7 +107,7 @@ export default function Messages() {
 
   return (
     <MainLayout>
-    <div className="space-y-6">
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Beskeder</h1>
@@ -246,7 +246,7 @@ export default function Messages() {
           )}
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
     </MainLayout>
   );
 }
