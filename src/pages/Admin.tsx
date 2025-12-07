@@ -220,7 +220,7 @@ export default function Admin() {
     },
     ejer: {
       ...defaultRolePermissions.ejer,
-      menuItems: editedPermissions.ejer,
+      menuItems: menuItems.map(m => m.id), // Ejer always has all permissions
     },
   };
 
