@@ -17,14 +17,21 @@ export default function Sales() {
   const syncLast24Hours = async () => {
     setIsSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('sync-adversus', {
-        body: { action: 'sync-sales-to-db', days: 1 }
+      // Usamos la nueva función adversus-sync-v2
+      const { data, error } = await supabase.functions.invoke('adversus-sync-v2', {
+        body: { action: 'sync-sales', days: 1 }
       });
+      
       if (error) throw error;
-      toast.success(`Synkronisering færdig: ${data?.salesCreated || 0} nye salg`);
+      
+      toast.success(data.message || "Sincronización de 24h completada");
       queryClient.invalidateQueries({ queryKey: ['sales-list'] });
+      
+      // Disparar búsqueda de OPP en segundo plano
+      supabase.functions.invoke("backfill-opp");
+      
     } catch (error: any) {
-      toast.error(`Fejl ved synkronisering: ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     } finally {
       setIsSyncing(false);
     }
