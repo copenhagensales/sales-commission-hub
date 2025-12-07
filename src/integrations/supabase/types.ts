@@ -423,6 +423,131 @@ export type Database = {
         }
         Relationships: []
       }
+      call_records: {
+        Row: {
+          candidate_id: string | null
+          direction: string
+          duration_seconds: number | null
+          employee_id: string | null
+          ended_at: string | null
+          from_number: string | null
+          id: string
+          notes: string | null
+          recording_url: string | null
+          started_at: string
+          status: string | null
+          to_number: string | null
+          twilio_call_sid: string | null
+        }
+        Insert: {
+          candidate_id?: string | null
+          direction: string
+          duration_seconds?: number | null
+          employee_id?: string | null
+          ended_at?: string | null
+          from_number?: string | null
+          id?: string
+          notes?: string | null
+          recording_url?: string | null
+          started_at?: string
+          status?: string | null
+          to_number?: string | null
+          twilio_call_sid?: string | null
+        }
+        Update: {
+          candidate_id?: string | null
+          direction?: string
+          duration_seconds?: number | null
+          employee_id?: string | null
+          ended_at?: string | null
+          from_number?: string | null
+          id?: string
+          notes?: string | null
+          recording_url?: string | null
+          started_at?: string
+          status?: string | null
+          to_number?: string | null
+          twilio_call_sid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_records_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_records_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      candidates: {
+        Row: {
+          applied_position: string | null
+          assigned_to: string | null
+          created_at: string
+          email: string | null
+          first_name: string
+          id: string
+          interview_date: string | null
+          last_name: string
+          notes: string | null
+          phone: string | null
+          rating: number | null
+          resume_url: string | null
+          source: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          applied_position?: string | null
+          assigned_to?: string | null
+          created_at?: string
+          email?: string | null
+          first_name: string
+          id?: string
+          interview_date?: string | null
+          last_name: string
+          notes?: string | null
+          phone?: string | null
+          rating?: number | null
+          resume_url?: string | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          applied_position?: string | null
+          assigned_to?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string
+          id?: string
+          interview_date?: string | null
+          last_name?: string
+          notes?: string | null
+          phone?: string | null
+          rating?: number | null
+          resume_url?: string | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidates_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       car_quiz_completions: {
         Row: {
           created_at: string
@@ -1647,6 +1772,60 @@ export type Database = {
         }
         Relationships: []
       }
+      messages: {
+        Row: {
+          candidate_id: string | null
+          content: string
+          created_at: string
+          direction: string
+          employee_id: string | null
+          id: string
+          message_type: string
+          phone_number: string | null
+          status: string | null
+          twilio_sid: string | null
+        }
+        Insert: {
+          candidate_id?: string | null
+          content: string
+          created_at?: string
+          direction: string
+          employee_id?: string | null
+          id?: string
+          message_type?: string
+          phone_number?: string | null
+          status?: string | null
+          twilio_sid?: string | null
+        }
+        Update: {
+          candidate_id?: string | null
+          content?: string
+          created_at?: string
+          direction?: string
+          employee_id?: string | null
+          id?: string
+          message_type?: string
+          phone_number?: string | null
+          status?: string | null
+          twilio_sid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mileage_report: {
         Row: {
           booking_id: string | null
@@ -1864,6 +2043,42 @@ export type Database = {
           is_active?: boolean
           month?: number
           year?: number
+        }
+        Relationships: []
+      }
+      recruitment_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          reference_id: string | null
+          reference_type: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          reference_id?: string | null
+          reference_type?: string | null
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          title?: string
+          type?: string
+          user_id?: string
         }
         Relationships: []
       }
