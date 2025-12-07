@@ -423,14 +423,27 @@ export default function Settings() {
   const syncSalesToDb = async () => {
     setLoading("sync");
     try {
-      const { data, error } = await supabase.functions.invoke("sync-adversus", {
-        body: { action: "sync-sales-to-db", days: syncDays },
+      // Usamos la nueva función adversus-sync-v2
+      // Primero sincronizamos campañas y usuarios para asegurar integridad referencial
+      await supabase.functions.invoke("adversus-sync-v2", { body: { action: "sync-campaigns" } });
+      await supabase.functions.invoke("adversus-sync-v2", { body: { action: "sync-users" } });
+      
+      // Luego sincronizamos las ventas
+      const { data, error } = await supabase.functions.invoke("adversus-sync-v2", {
+        body: { action: "sync-sales", days: syncDays },
       });
+      
       if (error) throw error;
+      
+      // Si la sincronización básica termina, disparamos el backfill de OPP en segundo plano
+      // Esto no bloquea la UI
+      supabase.functions.invoke("backfill-opp");
+
       setResults({ type: "sync", data });
-      toast.success(data.message || `Synced ${data.created} sales`);
+      toast.success(data.message || "Sincronización completada exitosamente");
     } catch (err: any) {
-      toast.error(err.message || "Sync fejlede");
+      console.error(err);
+      toast.error(err.message || "La sincronización falló");
     } finally {
       setLoading(null);
     }
