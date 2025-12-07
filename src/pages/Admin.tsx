@@ -81,6 +81,20 @@ const menuItems = [
   { id: "settings", name: "Indstillinger", icon: "Settings", category: "System" },
 ];
 
+// Employee type definitions
+type EmployeeType = "salgskonsulent" | "fieldmarketing";
+
+const employeeTypeLabels: Record<EmployeeType, { label: string, color: string }> = {
+  salgskonsulent: { label: "Salgskonsulent", color: "text-blue-500" },
+  fieldmarketing: { label: "Fieldmarketing", color: "text-emerald-500" },
+};
+
+// Default job type permissions (within medarbejder role)
+const defaultJobTypePermissions: Record<EmployeeType, string[]> = {
+  salgskonsulent: ["my-profile", "my-schedule", "my-contracts", "career-wishes", "pulse-survey", "code-of-conduct"],
+  fieldmarketing: ["my-profile", "my-schedule", "my-contracts", "career-wishes", "car-quiz", "fieldmarketing"],
+};
+
 // Default role permissions matrix (used as fallback if no DB config)
 const defaultRolePermissions: Record<SystemRole, { 
   menuItems: string[], 
@@ -142,6 +156,10 @@ export default function Admin() {
     teamleder: [...defaultRolePermissions.teamleder.menuItems],
     ejer: [...defaultRolePermissions.ejer.menuItems],
   });
+  const [editedJobTypePermissions, setEditedJobTypePermissions] = useState<Record<EmployeeType, string[]>>({
+    salgskonsulent: [...defaultJobTypePermissions.salgskonsulent],
+    fieldmarketing: [...defaultJobTypePermissions.fieldmarketing],
+  });
   const [hasChanges, setHasChanges] = useState(false);
   const [userPermissionSearch, setUserPermissionSearch] = useState("");
   const [showOnlyWithExtras, setShowOnlyWithExtras] = useState(false);
@@ -164,6 +182,18 @@ export default function Admin() {
     setHasChanges(true);
   };
 
+  // Toggle menu access for a job type
+  const toggleJobTypeMenuAccess = (jobType: EmployeeType, menuId: string) => {
+    setEditedJobTypePermissions(prev => {
+      const current = prev[jobType] || [];
+      const updated = current.includes(menuId)
+        ? current.filter(id => id !== menuId)
+        : [...current, menuId];
+      return { ...prev, [jobType]: updated };
+    });
+    setHasChanges(true);
+  };
+
   // Reset to defaults
   const resetPermissions = () => {
     setEditedPermissions({
@@ -171,6 +201,10 @@ export default function Admin() {
       rekruttering: [...defaultRolePermissions.rekruttering.menuItems],
       teamleder: [...defaultRolePermissions.teamleder.menuItems],
       ejer: [...defaultRolePermissions.ejer.menuItems],
+    });
+    setEditedJobTypePermissions({
+      salgskonsulent: [...defaultJobTypePermissions.salgskonsulent],
+      fieldmarketing: [...defaultJobTypePermissions.fieldmarketing],
     });
     setHasChanges(false);
     toast.info("Rettigheder nulstillet til standard");
@@ -180,6 +214,7 @@ export default function Admin() {
   const savePermissions = () => {
     // Store in localStorage for persistence
     localStorage.setItem("admin_role_permissions", JSON.stringify(editedPermissions));
+    localStorage.setItem("admin_job_type_permissions", JSON.stringify(editedJobTypePermissions));
     setHasChanges(false);
     toast.success("Rettigheder gemt");
   };
@@ -193,6 +228,15 @@ export default function Admin() {
         setEditedPermissions(prev => ({ ...prev, ...parsed }));
       } catch (e) {
         console.error("Failed to parse saved permissions", e);
+      }
+    }
+    const savedJobType = localStorage.getItem("admin_job_type_permissions");
+    if (savedJobType) {
+      try {
+        const parsed = JSON.parse(savedJobType);
+        setEditedJobTypePermissions(prev => ({ ...prev, ...parsed }));
+      } catch (e) {
+        console.error("Failed to parse saved job type permissions", e);
       }
     }
   }, []);
@@ -862,7 +906,7 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Permissions matrix */}
+            {/* Role Permissions matrix */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
@@ -931,6 +975,76 @@ export default function Admin() {
                                         disabled={isDisabled}
                                         onCheckedChange={() => toggleMenuAccess(role, item.id)}
                                         className={isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                                      />
+                                    </div>
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          ))}
+                        </>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Job Type Permissions matrix */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Rettigheder per medarbejdertype</span>
+                  {hasChanges && (
+                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
+                      Ikke gemt
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Ekstra rettigheder baseret på medarbejderens stilling (Salgskonsulent eller Fieldmarketing).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[200px]">Menupunkt</TableHead>
+                        <TableHead className="text-center">
+                          <div className="flex items-center justify-center gap-1 text-blue-500">
+                            <span className="w-2 h-2 rounded-full bg-blue-500" />
+                            Salgskonsulent
+                          </div>
+                        </TableHead>
+                        <TableHead className="text-center">
+                          <div className="flex items-center justify-center gap-1 text-emerald-500">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                            Fieldmarketing
+                          </div>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Object.entries(menuByCategory).map(([category, items]) => (
+                        <>
+                          <TableRow key={`jt-${category}`} className="bg-muted/50">
+                            <TableCell colSpan={3} className="font-semibold text-sm uppercase tracking-wide">
+                              {category}
+                            </TableCell>
+                          </TableRow>
+                          {items.map((item) => (
+                            <TableRow key={`jt-${item.id}`} className="hover:bg-muted/30">
+                              <TableCell className="font-medium">{item.name}</TableCell>
+                              {(["salgskonsulent", "fieldmarketing"] as EmployeeType[]).map((jobType) => {
+                                const hasAccess = editedJobTypePermissions[jobType]?.includes(item.id) || false;
+                                return (
+                                  <TableCell key={jobType} className="text-center">
+                                    <div className="flex justify-center">
+                                      <Switch
+                                        checked={hasAccess}
+                                        onCheckedChange={() => toggleJobTypeMenuAccess(jobType, item.id)}
+                                        className="cursor-pointer"
                                       />
                                     </div>
                                   </TableCell>
