@@ -7,17 +7,31 @@ const corsHeaders = {
 };
 
 const OPP_FIELD_ID = 80862;
-const BATCH_SIZE = 10; // Process 10 sales per run to avoid timeout
-const DELAY_MS = 3000; // 3 seconds between API calls
+const BATCH_SIZE = 10;
+const DELAY_MS = 3000;
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return minutes > 0 ? `${minutes}m ${remainingSeconds}s` : `${seconds}s`;
+}
+
 serve(async (req) => {
+  const startTime = Date.now();
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  console.log('='.repeat(60));
+  console.log('🚀 BACKFILL-OPP: Iniciando proceso');
+  console.log(`📅 Timestamp: ${new Date().toISOString()}`);
+  console.log('='.repeat(60));
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -26,14 +40,17 @@ serve(async (req) => {
     const adversusPassword = Deno.env.get('ADVERSUS_API_PASSWORD');
     
     if (!adversusUsername || !adversusPassword) {
+      console.error('❌ Error: Credenciales de Adversus no configuradas');
       throw new Error('Adversus credentials not configured');
     }
+    console.log('✅ Credenciales de Adversus verificadas');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const authHeader = btoa(`${adversusUsername}:${adversusPassword}`);
     const baseUrl = 'https://api.adversus.io/v1';
 
     // Find TDC sales without OPP number
+    console.log('\n📊 Buscando ventas TDC sin número OPP...');
     const { data: sales, error: salesError } = await supabase
       .from('sales')
       .select(`
@@ -49,29 +66,69 @@ serve(async (req) => {
       .not('adversus_event_id', 'is', null)
       .limit(BATCH_SIZE);
 
-    if (salesError) throw salesError;
+    if (salesError) {
+      console.error('❌ Error al buscar ventas:', salesError.message);
+      throw salesError;
+    }
 
     // Filter for TDC sales only
     const tdcSales = (sales || []).filter((sale: any) => 
       sale.client_campaigns?.clients?.name?.toLowerCase().includes('tdc')
     );
 
+    console.log(`📋 Ventas encontradas: ${sales?.length || 0} total, ${tdcSales.length} TDC`);
+
     if (tdcSales.length === 0) {
+      const duration = Date.now() - startTime;
+      console.log('\n' + '='.repeat(60));
+      console.log('📊 RESUMEN FINAL - BACKFILL-OPP');
+      console.log('='.repeat(60));
+      console.log('✅ Estado: Completado - No hay ventas pendientes');
+      console.log(`⏱️  Duración: ${formatDuration(duration)}`);
+      console.log('='.repeat(60));
+      
       return new Response(
         JSON.stringify({ 
           success: true, 
           message: 'No TDC sales without OPP number found',
-          processed: 0 
+          processed: 0,
+          summary: {
+            duration_ms: duration,
+            duration_formatted: formatDuration(duration)
+          }
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Processing ${tdcSales.length} TDC sales without OPP...`);
+    console.log(`\n🔄 Procesando ${tdcSales.length} ventas TDC...\n`);
 
-    const results: { saleId: string; oppNumber: string | null; error?: string }[] = [];
+    // Stats tracking
+    const stats = {
+      processed: 0,
+      successful: 0,
+      noOppFound: 0,
+      errors: 0,
+      rateLimited: false,
+      apiCalls: 0
+    };
 
-    for (const sale of tdcSales) {
+    const results: { 
+      saleId: string; 
+      externalId: string | null;
+      oppNumber: string | null; 
+      status: 'success' | 'no_opp' | 'error';
+      error?: string;
+      processingTime?: number;
+    }[] = [];
+
+    for (let i = 0; i < tdcSales.length; i++) {
+      const sale = tdcSales[i];
+      const saleStartTime = Date.now();
+      stats.processed++;
+      
+      console.log(`\n[${i + 1}/${tdcSales.length}] Procesando venta ${sale.adversus_external_id || sale.id}`);
+      
       try {
         // Get lead ID from the adversus event
         const { data: event } = await supabase
@@ -81,20 +138,37 @@ serve(async (req) => {
           .maybeSingle();
 
         if (!event) {
-          results.push({ saleId: sale.id, oppNumber: null, error: 'Event not found' });
+          console.log(`   ⚠️ Evento no encontrado para sale_id: ${sale.id}`);
+          stats.errors++;
+          results.push({ 
+            saleId: sale.id, 
+            externalId: sale.adversus_external_id,
+            oppNumber: null, 
+            status: 'error',
+            error: 'Event not found',
+            processingTime: Date.now() - saleStartTime
+          });
           continue;
         }
 
         const leadId = (event.payload as any)?.payload?.lead?.id;
         if (!leadId) {
-          results.push({ saleId: sale.id, oppNumber: null, error: 'No lead ID in event' });
+          console.log(`   ⚠️ No lead ID en evento para venta ${sale.adversus_external_id}`);
+          stats.errors++;
+          results.push({ 
+            saleId: sale.id, 
+            externalId: sale.adversus_external_id,
+            oppNumber: null, 
+            status: 'error',
+            error: 'No lead ID in event',
+            processingTime: Date.now() - saleStartTime
+          });
           continue;
         }
 
-        console.log(`Fetching lead ${leadId} for sale ${sale.adversus_external_id}...`);
-
-        // Wait before API call to avoid rate limiting
+        console.log(`   📡 Llamando API Adversus para lead ${leadId}...`);
         await sleep(DELAY_MS);
+        stats.apiCalls++;
 
         const leadResponse = await fetch(`${baseUrl}/leads/${leadId}`, {
           headers: {
@@ -105,11 +179,20 @@ serve(async (req) => {
 
         if (!leadResponse.ok) {
           const status = leadResponse.status;
-          console.error(`Failed to fetch lead ${leadId}: ${status}`);
-          results.push({ saleId: sale.id, oppNumber: null, error: `API error: ${status}` });
+          console.error(`   ❌ Error API (${status}) para lead ${leadId}`);
+          stats.errors++;
+          results.push({ 
+            saleId: sale.id, 
+            externalId: sale.adversus_external_id,
+            oppNumber: null, 
+            status: 'error',
+            error: `API error: ${status}`,
+            processingTime: Date.now() - saleStartTime
+          });
           
           if (status === 429) {
-            console.log('Rate limited, stopping batch');
+            console.log('   🚫 Rate limited - Deteniendo batch');
+            stats.rateLimited = true;
             break;
           }
           continue;
@@ -119,7 +202,16 @@ serve(async (req) => {
         const lead = Array.isArray(leadData) ? leadData[0] : (leadData.leads ? leadData.leads[0] : leadData);
 
         if (!lead) {
-          results.push({ saleId: sale.id, oppNumber: null, error: 'Lead not found in Adversus' });
+          console.log(`   ⚠️ Lead no encontrado en respuesta Adversus`);
+          stats.errors++;
+          results.push({ 
+            saleId: sale.id, 
+            externalId: sale.adversus_external_id,
+            oppNumber: null, 
+            status: 'error',
+            error: 'Lead not found in Adversus',
+            processingTime: Date.now() - saleStartTime
+          });
           continue;
         }
 
@@ -158,10 +250,26 @@ serve(async (req) => {
             .eq('id', sale.id);
 
           if (updateError) {
-            results.push({ saleId: sale.id, oppNumber: null, error: updateError.message });
+            console.error(`   ❌ Error actualizando BD: ${updateError.message}`);
+            stats.errors++;
+            results.push({ 
+              saleId: sale.id, 
+              externalId: sale.adversus_external_id,
+              oppNumber: null, 
+              status: 'error',
+              error: updateError.message,
+              processingTime: Date.now() - saleStartTime
+            });
           } else {
-            console.log(`Updated sale ${sale.adversus_external_id} with OPP: ${oppNumber}`);
-            results.push({ saleId: sale.id, oppNumber });
+            console.log(`   ✅ OPP encontrado y guardado: ${oppNumber}`);
+            stats.successful++;
+            results.push({ 
+              saleId: sale.id, 
+              externalId: sale.adversus_external_id,
+              oppNumber, 
+              status: 'success',
+              processingTime: Date.now() - saleStartTime
+            });
           }
         } else {
           // Mark as checked by setting empty string to avoid re-processing
@@ -169,12 +277,30 @@ serve(async (req) => {
             .from('sales')
             .update({ adversus_opp_number: '' })
             .eq('id', sale.id);
-          results.push({ saleId: sale.id, oppNumber: null, error: 'No OPP in Adversus' });
+          console.log(`   ⚪ Sin OPP en Adversus - marcado como procesado`);
+          stats.noOppFound++;
+          results.push({ 
+            saleId: sale.id, 
+            externalId: sale.adversus_external_id,
+            oppNumber: null, 
+            status: 'no_opp',
+            error: 'No OPP in Adversus',
+            processingTime: Date.now() - saleStartTime
+          });
         }
 
       } catch (err) {
-        console.error(`Error processing sale ${sale.id}:`, err);
-        results.push({ saleId: sale.id, oppNumber: null, error: String(err) });
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        console.error(`   ❌ Error inesperado: ${errorMsg}`);
+        stats.errors++;
+        results.push({ 
+          saleId: sale.id, 
+          externalId: sale.adversus_external_id,
+          oppNumber: null, 
+          status: 'error',
+          error: errorMsg,
+          processingTime: Date.now() - saleStartTime
+        });
       }
     }
 
@@ -185,24 +311,81 @@ serve(async (req) => {
       .is('adversus_opp_number', null)
       .not('adversus_event_id', 'is', null);
 
-    const successful = results.filter(r => r.oppNumber).length;
+    const duration = Date.now() - startTime;
+    const avgTimePerSale = stats.processed > 0 ? Math.round(duration / stats.processed) : 0;
+
+    // Final summary
+    console.log('\n' + '='.repeat(60));
+    console.log('📊 RESUMEN FINAL - BACKFILL-OPP');
+    console.log('='.repeat(60));
+    console.log(`📋 Ventas procesadas:     ${stats.processed}`);
+    console.log(`✅ OPP encontrados:       ${stats.successful}`);
+    console.log(`⚪ Sin OPP en Adversus:   ${stats.noOppFound}`);
+    console.log(`❌ Errores:               ${stats.errors}`);
+    console.log(`📡 Llamadas API:          ${stats.apiCalls}`);
+    console.log(`⏱️  Duración total:        ${formatDuration(duration)}`);
+    console.log(`⚡ Promedio por venta:    ${formatDuration(avgTimePerSale)}`);
+    console.log(`📦 Ventas restantes:      ${remaining || 0}`);
+    if (stats.rateLimited) {
+      console.log(`🚫 Rate limited:          Sí (batch detenido)`);
+    }
+    console.log('='.repeat(60));
+    
+    // Log individual results summary
+    if (stats.successful > 0) {
+      console.log('\n✅ OPPs encontrados:');
+      results.filter(r => r.status === 'success').forEach(r => {
+        console.log(`   - ${r.externalId}: ${r.oppNumber}`);
+      });
+    }
+    
+    if (stats.errors > 0) {
+      console.log('\n❌ Errores detallados:');
+      results.filter(r => r.status === 'error').forEach(r => {
+        console.log(`   - ${r.externalId || r.saleId}: ${r.error}`);
+      });
+    }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        processed: results.length,
-        successful,
+        processed: stats.processed,
+        successful: stats.successful,
+        noOppFound: stats.noOppFound,
+        errors: stats.errors,
         remaining: remaining || 0,
+        rateLimited: stats.rateLimited,
+        summary: {
+          duration_ms: duration,
+          duration_formatted: formatDuration(duration),
+          avg_per_sale_ms: avgTimePerSale,
+          api_calls: stats.apiCalls
+        },
         results
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Error:', error);
+    const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    console.log('\n' + '='.repeat(60));
+    console.log('❌ BACKFILL-OPP: ERROR FATAL');
+    console.log('='.repeat(60));
+    console.error(`Error: ${errorMessage}`);
+    console.log(`⏱️ Duración hasta error: ${formatDuration(duration)}`);
+    console.log('='.repeat(60));
+    
     return new Response(
-      JSON.stringify({ success: false, error: errorMessage }),
+      JSON.stringify({ 
+        success: false, 
+        error: errorMessage,
+        summary: {
+          duration_ms: duration,
+          duration_formatted: formatDuration(duration)
+        }
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
