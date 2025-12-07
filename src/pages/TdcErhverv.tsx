@@ -28,6 +28,8 @@ interface TdcSale {
   sale_datetime: string;
   agent_name: string | null;
   customer_company: string | null;
+  adversus_external_id: string | null;
+  adversus_opp_number: string | null;
   client_campaigns?: {
     name: string | null;
   } | null;
@@ -161,6 +163,7 @@ export default function TdcErhverv() {
         .from("sales")
         .select(
           `id, sale_datetime, agent_name, customer_company,
+           adversus_external_id, adversus_opp_number,
            client_campaigns ( name ),
            sale_items ( mapped_commission, mapped_revenue, quantity, products ( name ) )`
         )
@@ -647,6 +650,7 @@ export default function TdcErhverv() {
                     <TableHead>Kampagne</TableHead>
                     <TableHead>Kunde</TableHead>
                     <TableHead>Agent</TableHead>
+                    <TableHead>Order ID / OPP</TableHead>
                     <TableHead>Produkter</TableHead>
                     <TableHead className="text-right">Omsætning</TableHead>
                     <TableHead className="text-right">Provision</TableHead>
@@ -673,6 +677,11 @@ export default function TdcErhverv() {
                         <TableCell>{sale.client_campaigns?.name || "—"}</TableCell>
                         <TableCell>{sale.customer_company || "—"}</TableCell>
                         <TableCell>{sale.agent_name || "—"}</TableCell>
+                        <TableCell>
+                          <span className={`font-mono text-xs px-2 py-1 rounded ${sale.adversus_opp_number ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'}`}>
+                            {sale.adversus_opp_number || sale.adversus_external_id || '-'}
+                          </span>
+                        </TableCell>
                         <TableCell>
                           {sale.sale_items?.map((item, index) => {
                             const qty = Number((item as any).quantity) || 1;
