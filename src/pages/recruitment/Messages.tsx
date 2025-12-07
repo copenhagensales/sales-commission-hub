@@ -36,6 +36,7 @@ interface Message {
   application_id: string | null;
 }
 
+// Recruitment messages component
 export default function Messages() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<MessageType | "all">("all");
