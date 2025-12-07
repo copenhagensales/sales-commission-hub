@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// --- SISTEMA DE LOGGING ROBUSTO ---
+// --- SISTEMA DE LOGGING ---
 function log(type: 'INFO' | 'ERROR' | 'WARN', message: string, data?: any) {
   console.log(JSON.stringify({
     timestamp: new Date().toISOString(),
@@ -15,7 +15,7 @@ function log(type: 'INFO' | 'ERROR' | 'WARN', message: string, data?: any) {
   }))
 }
 
-// Configuración de servicios
+// Configuración
 const getConfigs = () => {
   const sbUrl = Deno.env.get('SUPABASE_URL')!
   const sbKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -43,20 +43,17 @@ Deno.serve(async (req) => {
     let result = {}
 
     switch (action) {
-      case 'test-connection':
-        result = await testConnection(config)
-        break
       case 'sync-campaigns':
-        result = await syncCampaigns(config)
+        result = await syncCampaignsSafe(config)
         break
       case 'sync-users':
-        result = await syncUsers(config)
+        result = await syncUsersSafe(config)
         break
       case 'sync-sales':
-        result = await syncSales(config, days)
+        result = await syncSalesSafe(config, days)
         break
       default:
-        throw new Error(`Acción no reconocida: ${action}`)
+        throw new Error(`Acción desconocida: ${action}`)
     }
 
     return new Response(JSON.stringify(result), {
@@ -64,85 +61,72 @@ Deno.serve(async (req) => {
     })
 
   } catch (error: any) {
-    log('ERROR', 'Fallo crítico en la función', { error: error.message, stack: error.stack })
+    log('ERROR', 'Fallo crítico', { error: error.message })
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 })
 
-// --- FUNCIONES AUXILIARES DE API ---
-
 async function fetchAdversus(url: string, authHeader: string) {
-  const start = Date.now()
   const res = await fetch(url, {
     headers: { 'Authorization': `Basic ${authHeader}`, 'Content-Type': 'application/json' }
   })
-  
-  const duration = Date.now() - start
-  
-  if (res.status === 429) {
-    log('WARN', 'Rate Limit alcanzado en Adversus', { url })
-    throw new Error('Rate Limit Adversus')
-  }
-  
-  if (!res.ok) {
-    const text = await res.text()
-    log('ERROR', 'Error API Adversus', { status: res.status, url, response: text })
-    throw new Error(`API Error: ${res.status}`)
-  }
-
-  log('INFO', 'Fetch exitoso', { url, duration_ms: duration })
+  if (res.status === 429) throw new Error('Rate Limit Adversus')
+  if (!res.ok) throw new Error(`API Error: ${res.status}`)
   return await res.json()
 }
 
-// 1. TEST DE CONEXIÓN (Para debug rápido)
-async function testConnection({ baseUrl, authHeader }: any) {
-  try {
-    const data = await fetchAdversus(`${baseUrl}/campaigns?pageSize=1`, authHeader)
-    return { success: true, message: 'Conexión exitosa', data }
-  } catch (e: any) {
-    return { success: false, message: e.message }
-  }
-}
-
-// 2. SINCRONIZAR CAMPAÑAS
-async function syncCampaigns({ supabase, baseUrl, authHeader }: any) {
+// 1. CAMPAÑAS - MODO SEGURO (Sin Upsert)
+async function syncCampaignsSafe({ supabase, baseUrl, authHeader }: any) {
   const data = await fetchAdversus(`${baseUrl}/campaigns`, authHeader)
   const campaigns = data.campaigns || data || []
-  
-  let upserted = 0
+  let count = 0
   let errors = 0
 
   for (const camp of campaigns) {
     const name = camp.settings?.name || camp.name
-    // Insertamos solo el mapeo base para tener el nombre
-    const { error } = await supabase.from('adversus_campaign_mappings')
-      .upsert({
-        adversus_campaign_id: String(camp.id),
-        adversus_campaign_name: name
-      }, { onConflict: 'adversus_campaign_id', ignoreDuplicates: true }) // No sobrescribir si ya existe
-    
-    if (error) {
-      log('ERROR', 'Error guardando campaña', { id: camp.id, error })
+    const campaignId = String(camp.id)
+
+    try {
+      // Manual Check
+      const { data: existing } = await supabase
+        .from('adversus_campaign_mappings')
+        .select('id')
+        .eq('adversus_campaign_id', campaignId)
+        .maybeSingle()
+
+      if (existing) {
+        // Update (si cambiara el nombre, por ejemplo)
+        await supabase
+          .from('adversus_campaign_mappings')
+          .update({ adversus_campaign_name: name })
+          .eq('id', existing.id)
+      } else {
+        // Insert
+        await supabase
+          .from('adversus_campaign_mappings')
+          .insert({
+            adversus_campaign_id: campaignId,
+            adversus_campaign_name: name
+          })
+      }
+      count++
+    } catch (e: any) {
+      log('ERROR', 'Error campaña', { id: campaignId, msg: e.message })
       errors++
-    } else {
-      upserted++
     }
   }
-  
-  return { success: true, upserted, errors }
+  return { success: true, processed: count, errors }
 }
 
-// 2. SINCRONIZAR USUARIOS (AGENTES) - Versión Segura (Sin Upsert)
-async function syncUsers({ supabase, baseUrl, authHeader }: any) {
-  log('INFO', 'Iniciando sync de usuarios...')
+// 2. USUARIOS - MODO SEGURO (Sin Upsert)
+async function syncUsersSafe({ supabase, baseUrl, authHeader }: any) {
   const data = await fetchAdversus(`${baseUrl}/users`, authHeader)
   const users = data.users || data || []
-  
-  let processed = 0
+  let count = 0
   let errors = 0
-  
+
   for (const user of users) {
     if (!user.active) continue
 
@@ -155,7 +139,7 @@ async function syncUsers({ supabase, baseUrl, authHeader }: any) {
     }
 
     try {
-      // Paso 1: Buscar si existe
+      // Manual Check
       const { data: existing } = await supabase
         .from('agents')
         .select('id')
@@ -163,31 +147,21 @@ async function syncUsers({ supabase, baseUrl, authHeader }: any) {
         .maybeSingle()
 
       if (existing) {
-        // Paso 2A: Actualizar
-        const { error } = await supabase
-          .from('agents')
-          .update(agentData)
-          .eq('id', existing.id)
-        if (error) throw error
+        await supabase.from('agents').update(agentData).eq('id', existing.id)
       } else {
-        // Paso 2B: Insertar
-        const { error } = await supabase
-          .from('agents')
-          .insert(agentData)
-        if (error) throw error
+        await supabase.from('agents').insert(agentData)
       }
-      processed++
-    } catch (err: any) {
-      log('ERROR', 'Error procesando agente', { id: user.id, error: err.message })
+      count++
+    } catch (e: any) {
+      log('ERROR', 'Error agente', { id: externalId, msg: e.message })
       errors++
     }
   }
-
-  return { success: true, processed, errors }
+  return { success: true, processed: count, errors }
 }
 
-// 4. SINCRONIZAR VENTAS - Versión Segura (Sin Upsert)
-async function syncSales({ supabase, baseUrl, authHeader }: any, days: number) {
+// 3. VENTAS - MODO SEGURO (Sin Upsert)
+async function syncSalesSafe({ supabase, baseUrl, authHeader }: any, days: number) {
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - days)
   
@@ -197,9 +171,8 @@ async function syncSales({ supabase, baseUrl, authHeader }: any, days: number) {
   let allSales: any[] = []
   let hasMore = true
   
-  log('INFO', 'Iniciando descarga de ventas', { since: startDate.toISOString() })
+  log('INFO', 'Descargando ventas', { since: startDate.toISOString() })
 
-  // 4.1 Descargar todas las ventas
   while (hasMore && page <= 50) {
     const url = `${baseUrl}/sales?pageSize=100&page=${page}&filters=${filterStr}`
     const data = await fetchAdversus(url, authHeader)
@@ -213,9 +186,9 @@ async function syncSales({ supabase, baseUrl, authHeader }: any, days: number) {
     await new Promise(r => setTimeout(r, 100))
   }
 
-  log('INFO', `Ventas descargadas: ${allSales.length}`)
+  log('INFO', `Total ventas a procesar: ${allSales.length}`)
 
-  // 4.2 Cargar datos de referencia
+  // Caches
   const { data: products } = await supabase.from('products').select('id, name, commission_dkk, revenue_dkk')
   const { data: prodMappings } = await supabase.from('adversus_product_mappings').select('*')
   
@@ -225,11 +198,9 @@ async function syncSales({ supabase, baseUrl, authHeader }: any, days: number) {
   let processed = 0
   let errors = 0
 
-  // 4.3 Procesar cada venta MANUALMENTE (Sin Upsert)
   for (const sale of allSales) {
     try {
       const externalId = String(sale.id)
-      
       const saleData = {
         adversus_external_id: externalId,
         sale_datetime: sale.closedTime || sale.createdTime,
@@ -238,44 +209,30 @@ async function syncSales({ supabase, baseUrl, authHeader }: any, days: number) {
         updated_at: new Date().toISOString()
       }
 
-      // --- CAMBIO CLAVE: MANUAL CHECK ---
+      // Manual Check Venta
       let saleId = null
-      
-      const { data: existingSale, error: findError } = await supabase
+      const { data: existingSale } = await supabase
         .from('sales')
         .select('id')
         .eq('adversus_external_id', externalId)
         .maybeSingle()
 
-      if (findError) throw findError
-
       if (existingSale) {
-        // UPDATE
-        const { error: updateError } = await supabase
-          .from('sales')
-          .update(saleData)
-          .eq('id', existingSale.id)
-        
-        if (updateError) throw updateError
+        await supabase.from('sales').update(saleData).eq('id', existingSale.id)
         saleId = existingSale.id
-        
-        // Limpiar items viejos para regenerarlos
+        // Limpiar items para regenerar
         await supabase.from('sale_items').delete().eq('sale_id', saleId)
       } else {
-        // INSERT
-        const { data: newSale, error: insertError } = await supabase
+        const { data: newSale } = await supabase
           .from('sales')
           .insert(saleData)
           .select('id')
           .single()
-        
-        if (insertError) throw insertError
         saleId = newSale.id
       }
-      // ----------------------------------
 
+      // Procesar Items
       const itemsToInsert = []
-
       for (const line of (sale.lines || [])) {
         const extProdId = String(line.productId)
         const title = line.title || 'Producto desconocido'
@@ -313,24 +270,17 @@ async function syncSales({ supabase, baseUrl, authHeader }: any, days: number) {
       }
 
       if (itemsToInsert.length > 0) {
-        const { error: itemsError } = await supabase.from('sale_items').insert(itemsToInsert)
-        if (itemsError) throw itemsError
+        await supabase.from('sale_items').insert(itemsToInsert)
       }
 
       processed++
 
     } catch (err: any) {
       errors++
-      log('ERROR', `Fallo en venta ID ${sale.id}`, { msg: err.message, code: err.code })
+      log('ERROR', `Fallo venta ${sale.id}`, { msg: err.message })
     }
   }
 
   log('INFO', 'Proceso finalizado', { processed, errors })
-
-  return { 
-    success: true, 
-    processed, 
-    errors,
-    message: `Sincronización completada: ${processed} ventas procesadas, ${errors} errores.` 
-  }
+  return { success: true, processed, errors }
 }
