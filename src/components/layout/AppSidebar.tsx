@@ -78,6 +78,10 @@ const employeeNavigation = [
 // Teamleder extra navigation (pulse survey results, code of conduct for their team)
 const teamlederExtraNavigation = [
   { name: "Pulsmåling resultater", href: "/pulse-survey-results", icon: BarChart3 },
+];
+
+// Code of conduct admin - only for teamleders (owners already have it in ownerNavigation)
+const teamlederCodeOfConductNav = [
   { name: "Code of Conduct overblik", href: "/code-of-conduct-admin", icon: Shield },
 ];
 
@@ -231,7 +235,7 @@ export function AppSidebar() {
   const mainNavigation = isOwner 
     ? [...ownerNavigation, ...teamlederExtraNavigation]
     : isTeamleder
-      ? [...teamlederNavigation, ...teamlederExtraNavigation] 
+      ? [...teamlederNavigation, ...teamlederExtraNavigation, ...teamlederCodeOfConductNav] 
       : isRekruttering 
         ? rekrutteringNavigation
         : employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey);
