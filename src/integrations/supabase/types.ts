@@ -279,6 +279,66 @@ export type Database = {
         }
         Relationships: []
       }
+      applications: {
+        Row: {
+          application_date: string
+          candidate_id: string
+          created_at: string
+          deadline: string | null
+          id: string
+          next_step: string | null
+          notes: string | null
+          role: string
+          source: string | null
+          status: string
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          application_date?: string
+          candidate_id: string
+          created_at?: string
+          deadline?: string | null
+          id?: string
+          next_step?: string | null
+          notes?: string | null
+          role: string
+          source?: string | null
+          status?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          application_date?: string
+          candidate_id?: string
+          created_at?: string
+          deadline?: string | null
+          id?: string
+          next_step?: string | null
+          notes?: string | null
+          role?: string
+          source?: string | null
+          status?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applications_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "applications_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking: {
         Row: {
           brand_id: string
@@ -870,6 +930,50 @@ export type Database = {
           },
         ]
       }
+      communication_logs: {
+        Row: {
+          application_id: string | null
+          content: string | null
+          created_at: string
+          direction: string
+          id: string
+          outcome: string | null
+          read: boolean
+          twilio_sid: string | null
+          type: string
+        }
+        Insert: {
+          application_id?: string | null
+          content?: string | null
+          created_at?: string
+          direction: string
+          id?: string
+          outcome?: string | null
+          read?: boolean
+          twilio_sid?: string | null
+          type: string
+        }
+        Update: {
+          application_id?: string | null
+          content?: string | null
+          created_at?: string
+          direction?: string
+          id?: string
+          outcome?: string | null
+          read?: boolean
+          twilio_sid?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_logs_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consent_log: {
         Row: {
           consent_type: string
@@ -1103,6 +1207,36 @@ export type Database = {
           id?: string
           payload?: Json
           processed?: boolean | null
+        }
+        Relationships: []
+      }
+      email_templates: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          name: string
+          subject: string
+          template_key: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          name: string
+          subject: string
+          template_key: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          name?: string
+          subject?: string
+          template_key?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1884,6 +2018,44 @@ export type Database = {
           },
         ]
       }
+      performance_reviews: {
+        Row: {
+          comments: string | null
+          created_at: string
+          id: string
+          rating: string
+          recruitment_employee_id: string
+          review_date: string
+          review_period: number
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string
+          id?: string
+          rating: string
+          recruitment_employee_id: string
+          review_date?: string
+          review_period: number
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string
+          id?: string
+          rating?: string
+          recruitment_employee_id?: string
+          review_date?: string
+          review_period?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_reviews_recruitment_employee_id_fkey"
+            columns: ["recruitment_employee_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           client_campaign_id: string | null
@@ -2046,6 +2218,63 @@ export type Database = {
         }
         Relationships: []
       }
+      recruitment_employees: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          deadline: string | null
+          employment_end_reason: string | null
+          employment_ended_date: string | null
+          hired_date: string | null
+          id: string
+          role: string
+          sub_team: string | null
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          deadline?: string | null
+          employment_end_reason?: string | null
+          employment_ended_date?: string | null
+          hired_date?: string | null
+          id?: string
+          role: string
+          sub_team?: string | null
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          deadline?: string | null
+          employment_end_reason?: string | null
+          employment_ended_date?: string | null
+          hired_date?: string | null
+          id?: string
+          role?: string
+          sub_team?: string | null
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recruitment_employees_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recruitment_employees_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recruitment_notifications: {
         Row: {
           created_at: string
@@ -2081,6 +2310,38 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      revenue_data: {
+        Row: {
+          created_at: string
+          id: string
+          period: number
+          recruitment_employee_id: string
+          revenue: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          period: number
+          recruitment_employee_id: string
+          revenue?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          period?: number
+          recruitment_employee_id?: string
+          revenue?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revenue_data_recruitment_employee_id_fkey"
+            columns: ["recruitment_employee_id"]
+            isOneToOne: false
+            referencedRelation: "recruitment_employees"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sale_items: {
         Row: {
@@ -2326,6 +2587,62 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_templates: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          name: string
+          template_key: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          name: string
+          template_key: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          name?: string
+          template_key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sub_teams: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          team_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          team_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          team_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_teams_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
