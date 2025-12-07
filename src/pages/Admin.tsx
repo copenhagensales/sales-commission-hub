@@ -16,6 +16,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -1343,22 +1351,22 @@ export default function Admin() {
       </AlertDialog>
 
       {/* Individual permissions dialog */}
-      <AlertDialog 
+      <Dialog 
         open={!!selectedUserForPermissions} 
         onOpenChange={(open) => !open && setSelectedUserForPermissions(null)}
       >
-        <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
               Rediger rettigheder for {selectedUserForPermissions?.first_name} {selectedUserForPermissions?.last_name}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
+            </DialogTitle>
+            <DialogDescription>
               Rolle: {getRoleBadge(selectedUserForPermissions?.role || null)}
               <br />
               Tilføj ekstra menupunkter som denne bruger skal have adgang til ud over sin rolle.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+            </DialogDescription>
+          </DialogHeader>
           
           <div className="overflow-y-auto flex-1 py-4">
             <div className="space-y-4">
@@ -1378,7 +1386,6 @@ export default function Admin() {
                       {items.map((item) => {
                         const isInRole = roleMenus.includes(item.id);
                         const isExtraPermission = userExtras.includes(item.id);
-                        const hasAccess = isInRole || isExtraPermission;
                         
                         return (
                           <div 
@@ -1430,11 +1437,13 @@ export default function Admin() {
             </div>
           </div>
           
-          <AlertDialogFooter>
-            <AlertDialogCancel>Luk</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedUserForPermissions(null)}>
+              Luk
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
