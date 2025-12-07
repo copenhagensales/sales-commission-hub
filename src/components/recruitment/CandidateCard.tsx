@@ -1,33 +1,43 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   Phone, 
   Mail, 
   MessageSquare, 
-  MoreVertical, 
-  Calendar,
-  Star,
-  User,
+  ChevronDown,
+  Clock,
+  FileText,
   Trash2
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, differenceInHours, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { SendSmsDialog } from "./SendSmsDialog";
 import { SendEmailDialog } from "./SendEmailDialog";
-import { CandidateDetailDialog } from "./CandidateDetailDialog";
+
+interface Application {
+  id: string;
+  role: string;
+  status: string;
+  application_date: string;
+  notes?: string;
+}
 
 interface Candidate {
   id: string;
@@ -36,8 +46,6 @@ interface Candidate {
   email: string | null;
   phone: string | null;
   status: string;
-  rating: number | null;
-  interview_date: string | null;
   created_at: string;
   source: string | null;
   notes: string | null;
@@ -46,15 +54,87 @@ interface Candidate {
 
 interface CandidateCardProps {
   candidate: Candidate;
-  statusLabels: Record<string, string>;
-  statusColors: Record<string, string>;
+  applications?: Application[];
+  onUpdate?: () => void;
 }
 
-export function CandidateCard({ candidate, statusLabels, statusColors }: CandidateCardProps) {
-  const [isSmsDialogOpen, setIsSmsDialogOpen] = useState(false);
-  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
-  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+const statusLabels: Record<string, string> = {
+  ny_ansoegning: "Ny ansøgning",
+  ansat: "Ansat",
+  udskudt_samtale: "Udskudt samtale",
+  ikke_kvalificeret: "Ikke kvalificeret",
+  ikke_ansat: "Ikke ansat",
+  startet: "Startet",
+  ghostet: "Ghostet",
+  takket_nej: "Takket nej",
+  interesseret_i_kundeservice: "Interesseret i kundeservice",
+  jobsamtale: "Jobsamtale",
+  new: "Ny ansøgning",
+  contacted: "Kontaktet",
+  interview_scheduled: "Samtale planlagt",
+  interviewed: "Samtale afholdt",
+  offer_sent: "Tilbud sendt",
+  hired: "Ansat",
+  rejected: "Afvist",
+};
+
+const statusColors: Record<string, string> = {
+  ny_ansoegning: "bg-[hsl(var(--status-new))]/10 text-[hsl(var(--status-new))] border-[hsl(var(--status-new))]/20",
+  ansat: "bg-[hsl(var(--status-success))]/10 text-[hsl(var(--status-success))] border-[hsl(var(--status-success))]/20",
+  udskudt_samtale: "bg-[hsl(var(--status-progress))]/10 text-[hsl(var(--status-progress))] border-[hsl(var(--status-progress))]/20",
+  ikke_kvalificeret: "bg-[hsl(var(--status-rejected))]/10 text-[hsl(var(--status-rejected))] border-[hsl(var(--status-rejected))]/20",
+  ikke_ansat: "bg-[hsl(var(--status-rejected))]/10 text-[hsl(var(--status-rejected))] border-[hsl(var(--status-rejected))]/20",
+  startet: "bg-[hsl(var(--status-progress))]/10 text-[hsl(var(--status-progress))] border-[hsl(var(--status-progress))]/20",
+  ghostet: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  takket_nej: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+  interesseret_i_kundeservice: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  jobsamtale: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+  new: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  contacted: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+  interview_scheduled: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+  interviewed: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+  offer_sent: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+  hired: "bg-green-500/10 text-green-400 border-green-500/20",
+  rejected: "bg-red-500/10 text-red-400 border-red-500/20",
+};
+
+const roleLabels: Record<string, string> = {
+  fieldmarketing: "Fieldmarketing",
+  salgskonsulent: "Salgskonsulent",
+  Fieldmarketing: "Fieldmarketing",
+  Salgskonsulent: "Salgskonsulent",
+};
+
+const roleColors: Record<string, string> = {
+  fieldmarketing: "bg-[hsl(var(--role-fieldmarketing))]/10 text-[hsl(var(--role-fieldmarketing))] border-[hsl(var(--role-fieldmarketing))]/20",
+  salgskonsulent: "bg-[hsl(var(--role-salgskonsulent))]/10 text-[hsl(var(--role-salgskonsulent))] border-[hsl(var(--role-salgskonsulent))]/20",
+  Fieldmarketing: "bg-[hsl(var(--role-fieldmarketing))]/10 text-[hsl(var(--role-fieldmarketing))] border-[hsl(var(--role-fieldmarketing))]/20",
+  Salgskonsulent: "bg-[hsl(var(--role-salgskonsulent))]/10 text-[hsl(var(--role-salgskonsulent))] border-[hsl(var(--role-salgskonsulent))]/20",
+};
+
+export function CandidateCard({ candidate, applications = [], onUpdate }: CandidateCardProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [showSmsDialog, setShowSmsDialog] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const queryClient = useQueryClient();
+
+  const getTimeSinceApplication = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const hoursDiff = differenceInHours(now, date);
+    const daysDiff = differenceInDays(now, date);
+
+    if (hoursDiff < 24) {
+      return `${hoursDiff}t`;
+    } else if (daysDiff < 7) {
+      return `${daysDiff}d`;
+    } else if (daysDiff < 30) {
+      return `${Math.floor(daysDiff / 7)}u`;
+    } else {
+      return `${Math.floor(daysDiff / 30)}m`;
+    }
+  };
 
   const updateStatusMutation = useMutation({
     mutationFn: async (newStatus: string) => {
@@ -68,6 +148,7 @@ export function CandidateCard({ candidate, statusLabels, statusColors }: Candida
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
       toast.success("Status opdateret");
+      if (onUpdate) onUpdate();
     },
     onError: () => {
       toast.error("Kunne ikke opdatere status");
@@ -86,169 +167,255 @@ export function CandidateCard({ candidate, statusLabels, statusColors }: Candida
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
       toast.success("Kandidat slettet");
+      if (onUpdate) onUpdate();
     },
     onError: () => {
       toast.error("Kunne ikke slette kandidat");
     },
   });
 
-  const initials = `${candidate.first_name?.[0] || ""}${candidate.last_name?.[0] || ""}`.toUpperCase();
-
-  const handleCall = () => {
+  const handlePhoneClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (candidate.phone) {
       window.location.href = `tel:${candidate.phone}`;
     } else {
-      toast.error("Ingen telefonnummer registreret");
+      toast.error("Ingen telefonnummer");
     }
   };
 
+  const handleCardClick = () => {
+    setIsOpen(!isOpen);
+  };
+
+  const position = candidate.applied_position?.toLowerCase() || "";
+
   return (
     <>
-      <Card 
-        className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer"
-        onClick={() => setIsDetailDialogOpen(true)}
-      >
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-primary/20 text-primary">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h3 className="font-semibold text-foreground">
-                  {candidate.first_name} {candidate.last_name}
-                </h3>
-                {candidate.applied_position && (
-                  <p className="text-sm text-muted-foreground">{candidate.applied_position}</p>
-                )}
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <Card
+          className={`hover:shadow-md transition-all duration-200 hover:border-primary/50 cursor-pointer ${
+            candidate.status === 'new' || candidate.status === 'ny_ansoegning' ? 'border-l-4 border-l-red-500' : ''
+          }`}
+          onClick={handleCardClick}
+        >
+          <CardContent className="p-3 md:p-4">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+              {/* Left side - Basic info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start gap-2 md:gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-base md:text-lg truncate text-foreground">
+                      {candidate.first_name} {candidate.last_name}
+                    </h3>
+                    <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4 mt-1 text-xs md:text-sm text-muted-foreground">
+                      {candidate.email && (
+                        <div className="flex items-center gap-1.5">
+                          <Mail className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
+                          <span className="truncate">{candidate.email}</span>
+                        </div>
+                      )}
+                      {candidate.phone && (
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
+                          <span>{candidate.phone}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Status and role badges */}
+                    <div className="flex flex-wrap items-center gap-1.5 md:gap-2 mt-2 md:mt-3">
+                      {candidate.applied_position && (
+                        <Badge className={roleColors[position] || "bg-muted text-muted-foreground"} variant="outline">
+                          {roleLabels[position] || candidate.applied_position}
+                        </Badge>
+                      )}
+                      <Select
+                        value={candidate.status}
+                        onValueChange={(value) => updateStatusMutation.mutate(value)}
+                      >
+                        <SelectTrigger
+                          className={`h-6 w-auto min-w-[120px] text-xs px-2 ${statusColors[candidate.status] || ""}`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent onClick={(e) => e.stopPropagation()} className="bg-popover border-border">
+                          <SelectItem value="new">Ny ansøgning</SelectItem>
+                          <SelectItem value="contacted">Kontaktet</SelectItem>
+                          <SelectItem value="interview_scheduled">Samtale planlagt</SelectItem>
+                          <SelectItem value="interviewed">Samtale afholdt</SelectItem>
+                          <SelectItem value="offer_sent">Tilbud sendt</SelectItem>
+                          <SelectItem value="hired">Ansat</SelectItem>
+                          <SelectItem value="rejected">Afvist</SelectItem>
+                          <SelectItem value="ghostet">Ghostet</SelectItem>
+                          <SelectItem value="takket_nej">Takket nej</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Badge variant="secondary" className="text-xs">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {getTimeSinceApplication(candidate.created_at)}
+                      </Badge>
+                    </div>
+
+                    {/* Notes preview */}
+                    {candidate.notes && (
+                      <div className="mt-2 text-xs text-muted-foreground bg-muted/30 rounded p-2 border border-border/50">
+                        <span className="line-clamp-2">{candidate.notes}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right side - Badges */}
+                  <div className="flex flex-col items-end gap-1.5 md:gap-2">
+                    {(candidate.status === 'new' || candidate.status === 'ny_ansoegning') && (
+                      <Badge className="bg-red-500 text-white whitespace-nowrap text-xs font-semibold">
+                        NY ANSØGNING
+                      </Badge>
+                    )}
+                    {applications.length > 0 && (
+                      <Badge variant="outline" className="whitespace-nowrap text-xs">
+                        <FileText className="h-3 w-3 mr-1" />
+                        {applications.length}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick actions */}
+                <div className="flex flex-wrap items-center gap-1.5 md:gap-2 mt-2 md:mt-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handlePhoneClick}
+                    className="h-7 md:h-8 text-xs"
+                  >
+                    <Phone className="h-3 w-3 md:h-3.5 md:w-3.5 md:mr-1.5" />
+                    <span className="hidden sm:inline ml-1">Ring op</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowSmsDialog(true);
+                    }}
+                    className="h-7 md:h-8 text-xs"
+                    disabled={!candidate.phone}
+                  >
+                    <MessageSquare className="h-3 w-3 md:h-3.5 md:w-3.5 md:mr-1.5" />
+                    <span className="hidden sm:inline ml-1">SMS</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowEmailDialog(true);
+                    }}
+                    className="h-7 md:h-8 text-xs"
+                    disabled={!candidate.email}
+                  >
+                    <Mail className="h-3 w-3 md:h-3.5 md:w-3.5 md:mr-1.5" />
+                    <span className="hidden sm:inline ml-1">Email</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDeleteDialog(true);
+                    }}
+                    className="h-7 md:h-8 text-xs text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                  </Button>
+                  <CollapsibleTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button size="sm" variant="ghost" className="h-7 md:h-8 ml-auto">
+                      <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </CollapsibleTrigger>
+                </div>
               </div>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-popover border-border">
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setIsDetailDialogOpen(true); }}>
-                  <User className="mr-2 h-4 w-4" />
-                  Se detaljer
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {Object.entries(statusLabels).map(([status, label]) => (
-                  <DropdownMenuItem 
-                    key={status}
-                    onClick={(e) => { e.stopPropagation(); updateStatusMutation.mutate(status); }}
-                  >
-                    Sæt til: {label}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  className="text-destructive"
-                  onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(); }}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Slet kandidat
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
 
-          <Badge 
-            variant="outline" 
-            className={`mb-3 ${statusColors[candidate.status] || ""}`}
-          >
-            {statusLabels[candidate.status] || candidate.status}
-          </Badge>
+            {/* Collapsible content */}
+            <CollapsibleContent className="mt-4 pt-4 border-t border-border">
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Kilde:</span>
+                    <span className="ml-2 text-foreground">{candidate.source || "Ikke angivet"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Oprettet:</span>
+                    <span className="ml-2 text-foreground">
+                      {format(new Date(candidate.created_at), "d. MMM yyyy", { locale: da })}
+                    </span>
+                  </div>
+                </div>
+                
+                {candidate.notes && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Noter:</span>
+                    <p className="mt-1 text-foreground bg-muted/30 rounded p-2">
+                      {candidate.notes}
+                    </p>
+                  </div>
+                )}
 
-          <div className="space-y-2 text-sm text-muted-foreground mb-4">
-            {candidate.email && (
-              <div className="flex items-center gap-2">
-                <Mail className="h-3 w-3" />
-                <span className="truncate">{candidate.email}</span>
+                {applications.length > 0 && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Ansøgninger ({applications.length}):</span>
+                    <div className="mt-2 space-y-2">
+                      {applications.map((app) => (
+                        <div key={app.id} className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                          <span className="text-foreground">{app.role}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {statusLabels[app.status] || app.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-            {candidate.phone && (
-              <div className="flex items-center gap-2">
-                <Phone className="h-3 w-3" />
-                <span>{candidate.phone}</span>
-              </div>
-            )}
-            {candidate.interview_date && (
-              <div className="flex items-center gap-2">
-                <Calendar className="h-3 w-3" />
-                <span>{format(new Date(candidate.interview_date), "d. MMM yyyy HH:mm", { locale: da })}</span>
-              </div>
-            )}
-            {candidate.rating && (
-              <div className="flex items-center gap-1">
-                {[...Array(5)].map((_, i) => (
-                  <Star 
-                    key={i} 
-                    className={`h-3 w-3 ${i < candidate.rating! ? "fill-yellow-400 text-yellow-400" : "text-muted"}`} 
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="flex-1"
-              onClick={handleCall}
-              disabled={!candidate.phone}
-            >
-              <Phone className="h-3 w-3 mr-1" />
-              Ring
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="flex-1"
-              onClick={() => setIsSmsDialogOpen(true)}
-              disabled={!candidate.phone}
-            >
-              <MessageSquare className="h-3 w-3 mr-1" />
-              SMS
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="flex-1"
-              onClick={() => setIsEmailDialogOpen(true)}
-              disabled={!candidate.email}
-            >
-              <Mail className="h-3 w-3 mr-1" />
-              Email
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            </CollapsibleContent>
+          </CardContent>
+        </Card>
+      </Collapsible>
 
       <SendSmsDialog
-        open={isSmsDialogOpen}
-        onOpenChange={setIsSmsDialogOpen}
+        open={showSmsDialog}
+        onOpenChange={setShowSmsDialog}
         candidate={candidate}
       />
 
       <SendEmailDialog
-        open={isEmailDialogOpen}
-        onOpenChange={setIsEmailDialogOpen}
+        open={showEmailDialog}
+        onOpenChange={setShowEmailDialog}
         candidate={candidate}
       />
 
-      <CandidateDetailDialog
-        open={isDetailDialogOpen}
-        onOpenChange={setIsDetailDialogOpen}
-        candidate={candidate}
-        statusLabels={statusLabels}
-        statusColors={statusColors}
-      />
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slet kandidat</AlertDialogTitle>
+            <AlertDialogDescription>
+              Er du sikker på, at du vil slette {candidate.first_name} {candidate.last_name}? 
+              Denne handling kan ikke fortrydes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Slet
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

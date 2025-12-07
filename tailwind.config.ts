@@ -92,18 +92,25 @@ export default {
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
   			},
-  			success: {
-  				DEFAULT: 'hsl(var(--success))',
-  				foreground: 'hsl(var(--success-foreground))'
-  			},
-  			warning: {
-  				DEFAULT: 'hsl(var(--warning))',
-  				foreground: 'hsl(var(--warning-foreground))'
-  			},
-  			danger: {
-  				DEFAULT: 'hsl(var(--danger))',
-  				foreground: 'hsl(var(--danger-foreground))'
-  			}
+			success: {
+				DEFAULT: 'hsl(var(--success))',
+				foreground: 'hsl(var(--success-foreground))'
+			},
+			warning: {
+				DEFAULT: 'hsl(var(--warning))',
+				foreground: 'hsl(var(--warning-foreground))'
+			},
+			danger: {
+				DEFAULT: 'hsl(var(--danger))',
+				foreground: 'hsl(var(--danger-foreground))'
+			},
+			'status-new': 'hsl(var(--status-new))',
+			'status-progress': 'hsl(var(--status-progress))',
+			'status-success': 'hsl(var(--status-success))',
+			'status-rejected': 'hsl(var(--status-rejected))',
+			'status-warning': 'hsl(var(--status-warning))',
+			'role-fieldmarketing': 'hsl(var(--role-fieldmarketing))',
+			'role-salgskonsulent': 'hsl(var(--role-salgskonsulent))'
   		},
   		borderRadius: {
   			lg: 'var(--radius)',

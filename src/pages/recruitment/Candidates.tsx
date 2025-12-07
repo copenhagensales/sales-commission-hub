@@ -1,46 +1,44 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Search, Plus, Users, UserCheck, Calendar, Phone } from "lucide-react";
-import { toast } from "sonner";
+import { Search, Plus, SlidersHorizontal } from "lucide-react";
 import { CandidateCard } from "@/components/recruitment/CandidateCard";
 import { NewCandidateDialog } from "@/components/recruitment/NewCandidateDialog";
 
-type CandidateStatus = "new" | "contacted" | "interview_scheduled" | "interviewed" | "offer_sent" | "hired" | "rejected";
+interface Application {
+  id: string;
+  role: string;
+  status: string;
+  application_date: string;
+  notes?: string;
+}
 
-const statusLabels: Record<CandidateStatus, string> = {
-  new: "Ny ansøgning",
-  contacted: "Kontaktet",
-  interview_scheduled: "Samtale planlagt",
-  interviewed: "Samtale afholdt",
-  offer_sent: "Tilbud sendt",
-  hired: "Ansat",
-  rejected: "Afvist",
-};
-
-const statusColors: Record<CandidateStatus, string> = {
-  new: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  contacted: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  interview_scheduled: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  interviewed: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-  offer_sent: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  hired: "bg-green-500/20 text-green-400 border-green-500/30",
-  rejected: "bg-red-500/20 text-red-400 border-red-500/30",
-};
+interface Candidate {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  status: string;
+  created_at: string;
+  source: string | null;
+  notes: string | null;
+  applied_position: string | null;
+  applications?: Application[];
+}
 
 export default function Candidates() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<CandidateStatus | "all">("all");
-  const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
-  const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showNewCandidateDialog, setShowNewCandidateDialog] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("newest");
 
-  const { data: candidates = [], isLoading } = useQuery({
+  const { data: candidatesWithApps = [], isLoading, refetch } = useQuery({
     queryKey: ["candidates"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -49,134 +47,144 @@ export default function Candidates() {
         .order("created_at", { ascending: false });
       
       if (error) throw error;
-      return data;
+      return data as Candidate[];
     },
   });
 
-  const filteredCandidates = candidates.filter((candidate) => {
-    const matchesSearch =
-      candidate.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      candidate.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      candidate.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      candidate.phone?.includes(searchQuery);
+  const filteredCandidates = candidatesWithApps
+    .filter((candidate) => {
+      // Search filter
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch =
+        candidate.first_name?.toLowerCase().includes(searchLower) ||
+        candidate.last_name?.toLowerCase().includes(searchLower) ||
+        candidate.email?.toLowerCase().includes(searchLower) ||
+        candidate.phone?.includes(searchTerm);
 
-    const matchesTab = activeTab === "all" || candidate.status === activeTab;
+      if (!matchesSearch) return false;
 
-    return matchesSearch && matchesTab;
-  });
+      // Status filter
+      if (statusFilter === "all") return true;
+      return candidate.status === statusFilter;
+    })
+    .sort((a, b) => {
+      const aDate = new Date(a.created_at).getTime();
+      const bDate = new Date(b.created_at).getTime();
 
-  const statusCounts = candidates.reduce((acc, candidate) => {
-    const status = candidate.status as CandidateStatus;
-    acc[status] = (acc[status] || 0) + 1;
-    return acc;
-  }, {} as Record<CandidateStatus, number>);
+      if (sortBy === "newest") {
+        return bDate - aDate;
+      } else {
+        return aDate - bDate;
+      }
+    });
+
+  const totalApplications = candidatesWithApps.reduce(
+    (sum, c) => sum + (c.applications?.length || 0),
+    0
+  );
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-muted-foreground">Indlæser kandidater...</p>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
       <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Kandidater</h1>
-          <p className="text-muted-foreground">Administrer ansøgere og rekrutteringsprocessen</p>
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Kandidater</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
+              {candidatesWithApps.length} kandidater · {totalApplications} ansøgninger
+            </p>
+          </div>
+          <Button onClick={() => setShowNewCandidateDialog(true)} className="w-full md:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Tilføj kandidat
+          </Button>
         </div>
-        <Button onClick={() => setIsNewDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Ny kandidat
-        </Button>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total kandidater</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{candidates.length}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Nye ansøgninger</CardTitle>
-            <Plus className="h-4 w-4 text-blue-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-400">{statusCounts.new || 0}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Planlagte samtaler</CardTitle>
-            <Calendar className="h-4 w-4 text-purple-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-400">{statusCounts.interview_scheduled || 0}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Ansat</CardTitle>
-            <UserCheck className="h-4 w-4 text-green-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-400">{statusCounts.hired || 0}</div>
-          </CardContent>
-        </Card>
-      </div>
+        <NewCandidateDialog
+          open={showNewCandidateDialog}
+          onOpenChange={setShowNewCandidateDialog}
+        />
 
-      {/* Search and Filter */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Søg efter navn, email eller telefon..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-background border-border"
-          />
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Søg efter navn, email eller telefon..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-background border-border"
+            />
+          </div>
+
+          <div className="flex items-start gap-4 flex-col md:flex-row">
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Filtre:</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 w-full">
+              <div className="space-y-2">
+                <Label htmlFor="status-filter" className="text-sm">Status</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger id="status-filter" className="bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border">
+                    <SelectItem value="all">Alle statuser</SelectItem>
+                    <SelectItem value="new">Ny ansøgning</SelectItem>
+                    <SelectItem value="contacted">Kontaktet</SelectItem>
+                    <SelectItem value="interview_scheduled">Samtale planlagt</SelectItem>
+                    <SelectItem value="interviewed">Samtale afholdt</SelectItem>
+                    <SelectItem value="offer_sent">Tilbud sendt</SelectItem>
+                    <SelectItem value="hired">Ansat</SelectItem>
+                    <SelectItem value="rejected">Afvist</SelectItem>
+                    <SelectItem value="ghostet">Ghostet</SelectItem>
+                    <SelectItem value="takket_nej">Takket nej</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sort-by" className="text-sm">Sortering</Label>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger id="sort-by" className="bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border">
+                    <SelectItem value="newest">Nyeste ansøgninger først</SelectItem>
+                    <SelectItem value="oldest">Ældste ansøgninger først</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Status Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CandidateStatus | "all")}>
-        <TabsList className="bg-muted/50 border border-border">
-          <TabsTrigger value="all" className="data-[state=active]:bg-background">
-            Alle ({candidates.length})
-          </TabsTrigger>
-          {Object.entries(statusLabels).map(([status, label]) => (
-            <TabsTrigger key={status} value={status} className="data-[state=active]:bg-background">
-              {label} ({statusCounts[status as CandidateStatus] || 0})
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        <TabsContent value={activeTab} className="mt-6">
-          {isLoading ? (
-            <div className="text-center py-12 text-muted-foreground">Indlæser kandidater...</div>
-          ) : filteredCandidates.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              Ingen kandidater fundet
+        <div className="grid gap-3">
+          {filteredCandidates.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Ingen kandidater fundet</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredCandidates.map((candidate) => (
-                <CandidateCard
-                  key={candidate.id}
-                  candidate={candidate}
-                  statusLabels={statusLabels}
-                  statusColors={statusColors}
-                />
-              ))}
-            </div>
+            filteredCandidates.map((candidate) => (
+              <CandidateCard
+                key={candidate.id}
+                candidate={candidate}
+                applications={candidate.applications}
+                onUpdate={refetch}
+              />
+            ))
           )}
-        </TabsContent>
-      </Tabs>
-
-      <NewCandidateDialog
-        open={isNewDialogOpen}
-        onOpenChange={setIsNewDialogOpen}
-      />
+        </div>
       </div>
     </MainLayout>
   );
