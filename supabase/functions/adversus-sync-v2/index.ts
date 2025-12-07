@@ -160,7 +160,7 @@ async function syncUsersSafe({ supabase, baseUrl, authHeader }: any) {
   return { success: true, processed: count, errors }
 }
 
-// 3. VENTAS - MODO SEGURO (Sin Upsert)
+// 3. VENTAS - MODO SEGURO (Optimizada para Datos)
 async function syncSalesSafe({ supabase, baseUrl, authHeader }: any, days: number) {
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - days)
@@ -188,12 +188,19 @@ async function syncSalesSafe({ supabase, baseUrl, authHeader }: any, days: numbe
 
   log('INFO', `Total ventas a procesar: ${allSales.length}`)
 
-  // Caches
+  // --- CACHES (Aquí está la magia para recuperar nombres) ---
+  
+  // 1. Productos y Mapeos
   const { data: products } = await supabase.from('products').select('id, name, commission_dkk, revenue_dkk')
   const { data: prodMappings } = await supabase.from('adversus_product_mappings').select('*')
   
+  // 2. Agentes (Para quitar el "Desconocido")
+  const { data: agents } = await supabase.from('agents').select('id, external_adversus_id, name')
+
+  // Mapas para búsqueda rápida
   const mapByExtId = new Map(prodMappings?.map((m: any) => [m.adversus_external_id, m.product_id]))
   const mapByName = new Map(products?.map((p: any) => [p.name.toLowerCase(), p]))
+  const mapAgents = new Map(agents?.map((a: any) => [String(a.external_adversus_id), a])) // Mapa de agentes por ID externo
 
   let processed = 0
   let errors = 0
@@ -201,11 +208,26 @@ async function syncSalesSafe({ supabase, baseUrl, authHeader }: any, days: numbe
   for (const sale of allSales) {
     try {
       const externalId = String(sale.id)
+      
+      // Resolver Agente
+      // Adversus a veces manda el objeto completo o solo el ID en ownedBy/createdBy
+      const agentExtId = String(sale.ownedBy?.id || sale.ownedBy || sale.createdBy?.id || sale.createdBy)
+      const internalAgent = mapAgents.get(agentExtId)
+      
+      // Si tenemos el agente en BD usamos su nombre, si no, intentamos leerlo del objeto sale, si no "Desconocido"
+      const agentName = (internalAgent as any)?.name || sale.ownedBy?.name || sale.createdBy?.name || 'Desconocido'
+
+      // Resolver Cliente (Intentar leer del objeto lead embebido si existe)
+      const customerCompany = sale.lead?.company || sale.lead?.name || ''
+      const customerPhone = sale.lead?.phone || ''
+
       const saleData = {
         adversus_external_id: externalId,
         sale_datetime: sale.closedTime || sale.createdTime,
-        agent_external_id: String(sale.ownedBy || sale.createdBy),
-        agent_name: sale.ownedBy?.name || 'Desconocido', 
+        agent_external_id: agentExtId,
+        agent_name: agentName,
+        customer_company: customerCompany,
+        customer_phone: customerPhone,
         updated_at: new Date().toISOString()
       }
 
@@ -220,7 +242,6 @@ async function syncSalesSafe({ supabase, baseUrl, authHeader }: any, days: numbe
       if (existingSale) {
         await supabase.from('sales').update(saleData).eq('id', existingSale.id)
         saleId = existingSale.id
-        // Limpiar items para regenerar
         await supabase.from('sale_items').delete().eq('sale_id', saleId)
       } else {
         const { data: newSale } = await supabase
@@ -243,8 +264,8 @@ async function syncSalesSafe({ supabase, baseUrl, authHeader }: any, days: numbe
         let revenue = 0
         
         if (!productId && title) {
-           const p = mapByName.get(title.toLowerCase()) as any
-           if (p) productId = p.id
+           const p = mapByName.get(title.toLowerCase())
+           if (p) productId = (p as any).id
         }
 
         if (productId) {
