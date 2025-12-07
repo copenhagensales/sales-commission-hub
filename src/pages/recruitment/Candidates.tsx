@@ -73,7 +73,7 @@ export default function Candidates() {
 
   return (
     <MainLayout>
-    <div className="space-y-6">
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Kandidater</h1>
@@ -177,7 +177,7 @@ export default function Candidates() {
         open={isNewDialogOpen}
         onOpenChange={setIsNewDialogOpen}
       />
-    </div>
+      </div>
     </MainLayout>
   );
 }
