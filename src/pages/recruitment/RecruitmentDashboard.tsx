@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,11 +16,26 @@ import {
   Mail,
   ArrowRight
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, subDays, eachDayOfInterval, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
+import { 
+  ChartContainer, 
+  ChartTooltip, 
+  ChartTooltipContent 
+} from "@/components/ui/chart";
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { Link } from "react-router-dom";
 
+const chartConfig = {
+  count: {
+    label: "Ansøgninger",
+    color: "hsl(var(--primary))",
+  },
+};
+
 export default function RecruitmentDashboard() {
+  const [chartPeriod, setChartPeriod] = useState(30);
+
   const { data: candidates = [] } = useQuery({
     queryKey: ["candidates"],
     queryFn: async () => {
@@ -76,6 +92,25 @@ export default function RecruitmentDashboard() {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     return created > weekAgo;
   }).length;
+
+  const chartData = useMemo(() => {
+    const endDate = startOfDay(new Date());
+    const startDate = subDays(endDate, chartPeriod);
+    const days = eachDayOfInterval({ start: startDate, end: endDate });
+
+    return days.map(day => {
+      const dayStart = startOfDay(day);
+      const count = candidates.filter(c => {
+        const created = startOfDay(new Date(c.created_at));
+        return created.getTime() === dayStart.getTime();
+      }).length;
+
+      return {
+        date: day.toISOString(),
+        count,
+      };
+    });
+  }, [candidates, chartPeriod]);
 
   return (
     <MainLayout>
@@ -233,6 +268,74 @@ export default function RecruitmentDashboard() {
               </div>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Applicants Over Time Chart */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Ansøgninger over tid
+            </CardTitle>
+            <div className="flex gap-1">
+              {[
+                { label: "30 dage", days: 30 },
+                { label: "60 dage", days: 60 },
+                { label: "90 dage", days: 90 },
+                { label: "6 mdr.", days: 180 },
+                { label: "12 mdr.", days: 365 },
+              ].map((option) => (
+                <Button
+                  key={option.days}
+                  variant={chartPeriod === option.days ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setChartPeriod(option.days)}
+                  className="text-xs"
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfig} className="h-[300px] w-full">
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="applicantGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <XAxis 
+                dataKey="date" 
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                tickFormatter={(value) => format(new Date(value), chartPeriod > 90 ? "MMM" : "d. MMM", { locale: da })}
+                interval={chartPeriod > 90 ? "preserveStartEnd" : Math.floor(chartData.length / 6)}
+              />
+              <YAxis 
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                allowDecimals={false}
+              />
+              <ChartTooltip 
+                content={<ChartTooltipContent />}
+                labelFormatter={(value) => format(new Date(value), "d. MMMM yyyy", { locale: da })}
+              />
+              <Area
+                type="monotone"
+                dataKey="count"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2}
+                fill="url(#applicantGradient)"
+              />
+            </AreaChart>
+          </ChartContainer>
         </CardContent>
       </Card>
       </div>
