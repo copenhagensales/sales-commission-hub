@@ -82,7 +82,14 @@ export default function RecruitmentDashboard() {
     },
   });
 
-  const statusCounts = candidates.reduce((acc, candidate) => {
+  const thirtyDaysAgo = subDays(new Date(), 30);
+  
+  const recentCandidates = useMemo(() => 
+    candidates.filter(c => new Date(c.created_at) >= thirtyDaysAgo), 
+    [candidates]
+  );
+
+  const statusCounts = recentCandidates.reduce((acc, candidate) => {
     acc[candidate.status] = (acc[candidate.status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -247,7 +254,7 @@ export default function RecruitmentDashboard() {
       {/* Pipeline Overview */}
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-foreground">Rekrutteringspipeline</CardTitle>
+          <CardTitle className="text-lg font-semibold text-foreground">Rekrutteringspipeline (30 dage)</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between gap-2">
