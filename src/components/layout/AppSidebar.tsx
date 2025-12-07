@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, Plus } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, Plus, UserPlus } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +49,7 @@ const teamlederNavigation = [
 
 // Navigation items for rekruttering role
 const rekrutteringNavigation = [
+  { name: "Rekruttering", href: "/recruitment", icon: UserPlus },
   { name: "Medarbejdere", href: "/employees", icon: Users },
   { name: "Teams", href: "/teams", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
@@ -56,6 +57,13 @@ const rekrutteringNavigation = [
   { name: "Karriereønsker", href: "/career-wishes-overview", icon: Sparkles },
   { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
   { name: "Min profil", href: "/my-profile", icon: User },
+];
+
+// Rekruttering submenu navigation
+const recruitmentNavigation = [
+  { name: "Dashboard", href: "/recruitment", icon: LayoutDashboard },
+  { name: "Kandidater", href: "/recruitment/candidates", icon: Users },
+  { name: "Beskeder", href: "/recruitment/messages", icon: FileText },
 ];
 
 // Navigation items for employees
@@ -110,6 +118,7 @@ export function AppSidebar() {
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
+  const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const [mgOpen, setMgOpen] = useState(
     ["/payroll", "/tdc-erhverv", "/codan", "/mg-test", "/adversus-data"].includes(location.pathname)
   );
@@ -408,6 +417,40 @@ export function AppSidebar() {
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
                 {mgNavigation.map((item) => {
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                        isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.name}
+                    </NavLink>
+                  );
+                })}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Rekruttering menu - for owners and rekruttering role */}
+          {(isOwner || isRekruttering) && (
+            <Collapsible open={recruitmentOpen} onOpenChange={setRecruitmentOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname.startsWith("/recruitment") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <UserPlus className="h-5 w-5" />
+                  Rekruttering
+                </div>
+                {recruitmentOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {recruitmentNavigation.map((item) => {
                   const isActive = location.pathname === item.href;
                   return (
                     <NavLink
