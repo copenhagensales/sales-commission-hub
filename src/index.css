@@ -59,6 +59,17 @@
     --danger: 0 84% 60%;
     --danger-foreground: 0 0% 98%;
 
+    /* Recruitment status colors */
+    --status-new: 217 91% 60%;
+    --status-progress: 43 96% 56%;
+    --status-success: 142 76% 36%;
+    --status-rejected: 0 84% 60%;
+    --status-warning: 38 92% 50%;
+
+    /* Role colors */
+    --role-fieldmarketing: 262 83% 58%;
+    --role-salgskonsulent: 173 80% 40%;
+
     /* KPI colors */
     --kpi-positive: 142 71% 45%;
     --kpi-negative: 0 84% 60%;
