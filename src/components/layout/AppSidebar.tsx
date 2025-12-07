@@ -64,6 +64,8 @@ const recruitmentNavigation = [
   { name: "Dashboard", href: "/recruitment", icon: LayoutDashboard },
   { name: "Kandidater", href: "/recruitment/candidates", icon: Users },
   { name: "Beskeder", href: "/recruitment/messages", icon: FileText },
+  { name: "SMS-skabeloner", href: "/recruitment/sms-templates", icon: FileText },
+  { name: "Email-skabeloner", href: "/recruitment/email-templates", icon: FileText },
 ];
 
 // Navigation items for employees

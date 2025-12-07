@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -25,6 +25,7 @@ interface Candidate {
   first_name: string;
   last_name: string;
   phone: string | null;
+  applied_position?: string | null;
 }
 
 interface SendSmsDialogProps {
@@ -33,28 +34,23 @@ interface SendSmsDialogProps {
   candidate: Candidate;
 }
 
-const smsTemplates = [
-  {
-    id: "interview_invitation",
-    name: "Invitation til samtale",
-    content: "Hej {navn}, tak for din ansøgning hos Copenhagen Sales! Vi vil gerne invitere dig til en samtale. Er du ledig i morgen kl. 10:00? Venlig hilsen Copenhagen Sales",
-  },
-  {
-    id: "interview_reminder",
-    name: "Påmindelse om samtale",
-    content: "Hej {navn}, dette er en påmindelse om din samtale i morgen. Vi glæder os til at møde dig! Venlig hilsen Copenhagen Sales",
-  },
-  {
-    id: "thank_you",
-    name: "Tak for samtale",
-    content: "Hej {navn}, tak for samtalen i dag. Vi vender tilbage med svar inden for et par dage. Venlig hilsen Copenhagen Sales",
-  },
-];
-
 export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogProps) {
   const [message, setMessage] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const queryClient = useQueryClient();
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ["sms_templates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sms_templates")
+        .select("*")
+        .order("name");
+
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const sendSmsMutation = useMutation({
     mutationFn: async () => {
@@ -70,7 +66,6 @@ export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogPr
       if (logError) throw logError;
 
       // In a real implementation, this would call an edge function to send via Twilio
-      // For now, we just log it
       console.log("SMS would be sent to:", candidate.phone, "Message:", message);
     },
     onSuccess: () => {
@@ -87,12 +82,11 @@ export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogPr
 
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplate(templateId);
-    const template = smsTemplates.find(t => t.id === templateId);
+    const template = templates.find(t => t.id === templateId);
     if (template) {
-      const personalizedMessage = template.content.replace(
-        "{navn}",
-        candidate.first_name
-      );
+      let personalizedMessage = template.content
+        .replace(/\{\{fornavn\}\}/g, candidate.first_name)
+        .replace(/\{\{rolle\}\}/g, candidate.applied_position || "stillingen");
       setMessage(personalizedMessage);
     }
   };
@@ -131,7 +125,7 @@ export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogPr
                 <SelectValue placeholder="Vælg en skabelon" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                {smsTemplates.map(template => (
+                {templates.map(template => (
                   <SelectItem key={template.id} value={template.id}>
                     {template.name}
                   </SelectItem>

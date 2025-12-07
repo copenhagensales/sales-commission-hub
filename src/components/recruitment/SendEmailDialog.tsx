@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -26,6 +26,7 @@ interface Candidate {
   first_name: string;
   last_name: string;
   email: string | null;
+  applied_position?: string | null;
 }
 
 interface SendEmailDialogProps {
@@ -34,63 +35,24 @@ interface SendEmailDialogProps {
   candidate: Candidate;
 }
 
-const emailTemplates = [
-  {
-    id: "interview_invitation",
-    name: "Invitation til samtale",
-    subject: "Invitation til samtale hos Copenhagen Sales",
-    content: `Kære {navn},
-
-Tak for din ansøgning til stillingen hos Copenhagen Sales.
-
-Vi vil meget gerne invitere dig til en samtale, hvor vi kan høre mere om dig og fortælle om mulighederne hos os.
-
-Samtalen vil vare ca. 30 minutter og foregår på vores kontor i København.
-
-Venligst bekræft din deltagelse ved at svare på denne mail.
-
-Med venlig hilsen
-Copenhagen Sales`,
-  },
-  {
-    id: "rejection",
-    name: "Afslag",
-    subject: "Vedrørende din ansøgning hos Copenhagen Sales",
-    content: `Kære {navn},
-
-Tak for din interesse i Copenhagen Sales og for den tid, du har brugt på din ansøgning.
-
-Desværre må vi meddele, at vi har valgt at gå videre med andre kandidater til stillingen.
-
-Vi ønsker dig held og lykke med din videre jobsøgning.
-
-Med venlig hilsen
-Copenhagen Sales`,
-  },
-  {
-    id: "offer",
-    name: "Jobtilbud",
-    subject: "Jobtilbud fra Copenhagen Sales",
-    content: `Kære {navn},
-
-Det er os en glæde at kunne tilbyde dig ansættelse hos Copenhagen Sales!
-
-Vi var meget imponerede over din profil og samtale, og vi er overbeviste om, at du vil blive et værdifuldt medlem af vores team.
-
-Vedlagt finder du ansættelseskontrakten. Venligst gennemgå den og vend tilbage med eventuelle spørgsmål.
-
-Vi glæder os til at høre fra dig!
-
-Med venlig hilsen
-Copenhagen Sales`,
-  },
-];
-
 export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDialogProps) {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const queryClient = useQueryClient();
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ["email_templates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("email_templates")
+        .select("*")
+        .order("name");
+
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const sendEmailMutation = useMutation({
     mutationFn: async () => {
@@ -123,14 +85,14 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
 
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplate(templateId);
-    const template = emailTemplates.find(t => t.id === templateId);
+    const template = templates.find(t => t.id === templateId);
     if (template) {
-      setSubject(template.subject);
-      const personalizedMessage = template.content.replace(
-        "{navn}",
-        candidate.first_name
-      );
-      setMessage(personalizedMessage);
+      setSubject(template.subject
+        .replace(/\{\{fornavn\}\}/g, candidate.first_name)
+        .replace(/\{\{rolle\}\}/g, candidate.applied_position || "stillingen"));
+      setMessage(template.content
+        .replace(/\{\{fornavn\}\}/g, candidate.first_name)
+        .replace(/\{\{rolle\}\}/g, candidate.applied_position || "stillingen"));
     }
   };
 
@@ -165,7 +127,7 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
                 <SelectValue placeholder="Vælg en skabelon" />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                {emailTemplates.map(template => (
+                {templates.map(template => (
                   <SelectItem key={template.id} value={template.id}>
                     {template.name}
                   </SelectItem>

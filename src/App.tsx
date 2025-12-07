@@ -66,6 +66,8 @@ const ExtraWorkAdmin = lazyWithRetry(() => import("./pages/ExtraWorkAdmin"));
 const RecruitmentDashboard = lazyWithRetry(() => import("./pages/recruitment/RecruitmentDashboard"));
 const RecruitmentCandidates = lazyWithRetry(() => import("./pages/recruitment/Candidates"));
 const RecruitmentMessages = lazyWithRetry(() => import("./pages/recruitment/Messages"));
+const SmsTemplates = lazyWithRetry(() => import("./pages/recruitment/SmsTemplates"));
+const EmailTemplatesPage = lazyWithRetry(() => import("./pages/recruitment/EmailTemplates"));
 
 const queryClient = new QueryClient();
 
@@ -255,6 +257,8 @@ const App = () => (
               <Route path="/recruitment" element={<RoleProtectedRoute requireTeamlederOrAbove><RecruitmentDashboard /></RoleProtectedRoute>} />
               <Route path="/recruitment/candidates" element={<RoleProtectedRoute requireTeamlederOrAbove><RecruitmentCandidates /></RoleProtectedRoute>} />
               <Route path="/recruitment/messages" element={<RoleProtectedRoute requireTeamlederOrAbove><RecruitmentMessages /></RoleProtectedRoute>} />
+              <Route path="/recruitment/sms-templates" element={<RoleProtectedRoute requireTeamlederOrAbove><SmsTemplates /></RoleProtectedRoute>} />
+              <Route path="/recruitment/email-templates" element={<RoleProtectedRoute requireTeamlederOrAbove><EmailTemplatesPage /></RoleProtectedRoute>} />
               {/* Admin route - owner only */}
               <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
