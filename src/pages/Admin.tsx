@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Shield, Users, Crown, User, Search, Trash2, Eye, EyeOff, Check, X, ChevronDown, ChevronUp, Save, RotateCcw } from "lucide-react";
+import { Shield, Users, Crown, User, Search, Trash2, Eye, EyeOff, Check, X, ChevronDown, ChevronUp, Save, RotateCcw, Home } from "lucide-react";
 import { useCanAccess, SystemRole } from "@/hooks/useSystemRoles";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -160,6 +160,13 @@ export default function Admin() {
     salgskonsulent: [...defaultJobTypePermissions.salgskonsulent],
     fieldmarketing: [...defaultJobTypePermissions.fieldmarketing],
   });
+  const [landingPages, setLandingPages] = useState<Record<string, string>>({
+    salgskonsulent: "/my-profile",
+    fieldmarketing: "/vagt-flow/min-uge",
+    rekruttering: "/recruitment",
+    teamleder: "/shift-planning/overview",
+    ejer: "/employees",
+  });
   const [hasChanges, setHasChanges] = useState(false);
   const [userPermissionSearch, setUserPermissionSearch] = useState("");
   const [showOnlyWithExtras, setShowOnlyWithExtras] = useState(false);
@@ -210,11 +217,18 @@ export default function Admin() {
     toast.info("Rettigheder nulstillet til standard");
   };
 
+  // Update landing page for a group
+  const updateLandingPage = (group: string, path: string) => {
+    setLandingPages(prev => ({ ...prev, [group]: path }));
+    setHasChanges(true);
+  };
+
   // Save permissions (for now just local - can be extended to save to DB)
   const savePermissions = () => {
     // Store in localStorage for persistence
     localStorage.setItem("admin_role_permissions", JSON.stringify(editedPermissions));
     localStorage.setItem("admin_job_type_permissions", JSON.stringify(editedJobTypePermissions));
+    localStorage.setItem("admin_landing_pages", JSON.stringify(landingPages));
     setHasChanges(false);
     toast.success("Rettigheder gemt");
   };
@@ -237,6 +251,15 @@ export default function Admin() {
         setEditedJobTypePermissions(prev => ({ ...prev, ...parsed }));
       } catch (e) {
         console.error("Failed to parse saved job type permissions", e);
+      }
+    }
+    const savedLandingPages = localStorage.getItem("admin_landing_pages");
+    if (savedLandingPages) {
+      try {
+        const parsed = JSON.parse(savedLandingPages);
+        setLandingPages(prev => ({ ...prev, ...parsed }));
+      } catch (e) {
+        console.error("Failed to parse saved landing pages", e);
       }
     }
   }, []);
@@ -1112,6 +1135,52 @@ export default function Admin() {
                     </Table>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Landing pages config */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Home className="h-5 w-5" />
+                  Startsider
+                </CardTitle>
+                <CardDescription>
+                  Vælg hvilken side hver gruppe ser som det første når de logger ind
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[
+                    { key: "salgskonsulent", label: "Salgskonsulent", color: "bg-blue-500" },
+                    { key: "fieldmarketing", label: "Fieldmarketing", color: "bg-emerald-500" },
+                    { key: "rekruttering", label: "Rekruttering", color: "bg-purple-500" },
+                    { key: "teamleder", label: "Teamleder", color: "bg-blue-500" },
+                    { key: "ejer", label: "Ejer", color: "bg-amber-500" },
+                  ].map(({ key, label, color }) => (
+                    <div key={key} className="space-y-2">
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${color}`} />
+                        {label}
+                      </label>
+                      <Select
+                        value={landingPages[key] || ""}
+                        onValueChange={(value) => updateLandingPage(key, value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Vælg startside" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {menuItems.map((item) => (
+                            <SelectItem key={item.id} value={`/${item.id.replace(/-/g, "/")}`}>
+                              {item.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
