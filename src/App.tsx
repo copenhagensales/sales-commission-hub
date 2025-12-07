@@ -68,6 +68,9 @@ const RecruitmentCandidates = lazyWithRetry(() => import("./pages/recruitment/Ca
 const RecruitmentMessages = lazyWithRetry(() => import("./pages/recruitment/Messages"));
 const SmsTemplates = lazyWithRetry(() => import("./pages/recruitment/SmsTemplates"));
 const EmailTemplatesPage = lazyWithRetry(() => import("./pages/recruitment/EmailTemplates"));
+const Winback = lazyWithRetry(() => import("./pages/recruitment/Winback"));
+const UpcomingInterviews = lazyWithRetry(() => import("./pages/recruitment/UpcomingInterviews"));
+const UpcomingHires = lazyWithRetry(() => import("./pages/recruitment/UpcomingHires"));
 
 const queryClient = new QueryClient();
 
@@ -259,6 +262,9 @@ const App = () => (
               <Route path="/recruitment/messages" element={<RoleProtectedRoute requireTeamlederOrAbove><RecruitmentMessages /></RoleProtectedRoute>} />
               <Route path="/recruitment/sms-templates" element={<RoleProtectedRoute requireTeamlederOrAbove><SmsTemplates /></RoleProtectedRoute>} />
               <Route path="/recruitment/email-templates" element={<RoleProtectedRoute requireTeamlederOrAbove><EmailTemplatesPage /></RoleProtectedRoute>} />
+              <Route path="/recruitment/winback" element={<RoleProtectedRoute requireTeamlederOrAbove><Winback /></RoleProtectedRoute>} />
+              <Route path="/recruitment/upcoming-interviews" element={<RoleProtectedRoute requireTeamlederOrAbove><UpcomingInterviews /></RoleProtectedRoute>} />
+              <Route path="/recruitment/upcoming-hires" element={<RoleProtectedRoute requireTeamlederOrAbove><UpcomingHires /></RoleProtectedRoute>} />
               {/* Admin route - owner only */}
               <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
               <Route path="*" element={<NotFound />} />

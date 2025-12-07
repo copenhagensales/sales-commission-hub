@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, Plus, UserPlus } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, Plus, UserPlus, RefreshCcw, CalendarClock, UserCog } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,6 +63,9 @@ const rekrutteringNavigation = [
 const recruitmentNavigation = [
   { name: "Dashboard", href: "/recruitment", icon: LayoutDashboard },
   { name: "Kandidater", href: "/recruitment/candidates", icon: Users },
+  { name: "Kommende samtaler", href: "/recruitment/upcoming-interviews", icon: CalendarClock },
+  { name: "Winback", href: "/recruitment/winback", icon: RefreshCcw },
+  { name: "Ansættelser", href: "/recruitment/upcoming-hires", icon: UserCog },
   { name: "Beskeder", href: "/recruitment/messages", icon: FileText },
   { name: "SMS-skabeloner", href: "/recruitment/sms-templates", icon: FileText },
   { name: "Email-skabeloner", href: "/recruitment/email-templates", icon: FileText },
