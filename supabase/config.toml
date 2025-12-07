@@ -59,3 +59,12 @@ verify_jwt = false
 
 [functions.update-cron-schedule]
 verify_jwt = true
+
+[functions.send-recruitment-sms]
+verify_jwt = true
+
+[functions.send-recruitment-email]
+verify_jwt = true
+
+[functions.twilio-webhook]
+verify_jwt = false
