@@ -3,6 +3,9 @@ project_id = "jwlimmeijpfmaksvmuru"
 [functions.sync-adversus]
 verify_jwt = false
 
+[functions.adversus-sync-v2]
+verify_jwt = false
+
 [functions.adversus-webhook]
 verify_jwt = false
 
