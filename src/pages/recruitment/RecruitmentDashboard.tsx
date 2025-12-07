@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { 
   Users, 
   UserPlus, 
@@ -77,6 +78,7 @@ export default function RecruitmentDashboard() {
   }).length;
 
   return (
+    <MainLayout>
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Rekruttering Dashboard</h1>
@@ -234,5 +236,6 @@ export default function RecruitmentDashboard() {
         </CardContent>
       </Card>
     </div>
+    </MainLayout>
   );
 }

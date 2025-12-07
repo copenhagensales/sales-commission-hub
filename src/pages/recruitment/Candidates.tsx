@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { Search, Plus, Users, UserCheck, Calendar, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { CandidateCard } from "@/components/recruitment/CandidateCard";
@@ -71,6 +72,7 @@ export default function Candidates() {
   }, {} as Record<CandidateStatus, number>);
 
   return (
+    <MainLayout>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -176,5 +178,6 @@ export default function Candidates() {
         onOpenChange={setIsNewDialogOpen}
       />
     </div>
+    </MainLayout>
   );
 }

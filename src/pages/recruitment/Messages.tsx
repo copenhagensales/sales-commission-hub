@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { 
   MessageSquare, 
   Phone, 
@@ -105,6 +106,7 @@ export default function Messages() {
   const unreadCount = messages.filter((m) => !m.read).length;
 
   return (
+    <MainLayout>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -245,5 +247,6 @@ export default function Messages() {
         </TabsContent>
       </Tabs>
     </div>
+    </MainLayout>
   );
 }
