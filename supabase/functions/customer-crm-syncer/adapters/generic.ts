@@ -1,6 +1,58 @@
 import { CrmAdapter, SaleToValidate, SaleUpdate, CrmConfig, CrmCredentials } from "../types.ts";
 
 export class GenericApiAdapter implements CrmAdapter {
+  // Método para probar conexión si no hay ventas
+  async testConnection(credentials: CrmCredentials, config: CrmConfig): Promise<boolean> {
+    if (!config.base_url) {
+      throw new Error("GenericAPI: Falta config.base_url (API URL)")
+    }
+    
+    console.log("[GenericAPI] Probando configuración:", { 
+      url: config.base_url,
+      hasApiKey: !!credentials.api_key,
+      hasToken: !!credentials.access_token
+    })
+    
+    const apiKey = credentials.api_key || credentials.access_token
+    if (!apiKey) {
+      throw new Error("GenericAPI: Credenciales vacías")
+    }
+    
+    // Intentar una petición simple para verificar conectividad
+    try {
+      const authHeader = config.auth_header || 'Authorization'
+      const authPrefix = config.auth_prefix || 'Bearer'
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        [authHeader]: `${authPrefix} ${apiKey}`
+      }
+      
+      const response = await fetch(config.base_url, {
+        method: 'GET',
+        headers
+      })
+      
+      console.log(`[GenericAPI] Test connection response: ${response.status}`)
+      
+      if (response.status >= 200 && response.status < 300) {
+        return true
+      } else if (response.status === 401 || response.status === 403) {
+        throw new Error(`Credenciales inválidas (HTTP ${response.status})`)
+      } else if (response.status === 404) {
+        console.log("[GenericAPI] Endpoint no encontrado, pero conexión OK")
+        return true
+      } else {
+        throw new Error(`Error de conexión (HTTP ${response.status})`)
+      }
+    } catch (error: any) {
+      if (error.message.includes('Credenciales') || error.message.includes('HTTP')) {
+        throw error
+      }
+      throw new Error(`No se pudo conectar: ${error.message}`)
+    }
+  }
+
   async validateSales(sales: SaleToValidate[], credentials: CrmCredentials, config: CrmConfig): Promise<SaleUpdate[]> {
     const results: SaleUpdate[] = [];
     const apiKey = credentials.api_key;
