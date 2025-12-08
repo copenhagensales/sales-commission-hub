@@ -10,11 +10,12 @@ export function useIsSomeEmployee() {
     queryFn: async () => {
       if (!user?.email) return false;
 
+      // Query with proper filter - check both private and work email
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("job_title")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
         .eq("is_active", true)
+        .or(`private_email.eq."${user.email}",work_email.eq."${user.email}"`)
         .maybeSingle();
 
       if (error) {
@@ -22,6 +23,8 @@ export function useIsSomeEmployee() {
         return false;
       }
 
+      console.log("useSomeEmployee result:", { email: user.email, job_title: data?.job_title, isSome: data?.job_title === "SOME" });
+      
       return data?.job_title === "SOME";
     },
     enabled: !!user?.email,
