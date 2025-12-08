@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings as SettingsIcon, RefreshCw, Send, Database, Download, Upload, Key, CheckCircle2, Plus, Pencil, Trash2, Clock, Save, X, ChevronDown, ChevronUp, History, Eye } from "lucide-react";
 import { CustomerIntegrations } from "@/components/settings/CustomerIntegrations";
-import { DialerIntegrationsCard } from "@/components/settings/DialerIntegrationsCard";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -545,9 +544,6 @@ export default function Settings() {
           <h1 className="text-3xl font-bold">Indstillinger</h1>
           <p className="text-muted-foreground">API-integrationer og Adversus sync</p>
         </div>
-
-        {/* Dialer Integrations (Multi-tenant Adversus/Enreach) */}
-        <DialerIntegrationsCard />
 
         {/* API Integrations Section */}
         <Card>
