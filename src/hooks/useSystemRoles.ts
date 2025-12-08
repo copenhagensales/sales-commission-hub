@@ -145,7 +145,7 @@ export function useAssignRole() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-system-roles"] });
       queryClient.invalidateQueries({ queryKey: ["users-with-roles"] });
-      queryClient.invalidateQueries({ queryKey: ["system-role"] });
+      queryClient.invalidateQueries({ queryKey: ["system-roles"] });
     },
   });
 }
@@ -165,7 +165,7 @@ export function useRemoveRole() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-system-roles"] });
       queryClient.invalidateQueries({ queryKey: ["users-with-roles"] });
-      queryClient.invalidateQueries({ queryKey: ["system-role"] });
+      queryClient.invalidateQueries({ queryKey: ["system-roles"] });
     },
   });
 }
