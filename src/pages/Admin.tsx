@@ -92,17 +92,19 @@ const menuItems = [
 ];
 
 // Employee type definitions
-type EmployeeType = "salgskonsulent" | "fieldmarketing";
+type EmployeeType = "salgskonsulent" | "fieldmarketing" | "some";
 
 const employeeTypeLabels: Record<EmployeeType, { label: string, color: string }> = {
   salgskonsulent: { label: "Salgskonsulent", color: "text-blue-500" },
   fieldmarketing: { label: "Fieldmarketing", color: "text-emerald-500" },
+  some: { label: "SOME", color: "text-pink-500" },
 };
 
 // Default job type permissions (within medarbejder role)
 const defaultJobTypePermissions: Record<EmployeeType, string[]> = {
   salgskonsulent: ["my-profile", "my-schedule", "my-contracts", "career-wishes", "pulse-survey", "code-of-conduct"],
   fieldmarketing: ["my-profile", "my-schedule", "my-contracts", "career-wishes", "car-quiz", "fieldmarketing"],
+  some: ["my-profile", "my-schedule", "my-contracts", "career-wishes", "some"],
 };
 
 // Default role permissions matrix (used as fallback if no DB config)
@@ -169,10 +171,12 @@ export default function Admin() {
   const [editedJobTypePermissions, setEditedJobTypePermissions] = useState<Record<EmployeeType, string[]>>({
     salgskonsulent: [...defaultJobTypePermissions.salgskonsulent],
     fieldmarketing: [...defaultJobTypePermissions.fieldmarketing],
+    some: [...defaultJobTypePermissions.some],
   });
   const [landingPages, setLandingPages] = useState<Record<string, string>>({
     salgskonsulent: "/my-profile",
     fieldmarketing: "/vagt-flow/min-uge",
+    some: "/some",
     rekruttering: "/recruitment",
     teamleder: "/shift-planning/overview",
     ejer: "/employees",
@@ -222,6 +226,7 @@ export default function Admin() {
     setEditedJobTypePermissions({
       salgskonsulent: [...defaultJobTypePermissions.salgskonsulent],
       fieldmarketing: [...defaultJobTypePermissions.fieldmarketing],
+      some: [...defaultJobTypePermissions.some],
     });
     setHasChanges(false);
     toast.info("Rettigheder nulstillet til standard");
