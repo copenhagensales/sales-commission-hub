@@ -362,16 +362,22 @@ export default function Admin() {
   // Add individual permission mutation
   const addIndividualPermission = useMutation({
     mutationFn: async ({ userId, menuItemId }: { userId: string; menuItemId: string }) => {
-      const { error } = await supabase
+      console.log("Adding permission:", { userId, menuItemId });
+      const { data, error } = await supabase
         .from("user_menu_permissions")
-        .insert({ user_id: userId, menu_item_id: menuItemId });
+        .insert({ user_id: userId, menu_item_id: menuItemId, permission_type: 'grant' })
+        .select();
+      console.log("Insert result:", { data, error });
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Permission added successfully:", data);
       queryClient.invalidateQueries({ queryKey: ["user-menu-permissions"] });
       toast.success("Rettighed tilføjet");
     },
     onError: (error: Error) => {
+      console.error("Failed to add permission:", error);
       toast.error("Kunne ikke tilføje rettighed: " + error.message);
     },
   });
