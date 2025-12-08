@@ -287,17 +287,6 @@ export function AppSidebar() {
     navigate("/auth");
   };
 
-  // Debug logging for SOME navigation
-  console.log("AppSidebar debug:", { 
-    isOwner, 
-    isTeamleder, 
-    isRekruttering, 
-    isSome, 
-    isSomeEmployee, 
-    role,
-    userEmail: user?.email 
-  });
-
   // Select navigation based on role and job type, filter out denied items
   const baseNavigation = isOwner 
     ? [...ownerNavigation, ...teamlederExtraNavigation]
