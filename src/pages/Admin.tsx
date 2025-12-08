@@ -382,7 +382,7 @@ export default function Admin() {
     },
   });
 
-  // Remove individual permission mutation
+  // Remove individual permission mutation (deletes grant permission)
   const removeIndividualPermission = useMutation({
     mutationFn: async ({ userId, menuItemId }: { userId: string; menuItemId: string }) => {
       const { error } = await supabase
@@ -398,6 +398,50 @@ export default function Admin() {
     },
     onError: (error: Error) => {
       toast.error("Kunne ikke fjerne rettighed: " + error.message);
+    },
+  });
+
+  // Add deny permission mutation (explicitly removes role-based access)
+  const addDenyPermission = useMutation({
+    mutationFn: async ({ userId, menuItemId }: { userId: string; menuItemId: string }) => {
+      console.log("Adding deny permission:", { userId, menuItemId });
+      // Upsert to handle if there's already a grant record
+      const { data, error } = await supabase
+        .from("user_menu_permissions")
+        .upsert({ user_id: userId, menu_item_id: menuItemId, permission_type: 'deny' }, 
+          { onConflict: 'user_id,menu_item_id' })
+        .select();
+      console.log("Deny result:", { data, error });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-menu-permissions"] });
+      toast.success("Adgang fjernet");
+    },
+    onError: (error: Error) => {
+      console.error("Failed to add deny permission:", error);
+      toast.error("Kunne ikke fjerne adgang: " + error.message);
+    },
+  });
+
+  // Remove deny permission mutation (restores role-based access)
+  const removeDenyPermission = useMutation({
+    mutationFn: async ({ userId, menuItemId }: { userId: string; menuItemId: string }) => {
+      const { error } = await supabase
+        .from("user_menu_permissions")
+        .delete()
+        .eq("user_id", userId)
+        .eq("menu_item_id", menuItemId)
+        .eq("permission_type", "deny");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-menu-permissions"] });
+      toast.success("Adgang genoprettet");
+    },
+    onError: (error: Error) => {
+      toast.error("Kunne ikke genoprette adgang: " + error.message);
     },
   });
 
@@ -1410,7 +1454,7 @@ export default function Admin() {
             <DialogDescription>
               Roller: {getRoleBadges(selectedUserForPermissions?.roles || [])}
               <br />
-              Tilføj ekstra menupunkter som denne bruger skal have adgang til ud over sine roller.
+              Tilføj eller fjern menupunkter for denne bruger. Ændringer overtrumfer rolle-standarder.
             </DialogDescription>
           </DialogHeader>
           
@@ -1420,8 +1464,11 @@ export default function Admin() {
                 const userRoles = selectedUserForPermissions?.roles || ["medarbejder"];
                 // Combine menu items from all user roles
                 const roleMenus = userRoles.flatMap(role => editedPermissions[role] || []);
-                const userExtras = individualPermissions?.filter(
-                  p => p.user_id === selectedUserForPermissions?.auth_user_id
+                const userGrants = individualPermissions?.filter(
+                  p => p.user_id === selectedUserForPermissions?.auth_user_id && p.permission_type === 'grant'
+                ).map(p => p.menu_item_id) || [];
+                const userDenies = individualPermissions?.filter(
+                  p => p.user_id === selectedUserForPermissions?.auth_user_id && p.permission_type === 'deny'
                 ).map(p => p.menu_item_id) || [];
                 
                 return (
@@ -1432,44 +1479,62 @@ export default function Admin() {
                     <div className="grid grid-cols-2 gap-2">
                       {items.map((item) => {
                         const isInRole = roleMenus.includes(item.id);
-                        const isExtraPermission = userExtras.includes(item.id);
+                        const isExtraGrant = userGrants.includes(item.id);
+                        const isDenied = userDenies.includes(item.id);
+                        // Actual access: has role access OR has grant, AND not denied
+                        const hasAccess = (isInRole || isExtraGrant) && !isDenied;
                         
                         return (
                           <div 
                             key={item.id} 
                             className={`flex items-center justify-between p-2 rounded-lg border ${
+                              isDenied ? "bg-red-500/10 border-red-500/30" :
                               isInRole ? "bg-muted/50 border-muted" : 
-                              isExtraPermission ? "bg-blue-500/10 border-blue-500/30" : 
+                              isExtraGrant ? "bg-blue-500/10 border-blue-500/30" : 
                               "border-border"
                             }`}
                           >
                             <div className="flex items-center gap-2">
                               <span className="text-sm">{item.name}</span>
-                              {isInRole && (
+                              {isInRole && !isDenied && (
                                 <Badge variant="secondary" className="text-xs">
                                   Fra rolle
                                 </Badge>
                               )}
-                              {isExtraPermission && (
+                              {isExtraGrant && !isDenied && (
                                 <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30 text-xs">
                                   Tilføjet
                                 </Badge>
                               )}
+                              {isDenied && (
+                                <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/30 text-xs">
+                                  Fjernet
+                                </Badge>
+                              )}
                             </div>
-                            {!isInRole && selectedUserForPermissions?.auth_user_id && (
+                            {selectedUserForPermissions?.auth_user_id && (
                               <Switch
-                                checked={isExtraPermission}
+                                checked={hasAccess}
                                 onCheckedChange={(checked) => {
+                                  const userId = selectedUserForPermissions.auth_user_id!;
                                   if (checked) {
-                                    addIndividualPermission.mutate({
-                                      userId: selectedUserForPermissions.auth_user_id!,
-                                      menuItemId: item.id,
-                                    });
+                                    // Turning ON
+                                    if (isDenied) {
+                                      // Remove deny to restore role access
+                                      removeDenyPermission.mutate({ userId, menuItemId: item.id });
+                                    } else if (!isInRole) {
+                                      // Add grant for non-role items
+                                      addIndividualPermission.mutate({ userId, menuItemId: item.id });
+                                    }
                                   } else {
-                                    removeIndividualPermission.mutate({
-                                      userId: selectedUserForPermissions.auth_user_id!,
-                                      menuItemId: item.id,
-                                    });
+                                    // Turning OFF
+                                    if (isInRole) {
+                                      // Add deny to override role access
+                                      addDenyPermission.mutate({ userId, menuItemId: item.id });
+                                    } else if (isExtraGrant) {
+                                      // Remove grant
+                                      removeIndividualPermission.mutate({ userId, menuItemId: item.id });
+                                    }
                                   }
                                 }}
                               />
