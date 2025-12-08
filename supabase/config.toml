@@ -77,12 +77,3 @@ verify_jwt = false
 
 [functions.delete-auth-user]
 verify_jwt = false
-
-[functions.integration-engine]
-verify_jwt = false
-
-[functions.scheduler-manager]
-verify_jwt = true
-
-[functions.customer-crm-syncer]
-verify_jwt = false

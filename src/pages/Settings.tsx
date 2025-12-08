@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings as SettingsIcon, RefreshCw, Send, Database, Download, Upload, Key, CheckCircle2, Plus, Pencil, Trash2, Clock, Save, X, ChevronDown, ChevronUp, History, Eye } from "lucide-react";
-import { CustomerIntegrations } from "@/components/settings/CustomerIntegrations";
-import { DialerIntegrations } from "@/components/settings/DialerIntegrations";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -1187,12 +1185,6 @@ export default function Settings() {
             </Card>
           </CardContent>
         </Card>
-
-        {/* Dialer Multi-Account Integrations */}
-        <DialerIntegrations />
-
-        {/* Customer CRM Integrations */}
-        <CustomerIntegrations />
 
         {results && (
           <Card>

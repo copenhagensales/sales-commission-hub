@@ -1207,59 +1207,6 @@ export type Database = {
           },
         ]
       }
-      customer_integrations: {
-        Row: {
-          api_url: string | null
-          client_id: string
-          config: Json | null
-          created_at: string | null
-          crm_type: Database["public"]["Enums"]["crm_type"]
-          cron_schedule: string | null
-          encrypted_credentials: string
-          id: string
-          is_active: boolean | null
-          last_run_at: string | null
-          last_status: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          api_url?: string | null
-          client_id: string
-          config?: Json | null
-          created_at?: string | null
-          crm_type: Database["public"]["Enums"]["crm_type"]
-          cron_schedule?: string | null
-          encrypted_credentials: string
-          id?: string
-          is_active?: boolean | null
-          last_run_at?: string | null
-          last_status?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          api_url?: string | null
-          client_id?: string
-          config?: Json | null
-          created_at?: string | null
-          crm_type?: Database["public"]["Enums"]["crm_type"]
-          cron_schedule?: string | null
-          encrypted_credentials?: string
-          id?: string
-          is_active?: boolean | null
-          last_run_at?: string | null
-          last_status?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customer_integrations_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: true
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       danish_holiday: {
         Row: {
           date: string
@@ -2511,7 +2458,6 @@ export type Database = {
           customer_phone: string | null
           id: string
           sale_datetime: string
-          status: string | null
           updated_at: string | null
         }
         Insert: {
@@ -2526,7 +2472,6 @@ export type Database = {
           customer_phone?: string | null
           id?: string
           sale_datetime?: string
-          status?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -2541,7 +2486,6 @@ export type Database = {
           customer_phone?: string | null
           id?: string
           sale_datetime?: string
-          status?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -3376,16 +3320,6 @@ export type Database = {
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_auth_user_id_by_email: { Args: { _email: string }; Returns: string }
       get_current_employee_id: { Args: never; Returns: string }
-      get_decrypted_integration: {
-        Args: { p_client_id: string; p_encryption_key: string }
-        Returns: {
-          api_url: string
-          config: Json
-          credentials: Json
-          crm_type: Database["public"]["Enums"]["crm_type"]
-          id: string
-        }[]
-      }
       get_employee_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_employee_roles_for_admin: {
         Args: never
@@ -3438,30 +3372,6 @@ export type Database = {
       is_teamleder_or_above: { Args: { _user_id: string }; Returns: boolean }
       is_vagt_admin_or_planner: { Args: { _user_id: string }; Returns: boolean }
       remove_role_by_email: { Args: { _email: string }; Returns: undefined }
-      save_integration_secret: {
-        Args: {
-          p_api_url: string
-          p_client_id: string
-          p_crm_type: Database["public"]["Enums"]["crm_type"]
-          p_encryption_key: string
-          p_secret_json: Json
-        }
-        Returns: string
-      }
-      schedule_integration_sync: {
-        Args: {
-          p_anon_key: string
-          p_client_id: string
-          p_function_url: string
-          p_job_name: string
-          p_schedule: string
-        }
-        Returns: number
-      }
-      unschedule_integration_sync: {
-        Args: { p_job_name: string }
-        Returns: boolean
-      }
     }
     Enums: {
       absence_request_status: "pending" | "approved" | "rejected"
@@ -3494,7 +3404,6 @@ export type Database = {
         | "company_car"
         | "termination"
         | "other"
-      crm_type: "hubspot" | "salesforce" | "pipedrive" | "generic_api" | "excel"
       employment_type: "hourly" | "monthly"
       leadership_interest: "yes" | "maybe" | "no"
       leadership_role_type: "junior_teamleder" | "teamleder" | "coach" | "other"
@@ -3678,7 +3587,6 @@ export const Constants = {
         "termination",
         "other",
       ],
-      crm_type: ["hubspot", "salesforce", "pipedrive", "generic_api", "excel"],
       employment_type: ["hourly", "monthly"],
       leadership_interest: ["yes", "maybe", "no"],
       leadership_role_type: ["junior_teamleder", "teamleder", "coach", "other"],

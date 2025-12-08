@@ -3,8 +3,6 @@ export interface StandardSale {
   sourceSystem: "adversus" | "enreach" | "other";
   saleDate: string;
   agentEmail: string;
-  agentExternalId?: string;
-  agentName?: string;
   customerName?: string;
   customerPhone?: string;
   products: StandardProduct[];
@@ -35,7 +33,6 @@ export interface StandardCampaign {
 export interface StandardProduct {
   name: string;
   externalId: string;
-  quantity: number;
-  unitPrice: number;
-  metadata?: Record<string, any>;
+  quantity?: number; // Opcional aquí porque es catálogo, no venta
+  unitPrice?: number; // Opcional
 }

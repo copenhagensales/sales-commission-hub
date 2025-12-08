@@ -5,12 +5,11 @@ export class AdversusAdapter implements DialerAdapter {
   private authHeader: string;
   private baseUrl = "https://api.adversus.io/v1";
 
-  // Recibe credenciales desde la DB en lugar de env vars
-  constructor(credentials: { username?: string; password?: string }) {
-    if (!credentials.username || !credentials.password) {
-      throw new Error("Credenciales de Adversus incompletas en la configuración");
-    }
-    this.authHeader = btoa(`${credentials.username}:${credentials.password}`);
+  constructor() {
+    const user = Deno.env.get("ADVERSUS_API_USERNAME");
+    const pass = Deno.env.get("ADVERSUS_API_PASSWORD");
+    if (!user || !pass) throw new Error("Credenciales Adversus faltantes");
+    this.authHeader = btoa(`${user}:${pass}`);
   }
 
   private async get(endpoint: string) {
