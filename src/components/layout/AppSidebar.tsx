@@ -165,15 +165,21 @@ export function AppSidebar() {
   });
 
   // Fetch granted menu items for this user (for opt-in features like time-stamp)
-  const { data: grantedMenuItems = [] } = useQuery({
+  const { data: grantedMenuItems = [], error: grantedError } = useQuery({
     queryKey: ["user-granted-permissions", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data } = await supabase
+      console.log("Fetching granted permissions for user:", user.id);
+      const { data, error } = await supabase
         .from("user_menu_permissions")
         .select("menu_item_id")
         .eq("user_id", user.id)
         .eq("permission_type", "grant");
+      console.log("Granted permissions result:", { data, error });
+      if (error) {
+        console.error("Error fetching granted permissions:", error);
+        return [];
+      }
       return data?.map(p => p.menu_item_id) || [];
     },
     enabled: !!user?.id,
