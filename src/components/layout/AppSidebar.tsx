@@ -164,23 +164,19 @@ export function AppSidebar() {
     staleTime: 60000,
   });
 
-  // Fetch granted menu items for this user (for opt-in features like time-stamp)
-  const { data: grantedMenuItems = [], error: grantedError } = useQuery({
+  // Fetch granted menu items for this user using security definer function
+  const { data: grantedMenuItems = [] } = useQuery({
     queryKey: ["user-granted-permissions", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      console.log("Fetching granted permissions for user:", user.id);
-      const { data, error } = await supabase
-        .from("user_menu_permissions")
-        .select("menu_item_id")
-        .eq("user_id", user.id)
-        .eq("permission_type", "grant");
-      console.log("Granted permissions result:", { data, error });
+      const { data, error } = await supabase.rpc('get_user_granted_permissions', {
+        _user_id: user.id
+      });
       if (error) {
         console.error("Error fetching granted permissions:", error);
         return [];
       }
-      return data?.map(p => p.menu_item_id) || [];
+      return data || [];
     },
     enabled: !!user?.id,
     staleTime: 60000,
@@ -293,9 +289,6 @@ export function AppSidebar() {
 
   // Check if user has SOME access via individual permission
   const hasSomeAccess = isMenuItemGranted("some");
-  
-  // Debug logging
-  console.log("AppSidebar - grantedMenuItems:", grantedMenuItems, "hasSomeAccess:", hasSomeAccess, "user:", user?.id);
   
   // Select navigation based on role and job type, filter out denied items
   const baseNavigation = isOwner 
