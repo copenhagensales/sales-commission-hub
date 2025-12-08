@@ -978,6 +978,12 @@ export default function Admin() {
                           </div>
                         </TableHead>
                         <TableHead className="text-center">
+                          <div className="flex items-center justify-center gap-1 text-pink-500">
+                            <span className="w-2 h-2 rounded-full bg-pink-500" />
+                            SOME
+                          </div>
+                        </TableHead>
+                        <TableHead className="text-center">
                           <div className="flex items-center justify-center gap-1 text-purple-500">
                             <Users className="h-4 w-4" />
                             Rekruttering
@@ -1001,7 +1007,7 @@ export default function Admin() {
                       {Object.entries(menuByCategory).map(([category, items]) => (
                         <>
                           <TableRow key={category} className="bg-muted/50">
-                            <TableCell colSpan={6} className="font-semibold text-sm uppercase tracking-wide">
+                            <TableCell colSpan={7} className="font-semibold text-sm uppercase tracking-wide">
                               {category}
                             </TableCell>
                           </TableRow>
@@ -1024,6 +1030,16 @@ export default function Admin() {
                                   <Switch
                                     checked={editedJobTypePermissions.fieldmarketing?.includes(item.id) || false}
                                     onCheckedChange={() => toggleJobTypeMenuAccess("fieldmarketing", item.id)}
+                                    className="cursor-pointer"
+                                  />
+                                </div>
+                              </TableCell>
+                              {/* SOME */}
+                              <TableCell className="text-center">
+                                <div className="flex justify-center">
+                                  <Switch
+                                    checked={editedJobTypePermissions.some?.includes(item.id) || false}
+                                    onCheckedChange={() => toggleJobTypeMenuAccess("some", item.id)}
                                     className="cursor-pointer"
                                   />
                                 </div>
@@ -1169,6 +1185,7 @@ export default function Admin() {
                   {[
                     { key: "salgskonsulent", label: "Salgskonsulent", color: "bg-blue-500" },
                     { key: "fieldmarketing", label: "Fieldmarketing", color: "bg-emerald-500" },
+                    { key: "some", label: "SOME", color: "bg-pink-500" },
                     { key: "rekruttering", label: "Rekruttering", color: "bg-purple-500" },
                     { key: "teamleder", label: "Teamleder", color: "bg-blue-500" },
                     { key: "ejer", label: "Ejer", color: "bg-amber-500" },
