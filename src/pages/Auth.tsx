@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, Wifi, WifiOff, RefreshCw, ArrowLeft } from "lucide-react";
+import { Mail, Lock, Wifi, WifiOff, RefreshCw, ArrowLeft, AlertTriangle } from "lucide-react";
 import cphSalesLogo from "@/assets/cph-sales-logo-dark.png";
 
 export default function Auth() {
@@ -14,6 +14,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [isNewPasswordMode, setIsNewPasswordMode] = useState(false);
+  const [expiredLinkError, setExpiredLinkError] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const { toast } = useToast();
 
@@ -34,11 +35,24 @@ export default function Auth() {
   useEffect(() => {
     testConnection();
 
+    // Check URL for error parameters (expired/invalid token)
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const errorDescription = hashParams.get('error_description');
+    const error = hashParams.get('error');
+    
+    if (error || errorDescription) {
+      setExpiredLinkError(true);
+      setIsResetMode(true);
+      // Clear the hash to clean up URL
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+
     // Listen for password recovery event
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         setIsNewPasswordMode(true);
         setIsResetMode(false);
+        setExpiredLinkError(false);
       }
     });
 
@@ -88,9 +102,10 @@ export default function Auth() {
         if (error) throw error;
         toast({
           title: "Email sendt",
-          description: "Tjek din indbakke for at nulstille din adgangskode.",
+          description: "Tjek din indbakke. Linket udløber efter 1 time og kan kun bruges én gang.",
         });
         setIsResetMode(false);
+        setExpiredLinkError(false);
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -193,6 +208,22 @@ export default function Auth() {
             <div className="flex items-center gap-2 text-muted-foreground">
               <RefreshCw className="h-4 w-4 animate-spin" />
               <span className="text-sm">Tjekker forbindelse...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Expired link warning */}
+        {expiredLinkError && (
+          <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+              <div>
+                <p className="font-medium text-amber-700">Linket er udløbet eller allerede brugt</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Password-links kan kun bruges én gang og udløber efter 1 time. 
+                  Indtast din email nedenfor for at få et nyt link.
+                </p>
+              </div>
             </div>
           </div>
         )}
