@@ -129,9 +129,6 @@ export function AppSidebar() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isTeamlederOrAbove, isOwner, isRekruttering, isRekrutteringOrAbove, isTeamleder, isSome, isLoading, role } = useCanAccess();
-  
-  // Debug: log role info
-  console.log("AppSidebar role info:", { role, isRekruttering, isOwner, isLoading });
   const { user } = useAuth();
   const { showMenuItem: showPulseSurvey, showBadge: showPulseBadge } = useShouldShowPulseSurvey();
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();

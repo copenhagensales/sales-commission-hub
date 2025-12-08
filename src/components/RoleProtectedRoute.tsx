@@ -4,17 +4,19 @@ import { useCanAccess } from "@/hooks/useSystemRoles";
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: "teamleder" | "ejer";
+  requiredRole?: "teamleder" | "ejer" | "rekruttering";
   requireTeamlederOrAbove?: boolean;
+  requireRekrutteringOrAbove?: boolean;
 }
 
 export function RoleProtectedRoute({ 
   children, 
   requiredRole,
-  requireTeamlederOrAbove = false 
+  requireTeamlederOrAbove = false,
+  requireRekrutteringOrAbove = false,
 }: RoleProtectedRouteProps) {
   const { user, loading: authLoading } = useAuth();
-  const { isLoading: roleLoading, role, isTeamlederOrAbove, isOwner } = useCanAccess();
+  const { isLoading: roleLoading, role, isTeamlederOrAbove, isOwner, isRekruttering, isRekrutteringOrAbove } = useCanAccess();
   
   // Wait for both auth and role to fully load
   const isLoading = authLoading || roleLoading;
@@ -36,7 +38,16 @@ export function RoleProtectedRoute({
     return <Navigate to="/my-schedule" replace />;
   }
 
-  if (requireTeamlederOrAbove && !isTeamlederOrAbove) {
+  if (requiredRole === "rekruttering" && !isRekruttering && !isOwner) {
+    return <Navigate to="/my-schedule" replace />;
+  }
+
+  // requireTeamlederOrAbove now also allows rekruttering for recruitment pages
+  if (requireTeamlederOrAbove && !isTeamlederOrAbove && !isRekruttering) {
+    return <Navigate to="/my-schedule" replace />;
+  }
+
+  if (requireRekrutteringOrAbove && !isRekrutteringOrAbove) {
     return <Navigate to="/my-schedule" replace />;
   }
 
