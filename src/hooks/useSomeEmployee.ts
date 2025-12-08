@@ -10,22 +10,27 @@ export function useIsSomeEmployee() {
     queryFn: async () => {
       if (!user?.email) return false;
 
-      // Query with proper filter - check both private and work email
-      const { data, error } = await supabase
+      // Try private_email first
+      const { data: privateData } = await supabase
         .from("employee_master_data")
         .select("job_title")
         .eq("is_active", true)
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .eq("private_email", user.email)
         .maybeSingle();
 
-      if (error) {
-        console.error("Error checking SOME status:", error);
-        return false;
-      }
+      if (privateData?.job_title === "SOME") return true;
 
-      return data?.job_title === "SOME";
+      // Try work_email
+      const { data: workData } = await supabase
+        .from("employee_master_data")
+        .select("job_title")
+        .eq("is_active", true)
+        .eq("work_email", user.email)
+        .maybeSingle();
+
+      return workData?.job_title === "SOME";
     },
     enabled: !!user?.email,
-    staleTime: 10000, // Reduced from 60s to 10s for faster updates
+    staleTime: 10000,
   });
 }
