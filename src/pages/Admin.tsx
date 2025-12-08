@@ -86,6 +86,7 @@ const menuItems = [
   { id: "career-wishes-overview", name: "Karriereønsker overblik", icon: "Sparkles", category: "Rapporter" },
   { id: "fieldmarketing", name: "Fieldmarketing", icon: "Calendar", category: "Fieldmarketing" },
   { id: "some", name: "SOME", icon: "Share2", category: "SOME" },
+  { id: "time-stamp", name: "Stempel", icon: "Clock", category: "Tidregistrering" },
   { id: "admin", name: "Administration", icon: "Shield", category: "System" },
   { id: "settings", name: "Indstillinger", icon: "Settings", category: "System" },
 ];
