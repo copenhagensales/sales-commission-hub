@@ -1281,6 +1281,51 @@ export type Database = {
         }
         Relationships: []
       }
+      dialer_integrations: {
+        Row: {
+          api_url: string | null
+          config: Json | null
+          created_at: string | null
+          encrypted_credentials: string
+          id: string
+          is_active: boolean | null
+          last_status: string | null
+          last_sync_at: string | null
+          name: string
+          provider: string
+          sync_frequency_minutes: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          api_url?: string | null
+          config?: Json | null
+          created_at?: string | null
+          encrypted_credentials: string
+          id?: string
+          is_active?: boolean | null
+          last_status?: string | null
+          last_sync_at?: string | null
+          name: string
+          provider: string
+          sync_frequency_minutes?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          api_url?: string | null
+          config?: Json | null
+          created_at?: string | null
+          encrypted_credentials?: string
+          id?: string
+          is_active?: boolean | null
+          last_status?: string | null
+          last_sync_at?: string | null
+          name?: string
+          provider?: string
+          sync_frequency_minutes?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       economic_events: {
         Row: {
           created_at: string
