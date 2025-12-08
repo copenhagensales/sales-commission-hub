@@ -48,8 +48,9 @@ export function useCurrentUserRoles() {
       }
     },
     enabled: !!user && !authLoading,
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-    gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
+    staleTime: 1000 * 30, // Cache for 30 seconds only
+    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
+    refetchOnWindowFocus: true, // Refetch when user returns to tab
     retry: 1,
   });
 }
