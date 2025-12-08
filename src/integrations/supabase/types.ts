@@ -3418,6 +3418,18 @@ export type Database = {
         Args: { contract_uuid: string }
         Returns: boolean
       }
+      create_customer_integration: {
+        Args: {
+          p_api_url: string
+          p_client_id: string
+          p_config: Json
+          p_credentials: string
+          p_crm_type: Database["public"]["Enums"]["crm_type"]
+          p_cron_schedule: string
+          p_encryption_key: string
+        }
+        Returns: string
+      }
       create_dialer_integration: {
         Args: {
           p_credentials: string
@@ -3430,6 +3442,23 @@ export type Database = {
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_auth_user_id_by_email: { Args: { _email: string }; Returns: string }
       get_current_employee_id: { Args: never; Returns: string }
+      get_customer_credentials: {
+        Args: { p_client_id: string; p_encryption_key: string }
+        Returns: Json
+      }
+      get_customer_integration_decrypted: {
+        Args: { p_client_id: string; p_encryption_key: string }
+        Returns: {
+          api_url: string
+          client_id: string
+          config: Json
+          credentials: Json
+          crm_type: Database["public"]["Enums"]["crm_type"]
+          cron_schedule: string
+          id: string
+          is_active: boolean
+        }[]
+      }
       get_decrypted_integration: {
         Args: { p_client_id: string; p_encryption_key: string }
         Returns: {
@@ -3519,6 +3548,14 @@ export type Database = {
       unschedule_integration_sync: {
         Args: { p_job_name: string }
         Returns: boolean
+      }
+      update_customer_credentials: {
+        Args: {
+          p_client_id: string
+          p_credentials: string
+          p_encryption_key: string
+        }
+        Returns: undefined
       }
       update_dialer_credentials: {
         Args: {
