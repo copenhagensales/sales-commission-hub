@@ -210,13 +210,18 @@ interface EditableSelectProps {
   options: { value: string; label: string }[];
   onSave: (field: string, value: string | null) => void;
   displayValue?: string | null;
+  allowClear?: boolean;
 }
 
-function EditableSelect({ label, value, field, options, onSave, displayValue }: EditableSelectProps) {
+function EditableSelect({ label, value, field, options, onSave, displayValue, allowClear = false }: EditableSelectProps) {
   const [isEditing, setIsEditing] = useState(false);
 
   const handleChange = (newValue: string) => {
-    onSave(field, newValue);
+    if (newValue === "__clear__") {
+      onSave(field, null);
+    } else {
+      onSave(field, newValue);
+    }
     setIsEditing(false);
   };
 
@@ -228,6 +233,9 @@ function EditableSelect({ label, value, field, options, onSave, displayValue }: 
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="z-50 bg-popover">
+            {allowClear && (
+              <SelectItem value="__clear__" className="text-muted-foreground italic">Fjern</SelectItem>
+            )}
             {options.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
             ))}
@@ -949,6 +957,7 @@ export default function EmployeeDetail() {
                           options={clients.map(c => ({ value: c.name, label: c.name }))}
                           onSave={handleSave}
                           displayValue={employee.department}
+                          allowClear
                         />
                       </div>
                       <div>
