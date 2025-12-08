@@ -285,6 +285,9 @@ export function AppSidebar() {
     navigate("/auth");
   };
 
+  // Check if user has SOME access via individual permission
+  const hasSomeAccess = isMenuItemGranted("some");
+  
   // Select navigation based on role and job type, filter out denied items
   const baseNavigation = isOwner 
     ? [...ownerNavigation, ...teamlederExtraNavigation]
@@ -320,6 +323,11 @@ export function AppSidebar() {
   // Add opt-in menu items if user has been granted access
   if (isMenuItemGranted("time-stamp")) {
     mainNavigation = [...mainNavigation, { name: "Stempelur", href: "/time-stamp", icon: Clock }];
+  }
+  
+  // Add SOME menu item if granted via individual permissions and not already in navigation
+  if (hasSomeAccess && !mainNavigation.some(item => item.href === "/some")) {
+    mainNavigation = [...mainNavigation, { name: "SOME", href: "/some", icon: Video }];
   }
   
   const currentShiftPlanningNav = isOwner ? shiftPlanningNavigation : employeeShiftPlanningNavigation;
