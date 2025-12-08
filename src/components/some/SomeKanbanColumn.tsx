@@ -10,6 +10,7 @@ interface SomeKanbanColumnProps {
   items: ContentItem[];
   onEdit: (item: ContentItem) => void;
   onDelete: (id: string) => void;
+  onStatusChange: (id: string, status: ContentStatus) => void;
 }
 
 const statusColors: Record<ContentStatus, string> = {
@@ -20,7 +21,7 @@ const statusColors: Record<ContentStatus, string> = {
   published: "border-t-green-500",
 };
 
-export function SomeKanbanColumn({ status, title, items, onEdit, onDelete }: SomeKanbanColumnProps) {
+export function SomeKanbanColumn({ status, title, items, onEdit, onDelete, onStatusChange }: SomeKanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
 
   return (
@@ -47,6 +48,7 @@ export function SomeKanbanColumn({ status, title, items, onEdit, onDelete }: Som
               item={item}
               onEdit={onEdit}
               onDelete={onDelete}
+              onStatusChange={onStatusChange}
             />
           ))}
         </div>
