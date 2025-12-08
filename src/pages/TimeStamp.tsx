@@ -95,18 +95,18 @@ export default function TimeStamp() {
 
   return (
     <MainLayout>
-      <div className="max-w-2xl mx-auto space-y-8 py-4">
+      <div className="max-w-lg mx-auto space-y-6 px-4 py-6 sm:py-4 sm:px-0">
         {/* Header */}
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Stempelur</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">Stempelur</h1>
           <p className="text-sm text-muted-foreground">
             {format(currentTime, "EEEE d. MMMM", { locale: da })}
           </p>
         </div>
 
         {/* Main Clock Display */}
-        <div className="text-center space-y-6">
-          <div className="text-7xl font-light font-mono tabular-nums tracking-tight">
+        <div className="text-center space-y-4 sm:space-y-6">
+          <div className="text-6xl sm:text-7xl font-light font-mono tabular-nums tracking-tight">
             {format(currentTime, "HH:mm")}
           </div>
           
@@ -141,7 +141,7 @@ export default function TimeStamp() {
 
         {/* Action Section */}
         <Card className="border-0 shadow-lg bg-card/50 backdrop-blur">
-          <CardContent className="p-6 space-y-4">
+          <CardContent className="p-4 sm:p-6 space-y-4">
             <Textarea
               placeholder="Tilføj en note (valgfrit)..."
               value={note}
@@ -153,22 +153,22 @@ export default function TimeStamp() {
             {!isClockedIn ? (
               <Button 
                 size="lg" 
-                className="w-full h-14 text-base font-medium bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20"
+                className="w-full h-16 sm:h-14 text-lg sm:text-base font-medium bg-green-600 hover:bg-green-700 active:bg-green-800 shadow-lg shadow-green-600/20 touch-manipulation"
                 onClick={handleClockIn}
                 disabled={clockIn.isPending}
               >
-                <Play className="w-5 h-5 mr-2" />
+                <Play className="w-6 h-6 sm:w-5 sm:h-5 mr-2" />
                 Start arbejdsdag
               </Button>
             ) : (
               <Button 
                 size="lg" 
                 variant="destructive"
-                className="w-full h-14 text-base font-medium shadow-lg shadow-destructive/20"
+                className="w-full h-16 sm:h-14 text-lg sm:text-base font-medium shadow-lg shadow-destructive/20 active:opacity-80 touch-manipulation"
                 onClick={handleClockOut}
                 disabled={clockOut.isPending}
               >
-                <Square className="w-5 h-5 mr-2" />
+                <Square className="w-6 h-6 sm:w-5 sm:h-5 mr-2" />
                 Afslut arbejdsdag
               </Button>
             )}
