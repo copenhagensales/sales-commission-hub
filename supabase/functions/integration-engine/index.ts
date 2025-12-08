@@ -1,57 +1,101 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { IngestionEngine } from "./core.ts";
 import { AdversusAdapter } from "./adapters/adversus.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { source, action, days = 1 } = await req.json();
+    const { source, action, actions, days = 1 } = await req.json();
+
+    // Inicializar Supabase para buscar configuraciones
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     const engine = new IngestionEngine();
-    
-    let adapter;
-    
-    switch (source) {
-      case 'adversus':
-        adapter = new AdversusAdapter();
-        break;
-      case 'enreach':
-        throw new Error("Enreach adapter coming soon");
-      default:
-        throw new Error(`Unknown source: ${source}`);
+
+    // Buscar todas las integraciones activas del tipo solicitado
+    const { data: integrations, error } = await supabase
+      .from("api_integrations")
+      .select("*")
+      .eq("type", source)
+      .eq("is_active", true);
+
+    if (error) throw error;
+    if (!integrations || integrations.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: `No hay integraciones activas para ${source}`,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    let result;
+    const results = [];
 
-    if (action === 'sync') {
-      const sales = await adapter.fetchSales(days);
-      const stats = await engine.processBatch(sales, source);
-      
-      result = {
-        success: true,
-        message: `${source} sync completed`,
-        details: {
-          fetched: sales.length,
-          ...stats
+    // Iterar sobre cada cuenta (Multi-tenancy)
+    for (const integration of integrations) {
+      console.log(`Procesando cuenta: ${integration.name}`);
+
+      let adapter;
+      try {
+        if (source === "adversus") {
+          adapter = new AdversusAdapter(integration.secrets);
+        } else {
+          throw new Error(`Fuente no soportada: ${source}`);
         }
-      };
-    } else {
-      throw new Error(`Unsupported action: ${action}`);
+
+        const runResults: Record<string, unknown> = {};
+
+        // Soportar tanto 'action' (legacy) como 'actions' (nuevo array)
+        const actionList = actions || (action === "sync" ? ["sales"] : [action]);
+
+        if (actionList.includes("campaigns")) {
+          const campaigns = await adapter.fetchCampaigns();
+          runResults["campaigns"] = await engine.processCampaigns(campaigns);
+        }
+
+        if (actionList.includes("users")) {
+          const users = await adapter.fetchUsers();
+          runResults["users"] = await engine.processUsers(users);
+        }
+
+        if (actionList.includes("sales") || action === "sync") {
+          const sales = await adapter.fetchSales(days);
+          runResults["sales"] = await engine.processSales(sales, integration.name);
+        }
+
+        // Actualizar timestamp de última sincronización
+        await supabase
+          .from("api_integrations")
+          .update({ last_sync_at: new Date().toISOString() })
+          .eq("id", integration.id);
+
+        results.push({ name: integration.name, status: "success", data: runResults });
+      } catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        console.error(`Error en integración ${integration.name}:`, e);
+        results.push({ name: integration.name, status: "error", error: errMsg });
+      }
     }
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    return new Response(JSON.stringify({ success: true, results }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
-  } catch (error: any) {
-    console.error('Integration engine error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error("Integration engine error:", error);
+    return new Response(JSON.stringify({ error: errMsg }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
