@@ -293,16 +293,44 @@ export function AppSidebar() {
   // Debug logging
   console.log("AppSidebar - grantedMenuItems:", grantedMenuItems, "hasSomeAccess:", hasSomeAccess, "user:", user?.id, "isRekruttering:", isRekruttering);
   
-  // Select navigation based on role and job type, filter out denied items
-  const baseNavigation = isOwner 
-    ? [...ownerNavigation, ...teamlederExtraNavigation]
-    : isTeamleder
-      ? [...teamlederNavigation, ...teamlederExtraNavigation, ...teamlederCodeOfConductNav] 
-        : isRekruttering 
-          ? rekrutteringNavigation
-          : (isSomeEmployee || isSome)
-            ? someEmployeeNavigation
-          : employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey);
+  // Build navigation based on ALL roles the user has (not just one)
+  const buildCombinedNavigation = () => {
+    const navItems: typeof ownerNavigation = [];
+    const seenHrefs = new Set<string>();
+
+    const addItems = (items: typeof ownerNavigation) => {
+      items.forEach(item => {
+        if (!seenHrefs.has(item.href)) {
+          seenHrefs.add(item.href);
+          navItems.push(item);
+        }
+      });
+    };
+
+    // Add items based on each role the user has
+    if (isOwner) {
+      addItems([...ownerNavigation, ...teamlederExtraNavigation]);
+    } else {
+      // Non-owner users get items based on their roles
+      if (isTeamleder) {
+        addItems([...teamlederNavigation, ...teamlederExtraNavigation, ...teamlederCodeOfConductNav]);
+      }
+      if (isRekruttering) {
+        addItems(rekrutteringNavigation);
+      }
+      if (isSomeEmployee || isSome) {
+        addItems(someEmployeeNavigation);
+      }
+      // If user has no special roles, give employee navigation
+      if (!isTeamleder && !isRekruttering && !(isSomeEmployee || isSome)) {
+        addItems(employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey));
+      }
+    }
+
+    return navItems;
+  };
+
+  const baseNavigation = buildCombinedNavigation();
   
   // Filter out denied menu items based on href to menu_item_id mapping
   const hrefToMenuId: Record<string, string> = {

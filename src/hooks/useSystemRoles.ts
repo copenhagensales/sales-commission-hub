@@ -13,7 +13,7 @@ export interface SystemRoleRecord {
   updated_at: string | null;
 }
 
-export function useCurrentUserRole() {
+export function useCurrentUserRoles() {
   const { user, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const previousUserId = useRef<string | undefined>();
@@ -21,31 +21,30 @@ export function useCurrentUserRole() {
   // Clear role cache only when user actually changes (not on every render)
   useEffect(() => {
     if (previousUserId.current && previousUserId.current !== user?.id) {
-      queryClient.removeQueries({ queryKey: ["system-role"] });
+      queryClient.removeQueries({ queryKey: ["system-roles"] });
     }
     previousUserId.current = user?.id;
   }, [user?.id, queryClient]);
 
   return useQuery({
-    queryKey: ["system-role", user?.id],
+    queryKey: ["system-roles", user?.id],
     queryFn: async () => {
-      if (!user) return null;
+      if (!user) return [];
 
       try {
         const { data, error } = await supabase
           .from("system_roles")
           .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
+          .eq("user_id", user.id);
 
         if (error) {
-          console.error("Error fetching system role:", error);
-          return null;
+          console.error("Error fetching system roles:", error);
+          return [];
         }
-        return data as SystemRoleRecord | null;
+        return (data as SystemRoleRecord[]) || [];
       } catch (error) {
-        console.error("Error in useCurrentUserRole:", error);
-        return null;
+        console.error("Error in useCurrentUserRoles:", error);
+        return [];
       }
     },
     enabled: !!user && !authLoading,
@@ -53,6 +52,17 @@ export function useCurrentUserRole() {
     gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
     retry: 1,
   });
+}
+
+// Keep legacy hook for backwards compatibility
+export function useCurrentUserRole() {
+  const { data: roles, isPending, isLoading } = useCurrentUserRoles();
+  // Return the first role for backwards compatibility
+  return {
+    data: roles && roles.length > 0 ? roles[0] : null,
+    isPending,
+    isLoading,
+  };
 }
 
 export function useAllSystemRoles() {
@@ -163,25 +173,29 @@ export function useRemoveRole() {
 // Helper to check permissions
 export function useCanAccess() {
   const { user, loading: authLoading } = useAuth();
-  const { data: roleData, isPending, isLoading: queryLoading } = useCurrentUserRole();
+  const { data: rolesData, isPending, isLoading: queryLoading } = useCurrentUserRoles();
 
   // Show loading if no user yet, or if query is still loading
   const isRoleLoading = authLoading || (!user ? false : (isPending || queryLoading));
 
-  // Only trust the role data if we have a user and the data's user_id matches
-  const isValidData = roleData && user && roleData.user_id === user.id;
+  // Get all roles for the user
+  const roles = rolesData || [];
+  const roleNames = roles.map(r => r.role);
   
-  // Explicitly check for elevated roles - default to medarbejder if no valid data
-  const actualRole = isValidData ? roleData.role : "medarbejder";
-  const isOwner = actualRole === "ejer";
-  const isTeamleder = actualRole === "teamleder";
-  const isRekruttering = actualRole === "rekruttering";
-  const isSome = actualRole === "some";
-  const isMedarbejder = actualRole === "medarbejder";
+  // Check for each role type
+  const isOwner = roleNames.includes("ejer");
+  const isTeamleder = roleNames.includes("teamleder");
+  const isRekruttering = roleNames.includes("rekruttering");
+  const isSome = roleNames.includes("some");
+  const isMedarbejder = roleNames.includes("medarbejder") || roles.length === 0;
+
+  // Primary role for display purposes (prioritize higher roles)
+  const primaryRole = isOwner ? "ejer" : isTeamleder ? "teamleder" : isRekruttering ? "rekruttering" : isSome ? "some" : "medarbejder";
 
   return {
     isLoading: isRoleLoading,
-    role: actualRole,
+    role: primaryRole,
+    roles: roleNames,
     isOwner,
     isTeamleder,
     isRekruttering,
@@ -194,5 +208,7 @@ export function useCanAccess() {
     canManageRoles: isOwner,
     canCreateEmployees: isRekruttering || isTeamleder || isOwner,
     canSendContracts: isRekruttering || isTeamleder || isOwner,
+    // User has multiple roles
+    hasMultipleRoles: roles.length > 1,
   };
 }
