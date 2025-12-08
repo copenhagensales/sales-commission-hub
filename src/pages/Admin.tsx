@@ -148,6 +148,14 @@ const defaultRolePermissions: Record<SystemRole, {
     canManageAllData: true,
     canManageRoles: true,
   },
+  some: {
+    menuItems: ["my-profile", "my-schedule", "my-contracts", "career-wishes", "some"],
+    description: "SOME-medarbejder adgang",
+    dataScope: "Kun egne data + SOME",
+    canManageTeam: false,
+    canManageAllData: false,
+    canManageRoles: false,
+  },
 };
 
 const roleLabels: Record<SystemRole, { label: string, color: string, icon: typeof Crown }> = {
@@ -155,6 +163,7 @@ const roleLabels: Record<SystemRole, { label: string, color: string, icon: typeo
   rekruttering: { label: "Rekruttering", color: "text-purple-500", icon: Users },
   teamleder: { label: "Teamleder", color: "text-blue-500", icon: Users },
   ejer: { label: "Ejer", color: "text-amber-500", icon: Crown },
+  some: { label: "SOME", color: "text-pink-500", icon: User },
 };
 
 export default function Admin() {
@@ -167,6 +176,7 @@ export default function Admin() {
     rekruttering: [...defaultRolePermissions.rekruttering.menuItems],
     teamleder: [...defaultRolePermissions.teamleder.menuItems],
     ejer: [...defaultRolePermissions.ejer.menuItems],
+    some: [...defaultRolePermissions.some.menuItems],
   });
   const [editedJobTypePermissions, setEditedJobTypePermissions] = useState<Record<EmployeeType, string[]>>({
     salgskonsulent: [...defaultJobTypePermissions.salgskonsulent],
@@ -222,6 +232,7 @@ export default function Admin() {
       rekruttering: [...defaultRolePermissions.rekruttering.menuItems],
       teamleder: [...defaultRolePermissions.teamleder.menuItems],
       ejer: [...defaultRolePermissions.ejer.menuItems],
+      some: [...defaultRolePermissions.some.menuItems],
     });
     setEditedJobTypePermissions({
       salgskonsulent: [...defaultJobTypePermissions.salgskonsulent],
@@ -303,6 +314,10 @@ export default function Admin() {
     ejer: {
       ...defaultRolePermissions.ejer,
       menuItems: menuItems.map(m => m.id), // Ejer always has all permissions
+    },
+    some: {
+      ...defaultRolePermissions.some,
+      menuItems: editedPermissions.some,
     },
   };
 

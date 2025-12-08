@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useRef } from "react";
 
-export type SystemRole = "medarbejder" | "teamleder" | "ejer" | "rekruttering";
+export type SystemRole = "medarbejder" | "teamleder" | "ejer" | "rekruttering" | "some";
 
 export interface SystemRoleRecord {
   id: string;
@@ -176,6 +176,7 @@ export function useCanAccess() {
   const isOwner = actualRole === "ejer";
   const isTeamleder = actualRole === "teamleder";
   const isRekruttering = actualRole === "rekruttering";
+  const isSome = actualRole === "some";
   const isMedarbejder = actualRole === "medarbejder";
 
   return {
@@ -184,6 +185,7 @@ export function useCanAccess() {
     isOwner,
     isTeamleder,
     isRekruttering,
+    isSome,
     isTeamlederOrAbove: isTeamleder || isOwner,
     isRekrutteringOrAbove: isRekruttering || isTeamleder || isOwner,
     isMedarbejder,
