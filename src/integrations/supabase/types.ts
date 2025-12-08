@@ -2684,6 +2684,45 @@ export type Database = {
         }
         Relationships: []
       }
+      some_weekly_metrics: {
+        Row: {
+          created_at: string | null
+          id: string
+          insta_followers: number | null
+          insta_likes: number | null
+          insta_views: number | null
+          tiktok_followers: number | null
+          tiktok_likes: number | null
+          tiktok_views: number | null
+          updated_at: string | null
+          week_start_date: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          insta_followers?: number | null
+          insta_likes?: number | null
+          insta_views?: number | null
+          tiktok_followers?: number | null
+          tiktok_likes?: number | null
+          tiktok_views?: number | null
+          updated_at?: string | null
+          week_start_date: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          insta_followers?: number | null
+          insta_likes?: number | null
+          insta_views?: number | null
+          tiktok_followers?: number | null
+          tiktok_likes?: number | null
+          tiktok_views?: number | null
+          updated_at?: string | null
+          week_start_date?: string
+        }
+        Relationships: []
+      }
       sub_teams: {
         Row: {
           created_at: string

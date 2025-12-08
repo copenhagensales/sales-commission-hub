@@ -11,7 +11,10 @@ import { SomeProgressCard } from "@/components/some/SomeProgressCard";
 import { SomeKanbanColumn } from "@/components/some/SomeKanbanColumn";
 import { AddContentDialog } from "@/components/some/AddContentDialog";
 import { SomeGoalsSettings } from "@/components/some/SomeGoalsSettings";
+import { SomeWeeklyMetricsCard } from "@/components/some/SomeWeeklyMetricsCard";
+import { SomeMetricsChart } from "@/components/some/SomeMetricsChart";
 import { useSomeContent, getWeekStartDate, ContentItem, ContentStatus, ContentType } from "@/hooks/useSomeContent";
+import { useSomeMetrics } from "@/hooks/useSomeMetrics";
 
 const statusColumns: { status: ContentStatus; title: string }[] = [
   { status: "planned", title: "Planlagt" },
@@ -35,6 +38,12 @@ export default function Some() {
     deleteItem,
     updateDefaultGoals,
   } = useSomeContent(weekStartDate);
+
+  const {
+    currentMetrics,
+    historicalMetrics,
+    upsertMetrics,
+  } = useSomeMetrics(weekStartDate);
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -210,6 +219,16 @@ export default function Some() {
             </div>
           </DndContext>
         </div>
+
+        {/* Weekly Metrics Section */}
+        <SomeWeeklyMetricsCard
+          weekStartDate={weekStartDate}
+          currentMetrics={currentMetrics}
+          onSave={upsertMetrics}
+        />
+
+        {/* Metrics Chart */}
+        <SomeMetricsChart historicalMetrics={historicalMetrics} />
       </div>
 
       <AddContentDialog
