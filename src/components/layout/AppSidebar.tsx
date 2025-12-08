@@ -89,7 +89,6 @@ const someEmployeeNavigation = [
   { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
   { name: "Min profil", href: "/my-profile", icon: Users },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
-  { name: "Teamønsker & karriere", href: "/career-wishes", icon: Sparkles },
 ];
 
 // Teamleder extra navigation (pulse survey results, code of conduct for their team)
