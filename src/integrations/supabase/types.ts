@@ -3445,6 +3445,20 @@ export type Database = {
         }
         Returns: string
       }
+      schedule_integration_sync: {
+        Args: {
+          p_anon_key: string
+          p_client_id: string
+          p_function_url: string
+          p_job_name: string
+          p_schedule: string
+        }
+        Returns: number
+      }
+      unschedule_integration_sync: {
+        Args: { p_job_name: string }
+        Returns: boolean
+      }
     }
     Enums: {
       absence_request_status: "pending" | "approved" | "rejected"

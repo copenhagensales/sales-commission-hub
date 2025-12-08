@@ -76,49 +76,30 @@ Deno.serve(async (req) => {
     if (action === 'activate') {
       const { schedule } = body
       const cronSchedule = schedule || '0 * * * *'
+      const functionUrl = `${supabaseUrl}/functions/v1/customer-crm-syncer`
 
       console.log(`[Scheduler] Activando job: ${jobName} con schedule: ${cronSchedule}`)
 
-      // First try to remove existing job
+      // First try to unschedule existing job
       try {
-        await supabase.rpc('cron_unschedule', { job_name: jobName })
+        await supabase.rpc('unschedule_integration_sync', { p_job_name: jobName })
         console.log(`[Scheduler] Job anterior eliminado`)
       } catch (e) {
-        console.log(`[Scheduler] No existía job previo`)
+        console.log(`[Scheduler] No existía job previo o error al eliminar`)
       }
 
-      // Create new cron job
-      const functionUrl = `${supabaseUrl}/functions/v1/customer-crm-syncer`
-
-      const { error: scheduleError } = await supabase.rpc('cron_schedule', {
-        job_name: jobName,
-        cron_pattern: cronSchedule,
-        command: `SELECT net.http_post(
-          url := '${functionUrl}',
-          headers := '{"Content-Type": "application/json", "Authorization": "Bearer ${anonKey}"}'::jsonb,
-          body := '{"client_id": "${client_id}"}'::jsonb
-        );`
+      // Schedule new cron job using wrapper function
+      const { data: jobId, error: scheduleError } = await supabase.rpc('schedule_integration_sync', {
+        p_job_name: jobName,
+        p_schedule: cronSchedule,
+        p_function_url: functionUrl,
+        p_anon_key: anonKey,
+        p_client_id: client_id
       })
 
       if (scheduleError) {
         console.error('[Scheduler] Error creando cron:', scheduleError)
-        // Try alternative method using exec_sql
-        const sqlCommand = `
-          SELECT cron.schedule(
-            '${jobName}',
-            '${cronSchedule}',
-            $$SELECT net.http_post(
-              url := '${functionUrl}',
-              headers := '{"Content-Type": "application/json", "Authorization": "Bearer ${anonKey}"}'::jsonb,
-              body := '{"client_id": "${client_id}"}'::jsonb
-            );$$
-          );
-        `
-        const { error: altError } = await supabase.rpc('exec_sql', { sql_query: sqlCommand })
-        if (altError) {
-          console.error('[Scheduler] Alt method also failed:', altError)
-          throw new Error(`Error creando cron: ${scheduleError.message}`)
-        }
+        throw new Error(`Error creando cron job: ${scheduleError.message}`)
       }
 
       // Update status in DB
@@ -126,9 +107,9 @@ Deno.serve(async (req) => {
         .update({ is_active: true, cron_schedule: cronSchedule, updated_at: new Date().toISOString() })
         .eq('client_id', client_id)
 
-      console.log(`[Scheduler] Job ${jobName} activado correctamente`)
+      console.log(`[Scheduler] Job ${jobName} activado correctamente con ID: ${jobId}`)
       return new Response(
-        JSON.stringify({ success: true, message: `Job ${jobName} activado`, schedule: cronSchedule }),
+        JSON.stringify({ success: true, message: `Job ${jobName} activado`, schedule: cronSchedule, jobId }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -137,10 +118,11 @@ Deno.serve(async (req) => {
     if (action === 'deactivate') {
       console.log(`[Scheduler] Desactivando job: ${jobName}`)
 
-      try {
-        await supabase.rpc('cron_unschedule', { job_name: jobName })
-      } catch (e) {
-        console.log(`[Scheduler] Job no existía o ya fue eliminado`)
+      // Unschedule using wrapper function
+      const { error: unscheduleError } = await supabase.rpc('unschedule_integration_sync', { p_job_name: jobName })
+      
+      if (unscheduleError) {
+        console.log(`[Scheduler] Job no existía o error al eliminar:`, unscheduleError)
       }
 
       await supabase.from('customer_integrations')
