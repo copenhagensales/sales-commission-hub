@@ -288,6 +288,9 @@ export function AppSidebar() {
   // Check if user has SOME access via individual permission
   const hasSomeAccess = isMenuItemGranted("some");
   
+  // Debug logging
+  console.log("AppSidebar - grantedMenuItems:", grantedMenuItems, "hasSomeAccess:", hasSomeAccess, "user:", user?.id);
+  
   // Select navigation based on role and job type, filter out denied items
   const baseNavigation = isOwner 
     ? [...ownerNavigation, ...teamlederExtraNavigation]
