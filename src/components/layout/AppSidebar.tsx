@@ -21,6 +21,7 @@ const ownerNavigation = [
   { name: "Teams", href: "/teams", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
+  { name: "Karriereønsker", href: "/career-wishes-overview", icon: Sparkles },
   { name: "Salg", href: "/sales", icon: ShoppingCart },
   { name: "Provision og CPO", href: "/commission-cpo", icon: Percent },
   { name: "Logikker", href: "/logikker", icon: ListChecks },
