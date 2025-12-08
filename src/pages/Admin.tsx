@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
+import { RoleSelector } from "@/components/admin/RoleSelector";
 import {
   Dialog,
   DialogContent,
@@ -42,8 +43,7 @@ interface EmployeeRole {
   job_title: string | null;
   is_active: boolean;
   auth_user_id: string | null;
-  role_id: string | null;
-  role: SystemRole | null;
+  roles: SystemRole[];
 }
 
 interface TeamInfo {
@@ -443,7 +443,7 @@ export default function Admin() {
     enabled: isOwner,
   });
 
-  // Assign role mutation using RPC
+  // Assign role mutation using RPC (adds role, allows multiple)
   const assignRole = useMutation({
     mutationFn: async ({ email, role }: { email: string; role: SystemRole }) => {
       const { error } = await supabase.rpc("assign_role_by_email", {
@@ -455,18 +455,19 @@ export default function Admin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-employee-roles"] });
       queryClient.invalidateQueries({ queryKey: ["system-role"] });
-      toast.success("Rolle opdateret");
+      toast.success("Rolle tilføjet");
     },
     onError: (error: Error) => {
-      toast.error("Kunne ikke opdatere rolle: " + error.message);
+      toast.error("Kunne ikke tilføje rolle: " + error.message);
     },
   });
 
-  // Remove role mutation using RPC
+  // Remove specific role mutation using RPC
   const removeRole = useMutation({
-    mutationFn: async (email: string) => {
+    mutationFn: async ({ email, role }: { email: string; role: SystemRole }) => {
       const { error } = await supabase.rpc("remove_role_by_email", {
         _email: email,
+        _role: role,
       });
       if (error) throw error;
     },
@@ -527,13 +528,13 @@ export default function Admin() {
     return fullName.includes(search) || email.includes(search);
   });
 
-  // Group users by role
+  // Group users by role (users can appear in multiple groups now)
   const usersByRole = {
-    ejer: filteredUsers?.filter(u => u.role === "ejer") || [],
-    teamleder: filteredUsers?.filter(u => u.role === "teamleder") || [],
-    rekruttering: filteredUsers?.filter(u => u.role === "rekruttering") || [],
-    some: filteredUsers?.filter(u => u.role === "some") || [],
-    medarbejder: filteredUsers?.filter(u => u.role === "medarbejder" || !u.role) || [],
+    ejer: filteredUsers?.filter(u => u.roles?.includes("ejer")) || [],
+    teamleder: filteredUsers?.filter(u => u.roles?.includes("teamleder")) || [],
+    rekruttering: filteredUsers?.filter(u => u.roles?.includes("rekruttering")) || [],
+    some: filteredUsers?.filter(u => u.roles?.includes("some")) || [],
+    medarbejder: filteredUsers?.filter(u => u.roles?.includes("medarbejder") || !u.roles || u.roles.length === 0) || [],
   };
 
   // Group menu items by category
@@ -543,21 +544,27 @@ export default function Admin() {
     return acc;
   }, {} as Record<string, typeof menuItems>);
 
-  const getRoleBadge = (role: SystemRole | null) => {
-    const roleInfo = role ? roleLabels[role] : null;
-    if (!roleInfo) {
+  const getRoleBadges = (roles: SystemRole[] | null) => {
+    if (!roles || roles.length === 0) {
       return (
         <Badge variant="outline" className="text-muted-foreground">
           Ingen rolle
         </Badge>
       );
     }
-    const Icon = roleInfo.icon;
     return (
-      <Badge className={`bg-${roleInfo.color.replace('text-', '')}/20 ${roleInfo.color} border-${roleInfo.color.replace('text-', '')}/30`}>
-        <Icon className="h-3 w-3 mr-1" />
-        {roleInfo.label}
-      </Badge>
+      <div className="flex flex-wrap gap-1">
+        {roles.map(role => {
+          const roleInfo = roleLabels[role];
+          const Icon = roleInfo.icon;
+          return (
+            <Badge key={role} className={`bg-${roleInfo.color.replace('text-', '')}/20 ${roleInfo.color} border-${roleInfo.color.replace('text-', '')}/30`}>
+              <Icon className="h-3 w-3 mr-1" />
+              {roleInfo.label}
+            </Badge>
+          );
+        })}
+      </div>
     );
   };
 
@@ -702,37 +709,12 @@ export default function Admin() {
                                             </TableCell>
                                             <TableCell className="text-right">
                                               <div className="flex items-center justify-end gap-2">
-                                                {user.auth_user_id && user.email ? (
-                                                  <Select
-                                                    value={user.role || "none"}
-                                                    onValueChange={(value) => {
-                                                      if (value === "none") {
-                                                        removeRole.mutate(user.email!);
-                                                      } else {
-                                                        assignRole.mutate({
-                                                          email: user.email!,
-                                                          role: value as SystemRole,
-                                                        });
-                                                      }
-                                                    }}
-                                                  >
-                                                    <SelectTrigger className="w-[130px]">
-                                                      <SelectValue placeholder="Vælg rolle" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                      <SelectItem value="none">Ingen rolle</SelectItem>
-                                                      <SelectItem value="medarbejder">Medarbejder</SelectItem>
-                                                      <SelectItem value="some">SOME</SelectItem>
-                                                      <SelectItem value="rekruttering">Rekruttering</SelectItem>
-                                                      <SelectItem value="teamleder">Teamleder</SelectItem>
-                                                      <SelectItem value="ejer">Ejer</SelectItem>
-                                                    </SelectContent>
-                                                  </Select>
-                                                ) : (
-                                                  <span className="text-sm text-muted-foreground">
-                                                    Kræver login
-                                                  </span>
-                                                )}
+                                                <RoleSelector
+                                                  currentRoles={user.roles || []}
+                                                  onAddRole={(role) => user.email && assignRole.mutate({ email: user.email, role })}
+                                                  onRemoveRole={(role) => user.email && removeRole.mutate({ email: user.email, role })}
+                                                  disabled={!user.auth_user_id || !user.email}
+                                                />
                                                 <Button
                                                   variant="ghost"
                                                   size="icon"
@@ -792,37 +774,12 @@ export default function Admin() {
                                             </TableCell>
                                             <TableCell className="text-right">
                                               <div className="flex items-center justify-end gap-2">
-                                                {user.auth_user_id && user.email ? (
-                                                  <Select
-                                                    value={user.role || "none"}
-                                                    onValueChange={(value) => {
-                                                      if (value === "none") {
-                                                        removeRole.mutate(user.email!);
-                                                      } else {
-                                                        assignRole.mutate({
-                                                          email: user.email!,
-                                                          role: value as SystemRole,
-                                                        });
-                                                      }
-                                                    }}
-                                                  >
-                                                    <SelectTrigger className="w-[130px]">
-                                                      <SelectValue placeholder="Vælg rolle" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                      <SelectItem value="none">Ingen rolle</SelectItem>
-                                                      <SelectItem value="medarbejder">Medarbejder</SelectItem>
-                                                      <SelectItem value="some">SOME</SelectItem>
-                                                      <SelectItem value="rekruttering">Rekruttering</SelectItem>
-                                                      <SelectItem value="teamleder">Teamleder</SelectItem>
-                                                      <SelectItem value="ejer">Ejer</SelectItem>
-                                                    </SelectContent>
-                                                  </Select>
-                                                ) : (
-                                                  <span className="text-sm text-muted-foreground">
-                                                    Kræver login
-                                                  </span>
-                                                )}
+                                                <RoleSelector
+                                                  currentRoles={user.roles || []}
+                                                  onAddRole={(role) => user.email && assignRole.mutate({ email: user.email, role })}
+                                                  onRemoveRole={(role) => user.email && removeRole.mutate({ email: user.email, role })}
+                                                  disabled={!user.auth_user_id || !user.email}
+                                                />
                                                 <Button
                                                   variant="ghost"
                                                   size="icon"
@@ -882,37 +839,12 @@ export default function Admin() {
                                             </TableCell>
                                             <TableCell className="text-right">
                                               <div className="flex items-center justify-end gap-2">
-                                                {user.auth_user_id && user.email ? (
-                                                  <Select
-                                                    value={user.role || "none"}
-                                                    onValueChange={(value) => {
-                                                      if (value === "none") {
-                                                        removeRole.mutate(user.email!);
-                                                      } else {
-                                                        assignRole.mutate({
-                                                          email: user.email!,
-                                                          role: value as SystemRole,
-                                                        });
-                                                      }
-                                                    }}
-                                                  >
-                                                    <SelectTrigger className="w-[130px]">
-                                                      <SelectValue placeholder="Vælg rolle" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                      <SelectItem value="none">Ingen rolle</SelectItem>
-                                                      <SelectItem value="medarbejder">Medarbejder</SelectItem>
-                                                      <SelectItem value="some">SOME</SelectItem>
-                                                      <SelectItem value="rekruttering">Rekruttering</SelectItem>
-                                                      <SelectItem value="teamleder">Teamleder</SelectItem>
-                                                      <SelectItem value="ejer">Ejer</SelectItem>
-                                                    </SelectContent>
-                                                  </Select>
-                                                ) : (
-                                                  <span className="text-sm text-muted-foreground">
-                                                    Kræver login
-                                                  </span>
-                                                )}
+                                                <RoleSelector
+                                                  currentRoles={user.roles || []}
+                                                  onAddRole={(role) => user.email && assignRole.mutate({ email: user.email, role })}
+                                                  onRemoveRole={(role) => user.email && removeRole.mutate({ email: user.email, role })}
+                                                  disabled={!user.auth_user_id || !user.email}
+                                                />
                                                 <Button
                                                   variant="ghost"
                                                   size="icon"
@@ -974,37 +906,12 @@ export default function Admin() {
                                             </TableCell>
                                             <TableCell className="text-right">
                                               <div className="flex items-center justify-end gap-2">
-                                                {user.auth_user_id && user.email ? (
-                                                  <Select
-                                                    value={user.role || "none"}
-                                                    onValueChange={(value) => {
-                                                      if (value === "none") {
-                                                        removeRole.mutate(user.email!);
-                                                      } else {
-                                                        assignRole.mutate({
-                                                          email: user.email!,
-                                                          role: value as SystemRole,
-                                                        });
-                                                      }
-                                                    }}
-                                                  >
-                                                    <SelectTrigger className="w-[130px]">
-                                                      <SelectValue placeholder="Vælg rolle" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                      <SelectItem value="none">Ingen rolle</SelectItem>
-                                                      <SelectItem value="medarbejder">Medarbejder</SelectItem>
-                                                      <SelectItem value="some">SOME</SelectItem>
-                                                      <SelectItem value="rekruttering">Rekruttering</SelectItem>
-                                                      <SelectItem value="teamleder">Teamleder</SelectItem>
-                                                      <SelectItem value="ejer">Ejer</SelectItem>
-                                                    </SelectContent>
-                                                  </Select>
-                                                ) : (
-                                                  <span className="text-sm text-muted-foreground">
-                                                    Kræver login
-                                                  </span>
-                                                )}
+                                                <RoleSelector
+                                                  currentRoles={user.roles || []}
+                                                  onAddRole={(role) => user.email && assignRole.mutate({ email: user.email, role })}
+                                                  onRemoveRole={(role) => user.email && removeRole.mutate({ email: user.email, role })}
+                                                  disabled={!user.auth_user_id || !user.email}
+                                                />
                                                 <Button
                                                   variant="ghost"
                                                   size="icon"
@@ -1244,7 +1151,7 @@ export default function Admin() {
                               <TableCell className="font-medium">
                                 {user.first_name} {user.last_name}
                               </TableCell>
-                              <TableCell>{getRoleBadge(user.role)}</TableCell>
+                              <TableCell>{getRoleBadges(user.roles)}</TableCell>
                               <TableCell>
                                 {extraMenuNames.length > 0 ? (
                                   <div className="flex flex-wrap gap-1">
@@ -1448,7 +1355,7 @@ export default function Admin() {
                           <TableCell className="text-muted-foreground">
                             {user.email || "-"}
                           </TableCell>
-                          <TableCell>{getRoleBadge(user.role)}</TableCell>
+                          <TableCell>{getRoleBadges(user.roles)}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="text-muted-foreground">
                               Se medarbejderdata
@@ -1501,17 +1408,18 @@ export default function Admin() {
               Rediger rettigheder for {selectedUserForPermissions?.first_name} {selectedUserForPermissions?.last_name}
             </DialogTitle>
             <DialogDescription>
-              Rolle: {getRoleBadge(selectedUserForPermissions?.role || null)}
+              Roller: {getRoleBadges(selectedUserForPermissions?.roles || [])}
               <br />
-              Tilføj ekstra menupunkter som denne bruger skal have adgang til ud over sin rolle.
+              Tilføj ekstra menupunkter som denne bruger skal have adgang til ud over sine roller.
             </DialogDescription>
           </DialogHeader>
           
           <div className="overflow-y-auto flex-1 py-4">
             <div className="space-y-4">
               {Object.entries(menuByCategory).map(([category, items]) => {
-                const userRole = selectedUserForPermissions?.role || "medarbejder";
-                const roleMenus = editedPermissions[userRole] || [];
+                const userRoles = selectedUserForPermissions?.roles || ["medarbejder"];
+                // Combine menu items from all user roles
+                const roleMenus = userRoles.flatMap(role => editedPermissions[role] || []);
                 const userExtras = individualPermissions?.filter(
                   p => p.user_id === selectedUserForPermissions?.auth_user_id
                 ).map(p => p.menu_item_id) || [];
