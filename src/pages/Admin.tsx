@@ -526,6 +526,7 @@ export default function Admin() {
     ejer: filteredUsers?.filter(u => u.role === "ejer") || [],
     teamleder: filteredUsers?.filter(u => u.role === "teamleder") || [],
     rekruttering: filteredUsers?.filter(u => u.role === "rekruttering") || [],
+    some: filteredUsers?.filter(u => u.role === "some") || [],
     medarbejder: filteredUsers?.filter(u => u.role === "medarbejder" || !u.role) || [],
   };
 
