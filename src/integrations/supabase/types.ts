@@ -3331,8 +3331,7 @@ export type Database = {
           is_active: boolean
           job_title: string
           last_name: string
-          role: Database["public"]["Enums"]["system_role"]
-          role_id: string
+          roles: Database["public"]["Enums"]["system_role"][]
         }[]
       }
       get_invitation_by_token: {
