@@ -43,11 +43,11 @@ const mgNavigation = [
 // Navigation items for teamleder (limited team-related access)
 const teamlederNavigation = [
   { name: "Vagtplan", href: "/shift-planning", icon: ClipboardList },
+  { name: "Min profil", href: "/my-profile", icon: User },
   { name: "Godkend fravær", href: "/shift-planning/absence", icon: Clock, badgeKey: "pendingAbsence" },
   { name: "Mit team", href: "/employees", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
-  { name: "Min profil", href: "/my-profile", icon: User },
 ];
 
 // Navigation items for rekruttering role (without Rekruttering - that's in submenu)
