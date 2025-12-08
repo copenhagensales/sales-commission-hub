@@ -83,6 +83,15 @@ const employeeNavigation = [
   { name: "Pulsmåling", href: "/pulse-survey", icon: HeartHandshake },
 ];
 
+// Navigation items for SOME employees (dedicated)
+const someEmployeeNavigation = [
+  { name: "SOME", href: "/some", icon: Video },
+  { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
+  { name: "Min profil", href: "/my-profile", icon: Users },
+  { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
+  { name: "Teamønsker & karriere", href: "/career-wishes", icon: Sparkles },
+];
+
 // Teamleder extra navigation (pulse survey results, code of conduct for their team)
 const teamlederExtraNavigation = [
   { name: "Pulsmåling resultater", href: "/pulse-survey-results", icon: BarChart3 },
@@ -278,14 +287,16 @@ export function AppSidebar() {
     navigate("/auth");
   };
 
-  // Select navigation based on role and filter out denied items
+  // Select navigation based on role and job type, filter out denied items
   const baseNavigation = isOwner 
     ? [...ownerNavigation, ...teamlederExtraNavigation]
     : isTeamleder
       ? [...teamlederNavigation, ...teamlederExtraNavigation, ...teamlederCodeOfConductNav] 
       : isRekruttering 
         ? rekrutteringNavigation
-        : employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey);
+        : isSomeEmployee
+          ? someEmployeeNavigation
+          : employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey);
   
   // Filter out denied menu items based on href to menu_item_id mapping
   const hrefToMenuId: Record<string, string> = {
@@ -401,19 +412,6 @@ export function AppSidebar() {
             </NavLink>
           )}
 
-          {/* SOME menu item for SOME employees */}
-          {isSomeEmployee && !isOwner && (
-            <NavLink
-              to="/some"
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname === "/some" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}
-            >
-              <Video className="h-5 w-5" />
-              SOME
-            </NavLink>
-          )}
 
           {isSalgskonsulent && !isOwner && (
             <NavLink
