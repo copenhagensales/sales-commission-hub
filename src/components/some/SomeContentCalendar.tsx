@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Video, Image, Layers } from "lucide-react";
+import { ChevronLeft, ChevronRight, Video, Image as ImageIcon, Layers } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, isToday } from "date-fns";
 import { da } from "date-fns/locale";
 import type { ContentItem } from "@/hooks/useSomeContent";
@@ -18,7 +18,7 @@ const platformColors = {
 
 const typeIcons = {
   video: Video,
-  post: Image,
+  post: ImageIcon,
   story: Layers,
 };
 
@@ -139,7 +139,7 @@ export function SomeContentCalendar({ contentItems }: SomeContentCalendarProps) 
               <span>Video</span>
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Image className="h-3 w-3" />
+              <ImageIcon className="h-3 w-3" />
               <span>Post</span>
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
