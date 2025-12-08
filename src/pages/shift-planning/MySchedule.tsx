@@ -260,14 +260,27 @@ export default function MySchedule() {
                             : "...";
                           const effectiveHours = timeStamp.effective_hours;
                           
+                          // Calculate daily pay if we have effective hours and salary amount
+                          const hourlyRate = employee?.salary_amount || 0;
+                          const dailyPay = effectiveHours !== null && hourlyRate > 0 
+                            ? effectiveHours * hourlyRate 
+                            : null;
+                          
                           timeStampInfo = (
-                            <div className="mt-0.5 text-[9px] text-blue-600 flex items-center gap-0.5">
-                              <Clock className="h-2.5 w-2.5" />
-                              <span>{clockIn}-{clockOut}</span>
-                              {effectiveHours !== null && (
-                                <span className="text-muted-foreground ml-0.5">
-                                  ({effectiveHours.toFixed(1)}t)
-                                </span>
+                            <div className="mt-0.5 space-y-0.5">
+                              <div className="text-[9px] text-blue-600 flex items-center gap-0.5">
+                                <Clock className="h-2.5 w-2.5" />
+                                <span>{clockIn}-{clockOut}</span>
+                                {effectiveHours !== null && (
+                                  <span className="text-muted-foreground ml-0.5">
+                                    ({effectiveHours.toFixed(1)}t)
+                                  </span>
+                                )}
+                              </div>
+                              {dailyPay !== null && timeStamp.clock_out && (
+                                <div className="text-[9px] text-green-600 font-medium">
+                                  💰 {dailyPay.toFixed(0)} kr
+                                </div>
                               )}
                             </div>
                           );
