@@ -616,7 +616,7 @@ export default function Admin() {
 
             {/* Users grouped by role */}
             <div className="space-y-4">
-              {(["ejer", "teamleder", "rekruttering", "medarbejder"] as SystemRole[]).map((role) => {
+              {(["ejer", "teamleder", "rekruttering", "some", "medarbejder"] as SystemRole[]).map((role) => {
                 const roleInfo = roleLabels[role];
                 const usersInRole = usersByRole[role];
                 const isExpanded = expandedRoles.includes(role);
