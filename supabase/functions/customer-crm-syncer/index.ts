@@ -8,14 +8,99 @@ const corsHeaders = {
 // ============ ADAPTER INTERFACES ============
 interface CrmAdapter {
   name: string;
-  validateSale(phone: string, email: string | null, config: Record<string, unknown>): Promise<CrmValidationResult>;
+  validateSale(sale: SaleRecord, config: Record<string, unknown>): Promise<CrmValidationResult>;
 }
 
 interface CrmValidationResult {
   found: boolean;
-  status?: string;
-  dealId?: string;
+  status?: "approved" | "cancelled" | "pending" | "unknown";
+  matchedField?: string;
+  matchedValue?: string;
   rawResponse?: unknown;
+}
+
+interface SaleRecord {
+  id: string;
+  customer_phone: string | null;
+  customer_company: string | null;
+  adversus_external_id: string | null;
+  adversus_opp_number: string | null;
+}
+
+// ============ EXCEL ADAPTER ============
+// Validates sales against tdc_cancellation_imports table
+class ExcelAdapter implements CrmAdapter {
+  name = "excel";
+  // deno-lint-ignore no-explicit-any
+  private supabase: any;
+  private clientId: string;
+
+  // deno-lint-ignore no-explicit-any
+  constructor(supabase: any, clientId: string) {
+    this.supabase = supabase;
+    this.clientId = clientId;
+  }
+
+  async validateSale(sale: SaleRecord, config: Record<string, unknown>): Promise<CrmValidationResult> {
+    // Get all cancellation imports
+    const { data: cancellations, error } = await this.supabase
+      .from("tdc_cancellation_imports")
+      .select("raw_data")
+      .order("uploaded_at", { ascending: false });
+
+    if (error || !cancellations || cancellations.length === 0) {
+      console.log("[ExcelAdapter] No cancellation data found");
+      return { found: false };
+    }
+
+    // Match against adversus_external_id (ordre-id) or adversus_opp_number
+    // deno-lint-ignore no-explicit-any
+    for (const row of cancellations as any[]) {
+      const rawData = row.raw_data as Record<string, unknown>;
+      
+      // Try matching by ordre-id (maps to adversus_external_id)
+      const ordreId = rawData["ordre-id"] || rawData["Ordre-id"] || rawData["ordreId"];
+      if (ordreId && sale.adversus_external_id) {
+        const ordreIdStr = String(ordreId).trim();
+        const saleIdStr = String(sale.adversus_external_id).trim();
+        if (ordreIdStr === saleIdStr) {
+          console.log(`[ExcelAdapter] Matched by ordre-id: ${ordreIdStr}`);
+          return {
+            found: true,
+            status: "cancelled",
+            matchedField: "ordre-id",
+            matchedValue: ordreIdStr,
+            rawResponse: rawData,
+          };
+        }
+      }
+
+      // Try matching by OPP number
+      const oppNumber = rawData["opp"] || rawData["OPP"] || rawData["opp-nummer"];
+      if (oppNumber && sale.adversus_opp_number) {
+        const oppStr = String(oppNumber).trim().replace(/^OPP-?/i, "");
+        const saleOppStr = String(sale.adversus_opp_number).trim().replace(/^OPP-?/i, "");
+        if (oppStr === saleOppStr) {
+          console.log(`[ExcelAdapter] Matched by OPP: ${oppStr}`);
+          return {
+            found: true,
+            status: "cancelled",
+            matchedField: "opp",
+            matchedValue: oppStr,
+            rawResponse: rawData,
+          };
+        }
+      }
+    }
+
+    // No match found - sale is approved (not cancelled)
+    return { 
+      found: true, 
+      status: "approved",
+      matchedField: "none",
+      matchedValue: "not_in_cancellation_list"
+    };
+  }
 }
 
 // ============ GENERIC API ADAPTER ============
@@ -29,9 +114,9 @@ class GenericApiAdapter implements CrmAdapter {
     this.credentials = credentials;
   }
 
-  async validateSale(phone: string, email: string | null, config: Record<string, unknown>): Promise<CrmValidationResult> {
+  async validateSale(sale: SaleRecord, config: Record<string, unknown>): Promise<CrmValidationResult> {
     const searchField = (config.search_field as string) || "phone";
-    const searchValue = searchField === "email" ? email : phone;
+    const searchValue = searchField === "phone" ? sale.customer_phone : sale.adversus_external_id;
 
     if (!searchValue) {
       return { found: false };
@@ -42,7 +127,6 @@ class GenericApiAdapter implements CrmAdapter {
         "Content-Type": "application/json",
       };
 
-      // Support different auth methods
       if (this.credentials.api_key) {
         headers["Authorization"] = `Bearer ${this.credentials.api_key}`;
       } else if (this.credentials.username && this.credentials.password) {
@@ -59,11 +143,23 @@ class GenericApiAdapter implements CrmAdapter {
 
       const data = await response.json();
       const statusField = (config.status_field as string) || "status";
+      const apiStatus = data[statusField] || "unknown";
+      
+      // Map API status to our standard statuses
+      let status: CrmValidationResult["status"] = "unknown";
+      if (["approved", "won", "closed_won", "active"].includes(apiStatus.toLowerCase())) {
+        status = "approved";
+      } else if (["cancelled", "canceled", "lost", "closed_lost", "annulleret"].includes(apiStatus.toLowerCase())) {
+        status = "cancelled";
+      } else if (["pending", "open", "new"].includes(apiStatus.toLowerCase())) {
+        status = "pending";
+      }
       
       return {
         found: true,
-        status: data[statusField] || "unknown",
-        dealId: data.id || data.deal_id,
+        status,
+        matchedField: searchField,
+        matchedValue: searchValue,
         rawResponse: data,
       };
     } catch (error) {
@@ -82,16 +178,15 @@ class HubSpotAdapter implements CrmAdapter {
     this.accessToken = credentials.access_token || credentials.api_key || "";
   }
 
-  async validateSale(phone: string, email: string | null, config: Record<string, unknown>): Promise<CrmValidationResult> {
+  async validateSale(sale: SaleRecord, config: Record<string, unknown>): Promise<CrmValidationResult> {
     const searchField = (config.search_field as string) || "phone";
-    const searchValue = searchField === "email" ? email : phone;
+    const searchValue = searchField === "phone" ? sale.customer_phone : sale.adversus_external_id;
 
     if (!searchValue || !this.accessToken) {
       return { found: false };
     }
 
     try {
-      // Search for contacts
       const searchResponse = await fetch("https://api.hubapi.com/crm/v3/objects/contacts/search", {
         method: "POST",
         headers: {
@@ -137,7 +232,7 @@ class HubSpotAdapter implements CrmAdapter {
         }
       );
 
-      let dealStatus = "no_deal";
+      let dealStatus: CrmValidationResult["status"] = "pending";
       let dealId: string | undefined;
 
       if (dealsResponse.ok) {
@@ -145,7 +240,6 @@ class HubSpotAdapter implements CrmAdapter {
         if (dealsData.results && dealsData.results.length > 0) {
           dealId = dealsData.results[0].id;
           
-          // Get deal details
           const dealDetailResponse = await fetch(
             `https://api.hubapi.com/crm/v3/objects/deals/${dealId}?properties=dealstage,dealname`,
             {
@@ -157,7 +251,14 @@ class HubSpotAdapter implements CrmAdapter {
 
           if (dealDetailResponse.ok) {
             const dealDetail = await dealDetailResponse.json();
-            dealStatus = dealDetail.properties?.dealstage || "unknown";
+            const stage = dealDetail.properties?.dealstage || "";
+            
+            // Map HubSpot stages to our statuses
+            if (stage.includes("won") || stage.includes("closed")) {
+              dealStatus = "approved";
+            } else if (stage.includes("lost")) {
+              dealStatus = "cancelled";
+            }
           }
         }
       }
@@ -165,7 +266,8 @@ class HubSpotAdapter implements CrmAdapter {
       return {
         found: true,
         status: dealStatus,
-        dealId,
+        matchedField: searchField,
+        matchedValue: searchValue,
         rawResponse: contact,
       };
     } catch (error) {
@@ -186,9 +288,9 @@ class SalesforceAdapter implements CrmAdapter {
     this.instanceUrl = credentials.instance_url || "";
   }
 
-  async validateSale(phone: string, email: string | null, config: Record<string, unknown>): Promise<CrmValidationResult> {
+  async validateSale(sale: SaleRecord, config: Record<string, unknown>): Promise<CrmValidationResult> {
     const searchField = (config.search_field as string) || "Phone";
-    const searchValue = searchField.toLowerCase() === "email" ? email : phone;
+    const searchValue = searchField.toLowerCase() === "phone" ? sale.customer_phone : sale.adversus_external_id;
 
     if (!searchValue || !this.accessToken || !this.instanceUrl) {
       return { found: false };
@@ -217,10 +319,20 @@ class SalesforceAdapter implements CrmAdapter {
       }
 
       const opportunity = data.records[0];
+      const stage = opportunity.StageName?.toLowerCase() || "";
+      
+      let status: CrmValidationResult["status"] = "pending";
+      if (stage.includes("won") || stage.includes("closed")) {
+        status = "approved";
+      } else if (stage.includes("lost")) {
+        status = "cancelled";
+      }
+      
       return {
         found: true,
-        status: opportunity.StageName,
-        dealId: opportunity.Id,
+        status,
+        matchedField: searchField,
+        matchedValue: searchValue,
         rawResponse: opportunity,
       };
     } catch (error) {
@@ -231,8 +343,17 @@ class SalesforceAdapter implements CrmAdapter {
 }
 
 // ============ ADAPTER FACTORY ============
-function createAdapter(crmType: string, apiUrl: string | null, credentials: Record<string, string>): CrmAdapter {
+function createAdapter(
+  crmType: string, 
+  apiUrl: string | null, 
+  credentials: Record<string, string>,
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  clientId: string
+): CrmAdapter {
   switch (crmType) {
+    case "excel":
+      return new ExcelAdapter(supabase, clientId);
     case "hubspot":
       return new HubSpotAdapter(credentials);
     case "salesforce":
@@ -251,7 +372,8 @@ Deno.serve(async (req) => {
 
   const startTime = Date.now();
   let processedCount = 0;
-  let validatedCount = 0;
+  let approvedCount = 0;
+  let cancelledCount = 0;
   let errorCount = 0;
 
   try {
@@ -297,7 +419,7 @@ Deno.serve(async (req) => {
     console.log(`[customer-crm-syncer] Using CRM type: ${config.crm_type}`);
 
     // Create adapter
-    const adapter = createAdapter(config.crm_type, config.api_url, credentials);
+    const adapter = createAdapter(config.crm_type, config.api_url, credentials, supabase, client_id);
 
     // Get recent sales for this client that need validation
     const { data: sales, error: salesError } = await supabase
@@ -306,15 +428,15 @@ Deno.serve(async (req) => {
         id,
         customer_phone,
         customer_company,
-        agent_name,
-        sale_datetime,
         adversus_external_id,
-        sale_items (id, quantity, product_id)
+        adversus_opp_number,
+        agent_name,
+        sale_datetime
       `)
       .eq("client_campaign_id", client_id)
-      .gte("sale_datetime", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days
+      .gte("sale_datetime", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // Last 30 days
       .order("sale_datetime", { ascending: false })
-      .limit(100);
+      .limit(200);
 
     if (salesError) {
       console.error("[customer-crm-syncer] Error fetching sales:", salesError);
@@ -323,33 +445,36 @@ Deno.serve(async (req) => {
 
     console.log(`[customer-crm-syncer] Found ${sales?.length || 0} sales to validate`);
 
-    const results: Array<{ saleId: string; result: CrmValidationResult }> = [];
+    const results: Array<{ saleId: string; status: string; matchedField?: string }> = [];
 
     for (const sale of sales || []) {
       processedCount++;
       
       try {
-        const result = await adapter.validateSale(
-          sale.customer_phone || "",
-          null, // email not available in current schema
-          mappingConfig
-        );
+        const result = await adapter.validateSale(sale as SaleRecord, mappingConfig);
 
-        results.push({ saleId: sale.id, result });
-
-        if (result.found) {
-          validatedCount++;
-          console.log(`[customer-crm-syncer] Sale ${sale.id} validated: ${result.status}`);
-        } else {
-          console.log(`[customer-crm-syncer] Sale ${sale.id} not found in CRM`);
+        if (result.found && result.status) {
+          if (result.status === "approved") {
+            approvedCount++;
+          } else if (result.status === "cancelled") {
+            cancelledCount++;
+          }
+          
+          results.push({ 
+            saleId: sale.id, 
+            status: result.status,
+            matchedField: result.matchedField 
+          });
+          
+          console.log(`[customer-crm-syncer] Sale ${sale.id} (${sale.adversus_external_id}): ${result.status}`);
         }
       } catch (err) {
         errorCount++;
         console.error(`[customer-crm-syncer] Error validating sale ${sale.id}:`, err);
       }
 
-      // Rate limiting - wait 100ms between requests
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Rate limiting - wait 50ms between requests
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     // Update last run status
@@ -368,16 +493,18 @@ Deno.serve(async (req) => {
       console.error("[customer-crm-syncer] Error updating status:", updateError);
     }
 
-    console.log(`[customer-crm-syncer] Completed in ${duration}ms. Processed: ${processedCount}, Validated: ${validatedCount}, Errors: ${errorCount}`);
+    console.log(`[customer-crm-syncer] Completed in ${duration}ms. Processed: ${processedCount}, Approved: ${approvedCount}, Cancelled: ${cancelledCount}, Errors: ${errorCount}`);
 
     return new Response(
       JSON.stringify({
         success: true,
         processed: processedCount,
-        validated: validatedCount,
+        approved: approvedCount,
+        cancelled: cancelledCount,
         errors: errorCount,
         duration_ms: duration,
         status,
+        results: results.slice(0, 20), // Return first 20 results for debugging
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

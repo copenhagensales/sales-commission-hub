@@ -119,18 +119,23 @@ export function CustomerIntegrations() {
     onError: (error) => toast.error(`Fejl: ${error.message}`),
   });
 
-  // Manual Sync
+  // Manual Sync with detailed results
   const [syncingClientId, setSyncingClientId] = useState<string | null>(null);
   const manualSyncMutation = useMutation({
     mutationFn: async (clientId: string) => {
       setSyncingClientId(clientId);
-      const { error } = await supabase.functions.invoke("customer-crm-syncer", {
+      const { data, error } = await supabase.functions.invoke("customer-crm-syncer", {
         body: { client_id: clientId },
       });
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
-      toast.success("Manuel sync gennemført");
+    onSuccess: (data) => {
+      const { processed = 0, approved = 0, cancelled = 0, errors = 0 } = data || {};
+      toast.success(
+        `Validering færdig: ${processed} behandlet, ${approved} godkendt, ${cancelled} annulleret, ${errors} fejl`,
+        { duration: 6000 }
+      );
       queryClient.invalidateQueries({ queryKey: ["clients-integrations"] });
       setSyncingClientId(null);
     },
