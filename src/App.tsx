@@ -71,6 +71,7 @@ const EmailTemplatesPage = lazyWithRetry(() => import("./pages/recruitment/Email
 const Winback = lazyWithRetry(() => import("./pages/recruitment/Winback"));
 const UpcomingInterviews = lazyWithRetry(() => import("./pages/recruitment/UpcomingInterviews"));
 const UpcomingHires = lazyWithRetry(() => import("./pages/recruitment/UpcomingHires"));
+const Some = lazyWithRetry(() => import("./pages/Some"));
 
 const queryClient = new QueryClient();
 
@@ -265,6 +266,8 @@ const App = () => (
               <Route path="/recruitment/winback" element={<RoleProtectedRoute requireTeamlederOrAbove><Winback /></RoleProtectedRoute>} />
               <Route path="/recruitment/upcoming-interviews" element={<RoleProtectedRoute requireTeamlederOrAbove><UpcomingInterviews /></RoleProtectedRoute>} />
               <Route path="/recruitment/upcoming-hires" element={<RoleProtectedRoute requireTeamlederOrAbove><UpcomingHires /></RoleProtectedRoute>} />
+              {/* SOME route */}
+              <Route path="/some" element={<RoleProtectedRoute requireTeamlederOrAbove><Some /></RoleProtectedRoute>} />
               {/* Admin route - owner only */}
               <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
