@@ -595,45 +595,19 @@ export function AppSidebar() {
           )}
         </nav>
         <div className="border-t border-sidebar-border p-4 space-y-2">
-          {/* Tidsregistrering with Ekstra arbejde submenu */}
-          <Collapsible open={timeTrackingOpen} onOpenChange={setTimeTrackingOpen}>
-            <CollapsibleTrigger className={cn(
-              "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+          {/* Time tracking icon link */}
+          <NavLink
+            to={isTeamlederOrAbove ? "/shift-planning/time-tracking" : "/extra-work"}
+            className={cn(
+              "flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 w-10 h-10",
               (location.pathname === "/shift-planning/time-tracking" || location.pathname === "/extra-work" || location.pathname === "/extra-work-admin") 
                 ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-            )}>
-              <div className="flex items-center gap-3">
-                <Timer className="h-5 w-5" />
-                Tidsregistrering
-              </div>
-              {timeTrackingOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pl-4 space-y-1 mt-1">
-              {isTeamlederOrAbove && (
-                <NavLink
-                  to="/shift-planning/time-tracking"
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/shift-planning/time-tracking" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}
-                >
-                  <Clock className="h-4 w-4" />
-                  Oversigt
-                </NavLink>
-              )}
-              <NavLink
-                to={isTeamlederOrAbove ? "/extra-work-admin" : "/extra-work"}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  (location.pathname === "/extra-work" || location.pathname === "/extra-work-admin") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}
-              >
-                <Plus className="h-4 w-4" />
-                Ekstra arbejde
-              </NavLink>
-            </CollapsibleContent>
-          </Collapsible>
+            )}
+            title="Tidsregistrering"
+          >
+            <Timer className="h-5 w-5" />
+          </NavLink>
 
           <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50">
             <LogOut className="h-5 w-5" />
