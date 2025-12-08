@@ -130,7 +130,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isTeamlederOrAbove, isOwner, isRekruttering, isRekrutteringOrAbove, isTeamleder, isLoading, role } = useCanAccess();
+  const { isTeamlederOrAbove, isOwner, isRekruttering, isRekrutteringOrAbove, isTeamleder, isSome, isLoading, role } = useCanAccess();
   const { user } = useAuth();
   const { showMenuItem: showPulseSurvey, showBadge: showPulseBadge } = useShouldShowPulseSurvey();
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
@@ -292,10 +292,10 @@ export function AppSidebar() {
     ? [...ownerNavigation, ...teamlederExtraNavigation]
     : isTeamleder
       ? [...teamlederNavigation, ...teamlederExtraNavigation, ...teamlederCodeOfConductNav] 
-      : isRekruttering 
-        ? rekrutteringNavigation
-        : isSomeEmployee
-          ? someEmployeeNavigation
+        : isRekruttering 
+          ? rekrutteringNavigation
+          : (isSomeEmployee || isSome)
+            ? someEmployeeNavigation
           : employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey);
   
   // Filter out denied menu items based on href to menu_item_id mapping
