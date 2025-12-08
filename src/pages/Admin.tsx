@@ -700,6 +700,7 @@ export default function Admin() {
                                                     <SelectContent>
                                                       <SelectItem value="none">Ingen rolle</SelectItem>
                                                       <SelectItem value="medarbejder">Medarbejder</SelectItem>
+                                                      <SelectItem value="some">SOME</SelectItem>
                                                       <SelectItem value="rekruttering">Rekruttering</SelectItem>
                                                       <SelectItem value="teamleder">Teamleder</SelectItem>
                                                       <SelectItem value="ejer">Ejer</SelectItem>
@@ -789,6 +790,7 @@ export default function Admin() {
                                                     <SelectContent>
                                                       <SelectItem value="none">Ingen rolle</SelectItem>
                                                       <SelectItem value="medarbejder">Medarbejder</SelectItem>
+                                                      <SelectItem value="some">SOME</SelectItem>
                                                       <SelectItem value="rekruttering">Rekruttering</SelectItem>
                                                       <SelectItem value="teamleder">Teamleder</SelectItem>
                                                       <SelectItem value="ejer">Ejer</SelectItem>
@@ -878,6 +880,7 @@ export default function Admin() {
                                                     <SelectContent>
                                                       <SelectItem value="none">Ingen rolle</SelectItem>
                                                       <SelectItem value="medarbejder">Medarbejder</SelectItem>
+                                                      <SelectItem value="some">SOME</SelectItem>
                                                       <SelectItem value="rekruttering">Rekruttering</SelectItem>
                                                       <SelectItem value="teamleder">Teamleder</SelectItem>
                                                       <SelectItem value="ejer">Ejer</SelectItem>
@@ -969,6 +972,7 @@ export default function Admin() {
                                                     <SelectContent>
                                                       <SelectItem value="none">Ingen rolle</SelectItem>
                                                       <SelectItem value="medarbejder">Medarbejder</SelectItem>
+                                                      <SelectItem value="some">SOME</SelectItem>
                                                       <SelectItem value="rekruttering">Rekruttering</SelectItem>
                                                       <SelectItem value="teamleder">Teamleder</SelectItem>
                                                       <SelectItem value="ejer">Ejer</SelectItem>
