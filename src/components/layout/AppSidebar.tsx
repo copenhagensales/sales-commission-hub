@@ -139,6 +139,25 @@ export function AppSidebar() {
     location.pathname === "/extra-work-admin"
   );
 
+  // Fetch denied menu items for this user
+  const { data: deniedMenuItems = [] } = useQuery({
+    queryKey: ["user-denied-permissions", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from("user_menu_permissions")
+        .select("menu_item_id")
+        .eq("user_id", user.id)
+        .eq("permission_type", "deny");
+      return data?.map(p => p.menu_item_id) || [];
+    },
+    enabled: !!user?.id,
+    staleTime: 60000,
+  });
+
+  // Helper to check if a menu item is denied
+  const isMenuItemDenied = (menuId: string) => deniedMenuItems.includes(menuId);
+
   // Fetch employee name and pending contracts count
   const { data: employeeData } = useQuery({
     queryKey: ["sidebar-employee-data", user?.email],
@@ -238,14 +257,36 @@ export function AppSidebar() {
     navigate("/auth");
   };
 
-  // Select navigation based on role
-  const mainNavigation = isOwner 
+  // Select navigation based on role and filter out denied items
+  const baseNavigation = isOwner 
     ? [...ownerNavigation, ...teamlederExtraNavigation]
     : isTeamleder
       ? [...teamlederNavigation, ...teamlederExtraNavigation, ...teamlederCodeOfConductNav] 
       : isRekruttering 
         ? rekrutteringNavigation
         : employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey);
+  
+  // Filter out denied menu items based on href to menu_item_id mapping
+  const hrefToMenuId: Record<string, string> = {
+    '/pulse-survey': 'pulse-survey',
+    '/some': 'some',
+    '/employees': 'employees',
+    '/teams': 'teams',
+    '/contracts': 'contracts',
+    '/my-contracts': 'my-contracts',
+    '/my-profile': 'my-profile',
+    '/my-schedule': 'my-schedule',
+    '/career-wishes': 'career-wishes',
+    '/sales': 'sales',
+    '/shift-planning': 'shift-planning',
+  };
+  
+  const mainNavigation = baseNavigation.filter(item => {
+    const menuId = hrefToMenuId[item.href];
+    if (menuId && isMenuItemDenied(menuId)) return false;
+    return true;
+  });
+  
   const currentShiftPlanningNav = isOwner ? shiftPlanningNavigation : employeeShiftPlanningNavigation;
 
   if (isLoading) {
