@@ -50,9 +50,8 @@ const teamlederNavigation = [
   { name: "Min profil", href: "/my-profile", icon: User },
 ];
 
-// Navigation items for rekruttering role
+// Navigation items for rekruttering role (without Rekruttering - that's in submenu)
 const rekrutteringNavigation = [
-  { name: "Rekruttering", href: "/recruitment", icon: UserPlus },
   { name: "Medarbejdere", href: "/employees", icon: Users },
   { name: "Teams", href: "/teams", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
