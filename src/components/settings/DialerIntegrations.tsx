@@ -66,9 +66,19 @@ export function DialerIntegrations() {
       console.error("Error fetching dialer integrations:", error);
       toast.error("Kunne ikke hente integrationer");
     } else {
-      setIntegrations((data || []).map(d => ({
+      // Filtrar solo integraciones con formato de credenciales multi-tenant (objeto con username/password o api_key)
+      const multiTenantIntegrations = (data || []).filter(d => {
+        const secrets = d.secrets;
+        // Verificar que secrets es un objeto con credenciales reales (no un array de nombres de env vars)
+        if (typeof secrets === 'object' && secrets !== null && !Array.isArray(secrets)) {
+          return secrets.username || secrets.api_key;
+        }
+        return false;
+      });
+      
+      setIntegrations(multiTenantIntegrations.map(d => ({
         ...d,
-        secrets: typeof d.secrets === 'object' && d.secrets !== null ? d.secrets : {}
+        secrets: d.secrets as DialerIntegration['secrets']
       })) as DialerIntegration[]);
     }
     setLoading(false);
