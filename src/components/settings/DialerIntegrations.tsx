@@ -201,7 +201,8 @@ export function DialerIntegrations() {
                       id="username"
                       value={formData.username}
                       onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                      required
+                      placeholder={editingId ? "(uændret hvis tom)" : ""}
+                      required={!editingId}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -211,8 +212,12 @@ export function DialerIntegrations() {
                       type="password"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      required
+                      placeholder={editingId ? "(uændret hvis tom)" : ""}
+                      required={!editingId}
                     />
+                    {editingId && (
+                      <p className="text-xs text-muted-foreground">Lad felterne være tomme for at beholde eksisterende credentials.</p>
+                    )}
                   </div>
                 </div>
                 <DialogFooter>
@@ -280,6 +285,22 @@ export function DialerIntegrations() {
                       ) : (
                         <Play className="h-4 w-4" />
                       )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditingId(integration.id);
+                        setFormData({
+                          name: integration.name,
+                          provider: integration.provider,
+                          username: "",
+                          password: "",
+                        });
+                        setIsDialogOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"

@@ -25,44 +25,40 @@ Deno.serve(async (req) => {
     if (action === "save_dialer") {
       const { integration_id, name, provider, credentials } = body;
 
-      if (!name || !provider || !credentials?.username || !credentials?.password) {
+      // For new integrations, require credentials
+      if (!integration_id && (!name || !provider || !credentials?.username || !credentials?.password)) {
         return new Response(
           JSON.stringify({ error: "Missing required fields: name, provider, credentials" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      const credentialsJson = JSON.stringify(credentials);
+      // For updates, only name and provider are required
+      if (integration_id && (!name || !provider)) {
+        return new Response(
+          JSON.stringify({ error: "Missing required fields: name, provider" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const hasNewCredentials = credentials?.username && credentials?.password;
+      const credentialsJson = hasNewCredentials ? JSON.stringify(credentials) : null;
 
       if (integration_id) {
-        // Update existing integration
-        const { error } = await supabase.rpc("exec_sql", {
-          sql: `
-            UPDATE public.dialer_integrations 
-            SET 
-              name = $1,
-              provider = $2,
-              encrypted_credentials = extensions.pgp_sym_encrypt($3, $4),
-              updated_at = now()
-            WHERE id = $5
-          `,
-          params: [name, provider, credentialsJson, encryptionKey, integration_id],
-        });
+        // Update existing integration - always update name/provider
+        const { error: updateError } = await supabase
+          .from("dialer_integrations")
+          .update({
+            name,
+            provider,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", integration_id);
 
-        if (error) {
-          // Fallback: use direct update with encryption via SQL
-          const { error: updateError } = await supabase
-            .from("dialer_integrations")
-            .update({
-              name,
-              provider,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", integration_id);
+        if (updateError) throw updateError;
 
-          if (updateError) throw updateError;
-
-          // Update credentials separately with encryption
+        // Only update credentials if new ones were provided
+        if (hasNewCredentials) {
           const { error: credError } = await supabase.rpc("update_dialer_credentials", {
             p_integration_id: integration_id,
             p_credentials: credentialsJson,
@@ -96,7 +92,7 @@ Deno.serve(async (req) => {
             .insert({
               name,
               provider,
-              encrypted_credentials: credentialsJson, // Will be plaintext - need migration for proper encryption
+              encrypted_credentials: credentialsJson || "{}",
             })
             .select("id")
             .single();

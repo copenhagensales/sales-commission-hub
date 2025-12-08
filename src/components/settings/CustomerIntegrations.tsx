@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Database, Settings, Key, Loader2 } from "lucide-react";
+import { Database, Settings, Key, Loader2, RefreshCw } from "lucide-react";
 
 interface ClientIntegration {
   id: string;
@@ -119,6 +119,27 @@ export function CustomerIntegrations() {
     onError: (error) => toast.error(`Fejl: ${error.message}`),
   });
 
+  // Manual Sync
+  const [syncingClientId, setSyncingClientId] = useState<string | null>(null);
+  const manualSyncMutation = useMutation({
+    mutationFn: async (clientId: string) => {
+      setSyncingClientId(clientId);
+      const { error } = await supabase.functions.invoke("customer-crm-syncer", {
+        body: { client_id: clientId },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Manuel sync gennemført");
+      queryClient.invalidateQueries({ queryKey: ["clients-integrations"] });
+      setSyncingClientId(null);
+    },
+    onError: (error) => {
+      toast.error(`Sync fejl: ${error.message}`);
+      setSyncingClientId(null);
+    },
+  });
+
   const openConfigDialog = (client: Client) => {
     setSelectedClient(client.id);
     if (client.integration) {
@@ -217,7 +238,22 @@ export function CustomerIntegrations() {
                       <span className="text-muted-foreground text-xs">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right space-x-1">
+                    {item.integration && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => manualSyncMutation.mutate(item.id)}
+                        disabled={syncingClientId === item.id}
+                      >
+                        {syncingClientId === item.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                        <span className="ml-1">Sync nu</span>
+                      </Button>
+                    )}
                     <Button variant="ghost" size="sm" onClick={() => openConfigDialog(item)}>
                       <Settings className="h-4 w-4 mr-1" /> Konfigurer
                     </Button>
