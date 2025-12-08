@@ -320,7 +320,7 @@ export function AppSidebar() {
   
   // Add opt-in menu items if user has been granted access
   if (isMenuItemGranted("time-stamp")) {
-    mainNavigation = [...mainNavigation, { name: "Stempel", href: "/time-stamp", icon: Clock }];
+    mainNavigation = [...mainNavigation, { name: "Stempelur", href: "/time-stamp", icon: Clock }];
   }
   
   const currentShiftPlanningNav = isOwner ? shiftPlanningNavigation : employeeShiftPlanningNavigation;

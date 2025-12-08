@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Clock, Play, Square, Timer, Calendar } from "lucide-react";
+import { Clock, Play, Square, Timer, Calendar, CheckCircle2 } from "lucide-react";
 import { useTimeStamps } from "@/hooks/useTimeStamps";
 import { toast } from "sonner";
-import { format, formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 import { da } from "date-fns/locale";
 
 export default function TimeStamp() {
@@ -27,15 +26,12 @@ export default function TimeStamp() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [elapsedTime, setElapsedTime] = useState("");
   
-  // Check if employee is hourly (has 1 hour break deducted) - salary_type "hourly" or "provision" workers are hourly
   const isHourly = employee?.salary_type !== "fixed";
 
-  // Update current time every second
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
       
-      // Calculate elapsed time if clocked in
       if (activeStamp) {
         const clockInTime = new Date(activeStamp.clock_in);
         const diff = new Date().getTime() - clockInTime.getTime();
@@ -73,11 +69,10 @@ export default function TimeStamp() {
   };
 
   const formatDuration = (clockIn: string, clockOut: string | null, effectiveHours?: number | null) => {
-    // If we have effective hours, show that
     if (effectiveHours !== null && effectiveHours !== undefined) {
       const hours = Math.floor(effectiveHours);
       const minutes = Math.round((effectiveHours - hours) * 60);
-      return `${hours}t ${minutes}m (effektiv)`;
+      return `${hours}t ${minutes}m`;
     }
     
     const start = new Date(clockIn);
@@ -100,124 +95,125 @@ export default function TimeStamp() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Stempel</h1>
-          <p className="text-muted-foreground">Registrer din arbejdstid</p>
+      <div className="max-w-2xl mx-auto space-y-8 py-4">
+        {/* Header */}
+        <div className="text-center space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Stempelur</h1>
+          <p className="text-sm text-muted-foreground">
+            {format(currentTime, "EEEE d. MMMM", { locale: da })}
+          </p>
         </div>
 
-        {/* Main Clock Card */}
-        <Card className="border-2">
-          <CardHeader className="text-center pb-2">
-            <CardTitle className="text-6xl font-mono tabular-nums">
-              {format(currentTime, "HH:mm:ss")}
-            </CardTitle>
-            <CardDescription className="text-lg">
-              {format(currentTime, "EEEE d. MMMM yyyy", { locale: da })}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Status Badge */}
-            <div className="flex justify-center">
-              {isClockedIn ? (
-                <Badge variant="default" className="text-lg px-4 py-2 bg-green-600 hover:bg-green-700">
-                  <Clock className="w-5 h-5 mr-2 animate-pulse" />
-                  Stemplet ind - {elapsedTime}
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="text-lg px-4 py-2">
-                  <Clock className="w-5 h-5 mr-2" />
-                  Ikke stemplet ind
-                </Badge>
-              )}
-            </div>
-
-            {/* Clock In Time Display */}
-            {activeStamp && (
-              <div className="text-center text-muted-foreground">
-                Stemplet ind kl. {format(new Date(activeStamp.clock_in), "HH:mm")}
-              </div>
+        {/* Main Clock Display */}
+        <div className="text-center space-y-6">
+          <div className="text-7xl font-light font-mono tabular-nums tracking-tight">
+            {format(currentTime, "HH:mm")}
+          </div>
+          
+          {/* Status indicator */}
+          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+            isClockedIn 
+              ? "bg-green-500/10 text-green-600 dark:text-green-400" 
+              : "bg-muted text-muted-foreground"
+          }`}>
+            {isClockedIn ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                Aktiv · {elapsedTime}
+              </>
+            ) : (
+              <>
+                <Clock className="h-3.5 w-3.5" />
+                Ikke aktiv
+              </>
             )}
+          </div>
 
-            {/* Note Input */}
+          {activeStamp && (
+            <p className="text-sm text-muted-foreground">
+              Startet kl. {format(new Date(activeStamp.clock_in), "HH:mm")}
+            </p>
+          )}
+        </div>
+
+        {/* Action Section */}
+        <Card className="border-0 shadow-lg bg-card/50 backdrop-blur">
+          <CardContent className="p-6 space-y-4">
             <Textarea
               placeholder="Tilføj en note (valgfrit)..."
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="resize-none"
+              className="resize-none bg-background/50 border-border/50 focus:border-primary/50"
               rows={2}
             />
 
-            {/* Action Buttons */}
-            <div className="flex gap-4 justify-center">
-              {!isClockedIn ? (
-                <Button 
-                  size="lg" 
-                  className="w-48 h-16 text-xl bg-green-600 hover:bg-green-700"
-                  onClick={handleClockIn}
-                  disabled={clockIn.isPending}
-                >
-                  <Play className="w-6 h-6 mr-2" />
-                  Stempel ind
-                </Button>
-              ) : (
-                <Button 
-                  size="lg" 
-                  variant="destructive"
-                  className="w-48 h-16 text-xl"
-                  onClick={handleClockOut}
-                  disabled={clockOut.isPending}
-                >
-                  <Square className="w-6 h-6 mr-2" />
-                  Stempel ud
-                </Button>
-              )}
-            </div>
+            {!isClockedIn ? (
+              <Button 
+                size="lg" 
+                className="w-full h-14 text-base font-medium bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20"
+                onClick={handleClockIn}
+                disabled={clockIn.isPending}
+              >
+                <Play className="w-5 h-5 mr-2" />
+                Start arbejdsdag
+              </Button>
+            ) : (
+              <Button 
+                size="lg" 
+                variant="destructive"
+                className="w-full h-14 text-base font-medium shadow-lg shadow-destructive/20"
+                onClick={handleClockOut}
+                disabled={clockOut.isPending}
+              >
+                <Square className="w-5 h-5 mr-2" />
+                Afslut arbejdsdag
+              </Button>
+            )}
           </CardContent>
         </Card>
 
-        {/* Today's Summary */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Timer className="w-5 h-5" />
-                I dag (effektiv tid)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">
-                {totalHoursToday.toFixed(1)} timer
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="border-0 shadow-md bg-card/50">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Timer className="w-4 h-4 text-primary" />
+                </div>
+                <span className="text-sm text-muted-foreground">I dag</span>
               </div>
-              <p className="text-muted-foreground text-sm">
-                {todayStamps.length} stempling{todayStamps.length !== 1 ? "er" : ""}
-              </p>
+              <div className="text-2xl font-semibold">
+                {totalHoursToday.toFixed(1)}t
+              </div>
               {isHourly && (
-                <p className="text-xs text-amber-600 mt-1">
-                  * 1 times pause fratrukket pr. dag
+                <p className="text-xs text-muted-foreground mt-1">
+                  Ekskl. 1t pause
                 </p>
               )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
-                Seneste 7 dage
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">
+          <Card className="border-0 shadow-md bg-card/50">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Calendar className="w-4 h-4 text-primary" />
+                </div>
+                <span className="text-sm text-muted-foreground">7 dage</span>
+              </div>
+              <div className="text-2xl font-semibold">
                 {recentStamps.reduce((total, stamp) => {
                   if (!stamp.clock_out) return total;
                   const clockIn = new Date(stamp.clock_in);
                   const clockOut = new Date(stamp.clock_out);
                   return total + (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
-                }, 0).toFixed(1)} timer
+                }, 0).toFixed(1)}t
               </div>
-              <p className="text-muted-foreground text-sm">
-                {recentStamps.filter(s => s.clock_out).length} afsluttede stemplinger
+              <p className="text-xs text-muted-foreground mt-1">
+                {recentStamps.filter(s => s.clock_out).length} dage
               </p>
             </CardContent>
           </Card>
@@ -225,75 +221,64 @@ export default function TimeStamp() {
 
         {/* Today's Log */}
         {todayStamps.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Dagens stemplinger</CardTitle>
-              {isHourly && (
-                <p className="text-xs text-muted-foreground">
-                  Effektiv tid er baseret på din vagt med 1 times pause fratrukket
-                </p>
-              )}
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {todayStamps.map((stamp) => {
-                  const effectiveIn = stamp.effective_clock_in 
-                    ? format(new Date(stamp.effective_clock_in), "HH:mm")
-                    : null;
-                  const effectiveOut = stamp.effective_clock_out 
-                    ? format(new Date(stamp.effective_clock_out), "HH:mm")
-                    : null;
-                  const hasEffectiveTime = effectiveIn && (stamp.clock_out ? effectiveOut : true);
-                  
-                  return (
-                    <div 
-                      key={stamp.id} 
-                      className="p-3 bg-muted/50 rounded-lg space-y-2"
-                    >
+          <div className="space-y-3">
+            <h2 className="text-sm font-medium text-muted-foreground px-1">
+              Dagens stemplinger
+            </h2>
+            <div className="space-y-2">
+              {todayStamps.map((stamp) => {
+                const effectiveIn = stamp.effective_clock_in 
+                  ? format(new Date(stamp.effective_clock_in), "HH:mm")
+                  : null;
+                const effectiveOut = stamp.effective_clock_out 
+                  ? format(new Date(stamp.effective_clock_out), "HH:mm")
+                  : null;
+                
+                return (
+                  <Card key={stamp.id} className="border-0 shadow-sm bg-card/50">
+                    <CardContent className="p-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="text-sm">
-                            <span className="text-muted-foreground text-xs mr-1">Registreret:</span>
-                            <span className="font-medium">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-1.5 rounded-full ${stamp.clock_out ? "bg-green-500/10" : "bg-amber-500/10"}`}>
+                            {stamp.clock_out ? (
+                              <CheckCircle2 className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-medium">
                               {format(new Date(stamp.clock_in), "HH:mm")}
-                            </span>
-                            <span className="text-muted-foreground"> → </span>
-                            <span className="font-medium">
+                              <span className="text-muted-foreground mx-1.5">→</span>
                               {stamp.clock_out 
                                 ? format(new Date(stamp.clock_out), "HH:mm")
                                 : "..."
                               }
-                            </span>
+                            </div>
+                            {stamp.note && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {stamp.note}
+                              </p>
+                            )}
                           </div>
-                          {stamp.note && (
-                            <span className="text-sm text-muted-foreground">
-                              "{stamp.note}"
-                            </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium">
+                            {formatDuration(stamp.clock_in, stamp.clock_out, stamp.effective_hours)}
+                          </div>
+                          {effectiveIn && stamp.clock_out && effectiveOut && (
+                            <p className="text-xs text-muted-foreground">
+                              Effektiv: {effectiveIn}–{effectiveOut}
+                            </p>
                           )}
                         </div>
-                        <Badge variant={stamp.clock_out ? "secondary" : "default"}>
-                          {formatDuration(stamp.clock_in, stamp.clock_out, stamp.effective_hours)}
-                        </Badge>
                       </div>
-                      
-                      {/* Show effective time if different from registered */}
-                      {hasEffectiveTime && stamp.clock_out && (
-                        <div className="text-xs text-blue-600 pl-1">
-                          <span className="text-muted-foreground mr-1">Effektiv:</span>
-                          {effectiveIn} → {effectiveOut}
-                          {stamp.effective_hours !== null && (
-                            <span className="ml-2 font-medium">
-                              = {stamp.effective_hours.toFixed(1)} timer
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
     </MainLayout>
