@@ -5,18 +5,19 @@ export class EnreachAdapter implements DialerAdapter {
   private apiKey: string;
   private baseUrl: string; 
 
-  constructor() {
-    this.apiKey = Deno.env.get('ENREACH_API_KEY')!;
-    this.baseUrl = Deno.env.get('ENREACH_BASE_URL')!;
-    
-    if (!this.apiKey || !this.baseUrl) throw new Error("Credenciales Enreach faltantes");
+  // Recibe credenciales desde la DB
+  constructor(credentials: { api_key?: string; base_url?: string }) {
+    if (!credentials.api_key || !credentials.base_url) {
+      throw new Error("Credenciales Enreach incompletas en la configuración");
+    }
+    this.apiKey = credentials.api_key;
+    this.baseUrl = credentials.base_url;
   }
 
   async fetchSales(days: number): Promise<StandardSale[]> {
     console.log(`[Enreach] Fetching last ${days} days...`);
     
     // TODO: Implementar cuando tengamos documentación de endpoints
-    // Normalmente GET /orders o GET /calls con estado de venta
     return []; 
   }
 
