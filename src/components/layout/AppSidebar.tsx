@@ -123,7 +123,12 @@ const vagtFlowNavigation = [
 // Employee-only shift planning items (empty - employees don't see shift planning menu)
 const employeeShiftPlanningNavigation: typeof shiftPlanningNavigation = [];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  isMobile?: boolean;
+  onNavigate?: () => void;
+}
+
+export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -380,18 +385,30 @@ export function AppSidebar() {
   
   const currentShiftPlanningNav = isOwner ? shiftPlanningNavigation : employeeShiftPlanningNavigation;
 
+  const handleNavClick = () => {
+    if (isMobile && onNavigate) {
+      onNavigate();
+    }
+  };
+
+  const sidebarClasses = isMobile 
+    ? "h-full w-full bg-sidebar overflow-y-auto" 
+    : "fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto";
+
   if (isLoading || isSomeLoading) {
     return (
-      <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto">
+      <aside className={sidebarClasses}>
         <div className="flex h-full flex-col">
-        <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-4">
-            <div 
-              onClick={() => navigate("/")} 
-              className="flex items-center justify-center px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
-            >
-              <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
+          {!isMobile && (
+            <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-4">
+              <div 
+                onClick={() => navigate("/")} 
+                className="flex items-center justify-center px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
+              >
+                <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
+              </div>
             </div>
-          </div>
+          )}
           <div className="flex-1 flex items-center justify-center">
             <div className="animate-pulse text-muted-foreground">Indlæser...</div>
           </div>
@@ -401,17 +418,19 @@ export function AppSidebar() {
   }
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto">
+    <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
-        <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-4">
-          <div 
-            onClick={() => navigate("/")} 
-            className="flex items-center justify-center px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
-          >
-            <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
+        {!isMobile && (
+          <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-4">
+            <div 
+              onClick={() => navigate("/")} 
+              className="flex items-center justify-center px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-sidebar-accent/50"
+            >
+              <img src={cphSalesLogo} alt="CPH Sales" className="h-10 w-auto object-contain" />
+            </div>
           </div>
-        </div>
-        <nav className="flex-1 space-y-1 p-4">
+        )}
+        <nav className="flex-1 space-y-1 p-4 pt-6">
           {mainNavigation.map((item) => {
             const isActive = location.pathname === item.href;
             const hasPendingAbsenceBadge = 'badgeKey' in item && item.badgeKey === 'pendingAbsence' && pendingAbsenceCount > 0;
@@ -427,6 +446,7 @@ export function AppSidebar() {
               <NavLink
                 key={item.name}
                 to={item.href}
+                onClick={handleNavClick}
                 className={cn(
                   "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                   isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -449,6 +469,7 @@ export function AppSidebar() {
           {isFieldmarketing && !isTeamlederOrAbove && (
             <NavLink
               to="/car-quiz"
+              onClick={handleNavClick}
               className={cn(
                 "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                 location.pathname === "/car-quiz" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -470,6 +491,7 @@ export function AppSidebar() {
           {isSalgskonsulent && !isOwner && (
             <NavLink
               to="/code-of-conduct"
+              onClick={handleNavClick}
               className={cn(
                 "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                 location.pathname === "/code-of-conduct" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -507,6 +529,7 @@ export function AppSidebar() {
                     <NavLink
                       key={item.name}
                       to={item.href}
+                      onClick={handleNavClick}
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                         isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -541,6 +564,7 @@ export function AppSidebar() {
                     <NavLink
                       key={item.name}
                       to={item.href}
+                      onClick={handleNavClick}
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                         isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -575,6 +599,7 @@ export function AppSidebar() {
                     <NavLink
                       key={item.name}
                       to={item.href}
+                      onClick={handleNavClick}
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                         isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -614,6 +639,7 @@ export function AppSidebar() {
                     <NavLink
                       key={item.name}
                       to={item.href}
+                      onClick={handleNavClick}
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                         isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -631,6 +657,7 @@ export function AppSidebar() {
           {isOwner && (
             <NavLink
               to="/admin"
+              onClick={handleNavClick}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                 location.pathname === "/admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -644,6 +671,7 @@ export function AppSidebar() {
           {isOwner && (
             <NavLink
               to="/settings"
+              onClick={handleNavClick}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                 location.pathname === "/settings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -658,6 +686,7 @@ export function AppSidebar() {
           {/* Time tracking icon link */}
           <NavLink
             to={isTeamlederOrAbove ? "/shift-planning/time-tracking" : "/extra-work"}
+            onClick={handleNavClick}
             className={cn(
               "flex items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 w-10 h-10",
               (location.pathname === "/shift-planning/time-tracking" || location.pathname === "/extra-work" || location.pathname === "/extra-work-admin") 
@@ -669,7 +698,7 @@ export function AppSidebar() {
             <Timer className="h-5 w-5" />
           </NavLink>
 
-          <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50">
+          <button onClick={() => { handleLogout(); handleNavClick(); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50">
             <LogOut className="h-5 w-5" />
             Log ud
           </button>
