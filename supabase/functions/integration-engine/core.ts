@@ -97,7 +97,6 @@ export class IngestionEngine {
     const { data: dbMappings } = await this.supabase.from("adversus_product_mappings").select("*");
 
     // Mapas para búsqueda O(1)
-    const agentMap = new Map(dbAgents?.map((a) => [String(a.external_adversus_id), a.id]));
     const productMapByName = new Map(dbProducts?.map((p) => [p.name.toLowerCase(), p]));
     const productMapByExtId = new Map(dbMappings?.map((m) => [m.adversus_external_id, m.product_id]));
 
@@ -106,17 +105,11 @@ export class IngestionEngine {
 
     for (const sale of sales) {
       try {
-        // Resolver Agente Interno
-        // Intentamos por ID externo (más seguro), si no, lo dejamos null o usamos lógica futura de email
-        // El StandardSale trae el 'agentExternalId' si el adaptador lo soporta (lo agregué en types abajo)
-        const agentId = agentMap.get(sale.agentExternalId || "") || null;
-
         const saleData = {
           adversus_external_id: sale.externalId,
           sale_datetime: sale.saleDate,
-          agent_external_id: sale.agentExternalId,
-          agent_name: sale.agentName, // Nombre que viene del CRM
-          agent_id: agentId, // ID interno de nuestra tabla agents
+          agent_external_id: sale.agentExternalId || null,
+          agent_name: sale.agentName || sale.agentEmail,
           customer_company: sale.customerName,
           customer_phone: sale.customerPhone,
           updated_at: new Date().toISOString(),

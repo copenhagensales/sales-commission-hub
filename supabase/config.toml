@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.delete-auth-user]
 verify_jwt = false
+
+[functions.integration-engine]
+verify_jwt = false

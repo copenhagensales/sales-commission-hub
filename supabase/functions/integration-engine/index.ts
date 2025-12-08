@@ -30,7 +30,7 @@ serve(async (req) => {
 
     if (action === 'sync') {
       const sales = await adapter.fetchSales(days);
-      const stats = await engine.processBatch(sales, source);
+      const stats = await engine.processSales(sales, source);
       
       result = {
         success: true,
