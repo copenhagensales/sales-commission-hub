@@ -360,8 +360,22 @@ export function AppSidebar() {
   
   // Add SOME menu item if granted via individual permissions and not already in navigation
   if (hasSomeAccess && !mainNavigation.some(item => item.href === "/some")) {
-    console.log("Adding SOME to navigation for user", user?.id);
     mainNavigation = [...mainNavigation, { name: "SOME", href: "/some", icon: Video }];
+  }
+  
+  // Add car-quiz-admin if granted
+  if (isMenuItemGranted("car-quiz-admin") && !mainNavigation.some(item => item.href === "/car-quiz-admin")) {
+    mainNavigation = [...mainNavigation, { name: "Bil-quiz overblik", href: "/car-quiz-admin", icon: Car }];
+  }
+  
+  // Add code of conduct admin if granted
+  if (isMenuItemGranted("coc-admin") && !mainNavigation.some(item => item.href === "/code-of-conduct-admin")) {
+    mainNavigation = [...mainNavigation, { name: "Code of Conduct overblik", href: "/code-of-conduct-admin", icon: Shield }];
+  }
+  
+  // Add pulse survey results if granted
+  if (isMenuItemGranted("pulse-results") && !mainNavigation.some(item => item.href === "/pulse-survey-results")) {
+    mainNavigation = [...mainNavigation, { name: "Pulsmåling resultater", href: "/pulse-survey-results", icon: BarChart3 }];
   }
   
   const currentShiftPlanningNav = isOwner ? shiftPlanningNavigation : employeeShiftPlanningNavigation;
@@ -507,8 +521,8 @@ export function AppSidebar() {
             </Collapsible>
           )}
 
-          {/* Fieldmarketing menu - only for owners */}
-          {isOwner && (
+          {/* Fieldmarketing menu - for owners or users with fieldmarketing permission */}
+          {(isOwner || isMenuItemGranted("fieldmarketing")) && (
             <Collapsible open={vagtFlowOpen} onOpenChange={setVagtFlowOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
