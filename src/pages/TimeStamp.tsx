@@ -19,12 +19,16 @@ export default function TimeStamp() {
     isLoading, 
     clockIn, 
     clockOut,
-    isClockedIn 
+    isClockedIn,
+    employee
   } = useTimeStamps();
   
   const [note, setNote] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [elapsedTime, setElapsedTime] = useState("");
+  
+  // Check if employee is hourly (has 1 hour break deducted) - salary_type "hourly" or "provision" workers are hourly
+  const isHourly = employee?.salary_type !== "fixed";
 
   // Update current time every second
   useEffect(() => {
@@ -68,7 +72,14 @@ export default function TimeStamp() {
     }
   };
 
-  const formatDuration = (clockIn: string, clockOut: string | null) => {
+  const formatDuration = (clockIn: string, clockOut: string | null, effectiveHours?: number | null) => {
+    // If we have effective hours, show that
+    if (effectiveHours !== null && effectiveHours !== undefined) {
+      const hours = Math.floor(effectiveHours);
+      const minutes = Math.round((effectiveHours - hours) * 60);
+      return `${hours}t ${minutes}m (effektiv)`;
+    }
+    
     const start = new Date(clockIn);
     const end = clockOut ? new Date(clockOut) : new Date();
     const diff = end.getTime() - start.getTime();
@@ -171,7 +182,7 @@ export default function TimeStamp() {
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Timer className="w-5 h-5" />
-                I dag
+                I dag (effektiv tid)
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -181,6 +192,11 @@ export default function TimeStamp() {
               <p className="text-muted-foreground text-sm">
                 {todayStamps.length} stempling{todayStamps.length !== 1 ? "er" : ""}
               </p>
+              {isHourly && (
+                <p className="text-xs text-amber-600 mt-1">
+                  * 1 times pause fratrukket pr. dag
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -212,38 +228,69 @@ export default function TimeStamp() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Dagens stemplinger</CardTitle>
+              {isHourly && (
+                <p className="text-xs text-muted-foreground">
+                  Effektiv tid er baseret på din vagt med 1 times pause fratrukket
+                </p>
+              )}
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {todayStamps.map((stamp) => (
-                  <div 
-                    key={stamp.id} 
-                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="text-sm">
-                        <span className="font-medium">
-                          {format(new Date(stamp.clock_in), "HH:mm")}
-                        </span>
-                        <span className="text-muted-foreground"> → </span>
-                        <span className="font-medium">
-                          {stamp.clock_out 
-                            ? format(new Date(stamp.clock_out), "HH:mm")
-                            : "..."
-                          }
-                        </span>
+                {todayStamps.map((stamp) => {
+                  const effectiveIn = stamp.effective_clock_in 
+                    ? format(new Date(stamp.effective_clock_in), "HH:mm")
+                    : null;
+                  const effectiveOut = stamp.effective_clock_out 
+                    ? format(new Date(stamp.effective_clock_out), "HH:mm")
+                    : null;
+                  const hasEffectiveTime = effectiveIn && (stamp.clock_out ? effectiveOut : true);
+                  
+                  return (
+                    <div 
+                      key={stamp.id} 
+                      className="p-3 bg-muted/50 rounded-lg space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="text-sm">
+                            <span className="text-muted-foreground text-xs mr-1">Registreret:</span>
+                            <span className="font-medium">
+                              {format(new Date(stamp.clock_in), "HH:mm")}
+                            </span>
+                            <span className="text-muted-foreground"> → </span>
+                            <span className="font-medium">
+                              {stamp.clock_out 
+                                ? format(new Date(stamp.clock_out), "HH:mm")
+                                : "..."
+                              }
+                            </span>
+                          </div>
+                          {stamp.note && (
+                            <span className="text-sm text-muted-foreground">
+                              "{stamp.note}"
+                            </span>
+                          )}
+                        </div>
+                        <Badge variant={stamp.clock_out ? "secondary" : "default"}>
+                          {formatDuration(stamp.clock_in, stamp.clock_out, stamp.effective_hours)}
+                        </Badge>
                       </div>
-                      {stamp.note && (
-                        <span className="text-sm text-muted-foreground">
-                          "{stamp.note}"
-                        </span>
+                      
+                      {/* Show effective time if different from registered */}
+                      {hasEffectiveTime && stamp.clock_out && (
+                        <div className="text-xs text-blue-600 pl-1">
+                          <span className="text-muted-foreground mr-1">Effektiv:</span>
+                          {effectiveIn} → {effectiveOut}
+                          {stamp.effective_hours !== null && (
+                            <span className="ml-2 font-medium">
+                              = {stamp.effective_hours.toFixed(1)} timer
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
-                    <Badge variant={stamp.clock_out ? "secondary" : "default"}>
-                      {formatDuration(stamp.clock_in, stamp.clock_out)}
-                    </Badge>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

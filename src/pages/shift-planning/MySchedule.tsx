@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { format, startOfMonth, endOfMonth, isToday, isSameDay, addMonths, subMonths, startOfWeek, addDays, addWeeks } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Briefcase, Thermometer, Palmtree, CalendarPlus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Briefcase, Thermometer, Palmtree, CalendarPlus, Clock } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 import { useCurrentEmployee, useMyShifts, useDanishHolidays, useAbsenceRequests } from "@/hooks/useShiftPlanning";
+import { useTimeStampsForRange } from "@/hooks/useTimeStamps";
 import { CreateAbsenceDialog } from "@/components/shift-planning/CreateAbsenceDialog";
 import { cn } from "@/lib/utils";
 import VagtMinUge from "@/pages/vagt-flow/MinUge";
@@ -61,6 +62,13 @@ export default function MySchedule() {
   );
   const { data: holidays } = useDanishHolidays(currentDate.getFullYear());
   const { data: myAbsences } = useAbsenceRequests(undefined, employee?.id);
+  
+  // Get time stamps for the month
+  const { data: timeStamps } = useTimeStampsForRange(
+    employee?.id,
+    format(monthStart, "yyyy-MM-dd"),
+    format(monthEnd, "yyyy-MM-dd")
+  );
 
   const isHoliday = (date: Date) => {
     return holidays?.some(h => isSameDay(new Date(h.date), date));
@@ -80,6 +88,14 @@ export default function MySchedule() {
       const start = new Date(a.start_date);
       const end = new Date(a.end_date);
       return date >= start && date <= end;
+    });
+  };
+  
+  // Get time stamp for a specific day
+  const getTimeStampForDay = (date: Date) => {
+    return timeStamps?.find(ts => {
+      const stampDate = new Date(ts.clock_in);
+      return isSameDay(stampDate, date);
     });
   };
 
@@ -166,6 +182,10 @@ export default function MySchedule() {
                 <div className="w-3 h-3 rounded bg-red-500/20 border border-red-500/30" />
                 <span className="text-muted-foreground">Syg</span>
               </div>
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3 h-3 text-blue-600" />
+                <span className="text-muted-foreground">Stemplet</span>
+              </div>
             </div>
 
             {/* Calendar Grid */}
@@ -205,12 +225,14 @@ export default function MySchedule() {
                         const holiday = isHoliday(day);
                         const holidayName = getHolidayName(day);
                         const absence = getAbsenceForDay(day);
+                        const timeStamp = getTimeStampForDay(day);
                         const isPast = day < new Date() && !isToday(day);
 
                         // Determine cell style based on status
                         let bgColor = "bg-green-500/15"; // Default: working day
                         let icon = <Briefcase className="h-3 w-3 text-green-600" />;
                         let statusText = workingHours.start.replace(":", ".") + "-" + workingHours.end.replace(":", ".");
+                        let timeStampInfo: React.ReactNode = null;
 
                         if (holiday) {
                           bgColor = "bg-destructive/10";
@@ -228,6 +250,27 @@ export default function MySchedule() {
                           }
                         } else if (shift) {
                           statusText = `${shift.start_time.slice(0, 5).replace(":", ".")}-${shift.end_time.slice(0, 5).replace(":", ".")}`;
+                        }
+                        
+                        // Show time stamp info if available
+                        if (timeStamp && !holiday && !absence) {
+                          const clockIn = format(new Date(timeStamp.clock_in), "HH:mm");
+                          const clockOut = timeStamp.clock_out 
+                            ? format(new Date(timeStamp.clock_out), "HH:mm") 
+                            : "...";
+                          const effectiveHours = timeStamp.effective_hours;
+                          
+                          timeStampInfo = (
+                            <div className="mt-0.5 text-[9px] text-blue-600 flex items-center gap-0.5">
+                              <Clock className="h-2.5 w-2.5" />
+                              <span>{clockIn}-{clockOut}</span>
+                              {effectiveHours !== null && (
+                                <span className="text-muted-foreground ml-0.5">
+                                  ({effectiveHours.toFixed(1)}t)
+                                </span>
+                              )}
+                            </div>
+                          );
                         }
 
                         return (
@@ -251,12 +294,15 @@ export default function MySchedule() {
                               </div>
 
                               {/* Status */}
-                              <div className="flex items-center gap-1 flex-1">
+                              <div className="flex items-center gap-1">
                                 {icon}
                                 <span className="text-[10px] text-muted-foreground truncate">
                                   {statusText}
                                 </span>
                               </div>
+                              
+                              {/* Time stamp info */}
+                              {timeStampInfo}
                             </div>
                           </div>
                         );
