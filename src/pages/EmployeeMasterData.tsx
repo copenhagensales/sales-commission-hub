@@ -103,7 +103,7 @@ export default function EmployeeMasterData() {
   const [editingEmployee, setEditingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
   const [formData, setFormData] = useState<NewEmployee>(defaultEmployee);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createData, setCreateData] = useState({ first_name: "", last_name: "", email: "", password: "", job_title: "" as "Fieldmarketing" | "Salgskonsulent" | "" });
+  const [createData, setCreateData] = useState({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
   const [creatingEmployee, setCreatingEmployee] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -474,7 +474,7 @@ export default function EmployeeMasterData() {
                     <Label>Stilling *</Label>
                     <Select 
                       value={createData.job_title} 
-                      onValueChange={(value: "Fieldmarketing" | "Salgskonsulent") => setCreateData({ ...createData, job_title: value })}
+                      onValueChange={(value) => setCreateData({ ...createData, job_title: value })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Vælg stilling" />
@@ -482,10 +482,17 @@ export default function EmployeeMasterData() {
                       <SelectContent>
                         <SelectItem value="Salgskonsulent">Salgskonsulent</SelectItem>
                         <SelectItem value="Fieldmarketing">Fieldmarketing</SelectItem>
+                        <SelectItem value="SOME">SOME</SelectItem>
+                        <SelectItem value="Teamleder">Teamleder</SelectItem>
+                        <SelectItem value="Assisterende Teamleder">Assisterende Teamleder</SelectItem>
+                        <SelectItem value="Rekruttering">Rekruttering</SelectItem>
+                        <SelectItem value="Backoffice">Backoffice</SelectItem>
+                        <SelectItem value="Projektleder">Projektleder</SelectItem>
+                        <SelectItem value="Ejer">Ejer</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Flere rettigheder kan tilføjes af en ejer senere.
+                      Rettigheder tildeles automatisk baseret på stilling.
                     </p>
                   </div>
                 </div>
