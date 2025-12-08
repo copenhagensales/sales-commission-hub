@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Upload, FileSpreadsheet, Loader2, Check, X, RefreshCw, Trash2 } from "lucide-react";
+import { Upload, FileSpreadsheet, Loader2, Check, RefreshCw, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 
 interface ParsedRow {
@@ -20,6 +20,16 @@ interface ColumnMapping {
   opp_number: string;
   status: string;
   customer_name: string;
+}
+
+interface ExcelImport {
+  id: string;
+  filename: string;
+  row_count: number;
+  uploaded_at: string;
+  validation_status: string | null;
+  matched_count: number | null;
+  cancelled_count: number | null;
 }
 
 const MAPPING_TARGETS = [
@@ -56,13 +66,14 @@ export function ExcelCrmUpload() {
     queryKey: ["crm-excel-imports", selectedClient],
     queryFn: async () => {
       if (!selectedClient) return [];
-      const { data } = await supabase
-        .from("crm_excel_imports")
+      const { data, error } = await supabase
+        .from("crm_excel_imports" as never)
         .select("*")
         .eq("client_id", selectedClient)
         .order("uploaded_at", { ascending: false })
         .limit(10);
-      return data || [];
+      if (error) throw error;
+      return (data || []) as ExcelImport[];
     },
     enabled: !!selectedClient,
   });
@@ -86,8 +97,8 @@ export function ExcelCrmUpload() {
         if (jsonData.length > 0) {
           const cols = Object.keys(jsonData[0]);
           setColumns(cols);
-          setParsedData(jsonData.slice(0, 100)); // Preview first 100 rows
-          toast.success(`Parsed ${jsonData.length} rows from Excel`);
+          setParsedData(jsonData.slice(0, 100));
+          toast.success(`Parsed ${jsonData.length} rækker fra Excel`);
         }
       } catch (err) {
         console.error("Error parsing Excel:", err);
@@ -115,34 +126,37 @@ export function ExcelCrmUpload() {
 
       // Insert main import record
       const { data: importRecord, error: importError } = await supabase
-        .from("crm_excel_imports")
+        .from("crm_excel_imports" as never)
         .insert({
           client_id: selectedClient,
           filename: file.name,
           row_count: transformedRows.length,
           column_mapping: columnMapping,
-        })
+        } as never)
         .select()
         .single();
 
       if (importError) throw importError;
 
+      const importData = importRecord as { id: string };
+
       // Insert rows
       const rowsToInsert = transformedRows.map((row) => ({
-        import_id: importRecord.id,
+        import_id: importData.id,
         ...row,
       }));
 
-      const { error: rowsError } = await supabase.from("crm_excel_import_rows").insert(rowsToInsert);
+      const { error: rowsError } = await supabase
+        .from("crm_excel_import_rows" as never)
+        .insert(rowsToInsert as never);
 
       if (rowsError) throw rowsError;
 
-      return { importId: importRecord.id, rowCount: transformedRows.length };
+      return { importId: importData.id, rowCount: transformedRows.length };
     },
     onSuccess: (data) => {
       toast.success(`Importeret ${data.rowCount} rækker`);
       queryClient.invalidateQueries({ queryKey: ["crm-excel-imports"] });
-      // Reset form
       setFile(null);
       setParsedData([]);
       setColumns([]);
@@ -151,7 +165,7 @@ export function ExcelCrmUpload() {
     onError: (error) => toast.error(`Fejl: ${error.message}`),
   });
 
-  // Validate mutation - match against sales
+  // Validate mutation
   const validateMutation = useMutation({
     mutationFn: async (importId: string) => {
       const { data, error } = await supabase.functions.invoke("validate-excel-import", {
@@ -173,10 +187,8 @@ export function ExcelCrmUpload() {
   // Delete import mutation
   const deleteMutation = useMutation({
     mutationFn: async (importId: string) => {
-      // Delete rows first
-      await supabase.from("crm_excel_import_rows").delete().eq("import_id", importId);
-      // Then delete import
-      const { error } = await supabase.from("crm_excel_imports").delete().eq("id", importId);
+      await supabase.from("crm_excel_import_rows" as never).delete().eq("import_id", importId);
+      const { error } = await supabase.from("crm_excel_imports" as never).delete().eq("id", importId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -210,8 +222,7 @@ export function ExcelCrmUpload() {
                 <SelectItem key={client.id} value={client.id}>
                   {client.name}
                 </SelectItem>
-              ))
-              }
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -263,13 +274,11 @@ export function ExcelCrmUpload() {
                             <SelectItem key={col} value={col}>
                               {col}
                             </SelectItem>
-                          ))
-                          }
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
-                  ))
-                  }
+                  ))}
                 </div>
 
                 {/* Preview Table */}
@@ -283,8 +292,7 @@ export function ExcelCrmUpload() {
                             <TableHead key={col} className="text-xs whitespace-nowrap">
                               {col}
                             </TableHead>
-                          ))
-                          }
+                          ))}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -294,11 +302,9 @@ export function ExcelCrmUpload() {
                               <TableCell key={col} className="text-xs">
                                 {String(row[col] ?? "")}
                               </TableCell>
-                            ))
-                            }
+                            ))}
                           </TableRow>
-                        ))
-                        }
+                        ))}
                       </TableBody>
                     </Table>
                   </div>
@@ -332,15 +338,7 @@ export function ExcelCrmUpload() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {existingImports.map((imp: {
-                      id: string;
-                      filename: string;
-                      row_count: number;
-                      uploaded_at: string;
-                      validation_status: string | null;
-                      matched_count: number | null;
-                      cancelled_count: number | null;
-                    }) => (
+                    {existingImports.map((imp) => (
                       <TableRow key={imp.id}>
                         <TableCell className="font-mono text-xs">{imp.filename}</TableCell>
                         <TableCell>{imp.row_count}</TableCell>
@@ -386,8 +384,7 @@ export function ExcelCrmUpload() {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))
-                    }
+                    ))}
                   </TableBody>
                 </Table>
               ) : (
