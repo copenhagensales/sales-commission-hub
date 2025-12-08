@@ -25,6 +25,18 @@ interface LatenessRecord {
   note: string | null;
 }
 
+type TimeStampData = {
+  id: string;
+  employee_id: string;
+  clock_in: string;
+  clock_out: string | null;
+  effective_clock_in: string | null;
+  effective_clock_out: string | null;
+  effective_hours: number | null;
+  break_minutes: number | null;
+  note: string | null;
+};
+
 export default function ShiftOverview() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
@@ -301,13 +313,8 @@ export default function ShiftOverview() {
   }, [employees, absences, weekDays]);
 
   // Handle cell click - cycle through: empty -> vacation -> sick -> late (dialog) -> empty
-  const handleCellClick = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null, currentLateness: LatenessRecord | null, hasShift: boolean) => {
+  const handleCellClick = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null, currentLateness: LatenessRecord | null) => {
     const dateStr = format(date, "yyyy-MM-dd");
-
-    if (hasShift) {
-      // If there's a shift, open edit dialog instead of cycling
-      return;
-    }
 
     // Cycle: empty -> vacation -> sick -> late (dialog) -> empty
     if (!currentLateness && !currentAbsence) {
@@ -345,13 +352,15 @@ export default function ShiftOverview() {
     setPendingDelayCell(null);
   };
 
-  // Handle double-click to open create shift dialog
-  const handleCellDoubleClick = (employeeId: string, date: Date, absence: AbsenceRequest | null, lateness: LatenessRecord | null) => {
-    if (!absence && !lateness) {
-      setSelectedEmployeeId(employeeId);
-      setSelectedDate(date);
-      setCreateDialogOpen(true);
-    }
+  // Handle double-click to open time stamp edit dialog
+  const handleCellDoubleClick = (employee: { id: string; first_name: string; last_name: string }, date: Date, timeStamp: TimeStampData | null) => {
+    setSelectedTimeStamp(timeStamp);
+    setSelectedTimeStampEmployee({
+      id: employee.id,
+      name: `${employee.first_name} ${employee.last_name}`,
+      date: date,
+    });
+    setEditTimeStampDialogOpen(true);
   };
 
   return (
@@ -591,12 +600,12 @@ export default function ShiftOverview() {
                         )}
                         onClick={() => {
                           if (!holiday) {
-                            handleCellClick(employee.id, day, absence, lateness, hasShift);
+                            handleCellClick(employee.id, day, absence, lateness);
                           }
                         }}
                         onDoubleClick={() => {
                           if (!holiday) {
-                            handleCellDoubleClick(employee.id, day, absenceDisplay, lateness);
+                            handleCellDoubleClick(employee, day, timeStamp);
                           }
                         }}
                       >
@@ -621,19 +630,7 @@ export default function ShiftOverview() {
                         )}
                         {/* Show work times and clock-in when working */}
                         {!hasShift && !isLate && isWorking && !holiday && (
-                          <div 
-                            className="flex flex-col items-center justify-center h-full gap-0.5 cursor-pointer hover:bg-emerald-500/40 rounded transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTimeStamp(timeStamp);
-                              setSelectedTimeStampEmployee({
-                                id: employee.id,
-                                name: `${employee.first_name} ${employee.last_name}`,
-                                date: day,
-                              });
-                              setEditTimeStampDialogOpen(true);
-                            }}
-                          >
+                          <div className="flex flex-col items-center justify-center h-full gap-0.5">
                             {workTimes && (
                               <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
                                 {workTimes}
@@ -647,7 +644,7 @@ export default function ShiftOverview() {
                             )}
                             {!timeStamp && (
                               <span className="text-[9px] text-muted-foreground/50">
-                                ⏱ Klik for at stemple
+                                ⏱ 2x klik for at stemple
                               </span>
                             )}
                           </div>
