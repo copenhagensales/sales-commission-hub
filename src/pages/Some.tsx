@@ -208,6 +208,7 @@ export default function Some() {
                   items={contentItems.filter((item) => item.status === status)}
                   onEdit={handleEditClick}
                   onDelete={deleteItem}
+                  onStatusChange={(id, newStatus) => updateItem({ id, status: newStatus })}
                 />
               ))}
             </div>

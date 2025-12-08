@@ -3,16 +3,18 @@ import { CSS } from "@dnd-kit/utilities";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { GripVertical, Pencil, Trash2, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import type { ContentItem } from "@/hooks/useSomeContent";
+import type { ContentItem, ContentStatus } from "@/hooks/useSomeContent";
 
 interface SomeContentCardProps {
   item: ContentItem;
   onEdit: (item: ContentItem) => void;
   onDelete: (id: string) => void;
+  onStatusChange: (id: string, status: ContentStatus) => void;
 }
 
 const typeLabels: Record<string, string> = {
@@ -26,7 +28,23 @@ const platformColors: Record<string, string> = {
   Instagram: "bg-gradient-to-r from-purple-500 to-pink-500 text-white",
 };
 
-export function SomeContentCard({ item, onEdit, onDelete }: SomeContentCardProps) {
+const statusLabels: Record<ContentStatus, string> = {
+  planned: "Planlagt",
+  in_progress: "I gang",
+  filmed: "Filmet",
+  edited: "Redigeret",
+  published: "Publiceret",
+};
+
+const statusColors: Record<ContentStatus, string> = {
+  planned: "text-muted-foreground",
+  in_progress: "text-blue-500",
+  filmed: "text-amber-500",
+  edited: "text-purple-500",
+  published: "text-green-500",
+};
+
+export function SomeContentCard({ item, onEdit, onDelete, onStatusChange }: SomeContentCardProps) {
   const {
     attributes,
     listeners,
@@ -72,12 +90,29 @@ export function SomeContentCard({ item, onEdit, onDelete }: SomeContentCardProps
             
             <p className="font-medium text-sm line-clamp-2 mb-2">{item.title}</p>
             
-            {item.due_date && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Calendar className="h-3 w-3" />
-                {format(new Date(item.due_date), "d. MMM", { locale: da })}
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <Select
+                value={item.status}
+                onValueChange={(value: ContentStatus) => onStatusChange(item.id, value)}
+              >
+                <SelectTrigger className={cn("h-7 w-[130px] text-xs", statusColors[item.status])}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="planned">{statusLabels.planned}</SelectItem>
+                  <SelectItem value="filmed">{statusLabels.filmed}</SelectItem>
+                  <SelectItem value="edited">{statusLabels.edited}</SelectItem>
+                  <SelectItem value="published">{statusLabels.published}</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {item.due_date && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Calendar className="h-3 w-3" />
+                  {format(new Date(item.due_date), "d. MMM", { locale: da })}
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="flex flex-col gap-1">
