@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useShouldShowPulseSurvey } from "@/hooks/usePulseSurvey";
 import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
+import { useIsSomeEmployee } from "@/hooks/useSomeEmployee";
 import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 
@@ -124,6 +125,7 @@ export function AppSidebar() {
   const { user } = useAuth();
   const { showMenuItem: showPulseSurvey, showBadge: showPulseBadge } = useShouldShowPulseSurvey();
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
+  const { data: isSomeEmployee } = useIsSomeEmployee();
   const { data: carQuizCompletion } = useCarQuizCompletion();
   const { data: isSalgskonsulent } = useIsSalgskonsulent();
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
@@ -399,7 +401,20 @@ export function AppSidebar() {
             </NavLink>
           )}
 
-          {/* Code of Conduct menu item for Salgskonsulenter (not owners - they only see admin view) */}
+          {/* SOME menu item for SOME employees */}
+          {isSomeEmployee && !isOwner && (
+            <NavLink
+              to="/some"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/some" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <Video className="h-5 w-5" />
+              SOME
+            </NavLink>
+          )}
+
           {isSalgskonsulent && !isOwner && (
             <NavLink
               to="/code-of-conduct"
