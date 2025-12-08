@@ -72,6 +72,7 @@ const Winback = lazyWithRetry(() => import("./pages/recruitment/Winback"));
 const UpcomingInterviews = lazyWithRetry(() => import("./pages/recruitment/UpcomingInterviews"));
 const UpcomingHires = lazyWithRetry(() => import("./pages/recruitment/UpcomingHires"));
 const Some = lazyWithRetry(() => import("./pages/Some"));
+const TimeStamp = lazyWithRetry(() => import("./pages/TimeStamp"));
 
 const queryClient = new QueryClient();
 
@@ -250,6 +251,8 @@ const App = () => (
               {/* Extra work routes */}
               <Route path="/extra-work" element={<ProtectedRoute><ExtraWork /></ProtectedRoute>} />
               <Route path="/extra-work-admin" element={<RoleProtectedRoute requireTeamlederOrAbove><ExtraWorkAdmin /></RoleProtectedRoute>} />
+              {/* Time stamp route */}
+              <Route path="/time-stamp" element={<ProtectedRoute><TimeStamp /></ProtectedRoute>} />
               {/* Contract routes */}
               <Route path="/contracts" element={<RoleProtectedRoute requireTeamlederOrAbove><Contracts /></RoleProtectedRoute>} />
               {/* Pulse survey results - teamleder+ */}

@@ -155,8 +155,27 @@ export function AppSidebar() {
     staleTime: 60000,
   });
 
+  // Fetch granted menu items for this user (for opt-in features like time-stamp)
+  const { data: grantedMenuItems = [] } = useQuery({
+    queryKey: ["user-granted-permissions", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from("user_menu_permissions")
+        .select("menu_item_id")
+        .eq("user_id", user.id)
+        .eq("permission_type", "grant");
+      return data?.map(p => p.menu_item_id) || [];
+    },
+    enabled: !!user?.id,
+    staleTime: 60000,
+  });
+
   // Helper to check if a menu item is denied
   const isMenuItemDenied = (menuId: string) => deniedMenuItems.includes(menuId);
+  
+  // Helper to check if a menu item is granted (for opt-in features)
+  const isMenuItemGranted = (menuId: string) => grantedMenuItems.includes(menuId);
 
   // Fetch employee name and pending contracts count
   const { data: employeeData } = useQuery({
@@ -281,11 +300,16 @@ export function AppSidebar() {
     '/shift-planning': 'shift-planning',
   };
   
-  const mainNavigation = baseNavigation.filter(item => {
+  let mainNavigation = baseNavigation.filter(item => {
     const menuId = hrefToMenuId[item.href];
     if (menuId && isMenuItemDenied(menuId)) return false;
     return true;
   });
+  
+  // Add opt-in menu items if user has been granted access
+  if (isMenuItemGranted("time-stamp")) {
+    mainNavigation = [...mainNavigation, { name: "Stempel", href: "/time-stamp", icon: Clock }];
+  }
   
   const currentShiftPlanningNav = isOwner ? shiftPlanningNavigation : employeeShiftPlanningNavigation;
 
