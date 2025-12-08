@@ -60,8 +60,15 @@ export function EditTimeStampDialog({
   const updateTimeStamp = useMutation({
     mutationFn: async (data: { clockIn: string; clockOut: string; note: string }) => {
       const dateStr = format(date, "yyyy-MM-dd");
-      const clockInTime = `${dateStr}T${data.clockIn}:00`;
-      const clockOutTime = data.clockOut ? `${dateStr}T${data.clockOut}:00` : null;
+      // Use timezone offset to ensure correct local time is stored
+      const tzOffset = new Date().getTimezoneOffset();
+      const tzSign = tzOffset <= 0 ? '+' : '-';
+      const tzHours = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, '0');
+      const tzMins = String(Math.abs(tzOffset) % 60).padStart(2, '0');
+      const tz = `${tzSign}${tzHours}:${tzMins}`;
+      
+      const clockInTime = `${dateStr}T${data.clockIn}:00${tz}`;
+      const clockOutTime = data.clockOut ? `${dateStr}T${data.clockOut}:00${tz}` : null;
 
       // Calculate effective hours if both times are set
       let effectiveHours: number | null = null;
@@ -99,8 +106,15 @@ export function EditTimeStampDialog({
   const createTimeStamp = useMutation({
     mutationFn: async (data: { clockIn: string; clockOut: string; note: string }) => {
       const dateStr = format(date, "yyyy-MM-dd");
-      const clockInTime = `${dateStr}T${data.clockIn}:00`;
-      const clockOutTime = data.clockOut ? `${dateStr}T${data.clockOut}:00` : null;
+      // Use timezone offset to ensure correct local time is stored
+      const tzOffset = new Date().getTimezoneOffset();
+      const tzSign = tzOffset <= 0 ? '+' : '-';
+      const tzHours = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, '0');
+      const tzMins = String(Math.abs(tzOffset) % 60).padStart(2, '0');
+      const tz = `${tzSign}${tzHours}:${tzMins}`;
+      
+      const clockInTime = `${dateStr}T${data.clockIn}:00${tz}`;
+      const clockOutTime = data.clockOut ? `${dateStr}T${data.clockOut}:00${tz}` : null;
 
       let effectiveHours: number | null = null;
       if (clockOutTime) {
