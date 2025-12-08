@@ -429,14 +429,22 @@ export function useCurrentEmployee() {
   });
 }
 
-// Get all employees for manager view
+// Get employees for manager view - teamledere see their team, owners see all
 export function useEmployeesForShifts(department?: string) {
+  const { user } = useAuth();
+  
   return useQuery({
-    queryKey: ["employees-for-shifts", department],
+    queryKey: ["employees-for-shifts", department, user?.id],
     queryFn: async () => {
+      // First check if user is owner
+      const { data: isOwner } = await supabase.rpc("is_owner", { _user_id: user?.id });
+      
+      // Get current employee id
+      const { data: currentEmployeeData } = await supabase.rpc("get_current_employee_id");
+      
       let query = supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, department, standard_start_time, weekly_hours")
+        .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id")
         .eq("is_active", true)
         .order("first_name");
 
@@ -446,8 +454,23 @@ export function useEmployeesForShifts(department?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
+      
+      // If owner, return all employees
+      if (isOwner) {
+        return data;
+      }
+      
+      // If teamleder, filter to only show team members (where manager_id = current user's employee id)
+      // and exclude themselves
+      if (currentEmployeeData) {
+        return data.filter(emp => 
+          emp.manager_id === currentEmployeeData && emp.id !== currentEmployeeData
+        );
+      }
+      
       return data;
     },
+    enabled: !!user?.id,
   });
 }
 
