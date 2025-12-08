@@ -182,12 +182,15 @@ export function useCanAccess() {
   const roles = rolesData || [];
   const roleNames = roles.map(r => r.role);
   
-  // Check for each role type
+  // Check for each role type - check array for multi-role support
   const isOwner = roleNames.includes("ejer");
   const isTeamleder = roleNames.includes("teamleder");
   const isRekruttering = roleNames.includes("rekruttering");
   const isSome = roleNames.includes("some");
   const isMedarbejder = roleNames.includes("medarbejder") || roles.length === 0;
+  
+  // Debug logging for role detection
+  console.log("useCanAccess - roles:", roleNames, "isRekruttering:", isRekruttering, "isTeamleder:", isTeamleder);
 
   // Primary role for display purposes (prioritize higher roles)
   const primaryRole = isOwner ? "ejer" : isTeamleder ? "teamleder" : isRekruttering ? "rekruttering" : isSome ? "some" : "medarbejder";
