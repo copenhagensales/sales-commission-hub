@@ -3042,6 +3042,7 @@ export type Database = {
           created_by: string | null
           id: string
           menu_item_id: string
+          permission_type: string
           user_id: string
         }
         Insert: {
@@ -3049,6 +3050,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           menu_item_id: string
+          permission_type?: string
           user_id: string
         }
         Update: {
@@ -3056,6 +3058,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           menu_item_id?: string
+          permission_type?: string
           user_id?: string
         }
         Relationships: []
