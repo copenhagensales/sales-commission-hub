@@ -63,18 +63,16 @@ export function SomeContentCard({ item, onEdit, onDelete, onStatusChange }: Some
     <Card
       ref={setNodeRef}
       style={style}
+      {...attributes}
+      {...listeners}
       className={cn(
-        "cursor-grab active:cursor-grabbing",
+        "cursor-grab active:cursor-grabbing touch-none",
         isDragging && "opacity-50 shadow-lg"
       )}
     >
       <CardContent className="p-3">
         <div className="flex items-start gap-2">
-          <div
-            {...attributes}
-            {...listeners}
-            className="mt-1 text-muted-foreground hover:text-foreground"
-          >
+          <div className="mt-1 text-muted-foreground">
             <GripVertical className="h-4 w-4" />
           </div>
           
