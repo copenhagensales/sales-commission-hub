@@ -521,8 +521,8 @@ export function AppSidebar() {
             </Collapsible>
           )}
 
-          {/* Fieldmarketing menu - for owners or users with fieldmarketing permission */}
-          {(isOwner || isMenuItemGranted("fieldmarketing")) && (
+          {/* Fieldmarketing menu - for owners, fieldmarketing employees, or users with fieldmarketing permission */}
+          {(isOwner || isFieldmarketing || isMenuItemGranted("fieldmarketing")) && (
             <Collapsible open={vagtFlowOpen} onOpenChange={setVagtFlowOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
