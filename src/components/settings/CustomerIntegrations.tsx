@@ -36,7 +36,6 @@ const CRM_TYPES = [
   { value: "salesforce", label: "Salesforce" },
   { value: "pipedrive", label: "Pipedrive" },
   { value: "generic_api", label: "Generic API" },
-  { value: "excel", label: "Excel Upload" },
 ];
 
 export function CustomerIntegrations() {

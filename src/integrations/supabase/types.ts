@@ -1207,6 +1207,110 @@ export type Database = {
           },
         ]
       }
+      crm_excel_import_rows: {
+        Row: {
+          created_at: string
+          customer_name: string | null
+          id: string
+          import_id: string
+          is_matched: boolean | null
+          matched_sale_id: string | null
+          opp_number: string | null
+          ordre_id: string | null
+          raw_data: Json | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          import_id: string
+          is_matched?: boolean | null
+          matched_sale_id?: string | null
+          opp_number?: string | null
+          ordre_id?: string | null
+          raw_data?: Json | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          import_id?: string
+          is_matched?: boolean | null
+          matched_sale_id?: string | null
+          opp_number?: string | null
+          ordre_id?: string | null
+          raw_data?: Json | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_excel_import_rows_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "crm_excel_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_excel_import_rows_matched_sale_id_fkey"
+            columns: ["matched_sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_excel_imports: {
+        Row: {
+          cancelled_count: number | null
+          client_id: string
+          column_mapping: Json | null
+          filename: string
+          id: string
+          matched_count: number | null
+          row_count: number
+          uploaded_at: string
+          uploaded_by: string | null
+          validated_at: string | null
+          validation_status: string | null
+        }
+        Insert: {
+          cancelled_count?: number | null
+          client_id: string
+          column_mapping?: Json | null
+          filename: string
+          id?: string
+          matched_count?: number | null
+          row_count?: number
+          uploaded_at?: string
+          uploaded_by?: string | null
+          validated_at?: string | null
+          validation_status?: string | null
+        }
+        Update: {
+          cancelled_count?: number | null
+          client_id?: string
+          column_mapping?: Json | null
+          filename?: string
+          id?: string
+          matched_count?: number | null
+          row_count?: number
+          uploaded_at?: string
+          uploaded_by?: string | null
+          validated_at?: string | null
+          validation_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_excel_imports_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_integrations: {
         Row: {
           api_url: string | null
