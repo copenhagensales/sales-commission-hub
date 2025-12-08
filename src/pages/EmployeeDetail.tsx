@@ -1000,6 +1000,7 @@ export default function EmployeeDetail() {
                           options={[
                             { value: "8.00-16.30", label: "8.00-16.30" },
                             { value: "8.30-16.30", label: "8.30-16.30" },
+                            { value: "9.00-16.30", label: "9.00-16.30" },
                             { value: "9.30-17.30", label: "9.30-17.30" },
                           ]}
                           onSave={handleSave}
