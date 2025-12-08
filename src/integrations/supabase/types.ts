@@ -2511,6 +2511,7 @@ export type Database = {
           customer_phone: string | null
           id: string
           sale_datetime: string
+          status: string | null
           updated_at: string | null
         }
         Insert: {
@@ -2525,6 +2526,7 @@ export type Database = {
           customer_phone?: string | null
           id?: string
           sale_datetime?: string
+          status?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -2539,6 +2541,7 @@ export type Database = {
           customer_phone?: string | null
           id?: string
           sale_datetime?: string
+          status?: string | null
           updated_at?: string | null
         }
         Relationships: [
