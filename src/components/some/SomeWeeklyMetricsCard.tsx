@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Save } from "lucide-react";
+import { Save, Info } from "lucide-react";
+import { format, endOfWeek, parseISO } from "date-fns";
+import { da } from "date-fns/locale";
 import type { WeeklyMetrics } from "@/hooks/useSomeMetrics";
 
 interface SomeWeeklyMetricsCardProps {
@@ -13,6 +15,9 @@ interface SomeWeeklyMetricsCardProps {
 }
 
 export function SomeWeeklyMetricsCard({ weekStartDate, currentMetrics, onSave }: SomeWeeklyMetricsCardProps) {
+  const weekStart = parseISO(weekStartDate);
+  const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+  const weekLabel = `${format(weekStart, "d. MMM", { locale: da })} – ${format(weekEnd, "d. MMM yyyy", { locale: da })}`;
   const [tiktokFollowers, setTiktokFollowers] = useState(0);
   const [tiktokViews, setTiktokViews] = useState(0);
   const [tiktokLikes, setTiktokLikes] = useState(0);
@@ -53,13 +58,25 @@ export function SomeWeeklyMetricsCard({ weekStartDate, currentMetrics, onSave }:
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center justify-between">
-          Ugerapport
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <CardTitle className="text-lg">Ugerapport: Uge {format(weekStart, "w", { locale: da })}</CardTitle>
+            <CardDescription className="mt-1">
+              {weekLabel}
+            </CardDescription>
+          </div>
           <Button size="sm" onClick={handleSave}>
             <Save className="h-4 w-4 mr-1" />
             Gem
           </Button>
-        </CardTitle>
+        </div>
+        <div className="flex items-start gap-2 mt-3 p-3 bg-muted/50 rounded-md text-sm text-muted-foreground">
+          <Info className="h-4 w-4 mt-0.5 shrink-0" />
+          <p>
+            Indtast dine tal for den valgte uge ovenfor. Brug ugeskifteren øverst til at navigere mellem uger. 
+            Når du gemmer, knyttes tallene til den viste uge og vises i grafen nedenfor.
+          </p>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
