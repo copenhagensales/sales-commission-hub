@@ -18,8 +18,14 @@ const frequencyToCron: Record<number, string> = {
 
 // Map integration type to edge function name
 const typeToFunction: Record<string, string> = {
-  adversus: "adversus-sync-v2",
+  adversus: "integration-engine",
   economic: "sync-economic",
+};
+
+// Map integration type to payload
+const typeToPayload: Record<string, object> = {
+  adversus: { source: "adversus", actions: ["sales"], days: 1 },
+  economic: {},
 };
 
 Deno.serve(async (req) => {
@@ -69,12 +75,12 @@ Deno.serve(async (req) => {
       const functionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
       
       // Build the SQL command for the cron job
-      // Payload actualizado para la v2
+      const payload = typeToPayload[integration_type] || {};
       const sqlCommand = `
         SELECT net.http_post(
           url := '${functionUrl}',
           headers := '{"Content-Type": "application/json", "Authorization": "Bearer ${anonKey}"}'::jsonb,
-          body := '{"action": "sync-sales", "days": 1}'::jsonb
+          body := '${JSON.stringify(payload)}'::jsonb
         ) AS request_id;
       `;
 
