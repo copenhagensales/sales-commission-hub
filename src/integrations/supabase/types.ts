@@ -3418,6 +3418,15 @@ export type Database = {
         Args: { contract_uuid: string }
         Returns: boolean
       }
+      create_dialer_integration: {
+        Args: {
+          p_credentials: string
+          p_encryption_key: string
+          p_name: string
+          p_provider: string
+        }
+        Returns: string
+      }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_auth_user_id_by_email: { Args: { _email: string }; Returns: string }
       get_current_employee_id: { Args: never; Returns: string }
@@ -3430,6 +3439,10 @@ export type Database = {
           crm_type: Database["public"]["Enums"]["crm_type"]
           id: string
         }[]
+      }
+      get_dialer_credentials: {
+        Args: { p_encryption_key: string; p_integration_id: string }
+        Returns: Json
       }
       get_employee_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_employee_roles_for_admin: {
@@ -3506,6 +3519,14 @@ export type Database = {
       unschedule_integration_sync: {
         Args: { p_job_name: string }
         Returns: boolean
+      }
+      update_dialer_credentials: {
+        Args: {
+          p_credentials: string
+          p_encryption_key: string
+          p_integration_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
