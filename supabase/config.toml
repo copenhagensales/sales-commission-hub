@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.zapier-webhook]
 verify_jwt = false
+
+[functions.delete-auth-user]
+verify_jwt = false
