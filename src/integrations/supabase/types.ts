@@ -1006,6 +1006,48 @@ export type Database = {
           },
         ]
       }
+      content_items: {
+        Row: {
+          created_at: string | null
+          due_date: string | null
+          id: string
+          notes: string | null
+          platform: Database["public"]["Enums"]["content_platform"]
+          sort_order: number | null
+          status: Database["public"]["Enums"]["content_status"]
+          title: string
+          type: Database["public"]["Enums"]["content_type"]
+          updated_at: string | null
+          week_start_date: string
+        }
+        Insert: {
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          platform: Database["public"]["Enums"]["content_platform"]
+          sort_order?: number | null
+          status?: Database["public"]["Enums"]["content_status"]
+          title: string
+          type: Database["public"]["Enums"]["content_type"]
+          updated_at?: string | null
+          week_start_date: string
+        }
+        Update: {
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          platform?: Database["public"]["Enums"]["content_platform"]
+          sort_order?: number | null
+          status?: Database["public"]["Enums"]["content_status"]
+          title?: string
+          type?: Database["public"]["Enums"]["content_type"]
+          updated_at?: string | null
+          week_start_date?: string
+        }
+        Relationships: []
+      }
       contract_signatures: {
         Row: {
           acceptance_text: string | null
@@ -2618,6 +2660,30 @@ export type Database = {
         }
         Relationships: []
       }
+      some_default_goals: {
+        Row: {
+          id: string
+          insta_posts_target: number
+          insta_stories_target: number
+          tiktok_videos_target: number
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          insta_posts_target?: number
+          insta_stories_target?: number
+          tiktok_videos_target?: number
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          insta_posts_target?: number
+          insta_stories_target?: number
+          tiktok_videos_target?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       sub_teams: {
         Row: {
           created_at: string
@@ -3093,6 +3159,36 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_goals: {
+        Row: {
+          created_at: string | null
+          id: string
+          insta_posts_target: number
+          insta_stories_target: number
+          tiktok_videos_target: number
+          updated_at: string | null
+          week_start_date: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          insta_posts_target?: number
+          insta_stories_target?: number
+          tiktok_videos_target?: number
+          updated_at?: string | null
+          week_start_date: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          insta_posts_target?: number
+          insta_stories_target?: number
+          tiktok_videos_target?: number
+          updated_at?: string | null
+          week_start_date?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -3175,6 +3271,14 @@ export type Database = {
       commission_transaction_type: "earn" | "clawback" | "manual_adjustment"
       commission_type: "fixed" | "percentage"
       communication_channel: "Telefon" | "Mail" | "Andet"
+      content_platform: "TikTok" | "Instagram"
+      content_status:
+        | "planned"
+        | "in_progress"
+        | "filmed"
+        | "edited"
+        | "published"
+      content_type: "tiktok_video" | "insta_story" | "insta_post"
       contract_status:
         | "draft"
         | "pending_employee"
@@ -3342,6 +3446,15 @@ export const Constants = {
       commission_transaction_type: ["earn", "clawback", "manual_adjustment"],
       commission_type: ["fixed", "percentage"],
       communication_channel: ["Telefon", "Mail", "Andet"],
+      content_platform: ["TikTok", "Instagram"],
+      content_status: [
+        "planned",
+        "in_progress",
+        "filmed",
+        "edited",
+        "published",
+      ],
+      content_type: ["tiktok_video", "insta_story", "insta_post"],
       contract_status: [
         "draft",
         "pending_employee",
