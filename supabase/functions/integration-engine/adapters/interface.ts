@@ -1,6 +1,8 @@
-import { StandardSale } from "../types.ts";
+import { StandardSale, StandardUser, StandardCampaign, StandardProduct } from "../types.ts";
 
 export interface DialerAdapter {
   fetchSales(days: number): Promise<StandardSale[]>;
-  normalizeWebhook?(payload: any): StandardSale;
+  fetchUsers(): Promise<StandardUser[]>;
+  fetchCampaigns(): Promise<StandardCampaign[]>;
+  fetchProducts?(): Promise<StandardProduct[]>;
 }
