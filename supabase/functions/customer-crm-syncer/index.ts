@@ -27,82 +27,6 @@ interface SaleRecord {
   adversus_opp_number: string | null;
 }
 
-// ============ EXCEL ADAPTER ============
-// Validates sales against tdc_cancellation_imports table
-class ExcelAdapter implements CrmAdapter {
-  name = "excel";
-  // deno-lint-ignore no-explicit-any
-  private supabase: any;
-  private clientId: string;
-
-  // deno-lint-ignore no-explicit-any
-  constructor(supabase: any, clientId: string) {
-    this.supabase = supabase;
-    this.clientId = clientId;
-  }
-
-  async validateSale(sale: SaleRecord, config: Record<string, unknown>): Promise<CrmValidationResult> {
-    // Get all cancellation imports
-    const { data: cancellations, error } = await this.supabase
-      .from("tdc_cancellation_imports")
-      .select("raw_data")
-      .order("uploaded_at", { ascending: false });
-
-    if (error || !cancellations || cancellations.length === 0) {
-      console.log("[ExcelAdapter] No cancellation data found");
-      return { found: false };
-    }
-
-    // Match against adversus_external_id (ordre-id) or adversus_opp_number
-    // deno-lint-ignore no-explicit-any
-    for (const row of cancellations as any[]) {
-      const rawData = row.raw_data as Record<string, unknown>;
-      
-      // Try matching by ordre-id (maps to adversus_external_id)
-      const ordreId = rawData["ordre-id"] || rawData["Ordre-id"] || rawData["ordreId"];
-      if (ordreId && sale.adversus_external_id) {
-        const ordreIdStr = String(ordreId).trim();
-        const saleIdStr = String(sale.adversus_external_id).trim();
-        if (ordreIdStr === saleIdStr) {
-          console.log(`[ExcelAdapter] Matched by ordre-id: ${ordreIdStr}`);
-          return {
-            found: true,
-            status: "cancelled",
-            matchedField: "ordre-id",
-            matchedValue: ordreIdStr,
-            rawResponse: rawData,
-          };
-        }
-      }
-
-      // Try matching by OPP number
-      const oppNumber = rawData["opp"] || rawData["OPP"] || rawData["opp-nummer"];
-      if (oppNumber && sale.adversus_opp_number) {
-        const oppStr = String(oppNumber).trim().replace(/^OPP-?/i, "");
-        const saleOppStr = String(sale.adversus_opp_number).trim().replace(/^OPP-?/i, "");
-        if (oppStr === saleOppStr) {
-          console.log(`[ExcelAdapter] Matched by OPP: ${oppStr}`);
-          return {
-            found: true,
-            status: "cancelled",
-            matchedField: "opp",
-            matchedValue: oppStr,
-            rawResponse: rawData,
-          };
-        }
-      }
-    }
-
-    // No match found - sale is approved (not cancelled)
-    return { 
-      found: true, 
-      status: "approved",
-      matchedField: "none",
-      matchedValue: "not_in_cancellation_list"
-    };
-  }
-}
-
 // ============ GENERIC API ADAPTER ============
 class GenericApiAdapter implements CrmAdapter {
   name = "generic_api";
@@ -145,7 +69,6 @@ class GenericApiAdapter implements CrmAdapter {
       const statusField = (config.status_field as string) || "status";
       const apiStatus = data[statusField] || "unknown";
       
-      // Map API status to our standard statuses
       let status: CrmValidationResult["status"] = "unknown";
       if (["approved", "won", "closed_won", "active"].includes(apiStatus.toLowerCase())) {
         status = "approved";
@@ -222,7 +145,6 @@ class HubSpotAdapter implements CrmAdapter {
 
       const contact = searchData.results[0];
 
-      // Get associated deals
       const dealsResponse = await fetch(
         `https://api.hubapi.com/crm/v3/objects/contacts/${contact.id}/associations/deals`,
         {
@@ -233,12 +155,11 @@ class HubSpotAdapter implements CrmAdapter {
       );
 
       let dealStatus: CrmValidationResult["status"] = "pending";
-      let dealId: string | undefined;
 
       if (dealsResponse.ok) {
         const dealsData = await dealsResponse.json();
         if (dealsData.results && dealsData.results.length > 0) {
-          dealId = dealsData.results[0].id;
+          const dealId = dealsData.results[0].id;
           
           const dealDetailResponse = await fetch(
             `https://api.hubapi.com/crm/v3/objects/deals/${dealId}?properties=dealstage,dealname`,
@@ -253,7 +174,6 @@ class HubSpotAdapter implements CrmAdapter {
             const dealDetail = await dealDetailResponse.json();
             const stage = dealDetail.properties?.dealstage || "";
             
-            // Map HubSpot stages to our statuses
             if (stage.includes("won") || stage.includes("closed")) {
               dealStatus = "approved";
             } else if (stage.includes("lost")) {
@@ -346,14 +266,9 @@ class SalesforceAdapter implements CrmAdapter {
 function createAdapter(
   crmType: string, 
   apiUrl: string | null, 
-  credentials: Record<string, string>,
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
-  clientId: string
+  credentials: Record<string, string>
 ): CrmAdapter {
   switch (crmType) {
-    case "excel":
-      return new ExcelAdapter(supabase, clientId);
     case "hubspot":
       return new HubSpotAdapter(credentials);
     case "salesforce":
@@ -395,7 +310,6 @@ Deno.serve(async (req) => {
 
     console.log(`[customer-crm-syncer] Starting sync for client: ${client_id}`);
 
-    // Get integration config with decrypted credentials
     const { data: integration, error: integrationError } = await supabase.rpc(
       "get_customer_integration_decrypted",
       {
@@ -418,10 +332,8 @@ Deno.serve(async (req) => {
 
     console.log(`[customer-crm-syncer] Using CRM type: ${config.crm_type}`);
 
-    // Create adapter
-    const adapter = createAdapter(config.crm_type, config.api_url, credentials, supabase, client_id);
+    const adapter = createAdapter(config.crm_type, config.api_url, credentials);
 
-    // Get recent sales for this client that need validation
     const { data: sales, error: salesError } = await supabase
       .from("sales")
       .select(`
@@ -434,7 +346,7 @@ Deno.serve(async (req) => {
         sale_datetime
       `)
       .eq("client_campaign_id", client_id)
-      .gte("sale_datetime", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()) // Last 30 days
+      .gte("sale_datetime", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .order("sale_datetime", { ascending: false })
       .limit(200);
 
@@ -473,11 +385,9 @@ Deno.serve(async (req) => {
         console.error(`[customer-crm-syncer] Error validating sale ${sale.id}:`, err);
       }
 
-      // Rate limiting - wait 50ms between requests
       await new Promise(resolve => setTimeout(resolve, 50));
     }
 
-    // Update last run status
     const duration = Date.now() - startTime;
     const status = errorCount === 0 ? "success" : errorCount === processedCount ? "failed" : "partial";
 
@@ -504,7 +414,7 @@ Deno.serve(async (req) => {
         errors: errorCount,
         duration_ms: duration,
         status,
-        results: results.slice(0, 20), // Return first 20 results for debugging
+        results: results.slice(0, 20),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
