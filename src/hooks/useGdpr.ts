@@ -5,19 +5,15 @@ import { useAuth } from "./useAuth";
 export function useGdprConsents() {
   const { user } = useAuth();
 
-  // First get the employee_id for the current user
+  // Use the same RPC function as useGiveConsent for consistency
   const { data: employeeId } = useQuery({
-    queryKey: ["current-employee-id-gdpr", user?.email],
+    queryKey: ["current-employee-id-gdpr-rpc", user?.id],
     queryFn: async () => {
-      if (!user?.email) return null;
-      const { data } = await supabase
-        .from("employee_master_data")
-        .select("id")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
-        .maybeSingle();
-      return data?.id || null;
+      const { data, error } = await supabase.rpc("get_current_employee_id");
+      if (error) return null;
+      return data;
     },
-    enabled: !!user?.email,
+    enabled: !!user?.id,
   });
 
   return useQuery({
