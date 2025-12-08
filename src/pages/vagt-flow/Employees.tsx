@@ -72,12 +72,23 @@ export default function VagtEmployees() {
     queryKey: ["vagt-all-employees"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("employee")
-        .select("*")
-        .order("full_name");
+        .from("employee_master_data")
+        .select("id, first_name, last_name, private_email, private_phone, is_active")
+        .eq("job_title", "Fieldmarketing")
+        .order("first_name");
 
       if (error) throw error;
-      return data;
+      
+      // Map to expected format with full_name
+      return (data || []).map(emp => ({
+        id: emp.id,
+        full_name: `${emp.first_name} ${emp.last_name}`,
+        email: emp.private_email,
+        phone: emp.private_phone,
+        is_active: emp.is_active ?? true,
+        team: null,
+        role: "employee",
+      }));
     },
   });
 
@@ -177,11 +188,9 @@ export default function VagtEmployees() {
   const updateEmployeeMutation = useMutation({
     mutationFn: async (data: { id: string; role: any; is_active: boolean; team: any }) => {
       const { error } = await supabase
-        .from("employee")
+        .from("employee_master_data")
         .update({
-          role: data.role,
           is_active: data.is_active,
-          team: data.team || null,
         })
         .eq("id", data.id);
 
@@ -196,7 +205,7 @@ export default function VagtEmployees() {
 
   const deleteEmployeeMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("employee").delete().eq("id", id);
+      const { error } = await supabase.from("employee_master_data").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
