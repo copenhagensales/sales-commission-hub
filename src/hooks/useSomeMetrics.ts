@@ -13,7 +13,7 @@ export interface WeeklyMetrics {
   insta_likes: number;
 }
 
-export function useSomeMetrics(weekStartDate: string) {
+export function useSomeMetrics(weekStartDate: string, previousWeekStartDate?: string) {
   const queryClient = useQueryClient();
 
   const { data: currentMetrics, isLoading: isLoadingCurrent } = useQuery({
@@ -28,6 +28,22 @@ export function useSomeMetrics(weekStartDate: string) {
       if (error) throw error;
       return data as WeeklyMetrics | null;
     },
+  });
+
+  const { data: previousMetrics, isLoading: isLoadingPrevious } = useQuery({
+    queryKey: ["some-metrics", previousWeekStartDate],
+    queryFn: async () => {
+      if (!previousWeekStartDate) return null;
+      const { data, error } = await supabase
+        .from("some_weekly_metrics")
+        .select("*")
+        .eq("week_start_date", previousWeekStartDate)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data as WeeklyMetrics | null;
+    },
+    enabled: !!previousWeekStartDate,
   });
 
   const { data: historicalMetrics = [], isLoading: isLoadingHistory } = useQuery({
@@ -69,8 +85,9 @@ export function useSomeMetrics(weekStartDate: string) {
 
   return {
     currentMetrics,
+    previousMetrics,
     historicalMetrics,
-    isLoading: isLoadingCurrent || isLoadingHistory,
+    isLoading: isLoadingCurrent || isLoadingHistory || isLoadingPrevious,
     upsertMetrics: upsertMetrics.mutate,
   };
 }

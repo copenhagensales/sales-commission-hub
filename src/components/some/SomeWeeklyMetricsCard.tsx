@@ -11,48 +11,69 @@ import type { WeeklyMetrics } from "@/hooks/useSomeMetrics";
 interface SomeWeeklyMetricsCardProps {
   weekStartDate: string;
   currentMetrics: WeeklyMetrics | null;
+  previousMetrics: WeeklyMetrics | null;
   onSave: (metrics: Omit<WeeklyMetrics, "id">) => void;
 }
 
-export function SomeWeeklyMetricsCard({ weekStartDate, currentMetrics, onSave }: SomeWeeklyMetricsCardProps) {
+export function SomeWeeklyMetricsCard({ weekStartDate, currentMetrics, previousMetrics, onSave }: SomeWeeklyMetricsCardProps) {
   const weekStart = parseISO(weekStartDate);
   const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
   const weekLabel = `${format(weekStart, "d. MMM", { locale: da })} – ${format(weekEnd, "d. MMM yyyy", { locale: da })}`;
-  const [tiktokFollowers, setTiktokFollowers] = useState(0);
+  
+  // Total values (what user enters)
+  const [tiktokFollowersTotal, setTiktokFollowersTotal] = useState(0);
   const [tiktokViews, setTiktokViews] = useState(0);
-  const [tiktokLikes, setTiktokLikes] = useState(0);
-  const [instaFollowers, setInstaFollowers] = useState(0);
+  const [tiktokLikesTotal, setTiktokLikesTotal] = useState(0);
+  const [instaFollowersTotal, setInstaFollowersTotal] = useState(0);
   const [instaViews, setInstaViews] = useState(0);
   const [instaLikes, setInstaLikes] = useState(0);
 
+  // Baseline from previous week (or hardcoded baseline if no previous)
+  const baselineTiktokFollowers = previousMetrics?.tiktok_followers ?? 4567;
+  const baselineTiktokLikes = previousMetrics?.tiktok_likes ?? 80555;
+  const baselineInstaFollowers = previousMetrics?.insta_followers ?? 1009;
+
+  // Calculate deltas
+  const tiktokFollowersDelta = tiktokFollowersTotal - baselineTiktokFollowers;
+  const tiktokLikesDelta = tiktokLikesTotal - baselineTiktokLikes;
+  const instaFollowersDelta = instaFollowersTotal - baselineInstaFollowers;
+
   useEffect(() => {
     if (currentMetrics) {
-      setTiktokFollowers(currentMetrics.tiktok_followers);
+      // When loading existing data, show the stored totals
+      setTiktokFollowersTotal(currentMetrics.tiktok_followers);
       setTiktokViews(currentMetrics.tiktok_views);
-      setTiktokLikes(currentMetrics.tiktok_likes);
-      setInstaFollowers(currentMetrics.insta_followers);
+      setTiktokLikesTotal(currentMetrics.tiktok_likes);
+      setInstaFollowersTotal(currentMetrics.insta_followers);
       setInstaViews(currentMetrics.insta_views);
       setInstaLikes(currentMetrics.insta_likes);
     } else {
-      setTiktokFollowers(0);
+      // Default to baseline values for new entries
+      setTiktokFollowersTotal(baselineTiktokFollowers);
       setTiktokViews(0);
-      setTiktokLikes(0);
-      setInstaFollowers(0);
+      setTiktokLikesTotal(baselineTiktokLikes);
+      setInstaFollowersTotal(baselineInstaFollowers);
       setInstaViews(0);
       setInstaLikes(0);
     }
-  }, [currentMetrics, weekStartDate]);
+  }, [currentMetrics, weekStartDate, baselineTiktokFollowers, baselineTiktokLikes, baselineInstaFollowers]);
 
   const handleSave = () => {
     onSave({
       week_start_date: weekStartDate,
-      tiktok_followers: tiktokFollowers,
+      tiktok_followers: tiktokFollowersTotal,
       tiktok_views: tiktokViews,
-      tiktok_likes: tiktokLikes,
-      insta_followers: instaFollowers,
+      tiktok_likes: tiktokLikesTotal,
+      insta_followers: instaFollowersTotal,
       insta_views: instaViews,
       insta_likes: instaLikes,
     });
+  };
+
+  const formatDelta = (delta: number) => {
+    if (delta > 0) return `+${delta.toLocaleString("da-DK")}`;
+    if (delta < 0) return delta.toLocaleString("da-DK");
+    return "0";
   };
 
   return (
@@ -73,8 +94,7 @@ export function SomeWeeklyMetricsCard({ weekStartDate, currentMetrics, onSave }:
         <div className="flex items-start gap-2 mt-3 p-3 bg-muted/50 rounded-md text-sm text-muted-foreground">
           <Info className="h-4 w-4 mt-0.5 shrink-0" />
           <p>
-            Indtast dine tal for den valgte uge ovenfor. Brug ugeskifteren øverst til at navigere mellem uger. 
-            Når du gemmer, knyttes tallene til den viste uge og vises i grafen nedenfor.
+            Indtast det <strong>samlede antal</strong> følgere/likes. Systemet beregner automatisk stigningen fra forrige uge.
           </p>
         </div>
       </CardHeader>
@@ -88,13 +108,16 @@ export function SomeWeeklyMetricsCard({ weekStartDate, currentMetrics, onSave }:
             </h4>
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <Label className="text-xs text-muted-foreground">Følgere</Label>
+                <Label className="text-xs text-muted-foreground">Følgere (total)</Label>
                 <Input
                   type="number"
-                  value={tiktokFollowers}
-                  onChange={(e) => setTiktokFollowers(Number(e.target.value))}
+                  value={tiktokFollowersTotal}
+                  onChange={(e) => setTiktokFollowersTotal(Number(e.target.value))}
                   className="h-8"
                 />
+                <span className={`text-xs ${tiktokFollowersDelta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                  {formatDelta(tiktokFollowersDelta)} denne uge
+                </span>
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Visninger</Label>
@@ -106,13 +129,16 @@ export function SomeWeeklyMetricsCard({ weekStartDate, currentMetrics, onSave }:
                 />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Likes</Label>
+                <Label className="text-xs text-muted-foreground">Likes (total)</Label>
                 <Input
                   type="number"
-                  value={tiktokLikes}
-                  onChange={(e) => setTiktokLikes(Number(e.target.value))}
+                  value={tiktokLikesTotal}
+                  onChange={(e) => setTiktokLikesTotal(Number(e.target.value))}
                   className="h-8"
                 />
+                <span className={`text-xs ${tiktokLikesDelta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                  {formatDelta(tiktokLikesDelta)} denne uge
+                </span>
               </div>
             </div>
           </div>
@@ -125,13 +151,16 @@ export function SomeWeeklyMetricsCard({ weekStartDate, currentMetrics, onSave }:
             </h4>
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <Label className="text-xs text-muted-foreground">Følgere</Label>
+                <Label className="text-xs text-muted-foreground">Følgere (total)</Label>
                 <Input
                   type="number"
-                  value={instaFollowers}
-                  onChange={(e) => setInstaFollowers(Number(e.target.value))}
+                  value={instaFollowersTotal}
+                  onChange={(e) => setInstaFollowersTotal(Number(e.target.value))}
                   className="h-8"
                 />
+                <span className={`text-xs ${instaFollowersDelta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                  {formatDelta(instaFollowersDelta)} denne uge
+                </span>
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Visninger</Label>
