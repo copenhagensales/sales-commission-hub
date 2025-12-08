@@ -134,7 +134,7 @@ export function AppSidebar() {
   const { user } = useAuth();
   const { showMenuItem: showPulseSurvey, showBadge: showPulseBadge } = useShouldShowPulseSurvey();
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
-  const { data: isSomeEmployee } = useIsSomeEmployee();
+  const { data: isSomeEmployee, isLoading: isSomeLoading } = useIsSomeEmployee();
   const { data: carQuizCompletion } = useCarQuizCompletion();
   const { data: isSalgskonsulent } = useIsSalgskonsulent();
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
@@ -337,7 +337,7 @@ export function AppSidebar() {
   
   const currentShiftPlanningNav = isOwner ? shiftPlanningNavigation : employeeShiftPlanningNavigation;
 
-  if (isLoading) {
+  if (isLoading || isSomeLoading) {
     return (
       <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto">
         <div className="flex h-full flex-col">
