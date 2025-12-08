@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { IngestionEngine } from "./core.ts";
 import { AdversusAdapter } from "./adapters/adversus.ts";
+import { EnreachAdapter } from "./adapters/enreach.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,7 +22,8 @@ serve(async (req) => {
         adapter = new AdversusAdapter();
         break;
       case 'enreach':
-        throw new Error("Enreach adapter coming soon");
+        adapter = new EnreachAdapter();
+        break;
       default:
         throw new Error(`Unknown source: ${source}`);
     }
