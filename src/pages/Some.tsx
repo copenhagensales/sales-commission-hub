@@ -14,6 +14,7 @@ import { SomeGoalsSettings } from "@/components/some/SomeGoalsSettings";
 import { SomeWeeklyMetricsCard } from "@/components/some/SomeWeeklyMetricsCard";
 import { SomeMetricsChart } from "@/components/some/SomeMetricsChart";
 import { SomeOverallProgress } from "@/components/some/SomeOverallProgress";
+import { SomeContentCalendar } from "@/components/some/SomeContentCalendar";
 import { useSomeContent, getWeekStartDate, ContentItem, ContentStatus, ContentType } from "@/hooks/useSomeContent";
 import { useSomeMetrics } from "@/hooks/useSomeMetrics";
 
@@ -223,6 +224,9 @@ export default function Some() {
 
         {/* Metrics Chart */}
         <SomeMetricsChart historicalMetrics={historicalMetrics} />
+
+        {/* Content Calendar */}
+        <SomeContentCalendar contentItems={contentItems} />
       </div>
 
       <AddContentDialog
