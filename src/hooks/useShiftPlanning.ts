@@ -440,7 +440,9 @@ export function useEmployeesForShifts(department?: string) {
       const { data: isOwner } = await supabase.rpc("is_owner", { _user_id: user?.id });
       
       // Get current employee id
-      const { data: currentEmployeeData } = await supabase.rpc("get_current_employee_id");
+      const { data: currentEmployeeId } = await supabase.rpc("get_current_employee_id");
+      
+      console.log("useEmployeesForShifts - isOwner:", isOwner, "currentEmployeeId:", currentEmployeeId);
       
       let query = supabase
         .from("employee_master_data")
@@ -457,17 +459,21 @@ export function useEmployeesForShifts(department?: string) {
       
       // If owner, return all employees
       if (isOwner) {
+        console.log("Owner - returning all employees:", data?.length);
         return data;
       }
       
       // If teamleder, filter to only show team members (where manager_id = current user's employee id)
       // and exclude themselves
-      if (currentEmployeeData) {
-        return data.filter(emp => 
-          emp.manager_id === currentEmployeeData && emp.id !== currentEmployeeData
+      if (currentEmployeeId) {
+        const filtered = data.filter(emp => 
+          emp.manager_id === currentEmployeeId && emp.id !== currentEmployeeId
         );
+        console.log("Teamleder - filtered employees:", filtered.length, "from", data?.length);
+        return filtered;
       }
       
+      console.log("No filtering applied - returning all:", data?.length);
       return data;
     },
     enabled: !!user?.id,
