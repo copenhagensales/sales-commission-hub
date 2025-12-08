@@ -23,9 +23,9 @@ serve(async (req) => {
 
     // Buscar todas las integraciones activas del tipo solicitado
     const { data: integrations, error } = await supabase
-      .from("api_integrations")
+      .from("dialer_integrations")
       .select("*")
-      .eq("type", source)
+      .eq("provider", source)
       .eq("is_active", true);
 
     if (error) throw error;
@@ -47,8 +47,15 @@ serve(async (req) => {
 
       let adapter;
       try {
+        // Obtener credenciales desencriptadas
+        const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY");
+        const { data: credentials } = await supabase.rpc("get_dialer_credentials", {
+          p_integration_id: integration.id,
+          p_encryption_key: encryptionKey,
+        });
+
         if (source === "adversus") {
-          adapter = new AdversusAdapter(integration.secrets);
+          adapter = new AdversusAdapter(credentials);
         } else {
           throw new Error(`Fuente no soportada: ${source}`);
         }
@@ -75,8 +82,8 @@ serve(async (req) => {
 
         // Actualizar timestamp de última sincronización
         await supabase
-          .from("api_integrations")
-          .update({ last_sync_at: new Date().toISOString() })
+          .from("dialer_integrations")
+          .update({ last_sync_at: new Date().toISOString(), last_status: "success" })
           .eq("id", integration.id);
 
         results.push({ name: integration.name, status: "success", data: runResults });
