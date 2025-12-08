@@ -290,6 +290,9 @@ export function AppSidebar() {
   // Check if user has SOME access via individual permission
   const hasSomeAccess = isMenuItemGranted("some");
   
+  // Debug logging
+  console.log("AppSidebar - grantedMenuItems:", grantedMenuItems, "hasSomeAccess:", hasSomeAccess, "user:", user?.id, "isRekruttering:", isRekruttering);
+  
   // Select navigation based on role and job type, filter out denied items
   const baseNavigation = isOwner 
     ? [...ownerNavigation, ...teamlederExtraNavigation]
@@ -329,6 +332,7 @@ export function AppSidebar() {
   
   // Add SOME menu item if granted via individual permissions and not already in navigation
   if (hasSomeAccess && !mainNavigation.some(item => item.href === "/some")) {
+    console.log("Adding SOME to navigation for user", user?.id);
     mainNavigation = [...mainNavigation, { name: "SOME", href: "/some", icon: Video }];
   }
   
