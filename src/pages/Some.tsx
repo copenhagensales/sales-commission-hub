@@ -15,7 +15,6 @@ import { useSomeContent, getWeekStartDate, ContentItem, ContentStatus, ContentTy
 
 const statusColumns: { status: ContentStatus; title: string }[] = [
   { status: "planned", title: "Planlagt" },
-  { status: "in_progress", title: "I gang" },
   { status: "filmed", title: "Filmet" },
   { status: "edited", title: "Redigeret" },
   { status: "published", title: "Publiceret" },

@@ -14,7 +14,7 @@ interface SomeKanbanColumnProps {
 
 const statusColors: Record<ContentStatus, string> = {
   planned: "border-t-slate-500",
-  in_progress: "border-t-blue-500",
+  in_progress: "border-t-blue-500", // kept for type compatibility
   filmed: "border-t-amber-500",
   edited: "border-t-purple-500",
   published: "border-t-green-500",
