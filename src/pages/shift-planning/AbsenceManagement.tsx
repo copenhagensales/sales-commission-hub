@@ -22,6 +22,7 @@ import {
   useAbsenceRequests,
   useUpdateAbsenceRequest,
   useDepartments,
+  useCurrentEmployee,
   AbsenceRequest,
 } from "@/hooks/useShiftPlanning";
 import { MarkSickDialog } from "@/components/shift-planning/MarkSickDialog";
@@ -37,12 +38,15 @@ export default function AbsenceManagement() {
   const { data: approvedRequests } = useAbsenceRequests("approved");
   const { data: rejectedRequests } = useAbsenceRequests("rejected");
   const { data: departments } = useDepartments();
+  const { data: currentEmployee } = useCurrentEmployee();
   const updateRequest = useUpdateAbsenceRequest();
 
   const filterByDepartment = (requests: AbsenceRequest[] | undefined) => {
     if (!requests) return [];
-    if (selectedDepartment === "all") return requests;
-    return requests.filter(r => r.employee?.department === selectedDepartment);
+    // Filter out current user's own requests (can't approve your own)
+    let filtered = requests.filter(r => r.employee_id !== currentEmployee?.id);
+    if (selectedDepartment === "all") return filtered;
+    return filtered.filter(r => r.employee?.department === selectedDepartment);
   };
 
   const handleApprove = (request: AbsenceRequest) => {
