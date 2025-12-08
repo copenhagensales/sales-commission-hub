@@ -27,6 +27,7 @@ const statusColumns: { status: ContentStatus; title: string }[] = [
 export default function Some() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const weekStartDate = getWeekStartDate(selectedDate);
+  const previousWeekStartDate = getWeekStartDate(subWeeks(new Date(weekStartDate), 1));
   const weekEnd = endOfWeek(new Date(weekStartDate), { weekStartsOn: 1 });
   
   const {
@@ -42,9 +43,10 @@ export default function Some() {
 
   const {
     currentMetrics,
+    previousMetrics,
     historicalMetrics,
     upsertMetrics,
-  } = useSomeMetrics(weekStartDate);
+  } = useSomeMetrics(weekStartDate, previousWeekStartDate);
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -215,6 +217,7 @@ export default function Some() {
         <SomeWeeklyMetricsCard
           weekStartDate={weekStartDate}
           currentMetrics={currentMetrics}
+          previousMetrics={previousMetrics}
           onSave={upsertMetrics}
         />
 
