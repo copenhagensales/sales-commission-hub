@@ -258,11 +258,11 @@ export default function MySchedule() {
                           const clockOut = timeStamp.clock_out 
                             ? format(new Date(timeStamp.clock_out), "HH:mm") 
                             : "...";
-                          const effectiveHours = timeStamp.effective_hours;
+                          const effectiveHours = timeStamp.effective_hours ?? null;
                           
                           // Calculate daily pay if we have effective hours and salary amount
                           const hourlyRate = employee?.salary_amount || 0;
-                          const dailyPay = effectiveHours !== null && hourlyRate > 0 
+                          const dailyPay = effectiveHours != null && hourlyRate > 0 
                             ? effectiveHours * hourlyRate 
                             : null;
                           
@@ -271,13 +271,13 @@ export default function MySchedule() {
                               <div className="text-[9px] text-blue-600 flex items-center gap-0.5">
                                 <Clock className="h-2.5 w-2.5" />
                                 <span>{clockIn}-{clockOut}</span>
-                                {effectiveHours !== null && (
+                                {effectiveHours != null && (
                                   <span className="text-muted-foreground ml-0.5">
                                     ({effectiveHours.toFixed(1)}t)
                                   </span>
                                 )}
                               </div>
-                              {dailyPay !== null && timeStamp.clock_out && (
+                              {dailyPay != null && timeStamp.clock_out && (
                                 <div className="text-[9px] text-green-600 font-medium">
                                   💰 {dailyPay.toFixed(0)} kr
                                 </div>
