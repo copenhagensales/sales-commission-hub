@@ -2,7 +2,7 @@ import { useState } from "react";
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { addWeeks, subWeeks, format, startOfWeek, endOfWeek } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Settings, Plus, Video, ImageIcon, SquareStack, Flame } from "lucide-react";
+import { ChevronLeft, ChevronRight, Settings, Plus, Video, ImageIcon, SquareStack } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { AddContentDialog } from "@/components/some/AddContentDialog";
 import { SomeGoalsSettings } from "@/components/some/SomeGoalsSettings";
 import { SomeWeeklyMetricsCard } from "@/components/some/SomeWeeklyMetricsCard";
 import { SomeMetricsChart } from "@/components/some/SomeMetricsChart";
+import { SomeOverallProgress } from "@/components/some/SomeOverallProgress";
 import { useSomeContent, getWeekStartDate, ContentItem, ContentStatus, ContentType } from "@/hooks/useSomeContent";
 import { useSomeMetrics } from "@/hooks/useSomeMetrics";
 
@@ -85,10 +86,6 @@ export default function Some() {
   const goToNextWeek = () => setSelectedDate(addWeeks(selectedDate, 1));
   const goToCurrentWeek = () => setSelectedDate(new Date());
 
-  const allGoalsComplete = 
-    progress.tiktok.done >= progress.tiktok.target &&
-    progress.stories.done >= progress.stories.target &&
-    progress.posts.done >= progress.posts.target;
 
   return (
     <MainLayout>
@@ -140,21 +137,15 @@ export default function Some() {
           </div>
         ) : (
           <>
-            {allGoalsComplete && (
-              <Card className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/30">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <Flame className="h-6 w-6 text-green-500" />
-                  <div>
-                    <p className="font-semibold text-green-700 dark:text-green-400">
-                      Alle mål nået! 🎉
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Du har ramt alle dine mål for denne uge. Godt arbejde!
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {/* Overall Progress */}
+            <SomeOverallProgress
+              tiktokDone={progress.tiktok.done}
+              tiktokTarget={progress.tiktok.target}
+              storiesDone={progress.stories.done}
+              storiesTarget={progress.stories.target}
+              postsDone={progress.posts.done}
+              postsTarget={progress.posts.target}
+            />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <SomeProgressCard
