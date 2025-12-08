@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useShifts, useDepartments, useEmployeesForShifts, useDanishHolidays, useAbsencesForDateRange, Shift, AbsenceRequest } from "@/hooks/useShiftPlanning";
 import { CreateShiftDialog } from "@/components/shift-planning/CreateShiftDialog";
 import { ShiftCard } from "@/components/shift-planning/ShiftCard";
+import { EditTimeStampDialog } from "@/components/shift-planning/EditTimeStampDialog";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
@@ -33,6 +34,9 @@ export default function ShiftOverview() {
   const [delayDialogOpen, setDelayDialogOpen] = useState(false);
   const [delayMinutes, setDelayMinutes] = useState("");
   const [pendingDelayCell, setPendingDelayCell] = useState<{ employeeId: string; date: string } | null>(null);
+  const [editTimeStampDialogOpen, setEditTimeStampDialogOpen] = useState(false);
+  const [selectedTimeStamp, setSelectedTimeStamp] = useState<{ id: string; employee_id: string; clock_in: string; clock_out: string | null; effective_clock_in: string | null; effective_clock_out: string | null; effective_hours: number | null; break_minutes: number | null; note: string | null } | null>(null);
+  const [selectedTimeStampEmployee, setSelectedTimeStampEmployee] = useState<{ id: string; name: string; date: Date } | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -80,7 +84,7 @@ export default function ShiftOverview() {
         .gte("clock_in", `${format(weekStart, "yyyy-MM-dd")}T00:00:00`)
         .lte("clock_in", `${format(weekEnd, "yyyy-MM-dd")}T23:59:59`);
       if (error) throw error;
-      return data as { id: string; employee_id: string; clock_in: string; clock_out: string | null }[];
+      return data as { id: string; employee_id: string; clock_in: string; clock_out: string | null; effective_clock_in: string | null; effective_clock_out: string | null; effective_hours: number | null; break_minutes: number | null; note: string | null }[];
     },
   });
 
@@ -617,7 +621,19 @@ export default function ShiftOverview() {
                         )}
                         {/* Show work times and clock-in when working */}
                         {!hasShift && !isLate && isWorking && !holiday && (
-                          <div className="flex flex-col items-center justify-center h-full gap-0.5">
+                          <div 
+                            className="flex flex-col items-center justify-center h-full gap-0.5 cursor-pointer hover:bg-emerald-500/40 rounded transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedTimeStamp(timeStamp);
+                              setSelectedTimeStampEmployee({
+                                id: employee.id,
+                                name: `${employee.first_name} ${employee.last_name}`,
+                                date: day,
+                              });
+                              setEditTimeStampDialogOpen(true);
+                            }}
+                          >
                             {workTimes && (
                               <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
                                 {workTimes}
@@ -627,6 +643,11 @@ export default function ShiftOverview() {
                               <span className="text-[9px] text-muted-foreground">
                                 ⏱ {format(new Date(timeStamp.clock_in), "HH:mm")}
                                 {timeStamp.clock_out && ` - ${format(new Date(timeStamp.clock_out), "HH:mm")}`}
+                              </span>
+                            )}
+                            {!timeStamp && (
+                              <span className="text-[9px] text-muted-foreground/50">
+                                ⏱ Klik for at stemple
                               </span>
                             )}
                           </div>
@@ -691,6 +712,18 @@ export default function ShiftOverview() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Time Stamp Dialog */}
+        {selectedTimeStampEmployee && (
+          <EditTimeStampDialog
+            open={editTimeStampDialogOpen}
+            onOpenChange={setEditTimeStampDialogOpen}
+            timeStamp={selectedTimeStamp}
+            employeeId={selectedTimeStampEmployee.id}
+            employeeName={selectedTimeStampEmployee.name}
+            date={selectedTimeStampEmployee.date}
+          />
+        )}
       </div>
     </MainLayout>
   );
