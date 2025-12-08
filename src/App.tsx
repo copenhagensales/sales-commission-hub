@@ -269,8 +269,8 @@ const App = () => (
               <Route path="/recruitment/winback" element={<RoleProtectedRoute requireTeamlederOrAbove><Winback /></RoleProtectedRoute>} />
               <Route path="/recruitment/upcoming-interviews" element={<RoleProtectedRoute requireTeamlederOrAbove><UpcomingInterviews /></RoleProtectedRoute>} />
               <Route path="/recruitment/upcoming-hires" element={<RoleProtectedRoute requireTeamlederOrAbove><UpcomingHires /></RoleProtectedRoute>} />
-              {/* SOME route */}
-              <Route path="/some" element={<RoleProtectedRoute requireTeamlederOrAbove><Some /></RoleProtectedRoute>} />
+              {/* SOME route - accessible to SOME employees and teamleder+ */}
+              <Route path="/some" element={<ProtectedRoute><Some /></ProtectedRoute>} />
               {/* Admin route - owner only */}
               <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
