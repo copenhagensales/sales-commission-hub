@@ -70,6 +70,29 @@ export default function ShiftOverview() {
     },
   });
 
+  // Fetch time stamps for the week
+  const { data: timeStamps } = useQuery({
+    queryKey: ["time-stamps-week", format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd")],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("time_stamps")
+        .select("*")
+        .gte("clock_in", `${format(weekStart, "yyyy-MM-dd")}T00:00:00`)
+        .lte("clock_in", `${format(weekEnd, "yyyy-MM-dd")}T23:59:59`);
+      if (error) throw error;
+      return data as { id: string; employee_id: string; clock_in: string; clock_out: string | null }[];
+    },
+  });
+
+  // Get time stamp for specific employee and date
+  const getTimeStampForDate = (employeeId: string, date: Date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return timeStamps?.find(ts => {
+      const tsDate = ts.clock_in.split("T")[0];
+      return ts.employee_id === employeeId && tsDate === dateStr;
+    }) || null;
+  };
+
   // Mutation to create absence
   const createAbsence = useMutation({
     mutationFn: async ({ employeeId, date, type }: { employeeId: string; date: string; type: "vacation" | "sick" }) => {
@@ -537,6 +560,7 @@ export default function ShiftOverview() {
                     const absence = getAbsenceForDate(employee.id, day);
                     const absenceDisplay = isDateInAbsence(employee.id, day);
                     const lateness = getLatenessForDate(employee.id, day);
+                    const timeStamp = getTimeStampForDate(employee.id, day);
                     const hasShift = dayShifts.length > 0;
                     const isVacation = absenceDisplay?.type === "vacation";
                     const isSick = absenceDisplay?.type === "sick";
@@ -544,6 +568,9 @@ export default function ShiftOverview() {
                     
                     // Default is green (working), late is orange, vacation is yellow, sick is red
                     const isWorking = !absenceDisplay && !lateness && !holiday;
+
+                    // Get work times to display
+                    const workTimes = employee.standard_start_time;
                     
                     return (
                       <div
@@ -586,6 +613,22 @@ export default function ShiftOverview() {
                         {!hasShift && !isLate && isSick && (
                           <div className="flex items-center justify-center h-full gap-1 text-red-500">
                             <Thermometer className="h-4 w-4" />
+                          </div>
+                        )}
+                        {/* Show work times and clock-in when working */}
+                        {!hasShift && !isLate && isWorking && !holiday && (
+                          <div className="flex flex-col items-center justify-center h-full gap-0.5">
+                            {workTimes && (
+                              <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                                {workTimes}
+                              </span>
+                            )}
+                            {timeStamp && (
+                              <span className="text-[9px] text-muted-foreground">
+                                ⏱ {format(new Date(timeStamp.clock_in), "HH:mm")}
+                                {timeStamp.clock_out && ` - ${format(new Date(timeStamp.clock_out), "HH:mm")}`}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
