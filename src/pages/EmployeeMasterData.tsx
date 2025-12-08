@@ -339,12 +339,17 @@ export default function EmployeeMasterData() {
         },
       });
 
+      // Check for error in response data first (edge function returns error in data)
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
       if (response.error) {
         throw new Error(response.error.message || "Kunne ikke oprette bruger");
       }
 
       if (!response.data?.success) {
-        throw new Error(response.data?.error || "Kunne ikke oprette bruger");
+        throw new Error("Kunne ikke oprette bruger");
       }
 
       // Create the employee record
