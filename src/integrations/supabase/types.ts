@@ -2996,9 +2996,15 @@ export type Database = {
       }
       time_stamps: {
         Row: {
+          break_minutes: number | null
           clock_in: string
           clock_out: string | null
           created_at: string
+          edited_at: string | null
+          edited_by: string | null
+          effective_clock_in: string | null
+          effective_clock_out: string | null
+          effective_hours: number | null
           employee_id: string
           id: string
           note: string | null
@@ -3006,9 +3012,15 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          break_minutes?: number | null
           clock_in?: string
           clock_out?: string | null
           created_at?: string
+          edited_at?: string | null
+          edited_by?: string | null
+          effective_clock_in?: string | null
+          effective_clock_out?: string | null
+          effective_hours?: number | null
           employee_id: string
           id?: string
           note?: string | null
@@ -3016,9 +3028,15 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          break_minutes?: number | null
           clock_in?: string
           clock_out?: string | null
           created_at?: string
+          edited_at?: string | null
+          edited_by?: string | null
+          effective_clock_in?: string | null
+          effective_clock_out?: string | null
+          effective_hours?: number | null
           employee_id?: string
           id?: string
           note?: string | null
