@@ -817,9 +817,98 @@ export default function Admin() {
                                 );
                               })()}
 
+                              {/* Group by job_title: SOME */}
+                              {(() => {
+                                const someEmployees = usersInRole.filter(u => u.job_title === "SOME");
+                                if (someEmployees.length === 0) return null;
+                                return (
+                                  <div>
+                                    <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                                      <span className="w-2 h-2 rounded-full bg-pink-500" />
+                                      SOME ({someEmployees.length})
+                                    </h4>
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead>Navn</TableHead>
+                                          <TableHead>Email</TableHead>
+                                          <TableHead>Login</TableHead>
+                                          <TableHead className="text-right">Handlinger</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {someEmployees.map((user) => (
+                                          <TableRow key={user.employee_id}>
+                                            <TableCell className="font-medium">
+                                              {user.first_name} {user.last_name}
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                              {user.email || "-"}
+                                            </TableCell>
+                                            <TableCell>
+                                              {user.auth_user_id ? (
+                                                <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/30">
+                                                  Aktiv
+                                                </Badge>
+                                              ) : (
+                                                <Badge variant="outline" className="text-muted-foreground">
+                                                  Ingen
+                                                </Badge>
+                                              )}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                              <div className="flex items-center justify-end gap-2">
+                                                {user.auth_user_id && user.email ? (
+                                                  <Select
+                                                    value={user.role || "none"}
+                                                    onValueChange={(value) => {
+                                                      if (value === "none") {
+                                                        removeRole.mutate(user.email!);
+                                                      } else {
+                                                        assignRole.mutate({
+                                                          email: user.email!,
+                                                          role: value as SystemRole,
+                                                        });
+                                                      }
+                                                    }}
+                                                  >
+                                                    <SelectTrigger className="w-[130px]">
+                                                      <SelectValue placeholder="Vælg rolle" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      <SelectItem value="none">Ingen rolle</SelectItem>
+                                                      <SelectItem value="medarbejder">Medarbejder</SelectItem>
+                                                      <SelectItem value="rekruttering">Rekruttering</SelectItem>
+                                                      <SelectItem value="teamleder">Teamleder</SelectItem>
+                                                      <SelectItem value="ejer">Ejer</SelectItem>
+                                                    </SelectContent>
+                                                  </Select>
+                                                ) : (
+                                                  <span className="text-sm text-muted-foreground">
+                                                    Kræver login
+                                                  </span>
+                                                )}
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                  onClick={() => handleDeleteClick(user)}
+                                                >
+                                                  <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                              </div>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                );
+                              })()}
+
                               {/* Group by job_title: Øvrige (other job titles) */}
                               {(() => {
-                                const other = usersInRole.filter(u => u.job_title !== "Salgskonsulent" && u.job_title !== "Fieldmarketing");
+                                const other = usersInRole.filter(u => u.job_title !== "Salgskonsulent" && u.job_title !== "Fieldmarketing" && u.job_title !== "SOME");
                                 if (other.length === 0) return null;
                                 return (
                                   <div>
