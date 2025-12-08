@@ -77,3 +77,9 @@ verify_jwt = false
 
 [functions.delete-auth-user]
 verify_jwt = false
+
+[functions.scheduler-manager]
+verify_jwt = true
+
+[functions.integration-engine]
+verify_jwt = false
