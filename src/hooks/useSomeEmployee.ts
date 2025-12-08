@@ -15,7 +15,7 @@ export function useIsSomeEmployee() {
         .from("employee_master_data")
         .select("job_title")
         .eq("is_active", true)
-        .or(`private_email.eq."${user.email}",work_email.eq."${user.email}"`)
+        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
         .maybeSingle();
 
       if (error) {
@@ -23,11 +23,9 @@ export function useIsSomeEmployee() {
         return false;
       }
 
-      console.log("useSomeEmployee result:", { email: user.email, job_title: data?.job_title, isSome: data?.job_title === "SOME" });
-      
       return data?.job_title === "SOME";
     },
     enabled: !!user?.email,
-    staleTime: 60000,
+    staleTime: 10000, // Reduced from 60s to 10s for faster updates
   });
 }
