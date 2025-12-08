@@ -5,19 +5,37 @@ import { useAuth } from "./useAuth";
 export function useGdprConsents() {
   const { user } = useAuth();
 
-  return useQuery({
-    queryKey: ["gdpr-consents", user?.id],
+  // First get the employee_id for the current user
+  const { data: employeeId } = useQuery({
+    queryKey: ["current-employee-id-gdpr", user?.email],
     queryFn: async () => {
+      if (!user?.email) return null;
+      const { data } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .maybeSingle();
+      return data?.id || null;
+    },
+    enabled: !!user?.email,
+  });
+
+  return useQuery({
+    queryKey: ["gdpr-consents", employeeId],
+    queryFn: async () => {
+      if (!employeeId) return [];
+      
       const { data, error } = await supabase
         .from("gdpr_consents")
         .select("*")
+        .eq("employee_id", employeeId)
         .is("revoked_at", null)
         .order("consented_at", { ascending: false });
       
       if (error) throw error;
-      return data;
+      return data || [];
     },
-    enabled: !!user,
+    enabled: !!employeeId,
   });
 }
 
