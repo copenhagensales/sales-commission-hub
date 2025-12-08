@@ -22,10 +22,10 @@ Deno.serve(async (req) => {
 
     console.log(`[scheduler-manager] Action: ${action}`);
 
+    // ============ DIALER INTEGRATIONS ============
     if (action === "save_dialer") {
       const { integration_id, name, provider, credentials } = body;
 
-      // For new integrations, require credentials
       if (!integration_id && (!name || !provider || !credentials?.username || !credentials?.password)) {
         return new Response(
           JSON.stringify({ error: "Missing required fields: name, provider, credentials" }),
@@ -33,7 +33,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // For updates, only name and provider are required
       if (integration_id && (!name || !provider)) {
         return new Response(
           JSON.stringify({ error: "Missing required fields: name, provider" }),
@@ -45,7 +44,6 @@ Deno.serve(async (req) => {
       const credentialsJson = hasNewCredentials ? JSON.stringify(credentials) : null;
 
       if (integration_id) {
-        // Update existing integration - always update name/provider
         const { error: updateError } = await supabase
           .from("dialer_integrations")
           .update({
@@ -57,7 +55,6 @@ Deno.serve(async (req) => {
 
         if (updateError) throw updateError;
 
-        // Only update credentials if new ones were provided
         if (hasNewCredentials) {
           const { error: credError } = await supabase.rpc("update_dialer_credentials", {
             p_integration_id: integration_id,
@@ -76,7 +73,6 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       } else {
-        // Create new integration with encrypted credentials
         const { data, error } = await supabase.rpc("create_dialer_integration", {
           p_name: name,
           p_provider: provider,
@@ -86,7 +82,6 @@ Deno.serve(async (req) => {
 
         if (error) {
           console.error("RPC error:", error);
-          // Fallback: insert without encryption (for testing)
           const { data: insertData, error: insertError } = await supabase
             .from("dialer_integrations")
             .insert({
@@ -112,6 +107,98 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+    }
+
+    // ============ CUSTOMER CRM INTEGRATIONS ============
+    if (action === "save_config") {
+      const { client_id, crm_type, api_url, credentials, config } = body;
+
+      if (!client_id || !crm_type) {
+        return new Response(
+          JSON.stringify({ error: "Missing required fields: client_id, crm_type" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const credentialsJson = JSON.stringify(credentials || {});
+      const configJson = config || {};
+
+      // Use RPC to create/update with encrypted credentials
+      const { data, error } = await supabase.rpc("create_customer_integration", {
+        p_client_id: client_id,
+        p_crm_type: crm_type,
+        p_api_url: api_url || null,
+        p_credentials: credentialsJson,
+        p_config: configJson,
+        p_cron_schedule: body.cron_schedule || "0 * * * *",
+        p_encryption_key: encryptionKey,
+      });
+
+      if (error) {
+        console.error("[scheduler-manager] save_config RPC error:", error);
+        throw error;
+      }
+
+      console.log(`[scheduler-manager] Saved customer integration for client: ${client_id}, id: ${data}`);
+      return new Response(
+        JSON.stringify({ success: true, id: data }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (action === "activate") {
+      const { client_id, schedule } = body;
+
+      if (!client_id) {
+        return new Response(
+          JSON.stringify({ error: "Missing client_id" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { error } = await supabase
+        .from("customer_integrations")
+        .update({
+          is_active: true,
+          cron_schedule: schedule || "0 * * * *",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("client_id", client_id);
+
+      if (error) throw error;
+
+      console.log(`[scheduler-manager] Activated customer integration for client: ${client_id}`);
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (action === "deactivate") {
+      const { client_id } = body;
+
+      if (!client_id) {
+        return new Response(
+          JSON.stringify({ error: "Missing client_id" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { error } = await supabase
+        .from("customer_integrations")
+        .update({
+          is_active: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("client_id", client_id);
+
+      if (error) throw error;
+
+      console.log(`[scheduler-manager] Deactivated customer integration for client: ${client_id}`);
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(
