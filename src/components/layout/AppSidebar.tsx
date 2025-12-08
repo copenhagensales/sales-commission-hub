@@ -539,15 +539,20 @@ export function AppSidebar() {
           {/* Rekruttering menu - for owners and rekruttering role */}
           {(isOwner || isRekruttering) && (
             <Collapsible open={recruitmentOpen} onOpenChange={setRecruitmentOpen}>
-              <CollapsibleTrigger className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname.startsWith("/recruitment") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}>
-                <div className="flex items-center gap-3">
-                  <UserPlus className="h-5 w-5" />
-                  Rekruttering
-                </div>
-                {recruitmentOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                    location.pathname.startsWith("/recruitment") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <UserPlus className="h-5 w-5" />
+                    Rekruttering
+                  </div>
+                  {recruitmentOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
                 {recruitmentNavigation.map((item) => {
