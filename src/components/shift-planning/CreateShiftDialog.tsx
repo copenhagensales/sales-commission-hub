@@ -41,7 +41,7 @@ export function CreateShiftDialog({
   const [date, setDate] = useState<Date | undefined>(selectedDate || undefined);
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("16:00");
-  const [breakMinutes, setBreakMinutes] = useState("30");
+  const [breakMinutes, setBreakMinutes] = useState("60");
   const [note, setNote] = useState("");
 
   const createShift = useCreateShift();
@@ -97,7 +97,7 @@ export function CreateShiftDialog({
     setDate(undefined);
     setStartTime("08:00");
     setEndTime("16:00");
-    setBreakMinutes("30");
+    setBreakMinutes("60");
     setNote("");
   };
 
