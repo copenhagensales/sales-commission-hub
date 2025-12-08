@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { StandardSale, StandardUser, StandardCampaign } from "./types.ts";
+import { StandardSale, StandardUser, StandardCampaign, StandardProduct } from "./types.ts";
 
 export class IngestionEngine {
   private supabase: SupabaseClient;
@@ -8,7 +8,7 @@ export class IngestionEngine {
     this.supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   }
 
-  private log(type: "INFO" | "ERROR" | "WARN", msg: string, data?: any) {
+  private log(type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) {
     console.log(JSON.stringify({ type, msg, data, timestamp: new Date().toISOString() }));
   }
 
@@ -22,7 +22,6 @@ export class IngestionEngine {
 
     for (const user of users) {
       try {
-        // Safe Sync: Buscar primero para evitar errores de constraint
         const { data: existing } = await this.supabase
           .from("agents")
           .select("id")
@@ -42,9 +41,10 @@ export class IngestionEngine {
           await this.supabase.from("agents").insert(agentData);
         }
         processed++;
-      } catch (e: any) {
+      } catch (e) {
         errors++;
-        this.log("ERROR", `Error guardando usuario ${user.name}`, e.message);
+        const errMsg = e instanceof Error ? e.message : String(e);
+        this.log("ERROR", `Error guardando usuario ${user.name}`, errMsg);
       }
     }
     return { processed, errors };
@@ -78,9 +78,10 @@ export class IngestionEngine {
           });
         }
         processed++;
-      } catch (e: any) {
+      } catch (e) {
         errors++;
-        this.log("ERROR", `Error campaña ${camp.name}`, e.message);
+        const errMsg = e instanceof Error ? e.message : String(e);
+        this.log("ERROR", `Error campaña ${camp.name}`, errMsg);
       }
     }
     return { processed, errors };
@@ -92,12 +93,10 @@ export class IngestionEngine {
     this.log("INFO", `Procesando ${sales.length} ventas de ${sourceSystem}...`);
 
     // A. Cargar Cachés (Optimización de rendimiento)
-    const { data: dbAgents } = await this.supabase.from("agents").select("id, external_adversus_id");
     const { data: dbProducts } = await this.supabase.from("products").select("id, name, commission_dkk, revenue_dkk");
     const { data: dbMappings } = await this.supabase.from("adversus_product_mappings").select("*");
 
     // Mapas para búsqueda O(1)
-    const agentMap = new Map(dbAgents?.map((a) => [String(a.external_adversus_id), a.id]));
     const productMapByName = new Map(dbProducts?.map((p) => [p.name.toLowerCase(), p]));
     const productMapByExtId = new Map(dbMappings?.map((m) => [m.adversus_external_id, m.product_id]));
 
@@ -106,24 +105,17 @@ export class IngestionEngine {
 
     for (const sale of sales) {
       try {
-        // Resolver Agente Interno
-        // Intentamos por ID externo (más seguro), si no, lo dejamos null o usamos lógica futura de email
-        // El StandardSale trae el 'agentExternalId' si el adaptador lo soporta (lo agregué en types abajo)
-        const agentId = agentMap.get(sale.agentExternalId || "") || null;
-
         const saleData = {
           adversus_external_id: sale.externalId,
           sale_datetime: sale.saleDate,
-          agent_external_id: sale.agentExternalId,
-          agent_name: sale.agentName, // Nombre que viene del CRM
-          agent_id: agentId, // ID interno de nuestra tabla agents
+          agent_name: sale.agentName || sale.agentEmail,
           customer_company: sale.customerName,
           customer_phone: sale.customerPhone,
           updated_at: new Date().toISOString(),
         };
 
         // B. Safe Sync Venta
-        let saleId = null;
+        let saleId: string | null = null;
         const { data: existingSale } = await this.supabase
           .from("sales")
           .select("id")
@@ -147,7 +139,7 @@ export class IngestionEngine {
         }
 
         // C. Procesar Productos
-        const itemsToInsert = sale.products.map((p) => {
+        const itemsToInsert = sale.products.map((p: StandardProduct) => {
           // 1. Intentar match por ID Externo
           let productId = productMapByExtId.get(p.externalId);
 
@@ -160,12 +152,13 @@ export class IngestionEngine {
           // 3. Calcular Finanzas
           let commission = 0;
           let revenue = 0;
+          const qty = p.quantity || 1;
 
           if (productId) {
             const fullProduct = dbProducts?.find((x) => x.id === productId);
             if (fullProduct) {
-              commission = (fullProduct.commission_dkk || 0) * p.quantity;
-              revenue = (fullProduct.revenue_dkk || 0) * p.quantity;
+              commission = (fullProduct.commission_dkk || 0) * qty;
+              revenue = (fullProduct.revenue_dkk || 0) * qty;
             }
           }
 
@@ -174,12 +167,11 @@ export class IngestionEngine {
             product_id: productId || null,
             adversus_external_id: p.externalId,
             adversus_product_title: p.name,
-            quantity: p.quantity,
+            quantity: qty,
             unit_price: p.unitPrice,
             mapped_commission: commission,
             mapped_revenue: revenue,
             needs_mapping: !productId,
-            raw_data: p.metadata, // Guardamos raw data si existe
           };
         });
 
@@ -189,9 +181,10 @@ export class IngestionEngine {
         }
 
         processed++;
-      } catch (e: any) {
+      } catch (e) {
         errors++;
-        this.log("ERROR", `Fallo venta ${sale.externalId}`, e.message);
+        const errMsg = e instanceof Error ? e.message : String(e);
+        this.log("ERROR", `Fallo venta ${sale.externalId}`, errMsg);
       }
     }
 

@@ -1,12 +1,22 @@
+export interface StandardProduct {
+  name: string;
+  externalId: string;
+  quantity: number;
+  unitPrice: number;
+  metadata?: Record<string, unknown>;
+}
+
 export interface StandardSale {
   externalId: string;
   sourceSystem: "adversus" | "enreach" | "other";
   saleDate: string;
   agentEmail: string;
+  agentExternalId?: string;
+  agentName?: string;
   customerName?: string;
   customerPhone?: string;
   products: StandardProduct[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SyncResult {
@@ -21,18 +31,11 @@ export interface StandardUser {
   name: string;
   email: string;
   isActive: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface StandardCampaign {
   externalId: string;
   name: string;
   isActive: boolean;
-}
-
-export interface StandardProduct {
-  name: string;
-  externalId: string;
-  quantity?: number; // Opcional aquí porque es catálogo, no venta
-  unitPrice?: number; // Opcional
 }
