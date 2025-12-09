@@ -374,31 +374,41 @@ export function EmployeeExcelImport() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-8"></TableHead>
-                      <TableHead>Fornavn</TableHead>
+                      <TableHead className="w-8 sticky left-0 bg-background"></TableHead>
+                      <TableHead className="sticky left-8 bg-background">Fornavn</TableHead>
                       <TableHead>Efternavn</TableHead>
+                      <TableHead>CPR</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Telefon</TableHead>
+                      <TableHead>Reg. nr.</TableHead>
+                      <TableHead>Kontonr.</TableHead>
                       <TableHead>Stilling</TableHead>
                       <TableHead>Afdeling</TableHead>
+                      <TableHead>Startdato</TableHead>
+                      <TableHead>Arbejdssted</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {parsedData.map((employee, index) => (
                       <TableRow key={index} className={!employee.isValid ? "bg-destructive/10" : ""}>
-                        <TableCell>
+                        <TableCell className="sticky left-0 bg-background">
                           {employee.isValid ? (
                             <Check className="h-4 w-4 text-green-500" />
                           ) : (
                             <AlertCircle className="h-4 w-4 text-destructive" />
                           )}
                         </TableCell>
-                        <TableCell>{employee.first_name || "-"}</TableCell>
+                        <TableCell className="sticky left-8 bg-background">{employee.first_name || "-"}</TableCell>
                         <TableCell>{employee.last_name || "-"}</TableCell>
+                        <TableCell>{employee.cpr_number || "-"}</TableCell>
                         <TableCell>{employee.private_email || "-"}</TableCell>
                         <TableCell>{employee.private_phone || "-"}</TableCell>
+                        <TableCell>{employee.bank_reg_number || "-"}</TableCell>
+                        <TableCell>{employee.bank_account_number || "-"}</TableCell>
                         <TableCell>{employee.job_title || "-"}</TableCell>
                         <TableCell>{employee.department || "-"}</TableCell>
+                        <TableCell>{employee.employment_start_date || "-"}</TableCell>
+                        <TableCell>{employee.work_location || "-"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
