@@ -152,45 +152,38 @@ export class EnreachAdapter implements DialerAdapter {
     try {
       console.log(`[EnreachAdapter] Fetching sales for last ${days} days`);
 
-      // HeroBase uses /leads endpoint with query params
-      // Use createdTime for sorting (safer than soldTime which may be null)
-      let data: HeroBaseLead[] | { leads?: HeroBaseLead[] };
-      
-      try {
-        // Primary attempt: order by createdTime
-        console.log("[EnreachAdapter] Attempting fetch with orderBy=createdTime");
-        data = await this.get(`/leads?take=100&orderBy=createdTime&descending=true`) as 
-          HeroBaseLead[] | { leads?: HeroBaseLead[] };
-      } catch (primaryError) {
-        console.warn("[EnreachAdapter] Primary fetch failed, trying fallback without sorting:", primaryError);
-        // Fallback: just get leads without sorting
-        data = await this.get(`/leads?take=50`) as 
-          HeroBaseLead[] | { leads?: HeroBaseLead[] };
-      }
-
-      const allLeads = Array.isArray(data) ? data : (data.leads || []);
-      console.log(`[EnreachAdapter] Fetched ${allLeads.length} total leads`);
-
-      // Filter to only sold leads (status = "Solgt" or similar)
-      const soldStatuses = ["solgt", "sold", "success", "won", "closed won"];
-      const results = allLeads.filter((lead) => {
-        const status = (lead.status || "").toLowerCase();
-        return soldStatuses.includes(status);
-      });
-      
-      console.log(`[EnreachAdapter] Filtered to ${results.length} sold leads`);
-
-      // Filter by date range
+      // HeroBase uses /simpleleads endpoint for exporting leads
+      // Format: /simpleleads?Projects=*&ModifiedFrom=YYYY-MM-DD&Statuses=UserProcessed&LeadClosures=Success
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - days);
+      const modifiedFrom = cutoffDate.toISOString().split('T')[0]; // YYYY-MM-DD format
       
-      const filteredResults = results.filter((lead) => {
-        const saleDate = lead.soldTime || lead.createdTime || lead.updatedTime;
-        if (!saleDate) return false;
-        return new Date(saleDate) >= cutoffDate;
-      });
+      let allLeads: HeroBaseLead[] = [];
       
-      console.log(`[EnreachAdapter] After date filter: ${filteredResults.length} leads in last ${days} days`);
+      try {
+        // Primary attempt: fetch successful/sold leads
+        const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&Statuses=UserProcessed&LeadClosures=Success`;
+        console.log(`[EnreachAdapter] Fetching from: ${endpoint}`);
+        const data = await this.get(endpoint) as HeroBaseLead[] | { Results?: HeroBaseLead[] };
+        allLeads = Array.isArray(data) ? data : (data.Results || []);
+      } catch (primaryError) {
+        console.warn("[EnreachAdapter] Primary fetch failed, trying alternative endpoint:", primaryError);
+        try {
+          // Fallback: try just with Projects=* and ModifiedFrom
+          const fallbackEndpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}`;
+          console.log(`[EnreachAdapter] Fallback fetch from: ${fallbackEndpoint}`);
+          const data = await this.get(fallbackEndpoint) as HeroBaseLead[] | { Results?: HeroBaseLead[] };
+          allLeads = Array.isArray(data) ? data : (data.Results || []);
+        } catch (fallbackError) {
+          console.error("[EnreachAdapter] Fallback also failed:", fallbackError);
+          return [];
+        }
+      }
+
+      console.log(`[EnreachAdapter] Fetched ${allLeads.length} total leads`);
+      
+      // No need to filter by status since we requested LeadClosures=Success
+      console.log(`[EnreachAdapter] Processing ${allLeads.length} leads`);
 
       // Build campaign mapping lookup by external campaign ID
       const mappingLookup = new Map<string, CampaignMappingConfig>();
@@ -201,7 +194,7 @@ export class EnreachAdapter implements DialerAdapter {
         console.log(`[EnreachAdapter] Loaded ${campaignMappings.length} campaign mappings`);
       }
 
-      return filteredResults.map((lead) => {
+      return allLeads.map((lead: HeroBaseLead) => {
         const agent = lead.agent || lead.user;
         const campaignId = lead.campaign?.uniqueId || "";
         
@@ -225,7 +218,8 @@ export class EnreachAdapter implements DialerAdapter {
         }
 
         // Map products
-        const products: StandardProduct[] = (lead.products || []).map((p) => ({
+        const leadProducts = lead.products || [];
+        const products: StandardProduct[] = leadProducts.map((p: { uniqueId?: string; name?: string; quantity?: number; price?: number }) => ({
           name: p.name || "Unknown Product",
           externalId: p.uniqueId || "unknown",
           quantity: p.quantity || 1,
