@@ -162,7 +162,7 @@ export function CustomerIntegrations() {
         crm_type: "generic_api",
         api_url: "",
         credentials_json: '{\n  "api_key": "..."\n}',
-        config_json: '{\n  "search_field": "phone"\n}',
+        config_json: '{\n  "search_field": "phone",\n  "status_field": "stage",\n  "approved_statuses": ["closedwon", "signed", "active"],\n  "cancelled_statuses": ["closedlost", "cancelled", "churn"]\n}',
         cron_schedule: "0 * * * *",
       });
     }
@@ -332,9 +332,12 @@ export function CustomerIntegrations() {
                 value={formData.config_json}
                 onChange={(e) => setFormData({ ...formData, config_json: e.target.value })}
                 className="font-mono text-xs"
-                rows={4}
-                placeholder='{"search_field": "phone", "status_field": "stage"}'
+                rows={6}
+                placeholder='{"search_field": "phone", "status_field": "stage", "approved_statuses": ["closedwon", "signed"], "cancelled_statuses": ["closedlost", "churn"]}'
               />
+              <p className="text-[10px] text-muted-foreground">
+                Definer hvilke CRM-statusser der betyder "godkendt" eller "annulleret" via approved_statuses og cancelled_statuses.
+              </p>
             </div>
           </div>
 

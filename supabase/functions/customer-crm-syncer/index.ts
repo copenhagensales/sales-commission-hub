@@ -37,6 +37,38 @@ interface SaleItemRecord {
   quantity: number | null;
 }
 
+// ============ STATUS MAPPING HELPER ============
+const DEFAULT_APPROVED_STATUSES = ["approved", "won", "closed_won", "closedwon", "active", "signed", "closed"];
+const DEFAULT_CANCELLED_STATUSES = ["cancelled", "canceled", "lost", "closed_lost", "closedlost", "annulleret", "churn", "rejected"];
+const DEFAULT_PENDING_STATUSES = ["pending", "open", "new", "in_progress"];
+
+function mapStatusFromConfig(
+  rawStatus: string,
+  config: Record<string, unknown>
+): CrmValidationResult["status"] {
+  const normalized = rawStatus.toLowerCase().trim();
+  
+  // Get config arrays or use defaults
+  const approvedStatuses = (config.approved_statuses as string[]) || DEFAULT_APPROVED_STATUSES;
+  const cancelledStatuses = (config.cancelled_statuses as string[]) || DEFAULT_CANCELLED_STATUSES;
+  const pendingStatuses = (config.pending_statuses as string[]) || DEFAULT_PENDING_STATUSES;
+  
+  // Normalize all config statuses for comparison
+  const normalizedApproved = approvedStatuses.map(s => s.toLowerCase().trim());
+  const normalizedCancelled = cancelledStatuses.map(s => s.toLowerCase().trim());
+  const normalizedPending = pendingStatuses.map(s => s.toLowerCase().trim());
+  
+  if (normalizedApproved.includes(normalized)) {
+    return "approved";
+  } else if (normalizedCancelled.includes(normalized)) {
+    return "cancelled";
+  } else if (normalizedPending.includes(normalized)) {
+    return "pending";
+  }
+  
+  return "unknown";
+}
+
 // ============ GENERIC API ADAPTER ============
 class GenericApiAdapter implements CrmAdapter {
   name = "generic_api";
@@ -79,14 +111,7 @@ class GenericApiAdapter implements CrmAdapter {
       const statusField = (config.status_field as string) || "status";
       const apiStatus = data[statusField] || "unknown";
       
-      let status: CrmValidationResult["status"] = "unknown";
-      if (["approved", "won", "closed_won", "active"].includes(apiStatus.toLowerCase())) {
-        status = "approved";
-      } else if (["cancelled", "canceled", "lost", "closed_lost", "annulleret"].includes(apiStatus.toLowerCase())) {
-        status = "cancelled";
-      } else if (["pending", "open", "new"].includes(apiStatus.toLowerCase())) {
-        status = "pending";
-      }
+      const status = mapStatusFromConfig(apiStatus, config);
       
       return {
         found: true,
@@ -184,11 +209,8 @@ class HubSpotAdapter implements CrmAdapter {
             const dealDetail = await dealDetailResponse.json();
             const stage = dealDetail.properties?.dealstage || "";
             
-            if (stage.includes("won") || stage.includes("closed")) {
-              dealStatus = "approved";
-            } else if (stage.includes("lost")) {
-              dealStatus = "cancelled";
-            }
+            // Use dynamic status mapping from config
+            dealStatus = mapStatusFromConfig(stage, config);
           }
         }
       }
@@ -249,14 +271,10 @@ class SalesforceAdapter implements CrmAdapter {
       }
 
       const opportunity = data.records[0];
-      const stage = opportunity.StageName?.toLowerCase() || "";
+      const stage = opportunity.StageName || "";
       
-      let status: CrmValidationResult["status"] = "pending";
-      if (stage.includes("won") || stage.includes("closed")) {
-        status = "approved";
-      } else if (stage.includes("lost")) {
-        status = "cancelled";
-      }
+      // Use dynamic status mapping from config
+      const status = mapStatusFromConfig(stage, config);
       
       return {
         found: true,
