@@ -177,16 +177,14 @@ export class AdversusAdapter implements DialerAdapter {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // Build filter - include campaignId if provided
-    const filterObj: any = { created: { $gt: startDate.toISOString() } };
-    if (campaignId) {
-      filterObj.campaignId = parseInt(campaignId, 10);
-    }
+    // Adversus API doesn't support campaignId filter well (returns 500), so we fetch all and filter client-side
+    const filterObj = { created: { $gt: startDate.toISOString() } };
     const filterStr = encodeURIComponent(JSON.stringify(filterObj));
 
-    console.log(`[Adversus] Fetching sales with filters: ${JSON.stringify(filterObj)}`);
+    console.log(`[Adversus] Fetching recent sales (last ${days} days) to find campaign ${campaignId}`);
     
-    const url = `${this.baseUrl}/sales?pageSize=20&page=1&filters=${filterStr}`;
+    // Fetch more sales to increase chance of finding matching campaign
+    const url = `${this.baseUrl}/sales?pageSize=100&page=1&filters=${filterStr}`;
     const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
 
     if (!res.ok) {
@@ -195,34 +193,25 @@ export class AdversusAdapter implements DialerAdapter {
     }
 
     const data = await res.json();
-    const sales = data.sales || data || [];
+    const allSales = data.sales || data || [];
 
-    console.log(`[Adversus] Found ${sales.length} sales for campaign ${campaignId}`);
+    console.log(`[Adversus] Fetched ${allSales.length} total sales`);
 
-    if (sales.length === 0) {
-      // Try without campaign filter to see if there are ANY sales
-      console.log(`[Adversus] No sales with campaign filter, trying without...`);
-      const noFilterUrl = `${this.baseUrl}/sales?pageSize=10&page=1`;
-      const noFilterRes = await fetch(noFilterUrl, { headers: { Authorization: `Basic ${this.authHeader}` } });
-      
-      if (noFilterRes.ok) {
-        const noFilterData = await noFilterRes.json();
-        const allSales = noFilterData.sales || noFilterData || [];
-        console.log(`[Adversus] Total sales without filter: ${allSales.length}`);
-        
-        // Filter manually by campaignId
-        const matchingSales = allSales.filter((s: any) => String(s.campaignId) === campaignId);
-        console.log(`[Adversus] Matching sales after manual filter: ${matchingSales.length}`);
-        
-        if (matchingSales.length > 0) {
-          return this.enrichSalesWithLeadData(matchingSales);
-        }
-      }
-      
+    // Filter by campaignId if provided
+    let matchingSales = allSales;
+    if (campaignId) {
+      matchingSales = allSales.filter((s: any) => String(s.campaignId) === campaignId);
+      console.log(`[Adversus] Found ${matchingSales.length} sales for campaign ${campaignId}`);
+    }
+
+    if (matchingSales.length === 0) {
+      // List available campaigns from fetched sales for debugging
+      const campaignIds = [...new Set(allSales.map((s: any) => s.campaignId))];
+      console.log(`[Adversus] Available campaigns in fetched data: ${campaignIds.join(', ')}`);
       return [];
     }
 
-    return this.enrichSalesWithLeadData(sales);
+    return this.enrichSalesWithLeadData(matchingSales);
   }
 
   // Helper to enrich sales with lead resultData
