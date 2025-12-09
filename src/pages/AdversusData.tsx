@@ -78,27 +78,62 @@ export default function AdversusData() {
       while (true) {
         const response = await supabase.functions.invoke("backfill-opp", {});
         
+        // Log full response for debugging
+        console.log("backfill-opp response:", response);
+        
         if (response.error) {
           throw new Error(response.error.message);
         }
         
         const data = response.data;
+        console.log("backfill-opp data:", data);
+        
         if (!data.success) {
           throw new Error(data.error || "Ukendt fejl");
         }
         
-        totalProcessed += data.successful;
-        remaining = data.remaining;
+        // Safely handle undefined values with fallback to 0
+        const successfulCount = Number(data.successful) || 0;
+        const processedCount = Number(data.processed) || 0;
+        const noOppCount = Number(data.noOppFound) || 0;
+        remaining = Number(data.remaining) || 0;
+        
+        totalProcessed += successfulCount;
         setBackfillStatus({ remaining, lastProcessed: totalProcessed });
         
-        if (remaining === 0 || data.processed === 0) {
+        // Show warning if OPP field not found in any sales
+        if (processedCount > 0 && successfulCount === 0 && noOppCount > 0) {
+          toast.warning(`${noOppCount} salg behandlet, men ingen OPP numre fundet. Tjek om 'OPP' feltet findes i Adversus.`);
+        }
+        
+        // Log detailed results if available
+        if (data.results && Array.isArray(data.results)) {
+          const noOppResults = data.results.filter((r: any) => r.status === 'no_opp');
+          const errorResults = data.results.filter((r: any) => r.status === 'error');
+          
+          if (noOppResults.length > 0) {
+            console.log("Sales without OPP in Adversus:", noOppResults);
+          }
+          if (errorResults.length > 0) {
+            console.log("Sales with errors:", errorResults);
+          }
+        }
+        
+        // Break if no more to process or nothing was processed
+        if (remaining === 0 || processedCount === 0) {
+          // Show specific message if nothing was found
+          if (processedCount === 0 && totalProcessed === 0) {
+            toast.info("Ingen TDC salg fundet der mangler OPP nummer.");
+          }
           break;
         }
         
         await new Promise(resolve => setTimeout(resolve, 500));
       }
       
-      toast.success(`Færdig! Opdaterede ${totalProcessed} salg med OPP.`);
+      if (totalProcessed > 0) {
+        toast.success(`Færdig! Opdaterede ${totalProcessed} salg med OPP.`);
+      }
       queryClient.invalidateQueries({ queryKey: ["missing-opp-count"] });
     } catch (error) {
       console.error("Backfill error:", error);
