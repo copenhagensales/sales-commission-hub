@@ -1,13 +1,14 @@
 import { useState, useMemo } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useShifts, useDepartments, useEmployeesForShifts, useDanishHolidays, useAbsencesForDateRange, Shift, AbsenceRequest } from "@/hooks/useShiftPlanning";
 import { CreateShiftDialog } from "@/components/shift-planning/CreateShiftDialog";
 import { ShiftCard } from "@/components/shift-planning/ShiftCard";
@@ -49,6 +50,7 @@ export default function ShiftOverview() {
   const [editTimeStampDialogOpen, setEditTimeStampDialogOpen] = useState(false);
   const [selectedTimeStamp, setSelectedTimeStamp] = useState<{ id: string; employee_id: string; clock_in: string; clock_out: string | null; effective_clock_in: string | null; effective_clock_out: string | null; effective_hours: number | null; break_minutes: number | null; note: string | null } | null>(null);
   const [selectedTimeStampEmployee, setSelectedTimeStampEmployee] = useState<{ id: string; name: string; date: Date } | null>(null);
+  const [openPopoverKey, setOpenPopoverKey] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -312,27 +314,62 @@ export default function ShiftOverview() {
     };
   }, [employees, absences, weekDays]);
 
-  // Handle cell click - cycle through: empty -> vacation -> sick -> late (dialog) -> empty
-  const handleCellClick = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null, currentLateness: LatenessRecord | null) => {
+  // Handle popover actions
+  const handleSetVacation = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null) => {
     const dateStr = format(date, "yyyy-MM-dd");
-
-    // Cycle: empty -> vacation -> sick -> late (dialog) -> empty
-    if (!currentLateness && !currentAbsence) {
-      // Empty -> create vacation
+    if (currentAbsence) {
+      if (currentAbsence.type !== "vacation") {
+        updateAbsence.mutate({ id: currentAbsence.id, type: "vacation" });
+      }
+    } else {
       createAbsence.mutate({ employeeId, date: dateStr, type: "vacation" });
-    } else if (currentAbsence?.type === "vacation" && !currentLateness) {
-      // Vacation -> change to sick
-      updateAbsence.mutate({ id: currentAbsence.id, type: "sick" });
-    } else if (currentAbsence?.type === "sick" && !currentLateness) {
-      // Sick -> show delay dialog (user can skip to go back to empty)
+    }
+    setOpenPopoverKey(null);
+  };
+
+  const handleSetSick = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    if (currentAbsence) {
+      if (currentAbsence.type !== "sick") {
+        updateAbsence.mutate({ id: currentAbsence.id, type: "sick" });
+      }
+    } else {
+      createAbsence.mutate({ employeeId, date: dateStr, type: "sick" });
+    }
+    setOpenPopoverKey(null);
+  };
+
+  const handleSetLateness = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    // Remove any existing absence first
+    if (currentAbsence) {
       deleteAbsence.mutate(currentAbsence.id);
-      setPendingDelayCell({ employeeId, date: dateStr });
-      setDelayMinutes("");
-      setDelayDialogOpen(true);
-    } else if (currentLateness) {
-      // Late -> remove lateness (back to empty)
+    }
+    setPendingDelayCell({ employeeId, date: dateStr });
+    setDelayMinutes("");
+    setDelayDialogOpen(true);
+    setOpenPopoverKey(null);
+  };
+
+  const handleEditTimeStamp = (employee: { id: string; first_name: string; last_name: string }, date: Date, timeStamp: TimeStampData | null) => {
+    setSelectedTimeStamp(timeStamp);
+    setSelectedTimeStampEmployee({
+      id: employee.id,
+      name: `${employee.first_name} ${employee.last_name}`,
+      date: date,
+    });
+    setEditTimeStampDialogOpen(true);
+    setOpenPopoverKey(null);
+  };
+
+  const handleClearStatus = (currentAbsence: AbsenceRequest | null, currentLateness: LatenessRecord | null) => {
+    if (currentAbsence) {
+      deleteAbsence.mutate(currentAbsence.id);
+    }
+    if (currentLateness) {
       deleteLateness.mutate(currentLateness.id);
     }
+    setOpenPopoverKey(null);
   };
 
   // Handle delay dialog submit
@@ -352,16 +389,6 @@ export default function ShiftOverview() {
     setPendingDelayCell(null);
   };
 
-  // Handle double-click to open time stamp edit dialog
-  const handleCellDoubleClick = (employee: { id: string; first_name: string; last_name: string }, date: Date, timeStamp: TimeStampData | null) => {
-    setSelectedTimeStamp(timeStamp);
-    setSelectedTimeStampEmployee({
-      id: employee.id,
-      name: `${employee.first_name} ${employee.last_name}`,
-      date: date,
-    });
-    setEditTimeStampDialogOpen(true);
-  };
 
   return (
     <MainLayout>
@@ -484,7 +511,7 @@ export default function ShiftOverview() {
             <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 font-medium">
               <AlarmClock className="h-3 w-3" /> Forsinket
             </span>
-            <span className="text-muted-foreground/70 ml-auto">Klik = skifte status • Dobbeltklik = rediger tid</span>
+            <span className="text-muted-foreground/70 ml-auto">Klik på celle for handlinger</span>
           </div>
         </div>
 
@@ -550,6 +577,7 @@ export default function ShiftOverview() {
                   {/* Day cells */}
                   {weekDays.map((day, dayIdx) => {
                     const dateKey = format(day, "yyyy-MM-dd");
+                    const popoverKey = `${employee.id}-${dateKey}`;
                     const dayShifts = shiftsByEmployeeAndDate.get(employee.id)?.get(dateKey) || [];
                     const holiday = isHoliday(day);
                     const absence = getAbsenceForDate(employee.id, day);
@@ -562,78 +590,144 @@ export default function ShiftOverview() {
                     const isLate = !!lateness;
                     const isWorking = !absenceDisplay && !lateness && !holiday;
                     const workTimes = employee.standard_start_time;
+                    const hasStatus = isVacation || isSick || isLate;
                     
                     return (
-                      <div
-                        key={day.toISOString()}
-                        className={cn(
-                          "min-h-[60px] p-2 border-l border-border/40 cursor-pointer transition-colors relative",
-                          isToday(day) && "bg-primary/5",
-                          holiday && "bg-muted/40 cursor-not-allowed",
-                          !holiday && "hover:bg-muted/30"
-                        )}
-                        onClick={() => {
-                          if (!holiday) {
-                            handleCellClick(employee.id, day, absence, lateness);
-                          }
-                        }}
-                        onDoubleClick={() => {
-                          if (!holiday) {
-                            handleCellDoubleClick(employee, day, timeStamp);
-                          }
-                        }}
+                      <Popover 
+                        key={day.toISOString()} 
+                        open={openPopoverKey === popoverKey} 
+                        onOpenChange={(open) => setOpenPopoverKey(open ? popoverKey : null)}
                       >
-                        <div className="flex flex-col items-center justify-center h-full gap-1.5">
-                          {/* Shift cards */}
-                          {hasShift && dayShifts.map(shift => (
-                            <ShiftCard key={shift.id} shift={shift} compact />
-                          ))}
+                        <PopoverTrigger asChild>
+                          <div
+                            className={cn(
+                              "min-h-[60px] p-2 border-l border-border/40 cursor-pointer transition-colors relative",
+                              isToday(day) && "bg-primary/5",
+                              holiday && "bg-muted/40 cursor-not-allowed",
+                              !holiday && "hover:bg-muted/30"
+                            )}
+                          >
+                            <div className="flex flex-col items-center justify-center h-full gap-1.5">
+                              {/* Shift cards */}
+                              {hasShift && dayShifts.map(shift => (
+                                <ShiftCard key={shift.id} shift={shift} compact />
+                              ))}
 
-                          {/* Status Tags */}
-                          {!hasShift && isLate && (
-                            <div className="flex flex-col items-center gap-1">
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
-                                <AlarmClock className="h-3 w-3" />
+                              {/* Status Tags */}
+                              {!hasShift && isLate && (
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+                                    <AlarmClock className="h-3 w-3" />
+                                    Forsinket
+                                  </span>
+                                  <span className="text-[10px] font-medium text-orange-600 dark:text-orange-400">
+                                    {lateness.minutes} min
+                                  </span>
+                                </div>
+                              )}
+
+                              {!hasShift && !isLate && isVacation && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                                  <Palmtree className="h-3 w-3" />
+                                  Ferie
+                                </span>
+                              )}
+
+                              {!hasShift && !isLate && isSick && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                                  <Thermometer className="h-3 w-3" />
+                                  Syg
+                                </span>
+                              )}
+
+                              {/* Working state */}
+                              {!hasShift && !isLate && isWorking && !holiday && (
+                                <div className="flex flex-col items-center gap-1">
+                                  {workTimes && (
+                                    <span className="text-[10px] font-medium text-muted-foreground">
+                                      {workTimes}
+                                    </span>
+                                  )}
+                                  {timeStamp && (
+                                    <span className="text-[9px] text-muted-foreground/80">
+                                      {format(new Date(timeStamp.clock_in), "HH:mm")}
+                                      {timeStamp.clock_out && ` – ${format(new Date(timeStamp.clock_out), "HH:mm")}`}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </PopoverTrigger>
+                        {!holiday && (
+                          <PopoverContent className="w-48 p-2" align="center" side="bottom">
+                            <div className="flex flex-col gap-1">
+                              <p className="text-xs font-medium text-muted-foreground px-2 py-1 border-b mb-1">
+                                {format(day, "EEEE d. MMM", { locale: da })}
+                              </p>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  "justify-start gap-2 h-8",
+                                  isVacation && "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                )}
+                                onClick={() => handleSetVacation(employee.id, day, absence)}
+                              >
+                                <Palmtree className="h-4 w-4" />
+                                Ferie
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  "justify-start gap-2 h-8",
+                                  isSick && "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                                )}
+                                onClick={() => handleSetSick(employee.id, day, absence)}
+                              >
+                                <Thermometer className="h-4 w-4" />
+                                Syg
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  "justify-start gap-2 h-8",
+                                  isLate && "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+                                )}
+                                onClick={() => handleSetLateness(employee.id, day, absence)}
+                              >
+                                <AlarmClock className="h-4 w-4" />
                                 Forsinket
-                              </span>
-                              <span className="text-[10px] font-medium text-orange-600 dark:text-orange-400">
-                                {lateness.minutes} min
-                              </span>
-                            </div>
-                          )}
-
-                          {!hasShift && !isLate && isVacation && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                              <Palmtree className="h-3 w-3" />
-                              Ferie
-                            </span>
-                          )}
-
-                          {!hasShift && !isLate && isSick && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
-                              <Thermometer className="h-3 w-3" />
-                              Syg
-                            </span>
-                          )}
-
-                          {/* Working state */}
-                          {!hasShift && !isLate && isWorking && !holiday && (
-                            <div className="flex flex-col items-center gap-1">
-                              {workTimes && (
-                                <span className="text-[10px] font-medium text-muted-foreground">
-                                  {workTimes}
-                                </span>
-                              )}
-                              {timeStamp && (
-                                <span className="text-[9px] text-muted-foreground/80">
-                                  {format(new Date(timeStamp.clock_in), "HH:mm")}
-                                  {timeStamp.clock_out && ` – ${format(new Date(timeStamp.clock_out), "HH:mm")}`}
-                                </span>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="justify-start gap-2 h-8"
+                                onClick={() => handleEditTimeStamp(employee, day, timeStamp)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                                Ændre indstempling
+                              </Button>
+                              {hasStatus && (
+                                <>
+                                  <div className="border-t my-1" />
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="justify-start gap-2 h-8 text-destructive hover:text-destructive"
+                                    onClick={() => handleClearStatus(absence, lateness)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                    Fjern status
+                                  </Button>
+                                </>
                               )}
                             </div>
-                          )}
-                        </div>
-                      </div>
+                          </PopoverContent>
+                        )}
+                      </Popover>
                     );
                   })}
                 </div>
