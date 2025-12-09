@@ -86,6 +86,81 @@ async function sendEmail(
   }
 }
 
+// Generate PDF using the existing generate-contract-pdf function
+async function generateContractPdf(contractId: string, supabaseUrl: string, serviceRoleKey: string): Promise<{ base64: string; filename: string }> {
+  const response = await fetch(`${supabaseUrl}/functions/v1/generate-contract-pdf`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${serviceRoleKey}`,
+    },
+    body: JSON.stringify({ contractId }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("PDF generation error:", error);
+    throw new Error("Failed to generate PDF");
+  }
+
+  const data = await response.json();
+  return { base64: data.pdf, filename: data.filename };
+}
+
+// Upload file to OneDrive via Microsoft Graph API
+async function uploadToOneDrive(
+  accessToken: string,
+  fileContent: Uint8Array,
+  filename: string,
+  employeeName: string
+): Promise<string> {
+  const oneDriveUserId = Deno.env.get("M365_ONEDRIVE_USER_ID");
+  
+  if (!oneDriveUserId) {
+    console.log("M365_ONEDRIVE_USER_ID not configured, skipping OneDrive upload");
+    return "";
+  }
+
+  // Create folder path: Kontrakter/[Employee Name]/
+  const folderPath = `Kontrakter/${employeeName.replace(/[<>:"/\\|?*]/g, '_')}`;
+  const filePath = `${folderPath}/${filename}`;
+  
+  console.log(`Uploading to OneDrive: ${filePath}`);
+
+  // Use the simple upload endpoint (for files < 4MB)
+  const uploadUrl = `https://graph.microsoft.com/v1.0/users/${oneDriveUserId}/drive/root:/${filePath}:/content`;
+  
+  const response = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/pdf",
+    },
+    body: fileContent as unknown as BodyInit,
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("OneDrive upload error:", error);
+    // Don't throw - OneDrive upload is optional
+    return "";
+  }
+
+  const data = await response.json();
+  console.log(`File uploaded successfully to OneDrive: ${data.webUrl}`);
+  return data.webUrl || "";
+}
+
+// Decode base64 to Uint8Array
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -117,6 +192,29 @@ const handler = async (req: Request): Promise<Response> => {
     if (contractError) {
       console.error("Error fetching contract:", contractError);
       throw new Error("Could not fetch contract content");
+    }
+
+    // Get M365 access token first
+    const accessToken = await getM365AccessToken();
+
+    // Generate PDF and upload to OneDrive in background
+    let oneDriveUrl = "";
+    try {
+      console.log("Generating PDF for contract:", contractId);
+      const { base64, filename } = await generateContractPdf(contractId, supabaseUrl, supabaseKey);
+      
+      // Convert base64 to bytes
+      const pdfBytes = base64ToUint8Array(base64);
+      
+      // Upload to OneDrive
+      oneDriveUrl = await uploadToOneDrive(accessToken, pdfBytes, filename, employeeName);
+      
+      if (oneDriveUrl) {
+        console.log("Contract PDF uploaded to OneDrive:", oneDriveUrl);
+      }
+    } catch (pdfError) {
+      console.error("PDF generation/upload error (non-fatal):", pdfError);
+      // Continue with email - PDF upload is optional
     }
 
     // Format signed date
@@ -152,6 +250,7 @@ const handler = async (req: Request): Promise<Response> => {
           .contract-content { background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-radius: 8px; margin: 25px 0; max-height: 500px; overflow-y: auto; }
           .contract-content h1, .contract-content h2, .contract-content h3 { color: #1e293b; }
           .legal-notice { font-size: 11px; color: #94a3b8; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e5e7eb; }
+          .onedrive-notice { background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px; border-radius: 6px; margin: 15px 0; font-size: 13px; color: #1e40af; }
         </style>
       </head>
       <body>
@@ -189,6 +288,12 @@ const handler = async (req: Request): Promise<Response> => {
               </div>
             </div>
 
+            ${oneDriveUrl ? `
+            <div class="onedrive-notice">
+              📁 En kopi af kontrakten er blevet gemt i virksomhedens arkiv.
+            </div>
+            ` : ''}
+
             <h3 style="margin-top: 30px;">Kopi af kontrakten</h3>
             <p style="font-size: 14px; color: #64748b;">Nedenfor finder du en kopi af kontraktens indhold til dine arkiver:</p>
             
@@ -214,13 +319,12 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Sending contract signed confirmation to ${employeeEmail} for contract ${contractId}`);
 
-    const accessToken = await getM365AccessToken();
     await sendEmail(accessToken, employeeEmail, `Bekræftelse: Du har underskrevet "${contractTitle}"`, htmlBody);
 
     console.log(`Contract signed confirmation sent successfully to ${employeeEmail}`);
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ success: true, oneDriveUrl }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
