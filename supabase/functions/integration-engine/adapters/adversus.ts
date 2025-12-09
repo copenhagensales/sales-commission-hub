@@ -165,7 +165,36 @@ export class AdversusAdapter implements DialerAdapter {
       }
       
       const data = await res.json();
-      return data.resultData || {};
+      console.log(`[Adversus] Lead ${leadId} raw response keys: ${Object.keys(data).join(', ')}`);
+      
+      // Adversus returns resultData as an array of {id, value} objects
+      // Convert to a flat object for easier inspection
+      const resultDataArray = data.resultData || [];
+      const masterDataArray = data.masterData || [];
+      
+      const result: Record<string, unknown> = {};
+      
+      // Add resultData fields (these are the custom fields we want)
+      if (Array.isArray(resultDataArray)) {
+        for (const field of resultDataArray) {
+          if (field.id !== undefined) {
+            result[`result_${field.id}`] = field.value;
+          }
+        }
+        console.log(`[Adversus] Parsed ${resultDataArray.length} resultData fields`);
+      }
+      
+      // Also add masterData fields for reference
+      if (Array.isArray(masterDataArray)) {
+        for (const field of masterDataArray) {
+          if (field.id !== undefined) {
+            result[`master_${field.id}`] = field.value;
+          }
+        }
+        console.log(`[Adversus] Parsed ${masterDataArray.length} masterData fields`);
+      }
+      
+      return result;
     } catch (e) {
       console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
       return {};
