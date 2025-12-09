@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { IngestionEngine } from "./core.ts";
 import { AdversusAdapter } from "./adapters/adversus.ts";
+import { EnreachAdapter } from "./adapters/enreach.ts";
+import { DialerAdapter } from "./adapters/interface.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -128,11 +130,15 @@ serve(async (req) => {
           p_encryption_key: encryptionKey,
         });
 
+        let dialerAdapter: DialerAdapter;
         if (source === "adversus") {
-          adapter = new AdversusAdapter(credentials);
+          dialerAdapter = new AdversusAdapter(credentials);
+        } else if (source === "enreach") {
+          dialerAdapter = new EnreachAdapter(credentials);
         } else {
           throw new Error(`Fuente no soportada: ${source}`);
         }
+        adapter = dialerAdapter;
 
         const runResults: Record<string, unknown> = {};
 
