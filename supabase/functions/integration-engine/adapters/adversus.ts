@@ -167,10 +167,15 @@ export class AdversusAdapter implements DialerAdapter {
       const data = await res.json();
       console.log(`[Adversus] Lead ${leadId} raw response keys: ${Object.keys(data).join(', ')}`);
       
+      // Adversus API returns { leads: [...] } - the lead data is inside the array
+      const lead = Array.isArray(data.leads) && data.leads.length > 0 ? data.leads[0] : data;
+      console.log(`[Adversus] Lead ${leadId} object keys: ${Object.keys(lead).join(', ')}`);
+      
       // Adversus returns resultData as an array of {id, value} objects
-      // Convert to a flat object for easier inspection
-      const resultDataArray = data.resultData || [];
-      const masterDataArray = data.masterData || [];
+      const resultDataArray = lead.resultData || [];
+      const masterDataArray = lead.masterData || [];
+      
+      console.log(`[Adversus] Lead ${leadId} resultData type: ${typeof resultDataArray}, isArray: ${Array.isArray(resultDataArray)}, length: ${Array.isArray(resultDataArray) ? resultDataArray.length : 'N/A'}`);
       
       const result: Record<string, unknown> = {};
       
