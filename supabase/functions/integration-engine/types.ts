@@ -6,6 +6,19 @@ export interface StandardProduct {
   metadata?: Record<string, unknown>;
 }
 
+// Reference extraction config stored in DB - flexible for any adapter
+export interface ReferenceExtractionConfig {
+  type: "field_id" | "json_path" | "regex" | "static";
+  value: string;
+}
+
+// Campaign mapping with extraction config
+export interface CampaignMappingConfig {
+  adversusCampaignId: string;
+  clientCampaignId: string | null;
+  referenceConfig: ReferenceExtractionConfig | null;
+}
+
 export interface StandardSale {
   externalId: string;
   sourceSystem: "adversus" | "enreach" | "other";
@@ -15,9 +28,13 @@ export interface StandardSale {
   agentName?: string;
   customerName?: string;
   customerPhone?: string;
-  campaignId?: string; // Adversus campaign ID for field mapping lookup
+  campaignId?: string;
+  // Explicit external reference (OPP number) - extracted by adapter
+  externalReference?: string | null;
+  // Client campaign ID - resolved by adapter
+  clientCampaignId?: string | null;
   products: StandardProduct[];
-  metadata?: Record<string, unknown>; // Includes lead.resultData for OPP extraction
+  metadata?: Record<string, unknown>;
 }
 
 export interface SyncResult {

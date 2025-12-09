@@ -103,8 +103,8 @@ export type Database = {
           adversus_campaign_name: string | null
           client_campaign_id: string | null
           created_at: string | null
-          external_reference_field_id: string | null
           id: string
+          reference_extraction_config: Json | null
           updated_at: string | null
         }
         Insert: {
@@ -112,8 +112,8 @@ export type Database = {
           adversus_campaign_name?: string | null
           client_campaign_id?: string | null
           created_at?: string | null
-          external_reference_field_id?: string | null
           id?: string
+          reference_extraction_config?: Json | null
           updated_at?: string | null
         }
         Update: {
@@ -121,8 +121,8 @@ export type Database = {
           adversus_campaign_name?: string | null
           client_campaign_id?: string | null
           created_at?: string | null
-          external_reference_field_id?: string | null
           id?: string
+          reference_extraction_config?: Json | null
           updated_at?: string | null
         }
         Relationships: [
