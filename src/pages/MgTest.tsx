@@ -52,11 +52,18 @@ interface EditEntry {
 
 type EditValues = Record<string, EditEntry>;
 
+interface ReferenceExtractionConfig {
+  type: "field_id" | "json_path" | "regex" | "static";
+  value: string;
+}
+
 interface CampaignMapping {
   id: string;
   adversus_campaign_id: string;
   adversus_campaign_name: string | null;
   client_campaign_id: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  reference_extraction_config: ReferenceExtractionConfig | any | null;
 }
 
 interface ClientCampaignRow {
@@ -139,6 +146,7 @@ export default function MgTest() {
   const [productClientDrafts, setProductClientDrafts] = useState<Record<string, string | null>>({});
   const [openProductGroups, setOpenProductGroups] = useState<Record<string, boolean>>({});
   const [openCampaignGroups, setOpenCampaignGroups] = useState<Record<string, boolean>>({});
+  const [campaignFieldIdDrafts, setCampaignFieldIdDrafts] = useState<Record<string, string>>({});
 
   // Hent alle kunder (kundenavne)
   const { data: clients, isLoading: loadingClients } = useQuery<ClientRow[]>({
@@ -607,7 +615,7 @@ export default function MgTest() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("adversus_campaign_mappings")
-        .select("id, adversus_campaign_id, adversus_campaign_name, client_campaign_id")
+        .select("id, adversus_campaign_id, adversus_campaign_name, client_campaign_id, reference_extraction_config")
         .order("adversus_campaign_name", { ascending: true });
 
       if (error) throw error;
@@ -685,7 +693,7 @@ export default function MgTest() {
   }, [campaignMappings, clientCampaigns, clients]);
 
   const updateCampaignMapping = useMutation({
-    mutationFn: async ({ mappingId, clientId }: { mappingId: string; clientId: string | null }) => {
+    mutationFn: async ({ mappingId, clientId, fieldId }: { mappingId: string; clientId: string | null; fieldId?: string }) => {
       let clientCampaignId: string | null = null;
 
       if (clientId) {
@@ -711,11 +719,19 @@ export default function MgTest() {
         }
       }
 
+      // Build reference_extraction_config as JSONB
+      const referenceConfig = fieldId && fieldId.trim() 
+        ? { type: "field_id" as const, value: fieldId.trim() }
+        : null;
+
       const { data, error } = await supabase
         .from("adversus_campaign_mappings")
-        .update({ client_campaign_id: clientCampaignId })
+        .update({ 
+          client_campaign_id: clientCampaignId,
+          reference_extraction_config: referenceConfig 
+        })
         .eq("id", mappingId)
-        .select("id, client_campaign_id")
+        .select("id, client_campaign_id, reference_extraction_config")
         .maybeSingle();
 
       if (error) throw error;
@@ -726,6 +742,11 @@ export default function MgTest() {
     onSuccess: (_data, variables) => {
       toast.success("Kampagnemapping gemt");
       setCampaignSelections((prev) => {
+        const next = { ...prev };
+        delete next[variables.mappingId];
+        return next;
+      });
+      setCampaignFieldIdDrafts((prev) => {
         const next = { ...prev };
         delete next[variables.mappingId];
         return next;
@@ -1441,10 +1462,12 @@ export default function MgTest() {
                           <div className="rounded-md border overflow-x-auto mt-4">
                             <Table>
                               <TableHeader>
-                                <TableRow>
-                                  <TableHead className="w-[30%]">Adversus kampagnenavn</TableHead>
-                                  <TableHead className="w-[20%]">Adversus campaignId</TableHead>
-                                  <TableHead className="w-[50%]">Intern kunde / kampagne</TableHead>
+                              <TableRow>
+                                  <TableHead className="w-[25%]">Adversus kampagnenavn</TableHead>
+                                  <TableHead className="w-[15%]">Adversus campaignId</TableHead>
+                                  <TableHead className="w-[30%]">Intern kunde / kampagne</TableHead>
+                                  <TableHead className="w-[15%]">OPP/Reference Field ID</TableHead>
+                                  <TableHead className="w-[15%]">Gem</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -1463,6 +1486,16 @@ export default function MgTest() {
                                   const selectedClientId =
                                     selectionFromState ?? existingClientId ?? (parsedClient ? parsedClient.id : null);
 
+                                  // Get field ID from draft or existing config
+                                  const existingFieldId = mapping.reference_extraction_config?.value ?? "";
+                                  const draftFieldId = campaignFieldIdDrafts[mapping.id];
+                                  const currentFieldId = draftFieldId !== undefined ? draftFieldId : existingFieldId;
+                                  
+                                  // Check if anything changed
+                                  const hasClientChange = selectedClientId !== existingClientId;
+                                  const hasFieldIdChange = draftFieldId !== undefined && draftFieldId !== existingFieldId;
+                                  const hasChanges = hasClientChange || hasFieldIdChange;
+
                                   return (
                                     <TableRow key={mapping.id}>
                                       <TableCell>
@@ -1476,45 +1509,55 @@ export default function MgTest() {
                                         </span>
                                       </TableCell>
                                       <TableCell>
-                                        <div className="flex flex-col gap-2 max-w-xl">
-                                          <Select
-                                            value={selectedClientId ?? undefined}
-                                            onValueChange={(value) =>
-                                              setCampaignSelections((prev) => ({
-                                                ...prev,
-                                                [mapping.id]: value,
-                                              }))
-                                            }
-                                          >
-                                            <SelectTrigger className="w-full">
-                                              <SelectValue placeholder="Vælg kunde" />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-background border z-50 max-h-72">
-                                              {clients?.map((client) => (
-                                                <SelectItem key={client.id} value={client.id} className="text-sm">
-                                                  {client.name}
-                                                </SelectItem>
-                                              ))}
-                                            </SelectContent>
-                                          </Select>
-                                          <div className="flex justify-end">
-                                            <Button
-                                              size="sm"
-                                              onClick={() =>
-                                                updateCampaignMapping.mutate({
-                                                  mappingId: mapping.id,
-                                                  clientId: selectedClientId,
-                                                })
-                                              }
-                                              disabled={
-                                                updateCampaignMapping.isPending ||
-                                                selectedClientId === existingClientId
-                                              }
-                                            >
-                                              Gem
-                                            </Button>
-                                          </div>
-                                        </div>
+                                        <Select
+                                          value={selectedClientId ?? undefined}
+                                          onValueChange={(value) =>
+                                            setCampaignSelections((prev) => ({
+                                              ...prev,
+                                              [mapping.id]: value,
+                                            }))
+                                          }
+                                        >
+                                          <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Vælg kunde" />
+                                          </SelectTrigger>
+                                          <SelectContent className="bg-background border z-50 max-h-72">
+                                            {clients?.map((client) => (
+                                              <SelectItem key={client.id} value={client.id} className="text-sm">
+                                                {client.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Input
+                                          type="text"
+                                          className="h-9 font-mono text-xs"
+                                          placeholder="f.eks. 80862"
+                                          value={currentFieldId}
+                                          onChange={(e) =>
+                                            setCampaignFieldIdDrafts((prev) => ({
+                                              ...prev,
+                                              [mapping.id]: e.target.value,
+                                            }))
+                                          }
+                                        />
+                                      </TableCell>
+                                      <TableCell>
+                                        <Button
+                                          size="sm"
+                                          onClick={() =>
+                                            updateCampaignMapping.mutate({
+                                              mappingId: mapping.id,
+                                              clientId: selectedClientId,
+                                              fieldId: currentFieldId,
+                                            })
+                                          }
+                                          disabled={updateCampaignMapping.isPending || !hasChanges}
+                                        >
+                                          Gem
+                                        </Button>
                                       </TableCell>
                                     </TableRow>
                                   );
