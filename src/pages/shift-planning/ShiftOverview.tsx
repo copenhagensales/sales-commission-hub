@@ -537,26 +537,30 @@ export default function ShiftOverview() {
                 <div 
                   key={employee.id} 
                   className={cn(
-                    "grid grid-cols-6 group/row transition-colors",
-                    idx < (employees?.length || 0) - 1 && "border-b border-border/40",
-                    idx % 2 === 0 
-                      ? "bg-background hover:bg-muted/20" 
-                      : "bg-muted/30 hover:bg-muted/40"
+                    "grid grid-cols-6 group/row transition-all duration-200",
+                    idx < (employees?.length || 0) - 1 && "border-b border-border/30"
                   )}
                 >
-                  {/* Employee name cell */}
+                  {/* Employee name cell - modernized with clear styling */}
                   <div className={cn(
-                    "p-4 flex flex-col justify-center border-r-2 border-border/30",
+                    "p-3 flex items-center gap-3 border-r-2 border-border/30 transition-all duration-200",
+                    "hover:bg-primary/5 cursor-pointer",
                     idx % 2 === 0 
-                      ? "bg-background" 
-                      : "bg-muted/40"
+                      ? "bg-card" 
+                      : "bg-muted/20"
                   )}>
-                    <p className="text-sm font-semibold leading-tight text-foreground">
-                      {employee.first_name} {employee.last_name?.charAt(0)}.
-                    </p>
-                    {employee.department && (
-                      <p className="text-[10px] text-muted-foreground mt-1 font-medium bg-muted/50 px-2 py-0.5 rounded-full w-fit">{employee.department}</p>
-                    )}
+                    {/* Avatar circle */}
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center text-sm font-bold text-primary shrink-0 shadow-sm">
+                      {employee.first_name?.charAt(0)}{employee.last_name?.charAt(0)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-foreground truncate">
+                        {employee.first_name} {employee.last_name}
+                      </p>
+                      {employee.department && (
+                        <p className="text-[10px] text-muted-foreground font-medium truncate">{employee.department}</p>
+                      )}
+                    </div>
                   </div>
                   {weekDays.map((day, dayIdx) => {
                     const dateKey = format(day, "yyyy-MM-dd");
@@ -581,14 +585,11 @@ export default function ShiftOverview() {
                       <div
                         key={day.toISOString()}
                         className={cn(
-                          "min-h-[64px] p-2 cursor-pointer transition-all duration-200 relative group",
-                          dayIdx < weekDays.length - 1 && "border-r border-border/30",
-                          isToday(day) && "ring-2 ring-inset ring-primary/50 bg-primary/5",
-                          holiday && "bg-muted/60 cursor-not-allowed opacity-60",
-                          !holiday && isLate && "bg-gradient-to-br from-orange-400/25 to-orange-500/35 hover:from-orange-400/35 hover:to-orange-500/45",
-                          !holiday && isVacation && "bg-gradient-to-br from-amber-300/25 to-amber-400/35 hover:from-amber-300/35 hover:to-amber-400/45",
-                          !holiday && isSick && "bg-gradient-to-br from-red-400/25 to-red-500/35 hover:from-red-400/35 hover:to-red-500/45",
-                          !holiday && isWorking && "bg-gradient-to-br from-emerald-400/15 to-emerald-500/25 hover:from-emerald-400/25 hover:to-emerald-500/35"
+                          "min-h-[72px] p-2 cursor-pointer transition-all duration-200 relative group",
+                          dayIdx < weekDays.length - 1 && "border-r border-border/20",
+                          idx % 2 === 0 ? "bg-card" : "bg-muted/10",
+                          isToday(day) && "ring-2 ring-inset ring-primary/40",
+                          holiday && "bg-muted/40 cursor-not-allowed opacity-50"
                         )}
                         onClick={() => {
                           if (!holiday) {
@@ -604,45 +605,58 @@ export default function ShiftOverview() {
                         {hasShift && dayShifts.map(shift => (
                           <ShiftCard key={shift.id} shift={shift} compact />
                         ))}
+                        
+                        {/* Lateness indicator with clear tag */}
                         {!hasShift && isLate && (
-                          <div className="flex flex-col items-center justify-center h-full gap-1">
-                            <div className="p-1.5 rounded-full bg-orange-500/20">
-                              <AlarmClock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                          <div className="flex flex-col items-center justify-center h-full gap-1.5">
+                            <div className="w-9 h-9 rounded-xl bg-orange-500/20 border border-orange-400/30 flex items-center justify-center shadow-sm">
+                              <AlarmClock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                             </div>
-                            <span className="text-[10px] font-bold text-orange-700 dark:text-orange-300">{lateness.minutes}m</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500 text-white shadow-sm">
+                              {lateness.minutes} min
+                            </span>
                           </div>
                         )}
+                        
+                        {/* Vacation indicator with clear tag */}
                         {!hasShift && !isLate && isVacation && (
-                          <div className="flex items-center justify-center h-full">
-                            <div className="p-2 rounded-full bg-amber-500/20">
+                          <div className="flex flex-col items-center justify-center h-full gap-1.5">
+                            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center shadow-sm">
                               <Palmtree className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                             </div>
+                            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500 text-white shadow-sm">
+                              Ferie
+                            </span>
                           </div>
                         )}
+                        
+                        {/* Sick indicator with clear tag */}
                         {!hasShift && !isLate && isSick && (
-                          <div className="flex items-center justify-center h-full">
-                            <div className="p-2 rounded-full bg-red-500/20">
+                          <div className="flex flex-col items-center justify-center h-full gap-1.5">
+                            <div className="w-9 h-9 rounded-xl bg-red-500/20 border border-red-400/30 flex items-center justify-center shadow-sm">
                               <Thermometer className="h-5 w-5 text-red-600 dark:text-red-400" />
                             </div>
+                            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-red-500 text-white shadow-sm">
+                              Syg
+                            </span>
                           </div>
                         )}
-                        {/* Show work times and clock-in when working */}
+                        
+                        {/* Working indicator with time display */}
                         {!hasShift && !isLate && isWorking && !holiday && (
                           <div className="flex flex-col items-center justify-center h-full gap-1">
+                            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-400/20 flex items-center justify-center">
+                              <span className="text-lg">✓</span>
+                            </div>
                             {workTimes && (
-                              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                              <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
                                 {workTimes}
                               </span>
                             )}
                             {timeStamp && (
-                              <span className="text-[9px] font-medium text-muted-foreground bg-background/60 px-1.5 py-0.5 rounded">
+                              <span className="text-[9px] font-medium text-muted-foreground bg-background/80 px-1.5 py-0.5 rounded border">
                                 ⏱ {format(new Date(timeStamp.clock_in), "HH:mm")}
                                 {timeStamp.clock_out && ` → ${format(new Date(timeStamp.clock_out), "HH:mm")}`}
-                              </span>
-                            )}
-                            {!timeStamp && (
-                              <span className="text-[9px] text-muted-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity">
-                                2x klik = stemple
                               </span>
                             )}
                           </div>
