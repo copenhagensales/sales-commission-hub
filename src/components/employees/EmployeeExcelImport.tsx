@@ -134,6 +134,37 @@ export function EmployeeExcelImport() {
     }
   };
 
+  // Helper to parse various date formats to YYYY-MM-DD
+  const parseDate = (value: unknown): string | undefined => {
+    if (!value) return undefined;
+    const strValue = String(value).trim();
+    
+    // Already in YYYY-MM-DD format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(strValue)) {
+      return strValue;
+    }
+    
+    // DD-MM-YYYY or DD/MM/YYYY format
+    const dmyMatch = strValue.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (dmyMatch) {
+      const day = dmyMatch[1].padStart(2, '0');
+      const month = dmyMatch[2].padStart(2, '0');
+      const year = dmyMatch[3];
+      return `${year}-${month}-${day}`;
+    }
+    
+    // DD.MM.YYYY format
+    const dotMatch = strValue.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (dotMatch) {
+      const day = dotMatch[1].padStart(2, '0');
+      const month = dotMatch[2].padStart(2, '0');
+      const year = dotMatch[3];
+      return `${year}-${month}-${day}`;
+    }
+    
+    return undefined;
+  };
+
   const applyMapping = () => {
     const employees: ParsedEmployee[] = rawData.map((row) => {
       const employee: ParsedEmployee = {
@@ -150,7 +181,7 @@ export function EmployeeExcelImport() {
         const value = row[column];
         if (value === undefined || value === null || value === "") return;
 
-        const strValue = String(value);
+        const strValue = String(value).trim();
         switch (field) {
           case "salary_amount":
           case "weekly_hours":
@@ -165,6 +196,9 @@ export function EmployeeExcelImport() {
             } else if (val === "time" || val === "timeløn") {
               employee.salary_type = "hourly";
             }
+            break;
+          case "employment_start_date":
+            employee.employment_start_date = parseDate(value);
             break;
           default:
             employee[field] = strValue;
