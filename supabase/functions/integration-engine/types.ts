@@ -15,8 +15,9 @@ export interface StandardSale {
   agentName?: string;
   customerName?: string;
   customerPhone?: string;
+  campaignId?: string; // Adversus campaign ID for field mapping lookup
   products: StandardProduct[];
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown>; // Includes lead.resultData for OPP extraction
 }
 
 export interface SyncResult {

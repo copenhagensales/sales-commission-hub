@@ -103,6 +103,7 @@ export type Database = {
           adversus_campaign_name: string | null
           client_campaign_id: string | null
           created_at: string | null
+          external_reference_field_id: string | null
           id: string
           updated_at: string | null
         }
@@ -111,6 +112,7 @@ export type Database = {
           adversus_campaign_name?: string | null
           client_campaign_id?: string | null
           created_at?: string | null
+          external_reference_field_id?: string | null
           id?: string
           updated_at?: string | null
         }
@@ -119,6 +121,7 @@ export type Database = {
           adversus_campaign_name?: string | null
           client_campaign_id?: string | null
           created_at?: string | null
+          external_reference_field_id?: string | null
           id?: string
           updated_at?: string | null
         }

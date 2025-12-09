@@ -95,22 +95,66 @@ export class IngestionEngine {
     // A. Cargar Cachés (Optimización de rendimiento)
     const { data: dbProducts } = await this.supabase.from("products").select("id, name, commission_dkk, revenue_dkk");
     const { data: dbMappings } = await this.supabase.from("adversus_product_mappings").select("*");
+    
+    // Fetch campaign mappings with external_reference_field_id for dynamic OPP extraction
+    const { data: campaignMappings } = await this.supabase
+      .from("adversus_campaign_mappings")
+      .select("adversus_campaign_id, external_reference_field_id, client_campaign_id");
 
     // Mapas para búsqueda O(1)
     const productMapByName = new Map(dbProducts?.map((p) => [p.name.toLowerCase(), p]));
     const productMapByExtId = new Map(dbMappings?.map((m) => [m.adversus_external_id, m.product_id]));
+    
+    // Campaign field mapping for dynamic OPP extraction
+    const campaignFieldMap = new Map(
+      campaignMappings?.filter(c => c.external_reference_field_id)
+        .map(c => [c.adversus_campaign_id, { fieldId: c.external_reference_field_id, clientCampaignId: c.client_campaign_id }])
+    );
 
     let processed = 0;
     let errors = 0;
 
     for (const sale of sales) {
       try {
+        // Extract OPP number dynamically based on campaign field mapping
+        let oppNumber: string | null = null;
+        
+        if (sale.campaignId && campaignFieldMap.has(sale.campaignId)) {
+          const mapping = campaignFieldMap.get(sale.campaignId);
+          if (mapping?.fieldId && sale.metadata?.resultData) {
+            const resultData = sale.metadata.resultData as Record<string, unknown>;
+            // Try direct field ID lookup
+            const fieldValue = resultData[mapping.fieldId];
+            if (fieldValue !== undefined && fieldValue !== null) {
+              oppNumber = String(fieldValue);
+              this.log("INFO", `Found OPP ${oppNumber} via field ${mapping.fieldId} for campaign ${sale.campaignId}`);
+            }
+          }
+        }
+        
+        // Fallback: search for common OPP patterns in resultData
+        if (!oppNumber && sale.metadata?.resultData) {
+          const resultData = sale.metadata.resultData as Record<string, unknown>;
+          oppNumber = this.searchForOppInResultData(resultData);
+        }
+
+        // Get client_campaign_id from mapping
+        let clientCampaignId: string | null = null;
+        if (sale.campaignId) {
+          const mapping = campaignMappings?.find(c => c.adversus_campaign_id === sale.campaignId);
+          if (mapping?.client_campaign_id) {
+            clientCampaignId = mapping.client_campaign_id;
+          }
+        }
+
         const saleData = {
           adversus_external_id: sale.externalId,
           sale_datetime: sale.saleDate,
           agent_name: sale.agentName || sale.agentEmail,
           customer_company: sale.customerName,
           customer_phone: sale.customerPhone,
+          adversus_opp_number: oppNumber,
+          client_campaign_id: clientCampaignId,
           updated_at: new Date().toISOString(),
         };
 
@@ -189,5 +233,35 @@ export class IngestionEngine {
     }
 
     return { processed, errors };
+  }
+
+  // Helper: Search for OPP-like values in resultData
+  private searchForOppInResultData(resultData: Record<string, unknown>): string | null {
+    // Common field patterns for order/reference IDs
+    const oppPatterns = ['opp', 'order', 'ordre', 'reference', 'policy', 'ref'];
+    
+    for (const [key, value] of Object.entries(resultData)) {
+      if (value === null || value === undefined) continue;
+      
+      const keyLower = key.toLowerCase();
+      
+      // Check if key matches common patterns
+      for (const pattern of oppPatterns) {
+        if (keyLower.includes(pattern)) {
+          const strValue = String(value).trim();
+          if (strValue && strValue !== 'null' && strValue !== 'undefined') {
+            return strValue;
+          }
+        }
+      }
+      
+      // Check if value looks like an OPP (starts with OPP- or is numeric reference)
+      const strValue = String(value).trim();
+      if (strValue.toUpperCase().startsWith('OPP-') || strValue.toUpperCase().startsWith('OPP')) {
+        return strValue;
+      }
+    }
+    
+    return null;
   }
 }
