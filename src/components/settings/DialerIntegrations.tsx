@@ -16,6 +16,7 @@ interface DialerIntegration {
   id: string;
   name: string;
   provider: string;
+  api_url: string | null;
   is_active: boolean;
   last_sync_at: string | null;
   sync_frequency_minutes: number | null;
@@ -26,6 +27,7 @@ interface FormData {
   provider: string;
   username: string;
   password: string;
+  api_url: string;
 }
 
 export function DialerIntegrations() {
@@ -38,6 +40,7 @@ export function DialerIntegrations() {
     provider: "adversus",
     username: "",
     password: "",
+    api_url: "",
   });
 
   // Fetch Dialer Integrations from new table
@@ -46,7 +49,7 @@ export function DialerIntegrations() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("dialer_integrations")
-        .select("id, name, provider, is_active, last_sync_at, sync_frequency_minutes")
+        .select("id, name, provider, api_url, is_active, last_sync_at, sync_frequency_minutes")
         .order("name");
 
       if (error) throw error;
@@ -63,9 +66,11 @@ export function DialerIntegrations() {
           integration_id: data.id,
           name: data.name,
           provider: data.provider,
+          api_url: data.api_url || null,
           credentials: {
             username: data.username,
             password: data.password,
+            api_url: data.api_url || null,
           },
         },
       });
@@ -133,7 +138,7 @@ export function DialerIntegrations() {
   });
 
   const resetForm = () => {
-    setFormData({ name: "", provider: "adversus", username: "", password: "" });
+    setFormData({ name: "", provider: "adversus", username: "", password: "", api_url: "" });
     setEditingId(null);
     setIsDialogOpen(false);
   };
@@ -194,6 +199,18 @@ export function DialerIntegrations() {
                         <SelectItem value="enreach">Enreach</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="api_url">API Base URL (Valgfri)</Label>
+                    <Input
+                      id="api_url"
+                      placeholder="f.eks. https://wshero01.herobase.com/api"
+                      value={formData.api_url}
+                      onChange={(e) => setFormData({ ...formData, api_url: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Kun nødvendig for Enreach/HeroBase. Lad stå tom for standard Adversus.
+                    </p>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="username">Brugernavn / API Key</Label>
@@ -257,9 +274,16 @@ export function DialerIntegrations() {
                 <TableRow key={integration.id}>
                   <TableCell className="font-medium">{integration.name}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="capitalize">
-                      {integration.provider}
-                    </Badge>
+                    <div className="flex flex-col gap-0.5">
+                      <Badge variant="outline" className="capitalize w-fit">
+                        {integration.provider}
+                      </Badge>
+                      {integration.api_url && (
+                        <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                          {integration.api_url}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant={integration.is_active ? "default" : "secondary"}>
@@ -296,6 +320,7 @@ export function DialerIntegrations() {
                           provider: integration.provider,
                           username: "",
                           password: "",
+                          api_url: integration.api_url || "",
                         });
                         setIsDialogOpen(true);
                       }}
