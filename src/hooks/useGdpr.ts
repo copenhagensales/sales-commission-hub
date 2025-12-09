@@ -58,6 +58,21 @@ export function useGiveConsent() {
         throw new Error("Kunne ikke finde medarbejder");
       }
 
+      // Check if consent already exists
+      const { data: existingConsent } = await supabase
+        .from("gdpr_consents")
+        .select("id")
+        .eq("employee_id", employeeData)
+        .eq("consent_type", consentType)
+        .is("revoked_at", null)
+        .limit(1)
+        .maybeSingle();
+
+      // If consent already exists, just return without inserting
+      if (existingConsent) {
+        return;
+      }
+
       const { error } = await supabase.from("gdpr_consents").insert({
         employee_id: employeeData,
         consent_type: consentType,
