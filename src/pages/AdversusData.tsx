@@ -56,40 +56,14 @@ export default function AdversusData() {
   const [isBackfilling, setIsBackfilling] = useState(false);
   const [backfillStatus, setBackfillStatus] = useState<{ remaining: number; lastProcessed: number } | null>(null);
 
-  // Count ONLY TDC sales missing OPP (matching edge function logic)
   const { data: missingOppCount } = useQuery({
     queryKey: ["missing-opp-count"],
     queryFn: async () => {
-      // First get TDC client IDs
-      const { data: tdcClients, error: clientError } = await supabase
-        .from("clients")
-        .select("id, name")
-        .ilike("name", "%tdc%");
-      
-      if (clientError) throw clientError;
-      if (!tdcClients || tdcClients.length === 0) return 0;
-      
-      const tdcClientIds = tdcClients.map(c => c.id);
-      
-      // Get TDC campaign IDs
-      const { data: tdcCampaigns, error: campaignError } = await supabase
-        .from("client_campaigns")
-        .select("id")
-        .in("client_id", tdcClientIds);
-      
-      if (campaignError) throw campaignError;
-      if (!tdcCampaigns || tdcCampaigns.length === 0) return 0;
-      
-      const tdcCampaignIds = tdcCampaigns.map(c => c.id);
-      
-      // Count TDC sales missing OPP
       const { count, error } = await supabase
         .from("sales")
         .select("id", { count: "exact", head: true })
         .is("adversus_opp_number", null)
-        .not("adversus_event_id", "is", null)
-        .in("client_campaign_id", tdcCampaignIds);
-      
+        .not("adversus_event_id", "is", null);
       if (error) throw error;
       return count ?? 0;
     },
