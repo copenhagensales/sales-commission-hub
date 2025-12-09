@@ -10,8 +10,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ChevronDown } from "lucide-react";
+import { Loader2, ChevronDown, Search } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+
+interface InspectorField {
+  fieldId: string;
+  label: string;
+  sampleValue: string;
+}
 
 interface WebhookSaleItem {
   id: string;
@@ -147,6 +160,63 @@ export default function MgTest() {
   const [openProductGroups, setOpenProductGroups] = useState<Record<string, boolean>>({});
   const [openCampaignGroups, setOpenCampaignGroups] = useState<Record<string, boolean>>({});
   const [campaignFieldIdDrafts, setCampaignFieldIdDrafts] = useState<Record<string, string>>({});
+
+  // Field Inspector state
+  const [inspectingCampaign, setInspectingCampaign] = useState<CampaignMapping | null>(null);
+  const [inspectorFields, setInspectorFields] = useState<InspectorField[]>([]);
+  const [inspectorLoading, setInspectorLoading] = useState(false);
+  const [inspectorError, setInspectorError] = useState<string | null>(null);
+
+  // Inspector mutation - fetch sample fields from Adversus
+  const inspectCampaignMutation = useMutation({
+    mutationFn: async (campaign: CampaignMapping) => {
+      const response = await supabase.functions.invoke("integration-engine", {
+        body: {
+          source: "adversus",
+          action: "fetch-sample-fields",
+          campaignId: campaign.adversus_campaign_id,
+          days: 30,
+        },
+      });
+
+      if (response.error) throw new Error(response.error.message);
+      if (!response.data.success) throw new Error(response.data.error || "Failed to fetch fields");
+
+      return response.data as { fields: InspectorField[]; saleCount: number; sampleSaleId: string };
+    },
+    onSuccess: (data, campaign) => {
+      setInspectorFields(data.fields);
+      setInspectorError(null);
+      setInspectingCampaign(campaign);
+    },
+    onError: (error: Error) => {
+      setInspectorError(error.message);
+      toast.error(`Kunne ikke hente felter: ${error.message}`);
+    },
+  });
+
+  const handleInspectCampaign = (campaign: CampaignMapping) => {
+    setInspectorLoading(true);
+    setInspectorError(null);
+    setInspectorFields([]);
+    inspectCampaignMutation.mutate(campaign, {
+      onSettled: () => setInspectorLoading(false),
+    });
+  };
+
+  const handleSelectField = (fieldId: string) => {
+    if (!inspectingCampaign) return;
+    
+    // Set the draft value for this campaign
+    setCampaignFieldIdDrafts((prev) => ({
+      ...prev,
+      [inspectingCampaign.id]: fieldId,
+    }));
+    
+    // Close dialog and show toast
+    setInspectingCampaign(null);
+    toast.success(`Field ID "${fieldId}" valgt`);
+  };
 
   // Hent alle kunder (kundenavne)
   const { data: clients, isLoading: loadingClients } = useQuery<ClientRow[]>({
@@ -1463,10 +1533,11 @@ export default function MgTest() {
                             <Table>
                               <TableHeader>
                               <TableRow>
-                                  <TableHead className="w-[25%]">Adversus kampagnenavn</TableHead>
-                                  <TableHead className="w-[15%]">Adversus campaignId</TableHead>
-                                  <TableHead className="w-[30%]">Intern kunde / kampagne</TableHead>
-                                  <TableHead className="w-[15%]">OPP/Reference Field ID</TableHead>
+                                  <TableHead className="w-[22%]">Adversus kampagnenavn</TableHead>
+                                  <TableHead className="w-[12%]">Campaign ID</TableHead>
+                                  <TableHead className="w-[8%]">Inspect</TableHead>
+                                  <TableHead className="w-[25%]">Intern kunde / kampagne</TableHead>
+                                  <TableHead className="w-[18%]">OPP/Reference Field ID</TableHead>
                                   <TableHead className="w-[15%]">Gem</TableHead>
                                 </TableRow>
                               </TableHeader>
@@ -1507,6 +1578,20 @@ export default function MgTest() {
                                         <span className="text-xs font-mono text-muted-foreground">
                                           {mapping.adversus_campaign_id}
                                         </span>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleInspectCampaign(mapping)}
+                                          disabled={inspectorLoading && inspectingCampaign?.id === mapping.id}
+                                        >
+                                          {inspectorLoading && inspectingCampaign?.id === mapping.id ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            <Search className="h-4 w-4" />
+                                          )}
+                                        </Button>
                                       </TableCell>
                                       <TableCell>
                                         <Select
@@ -1893,6 +1978,78 @@ export default function MgTest() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Field Inspector Dialog */}
+      <Dialog open={!!inspectingCampaign} onOpenChange={(open) => !open && setInspectingCampaign(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Field Inspector
+            </DialogTitle>
+            <DialogDescription>
+              Viser felter fra et sample-salg for kampagne:{" "}
+              <span className="font-medium">{inspectingCampaign?.adversus_campaign_name || inspectingCampaign?.adversus_campaign_id}</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto">
+            {inspectorLoading ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>Henter felter fra Adversus...</span>
+              </div>
+            ) : inspectorError ? (
+              <div className="py-8 text-center text-destructive">
+                <p className="font-medium">Kunne ikke hente felter</p>
+                <p className="text-sm text-muted-foreground mt-1">{inspectorError}</p>
+              </div>
+            ) : inspectorFields.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <p>Ingen felter fundet i sample-salg.</p>
+                <p className="text-sm mt-1">Prøv at vælge en kampagne med nyere salg.</p>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[25%]">Field ID</TableHead>
+                      <TableHead className="w-[25%]">Label</TableHead>
+                      <TableHead className="w-[50%]">Sample Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {inspectorFields.map((field) => (
+                      <TableRow
+                        key={field.fieldId}
+                        className="cursor-pointer hover:bg-accent/50"
+                        onClick={() => handleSelectField(field.fieldId)}
+                      >
+                        <TableCell>
+                          <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                            {field.fieldId}
+                          </code>
+                        </TableCell>
+                        <TableCell className="text-sm">{field.label}</TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground truncate block max-w-[300px]">
+                            {field.sampleValue}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-4 border-t text-sm text-muted-foreground">
+            Klik på en række for at vælge det Field ID til OPP/Reference-konfigurationen.
+          </div>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

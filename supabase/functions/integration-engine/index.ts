@@ -12,12 +12,91 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { source, action, actions, days = 1 } = await req.json();
+    const { source, action, actions, days = 1, campaignId } = await req.json();
 
     // Inicializar Supabase para buscar configuraciones
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Handle fetch-sample-fields action - returns raw field data for UI inspection
+    if (action === "fetch-sample-fields") {
+      console.log(`[Integration Engine] Fetching sample fields for campaign: ${campaignId}`);
+      
+      const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY");
+      
+      // Get active Adversus integration
+      const { data: integrations, error: intError } = await supabase
+        .from("dialer_integrations")
+        .select("*")
+        .eq("provider", source || "adversus")
+        .eq("is_active", true)
+        .limit(1);
+
+      if (intError) throw intError;
+      if (!integrations || integrations.length === 0) {
+        return new Response(
+          JSON.stringify({ success: false, error: "No active integration found" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const integration = integrations[0];
+      const { data: credentials } = await supabase.rpc("get_dialer_credentials", {
+        p_integration_id: integration.id,
+        p_encryption_key: encryptionKey,
+      });
+
+      // Create adapter and fetch sales
+      const adapter = new AdversusAdapter(credentials);
+      const sales = await adapter.fetchSales(days || 30);
+
+      // Filter by campaignId if provided
+      let filteredSales = sales;
+      if (campaignId) {
+        filteredSales = sales.filter(s => s.campaignId === campaignId);
+      }
+
+      if (filteredSales.length === 0) {
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            fields: [], 
+            message: `No sales found for campaign ${campaignId} in last ${days} days` 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Extract resultData fields from first sale
+      const sampleSale = filteredSales[0];
+      const resultData = (sampleSale.metadata as any)?.resultData || {};
+
+      // Format fields for the UI
+      const fields: { fieldId: string; label: string; sampleValue: string }[] = [];
+      for (const [key, value] of Object.entries(resultData)) {
+        fields.push({
+          fieldId: key,
+          label: key, // Adversus doesn't provide labels separately
+          sampleValue: value !== null && value !== undefined ? String(value) : "(empty)",
+        });
+      }
+
+      // Sort fields alphabetically by fieldId
+      fields.sort((a, b) => a.fieldId.localeCompare(b.fieldId));
+
+      console.log(`[Integration Engine] Found ${fields.length} fields in sample sale`);
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          fields,
+          saleCount: filteredSales.length,
+          sampleSaleId: sampleSale.externalId,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const engine = new IngestionEngine();
 
