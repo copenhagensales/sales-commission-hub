@@ -49,18 +49,14 @@ serve(async (req) => {
     const authHeader = btoa(`${adversusUsername}:${adversusPassword}`);
     const baseUrl = 'https://api.adversus.io/v1';
 
-    // Find TDC sales without OPP number
-    console.log('\n📊 Buscando ventas TDC sin número OPP...');
+    // Find ALL sales without OPP number (all clients)
+    console.log('\n📊 Buscando ventas sin número OPP (todos los clientes)...');
     const { data: sales, error: salesError } = await supabase
       .from('sales')
       .select(`
         id, 
         adversus_external_id, 
-        adversus_event_id,
-        client_campaigns!inner(
-          id,
-          clients!inner(name)
-        )
+        adversus_event_id
       `)
       .is('adversus_opp_number', null)
       .not('adversus_event_id', 'is', null)
@@ -71,14 +67,9 @@ serve(async (req) => {
       throw salesError;
     }
 
-    // Filter for TDC sales only
-    const tdcSales = (sales || []).filter((sale: any) => 
-      sale.client_campaigns?.clients?.name?.toLowerCase().includes('tdc')
-    );
+    console.log(`📋 Ventas encontradas: ${sales?.length || 0}`);
 
-    console.log(`📋 Ventas encontradas: ${sales?.length || 0} total, ${tdcSales.length} TDC`);
-
-    if (tdcSales.length === 0) {
+    if (!sales || sales.length === 0) {
       const duration = Date.now() - startTime;
       console.log('\n' + '='.repeat(60));
       console.log('📊 RESUMEN FINAL - BACKFILL-OPP');
@@ -90,7 +81,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: 'No TDC sales without OPP number found',
+          message: 'No sales without OPP number found',
           processed: 0,
           summary: {
             duration_ms: duration,
@@ -101,7 +92,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`\n🔄 Procesando ${tdcSales.length} ventas TDC...\n`);
+    console.log(`\n🔄 Procesando ${sales.length} ventas...\n`);
 
     // Stats tracking
     const stats = {
@@ -122,12 +113,12 @@ serve(async (req) => {
       processingTime?: number;
     }[] = [];
 
-    for (let i = 0; i < tdcSales.length; i++) {
-      const sale = tdcSales[i];
+    for (let i = 0; i < sales.length; i++) {
+      const sale = sales[i];
       const saleStartTime = Date.now();
       stats.processed++;
       
-      console.log(`\n[${i + 1}/${tdcSales.length}] Procesando venta ${sale.adversus_external_id || sale.id}`);
+      console.log(`\n[${i + 1}/${sales.length}] Procesando venta ${sale.adversus_external_id || sale.id}`);
       
       try {
         // Get lead ID from the adversus event
@@ -304,7 +295,7 @@ serve(async (req) => {
       }
     }
 
-    // Count remaining TDC sales without OPP
+    // Count remaining sales without OPP (all clients)
     const { count: remaining } = await supabase
       .from('sales')
       .select('id', { count: 'exact', head: true })
