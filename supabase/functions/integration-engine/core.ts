@@ -130,6 +130,7 @@ export class IngestionEngine {
           customer_phone: sale.customerPhone,
           adversus_opp_number: sale.externalReference || null,
           client_campaign_id: sale.clientCampaignId || null,
+          source: sourceSystem, // Track which dialer system the sale came from
           updated_at: new Date().toISOString(),
         };
 
