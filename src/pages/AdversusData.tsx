@@ -127,7 +127,7 @@ export default function AdversusData() {
         if (remaining === 0 || processedCount === 0) {
           // Show specific message if nothing was found
           if (processedCount === 0 && totalProcessed === 0) {
-            toast.info("Ingen TDC salg fundet der mangler OPP nummer.");
+            toast.info("Ingen salg fundet der mangler OPP nummer.");
           }
           break;
         }
@@ -352,7 +352,7 @@ export default function AdversusData() {
             <Card className="border-amber-500/50">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-amber-500" /> TDC salg mangler OPP nummer
+                  <AlertCircle className="h-4 w-4 text-amber-500" /> Salg mangler OPP nummer
                 </CardTitle>
               </CardHeader>
               <CardContent>
