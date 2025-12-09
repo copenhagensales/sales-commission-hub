@@ -107,6 +107,49 @@ async function generateContractPdf(contractId: string, supabaseUrl: string, serv
   return { base64: data.pdf, filename: data.filename };
 }
 
+// Provision OneDrive for user if not already done
+async function provisionOneDrive(accessToken: string, userId: string): Promise<boolean> {
+  try {
+    // Try to access the drive - this will provision it if it doesn't exist
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${userId}/drive`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (response.ok) {
+      console.log("OneDrive is available for user");
+      return true;
+    }
+
+    // If not found, try to provision by accessing personal site
+    const provisionResponse = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${userId}/drive/root`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (provisionResponse.ok) {
+      console.log("OneDrive provisioned successfully");
+      return true;
+    }
+
+    console.error("Could not provision OneDrive:", await provisionResponse.text());
+    return false;
+  } catch (error) {
+    console.error("Error checking/provisioning OneDrive:", error);
+    return false;
+  }
+}
+
 // Upload file to OneDrive via Microsoft Graph API
 async function uploadToOneDrive(
   accessToken: string,
@@ -121,34 +164,118 @@ async function uploadToOneDrive(
     return "";
   }
 
+  console.log(`OneDrive user ID: ${oneDriveUserId}`);
+
+  // First, try to provision OneDrive if not already done
+  const isProvisioned = await provisionOneDrive(accessToken, oneDriveUserId);
+  
+  if (!isProvisioned) {
+    console.log("OneDrive not provisioned, trying SharePoint approach...");
+    
+    // Try using the beta endpoint which may be more forgiving
+    return await uploadToSharePointPersonalSite(accessToken, oneDriveUserId, fileContent, filename, employeeName);
+  }
+
   // Create folder path: Kontrakter/[Employee Name]/
-  const folderPath = `Kontrakter/${employeeName.replace(/[<>:"/\\|?*]/g, '_')}`;
+  const sanitizedName = employeeName.replace(/[<>:"/\\|?*]/g, '_').trim();
+  const folderPath = `Kontrakter/${sanitizedName}`;
   const filePath = `${folderPath}/${filename}`;
   
   console.log(`Uploading to OneDrive: ${filePath}`);
 
   // Use the simple upload endpoint (for files < 4MB)
-  const uploadUrl = `https://graph.microsoft.com/v1.0/users/${oneDriveUserId}/drive/root:/${filePath}:/content`;
+  const uploadUrl = `https://graph.microsoft.com/v1.0/users/${oneDriveUserId}/drive/root:/${encodeURIComponent(filePath.replace(/\//g, '/'))}:/content`;
   
-  const response = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/pdf",
-    },
-    body: fileContent as unknown as BodyInit,
-  });
+  const response = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${oneDriveUserId}/drive/root:/${filePath}:/content`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/pdf",
+      },
+      body: fileContent as unknown as BodyInit,
+    }
+  );
 
   if (!response.ok) {
     const error = await response.text();
     console.error("OneDrive upload error:", error);
-    // Don't throw - OneDrive upload is optional
-    return "";
+    
+    // Try the fallback approach
+    return await uploadToSharePointPersonalSite(accessToken, oneDriveUserId, fileContent, filename, employeeName);
   }
 
   const data = await response.json();
   console.log(`File uploaded successfully to OneDrive: ${data.webUrl}`);
   return data.webUrl || "";
+}
+
+// Fallback: Upload to SharePoint personal site
+async function uploadToSharePointPersonalSite(
+  accessToken: string,
+  userId: string,
+  fileContent: Uint8Array,
+  filename: string,
+  employeeName: string
+): Promise<string> {
+  console.log("Attempting SharePoint fallback upload...");
+  
+  // Try to get the user's personal site URL
+  try {
+    // First try with email as UPN
+    const userResponse = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${userId}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+    
+    if (!userResponse.ok) {
+      console.error("Could not get user info:", await userResponse.text());
+      return "";
+    }
+    
+    const userData = await userResponse.json();
+    console.log("User info retrieved:", userData.userPrincipalName);
+    
+    // Try using the MySite URL pattern
+    const upn = userData.userPrincipalName || userId;
+    const sanitizedName = employeeName.replace(/[<>:"/\\|?*]/g, '_').trim();
+    const filePath = `Kontrakter/${sanitizedName}/${filename}`;
+    
+    // Try the direct upload again with confirmed user ID
+    const uploadResponse = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${userData.id}/drive/root:/${filePath}:/content`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/pdf",
+        },
+        body: fileContent as unknown as BodyInit,
+      }
+    );
+    
+    if (uploadResponse.ok) {
+      const data = await uploadResponse.json();
+      console.log(`File uploaded via fallback: ${data.webUrl}`);
+      return data.webUrl || "";
+    }
+    
+    const errorText = await uploadResponse.text();
+    console.error("SharePoint fallback upload failed:", errorText);
+    
+    // Final fallback: check if we need admin to provision OneDrive
+    if (errorText.includes("mysite not found")) {
+      console.error("OneDrive is not provisioned for this user. Admin needs to provision it first by visiting the user's OneDrive in M365 admin center.");
+    }
+    
+    return "";
+  } catch (error) {
+    console.error("SharePoint fallback error:", error);
+    return "";
+  }
 }
 
 // Decode base64 to Uint8Array
