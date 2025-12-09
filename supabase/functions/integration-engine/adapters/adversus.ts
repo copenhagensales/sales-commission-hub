@@ -151,6 +151,84 @@ export class AdversusAdapter implements DialerAdapter {
     });
   }
 
+  // Fetch a specific lead's resultData (for field inspection)
+  async fetchLeadResultData(leadId: string): Promise<Record<string, unknown>> {
+    try {
+      const url = `${this.baseUrl}/leads/${leadId}`;
+      const res = await fetch(url, { 
+        headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" } 
+      });
+      
+      if (!res.ok) {
+        console.log(`[Adversus] Failed to fetch lead ${leadId}: ${res.status}`);
+        return {};
+      }
+      
+      const data = await res.json();
+      return data.resultData || {};
+    } catch (e) {
+      console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
+      return {};
+    }
+  }
+
+  // Fetch sales with enriched lead data (for field inspection)
+  async fetchSalesWithLeadData(days: number, campaignId?: string): Promise<{ sale: any; resultData: Record<string, unknown> }[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    // Build filter - include campaignId if provided
+    const filterObj: any = { created: { $gt: startDate.toISOString() } };
+    if (campaignId) {
+      filterObj.campaignId = parseInt(campaignId, 10);
+    }
+    const filterStr = encodeURIComponent(JSON.stringify(filterObj));
+
+    const url = `${this.baseUrl}/sales?pageSize=10&page=1&filters=${filterStr}`;
+    const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
+
+    if (!res.ok) {
+      console.log(`[Adversus] Failed to fetch sales: ${res.status}`);
+      return [];
+    }
+
+    const data = await res.json();
+    const sales = data.sales || data || [];
+
+    if (sales.length === 0) {
+      console.log(`[Adversus] No sales found for campaign ${campaignId} in last ${days} days`);
+      return [];
+    }
+
+    // For field inspection, fetch lead data for the first sale
+    const results: { sale: any; resultData: Record<string, unknown> }[] = [];
+    
+    for (const sale of sales.slice(0, 3)) { // Check first 3 sales to find one with data
+      const leadId = sale.leadId;
+      if (!leadId) continue;
+
+      const resultData = await this.fetchLeadResultData(String(leadId));
+      
+      if (Object.keys(resultData).length > 0) {
+        results.push({ sale, resultData });
+        break; // Found one with data, stop
+      }
+      
+      // Small delay between requests
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
+    // If no lead data found, still return the first sale with empty resultData
+    if (results.length === 0 && sales.length > 0) {
+      results.push({ 
+        sale: sales[0], 
+        resultData: sales[0].lead?.resultData || {} 
+      });
+    }
+
+    return results;
+  }
+
   // Extract reference value based on config type
   private extractReference(resultData: Record<string, unknown>, config: ReferenceExtractionConfig): string | null {
     const { type, value } = config;
