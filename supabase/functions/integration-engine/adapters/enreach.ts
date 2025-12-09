@@ -4,8 +4,49 @@ import { StandardSale, StandardUser, StandardCampaign, StandardProduct, Campaign
 interface EnreachCredentials {
   username?: string;
   password?: string;
-  api_token?: string; // Fallback for Bearer token auth
-  api_url?: string; // Full base URL like https://hero01.herobase.com
+  api_token?: string;
+  api_url?: string; // Full base URL like https://wshero01.herobase.com/api
+}
+
+// HeroBase API response types
+interface HeroBaseCampaign {
+  uniqueId: string;
+  name: string;
+  active?: boolean;
+  status?: string;
+}
+
+interface HeroBaseLead {
+  uniqueId: string;
+  soldTime?: string;
+  createdTime?: string;
+  updatedTime?: string;
+  status?: string;
+  agent?: {
+    uniqueId?: string;
+    name?: string;
+    email?: string;
+  };
+  user?: {
+    uniqueId?: string;
+    name?: string;
+    email?: string;
+  };
+  campaign?: {
+    uniqueId?: string;
+    name?: string;
+  };
+  data?: Record<string, unknown>;
+  customFields?: Record<string, unknown>;
+  company?: string;
+  name?: string;
+  phone?: string;
+  products?: Array<{
+    uniqueId?: string;
+    name?: string;
+    quantity?: number;
+    price?: number;
+  }>;
 }
 
 export class EnreachAdapter implements DialerAdapter {
@@ -13,22 +54,24 @@ export class EnreachAdapter implements DialerAdapter {
   private headers: Record<string, string>;
 
   constructor(credentials: EnreachCredentials) {
-    // The api_url should be the base like https://hero01.herobase.com
-    // We'll append /api/ for the API calls
-    const baseHost = credentials.api_url || "https://hero01.herobase.com";
-    this.baseUrl = baseHost.endsWith('/') ? baseHost.slice(0, -1) : baseHost;
+    // Default to wshero01.herobase.com/api if not provided
+    const providedUrl = credentials.api_url || "https://wshero01.herobase.com/api";
+    // Ensure no trailing slash
+    this.baseUrl = providedUrl.endsWith('/') ? providedUrl.slice(0, -1) : providedUrl;
+    // Ensure /api suffix
+    if (!this.baseUrl.endsWith('/api')) {
+      this.baseUrl = this.baseUrl + '/api';
+    }
     
     console.log(`[EnreachAdapter] Base URL: ${this.baseUrl}`);
     
     // Determine auth method: Basic (username/password) or Bearer (api_token)
     let authHeader: string;
     if (credentials.username && credentials.password) {
-      // Basic Authentication - matching PHP: CURLOPT_USERPWD, "user@example.com:examplepassword"
       const basicAuth = btoa(`${credentials.username}:${credentials.password}`);
       authHeader = `Basic ${basicAuth}`;
       console.log(`[EnreachAdapter] Using Basic Authentication for user: ${credentials.username}`);
     } else if (credentials.api_token) {
-      // Fallback to Bearer token
       authHeader = `Bearer ${credentials.api_token}`;
       console.log("[EnreachAdapter] Using Bearer Token Authentication");
     } else {
@@ -37,13 +80,13 @@ export class EnreachAdapter implements DialerAdapter {
 
     this.headers = {
       "Authorization": authHeader,
-      "Content-Type": "application/json; charset=utf-8", // Match PHP example
+      "Content-Type": "application/json; charset=utf-8",
     };
   }
 
   private async get(endpoint: string): Promise<unknown> {
-    // API path: /api{endpoint} - matching PHP example: https://wshero02.herobase.com/api/leads
-    const url = `${this.baseUrl}/api${endpoint}`;
+    // Endpoint already includes leading slash, e.g., /campaigns
+    const url = `${this.baseUrl}${endpoint}`;
     console.log(`[EnreachAdapter] GET ${url}`);
     
     const response = await fetch(url, {
@@ -62,21 +105,21 @@ export class EnreachAdapter implements DialerAdapter {
 
   async fetchUsers(): Promise<StandardUser[]> {
     try {
-      const data = await this.get("/users") as { users?: Array<{
-        id: string;
-        name: string;
-        email: string;
+      // HeroBase returns array directly
+      const data = await this.get("/users") as Array<{
+        uniqueId: string;
+        name?: string;
+        email?: string;
         active?: boolean;
-        status?: string;
-      }> };
+      }> | { users?: Array<{ uniqueId: string; name?: string; email?: string; active?: boolean }> };
 
-      const users = data.users || [];
+      const users = Array.isArray(data) ? data : (data.users || []);
       
       return users.map((user) => ({
-        externalId: String(user.id),
+        externalId: user.uniqueId || String(user.uniqueId),
         name: user.name || "Unknown",
         email: user.email || "",
-        isActive: user.active ?? user.status === "active",
+        isActive: user.active ?? true,
         metadata: { source: "enreach" },
       }));
     } catch (error) {
@@ -87,20 +130,16 @@ export class EnreachAdapter implements DialerAdapter {
 
   async fetchCampaigns(): Promise<StandardCampaign[]> {
     try {
-      // Enreach typically calls these "flows" or "queues"
-      const data = await this.get("/flows") as { flows?: Array<{
-        id: string;
-        name: string;
-        active?: boolean;
-        status?: string;
-      }> };
+      // HeroBase uses /campaigns endpoint and returns array directly
+      const data = await this.get("/campaigns") as HeroBaseCampaign[] | { campaigns?: HeroBaseCampaign[] };
 
-      const flows = data.flows || [];
+      const campaigns = Array.isArray(data) ? data : (data.campaigns || []);
+      console.log(`[EnreachAdapter] Fetched ${campaigns.length} campaigns`);
       
-      return flows.map((flow) => ({
-        externalId: String(flow.id),
-        name: flow.name || "Unknown Flow",
-        isActive: flow.active ?? flow.status === "active",
+      return campaigns.map((campaign) => ({
+        externalId: campaign.uniqueId,
+        name: campaign.name || "Unknown Campaign",
+        isActive: campaign.active ?? (campaign.status === "active"),
       }));
     } catch (error) {
       console.error("[EnreachAdapter] Error fetching campaigns:", error);
@@ -110,59 +149,36 @@ export class EnreachAdapter implements DialerAdapter {
 
   async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
     try {
-      // Calculate date range
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+      console.log(`[EnreachAdapter] Fetching sales for last ${days} days`);
 
-      const startStr = startDate.toISOString().split("T")[0];
-      const endStr = endDate.toISOString().split("T")[0];
+      // HeroBase uses /leads endpoint with query params
+      // Get recent leads ordered by soldTime, take 100
+      const data = await this.get(`/leads?take=100&orderBy=soldTime&descending=true`) as 
+        HeroBaseLead[] | { leads?: HeroBaseLead[] };
 
-      console.log(`[EnreachAdapter] Fetching sales from ${startStr} to ${endStr}`);
+      const allLeads = Array.isArray(data) ? data : (data.leads || []);
+      console.log(`[EnreachAdapter] Fetched ${allLeads.length} total leads`);
 
-      // Enreach typically uses /calls or /results endpoint for completed calls/sales
-      const data = await this.get(`/results?from=${startStr}&to=${endStr}&status=sale`) as {
-        results?: Array<{
-          id: string;
-          external_id?: string;
-          created_at?: string;
-          timestamp?: string;
-          agent?: {
-            id: string;
-            name: string;
-            email: string;
-          };
-          user?: {
-            id: string;
-            name: string;
-            email: string;
-          };
-          contact?: {
-            name?: string;
-            company?: string;
-            phone?: string;
-          };
-          lead?: {
-            name?: string;
-            company?: string;
-            phone?: string;
-          };
-          flow_id?: string;
-          campaign_id?: string;
-          variables?: Record<string, unknown>;
-          call_variables?: Record<string, unknown>;
-          products?: Array<{
-            id: string;
-            external_id?: string;
-            name: string;
-            quantity?: number;
-            price?: number;
-          }>;
-        }>;
-      };
+      // Filter to only sold leads (status = "Solgt" or similar)
+      const soldStatuses = ["solgt", "sold", "success", "won", "closed won"];
+      const results = allLeads.filter((lead) => {
+        const status = (lead.status || "").toLowerCase();
+        return soldStatuses.includes(status);
+      });
+      
+      console.log(`[EnreachAdapter] Filtered to ${results.length} sold leads`);
 
-      const results = data.results || [];
-      console.log(`[EnreachAdapter] Fetched ${results.length} sales`);
+      // Filter by date range
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+      
+      const filteredResults = results.filter((lead) => {
+        const saleDate = lead.soldTime || lead.createdTime || lead.updatedTime;
+        if (!saleDate) return false;
+        return new Date(saleDate) >= cutoffDate;
+      });
+      
+      console.log(`[EnreachAdapter] After date filter: ${filteredResults.length} leads in last ${days} days`);
 
       // Build campaign mapping lookup by external campaign ID
       const mappingLookup = new Map<string, CampaignMappingConfig>();
@@ -173,20 +189,18 @@ export class EnreachAdapter implements DialerAdapter {
         console.log(`[EnreachAdapter] Loaded ${campaignMappings.length} campaign mappings`);
       }
 
-      return results.map((result) => {
-        const agent = result.agent || result.user;
-        const contact = result.contact || result.lead;
-        const campaignId = result.flow_id || result.campaign_id || "";
+      return filteredResults.map((lead) => {
+        const agent = lead.agent || lead.user;
+        const campaignId = lead.campaign?.uniqueId || "";
         
         // Get mapping config for this campaign
         const mapping = mappingLookup.get(campaignId);
         
-        // Extract external reference (OPP) from call variables
-        const variables = result.variables || result.call_variables || {};
+        // Extract external reference (OPP) from customFields or data
+        const variables = { ...lead.data, ...lead.customFields };
         let externalReference: string | null = null;
         
         if (mapping?.referenceConfig) {
-          // Use configured extraction method
           externalReference = this.extractReference(variables, mapping.referenceConfig);
           if (externalReference) {
             console.log(`[EnreachAdapter] Extracted reference via config: ${externalReference}`);
@@ -199,9 +213,9 @@ export class EnreachAdapter implements DialerAdapter {
         }
 
         // Map products
-        const products: StandardProduct[] = (result.products || []).map((p) => ({
-          name: p.name,
-          externalId: p.external_id || p.id,
+        const products: StandardProduct[] = (lead.products || []).map((p) => ({
+          name: p.name || "Unknown Product",
+          externalId: p.uniqueId || "unknown",
           quantity: p.quantity || 1,
           unitPrice: p.price || 0,
         }));
@@ -217,20 +231,21 @@ export class EnreachAdapter implements DialerAdapter {
         }
 
         return {
-          externalId: result.external_id || result.id,
+          externalId: lead.uniqueId,
           sourceSystem: "enreach" as const,
-          saleDate: result.created_at || result.timestamp || new Date().toISOString(),
+          saleDate: lead.soldTime || lead.createdTime || new Date().toISOString(),
           agentEmail: agent?.email || "",
-          agentExternalId: agent?.id ? String(agent.id) : undefined,
+          agentExternalId: agent?.uniqueId,
           agentName: agent?.name,
-          customerName: contact?.company || contact?.name,
-          customerPhone: contact?.phone,
+          customerName: lead.company || lead.name,
+          customerPhone: lead.phone,
           campaignId,
           externalReference,
           clientCampaignId: mapping?.clientCampaignId || null,
           products,
           metadata: {
             source: "enreach",
+            campaignName: lead.campaign?.name,
             variables,
           },
         };
@@ -255,7 +270,6 @@ export class EnreachAdapter implements DialerAdapter {
           return value ? String(value) : null;
         }
         case "json_path": {
-          // Simple dot-notation path resolution
           const parts = config.value.split(".");
           let current: unknown = variables;
           for (const part of parts) {
@@ -268,7 +282,6 @@ export class EnreachAdapter implements DialerAdapter {
           return current ? String(current) : null;
         }
         case "regex": {
-          // Search all string values for regex match
           const regex = new RegExp(config.value);
           for (const value of Object.values(variables)) {
             if (typeof value === "string") {
@@ -290,16 +303,15 @@ export class EnreachAdapter implements DialerAdapter {
   }
 
   /**
-   * Fallback search for OPP-like values in call variables
+   * Fallback search for OPP-like values in lead data/customFields
    */
   private searchForOppInVariables(variables: Record<string, unknown>): string | null {
-    // Common field names for order/reference numbers in Enreach
     const commonFields = [
       "opp", "OPP", "opp_number", "order_id", "order_number",
-      "reference", "ref", "external_ref", "orderId", "orderNumber"
+      "reference", "ref", "external_ref", "orderId", "orderNumber",
+      "ordreId", "ordrenummer", "OpportunityId"
     ];
 
-    // Check common field names first
     for (const field of commonFields) {
       if (variables[field]) {
         return String(variables[field]);
@@ -322,23 +334,18 @@ export class EnreachAdapter implements DialerAdapter {
   }
 
   /**
-   * Fetch detailed call/result data for enrichment (similar to Adversus lead data)
+   * Fetch detailed lead data for enrichment
    */
   async fetchResultData(resultId: string): Promise<Record<string, unknown>> {
     try {
-      const data = await this.get(`/results/${resultId}`) as {
-        variables?: Record<string, unknown>;
-        call_variables?: Record<string, unknown>;
-        custom_fields?: Record<string, unknown>;
-      };
+      const data = await this.get(`/leads/${resultId}`) as HeroBaseLead;
 
       return {
-        ...data.variables,
-        ...data.call_variables,
-        ...data.custom_fields,
+        ...data.data,
+        ...data.customFields,
       };
     } catch (error) {
-      console.error(`[EnreachAdapter] Error fetching result data for ${resultId}:`, error);
+      console.error(`[EnreachAdapter] Error fetching lead data for ${resultId}:`, error);
       return {};
     }
   }
