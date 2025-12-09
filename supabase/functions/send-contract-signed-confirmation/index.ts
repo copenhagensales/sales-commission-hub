@@ -107,146 +107,64 @@ async function generateContractPdf(contractId: string, supabaseUrl: string, serv
   return { base64: data.pdf, filename: data.filename };
 }
 
-// Provision OneDrive for user if not already done
-async function provisionOneDrive(accessToken: string, userId: string): Promise<boolean> {
-  try {
-    // Try to access the drive - this will provision it if it doesn't exist
-    const response = await fetch(
-      `https://graph.microsoft.com/v1.0/users/${userId}/drive`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
-
-    if (response.ok) {
-      console.log("OneDrive is available for user");
-      return true;
-    }
-
-    // If not found, try to provision by accessing personal site
-    const provisionResponse = await fetch(
-      `https://graph.microsoft.com/v1.0/users/${userId}/drive/root`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
-
-    if (provisionResponse.ok) {
-      console.log("OneDrive provisioned successfully");
-      return true;
-    }
-
-    console.error("Could not provision OneDrive:", await provisionResponse.text());
-    return false;
-  } catch (error) {
-    console.error("Error checking/provisioning OneDrive:", error);
-    return false;
-  }
-}
-
-// Upload file to OneDrive via Microsoft Graph API
-async function uploadToOneDrive(
+// Upload file to SharePoint site
+async function uploadToSharePoint(
   accessToken: string,
   fileContent: Uint8Array,
   filename: string,
   employeeName: string
 ): Promise<string> {
-  const oneDriveUserId = Deno.env.get("M365_ONEDRIVE_USER_ID");
+  const siteName = "CopenhagenSalesXScaleUp";
   
-  if (!oneDriveUserId) {
-    console.log("M365_ONEDRIVE_USER_ID not configured, skipping OneDrive upload");
-    return "";
-  }
+  console.log(`Uploading to SharePoint site: ${siteName}`);
 
-  console.log(`OneDrive user ID: ${oneDriveUserId}`);
-
-  // First, try to provision OneDrive if not already done
-  const isProvisioned = await provisionOneDrive(accessToken, oneDriveUserId);
-  
-  if (!isProvisioned) {
-    console.log("OneDrive not provisioned, trying SharePoint approach...");
-    
-    // Try using the beta endpoint which may be more forgiving
-    return await uploadToSharePointPersonalSite(accessToken, oneDriveUserId, fileContent, filename, employeeName);
-  }
-
-  // Create folder path: Kontrakter/[Employee Name]/
-  const sanitizedName = employeeName.replace(/[<>:"/\\|?*]/g, '_').trim();
-  const folderPath = `Kontrakter/${sanitizedName}`;
-  const filePath = `${folderPath}/${filename}`;
-  
-  console.log(`Uploading to OneDrive: ${filePath}`);
-
-  // Use the simple upload endpoint (for files < 4MB)
-  const uploadUrl = `https://graph.microsoft.com/v1.0/users/${oneDriveUserId}/drive/root:/${encodeURIComponent(filePath.replace(/\//g, '/'))}:/content`;
-  
-  const response = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${oneDriveUserId}/drive/root:/${filePath}:/content`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/pdf",
-      },
-      body: fileContent as unknown as BodyInit,
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error("OneDrive upload error:", error);
-    
-    // Try the fallback approach
-    return await uploadToSharePointPersonalSite(accessToken, oneDriveUserId, fileContent, filename, employeeName);
-  }
-
-  const data = await response.json();
-  console.log(`File uploaded successfully to OneDrive: ${data.webUrl}`);
-  return data.webUrl || "";
-}
-
-// Fallback: Upload to SharePoint personal site
-async function uploadToSharePointPersonalSite(
-  accessToken: string,
-  userId: string,
-  fileContent: Uint8Array,
-  filename: string,
-  employeeName: string
-): Promise<string> {
-  console.log("Attempting SharePoint fallback upload...");
-  
-  // Try to get the user's personal site URL
   try {
-    // First try with email as UPN
-    const userResponse = await fetch(
-      `https://graph.microsoft.com/v1.0/users/${userId}`,
+    // Get the SharePoint site ID
+    const siteResponse = await fetch(
+      `https://graph.microsoft.com/v1.0/sites/copenhagensalesaps.sharepoint.com:/sites/${siteName}`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
       }
     );
-    
-    if (!userResponse.ok) {
-      console.error("Could not get user info:", await userResponse.text());
+
+    if (!siteResponse.ok) {
+      const error = await siteResponse.text();
+      console.error("Could not get SharePoint site:", error);
       return "";
     }
-    
-    const userData = await userResponse.json();
-    console.log("User info retrieved:", userData.userPrincipalName);
-    
-    // Try using the MySite URL pattern
-    const upn = userData.userPrincipalName || userId;
+
+    const siteData = await siteResponse.json();
+    const siteId = siteData.id;
+    console.log(`SharePoint site ID: ${siteId}`);
+
+    // Get the default document library (Shared Documents / Dokumenter)
+    const driveResponse = await fetch(
+      `https://graph.microsoft.com/v1.0/sites/${siteId}/drive`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+
+    if (!driveResponse.ok) {
+      const error = await driveResponse.text();
+      console.error("Could not get SharePoint drive:", error);
+      return "";
+    }
+
+    const driveData = await driveResponse.json();
+    const driveId = driveData.id;
+    console.log(`SharePoint drive ID: ${driveId}`);
+
+    // Create folder path: Kontrakter/[Employee Name]/
     const sanitizedName = employeeName.replace(/[<>:"/\\|?*]/g, '_').trim();
-    const filePath = `Kontrakter/${sanitizedName}/${filename}`;
-    
-    // Try the direct upload again with confirmed user ID
+    const folderPath = `Kontrakter/${sanitizedName}`;
+    const filePath = `${folderPath}/${filename}`;
+
+    console.log(`Uploading file to: ${filePath}`);
+
+    // Upload the file
     const uploadResponse = await fetch(
-      `https://graph.microsoft.com/v1.0/users/${userData.id}/drive/root:/${filePath}:/content`,
+      `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/${filePath}:/content`,
       {
         method: "PUT",
         headers: {
@@ -256,24 +174,18 @@ async function uploadToSharePointPersonalSite(
         body: fileContent as unknown as BodyInit,
       }
     );
-    
-    if (uploadResponse.ok) {
-      const data = await uploadResponse.json();
-      console.log(`File uploaded via fallback: ${data.webUrl}`);
-      return data.webUrl || "";
+
+    if (!uploadResponse.ok) {
+      const error = await uploadResponse.text();
+      console.error("SharePoint upload error:", error);
+      return "";
     }
-    
-    const errorText = await uploadResponse.text();
-    console.error("SharePoint fallback upload failed:", errorText);
-    
-    // Final fallback: check if we need admin to provision OneDrive
-    if (errorText.includes("mysite not found")) {
-      console.error("OneDrive is not provisioned for this user. Admin needs to provision it first by visiting the user's OneDrive in M365 admin center.");
-    }
-    
-    return "";
+
+    const uploadData = await uploadResponse.json();
+    console.log(`File uploaded successfully to SharePoint: ${uploadData.webUrl}`);
+    return uploadData.webUrl || "";
   } catch (error) {
-    console.error("SharePoint fallback error:", error);
+    console.error("SharePoint upload error:", error);
     return "";
   }
 }
@@ -324,8 +236,8 @@ const handler = async (req: Request): Promise<Response> => {
     // Get M365 access token first
     const accessToken = await getM365AccessToken();
 
-    // Generate PDF and upload to OneDrive in background
-    let oneDriveUrl = "";
+    // Generate PDF and upload to SharePoint in background
+    let sharePointUrl = "";
     try {
       console.log("Generating PDF for contract:", contractId);
       const { base64, filename } = await generateContractPdf(contractId, supabaseUrl, supabaseKey);
@@ -333,11 +245,11 @@ const handler = async (req: Request): Promise<Response> => {
       // Convert base64 to bytes
       const pdfBytes = base64ToUint8Array(base64);
       
-      // Upload to OneDrive
-      oneDriveUrl = await uploadToOneDrive(accessToken, pdfBytes, filename, employeeName);
+      // Upload to SharePoint
+      sharePointUrl = await uploadToSharePoint(accessToken, pdfBytes, filename, employeeName);
       
-      if (oneDriveUrl) {
-        console.log("Contract PDF uploaded to OneDrive:", oneDriveUrl);
+      if (sharePointUrl) {
+        console.log("Contract PDF uploaded to SharePoint:", sharePointUrl);
       }
     } catch (pdfError) {
       console.error("PDF generation/upload error (non-fatal):", pdfError);
@@ -415,7 +327,7 @@ const handler = async (req: Request): Promise<Response> => {
               </div>
             </div>
 
-            ${oneDriveUrl ? `
+            ${sharePointUrl ? `
             <div class="onedrive-notice">
               📁 En kopi af kontrakten er blevet gemt i virksomhedens arkiv.
             </div>
@@ -451,7 +363,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Contract signed confirmation sent successfully to ${employeeEmail}`);
 
     return new Response(
-      JSON.stringify({ success: true, oneDriveUrl }),
+      JSON.stringify({ success: true, sharePointUrl }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
