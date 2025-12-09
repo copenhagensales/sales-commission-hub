@@ -156,11 +156,41 @@ Deno.serve(async (req) => {
         );
       }
 
+      const cronSchedule = schedule || "0 * * * *";
+      const jobName = `customer-crm-sync-${client_id}`;
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const functionUrl = `${supabaseUrl}/functions/v1/customer-crm-syncer`;
+
+      // First, try to unschedule any existing job
+      try {
+        await supabase.rpc("unschedule_integration_sync", { p_job_name: jobName });
+        console.log(`[scheduler-manager] Unscheduled existing job: ${jobName}`);
+      } catch (e) {
+        console.log(`[scheduler-manager] No existing job to unschedule: ${jobName}`);
+      }
+
+      // Schedule the cron job using pg_cron
+      const { error: cronError } = await supabase.rpc("schedule_integration_sync", {
+        p_job_name: jobName,
+        p_schedule: cronSchedule,
+        p_function_url: functionUrl,
+        p_anon_key: anonKey,
+        p_client_id: client_id,
+      });
+
+      if (cronError) {
+        console.error("[scheduler-manager] Failed to schedule cron job:", cronError);
+        // Continue anyway, update the database record
+      } else {
+        console.log(`[scheduler-manager] Scheduled cron job: ${jobName} with schedule: ${cronSchedule}`);
+      }
+
+      // Update the database record
       const { error } = await supabase
         .from("customer_integrations")
         .update({
           is_active: true,
-          cron_schedule: schedule || "0 * * * *",
+          cron_schedule: cronSchedule,
           updated_at: new Date().toISOString(),
         })
         .eq("client_id", client_id);
@@ -169,7 +199,7 @@ Deno.serve(async (req) => {
 
       console.log(`[scheduler-manager] Activated customer integration for client: ${client_id}`);
       return new Response(
-        JSON.stringify({ success: true }),
+        JSON.stringify({ success: true, cron_scheduled: !cronError }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -182,6 +212,16 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: "Missing client_id" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
+      }
+
+      const jobName = `customer-crm-sync-${client_id}`;
+
+      // Unschedule the cron job
+      try {
+        await supabase.rpc("unschedule_integration_sync", { p_job_name: jobName });
+        console.log(`[scheduler-manager] Unscheduled cron job: ${jobName}`);
+      } catch (e) {
+        console.log(`[scheduler-manager] No job to unschedule: ${jobName}`);
       }
 
       const { error } = await supabase
