@@ -22,6 +22,9 @@ interface ParsedEmployee {
   weekly_hours?: number;
   standard_start_time?: string;
   work_location?: string;
+  cpr_number?: string;
+  bank_reg_number?: string;
+  bank_account_number?: string;
   isValid: boolean;
   errors: string[];
 }
@@ -34,6 +37,9 @@ const FIELD_OPTIONS: { value: FieldKey | "skip"; label: string }[] = [
   { value: "last_name", label: "Efternavn *" },
   { value: "private_email", label: "Email" },
   { value: "private_phone", label: "Telefon" },
+  { value: "cpr_number", label: "CPR-nummer" },
+  { value: "bank_reg_number", label: "Reg. nr." },
+  { value: "bank_account_number", label: "Kontonummer" },
   { value: "job_title", label: "Stilling" },
   { value: "department", label: "Afdeling" },
   { value: "employment_start_date", label: "Startdato" },
@@ -53,6 +59,9 @@ const suggestMapping = (columnName: string): FieldKey | "skip" => {
     "efternavn": "last_name", "last_name": "last_name", "lastname": "last_name",
     "email": "private_email", "e-mail": "private_email", "mail": "private_email",
     "telefon": "private_phone", "tlf": "private_phone", "mobil": "private_phone", "phone": "private_phone",
+    "cpr": "cpr_number", "cpr-nummer": "cpr_number", "cpr nummer": "cpr_number", "personnummer": "cpr_number",
+    "reg": "bank_reg_number", "reg.": "bank_reg_number", "reg. nr.": "bank_reg_number", "regnr": "bank_reg_number", "reg nr": "bank_reg_number",
+    "konto": "bank_account_number", "kontonummer": "bank_account_number", "konto nr": "bank_account_number", "kontonr": "bank_account_number",
     "stilling": "job_title", "titel": "job_title", "jobtitel": "job_title", "rolle": "job_title",
     "afdeling": "department", "department": "department", "team": "department",
     "startdato": "employment_start_date", "ansættelsesdato": "employment_start_date",
@@ -193,6 +202,9 @@ export function EmployeeExcelImport() {
         last_name: e.last_name,
         private_email: e.private_email || null,
         private_phone: e.private_phone || null,
+        cpr_number: e.cpr_number || null,
+        bank_reg_number: e.bank_reg_number || null,
+        bank_account_number: e.bank_account_number || null,
         job_title: e.job_title || null,
         department: e.department || null,
         employment_start_date: e.employment_start_date || new Date().toISOString().split("T")[0],
