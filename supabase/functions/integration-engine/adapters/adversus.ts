@@ -91,6 +91,9 @@ export class AdversusAdapter implements DialerAdapter {
       const agentEmail = typeof agentObj === "object" ? agentObj.email : `agent-${agentId}@adversus.local`;
       const agentName = typeof agentObj === "object" ? agentObj.name || agentObj.displayName : "Desconocido";
 
+      // Extract lead resultData for dynamic OPP field mapping
+      const resultData = s.lead?.resultData || s.resultData || {};
+      
       return {
         externalId: String(s.id),
         sourceSystem: "adversus",
@@ -102,6 +105,8 @@ export class AdversusAdapter implements DialerAdapter {
 
         customerName: s.lead?.company || s.lead?.name || "",
         customerPhone: s.lead?.phone || "",
+        
+        campaignId: s.campaignId ? String(s.campaignId) : undefined,
 
         products: (s.lines || []).map((l: any) => ({
           name: l.title || "Producto desconocido",
@@ -114,6 +119,8 @@ export class AdversusAdapter implements DialerAdapter {
         metadata: {
           campaignId: s.campaignId,
           leadId: s.leadId,
+          resultData: resultData, // Full resultData for dynamic field extraction
+          lead: s.lead, // Full lead object as backup
         },
       };
     });
