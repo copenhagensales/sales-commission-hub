@@ -153,9 +153,20 @@ export class EnreachAdapter implements DialerAdapter {
       console.log(`[EnreachAdapter] Fetching sales for last ${days} days`);
 
       // HeroBase uses /leads endpoint with query params
-      // Get recent leads ordered by soldTime, take 100
-      const data = await this.get(`/leads?take=100&orderBy=soldTime&descending=true`) as 
-        HeroBaseLead[] | { leads?: HeroBaseLead[] };
+      // Use createdTime for sorting (safer than soldTime which may be null)
+      let data: HeroBaseLead[] | { leads?: HeroBaseLead[] };
+      
+      try {
+        // Primary attempt: order by createdTime
+        console.log("[EnreachAdapter] Attempting fetch with orderBy=createdTime");
+        data = await this.get(`/leads?take=100&orderBy=createdTime&descending=true`) as 
+          HeroBaseLead[] | { leads?: HeroBaseLead[] };
+      } catch (primaryError) {
+        console.warn("[EnreachAdapter] Primary fetch failed, trying fallback without sorting:", primaryError);
+        // Fallback: just get leads without sorting
+        data = await this.get(`/leads?take=50`) as 
+          HeroBaseLead[] | { leads?: HeroBaseLead[] };
+      }
 
       const allLeads = Array.isArray(data) ? data : (data.leads || []);
       console.log(`[EnreachAdapter] Fetched ${allLeads.length} total leads`);
