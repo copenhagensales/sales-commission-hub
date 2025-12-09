@@ -798,87 +798,85 @@ export default function EmployeeMasterData() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Aktive medarbejdere</CardTitle>
+          <div className="rounded-xl bg-card/50 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-muted-foreground">Aktive medarbejdere</span>
               <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activeCount}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Inaktive medarbejdere</CardTitle>
+            </div>
+            <div className="text-2xl font-bold">{activeCount}</div>
+          </div>
+          <div className="rounded-xl bg-card/50 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-muted-foreground">Inaktive medarbejdere</span>
               <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{employees.length - activeCount}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total</CardTitle>
+            </div>
+            <div className="text-2xl font-bold">{employees.length - activeCount}</div>
+          </div>
+          <div className="rounded-xl bg-card/50 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-muted-foreground">Total</span>
               <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{employees.length}</div>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="text-2xl font-bold">{employees.length}</div>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <CardTitle>Medarbejderoversigt</CardTitle>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center rounded-lg border border-border p-1">
-                  <Button
-                    variant={statusFilter === "active" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setStatusFilter("active")}
-                    className="h-7 px-3"
-                  >
-                    Aktive ({activeCount})
-                  </Button>
-                  <Button
-                    variant={statusFilter === "inactive" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setStatusFilter("inactive")}
-                    className="h-7 px-3"
-                  >
-                    Inaktive ({inactiveCount})
-                  </Button>
-                  <Button
-                    variant={statusFilter === "all" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setStatusFilter("all")}
-                    className="h-7 px-3"
-                  >
-                    Alle ({employees.length})
-                  </Button>
-                </div>
-                <div className="relative w-64">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Søg..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8" />
-                </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <h2 className="text-xl font-semibold">Medarbejderoversigt</h2>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center rounded-lg bg-muted/50 p-1">
+                <Button
+                  variant={statusFilter === "active" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setStatusFilter("active")}
+                  className="h-7 px-3 text-xs"
+                >
+                  Aktive ({activeCount})
+                </Button>
+                <Button
+                  variant={statusFilter === "inactive" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setStatusFilter("inactive")}
+                  className="h-7 px-3 text-xs"
+                >
+                  Inaktive ({inactiveCount})
+                </Button>
+                <Button
+                  variant={statusFilter === "all" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setStatusFilter("all")}
+                  className="h-7 px-3 text-xs"
+                >
+                  Alle ({employees.length})
+                </Button>
+              </div>
+              <div className="relative w-56">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Søg..." 
+                  value={searchTerm} 
+                  onChange={(e) => setSearchTerm(e.target.value)} 
+                  className="pl-9 bg-muted/50 border-0 focus-visible:ring-1 h-9" 
+                />
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+          
+          <div className="rounded-xl bg-card/50 overflow-hidden">
             {isLoading ? (
-              <p className="text-muted-foreground">Indlæser...</p>
+              <p className="text-muted-foreground p-6">Indlæser...</p>
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Navn</TableHead>
-                    <TableHead>E-mail</TableHead>
-                    <TableHead>Telefon</TableHead>
-                    <TableHead>Afdeling</TableHead>
-                    <TableHead>Stilling</TableHead>
-                    <TableHead>Løntype</TableHead>
-                    <TableHead>Status</TableHead>
+                  <TableRow className="hover:bg-transparent border-b border-border/50">
+                    <TableHead className="text-xs font-medium text-muted-foreground">Navn</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">E-mail</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Telefon</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Afdeling</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Stilling</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Løntype</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -886,89 +884,102 @@ export default function EmployeeMasterData() {
                   {filteredEmployees.map((employee) => (
                     <TableRow 
                       key={employee.id} 
-                      className="cursor-pointer hover:bg-muted/50"
+                      className="cursor-pointer hover:bg-muted/30 border-b border-border/30"
                       onClick={() => navigate(`/employees/${employee.id}`)}
                     >
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <FileText className={`h-4 w-4 ${hasSignedContract(employee.id) ? "text-green-500" : "text-muted-foreground/40"}`} />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {hasSignedContract(employee.id) ? "Kontrakt underskrevet" : "Ingen underskrevet kontrakt"}
-                            </TooltipContent>
-                          </Tooltip>
-                          {employee.first_name} {employee.last_name}
+                      <TableCell className="font-medium py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
+                            {employee.first_name?.[0]}{employee.last_name?.[0]}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <FileText className={`h-3.5 w-3.5 ${hasSignedContract(employee.id) ? "text-green-500" : "text-muted-foreground/30"}`} />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {hasSignedContract(employee.id) ? "Kontrakt underskrevet" : "Ingen underskrevet kontrakt"}
+                              </TooltipContent>
+                            </Tooltip>
+                            <span>{employee.first_name} {employee.last_name}</span>
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                         {employee.private_email ? (
                           <a 
                             href={`mailto:${employee.private_email}`} 
-                            className="text-primary hover:underline"
+                            className="text-primary hover:underline text-sm"
                           >
                             {employee.private_email}
                           </a>
-                        ) : "-"}
+                        ) : <span className="text-muted-foreground/50">-</span>}
                       </TableCell>
-                      <TableCell>{employee.private_phone || "-"}</TableCell>
-                      <TableCell>{employee.department || "-"}</TableCell>
-                      <TableCell>{employee.job_title || "-"}</TableCell>
-                      <TableCell>
+                      <TableCell className="py-3 text-sm">{employee.private_phone || <span className="text-muted-foreground/50">-</span>}</TableCell>
+                      <TableCell className="py-3 text-sm">{employee.department || <span className="text-muted-foreground/50">-</span>}</TableCell>
+                      <TableCell className="py-3">
+                        {employee.job_title ? (
+                          <Badge variant="secondary" className="text-xs font-normal">{employee.job_title}</Badge>
+                        ) : <span className="text-muted-foreground/50">-</span>}
+                      </TableCell>
+                      <TableCell className="py-3 text-sm">
                         {employee.salary_type === "provision" && "Provision"}
                         {employee.salary_type === "fixed" && "Fast løn"}
                         {employee.salary_type === "hourly" && "Timeløn"}
-                        {!employee.salary_type && "-"}
+                        {!employee.salary_type && <span className="text-muted-foreground/50">-</span>}
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                         <Switch 
                           checked={employee.is_active} 
                           onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: employee.id, is_active: checked })}
                         />
                       </TableCell>
-                      <TableCell className="flex items-center gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            toast({ title: "Ring op", description: "Softphone integration kommer snart" });
-                          }}
-                          disabled={!employee.private_phone}
-                        >
-                          <Phone className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            toast({ title: "Send SMS", description: "SMS integration kommer snart" });
-                          }}
-                          disabled={!employee.private_phone}
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        {isOwner && (
+                      <TableCell className="py-3">
+                        <div className="flex items-center gap-0.5">
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            onClick={(e) => { e.stopPropagation(); setDeleteEmployeeId(employee.id); }}
-                            className="text-destructive hover:text-destructive"
+                            className="h-8 w-8"
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              toast({ title: "Ring op", description: "Softphone integration kommer snart" });
+                            }}
+                            disabled={!employee.private_phone}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Phone className="h-3.5 w-3.5" />
                           </Button>
-                        )}
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              toast({ title: "Send SMS", description: "SMS integration kommer snart" });
+                            }}
+                            disabled={!employee.private_phone}
+                          >
+                            <MessageSquare className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          {isOwner && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={(e) => { e.stopPropagation(); setDeleteEmployeeId(employee.id); }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
                   {filteredEmployees.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         Ingen medarbejdere fundet
                       </TableCell>
                     </TableRow>
@@ -976,8 +987,8 @@ export default function EmployeeMasterData() {
                 </TableBody>
               </Table>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Delete confirmation dialog */}
         <AlertDialog open={!!deleteEmployeeId} onOpenChange={(open) => !open && setDeleteEmployeeId(null)}>
