@@ -6,14 +6,14 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, Check, X, History, Phone, Mail, Pencil, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, TrendingUp, AlertTriangle, AlarmClock, FileText, Send } from "lucide-react";
+import { ArrowLeft, Phone, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, AlertTriangle, AlarmClock, FileText, Send, Palmtree, History } from "lucide-react";
 import { SendContractDialog } from "@/components/contracts/SendContractDialog";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
 import { TeamLeaderTeams } from "@/components/employees/TeamLeaderTeams";
+import { EditableRow, ContactRow, SelectRow, TableSection } from "@/components/employee/EmployeeDetailFields";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -58,267 +58,6 @@ interface EmployeeMasterDataRecord {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-}
-
-interface EditableFieldProps {
-  label: string;
-  value: string | number | null | undefined;
-  field: keyof EmployeeMasterDataRecord;
-  type?: "text" | "date" | "number" | "time" | "email" | "password";
-  onSave: (field: string, value: string | number | null) => void;
-  displayValue?: string | null;
-}
-
-function EditableField({ label, value, field, type = "text", onSave, displayValue }: EditableFieldProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(String(value || ""));
-
-  const handleSave = () => {
-    let finalValue: string | number | null = editValue || null;
-    if (type === "number" && editValue) {
-      finalValue = parseFloat(editValue);
-    }
-    onSave(field, finalValue);
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditValue(String(value || ""));
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleSave();
-    if (e.key === "Escape") handleCancel();
-  };
-
-  if (isEditing) {
-    return (
-      <div className="flex items-center gap-1">
-        <Input
-          type={type}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="h-9 flex-1"
-          autoFocus
-        />
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
-          <Check className="h-4 w-4 text-green-600" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleCancel}>
-          <X className="h-4 w-4 text-destructive" />
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div 
-      className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md cursor-pointer hover:bg-muted/50 transition-colors group min-h-[40px]"
-      onClick={() => setIsEditing(true)}
-    >
-      <span className="font-medium">{displayValue ?? value ?? "-"}</span>
-      <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-    </div>
-  );
-}
-
-interface ClickableContactFieldProps {
-  label: string;
-  value: string | null;
-  field: keyof EmployeeMasterDataRecord;
-  type: "phone" | "email";
-  onSave: (field: string, value: string | null) => void;
-}
-
-function ClickableContactField({ label, value, field, type, onSave }: ClickableContactFieldProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value || "");
-
-  const handleSave = () => {
-    onSave(field, editValue || null);
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditValue(value || "");
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleSave();
-    if (e.key === "Escape") handleCancel();
-  };
-
-  if (isEditing) {
-    return (
-      <div className="flex items-center gap-1">
-        <Input
-          type={type === "email" ? "email" : "tel"}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="h-9 flex-1"
-          autoFocus
-        />
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
-          <Check className="h-4 w-4 text-green-600" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleCancel}>
-          <X className="h-4 w-4 text-destructive" />
-        </Button>
-      </div>
-    );
-  }
-
-  const href = type === "phone" ? `tel:${value}` : `mailto:${value}`;
-  const Icon = type === "phone" ? Phone : Mail;
-
-  return (
-    <div className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md group min-h-[40px]">
-      <div className="flex items-center gap-2">
-        {value ? (
-          <a 
-            href={href} 
-            className="font-medium text-primary hover:underline flex items-center gap-1.5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Icon className="h-4 w-4" />
-            {value}
-          </a>
-        ) : (
-          <span className="font-medium text-muted-foreground">-</span>
-        )}
-      </div>
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" 
-        onClick={() => setIsEditing(true)}
-      >
-        <Pencil className="h-3.5 w-3.5" />
-      </Button>
-    </div>
-  );
-}
-
-interface EditableSelectProps {
-  label: string;
-  value: string | null;
-  field: keyof EmployeeMasterDataRecord;
-  options: { value: string; label: string }[];
-  onSave: (field: string, value: string | null) => void;
-  displayValue?: string | null;
-  allowClear?: boolean;
-}
-
-function EditableSelect({ label, value, field, options, onSave, displayValue, allowClear = false }: EditableSelectProps) {
-  const [isEditing, setIsEditing] = useState(false);
-
-  const handleChange = (newValue: string) => {
-    if (newValue === "__clear__") {
-      onSave(field, null);
-    } else {
-      onSave(field, newValue);
-    }
-    setIsEditing(false);
-  };
-
-  if (isEditing) {
-    return (
-      <div className="flex items-center gap-1">
-        <Select value={value || ""} onValueChange={handleChange}>
-          <SelectTrigger className="h-9 flex-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="z-50 bg-popover">
-            {allowClear && (
-              <SelectItem value="__clear__" className="text-muted-foreground italic">Fjern</SelectItem>
-            )}
-            {options.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setIsEditing(false)}>
-          <X className="h-4 w-4 text-destructive" />
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div 
-      className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md cursor-pointer hover:bg-muted/50 transition-colors group min-h-[40px]"
-      onClick={() => setIsEditing(true)}
-    >
-      <span className="font-medium">{displayValue ?? "-"}</span>
-      <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-    </div>
-  );
-}
-
-interface EditableSwitchProps {
-  label: string;
-  value: boolean;
-  field: keyof EmployeeMasterDataRecord;
-  onSave: (field: string, value: boolean) => void;
-}
-
-function EditableSwitch({ label, value, field, onSave }: EditableSwitchProps) {
-  return (
-    <div className="flex justify-between items-center py-2 border-b border-border last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <Switch checked={value} onCheckedChange={(checked) => onSave(field, checked)} />
-    </div>
-  );
-}
-
-function MaskedField({ label, value, field, onSave }: { label: string; value: string | null; field: keyof EmployeeMasterDataRecord; onSave: (field: string, value: string | null) => void }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value || "");
-
-  const handleSave = () => {
-    onSave(field, editValue || null);
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditValue(value || "");
-    setIsEditing(false);
-  };
-
-  if (isEditing) {
-    return (
-      <div className="flex items-center gap-1">
-        <Input
-          type="text"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancel(); }}
-          className="h-9 flex-1"
-          autoFocus
-        />
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
-          <Check className="h-4 w-4 text-green-600" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleCancel}>
-          <X className="h-4 w-4 text-destructive" />
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div 
-      className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md cursor-pointer hover:bg-muted/50 transition-colors group min-h-[40px]"
-      onClick={() => setIsEditing(true)}
-    >
-      <span className="font-medium">{value ? "••••••••" : "-"}</span>
-      <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-    </div>
-  );
 }
 
 export default function EmployeeDetail() {
@@ -846,324 +585,182 @@ export default function EmployeeDetail() {
           </TabsList>
 
           <TabsContent value="stamdata" className="mt-6">
-            <div className="space-y-6">
-              {/* Personal Information - Combined Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Personlige oplysninger</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-6 md:grid-cols-2">
-                    {/* Left Column - Identity & Contact */}
-                    <div className="space-y-4">
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Identitet</h4>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-xs text-muted-foreground">Fornavn(e)</label>
-                            <EditableField label="" value={employee.first_name} field="first_name" onSave={handleSave} />
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground">Efternavn</label>
-                            <EditableField label="" value={employee.last_name} field="last_name" onSave={handleSave} />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">CPR-nr.</label>
-                          <MaskedField label="" value={employee.cpr_number} field="cpr_number" onSave={handleSave} />
-                        </div>
-                      </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Left column */}
+              <div className="space-y-4">
+                <TableSection title="Identitet">
+                  <EditableRow label="Fornavn(e)" value={employee.first_name} field="first_name" onSave={handleSave} />
+                  <EditableRow label="Efternavn" value={employee.last_name} field="last_name" onSave={handleSave} />
+                  <EditableRow label="CPR-nr." value={employee.cpr_number} field="cpr_number" onSave={handleSave} masked />
+                </TableSection>
 
-                      <div className="space-y-3 pt-2">
-                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Kontakt</h4>
-                        <div>
-                          <label className="text-xs text-muted-foreground">Telefon</label>
-                          <ClickableContactField label="" value={employee.private_phone} field="private_phone" type="phone" onSave={handleSave} />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">Privat email</label>
-                          <ClickableContactField label="" value={employee.private_email} field="private_email" type="email" onSave={handleSave} />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">Arbejdsemail</label>
-                          <ClickableContactField label="" value={employee.work_email} field="work_email" type="email" onSave={handleSave} />
-                        </div>
-                      </div>
-                    </div>
+                <TableSection title="Kontakt">
+                  <ContactRow label="Telefon" value={employee.private_phone} field="private_phone" type="phone" onSave={handleSave} />
+                  <ContactRow label="Privat email" value={employee.private_email} field="private_email" type="email" onSave={handleSave} />
+                  <ContactRow label="Arbejdsemail" value={employee.work_email} field="work_email" type="email" onSave={handleSave} />
+                </TableSection>
 
-                    {/* Right Column - Address */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Adresse</h4>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Vejnavn og nr.</label>
-                        <EditableField label="" value={employee.address_street} field="address_street" onSave={handleSave} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-xs text-muted-foreground">Postnummer</label>
-                          <EditableField label="" value={employee.address_postal_code} field="address_postal_code" onSave={handleSave} />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">By</label>
-                          <EditableField label="" value={employee.address_city} field="address_city" onSave={handleSave} />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Land</label>
-                        <EditableField label="" value={employee.address_country} field="address_country" onSave={handleSave} />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                <TableSection title="Adresse">
+                  <EditableRow label="Vejnavn og nr." value={employee.address_street} field="address_street" onSave={handleSave} />
+                  <EditableRow label="Postnummer" value={employee.address_postal_code} field="address_postal_code" onSave={handleSave} />
+                  <EditableRow label="By" value={employee.address_city} field="address_city" onSave={handleSave} />
+                  <EditableRow label="Land" value={employee.address_country} field="address_country" onSave={handleSave} />
+                </TableSection>
 
-              {/* Employment Information - Combined Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Ansættelsesforhold</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {/* Employment Details */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Stilling</h4>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Jobtitel</label>
-                        <EditableSelect
-                          label=""
-                          value={employee.job_title}
-                          field="job_title"
-                          options={[
-                            { value: "Salgskonsulent", label: "Salgskonsulent" },
-                            { value: "Fieldmarketing", label: "Fieldmarketing" },
-                            { value: "Teamleder", label: "Teamleder" },
-                            { value: "Assisterende Teamleder", label: "Assisterende Teamleder" },
-                            { value: "Rekruttering", label: "Rekruttering" },
-                            { value: "SOME", label: "SOME" },
-                            { value: "Backoffice", label: "Backoffice" },
-                            { value: "Projektleder", label: "Projektleder" },
-                            { value: "Ejer", label: "Ejer" },
-                          ]}
-                          onSave={handleSave}
-                          displayValue={employee.job_title}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Afdeling / Team</label>
-                        <EditableSelect
-                          label=""
-                          value={employee.department}
-                          field="department"
-                          options={clients.map(c => ({ value: c.name, label: c.name }))}
-                          onSave={handleSave}
-                          displayValue={employee.department}
-                          allowClear
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Arbejdssted</label>
-                        <EditableSelect
-                          label=""
-                          value={employee.work_location}
-                          field="work_location"
-                          options={[
-                            { value: "København V", label: "København V" },
-                            { value: "Århus", label: "Århus" },
-                          ]}
-                          onSave={handleSave}
-                          displayValue={employee.work_location || "-"}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Leder</label>
-                        <div className="py-2 font-medium">{manager ? `${manager.first_name} ${manager.last_name}` : "-"}</div>
-                      </div>
-                    </div>
+                <TableSection title="Løn">
+                  <SelectRow 
+                    label="Løntype" 
+                    value={employee.salary_type} 
+                    field="salary_type" 
+                    options={[
+                      { value: "provision", label: "Provision" },
+                      { value: "fixed", label: "Fast løn" },
+                      { value: "hourly", label: "Timeløn" },
+                    ]}
+                    onSave={handleSave}
+                    displayValue={getSalaryTypeLabel(employee.salary_type)}
+                  />
+                  {(employee.salary_type === "fixed" || employee.salary_type === "hourly") && (
+                    <EditableRow 
+                      label="Beløb" 
+                      value={employee.salary_amount} 
+                      field="salary_amount" 
+                      type="number" 
+                      onSave={handleSave} 
+                      displayValue={employee.salary_amount ? `${employee.salary_amount.toLocaleString("da-DK")} DKK` : null}
+                    />
+                  )}
+                  <EditableRow label="Reg.nr." value={employee.bank_reg_number} field="bank_reg_number" onSave={handleSave} masked />
+                  <EditableRow label="Kontonummer" value={employee.bank_account_number} field="bank_account_number" onSave={handleSave} masked />
+                </TableSection>
+              </div>
 
-                    {/* Dates & Status */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Periode</h4>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Ansættelsesdato</label>
-                        <EditableField label="" value={employee.employment_start_date} field="employment_start_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_start_date)} />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Slutdato</label>
-                        <EditableField label="" value={employee.employment_end_date} field="employment_end_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_end_date)} />
-                      </div>
-                    </div>
+              {/* Right column */}
+              <div className="space-y-4">
+                <TableSection title="Stilling">
+                  <SelectRow 
+                    label="Jobtitel" 
+                    value={employee.job_title} 
+                    field="job_title" 
+                    options={[
+                      { value: "Salgskonsulent", label: "Salgskonsulent" },
+                      { value: "Fieldmarketing", label: "Fieldmarketing" },
+                      { value: "Teamleder", label: "Teamleder" },
+                      { value: "Assisterende Teamleder", label: "Assisterende Teamleder" },
+                      { value: "Rekruttering", label: "Rekruttering" },
+                      { value: "SOME", label: "SOME" },
+                      { value: "Backoffice", label: "Backoffice" },
+                      { value: "Projektleder", label: "Projektleder" },
+                      { value: "Ejer", label: "Ejer" },
+                    ]}
+                    onSave={handleSave}
+                    displayValue={employee.job_title}
+                  />
+                  <SelectRow 
+                    label="Afdeling" 
+                    value={employee.department} 
+                    field="department" 
+                    options={clients.map(c => ({ value: c.name, label: c.name }))}
+                    onSave={handleSave}
+                    displayValue={employee.department}
+                    allowClear
+                  />
+                  <SelectRow 
+                    label="Arbejdssted" 
+                    value={employee.work_location} 
+                    field="work_location" 
+                    options={[
+                      { value: "København V", label: "København V" },
+                      { value: "Århus", label: "Århus" },
+                    ]}
+                    onSave={handleSave}
+                    displayValue={employee.work_location}
+                  />
+                  <tr className="border-b border-border/50 last:border-0">
+                    <td className="py-2.5 pr-4 text-sm text-muted-foreground w-1/3">Leder</td>
+                    <td className="py-2.5 text-sm font-medium">{manager ? `${manager.first_name} ${manager.last_name}` : "-"}</td>
+                  </tr>
+                </TableSection>
 
-                    {/* Working Hours */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Arbejdstid</h4>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Timer pr. uge</label>
-                        <EditableField label="" value={employee.weekly_hours} field="weekly_hours" type="number" onSave={handleSave} displayValue={employee.weekly_hours ? `${employee.weekly_hours} timer` : null} />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Mødetid</label>
-                        <EditableSelect
-                          label=""
-                          value={employee.standard_start_time}
-                          field="standard_start_time"
-                          options={[
-                            { value: "8.00-16.30", label: "8.00-16.30" },
-                            { value: "8.30-16.30", label: "8.30-16.30" },
-                            { value: "9.00-16.30", label: "9.00-16.30" },
-                            { value: "9.30-17.30", label: "9.30-17.30" },
-                          ]}
-                          onSave={handleSave}
-                          displayValue={employee.standard_start_time || "-"}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                <TableSection title="Ansættelse">
+                  <EditableRow label="Startdato" value={employee.employment_start_date} field="employment_start_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_start_date)} />
+                  <EditableRow label="Slutdato" value={employee.employment_end_date} field="employment_end_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_end_date)} />
+                  <EditableRow label="Timer/uge" value={employee.weekly_hours} field="weekly_hours" type="number" onSave={handleSave} displayValue={employee.weekly_hours ? `${employee.weekly_hours} timer` : null} />
+                  <SelectRow 
+                    label="Mødetid" 
+                    value={employee.standard_start_time} 
+                    field="standard_start_time" 
+                    options={[
+                      { value: "8.00-16.30", label: "8.00-16.30" },
+                      { value: "8.30-16.30", label: "8.30-16.30" },
+                      { value: "9.00-16.30", label: "9.00-16.30" },
+                      { value: "9.30-17.30", label: "9.30-17.30" },
+                    ]}
+                    onSave={handleSave}
+                    displayValue={employee.standard_start_time}
+                  />
+                </TableSection>
 
-              {/* Salary & Benefits - Combined Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Løn og goder</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {/* Salary */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Løn</h4>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Løntype</label>
-                        <EditableSelect
-                          label=""
-                          value={employee.salary_type}
-                          field="salary_type"
-                          options={[
-                            { value: "provision", label: "Provision" },
-                            { value: "fixed", label: "Fast løn" },
-                            { value: "hourly", label: "Timeløn" },
-                          ]}
-                          onSave={handleSave}
-                          displayValue={getSalaryTypeLabel(employee.salary_type)}
-                        />
-                      </div>
-                      {(employee.salary_type === "fixed" || employee.salary_type === "hourly") && (
-                        <div>
-                          <label className="text-xs text-muted-foreground">Beløb (DKK)</label>
-                          <EditableField 
-                            label="" 
-                            value={employee.salary_amount} 
-                            field="salary_amount" 
-                            type="number" 
-                            onSave={handleSave} 
-                            displayValue={employee.salary_amount ? `${employee.salary_amount.toLocaleString("da-DK")} DKK` : null}
-                          />
-                        </div>
-                      )}
-                    </div>
+                <TableSection title="Ferie & tillæg">
+                  <SelectRow 
+                    label="Ferietype" 
+                    value={employee.vacation_type} 
+                    field="vacation_type" 
+                    options={[
+                      { value: "vacation_pay", label: "Ferieløn" },
+                      { value: "vacation_bonus", label: "Feriebonus" },
+                    ]}
+                    onSave={handleSave}
+                    displayValue={getVacationTypeLabel(employee.vacation_type)}
+                  />
+                  {employee.vacation_type === "vacation_bonus" && (
+                    <EditableRow 
+                      label="Feriebonus %" 
+                      value={employee.vacation_bonus_percent} 
+                      field="vacation_bonus_percent" 
+                      type="number" 
+                      onSave={handleSave}
+                      displayValue={employee.vacation_bonus_percent ? `${employee.vacation_bonus_percent}%` : null}
+                    />
+                  )}
+                  <EditableRow 
+                    label="Parkering/md" 
+                    value={employee.parking_monthly_cost} 
+                    field="parking_monthly_cost" 
+                    type="number" 
+                    onSave={handleSave}
+                    displayValue={employee.parking_monthly_cost ? `${employee.parking_monthly_cost} DKK` : null}
+                  />
+                  <EditableRow 
+                    label="Henvisningsbonus" 
+                    value={employee.referral_bonus} 
+                    field="referral_bonus" 
+                    type="number" 
+                    onSave={handleSave}
+                    displayValue={employee.referral_bonus ? `${employee.referral_bonus} DKK` : null}
+                  />
+                  <EditableRow 
+                    label="Regulering/md" 
+                    value={employee.salary_deduction} 
+                    field="salary_deduction" 
+                    type="number" 
+                    onSave={handleSave}
+                    displayValue={employee.salary_deduction ? `${employee.salary_deduction} DKK` : null}
+                  />
+                  {employee.salary_deduction && (
+                    <EditableRow label="Reg. note" value={employee.salary_deduction_note} field="salary_deduction_note" onSave={handleSave} />
+                  )}
+                </TableSection>
+              </div>
 
-                    {/* Bank */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Bank</h4>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Reg.nr.</label>
-                        <MaskedField label="" value={employee.bank_reg_number} field="bank_reg_number" onSave={handleSave} />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Kontonummer</label>
-                        <MaskedField label="" value={employee.bank_account_number} field="bank_account_number" onSave={handleSave} />
-                      </div>
-                    </div>
-
-                    {/* Vacation & Parking */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Ferie</h4>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Ferietype</label>
-                        <EditableSelect
-                          label=""
-                          value={employee.vacation_type}
-                          field="vacation_type"
-                          options={[
-                            { value: "vacation_pay", label: "Ferieløn" },
-                            { value: "vacation_bonus", label: "Feriebonus" },
-                          ]}
-                          onSave={handleSave}
-                          displayValue={getVacationTypeLabel(employee.vacation_type)}
-                        />
-                      </div>
-                      {employee.vacation_type === "vacation_bonus" && (
-                        <div>
-                          <label className="text-xs text-muted-foreground">Feriebonus %</label>
-                          <EditableField 
-                            label="" 
-                            value={employee.vacation_bonus_percent} 
-                            field="vacation_bonus_percent" 
-                            type="number" 
-                            onSave={handleSave}
-                            displayValue={employee.vacation_bonus_percent ? `${employee.vacation_bonus_percent}%` : null}
-                          />
-                        </div>
-                      )}
-                      <div className="pt-3">
-                        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Løntillæg & fradrag</h4>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="text-xs text-muted-foreground">Parkering (månedlig)</label>
-                            <EditableField 
-                              label="" 
-                              value={employee.parking_monthly_cost} 
-                              field="parking_monthly_cost" 
-                              type="number" 
-                              onSave={handleSave}
-                              displayValue={employee.parking_monthly_cost ? `${employee.parking_monthly_cost} DKK/md` : null}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground">Henvisningsbonus (éngangs)</label>
-                            <EditableField 
-                              label="" 
-                              value={employee.referral_bonus} 
-                              field="referral_bonus" 
-                              type="number" 
-                              onSave={handleSave}
-                              displayValue={employee.referral_bonus ? `${employee.referral_bonus} DKK` : null}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground">Regulering (månedlig)</label>
-                            <EditableField 
-                              label="" 
-                              value={employee.salary_deduction} 
-                              field="salary_deduction" 
-                              type="number" 
-                              onSave={handleSave}
-                              displayValue={employee.salary_deduction ? `${employee.salary_deduction} DKK/md` : null}
-                            />
-                          </div>
-                          {employee.salary_deduction && (
-                            <div>
-                              <label className="text-xs text-muted-foreground">Note til regulering</label>
-                              <EditableField 
-                                label="" 
-                                value={employee.salary_deduction_note} 
-                                field="salary_deduction_note" 
-                                onSave={handleSave}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Team Leader Teams Section - only show for Teamleder or Ejer */}
+              {/* Team Leader Teams Section - full width */}
               {(employee.job_title === "Teamleder" || employee.job_title === "Ejer" || employee.job_title === "Assisterende Teamleder") && (
-                <TeamLeaderTeams 
-                  employeeId={employee.id} 
-                  employeeName={`${employee.first_name} ${employee.last_name}`} 
-                />
+                <div className="md:col-span-2">
+                  <TeamLeaderTeams 
+                    employeeId={employee.id} 
+                    employeeName={`${employee.first_name} ${employee.last_name}`} 
+                  />
+                </div>
               )}
             </div>
           </TabsContent>
