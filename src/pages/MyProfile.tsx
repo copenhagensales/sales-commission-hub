@@ -290,17 +290,37 @@ export default function MyProfile() {
     enabled: !!employee?.id,
   });
 
-  // Calculate shift statistics
+  // Deduplicate time stamps - keep only the most recent entry per date (manager edits take priority)
+  const deduplicatedTimeStamps = useMemo(() => {
+    const byDate = new Map<string, typeof timeStamps[0]>();
+    // Sort by updated_at desc so we pick the latest edit first
+    const sorted = [...timeStamps].sort((a, b) => 
+      new Date(b.updated_at || b.clock_in).getTime() - new Date(a.updated_at || a.clock_in).getTime()
+    );
+    sorted.forEach(stamp => {
+      const dateKey = stamp.clock_in.split('T')[0];
+      if (!byDate.has(dateKey)) {
+        byDate.set(dateKey, stamp);
+      }
+    });
+    return Array.from(byDate.values()).sort((a, b) => 
+      new Date(b.clock_in).getTime() - new Date(a.clock_in).getTime()
+    );
+  }, [timeStamps]);
+
+  // Calculate shift statistics using deduplicated stamps and effective hours
   const shiftStats = useMemo(() => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const hourlyRate = employee?.salary_amount || 0;
     
-    // Time stamps stats
-    const monthStamps = timeStamps.filter(t => new Date(t.clock_in) >= monthStart);
+    // Time stamps stats - use effective_hours (manager edits) when available
+    const monthStamps = deduplicatedTimeStamps.filter(t => new Date(t.clock_in) >= monthStart);
     const totalHoursThisMonth = monthStamps.reduce((sum, t) => {
       const hours = t.effective_hours || 0;
       return sum + hours;
     }, 0);
+    const totalSalaryThisMonth = totalHoursThisMonth * hourlyRate;
     
     // Booking assignments stats  
     const monthBookings = bookingAssignments.filter(b => new Date(b.date) >= monthStart);
@@ -310,14 +330,18 @@ export default function MyProfile() {
       const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
       return sum + hours;
     }, 0);
+    const totalBookingSalary = totalBookingHours * hourlyRate;
     
     return {
       stampCount: monthStamps.length,
       stampHours: totalHoursThisMonth,
+      stampSalary: totalSalaryThisMonth,
       bookingCount: monthBookings.length,
       bookingHours: totalBookingHours,
+      bookingSalary: totalBookingSalary,
+      hourlyRate,
     };
-  }, [timeStamps, bookingAssignments]);
+  }, [deduplicatedTimeStamps, bookingAssignments, employee?.salary_amount]);
 
   // Calculate absence statistics
   const absenceStats = useMemo(() => {
@@ -896,7 +920,7 @@ export default function MyProfile() {
           <TabsContent value="vagthistorik" className="mt-6">
             <div className="space-y-6">
               {/* Stats Cards */}
-              <div className="grid gap-4 md:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
@@ -923,31 +947,29 @@ export default function MyProfile() {
                     </div>
                   </CardContent>
                 </Card>
-                {shiftStats.stampCount > 0 && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-full bg-blue-500/10">
-                          <Clock className="h-5 w-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Stemplet timer</p>
-                          <p className="text-2xl font-bold">{shiftStats.stampHours.toFixed(1)}</p>
-                        </div>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-emerald-500/10">
+                        <Wallet className="h-5 w-5 text-emerald-600" />
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
-                {shiftStats.bookingCount > 0 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Løn denne måned</p>
+                        <p className="text-2xl font-bold">{(shiftStats.stampSalary + shiftStats.bookingSalary).toLocaleString('da-DK')} kr</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                {shiftStats.hourlyRate > 0 && (
                   <Card>
                     <CardContent className="pt-6">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-full bg-amber-500/10">
-                          <MapPin className="h-5 w-5 text-amber-600" />
+                        <div className="p-2 rounded-full bg-muted">
+                          <Clock className="h-5 w-5 text-muted-foreground" />
                         </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">Field timer</p>
-                          <p className="text-2xl font-bold">{shiftStats.bookingHours.toFixed(1)}</p>
+                          <p className="text-sm text-muted-foreground">Timeløn</p>
+                          <p className="text-2xl font-bold">{shiftStats.hourlyRate.toLocaleString('da-DK')} kr</p>
                         </div>
                       </div>
                     </CardContent>
@@ -956,7 +978,7 @@ export default function MyProfile() {
               </div>
 
               {/* Time Stamps History */}
-              {timeStamps.length > 0 && (
+              {deduplicatedTimeStamps.length > 0 && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
@@ -966,22 +988,40 @@ export default function MyProfile() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {timeStamps.slice(0, 20).map((stamp) => {
+                      {deduplicatedTimeStamps.slice(0, 20).map((stamp) => {
                         const clockIn = new Date(stamp.clock_in);
                         const clockOut = stamp.clock_out ? new Date(stamp.clock_out) : null;
+                        const effectiveIn = stamp.effective_clock_in ? new Date(stamp.effective_clock_in) : null;
+                        const effectiveOut = stamp.effective_clock_out ? new Date(stamp.effective_clock_out) : null;
+                        const hours = stamp.effective_hours || 0;
+                        const dailySalary = hours * shiftStats.hourlyRate;
+                        const wasEdited = effectiveIn || effectiveOut;
+                        
                         return (
                           <div key={stamp.id} className="flex items-center justify-between py-2 border-b last:border-0">
                             <div className="flex items-center gap-3">
                               <span className="text-sm font-medium">
                                 {format(clockIn, "EEEE d. MMM", { locale: da })}
                               </span>
-                              <span className="text-xs text-muted-foreground">
-                                {format(clockIn, "HH:mm")} - {clockOut ? format(clockOut, "HH:mm") : "..."}
-                              </span>
+                              <div className="flex flex-col">
+                                <span className="text-xs text-muted-foreground">
+                                  {effectiveIn ? format(effectiveIn, "HH:mm") : format(clockIn, "HH:mm")} - {effectiveOut ? format(effectiveOut, "HH:mm") : (clockOut ? format(clockOut, "HH:mm") : "...")}
+                                </span>
+                                {wasEdited && (
+                                  <span className="text-xs text-blue-500">Rettet af leder</span>
+                                )}
+                              </div>
                             </div>
-                            <Badge variant="outline">
-                              {stamp.effective_hours ? `${stamp.effective_hours.toFixed(1)} timer` : "-"}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">
+                                {hours.toFixed(1)} timer
+                              </Badge>
+                              {shiftStats.hourlyRate > 0 && (
+                                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                  {dailySalary.toLocaleString('da-DK')} kr
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -1044,7 +1084,7 @@ export default function MyProfile() {
               )}
 
               {/* Empty state */}
-              {timeStamps.length === 0 && bookingAssignments.length === 0 && (
+              {deduplicatedTimeStamps.length === 0 && bookingAssignments.length === 0 && (
                 <Card>
                   <CardContent className="py-12 text-center">
                     <History className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
