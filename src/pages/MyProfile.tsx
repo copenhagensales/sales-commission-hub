@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield } from "lucide-react";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History } from "lucide-react";
 import { GdprSettingsCard } from "@/components/gdpr/GdprSettingsCard";
 import { GdprConsentDialog } from "@/components/gdpr/GdprConsentDialog";
 import { useHasDataProcessingConsent } from "@/hooks/useGdpr";
@@ -250,6 +250,75 @@ export default function MyProfile() {
     enabled: !!employee?.id,
   });
 
+  // Fetch shift history (time_stamps)
+  const { data: timeStamps = [] } = useQuery({
+    queryKey: ["my-time-stamps", employee?.id],
+    queryFn: async () => {
+      if (!employee?.id) return [];
+      const { data, error } = await supabase
+        .from("time_stamps")
+        .select("*")
+        .eq("employee_id", employee.id)
+        .order("clock_in", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!employee?.id,
+  });
+
+  // Fetch booking assignments (fieldmarketing shifts)
+  const { data: bookingAssignments = [] } = useQuery({
+    queryKey: ["my-booking-assignments", employee?.id],
+    queryFn: async () => {
+      if (!employee?.id) return [];
+      const { data, error } = await supabase
+        .from("booking_assignment")
+        .select(`
+          *,
+          booking:booking_id (
+            location:location_id (name),
+            brand:brand_id (name, color_hex)
+          )
+        `)
+        .eq("employee_id", employee.id)
+        .order("date", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!employee?.id,
+  });
+
+  // Calculate shift statistics
+  const shiftStats = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    // Time stamps stats
+    const monthStamps = timeStamps.filter(t => new Date(t.clock_in) >= monthStart);
+    const totalHoursThisMonth = monthStamps.reduce((sum, t) => {
+      const hours = t.effective_hours || 0;
+      return sum + hours;
+    }, 0);
+    
+    // Booking assignments stats  
+    const monthBookings = bookingAssignments.filter(b => new Date(b.date) >= monthStart);
+    const totalBookingHours = monthBookings.reduce((sum, b) => {
+      const start = new Date(`1970-01-01T${b.start_time}`);
+      const end = new Date(`1970-01-01T${b.end_time}`);
+      const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+      return sum + hours;
+    }, 0);
+    
+    return {
+      stampCount: monthStamps.length,
+      stampHours: totalHoursThisMonth,
+      bookingCount: monthBookings.length,
+      bookingHours: totalBookingHours,
+    };
+  }, [timeStamps, bookingAssignments]);
+
   // Calculate absence statistics
   const absenceStats = useMemo(() => {
     const now = new Date();
@@ -420,6 +489,10 @@ export default function MyProfile() {
             <TabsTrigger value="kontrakter">
               <FileText className="h-4 w-4 mr-2" />
               Kontrakter
+            </TabsTrigger>
+            <TabsTrigger value="vagthistorik">
+              <History className="h-4 w-4 mr-2" />
+              Vagthistorik
             </TabsTrigger>
             <TabsTrigger value="fravaer">
               <CalendarX className="h-4 w-4 mr-2" />
@@ -818,6 +891,168 @@ export default function MyProfile() {
               absences={absences.map(a => ({ id: a.id, type: a.type, start_date: a.start_date, end_date: a.end_date }))}
               latenessRecords={latenessRecords.map(l => ({ id: l.id, date: l.date, minutes: l.minutes }))}
             />
+          </TabsContent>
+
+          <TabsContent value="vagthistorik" className="mt-6">
+            <div className="space-y-6">
+              {/* Stats Cards */}
+              <div className="grid gap-4 md:grid-cols-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <Clock className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Timer denne måned</p>
+                        <p className="text-2xl font-bold">{(shiftStats.stampHours + shiftStats.bookingHours).toFixed(1)}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-green-500/10">
+                        <Briefcase className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Vagter denne måned</p>
+                        <p className="text-2xl font-bold">{shiftStats.stampCount + shiftStats.bookingCount}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                {shiftStats.stampCount > 0 && (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-full bg-blue-500/10">
+                          <Clock className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Stemplet timer</p>
+                          <p className="text-2xl font-bold">{shiftStats.stampHours.toFixed(1)}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                {shiftStats.bookingCount > 0 && (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-full bg-amber-500/10">
+                          <MapPin className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Field timer</p>
+                          <p className="text-2xl font-bold">{shiftStats.bookingHours.toFixed(1)}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {/* Time Stamps History */}
+              {timeStamps.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Stemplet tid
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {timeStamps.slice(0, 20).map((stamp) => {
+                        const clockIn = new Date(stamp.clock_in);
+                        const clockOut = stamp.clock_out ? new Date(stamp.clock_out) : null;
+                        return (
+                          <div key={stamp.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-medium">
+                                {format(clockIn, "EEEE d. MMM", { locale: da })}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {format(clockIn, "HH:mm")} - {clockOut ? format(clockOut, "HH:mm") : "..."}
+                              </span>
+                            </div>
+                            <Badge variant="outline">
+                              {stamp.effective_hours ? `${stamp.effective_hours.toFixed(1)} timer` : "-"}
+                            </Badge>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Booking Assignments History */}
+              {bookingAssignments.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Fieldmarketing vagter
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {bookingAssignments.slice(0, 20).map((assignment) => {
+                        const date = new Date(assignment.date);
+                        const location = assignment.booking?.location?.name || "Ukendt";
+                        const brand = assignment.booking?.brand;
+                        const start = new Date(`1970-01-01T${assignment.start_time}`);
+                        const end = new Date(`1970-01-01T${assignment.end_time}`);
+                        const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+                        return (
+                          <div key={assignment.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                            <div className="flex items-center gap-3">
+                              {brand && (
+                                <div 
+                                  className="w-3 h-3 rounded-full" 
+                                  style={{ backgroundColor: brand.color_hex }}
+                                  title={brand.name}
+                                />
+                              )}
+                              <div>
+                                <span className="text-sm font-medium">
+                                  {format(date, "EEEE d. MMM", { locale: da })}
+                                </span>
+                                <span className="text-xs text-muted-foreground ml-2">
+                                  {location}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                {assignment.start_time.slice(0, 5)} - {assignment.end_time.slice(0, 5)}
+                              </span>
+                              <Badge variant="outline">
+                                {hours.toFixed(1)} timer
+                              </Badge>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Empty state */}
+              {timeStamps.length === 0 && bookingAssignments.length === 0 && (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <History className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                    <p className="text-muted-foreground">Ingen vagthistorik at vise</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="gdpr" className="mt-6">
