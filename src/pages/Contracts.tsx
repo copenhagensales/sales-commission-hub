@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search } from "lucide-react";
+import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search, Upload, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RichTextEditor } from "@/components/contracts/RichTextEditor";
 
@@ -176,6 +176,31 @@ export default function Contracts() {
     },
   });
 
+  // Sync contracts to SharePoint mutation
+  const [isSyncing, setIsSyncing] = useState(false);
+  
+  const syncToSharePoint = async () => {
+    setIsSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-contracts-to-sharepoint");
+      
+      if (error) throw error;
+      
+      if (data.synced > 0) {
+        toast.success(`${data.synced} kontrakter synkroniseret til SharePoint`);
+      } else if (data.total === 0) {
+        toast.info("Ingen underskrevne kontrakter at synkronisere");
+      } else {
+        toast.warning(`Synkronisering færdig med ${data.errors} fejl`);
+      }
+    } catch (error: any) {
+      console.error("Sync error:", error);
+      toast.error("Kunne ikke synkronisere kontrakter");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleEditTemplate = (template: ContractTemplate) => {
     setEditingTemplate(template);
     setTemplateForm({
@@ -277,7 +302,7 @@ export default function Contracts() {
           </TabsList>
 
           <TabsContent value="contracts" className="space-y-4">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between gap-4">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -287,6 +312,18 @@ export default function Contracts() {
                   className="pl-10"
                 />
               </div>
+              <Button 
+                variant="outline" 
+                onClick={syncToSharePoint}
+                disabled={isSyncing || signedCount === 0}
+              >
+                {isSyncing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4 mr-2" />
+                )}
+                Sync til SharePoint
+              </Button>
             </div>
 
             <Card>
