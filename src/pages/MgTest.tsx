@@ -167,6 +167,14 @@ export default function MgTest() {
   const [inspectorLoading, setInspectorLoading] = useState(false);
   const [inspectorError, setInspectorError] = useState<string | null>(null);
 
+  // Retroactive update dialog state
+  const [retroactiveDialog, setRetroactiveDialog] = useState<{
+    open: boolean;
+    campaignId: string;
+    campaignName: string;
+  } | null>(null);
+  const [retroactiveSyncing, setRetroactiveSyncing] = useState(false);
+
   // Inspector mutation - fetch sample fields from Adversus
   const inspectCampaignMutation = useMutation({
     mutationFn: async (campaign: CampaignMapping) => {
@@ -763,7 +771,13 @@ export default function MgTest() {
   }, [campaignMappings, clientCampaigns, clients]);
 
   const updateCampaignMapping = useMutation({
-    mutationFn: async ({ mappingId, clientId, fieldId }: { mappingId: string; clientId: string | null; fieldId?: string }) => {
+    mutationFn: async ({ mappingId, clientId, fieldId, adversusCampaignId, adversusCampaignName }: { 
+      mappingId: string; 
+      clientId: string | null; 
+      fieldId?: string;
+      adversusCampaignId?: string;
+      adversusCampaignName?: string;
+    }) => {
       let clientCampaignId: string | null = null;
 
       if (clientId) {
@@ -808,8 +822,11 @@ export default function MgTest() {
       if (!data) {
         throw new Error("Kunne ikke gemme kampagnemapping (mangler rettigheder?)");
       }
+
+      // Return info needed for retroactive dialog
+      return { fieldId, adversusCampaignId, adversusCampaignName };
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: (result, variables) => {
       toast.success("Kampagnemapping gemt");
       setCampaignSelections((prev) => {
         const next = { ...prev };
@@ -823,11 +840,61 @@ export default function MgTest() {
       });
       queryClient.invalidateQueries({ queryKey: ["mg-campaign-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
+
+      // If a field ID was saved, prompt for retroactive update
+      if (result?.fieldId && result.fieldId.trim() && result.adversusCampaignId) {
+        setRetroactiveDialog({
+          open: true,
+          campaignId: result.adversusCampaignId,
+          campaignName: result.adversusCampaignName || result.adversusCampaignId,
+        });
+      }
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke gemme kampagnemapping");
     },
   });
+
+  // Retroactive sync mutation
+  const retroactiveSyncMutation = useMutation({
+    mutationFn: async ({ campaignId, days }: { campaignId: string; days: number }) => {
+      const response = await supabase.functions.invoke("integration-engine", {
+        body: {
+          source: "adversus",
+          action: "sync",
+          campaignId,
+          days,
+        },
+      });
+
+      if (response.error) throw new Error(response.error.message);
+      if (!response.data?.success) throw new Error(response.data?.error || "Sync failed");
+
+      return response.data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Retroaktiv opdatering gennemført: ${data.created || 0} oprettet, ${data.updated || 0} opdateret`);
+      setRetroactiveDialog(null);
+      queryClient.invalidateQueries({ queryKey: ["mg-webhook-products"] });
+    },
+    onError: (error: Error) => {
+      toast.error(`Fejl under retroaktiv opdatering: ${error.message}`);
+    },
+  });
+
+  const handleRetroactiveSync = async (sync: boolean) => {
+    if (!retroactiveDialog) return;
+    
+    if (sync) {
+      setRetroactiveSyncing(true);
+      retroactiveSyncMutation.mutate(
+        { campaignId: retroactiveDialog.campaignId, days: 30 },
+        { onSettled: () => setRetroactiveSyncing(false) }
+      );
+    } else {
+      setRetroactiveDialog(null);
+    }
+  };
 
   const autoAssignCampaigns = useMutation({
     mutationFn: async () => {
@@ -1637,6 +1704,8 @@ export default function MgTest() {
                                               mappingId: mapping.id,
                                               clientId: selectedClientId,
                                               fieldId: currentFieldId,
+                                              adversusCampaignId: mapping.adversus_campaign_id,
+                                              adversusCampaignName: mapping.adversus_campaign_name || undefined,
                                             })
                                           }
                                           disabled={updateCampaignMapping.isPending || !hasChanges}
@@ -2047,6 +2116,45 @@ export default function MgTest() {
 
           <div className="pt-4 border-t text-sm text-muted-foreground">
             Klik på en række for at vælge det Field ID til OPP/Reference-konfigurationen.
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Retroactive Update Dialog */}
+      <Dialog open={retroactiveDialog?.open ?? false} onOpenChange={(open) => !open && setRetroactiveDialog(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Opdater eksisterende salg?</DialogTitle>
+            <DialogDescription className="pt-2">
+              Du har gemt en ny Field ID mapping for kampagne{" "}
+              <span className="font-medium">{retroactiveDialog?.campaignName}</span>.
+              <br /><br />
+              Vil du opdatere eksisterende salg med denne nye regel? Dette vil gensynkronisere salg fra de sidste 30 dage.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-4">
+            <Button 
+              onClick={() => handleRetroactiveSync(true)} 
+              disabled={retroactiveSyncing}
+              className="w-full"
+            >
+              {retroactiveSyncing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Opdaterer salg...
+                </>
+              ) : (
+                "Ja, opdater sidste 30 dage"
+              )}
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => handleRetroactiveSync(false)}
+              disabled={retroactiveSyncing}
+              className="w-full"
+            >
+              Nej, kun fremtidige
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

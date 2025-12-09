@@ -150,7 +150,16 @@ serve(async (req) => {
         }
 
         if (actionList.includes("sales") || action === "sync") {
-          const sales = await adapter.fetchSales(days);
+          let sales = await adapter.fetchSales(days);
+          
+          // Filter by campaignId if provided (for retroactive sync)
+          if (campaignId) {
+            console.log(`[Integration Engine] Filtering sales for campaign: ${campaignId}`);
+            const beforeCount = sales.length;
+            sales = sales.filter(s => s.campaignId === String(campaignId));
+            console.log(`[Integration Engine] Filtered ${beforeCount} -> ${sales.length} sales for campaign ${campaignId}`);
+          }
+          
           runResults["sales"] = await engine.processSales(sales, integration.name);
         }
 
@@ -168,7 +177,21 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, results }), {
+    // Calculate aggregate stats for response
+    const totalCreated = results.reduce((acc, r) => {
+      if (r.status === 'success' && r.data?.sales && typeof r.data.sales === 'object') {
+        const salesData = r.data.sales as { processed?: number };
+        return acc + (salesData.processed || 0);
+      }
+      return acc;
+    }, 0);
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      results,
+      created: totalCreated,
+      updated: 0, // core.ts doesn't distinguish created vs updated yet
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
