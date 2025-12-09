@@ -17,6 +17,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useCanAccess } from "@/hooks/useSystemRoles";
+import { EmployeeExcelImport } from "@/components/employees/EmployeeExcelImport";
+
 
 interface EmployeeMasterDataRecord {
   id: string;
@@ -410,6 +412,7 @@ export default function EmployeeMasterData() {
             <p className="text-muted-foreground">Stamkort og medarbejderdata</p>
           </div>
           <div className="flex gap-2">
+            <EmployeeExcelImport />
             <Dialog open={createDialogOpen} onOpenChange={(open) => {
               setCreateDialogOpen(open);
               if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
