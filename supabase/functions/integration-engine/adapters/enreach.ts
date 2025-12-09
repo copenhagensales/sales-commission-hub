@@ -81,6 +81,7 @@ export class EnreachAdapter implements DialerAdapter {
     this.headers = {
       "Authorization": authHeader,
       "Content-Type": "application/json; charset=utf-8",
+      "Accept": "application/json",
     };
   }
 
