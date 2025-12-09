@@ -2753,6 +2753,7 @@ export type Database = {
           customer_phone: string | null
           id: string
           sale_datetime: string
+          source: string | null
           status: string | null
           updated_at: string | null
           validation_status: string | null
@@ -2769,6 +2770,7 @@ export type Database = {
           customer_phone?: string | null
           id?: string
           sale_datetime?: string
+          source?: string | null
           status?: string | null
           updated_at?: string | null
           validation_status?: string | null
@@ -2785,6 +2787,7 @@ export type Database = {
           customer_phone?: string | null
           id?: string
           sale_datetime?: string
+          source?: string | null
           status?: string | null
           updated_at?: string | null
           validation_status?: string | null
