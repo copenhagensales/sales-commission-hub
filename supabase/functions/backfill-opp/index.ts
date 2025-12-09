@@ -304,12 +304,32 @@ serve(async (req) => {
       }
     }
 
-    // Count remaining TDC sales without OPP
-    const { count: remaining } = await supabase
-      .from('sales')
-      .select('id', { count: 'exact', head: true })
-      .is('adversus_opp_number', null)
-      .not('adversus_event_id', 'is', null);
+    // Count remaining TDC sales without OPP (filter for TDC only)
+    // First get TDC client/campaign IDs
+    const { data: tdcClients } = await supabase
+      .from('clients')
+      .select('id')
+      .ilike('name', '%tdc%');
+    
+    let remainingCount = 0;
+    if (tdcClients && tdcClients.length > 0) {
+      const tdcClientIds = tdcClients.map(c => c.id);
+      const { data: tdcCampaigns } = await supabase
+        .from('client_campaigns')
+        .select('id')
+        .in('client_id', tdcClientIds);
+      
+      if (tdcCampaigns && tdcCampaigns.length > 0) {
+        const tdcCampaignIds = tdcCampaigns.map(c => c.id);
+        const { count } = await supabase
+          .from('sales')
+          .select('id', { count: 'exact', head: true })
+          .is('adversus_opp_number', null)
+          .not('adversus_event_id', 'is', null)
+          .in('client_campaign_id', tdcCampaignIds);
+        remainingCount = count || 0;
+      }
+    }
 
     const duration = Date.now() - startTime;
     const avgTimePerSale = stats.processed > 0 ? Math.round(duration / stats.processed) : 0;
@@ -325,7 +345,7 @@ serve(async (req) => {
     console.log(`📡 Llamadas API:          ${stats.apiCalls}`);
     console.log(`⏱️  Duración total:        ${formatDuration(duration)}`);
     console.log(`⚡ Promedio por venta:    ${formatDuration(avgTimePerSale)}`);
-    console.log(`📦 Ventas restantes:      ${remaining || 0}`);
+    console.log(`📦 Ventas restantes:      ${remainingCount}`);
     if (stats.rateLimited) {
       console.log(`🚫 Rate limited:          Sí (batch detenido)`);
     }
@@ -353,7 +373,7 @@ serve(async (req) => {
         successful: stats.successful,
         noOppFound: stats.noOppFound,
         errors: stats.errors,
-        remaining: remaining || 0,
+        remaining: remainingCount,
         rateLimited: stats.rateLimited,
         summary: {
           duration_ms: duration,
