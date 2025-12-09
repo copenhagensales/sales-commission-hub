@@ -424,109 +424,100 @@ export default function ShiftOverview() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            <div className="group bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-4 flex items-center gap-4 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 hover:-translate-y-0.5">
-              <div className="p-3 rounded-xl bg-primary/15 group-hover:bg-primary/25 transition-colors">
-                <Users className="h-5 w-5 text-primary" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="bg-card border border-border/40 rounded-lg p-3 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Users className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Medarbejdere</p>
-                <p className="text-2xl font-bold text-foreground">{employees?.length || 0}</p>
+                <p className="text-[10px] font-medium text-muted-foreground uppercase">Medarbejdere</p>
+                <p className="text-xl font-semibold text-foreground">{employees?.length || 0}</p>
               </div>
             </div>
-            <div className="group bg-gradient-to-br from-blue-500/5 via-blue-500/10 to-blue-500/5 border border-blue-500/20 rounded-2xl p-4 flex items-center gap-4 hover:shadow-lg hover:shadow-blue-500/5 transition-all duration-300 hover:-translate-y-0.5">
-              <div className="p-3 rounded-xl bg-blue-500/15 group-hover:bg-blue-500/25 transition-colors">
-                <CalendarDays className="h-5 w-5 text-blue-500" />
+            <div className="bg-card border border-border/40 rounded-lg p-3 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-500/10">
+                <CalendarDays className="h-4 w-4 text-blue-500" />
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Vagter</p>
-                <p className="text-2xl font-bold text-foreground">{shifts?.length || 0}</p>
+                <p className="text-[10px] font-medium text-muted-foreground uppercase">Vagter</p>
+                <p className="text-xl font-semibold text-foreground">{shifts?.length || 0}</p>
               </div>
             </div>
-            <div className="group bg-gradient-to-br from-emerald-500/5 via-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 flex items-center gap-4 hover:shadow-lg hover:shadow-emerald-500/5 transition-all duration-300 hover:-translate-y-0.5">
-              <div className="p-3 rounded-xl bg-emerald-500/15 group-hover:bg-emerald-500/25 transition-colors">
-                <Clock className="h-5 w-5 text-emerald-500" />
+            <div className="bg-card border border-border/40 rounded-lg p-3 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-emerald-500/10">
+                <Clock className="h-4 w-4 text-emerald-500" />
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Timer</p>
-                <p className="text-2xl font-bold text-foreground">{totalPlannedHours.toFixed(0)}t</p>
+                <p className="text-[10px] font-medium text-muted-foreground uppercase">Timer</p>
+                <p className="text-xl font-semibold text-foreground">{totalPlannedHours.toFixed(0)}t</p>
               </div>
             </div>
-            <div className="group bg-gradient-to-br from-amber-500/5 via-amber-500/10 to-amber-500/5 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-4 hover:shadow-lg hover:shadow-amber-500/5 transition-all duration-300 hover:-translate-y-0.5">
-              <div className="p-3 rounded-xl bg-amber-500/15 group-hover:bg-amber-500/25 transition-colors">
-                <Palmtree className="h-5 w-5 text-amber-500" />
+            <div className="bg-card border border-border/40 rounded-lg p-3 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-500/10">
+                <Palmtree className="h-4 w-4 text-amber-500" />
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Ferie</p>
-                <p className="text-2xl font-bold text-foreground">{absenceStats.weekVacation}%</p>
+                <p className="text-[10px] font-medium text-muted-foreground uppercase">Ferie</p>
+                <p className="text-xl font-semibold text-foreground">{absenceStats.weekVacation}%</p>
               </div>
             </div>
-            <div className="group bg-gradient-to-br from-red-500/5 via-red-500/10 to-red-500/5 border border-red-500/20 rounded-2xl p-4 flex items-center gap-4 hover:shadow-lg hover:shadow-red-500/5 transition-all duration-300 hover:-translate-y-0.5">
-              <div className="p-3 rounded-xl bg-red-500/15 group-hover:bg-red-500/25 transition-colors">
-                <Thermometer className="h-5 w-5 text-red-500" />
+            <div className="bg-card border border-border/40 rounded-lg p-3 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-red-500/10">
+                <Thermometer className="h-4 w-4 text-red-500" />
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sygdom</p>
-                <p className="text-2xl font-bold text-foreground">{absenceStats.weekSick}%</p>
+                <p className="text-[10px] font-medium text-muted-foreground uppercase">Sygdom</p>
+                <p className="text-xl font-semibold text-foreground">{absenceStats.weekSick}%</p>
               </div>
             </div>
           </div>
 
           {/* Legend */}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm bg-gradient-to-r from-muted/40 to-muted/20 rounded-xl px-5 py-3 border border-border/40">
-            <span className="font-semibold text-foreground/80">Status:</span>
-            <div className="flex items-center gap-2.5">
-              <div className="w-4 h-4 rounded-md bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-sm shadow-emerald-500/30"></div>
-              <span className="font-medium">Arbejder</span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-4 h-4 rounded-md bg-gradient-to-br from-amber-400 to-amber-500 shadow-sm shadow-amber-500/30"></div>
-              <span className="font-medium">Ferie</span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-4 h-4 rounded-md bg-gradient-to-br from-red-400 to-red-500 shadow-sm shadow-red-500/30"></div>
-              <span className="font-medium">Syg</span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-4 h-4 rounded-md bg-gradient-to-br from-orange-400 to-orange-500 shadow-sm shadow-orange-500/30"></div>
-              <span className="font-medium">Forsinket</span>
-            </div>
-            <div className="hidden sm:block w-px h-5 bg-border/60 mx-2" />
-            <span className="text-xs text-muted-foreground">Klik = skifte status • Dobbeltklik = rediger tid</span>
+          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Status:</span>
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-medium">
+              <Palmtree className="h-3 w-3" /> Ferie
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 font-medium">
+              <Thermometer className="h-3 w-3" /> Syg
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 font-medium">
+              <AlarmClock className="h-3 w-3" /> Forsinket
+            </span>
+            <span className="text-muted-foreground/70 ml-auto">Klik = skifte status • Dobbeltklik = rediger tid</span>
           </div>
         </div>
 
         {/* Calendar Grid */}
-        <div className="bg-card rounded-2xl border border-border/60 overflow-hidden shadow-xl shadow-black/5">
+        <div className="bg-card rounded-xl border border-border/40 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <div className="min-w-[800px]">
               {/* Day Headers */}
-              <div className="grid grid-cols-6 bg-gradient-to-r from-muted/80 to-muted/60">
-                <div className="p-4 text-xs font-bold text-foreground uppercase tracking-wider border-r-2 border-border/30">
+              <div className="grid grid-cols-6 border-b border-border/60 bg-muted/30">
+                <div className="p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Medarbejder
                 </div>
                 {weekDays.map((day, dayIdx) => (
                   <div
                     key={day.toISOString()}
                     className={cn(
-                      "text-center py-3 px-2 transition-colors",
-                      dayIdx < weekDays.length - 1 && "border-r border-border/30",
-                      isToday(day) && "bg-primary/15"
+                      "text-center py-3 px-2 border-l border-border/40",
+                      isToday(day) && "bg-primary/10"
                     )}
                   >
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
                       {format(day, "EEE", { locale: da })}
                     </p>
                     <p className={cn(
-                      "text-xl font-bold mt-1",
+                      "text-lg font-semibold mt-0.5",
                       isToday(day) ? "text-primary" : "text-foreground"
                     )}>
                       {format(day, "d")}
                     </p>
                     {isHoliday(day) && (
-                      <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 mt-1.5 border-red-300 text-red-600 bg-red-50 dark:bg-red-950/30 dark:border-red-800 dark:text-red-400 font-semibold">
+                      <span className="inline-block text-[9px] px-1.5 py-0.5 mt-1 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 font-medium">
                         {getHolidayName(day)}
-                      </Badge>
+                      </span>
                     )}
                   </div>
                 ))}
@@ -537,27 +528,26 @@ export default function ShiftOverview() {
                 <div 
                   key={employee.id} 
                   className={cn(
-                    "grid grid-cols-6 group/row transition-colors",
-                    idx < (employees?.length || 0) - 1 && "border-b border-border/40",
-                    idx % 2 === 0 
-                      ? "bg-background hover:bg-muted/20" 
-                      : "bg-muted/30 hover:bg-muted/40"
+                    "grid grid-cols-6",
+                    idx < (employees?.length || 0) - 1 && "border-b border-border/30"
                   )}
                 >
                   {/* Employee name cell */}
-                  <div className={cn(
-                    "p-4 flex flex-col justify-center border-r-2 border-border/30",
-                    idx % 2 === 0 
-                      ? "bg-background" 
-                      : "bg-muted/40"
-                  )}>
-                    <p className="text-sm font-semibold leading-tight text-foreground">
-                      {employee.first_name} {employee.last_name?.charAt(0)}.
-                    </p>
-                    {employee.department && (
-                      <p className="text-[10px] text-muted-foreground mt-1 font-medium bg-muted/50 px-2 py-0.5 rounded-full w-fit">{employee.department}</p>
-                    )}
+                  <div className="p-3 flex items-center gap-3 bg-muted/10">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
+                      {employee.first_name?.charAt(0)}{employee.last_name?.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {employee.first_name} {employee.last_name}
+                      </p>
+                      {employee.department && (
+                        <p className="text-[10px] text-muted-foreground truncate">{employee.department}</p>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Day cells */}
                   {weekDays.map((day, dayIdx) => {
                     const dateKey = format(day, "yyyy-MM-dd");
                     const dayShifts = shiftsByEmployeeAndDate.get(employee.id)?.get(dateKey) || [];
@@ -570,25 +560,17 @@ export default function ShiftOverview() {
                     const isVacation = absenceDisplay?.type === "vacation";
                     const isSick = absenceDisplay?.type === "sick";
                     const isLate = !!lateness;
-                    
-                    // Default is green (working), late is orange, vacation is yellow, sick is red
                     const isWorking = !absenceDisplay && !lateness && !holiday;
-
-                    // Get work times to display
                     const workTimes = employee.standard_start_time;
                     
                     return (
                       <div
                         key={day.toISOString()}
                         className={cn(
-                          "min-h-[64px] p-2 cursor-pointer transition-all duration-200 relative group",
-                          dayIdx < weekDays.length - 1 && "border-r border-border/30",
-                          isToday(day) && "ring-2 ring-inset ring-primary/50 bg-primary/5",
-                          holiday && "bg-muted/60 cursor-not-allowed opacity-60",
-                          !holiday && isLate && "bg-gradient-to-br from-orange-400/25 to-orange-500/35 hover:from-orange-400/35 hover:to-orange-500/45",
-                          !holiday && isVacation && "bg-gradient-to-br from-amber-300/25 to-amber-400/35 hover:from-amber-300/35 hover:to-amber-400/45",
-                          !holiday && isSick && "bg-gradient-to-br from-red-400/25 to-red-500/35 hover:from-red-400/35 hover:to-red-500/45",
-                          !holiday && isWorking && "bg-gradient-to-br from-emerald-400/15 to-emerald-500/25 hover:from-emerald-400/25 hover:to-emerald-500/35"
+                          "min-h-[60px] p-2 border-l border-border/40 cursor-pointer transition-colors relative",
+                          isToday(day) && "bg-primary/5",
+                          holiday && "bg-muted/40 cursor-not-allowed",
+                          !holiday && "hover:bg-muted/30"
                         )}
                         onClick={() => {
                           if (!holiday) {
@@ -601,52 +583,56 @@ export default function ShiftOverview() {
                           }
                         }}
                       >
-                        {hasShift && dayShifts.map(shift => (
-                          <ShiftCard key={shift.id} shift={shift} compact />
-                        ))}
-                        {!hasShift && isLate && (
-                          <div className="flex flex-col items-center justify-center h-full gap-1">
-                            <div className="p-1.5 rounded-full bg-orange-500/20">
-                              <AlarmClock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                            </div>
-                            <span className="text-[10px] font-bold text-orange-700 dark:text-orange-300">{lateness.minutes}m</span>
-                          </div>
-                        )}
-                        {!hasShift && !isLate && isVacation && (
-                          <div className="flex items-center justify-center h-full">
-                            <div className="p-2 rounded-full bg-amber-500/20">
-                              <Palmtree className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                            </div>
-                          </div>
-                        )}
-                        {!hasShift && !isLate && isSick && (
-                          <div className="flex items-center justify-center h-full">
-                            <div className="p-2 rounded-full bg-red-500/20">
-                              <Thermometer className="h-5 w-5 text-red-600 dark:text-red-400" />
-                            </div>
-                          </div>
-                        )}
-                        {/* Show work times and clock-in when working */}
-                        {!hasShift && !isLate && isWorking && !holiday && (
-                          <div className="flex flex-col items-center justify-center h-full gap-1">
-                            {workTimes && (
-                              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                                {workTimes}
+                        <div className="flex flex-col items-center justify-center h-full gap-1.5">
+                          {/* Shift cards */}
+                          {hasShift && dayShifts.map(shift => (
+                            <ShiftCard key={shift.id} shift={shift} compact />
+                          ))}
+
+                          {/* Status Tags */}
+                          {!hasShift && isLate && (
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+                                <AlarmClock className="h-3 w-3" />
+                                Forsinket
                               </span>
-                            )}
-                            {timeStamp && (
-                              <span className="text-[9px] font-medium text-muted-foreground bg-background/60 px-1.5 py-0.5 rounded">
-                                ⏱ {format(new Date(timeStamp.clock_in), "HH:mm")}
-                                {timeStamp.clock_out && ` → ${format(new Date(timeStamp.clock_out), "HH:mm")}`}
+                              <span className="text-[10px] font-medium text-orange-600 dark:text-orange-400">
+                                {lateness.minutes} min
                               </span>
-                            )}
-                            {!timeStamp && (
-                              <span className="text-[9px] text-muted-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity">
-                                2x klik = stemple
-                              </span>
-                            )}
-                          </div>
-                        )}
+                            </div>
+                          )}
+
+                          {!hasShift && !isLate && isVacation && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                              <Palmtree className="h-3 w-3" />
+                              Ferie
+                            </span>
+                          )}
+
+                          {!hasShift && !isLate && isSick && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                              <Thermometer className="h-3 w-3" />
+                              Syg
+                            </span>
+                          )}
+
+                          {/* Working state */}
+                          {!hasShift && !isLate && isWorking && !holiday && (
+                            <div className="flex flex-col items-center gap-1">
+                              {workTimes && (
+                                <span className="text-[10px] font-medium text-muted-foreground">
+                                  {workTimes}
+                                </span>
+                              )}
+                              {timeStamp && (
+                                <span className="text-[9px] text-muted-foreground/80">
+                                  {format(new Date(timeStamp.clock_in), "HH:mm")}
+                                  {timeStamp.clock_out && ` – ${format(new Date(timeStamp.clock_out), "HH:mm")}`}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
