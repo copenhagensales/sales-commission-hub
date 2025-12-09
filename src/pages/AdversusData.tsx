@@ -92,14 +92,18 @@ export default function AdversusData() {
           throw new Error(data.error || "Ukendt fejl");
         }
         
-        // Safely handle undefined values with fallback to 0
-        const successfulCount = Number(data.successful) || 0;
-        const processedCount = Number(data.processed) || 0;
-        const noOppCount = Number(data.noOppFound) || 0;
-        remaining = Number(data.remaining) || 0;
+        // Safely handle undefined/null values - use explicit checks
+        const successfulCount = typeof data.successful === 'number' ? data.successful : 0;
+        const processedCount = typeof data.processed === 'number' ? data.processed : 0;
+        const noOppCount = typeof data.noOppFound === 'number' ? data.noOppFound : 0;
+        remaining = typeof data.remaining === 'number' ? data.remaining : 0;
         
         totalProcessed += successfulCount;
-        setBackfillStatus({ remaining, lastProcessed: totalProcessed });
+        
+        // Only update status if we have valid numbers
+        if (!isNaN(totalProcessed) && !isNaN(remaining)) {
+          setBackfillStatus({ remaining, lastProcessed: totalProcessed });
+        }
         
         // Show warning if OPP field not found in any sales
         if (processedCount > 0 && successfulCount === 0 && noOppCount > 0) {
