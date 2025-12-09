@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
 
     // ============ DIALER INTEGRATIONS ============
     if (action === "save_dialer") {
-      const { integration_id, name, provider, credentials } = body;
+      const { integration_id, name, provider, credentials, api_url } = body;
 
       if (!integration_id && (!name || !provider || !credentials?.username || !credentials?.password)) {
         return new Response(
@@ -41,14 +41,20 @@ Deno.serve(async (req) => {
       }
 
       const hasNewCredentials = credentials?.username && credentials?.password;
-      const credentialsJson = hasNewCredentials ? JSON.stringify(credentials) : null;
+      // Include api_url in credentials so it's available to the adapter
+      const credentialsWithUrl = hasNewCredentials 
+        ? { ...credentials, api_url: api_url || credentials.api_url || null }
+        : null;
+      const credentialsJson = credentialsWithUrl ? JSON.stringify(credentialsWithUrl) : null;
 
       if (integration_id) {
+        // Update existing integration
         const { error: updateError } = await supabase
           .from("dialer_integrations")
           .update({
             name,
             provider,
+            api_url: api_url || null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", integration_id);
@@ -73,6 +79,7 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       } else {
+        // Create new integration
         const { data, error } = await supabase.rpc("create_dialer_integration", {
           p_name: name,
           p_provider: provider,
@@ -82,11 +89,13 @@ Deno.serve(async (req) => {
 
         if (error) {
           console.error("RPC error:", error);
+          // Fallback to direct insert
           const { data: insertData, error: insertError } = await supabase
             .from("dialer_integrations")
             .insert({
               name,
               provider,
+              api_url: api_url || null,
               encrypted_credentials: credentialsJson || "{}",
             })
             .select("id")
@@ -99,6 +108,14 @@ Deno.serve(async (req) => {
             JSON.stringify({ success: true, id: insertData.id }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
+        }
+
+        // Update api_url after RPC creation (RPC may not support api_url param)
+        if (api_url && data) {
+          await supabase
+            .from("dialer_integrations")
+            .update({ api_url })
+            .eq("id", data);
         }
 
         console.log(`[scheduler-manager] Created dialer integration: ${data}`);
