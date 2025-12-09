@@ -169,10 +169,42 @@ serve(async (req) => {
           .update({ last_sync_at: new Date().toISOString(), last_status: "success" })
           .eq("id", integration.id);
 
+        // Log success to integration_logs
+        const salesData = runResults["sales"] as { processed?: number } | undefined;
+        await supabase.from("integration_logs").insert({
+          integration_type: "dialer",
+          integration_id: integration.id,
+          integration_name: integration.name,
+          status: "success",
+          message: `Sync completed: ${salesData?.processed || 0} sales processed`,
+          details: {
+            source,
+            days,
+            campaignId: campaignId || null,
+            results: runResults,
+          },
+        });
+
         results.push({ name: integration.name, status: "success", data: runResults });
       } catch (e) {
         const errMsg = e instanceof Error ? e.message : String(e);
         console.error(`Error en integración ${integration.name}:`, e);
+
+        // Log error to integration_logs
+        await supabase.from("integration_logs").insert({
+          integration_type: "dialer",
+          integration_id: integration.id,
+          integration_name: integration.name,
+          status: "error",
+          message: `Sync failed: ${errMsg}`,
+          details: {
+            source,
+            days,
+            campaignId: campaignId || null,
+            error: errMsg,
+          },
+        });
+
         results.push({ name: integration.name, status: "error", error: errMsg });
       }
     }

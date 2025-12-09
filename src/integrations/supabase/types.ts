@@ -2076,6 +2076,39 @@ export type Database = {
           },
         ]
       }
+      integration_logs: {
+        Row: {
+          created_at: string
+          details: Json | null
+          id: string
+          integration_id: string | null
+          integration_name: string | null
+          integration_type: string
+          message: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          integration_id?: string | null
+          integration_name?: string | null
+          integration_type: string
+          message: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          integration_id?: string | null
+          integration_name?: string | null
+          integration_type?: string
+          message?: string
+          status?: string
+        }
+        Relationships: []
+      }
       lateness_record: {
         Row: {
           created_at: string

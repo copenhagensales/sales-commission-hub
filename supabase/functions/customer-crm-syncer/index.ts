@@ -571,6 +571,27 @@ Deno.serve(async (req) => {
       console.error("[customer-crm-syncer] Error updating status:", updateError);
     }
 
+    // Log to integration_logs
+    const logStatus = errorCount === 0 ? "success" : errorCount === processedCount ? "error" : "warning";
+    await supabase.from("integration_logs").insert({
+      integration_type: "crm",
+      integration_id: config.id,
+      integration_name: `CRM Sync (${config.crm_type})`,
+      status: logStatus,
+      message: detailedStatus,
+      details: {
+        client_id,
+        crm_type: config.crm_type,
+        processed: processedCount,
+        approved: approvedCount,
+        cancelled: cancelledCount,
+        unmatched: unmatchedCount,
+        errors: errorCount,
+        clawbacks: { count: newClawbacks, total: clawbackTotal },
+        duration_ms: duration,
+      },
+    });
+
     console.log(`[customer-crm-syncer] ${detailedStatus} in ${duration}ms`);
 
     return new Response(
@@ -594,6 +615,21 @@ Deno.serve(async (req) => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[customer-crm-syncer] Error:", message);
+
+    // Log critical error
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    await supabase.from("integration_logs").insert({
+      integration_type: "crm",
+      integration_id: null,
+      integration_name: "CRM Sync",
+      status: "error",
+      message: `Critical error: ${message}`,
+      details: { error: message },
+    });
+
     return new Response(
       JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
