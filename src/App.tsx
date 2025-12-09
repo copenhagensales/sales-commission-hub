@@ -73,6 +73,8 @@ const UpcomingInterviews = lazyWithRetry(() => import("./pages/recruitment/Upcom
 const UpcomingHires = lazyWithRetry(() => import("./pages/recruitment/UpcomingHires"));
 const Some = lazyWithRetry(() => import("./pages/Some"));
 const TimeStamp = lazyWithRetry(() => import("./pages/TimeStamp"));
+// Boards pages
+const TestBoard = lazyWithRetry(() => import("./pages/boards/TestBoard"));
 
 const queryClient = new QueryClient();
 
@@ -271,6 +273,8 @@ const App = () => (
               <Route path="/recruitment/upcoming-hires" element={<RoleProtectedRoute requireTeamlederOrAbove><UpcomingHires /></RoleProtectedRoute>} />
               {/* SOME route - accessible to SOME employees and teamleder+ */}
               <Route path="/some" element={<ProtectedRoute><Some /></ProtectedRoute>} />
+              {/* Boards routes */}
+              <Route path="/boards/test" element={<RoleProtectedRoute requireTeamlederOrAbove><TestBoard /></RoleProtectedRoute>} />
               {/* Admin route - owner only */}
               <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
               <Route path="*" element={<NotFound />} />

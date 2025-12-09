@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, Plus, UserPlus, RefreshCcw, CalendarClock, UserCog, Video } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, Plus, UserPlus, RefreshCcw, CalendarClock, UserCog, Video, Monitor } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -120,6 +120,11 @@ const vagtFlowNavigation = [
   { name: "Fakturering", href: "/vagt-flow/billing", icon: Receipt },
 ];
 
+// Boards navigation
+const boardsNavigation = [
+  { name: "Test", href: "/boards/test", icon: Tv },
+];
+
 // Employee-only shift planning items (empty - employees don't see shift planning menu)
 const employeeShiftPlanningNavigation: typeof shiftPlanningNavigation = [];
 
@@ -152,6 +157,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     location.pathname === "/extra-work" || 
     location.pathname === "/extra-work-admin"
   );
+  const [boardsOpen, setBoardsOpen] = useState(location.pathname.startsWith("/boards"));
 
   // Fetch denied menu items for this user
   const { data: deniedMenuItems = [] } = useQuery({
@@ -594,6 +600,41 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
                 {mgNavigation.map((item) => {
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      onClick={handleNavClick}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                        isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.name}
+                    </NavLink>
+                  );
+                })}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Boards menu - for owners */}
+          {isOwner && (
+            <Collapsible open={boardsOpen} onOpenChange={setBoardsOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname.startsWith("/boards") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <Monitor className="h-5 w-5" />
+                  Boards
+                </div>
+                {boardsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {boardsNavigation.map((item) => {
                   const isActive = location.pathname === item.href;
                   return (
                     <NavLink
