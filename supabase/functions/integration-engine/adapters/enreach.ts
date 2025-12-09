@@ -5,7 +5,7 @@ interface EnreachCredentials {
   username?: string;
   password?: string;
   api_token?: string; // Fallback for Bearer token auth
-  api_url?: string;
+  api_url?: string; // Full base URL like https://hero01.herobase.com
 }
 
 export class EnreachAdapter implements DialerAdapter {
@@ -13,15 +13,20 @@ export class EnreachAdapter implements DialerAdapter {
   private headers: Record<string, string>;
 
   constructor(credentials: EnreachCredentials) {
-    this.baseUrl = credentials.api_url || "https://hero01.herobase.com/api/v1";
+    // The api_url should be the base like https://hero01.herobase.com
+    // We'll append /api/ for the API calls
+    const baseHost = credentials.api_url || "https://hero01.herobase.com";
+    this.baseUrl = baseHost.endsWith('/') ? baseHost.slice(0, -1) : baseHost;
+    
+    console.log(`[EnreachAdapter] Base URL: ${this.baseUrl}`);
     
     // Determine auth method: Basic (username/password) or Bearer (api_token)
     let authHeader: string;
     if (credentials.username && credentials.password) {
-      // Basic Authentication
+      // Basic Authentication - matching PHP: CURLOPT_USERPWD, "user@example.com:examplepassword"
       const basicAuth = btoa(`${credentials.username}:${credentials.password}`);
       authHeader = `Basic ${basicAuth}`;
-      console.log("[EnreachAdapter] Using Basic Authentication");
+      console.log(`[EnreachAdapter] Using Basic Authentication for user: ${credentials.username}`);
     } else if (credentials.api_token) {
       // Fallback to Bearer token
       authHeader = `Bearer ${credentials.api_token}`;
@@ -32,12 +37,13 @@ export class EnreachAdapter implements DialerAdapter {
 
     this.headers = {
       "Authorization": authHeader,
-      "Content-Type": "application/json",
+      "Content-Type": "application/json; charset=utf-8", // Match PHP example
     };
   }
 
   private async get(endpoint: string): Promise<unknown> {
-    const url = `${this.baseUrl}${endpoint}`;
+    // API path: /api{endpoint} - matching PHP example: https://wshero02.herobase.com/api/leads
+    const url = `${this.baseUrl}/api${endpoint}`;
     console.log(`[EnreachAdapter] GET ${url}`);
     
     const response = await fetch(url, {
@@ -47,7 +53,8 @@ export class EnreachAdapter implements DialerAdapter {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Enreach API error: ${response.status} - ${errorText}`);
+      console.error(`[EnreachAdapter] API Error ${response.status}: ${errorText.substring(0, 300)}`);
+      throw new Error(`Enreach API error: ${response.status} - ${errorText.substring(0, 300)}`);
     }
 
     return response.json();
