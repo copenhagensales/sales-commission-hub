@@ -358,9 +358,56 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Sending contract signed confirmation to ${employeeEmail} for contract ${contractId}`);
 
+    // Send confirmation to employee
     await sendEmail(accessToken, employeeEmail, `Bekræftelse: Du har underskrevet "${contractTitle}"`, htmlBody);
-
     console.log(`Contract signed confirmation sent successfully to ${employeeEmail}`);
+
+    // Send copy to HR/job email
+    const hrEmail = "job@copenhagensales.dk";
+    const hrSubject = `Ny kontrakt underskrevet: ${employeeName} - ${contractTitle}`;
+    const hrBody = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 700px; margin: 0 auto; padding: 20px; }
+          .header { background: #1a1a2e; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #ffffff; padding: 25px; border: 1px solid #e5e7eb; }
+          .details-box { background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0; }
+          .contract-content { background: #fff; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; margin: 20px 0; max-height: 400px; overflow-y: auto; font-size: 13px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h2 style="margin:0;">Ny kontrakt underskrevet</h2>
+          </div>
+          <div class="content">
+            <p><strong>${employeeName}</strong> har underskrevet en kontrakt.</p>
+            
+            <div class="details-box">
+              <p style="margin:5px 0;"><strong>Kontrakt:</strong> ${contractTitle}</p>
+              <p style="margin:5px 0;"><strong>Medarbejder:</strong> ${employeeName}</p>
+              <p style="margin:5px 0;"><strong>Email:</strong> ${employeeEmail}</p>
+              <p style="margin:5px 0;"><strong>Underskrevet:</strong> ${formattedDate}</p>
+              <p style="margin:5px 0;"><strong>IP-adresse:</strong> ${ipAddress}</p>
+              <p style="margin:5px 0;"><strong>Kontrakt-ID:</strong> <code>${contractId}</code></p>
+            </div>
+
+            <h3>Kontraktens indhold</h3>
+            <div class="contract-content">
+              ${contract.content}
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    await sendEmail(accessToken, hrEmail, hrSubject, hrBody);
+    console.log(`Contract copy sent to HR at ${hrEmail}`);
 
     return new Response(
       JSON.stringify({ success: true, sharePointUrl }),
