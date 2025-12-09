@@ -11,7 +11,7 @@ export class EnreachAdapter implements DialerAdapter {
   private headers: Record<string, string>;
 
   constructor(credentials: EnreachCredentials) {
-    this.baseUrl = credentials.api_url || "https://api.enreach.com/v1";
+    this.baseUrl = credentials.api_url || "https://hero01.herobase.com/api/v1";
     this.headers = {
       "Authorization": `Bearer ${credentials.api_token}`,
       "Content-Type": "application/json",
