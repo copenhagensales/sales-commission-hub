@@ -231,25 +231,37 @@ export function EmployeeExcelImport() {
 
     setImporting(true);
     try {
-      const employeesToInsert = validEmployees.map((e) => ({
-        first_name: e.first_name,
-        last_name: e.last_name,
-        private_email: e.private_email || null,
-        private_phone: e.private_phone || null,
-        cpr_number: e.cpr_number || null,
-        bank_reg_number: e.bank_reg_number || null,
-        bank_account_number: e.bank_account_number || null,
-        job_title: e.job_title || null,
-        department: e.department || null,
-        employment_start_date: e.employment_start_date || new Date().toISOString().split("T")[0],
-        salary_type: e.salary_type || null,
-        salary_amount: e.salary_amount || null,
-        weekly_hours: e.weekly_hours || 37.5,
-        standard_start_time: e.standard_start_time || null,
-        work_location: e.work_location || "København V",
-        is_active: true,
-        address_country: "Danmark",
-      }));
+      const employeesToInsert = validEmployees.map((e) => {
+        // Ensure date is in YYYY-MM-DD format
+        let startDate = e.employment_start_date;
+        if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+          // Try to parse DD-MM-YYYY or DD/MM/YYYY
+          const dmyMatch = startDate.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+          if (dmyMatch) {
+            startDate = `${dmyMatch[3]}-${dmyMatch[2].padStart(2, '0')}-${dmyMatch[1].padStart(2, '0')}`;
+          }
+        }
+        
+        return {
+          first_name: e.first_name.trim(),
+          last_name: e.last_name.trim(),
+          private_email: e.private_email?.trim() || null,
+          private_phone: e.private_phone?.trim() || null,
+          cpr_number: e.cpr_number?.trim() || null,
+          bank_reg_number: e.bank_reg_number?.trim() || null,
+          bank_account_number: e.bank_account_number?.trim() || null,
+          job_title: e.job_title?.trim() || null,
+          department: e.department?.trim() || null,
+          employment_start_date: startDate || new Date().toISOString().split("T")[0],
+          salary_type: e.salary_type || null,
+          salary_amount: e.salary_amount || null,
+          weekly_hours: e.weekly_hours || 37.5,
+          standard_start_time: e.standard_start_time?.trim() || null,
+          work_location: e.work_location?.trim() || "København V",
+          is_active: true,
+          address_country: "Danmark",
+        };
+      });
 
       const { error } = await supabase.from("employee_master_data").insert(employeesToInsert);
 
