@@ -26,32 +26,73 @@ interface ParsedEmployee {
 }
 
 const COLUMN_MAPPING: Record<string, keyof Omit<ParsedEmployee, "isValid" | "errors">> = {
+  // First name variations
   "fornavn": "first_name",
   "first_name": "first_name",
+  "firstname": "first_name",
+  "first name": "first_name",
+  "navn": "first_name",
+  // Last name variations
   "efternavn": "last_name",
   "last_name": "last_name",
+  "lastname": "last_name",
+  "last name": "last_name",
+  // Email variations
   "email": "private_email",
+  "e-mail": "private_email",
+  "mail": "private_email",
   "privat email": "private_email",
   "private_email": "private_email",
+  "privatmail": "private_email",
+  // Phone variations
   "telefon": "private_phone",
+  "tlf": "private_phone",
+  "tlf.": "private_phone",
+  "mobil": "private_phone",
+  "mobilnummer": "private_phone",
   "phone": "private_phone",
   "private_phone": "private_phone",
+  "telefonnummer": "private_phone",
+  // Job title variations
   "stilling": "job_title",
+  "titel": "job_title",
+  "jobtitel": "job_title",
   "job_title": "job_title",
+  "job title": "job_title",
+  "rolle": "job_title",
+  // Department variations
   "afdeling": "department",
   "department": "department",
+  "team": "department",
+  // Start date variations
   "startdato": "employment_start_date",
+  "start dato": "employment_start_date",
+  "ansættelsesdato": "employment_start_date",
   "employment_start_date": "employment_start_date",
+  "start": "employment_start_date",
+  // Salary type variations
   "løntype": "salary_type",
   "salary_type": "salary_type",
+  "lønform": "salary_type",
+  // Salary amount variations
   "løn": "salary_amount",
   "salary_amount": "salary_amount",
+  "timeløn": "salary_amount",
+  "månedsløn": "salary_amount",
+  // Weekly hours variations
   "timer": "weekly_hours",
   "weekly_hours": "weekly_hours",
+  "timer/uge": "weekly_hours",
+  "ugentlige timer": "weekly_hours",
+  // Work time variations
   "arbejdstid": "standard_start_time",
   "standard_start_time": "standard_start_time",
+  "mødetid": "standard_start_time",
+  // Work location variations
   "arbejdssted": "work_location",
   "work_location": "work_location",
+  "lokation": "work_location",
+  "kontor": "work_location",
 };
 
 export function EmployeeExcelImport() {
