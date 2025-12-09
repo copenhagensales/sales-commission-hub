@@ -47,30 +47,24 @@ serve(async (req) => {
         p_encryption_key: encryptionKey,
       });
 
-      // Create adapter and fetch sales
+      // Create adapter and fetch sales with enriched lead data
       const adapter = new AdversusAdapter(credentials);
-      const sales = await adapter.fetchSales(days || 30);
+      const salesWithData = await adapter.fetchSalesWithLeadData(days || 30, campaignId);
 
-      // Filter by campaignId if provided
-      let filteredSales = sales;
-      if (campaignId) {
-        filteredSales = sales.filter(s => s.campaignId === campaignId);
-      }
-
-      if (filteredSales.length === 0) {
+      if (salesWithData.length === 0) {
+        console.log(`[Integration Engine] No sales with lead data found for campaign ${campaignId}`);
         return new Response(
           JSON.stringify({ 
             success: true, 
             fields: [], 
-            message: `No sales found for campaign ${campaignId} in last ${days} days` 
+            message: `No sales found for campaign ${campaignId} in last ${days || 30} days` 
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Extract resultData fields from first sale
-      const sampleSale = filteredSales[0];
-      const resultData = (sampleSale.metadata as any)?.resultData || {};
+      // Extract resultData fields from first sale with data
+      const { sale, resultData } = salesWithData[0];
 
       // Format fields for the UI
       const fields: { fieldId: string; label: string; sampleValue: string }[] = [];
@@ -85,14 +79,15 @@ serve(async (req) => {
       // Sort fields alphabetically by fieldId
       fields.sort((a, b) => a.fieldId.localeCompare(b.fieldId));
 
-      console.log(`[Integration Engine] Found ${fields.length} fields in sample sale`);
+      console.log(`[Integration Engine] Found ${fields.length} fields in sample sale (leadId: ${sale.leadId})`);
 
       return new Response(
         JSON.stringify({ 
           success: true, 
           fields,
-          saleCount: filteredSales.length,
-          sampleSaleId: sampleSale.externalId,
+          saleCount: salesWithData.length,
+          sampleSaleId: sale.id,
+          leadId: sale.leadId,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
