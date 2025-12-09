@@ -184,7 +184,9 @@ export class AdversusAdapter implements DialerAdapter {
     }
     const filterStr = encodeURIComponent(JSON.stringify(filterObj));
 
-    const url = `${this.baseUrl}/sales?pageSize=10&page=1&filters=${filterStr}`;
+    console.log(`[Adversus] Fetching sales with filters: ${JSON.stringify(filterObj)}`);
+    
+    const url = `${this.baseUrl}/sales?pageSize=20&page=1&filters=${filterStr}`;
     const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
 
     if (!res.ok) {
@@ -195,22 +197,53 @@ export class AdversusAdapter implements DialerAdapter {
     const data = await res.json();
     const sales = data.sales || data || [];
 
+    console.log(`[Adversus] Found ${sales.length} sales for campaign ${campaignId}`);
+
     if (sales.length === 0) {
-      console.log(`[Adversus] No sales found for campaign ${campaignId} in last ${days} days`);
+      // Try without campaign filter to see if there are ANY sales
+      console.log(`[Adversus] No sales with campaign filter, trying without...`);
+      const noFilterUrl = `${this.baseUrl}/sales?pageSize=10&page=1`;
+      const noFilterRes = await fetch(noFilterUrl, { headers: { Authorization: `Basic ${this.authHeader}` } });
+      
+      if (noFilterRes.ok) {
+        const noFilterData = await noFilterRes.json();
+        const allSales = noFilterData.sales || noFilterData || [];
+        console.log(`[Adversus] Total sales without filter: ${allSales.length}`);
+        
+        // Filter manually by campaignId
+        const matchingSales = allSales.filter((s: any) => String(s.campaignId) === campaignId);
+        console.log(`[Adversus] Matching sales after manual filter: ${matchingSales.length}`);
+        
+        if (matchingSales.length > 0) {
+          return this.enrichSalesWithLeadData(matchingSales);
+        }
+      }
+      
       return [];
     }
 
-    // For field inspection, fetch lead data for the first sale
+    return this.enrichSalesWithLeadData(sales);
+  }
+
+  // Helper to enrich sales with lead resultData
+  private async enrichSalesWithLeadData(sales: any[]): Promise<{ sale: any; resultData: Record<string, unknown> }[]> {
     const results: { sale: any; resultData: Record<string, unknown> }[] = [];
     
-    for (const sale of sales.slice(0, 3)) { // Check first 3 sales to find one with data
+    for (const sale of sales.slice(0, 5)) { // Check first 5 sales to find one with data
       const leadId = sale.leadId;
-      if (!leadId) continue;
+      console.log(`[Adversus] Checking sale ${sale.id} with leadId: ${leadId}`);
+      
+      if (!leadId) {
+        console.log(`[Adversus] Sale ${sale.id} has no leadId`);
+        continue;
+      }
 
       const resultData = await this.fetchLeadResultData(String(leadId));
+      console.log(`[Adversus] Lead ${leadId} resultData keys: ${Object.keys(resultData).join(', ') || '(empty)'}`);
       
       if (Object.keys(resultData).length > 0) {
         results.push({ sale, resultData });
+        console.log(`[Adversus] Found ${Object.keys(resultData).length} fields in lead ${leadId}`);
         break; // Found one with data, stop
       }
       
@@ -218,11 +251,13 @@ export class AdversusAdapter implements DialerAdapter {
       await new Promise((r) => setTimeout(r, 100));
     }
 
-    // If no lead data found, still return the first sale with empty resultData
+    // If no lead data found, still return the first sale with inline resultData
     if (results.length === 0 && sales.length > 0) {
+      const inlineResultData = sales[0].lead?.resultData || {};
+      console.log(`[Adversus] Using inline resultData from sale, keys: ${Object.keys(inlineResultData).join(', ') || '(empty)'}`);
       results.push({ 
         sale: sales[0], 
-        resultData: sales[0].lead?.resultData || {} 
+        resultData: inlineResultData 
       });
     }
 
