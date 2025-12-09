@@ -2,7 +2,8 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, FileSpreadsheet, Check, AlertCircle, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Upload, FileSpreadsheet, Check, AlertCircle, Loader2, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -25,78 +26,52 @@ interface ParsedEmployee {
   errors: string[];
 }
 
-const COLUMN_MAPPING: Record<string, keyof Omit<ParsedEmployee, "isValid" | "errors">> = {
-  // First name variations
-  "fornavn": "first_name",
-  "first_name": "first_name",
-  "firstname": "first_name",
-  "first name": "first_name",
-  "navn": "first_name",
-  // Last name variations
-  "efternavn": "last_name",
-  "last_name": "last_name",
-  "lastname": "last_name",
-  "last name": "last_name",
-  // Email variations
-  "email": "private_email",
-  "e-mail": "private_email",
-  "mail": "private_email",
-  "privat email": "private_email",
-  "private_email": "private_email",
-  "privatmail": "private_email",
-  // Phone variations
-  "telefon": "private_phone",
-  "tlf": "private_phone",
-  "tlf.": "private_phone",
-  "mobil": "private_phone",
-  "mobilnummer": "private_phone",
-  "phone": "private_phone",
-  "private_phone": "private_phone",
-  "telefonnummer": "private_phone",
-  // Job title variations
-  "stilling": "job_title",
-  "titel": "job_title",
-  "jobtitel": "job_title",
-  "job_title": "job_title",
-  "job title": "job_title",
-  "rolle": "job_title",
-  // Department variations
-  "afdeling": "department",
-  "department": "department",
-  "team": "department",
-  // Start date variations
-  "startdato": "employment_start_date",
-  "start dato": "employment_start_date",
-  "ansættelsesdato": "employment_start_date",
-  "employment_start_date": "employment_start_date",
-  "start": "employment_start_date",
-  // Salary type variations
-  "løntype": "salary_type",
-  "salary_type": "salary_type",
-  "lønform": "salary_type",
-  // Salary amount variations
-  "løn": "salary_amount",
-  "salary_amount": "salary_amount",
-  "timeløn": "salary_amount",
-  "månedsløn": "salary_amount",
-  // Weekly hours variations
-  "timer": "weekly_hours",
-  "weekly_hours": "weekly_hours",
-  "timer/uge": "weekly_hours",
-  "ugentlige timer": "weekly_hours",
-  // Work time variations
-  "arbejdstid": "standard_start_time",
-  "standard_start_time": "standard_start_time",
-  "mødetid": "standard_start_time",
-  // Work location variations
-  "arbejdssted": "work_location",
-  "work_location": "work_location",
-  "lokation": "work_location",
-  "kontor": "work_location",
+type FieldKey = keyof Omit<ParsedEmployee, "isValid" | "errors">;
+
+const FIELD_OPTIONS: { value: FieldKey | "skip"; label: string }[] = [
+  { value: "skip", label: "Spring over" },
+  { value: "first_name", label: "Fornavn *" },
+  { value: "last_name", label: "Efternavn *" },
+  { value: "private_email", label: "Email" },
+  { value: "private_phone", label: "Telefon" },
+  { value: "job_title", label: "Stilling" },
+  { value: "department", label: "Afdeling" },
+  { value: "employment_start_date", label: "Startdato" },
+  { value: "salary_type", label: "Løntype" },
+  { value: "salary_amount", label: "Løn" },
+  { value: "weekly_hours", label: "Timer/uge" },
+  { value: "standard_start_time", label: "Arbejdstid" },
+  { value: "work_location", label: "Arbejdssted" },
+];
+
+// Auto-suggest mapping based on column name
+const suggestMapping = (columnName: string): FieldKey | "skip" => {
+  const normalized = columnName.toLowerCase().trim();
+  
+  const mappings: Record<string, FieldKey> = {
+    "fornavn": "first_name", "first_name": "first_name", "firstname": "first_name",
+    "efternavn": "last_name", "last_name": "last_name", "lastname": "last_name",
+    "email": "private_email", "e-mail": "private_email", "mail": "private_email",
+    "telefon": "private_phone", "tlf": "private_phone", "mobil": "private_phone", "phone": "private_phone",
+    "stilling": "job_title", "titel": "job_title", "jobtitel": "job_title", "rolle": "job_title",
+    "afdeling": "department", "department": "department", "team": "department",
+    "startdato": "employment_start_date", "ansættelsesdato": "employment_start_date",
+    "løntype": "salary_type", "lønform": "salary_type",
+    "løn": "salary_amount", "timeløn": "salary_amount", "månedsløn": "salary_amount",
+    "timer": "weekly_hours", "timer/uge": "weekly_hours",
+    "arbejdstid": "standard_start_time", "mødetid": "standard_start_time",
+    "arbejdssted": "work_location", "lokation": "work_location", "kontor": "work_location",
+  };
+  
+  return mappings[normalized] || "skip";
 };
 
 export function EmployeeExcelImport() {
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<"upload" | "mapping" | "preview">("upload");
+  const [rawData, setRawData] = useState<Record<string, unknown>[]>([]);
+  const [columns, setColumns] = useState<string[]>([]);
+  const [columnMapping, setColumnMapping] = useState<Record<string, FieldKey | "skip">>({});
   const [parsedData, setParsedData] = useState<ParsedEmployee[]>([]);
   const [importing, setImporting] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -114,81 +89,24 @@ export function EmployeeExcelImport() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
 
-        const employees: ParsedEmployee[] = jsonData.map((row) => {
-          const employee: ParsedEmployee = {
-            first_name: "",
-            last_name: "",
-            isValid: true,
-            errors: [],
-          };
+        if (jsonData.length === 0) {
+          toast({ title: "Tom fil", description: "Excel-filen indeholder ingen data", variant: "destructive" });
+          return;
+        }
 
-          // Map columns
-          Object.entries(row).forEach(([key, value]) => {
-            const normalizedKey = key.toLowerCase().trim();
-            const mappedField = COLUMN_MAPPING[normalizedKey];
-            if (mappedField && value !== undefined && value !== null && value !== "") {
-              const strValue = String(value);
-              switch (mappedField) {
-                case "salary_amount":
-                case "weekly_hours":
-                  employee[mappedField] = Number(value);
-                  break;
-                case "salary_type":
-                  const val = strValue.toLowerCase();
-                  if (val === "provision" || val === "fixed" || val === "hourly") {
-                    employee.salary_type = val;
-                  } else if (val === "fast") {
-                    employee.salary_type = "fixed";
-                  } else if (val === "time" || val === "timeløn") {
-                    employee.salary_type = "hourly";
-                  }
-                  break;
-                case "first_name":
-                  employee.first_name = strValue;
-                  break;
-                case "last_name":
-                  employee.last_name = strValue;
-                  break;
-                case "private_email":
-                  employee.private_email = strValue;
-                  break;
-                case "private_phone":
-                  employee.private_phone = strValue;
-                  break;
-                case "job_title":
-                  employee.job_title = strValue;
-                  break;
-                case "department":
-                  employee.department = strValue;
-                  break;
-                case "employment_start_date":
-                  employee.employment_start_date = strValue;
-                  break;
-                case "standard_start_time":
-                  employee.standard_start_time = strValue;
-                  break;
-                case "work_location":
-                  employee.work_location = strValue;
-                  break;
-              }
-            }
-          });
-
-          // Validate
-          if (!employee.first_name) {
-            employee.isValid = false;
-            employee.errors.push("Mangler fornavn");
-          }
-          if (!employee.last_name) {
-            employee.isValid = false;
-            employee.errors.push("Mangler efternavn");
-          }
-
-          return employee;
-        });
-
-        setParsedData(employees);
+        // Extract column names from first row
+        const cols = Object.keys(jsonData[0]);
+        setColumns(cols);
+        setRawData(jsonData);
         setFileName(file.name);
+
+        // Auto-suggest mappings
+        const initialMapping: Record<string, FieldKey | "skip"> = {};
+        cols.forEach((col) => {
+          initialMapping[col] = suggestMapping(col);
+        });
+        setColumnMapping(initialMapping);
+        setStep("mapping");
       } catch (error) {
         toast({
           title: "Fejl ved læsning af fil",
@@ -205,6 +123,60 @@ export function EmployeeExcelImport() {
     if (file) {
       parseExcelFile(file);
     }
+  };
+
+  const applyMapping = () => {
+    const employees: ParsedEmployee[] = rawData.map((row) => {
+      const employee: ParsedEmployee = {
+        first_name: "",
+        last_name: "",
+        isValid: true,
+        errors: [],
+      };
+
+      // Apply user-defined mapping
+      Object.entries(columnMapping).forEach(([column, field]) => {
+        if (field === "skip") return;
+        
+        const value = row[column];
+        if (value === undefined || value === null || value === "") return;
+
+        const strValue = String(value);
+        switch (field) {
+          case "salary_amount":
+          case "weekly_hours":
+            employee[field] = Number(value);
+            break;
+          case "salary_type":
+            const val = strValue.toLowerCase();
+            if (val === "provision" || val === "fixed" || val === "hourly") {
+              employee.salary_type = val;
+            } else if (val === "fast") {
+              employee.salary_type = "fixed";
+            } else if (val === "time" || val === "timeløn") {
+              employee.salary_type = "hourly";
+            }
+            break;
+          default:
+            employee[field] = strValue;
+        }
+      });
+
+      // Validate
+      if (!employee.first_name) {
+        employee.isValid = false;
+        employee.errors.push("Mangler fornavn");
+      }
+      if (!employee.last_name) {
+        employee.isValid = false;
+        employee.errors.push("Mangler efternavn");
+      }
+
+      return employee;
+    });
+
+    setParsedData(employees);
+    setStep("preview");
   };
 
   const handleImport = async () => {
@@ -242,9 +214,7 @@ export function EmployeeExcelImport() {
         description: `${validEmployees.length} medarbejdere importeret`,
       });
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
-      setOpen(false);
-      setParsedData([]);
-      setFileName(null);
+      resetState();
     } catch (error) {
       toast({
         title: "Fejl ved import",
@@ -256,11 +226,29 @@ export function EmployeeExcelImport() {
     }
   };
 
+  const resetState = () => {
+    setOpen(false);
+    setStep("upload");
+    setRawData([]);
+    setColumns([]);
+    setColumnMapping({});
+    setParsedData([]);
+    setFileName(null);
+  };
+
   const validCount = parsedData.filter((e) => e.isValid).length;
   const invalidCount = parsedData.length - validCount;
 
+  // Check if required fields are mapped
+  const hasFirstName = Object.values(columnMapping).includes("first_name");
+  const hasLastName = Object.values(columnMapping).includes("last_name");
+  const canProceed = hasFirstName && hasLastName;
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      if (!isOpen) resetState();
+      else setOpen(true);
+    }}>
       <DialogTrigger asChild>
         <Button variant="outline">
           <Upload className="mr-2 h-4 w-4" /> Importer fra Excel
@@ -268,11 +256,15 @@ export function EmployeeExcelImport() {
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Importer medarbejdere fra Excel</DialogTitle>
+          <DialogTitle>
+            {step === "upload" && "Vælg Excel-fil"}
+            {step === "mapping" && "Vælg kolonnemapping"}
+            {step === "preview" && "Forhåndsvisning"}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-          {!fileName ? (
+          {step === "upload" && (
             <div
               className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
               onClick={() => fileInputRef.current?.click()}
@@ -282,7 +274,7 @@ export function EmployeeExcelImport() {
                 Klik for at vælge Excel-fil (.xlsx, .xls)
               </p>
               <p className="text-xs text-muted-foreground">
-                Kolonner: fornavn, efternavn, email, telefon, stilling, afdeling, startdato, løntype, løn, timer, arbejdstid
+                Du kan selv vælge hvilke kolonner der skal bruges
               </p>
               <input
                 ref={fileInputRef}
@@ -292,36 +284,78 @@ export function EmployeeExcelImport() {
                 className="hidden"
               />
             </div>
-          ) : (
+          )}
+
+          {step === "mapping" && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Vælg hvilke felter hver kolonne skal mappes til. Felter markeret med * er påkrævede.
+              </p>
+              
+              <div className="flex-1 overflow-auto space-y-3 pr-2">
+                {columns.map((column) => (
+                  <div key={column} className="flex items-center gap-4 py-2 border-b border-border/50">
+                    <div className="w-1/3 font-medium truncate" title={column}>
+                      {column}
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="w-1/2">
+                      <Select
+                        value={columnMapping[column] || "skip"}
+                        onValueChange={(value) => setColumnMapping({ ...columnMapping, [column]: value as FieldKey | "skip" })}
+                      >
+                        <SelectTrigger className="bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover z-50">
+                          {FIELD_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {!canProceed && (
+                <p className="text-sm text-destructive">
+                  Du skal mappe mindst én kolonne til Fornavn og én til Efternavn
+                </p>
+              )}
+
+              <div className="flex justify-between pt-2">
+                <Button variant="outline" onClick={() => setStep("upload")}>
+                  Tilbage
+                </Button>
+                <Button onClick={applyMapping} disabled={!canProceed}>
+                  Fortsæt til forhåndsvisning
+                </Button>
+              </div>
+            </>
+          )}
+
+          {step === "preview" && (
             <>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FileSpreadsheet className="h-5 w-5 text-green-500" />
                   <span className="font-medium">{fileName}</span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setParsedData([]);
-                    setFileName(null);
-                  }}
-                >
-                  Vælg anden fil
-                </Button>
-              </div>
-
-              <div className="flex gap-4 text-sm">
-                <div className="flex items-center gap-1 text-green-600">
-                  <Check className="h-4 w-4" />
-                  {validCount} gyldige
-                </div>
-                {invalidCount > 0 && (
-                  <div className="flex items-center gap-1 text-destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    {invalidCount} med fejl
+                <div className="flex gap-4 text-sm">
+                  <div className="flex items-center gap-1 text-green-600">
+                    <Check className="h-4 w-4" />
+                    {validCount} gyldige
                   </div>
-                )}
+                  {invalidCount > 0 && (
+                    <div className="flex items-center gap-1 text-destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      {invalidCount} med fejl
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex-1 overflow-auto rounded-lg border">
@@ -332,6 +366,7 @@ export function EmployeeExcelImport() {
                       <TableHead>Fornavn</TableHead>
                       <TableHead>Efternavn</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Telefon</TableHead>
                       <TableHead>Stilling</TableHead>
                       <TableHead>Afdeling</TableHead>
                     </TableRow>
@@ -349,6 +384,7 @@ export function EmployeeExcelImport() {
                         <TableCell>{employee.first_name || "-"}</TableCell>
                         <TableCell>{employee.last_name || "-"}</TableCell>
                         <TableCell>{employee.private_email || "-"}</TableCell>
+                        <TableCell>{employee.private_phone || "-"}</TableCell>
                         <TableCell>{employee.job_title || "-"}</TableCell>
                         <TableCell>{employee.department || "-"}</TableCell>
                       </TableRow>
@@ -357,9 +393,9 @@ export function EmployeeExcelImport() {
                 </Table>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setOpen(false)}>
-                  Annuller
+              <div className="flex justify-between pt-2">
+                <Button variant="outline" onClick={() => setStep("mapping")}>
+                  Tilbage til mapping
                 </Button>
                 <Button onClick={handleImport} disabled={importing || validCount === 0}>
                   {importing ? (
