@@ -31,18 +31,34 @@ interface PayrollSale {
   id: string;
   sale_datetime: string;
   agent_name: string | null;
+  validation_status: string | null;
   sale_items: PayrollSaleItem[];
+}
+
+interface CommissionTransaction {
+  id: string;
+  sale_id: string | null;
+  agent_name: string;
+  transaction_type: string;
+  amount: number;
+  reason: string | null;
+  source: string | null;
+  created_at: string;
 }
 
 interface PayrollSummary {
   totalUnits: number;
   totalRevenue: number;
   totalCommission: number;
+  totalClawbacks: number;
+  netCommission: number;
   perAgent: {
     agentName: string;
     units: number;
     revenue: number;
     commission: number;
+    clawbacks: number;
+    netCommission: number;
   }[];
 }
 
@@ -50,6 +66,8 @@ const emptySummary: PayrollSummary = {
   totalUnits: 0,
   totalRevenue: 0,
   totalCommission: 0,
+  totalClawbacks: 0,
+  netCommission: 0,
   perAgent: [],
 };
 
@@ -92,6 +110,7 @@ interface SearchableSale {
   customer_phone: string | null;
   adversus_external_id: string | null;
   adversus_opp_number: string | null;
+  validation_status: string | null;
   sale_items: PayrollSaleItem[];
 }
 
@@ -159,7 +178,7 @@ export default function Payroll() {
       const { data: sales, error: salesError } = await supabase
         .from("sales")
         .select(
-          "id, sale_datetime, agent_name, sale_items(mapped_commission, mapped_revenue, quantity)"
+          "id, sale_datetime, agent_name, validation_status, sale_items(mapped_commission, mapped_revenue, quantity)"
         )
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", fromDate.toISOString())
@@ -167,12 +186,25 @@ export default function Payroll() {
 
       if (salesError) throw salesError;
 
+      // Fetch clawback transactions for this client and period
+      const { data: clawbacks, error: clawbacksError } = await supabase
+        .from("commission_transactions")
+        .select("id, sale_id, agent_name, transaction_type, amount, created_at")
+        .eq("client_id", selectedClientId)
+        .eq("transaction_type", "clawback")
+        .gte("created_at", fromDate.toISOString())
+        .lte("created_at", toDate.toISOString());
+
+      if (clawbacksError) throw clawbacksError;
+
       const typedSales = (sales || []) as unknown as PayrollSale[];
+      const typedClawbacks = (clawbacks || []) as unknown as CommissionTransaction[];
 
       let totalUnits = 0;
       let totalRevenue = 0;
       let totalCommission = 0;
-      const perAgentMap = new Map<string, { units: number; revenue: number; commission: number }>();
+      let totalClawbacks = 0;
+      const perAgentMap = new Map<string, { units: number; revenue: number; commission: number; clawbacks: number }>();
 
       typedSales.forEach((sale) => {
         const agentName = sale.agent_name && sale.agent_name.trim().length > 0 ? sale.agent_name : "Ukendt";
@@ -192,6 +224,7 @@ export default function Payroll() {
             units: 0,
             revenue: 0,
             commission: 0,
+            clawbacks: 0,
           };
 
           existing.units += qty;
@@ -202,14 +235,38 @@ export default function Payroll() {
         });
       });
 
+      // Process clawbacks
+      typedClawbacks.forEach((clawback) => {
+        const agentName = clawback.agent_name && clawback.agent_name.trim().length > 0 ? clawback.agent_name : "Ukendt";
+        const amount = Math.abs(Number(clawback.amount) || 0);
+        
+        totalClawbacks += amount;
+
+        const existing = perAgentMap.get(agentName) || {
+          units: 0,
+          revenue: 0,
+          commission: 0,
+          clawbacks: 0,
+        };
+
+        existing.clawbacks += amount;
+        perAgentMap.set(agentName, existing);
+      });
+
       const perAgent = Array.from(perAgentMap.entries())
-        .map(([agentName, values]) => ({ agentName, ...values }))
+        .map(([agentName, values]) => ({ 
+          agentName, 
+          ...values,
+          netCommission: values.commission - values.clawbacks,
+        }))
         .sort((a, b) => a.agentName.localeCompare(b.agentName, "da-DK"));
 
       return {
         totalUnits,
         totalRevenue,
         totalCommission,
+        totalClawbacks,
+        netCommission: totalCommission - totalClawbacks,
         perAgent,
       } satisfies PayrollSummary;
     },
@@ -457,7 +514,7 @@ export default function Payroll() {
       const { data: sales, error: salesError } = await supabase
         .from("sales")
         .select(
-          "id, sale_datetime, agent_name, customer_company, customer_phone, adversus_external_id, adversus_opp_number, sale_items(adversus_product_title, mapped_commission, mapped_revenue, quantity)"
+          "id, sale_datetime, agent_name, customer_company, customer_phone, adversus_external_id, adversus_opp_number, validation_status, sale_items(adversus_product_title, mapped_commission, mapped_revenue, quantity)"
         )
         .in("client_campaign_id", campaignIds);
 
@@ -611,7 +668,7 @@ export default function Payroll() {
               </div>
             ) : (
               <div className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-4">
                   <div className="rounded-lg border bg-muted/40 p-4">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Antal salg (stk.)
@@ -628,13 +685,32 @@ export default function Payroll() {
                   </div>
                   <div className="rounded-lg border bg-muted/40 p-4">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Provision
+                      Brutto provision
                     </p>
                     <p className="mt-2 text-2xl font-bold">
                       {summary.totalCommission.toLocaleString("da-DK")} DKK
                     </p>
                   </div>
+                  <div className="rounded-lg border bg-green-500/10 border-green-500/30 p-4">
+                    <p className="text-xs font-medium text-green-600 uppercase tracking-wide">
+                      Netto provision
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-green-600">
+                      {summary.netCommission.toLocaleString("da-DK")} DKK
+                    </p>
+                  </div>
                 </div>
+
+                {summary.totalClawbacks > 0 && (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+                    <p className="text-sm font-medium text-destructive">
+                      Clawbacks i perioden: {summary.totalClawbacks.toLocaleString("da-DK")} DKK
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Clawbacks er fratrukket brutto provision for at beregne netto provision.
+                    </p>
+                  </div>
+                )}
 
                 {cancellations && !loadingCancellations && (
                   <p className="text-sm text-muted-foreground">
@@ -648,12 +724,14 @@ export default function Payroll() {
                 <div>
                   <p className="text-sm font-medium mb-2">Fordeling pr. agent</p>
                   <div className="overflow-hidden rounded-lg border bg-muted/40">
-                    <div className="grid grid-cols-5 gap-2 border-b bg-muted px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    <div className="grid grid-cols-7 gap-2 border-b bg-muted px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       <span>Agent</span>
                       <span className="text-right">Salg (stk.)</span>
-                      <span className="text-right">Annullerede salg</span>
+                      <span className="text-right">Annullerede</span>
                       <span className="text-right">Omsætning</span>
-                      <span className="text-right">Provision</span>
+                      <span className="text-right">Brutto prov.</span>
+                      <span className="text-right">Clawbacks</span>
+                      <span className="text-right">Netto prov.</span>
                     </div>
                     <div className="divide-y divide-border">
                       {summary.perAgent.map((row) => {
@@ -665,7 +743,7 @@ export default function Payroll() {
                           }).length ?? 0;
 
                         return (
-                          <div key={row.agentName} className="grid grid-cols-5 gap-2 px-4 py-2 text-sm">
+                          <div key={row.agentName} className="grid grid-cols-7 gap-2 px-4 py-2 text-sm">
                             <span>{row.agentName}</span>
                             <span className="text-right">{row.units}</span>
                             <span className="text-right">{cancelledCount}</span>
@@ -674,6 +752,12 @@ export default function Payroll() {
                             </span>
                             <span className="text-right">
                               {row.commission.toLocaleString("da-DK")} DKK
+                            </span>
+                            <span className="text-right text-destructive">
+                              {row.clawbacks > 0 ? `-${row.clawbacks.toLocaleString("da-DK")} DKK` : "-"}
+                            </span>
+                            <span className="text-right font-semibold text-green-600">
+                              {row.netCommission.toLocaleString("da-DK")} DKK
                             </span>
                           </div>
                         );
@@ -830,9 +914,9 @@ export default function Payroll() {
                           <TableHead>Dato</TableHead>
                           <TableHead>Agent</TableHead>
                           <TableHead>Kunde</TableHead>
-                          <TableHead>Telefon</TableHead>
                           <TableHead>Ordre-id</TableHead>
                           <TableHead>OPP-nummer</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead className="text-right">Salg (stk.)</TableHead>
                           <TableHead className="text-right">Provision</TableHead>
                         </TableRow>
@@ -857,6 +941,20 @@ export default function Payroll() {
                             sale.adversus_opp_number ?? matchFromCancellations?.oppNumber ?? "";
                           const oppNumber = rawOpp || "-";
 
+                          const getStatusBadge = (status: string | null) => {
+                            switch (status) {
+                              case "approved":
+                                return <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Godkendt</span>;
+                              case "cancelled":
+                                return <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Annulleret</span>;
+                              case "rejected":
+                                return <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">Afvist</span>;
+                              case "pending":
+                              default:
+                                return <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">Afventer</span>;
+                            }
+                          };
+
                           return (
                             <TableRow
                               key={sale.id}
@@ -870,11 +968,11 @@ export default function Payroll() {
                               </TableCell>
                               <TableCell>{sale.agent_name ?? "Ukendt"}</TableCell>
                               <TableCell>{sale.customer_company ?? "-"}</TableCell>
-                              <TableCell>{sale.customer_phone ?? "-"}</TableCell>
                               <TableCell className="font-mono text-xs">
                                 {sale.adversus_external_id ?? "-"}
                               </TableCell>
                               <TableCell className="font-mono text-xs">{oppNumber}</TableCell>
+                              <TableCell>{getStatusBadge(sale.validation_status)}</TableCell>
                               <TableCell className="text-right">{units}</TableCell>
                               <TableCell className="text-right">
                                 {commission.toLocaleString("da-DK")} DKK
@@ -934,6 +1032,15 @@ export default function Payroll() {
                                 const rawOpp = selectedSale.adversus_opp_number ?? match?.oppNumber ?? "";
                                 return rawOpp || "-";
                               })()}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Valideringsstatus</p>
+                            <p className="font-medium">
+                              {selectedSale.validation_status === "approved" && <span className="text-green-600">Godkendt</span>}
+                              {selectedSale.validation_status === "cancelled" && <span className="text-red-600">Annulleret</span>}
+                              {selectedSale.validation_status === "rejected" && <span className="text-orange-600">Afvist</span>}
+                              {(!selectedSale.validation_status || selectedSale.validation_status === "pending") && <span className="text-muted-foreground">Afventer</span>}
                             </p>
                           </div>
                         </div>

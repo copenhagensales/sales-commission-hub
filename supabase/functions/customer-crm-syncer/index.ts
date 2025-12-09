@@ -25,6 +25,16 @@ interface SaleRecord {
   customer_company: string | null;
   adversus_external_id: string | null;
   adversus_opp_number: string | null;
+  agent_name: string | null;
+  client_campaign_id: string | null;
+  validation_status: string | null;
+}
+
+interface SaleItemRecord {
+  id: string;
+  sale_id: string;
+  mapped_commission: number | null;
+  quantity: number | null;
 }
 
 // ============ GENERIC API ADAPTER ============
@@ -279,6 +289,65 @@ function createAdapter(
   }
 }
 
+// ============ CLAWBACK HANDLER ============
+async function createClawbackTransaction(
+  supabase: any,
+  sale: SaleRecord,
+  saleItems: SaleItemRecord[],
+  clientId: string,
+  source: string
+): Promise<number> {
+  const agentName = sale.agent_name || "Ukendt";
+  let totalClawback = 0;
+
+  for (const item of saleItems) {
+    const qty = Number(item.quantity ?? 1) || 1;
+    const commission = Number(item.mapped_commission) || 0;
+    const lineCommission = qty * commission;
+    
+    if (lineCommission > 0) {
+      totalClawback += lineCommission;
+    }
+  }
+
+  if (totalClawback > 0) {
+    // Check if clawback already exists for this sale
+    const { data: existingClawback } = await supabase
+      .from("commission_transactions")
+      .select("id")
+      .eq("sale_id", sale.id)
+      .eq("transaction_type", "clawback")
+      .limit(1)
+      .maybeSingle();
+
+    if (existingClawback) {
+      console.log(`[customer-crm-syncer] Clawback already exists for sale ${sale.id}, skipping`);
+      return 0;
+    }
+
+    const { error } = await supabase
+      .from("commission_transactions")
+      .insert({
+        sale_id: sale.id,
+        agent_name: agentName,
+        client_id: clientId,
+        transaction_type: "clawback",
+        amount: -totalClawback,
+        reason: `Sale cancelled/rejected by CRM validation`,
+        source: source,
+        source_reference: sale.adversus_external_id || sale.id,
+      });
+
+    if (error) {
+      console.error(`[customer-crm-syncer] Error creating clawback:`, error);
+    } else {
+      console.log(`[customer-crm-syncer] Created clawback of ${totalClawback} DKK for sale ${sale.id}`);
+    }
+  }
+
+  return totalClawback;
+}
+
 // ============ MAIN HANDLER ============
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -289,7 +358,11 @@ Deno.serve(async (req) => {
   let processedCount = 0;
   let approvedCount = 0;
   let cancelledCount = 0;
+  let unmatchedCount = 0;
+  let rejectedCount = 0;
   let errorCount = 0;
+  let clawbackTotal = 0;
+  let newClawbacks = 0;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -334,6 +407,7 @@ Deno.serve(async (req) => {
 
     const adapter = createAdapter(config.crm_type, config.api_url, credentials);
 
+    // Fetch sales with validation_status to check for already processed ones
     const { data: sales, error: salesError } = await supabase
       .from("sales")
       .select(`
@@ -343,6 +417,8 @@ Deno.serve(async (req) => {
         adversus_external_id,
         adversus_opp_number,
         agent_name,
+        client_campaign_id,
+        validation_status,
         sale_datetime
       `)
       .eq("client_campaign_id", client_id)
@@ -357,45 +433,119 @@ Deno.serve(async (req) => {
 
     console.log(`[customer-crm-syncer] Found ${sales?.length || 0} sales to validate`);
 
-    const results: Array<{ saleId: string; status: string; matchedField?: string }> = [];
+    const results: Array<{ saleId: string; status: string; matchedField?: string; clawback?: number }> = [];
 
-    for (const sale of sales || []) {
+    for (const sale of (sales || []) as SaleRecord[]) {
       processedCount++;
       
       try {
-        const result = await adapter.validateSale(sale as SaleRecord, mappingConfig);
+        const result = await adapter.validateSale(sale, mappingConfig);
+        const previousStatus = sale.validation_status;
+        let newStatus = previousStatus;
 
         if (result.found && result.status) {
+          newStatus = result.status;
+          
           if (result.status === "approved") {
             approvedCount++;
           } else if (result.status === "cancelled") {
             cancelledCount++;
           }
+
+          // Update sale validation_status
+          if (previousStatus !== result.status) {
+            await supabase
+              .from("sales")
+              .update({ validation_status: result.status })
+              .eq("id", sale.id);
+
+            // Create clawback if status changed to cancelled/rejected and wasn't before
+            if ((result.status === "cancelled" || result.status === "unknown") && 
+                previousStatus !== "cancelled" && previousStatus !== "rejected") {
+              
+              // Fetch sale items for commission calculation
+              const { data: saleItems } = await supabase
+                .from("sale_items")
+                .select("id, sale_id, mapped_commission, quantity")
+                .eq("sale_id", sale.id);
+
+              if (saleItems && saleItems.length > 0) {
+                // Get client_id from client_campaigns
+                const { data: campaign } = await supabase
+                  .from("client_campaigns")
+                  .select("client_id")
+                  .eq("id", sale.client_campaign_id)
+                  .single();
+
+                if (campaign?.client_id) {
+                  const clawbackAmount = await createClawbackTransaction(
+                    supabase,
+                    sale,
+                    saleItems as SaleItemRecord[],
+                    campaign.client_id,
+                    "crm_sync"
+                  );
+                  
+                  if (clawbackAmount > 0) {
+                    clawbackTotal += clawbackAmount;
+                    newClawbacks++;
+                  }
+                }
+              }
+            }
+          }
           
           results.push({ 
             saleId: sale.id, 
             status: result.status,
-            matchedField: result.matchedField 
+            matchedField: result.matchedField,
+            clawback: result.status === "cancelled" ? clawbackTotal : undefined
           });
           
           console.log(`[customer-crm-syncer] Sale ${sale.id} (${sale.adversus_external_id}): ${result.status}`);
+        } else {
+          // Sale not found in CRM
+          unmatchedCount++;
+          
+          if (previousStatus !== "pending") {
+            await supabase
+              .from("sales")
+              .update({ validation_status: "pending" })
+              .eq("id", sale.id);
+          }
         }
       } catch (err) {
         errorCount++;
         console.error(`[customer-crm-syncer] Error validating sale ${sale.id}:`, err);
       }
 
+      // Rate limiting
       await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     const duration = Date.now() - startTime;
-    const status = errorCount === 0 ? "success" : errorCount === processedCount ? "failed" : "partial";
+    
+    // Build detailed status message
+    const statusParts: string[] = [];
+    statusParts.push(`Processed ${processedCount} sales`);
+    if (approvedCount > 0) statusParts.push(`${approvedCount} approved`);
+    if (cancelledCount > 0) statusParts.push(`${cancelledCount} cancelled`);
+    if (unmatchedCount > 0) statusParts.push(`${unmatchedCount} not found in CRM`);
+    if (newClawbacks > 0) statusParts.push(`${newClawbacks} clawbacks (${clawbackTotal.toLocaleString("da-DK")} DKK)`);
+    if (errorCount > 0) statusParts.push(`${errorCount} errors`);
 
+    const detailedStatus = errorCount === 0 
+      ? `Success: ${statusParts.join(", ")}`
+      : errorCount === processedCount 
+        ? `Failed: ${statusParts.join(", ")}`
+        : `Partial: ${statusParts.join(", ")}`;
+
+    // Update integration status with detailed message
     const { error: updateError } = await supabase
       .from("customer_integrations")
       .update({
         last_run_at: new Date().toISOString(),
-        last_status: status,
+        last_status: detailedStatus,
       })
       .eq("client_id", client_id);
 
@@ -403,7 +553,7 @@ Deno.serve(async (req) => {
       console.error("[customer-crm-syncer] Error updating status:", updateError);
     }
 
-    console.log(`[customer-crm-syncer] Completed in ${duration}ms. Processed: ${processedCount}, Approved: ${approvedCount}, Cancelled: ${cancelledCount}, Errors: ${errorCount}`);
+    console.log(`[customer-crm-syncer] ${detailedStatus} in ${duration}ms`);
 
     return new Response(
       JSON.stringify({
@@ -411,9 +561,14 @@ Deno.serve(async (req) => {
         processed: processedCount,
         approved: approvedCount,
         cancelled: cancelledCount,
+        unmatched: unmatchedCount,
         errors: errorCount,
+        clawbacks: {
+          count: newClawbacks,
+          total: clawbackTotal,
+        },
         duration_ms: duration,
-        status,
+        status: detailedStatus,
         results: results.slice(0, 20),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

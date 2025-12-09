@@ -878,6 +878,63 @@ export type Database = {
           },
         ]
       }
+      commission_transactions: {
+        Row: {
+          agent_name: string
+          amount: number
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          reason: string | null
+          sale_id: string | null
+          source: string | null
+          source_reference: string | null
+          transaction_type: string
+        }
+        Insert: {
+          agent_name: string
+          amount: number
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reason?: string | null
+          sale_id?: string | null
+          source?: string | null
+          source_reference?: string | null
+          transaction_type: string
+        }
+        Update: {
+          agent_name?: string
+          amount?: number
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reason?: string | null
+          sale_id?: string | null
+          source?: string | null
+          source_reference?: string | null
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_transactions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_transactions_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       communication_log: {
         Row: {
           booking_id: string | null
@@ -2662,6 +2719,7 @@ export type Database = {
           sale_datetime: string
           status: string | null
           updated_at: string | null
+          validation_status: string | null
         }
         Insert: {
           adversus_event_id?: string | null
@@ -2677,6 +2735,7 @@ export type Database = {
           sale_datetime?: string
           status?: string | null
           updated_at?: string | null
+          validation_status?: string | null
         }
         Update: {
           adversus_event_id?: string | null
@@ -2692,6 +2751,7 @@ export type Database = {
           sale_datetime?: string
           status?: string | null
           updated_at?: string | null
+          validation_status?: string | null
         }
         Relationships: [
           {
