@@ -2,7 +2,9 @@ import { DialerAdapter } from "./interface.ts";
 import { StandardSale, StandardUser, StandardCampaign, StandardProduct, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";
 
 interface EnreachCredentials {
-  api_token: string;
+  username?: string;
+  password?: string;
+  api_token?: string; // Fallback for Bearer token auth
   api_url?: string;
 }
 
@@ -12,8 +14,24 @@ export class EnreachAdapter implements DialerAdapter {
 
   constructor(credentials: EnreachCredentials) {
     this.baseUrl = credentials.api_url || "https://hero01.herobase.com/api/v1";
+    
+    // Determine auth method: Basic (username/password) or Bearer (api_token)
+    let authHeader: string;
+    if (credentials.username && credentials.password) {
+      // Basic Authentication
+      const basicAuth = btoa(`${credentials.username}:${credentials.password}`);
+      authHeader = `Basic ${basicAuth}`;
+      console.log("[EnreachAdapter] Using Basic Authentication");
+    } else if (credentials.api_token) {
+      // Fallback to Bearer token
+      authHeader = `Bearer ${credentials.api_token}`;
+      console.log("[EnreachAdapter] Using Bearer Token Authentication");
+    } else {
+      throw new Error("[EnreachAdapter] No valid credentials provided. Require username/password or api_token.");
+    }
+
     this.headers = {
-      "Authorization": `Bearer ${credentials.api_token}`,
+      "Authorization": authHeader,
       "Content-Type": "application/json",
     };
   }
@@ -139,12 +157,13 @@ export class EnreachAdapter implements DialerAdapter {
       const results = data.results || [];
       console.log(`[EnreachAdapter] Fetched ${results.length} sales`);
 
-      // Build campaign mapping lookup
+      // Build campaign mapping lookup by external campaign ID
       const mappingLookup = new Map<string, CampaignMappingConfig>();
       if (campaignMappings) {
         for (const mapping of campaignMappings) {
           mappingLookup.set(mapping.adversusCampaignId, mapping);
         }
+        console.log(`[EnreachAdapter] Loaded ${campaignMappings.length} campaign mappings`);
       }
 
       return results.map((result) => {
@@ -152,7 +171,7 @@ export class EnreachAdapter implements DialerAdapter {
         const contact = result.contact || result.lead;
         const campaignId = result.flow_id || result.campaign_id || "";
         
-        // Get mapping config for this campaign (Enreach uses same mapping table)
+        // Get mapping config for this campaign
         const mapping = mappingLookup.get(campaignId);
         
         // Extract external reference (OPP) from call variables
@@ -160,9 +179,15 @@ export class EnreachAdapter implements DialerAdapter {
         let externalReference: string | null = null;
         
         if (mapping?.referenceConfig) {
+          // Use configured extraction method
           externalReference = this.extractReference(variables, mapping.referenceConfig);
-        } else {
-          // Fallback: search for common OPP field patterns in Enreach
+          if (externalReference) {
+            console.log(`[EnreachAdapter] Extracted reference via config: ${externalReference}`);
+          }
+        } 
+        
+        if (!externalReference) {
+          // Fallback: search for common OPP field patterns
           externalReference = this.searchForOppInVariables(variables);
         }
 
