@@ -9,7 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Phone, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, AlertTriangle, AlarmClock, FileText, Send, Palmtree, History } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, Phone, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, AlertTriangle, AlarmClock, FileText, Send, Palmtree, History, Lock } from "lucide-react";
 import { SendContractDialog } from "@/components/contracts/SendContractDialog";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
 import { TeamLeaderTeams } from "@/components/employees/TeamLeaderTeams";
@@ -18,7 +21,7 @@ import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-
+import { useCanAccess } from "@/hooks/useSystemRoles";
 interface EmployeeMasterDataRecord {
   id: string;
   first_name: string;
@@ -65,8 +68,12 @@ export default function EmployeeDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isOwner } = useCanAccess();
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
   const [sendContractOpen, setSendContractOpen] = useState(false);
+  const [setPasswordOpen, setSetPasswordOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [isSettingPassword, setIsSettingPassword] = useState(false);
 
   const { data: employee, isLoading, error } = useQuery({
     queryKey: ["employee-detail", id],
@@ -564,6 +571,16 @@ export default function EmployeeDetail() {
               <RotateCcw className="h-4 w-4 mr-2" />
               Nulstil login
             </Button>
+            {isOwner && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setSetPasswordOpen(true)}
+              >
+                <Lock className="h-4 w-4 mr-2" />
+                Sæt ny kode
+              </Button>
+            )}
           </div>
         </div>
 
@@ -1067,6 +1084,86 @@ export default function EmployeeDetail() {
             employee={employee}
           />
         )}
+
+        {/* Set Password Dialog - Only for owners */}
+        <Dialog open={setPasswordOpen} onOpenChange={(open) => {
+          setSetPasswordOpen(open);
+          if (!open) setNewPassword("");
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Sæt ny adgangskode</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">Ny adgangskode for {employee?.first_name} {employee?.last_name}</Label>
+                <Input
+                  id="new-password"
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Indtast ny adgangskode (mindst 6 tegn)"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSetPasswordOpen(false)}>
+                Annuller
+              </Button>
+              <Button 
+                disabled={isSettingPassword || newPassword.length < 6}
+                onClick={async () => {
+                  if (!employee?.private_email) {
+                    toast({ 
+                      title: "Mangler email", 
+                      description: "Medarbejderen har ikke en email registreret.",
+                      variant: "destructive"
+                    });
+                    return;
+                  }
+                  
+                  setIsSettingPassword(true);
+                  try {
+                    const { data, error } = await supabase.functions.invoke('set-user-password', {
+                      body: { email: employee.private_email, newPassword }
+                    });
+                    
+                    if (error) {
+                      toast({ 
+                        title: "Fejl", 
+                        description: error.message,
+                        variant: "destructive"
+                      });
+                    } else if (data?.error) {
+                      toast({ 
+                        title: "Fejl", 
+                        description: data.error,
+                        variant: "destructive"
+                      });
+                    } else {
+                      toast({ 
+                        title: "Adgangskode opdateret", 
+                        description: `Ny adgangskode er sat for ${employee.private_email}` 
+                      });
+                      setSetPasswordOpen(false);
+                      setNewPassword("");
+                    }
+                  } catch (err) {
+                    toast({ 
+                      title: "Fejl", 
+                      description: "Kunne ikke kontakte serveren",
+                      variant: "destructive"
+                    });
+                  } finally {
+                    setIsSettingPassword(false);
+                  }
+                }}
+              >
+                {isSettingPassword ? "Gemmer..." : "Gem adgangskode"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
