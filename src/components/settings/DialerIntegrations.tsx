@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Phone, Play, Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
 interface DialerIntegration {
   id: string;
@@ -42,6 +43,12 @@ export function DialerIntegrations() {
     password: "",
     api_url: "",
   });
+
+  // Manual function execution state
+  const [manualFunction, setManualFunction] = useState("backfill-opp");
+  const [manualDays, setManualDays] = useState("30");
+  const [manualLimit, setManualLimit] = useState("100");
+  const [isExecuting, setIsExecuting] = useState(false);
 
   // Fetch Dialer Integrations from new table
   const { data: integrations, isLoading } = useQuery({
@@ -141,6 +148,42 @@ export function DialerIntegrations() {
     setFormData({ name: "", provider: "adversus", username: "", password: "", api_url: "" });
     setEditingId(null);
     setIsDialogOpen(false);
+  };
+
+  // Execute manual function
+  const executeManualFunction = async () => {
+    setIsExecuting(true);
+    try {
+      toast.info(`Ejecutando ${manualFunction}...`);
+      
+      const body: Record<string, unknown> = {};
+      
+      // Build body based on function
+      if (manualFunction === "backfill-opp") {
+        body.limit = parseInt(manualLimit) || 100;
+      } else if (manualFunction === "integration-engine") {
+        body.source = "adversus";
+        body.action = "repair-history";
+        body.days = parseInt(manualDays) || 30;
+      } else if (manualFunction === "sync-adversus") {
+        body.days = parseInt(manualDays) || 7;
+      }
+
+      const { data, error } = await supabase.functions.invoke(manualFunction, { body });
+
+      if (error) throw error;
+
+      toast.success(`${manualFunction} ejecutado`, {
+        description: JSON.stringify(data).slice(0, 200),
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Error desconocido";
+      toast.error(`Error: ${errorMessage}`);
+    } finally {
+      setIsExecuting(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -340,6 +383,83 @@ export function DialerIntegrations() {
             </TableBody>
           </Table>
         )}
+
+        <Separator className="my-6" />
+
+        {/* Manual Function Execution Section */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Terminal className="h-4 w-4 text-muted-foreground" />
+            <h4 className="font-medium">Ejecutar Función Manual</h4>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Ejecuta funciones edge específicas con parámetros personalizados.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="space-y-2">
+              <Label>Función</Label>
+              <Select value={manualFunction} onValueChange={setManualFunction}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="backfill-opp">backfill-opp</SelectItem>
+                  <SelectItem value="integration-engine">integration-engine (repair)</SelectItem>
+                  <SelectItem value="sync-adversus">sync-adversus</SelectItem>
+                  <SelectItem value="cleanup-inactive-employees">cleanup-inactive-employees</SelectItem>
+                  <SelectItem value="send-contract-reminders">send-contract-reminders</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(manualFunction === "integration-engine" || manualFunction === "sync-adversus") && (
+              <div className="space-y-2">
+                <Label>Días (days)</Label>
+                <Input
+                  type="number"
+                  value={manualDays}
+                  onChange={(e) => setManualDays(e.target.value)}
+                  placeholder="30"
+                  min="1"
+                  max="365"
+                />
+              </div>
+            )}
+
+            {manualFunction === "backfill-opp" && (
+              <div className="space-y-2">
+                <Label>Límite (limit)</Label>
+                <Input
+                  type="number"
+                  value={manualLimit}
+                  onChange={(e) => setManualLimit(e.target.value)}
+                  placeholder="100"
+                  min="1"
+                  max="1000"
+                />
+              </div>
+            )}
+
+            <Button
+              onClick={executeManualFunction}
+              disabled={isExecuting}
+              className="h-10"
+            >
+              {isExecuting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Ejecutando...
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Ejecutar
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
