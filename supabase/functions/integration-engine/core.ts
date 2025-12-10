@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { StandardSale, StandardUser, StandardCampaign, StandardProduct, CampaignMappingConfig, ReferenceExtractionConfig } from "./types.ts";
+import { StandardSale, StandardUser, StandardCampaign, StandardProduct, StandardCall, CampaignMappingConfig, ReferenceExtractionConfig } from "./types.ts";
 
 export class IngestionEngine {
   private supabase: SupabaseClient;
@@ -343,5 +343,124 @@ export class IngestionEngine {
         needs_mapping: !productId,
       });
     }
+  }
+
+  // --- 4. PROCESAR LLAMADAS (CDR - GDPR Compliant) ---
+  async processCalls(calls: StandardCall[], batchSize = 500) {
+    if (calls.length === 0) return { processed: 0, errors: 0, matched: 0 };
+
+    const sampleCall = calls[0];
+    this.log("INFO", `Procesando ${calls.length} llamadas de ${sampleCall.dialerName} (${sampleCall.integrationType}) en lotes de ${batchSize}...`);
+
+    // A. Cargar agentes para matching por external_adversus_id
+    const { data: agents } = await this.supabase
+      .from("agents")
+      .select("id, external_adversus_id, email");
+
+    // Mapas para matching O(1)
+    const agentMapByExtId = new Map(agents?.map(a => [a.external_adversus_id, a.id]) || []);
+    const agentMapByEmail = new Map(agents?.map(a => [a.email?.toLowerCase(), a.id]) || []);
+
+    let totalProcessed = 0;
+    let totalErrors = 0;
+    let totalMatched = 0;
+
+    // Process in batches
+    const totalBatches = Math.ceil(calls.length / batchSize);
+    
+    for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+      const start = batchNum * batchSize;
+      const end = Math.min(start + batchSize, calls.length);
+      const batch = calls.slice(start, end);
+      
+      this.log("INFO", `Procesando lote de llamadas ${batchNum + 1}/${totalBatches} (${batch.length} llamadas)...`);
+      
+      const { processed, errors, matched } = await this.processCallsBatch(batch, agentMapByExtId, agentMapByEmail);
+      totalProcessed += processed;
+      totalErrors += errors;
+      totalMatched += matched;
+      
+      this.log("INFO", `Lote ${batchNum + 1} completado: ${processed} procesadas, ${matched} matched, ${errors} errores`);
+    }
+
+    return { processed: totalProcessed, errors: totalErrors, matched: totalMatched };
+  }
+
+  // Process a single batch of calls using BULK UPSERT
+  private async processCallsBatch(
+    calls: StandardCall[],
+    agentMapByExtId: Map<string, string>,
+    agentMapByEmail: Map<string, string>
+  ) {
+    let processed = 0;
+    let errors = 0;
+    let matched = 0;
+
+    // Prepare ALL calls for UPSERT
+    const allCallsData: any[] = [];
+
+    for (const call of calls) {
+      try {
+        // Match agent by external_adversus_id first, then by email
+        let agentId = agentMapByExtId.get(call.agentExternalId) || null;
+        
+        // If not found by external ID, check metadata for email
+        if (!agentId && call.metadata) {
+          const agentEmail = (call.metadata as any).agentEmail?.toLowerCase();
+          if (agentEmail) {
+            agentId = agentMapByEmail.get(agentEmail) || null;
+          }
+        }
+
+        if (agentId) matched++;
+
+        const callData = {
+          external_id: call.externalId,
+          integration_type: call.integrationType,
+          dialer_name: call.dialerName,
+          start_time: call.startTime,
+          end_time: call.endTime,
+          duration_seconds: call.durationSeconds,
+          total_duration_seconds: call.totalDurationSeconds,
+          status: call.status,
+          agent_external_id: call.agentExternalId,
+          campaign_external_id: call.campaignExternalId,
+          lead_external_id: call.leadExternalId,
+          agent_id: agentId,
+          recording_url: call.recordingUrl || null,
+          metadata: call.metadata || null,
+          updated_at: new Date().toISOString(),
+        };
+
+        allCallsData.push(callData);
+        processed++;
+      } catch (e) {
+        errors++;
+        const errMsg = e instanceof Error ? e.message : String(e);
+        this.log("ERROR", `Error preparando llamada ${call.externalId}`, errMsg);
+      }
+    }
+
+    // BULK UPSERT all calls (1 query)
+    try {
+      if (allCallsData.length > 0) {
+        const { error: upsertError } = await this.supabase
+          .from("dialer_calls")
+          .upsert(allCallsData, {
+            onConflict: "external_id,integration_type,dialer_name",
+            ignoreDuplicates: false
+          });
+
+        if (upsertError) throw upsertError;
+      }
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      this.log("ERROR", `Error en upsert bulk de llamadas`, errMsg);
+      errors += calls.length;
+      processed = 0;
+      matched = 0;
+    }
+
+    return { processed, errors, matched };
   }
 }

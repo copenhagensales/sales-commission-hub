@@ -335,6 +335,19 @@ serve(async (req) => {
           runResults["sales"] = await engine.processSales(sales);
         }
 
+        // --- CALLS (CDR - GDPR Compliant) ---
+        if (actionList.includes("calls")) {
+          if (adapter.fetchCalls) {
+            console.log(`[Integration Engine] Fetching calls for ${integration.name}...`);
+            const calls = await adapter.fetchCalls(days);
+            console.log(`[Integration Engine] Fetched ${calls.length} calls`);
+            runResults["calls"] = await engine.processCalls(calls);
+          } else {
+            console.log(`[Integration Engine] Adapter for ${integration.name} does not support fetchCalls`);
+            runResults["calls"] = { processed: 0, errors: 0, matched: 0, message: "Adapter does not support calls" };
+          }
+        }
+
         // Actualizar timestamp de última sincronización
         await supabase
           .from("dialer_integrations")
