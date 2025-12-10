@@ -53,100 +53,56 @@ export default function AdversusData() {
 
   const queryClient = useQueryClient();
   const [showAllEvents, setShowAllEvents] = useState(false);
-  const [isBackfilling, setIsBackfilling] = useState(false);
-  const [backfillStatus, setBackfillStatus] = useState<{ remaining: number; lastProcessed: number } | null>(null);
+  const [isRepairing, setIsRepairing] = useState(false);
 
   const { data: missingOppCount } = useQuery({
     queryKey: ["missing-opp-count"],
     queryFn: async () => {
+      // Only count Adversus sales missing OPP (Enreach doesn't have OPP)
       const { count, error } = await supabase
         .from("sales")
         .select("id", { count: "exact", head: true })
         .is("adversus_opp_number", null)
-        .not("adversus_event_id", "is", null);
+        .or("integration_type.eq.adversus,integration_type.is.null");
       if (error) throw error;
       return count ?? 0;
     },
   });
 
-  const handleBackfillOpp = async () => {
-    setIsBackfilling(true);
-    let totalProcessed = 0;
-    let remaining = 0;
+  const handleRepairHistory = async () => {
+    setIsRepairing(true);
     
     try {
-      while (true) {
-        const response = await supabase.functions.invoke("backfill-opp", {});
-        
-        // Log full response for debugging
-        console.log("backfill-opp response:", response);
-        
-        if (response.error) {
-          throw new Error(response.error.message);
+      toast.info("Starter bulk reparation af historik (90 dage)...");
+      
+      const response = await supabase.functions.invoke("integration-engine", {
+        body: { 
+          source: "adversus",
+          action: "repair-history", 
+          days: 90 
         }
-        
-        const data = response.data;
-        console.log("backfill-opp data:", data);
-        
-        if (!data.success) {
-          throw new Error(data.error || "Ukendt fejl");
-        }
-        
-        // Safely handle undefined/null values - use explicit checks
-        const successfulCount = typeof data.successful === 'number' ? data.successful : 0;
-        const processedCount = typeof data.processed === 'number' ? data.processed : 0;
-        const noOppCount = typeof data.noOppFound === 'number' ? data.noOppFound : 0;
-        remaining = typeof data.remaining === 'number' ? data.remaining : 0;
-        
-        totalProcessed += successfulCount;
-        
-        // Only update status if we have valid numbers
-        if (!isNaN(totalProcessed) && !isNaN(remaining)) {
-          setBackfillStatus({ remaining, lastProcessed: totalProcessed });
-        }
-        
-        // Show warning if OPP field not found in any sales
-        if (processedCount > 0 && successfulCount === 0 && noOppCount > 0) {
-          toast.warning(`${noOppCount} salg behandlet, men ingen OPP numre fundet. Tjek om 'OPP' feltet findes i Adversus.`);
-        }
-        
-        // Log detailed results if available
-        if (data.results && Array.isArray(data.results)) {
-          const noOppResults = data.results.filter((r: any) => r.status === 'no_opp');
-          const errorResults = data.results.filter((r: any) => r.status === 'error');
-          
-          if (noOppResults.length > 0) {
-            console.log("Sales without OPP in Adversus:", noOppResults);
-          }
-          if (errorResults.length > 0) {
-            console.log("Sales with errors:", errorResults);
-          }
-        }
-        
-        // Break if no more to process or nothing was processed
-        if (remaining === 0 || processedCount === 0) {
-          // Show specific message if nothing was found
-          if (processedCount === 0 && totalProcessed === 0) {
-            toast.info("Ingen salg fundet der mangler OPP nummer.");
-          }
-          break;
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 500));
+      });
+      
+      console.log("repair-history response:", response);
+      
+      if (response.error) {
+        throw new Error(response.error.message);
       }
       
-      if (totalProcessed > 0) {
-        toast.success(`Færdig! Opdaterede ${totalProcessed} salg med OPP.`);
+      const data = response.data;
+      
+      if (!data.success) {
+        throw new Error(data.error || "Ukendt fejl");
       }
+      
+      toast.success(`Bulk reparation færdig! Behandlet ${data.totalProcessed} salg med ${data.totalErrors} fejl.`);
       queryClient.invalidateQueries({ queryKey: ["missing-opp-count"] });
+      queryClient.invalidateQueries({ queryKey: ["adversus-stats"] });
     } catch (error) {
-      console.error("Backfill error:", error);
-      toast.error("Fejl ved OPP backfill: " + (error instanceof Error ? error.message : "Ukendt fejl"));
-      if (totalProcessed > 0) {
-        toast.info(`Nåede at opdatere ${totalProcessed} salg før fejlen.`);
-      }
+      console.error("Repair history error:", error);
+      toast.error("Fejl ved reparation: " + (error instanceof Error ? error.message : "Ukendt fejl"));
     } finally {
-      setIsBackfilling(false);
+      setIsRepairing(false);
     }
   };
 
@@ -352,7 +308,7 @@ export default function AdversusData() {
             <Card className="border-amber-500/50">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-amber-500" /> Salg mangler OPP nummer
+                  <AlertCircle className="h-4 w-4 text-amber-500" /> Adversus salg mangler OPP nummer
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -360,22 +316,17 @@ export default function AdversusData() {
                   <div>
                     <p className="text-2xl font-bold text-amber-500">{missingOppCount}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Salg uden OPP nummer (hentes 10 ad gangen pga rate limiting)
+                      Bulk synkronisering henter 100+ salg pr. API-kald (hurtig)
                     </p>
-                    {backfillStatus && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Sidst hentet: {backfillStatus.lastProcessed} | Tilbage: {backfillStatus.remaining}
-                      </p>
-                    )}
                   </div>
                   <Button 
-                    onClick={handleBackfillOpp} 
-                    disabled={isBackfilling}
+                    onClick={handleRepairHistory} 
+                    disabled={isRepairing}
                     variant="outline"
                     className="border-amber-500 text-amber-500 hover:bg-amber-500/10"
                   >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${isBackfilling ? 'animate-spin' : ''}`} />
-                    {isBackfilling ? 'Henter...' : 'Hent OPP numre'}
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isRepairing ? 'animate-spin' : ''}`} />
+                    {isRepairing ? 'Reparerer...' : 'Reparer Historik (Bulk)'}
                   </Button>
                 </div>
               </CardContent>
