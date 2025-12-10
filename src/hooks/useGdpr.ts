@@ -6,7 +6,7 @@ export function useGdprConsents() {
   const { user } = useAuth();
 
   // Use the same RPC function as useGiveConsent for consistency
-  const { data: employeeId } = useQuery({
+  const { data: employeeId, isLoading: employeeIdLoading } = useQuery({
     queryKey: ["current-employee-id-gdpr-rpc", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_current_employee_id");
@@ -16,7 +16,7 @@ export function useGdprConsents() {
     enabled: !!user?.id,
   });
 
-  return useQuery({
+  const consentsQuery = useQuery({
     queryKey: ["gdpr-consents", employeeId],
     queryFn: async () => {
       if (!employeeId) return [];
@@ -33,6 +33,14 @@ export function useGdprConsents() {
     },
     enabled: !!employeeId,
   });
+
+  // Combine loading states - still loading if either query is loading OR employeeId query hasn't returned yet
+  const isLoading = employeeIdLoading || (!employeeId && !!user?.id) || consentsQuery.isLoading;
+
+  return {
+    data: consentsQuery.data,
+    isLoading,
+  };
 }
 
 export function useHasDataProcessingConsent() {
