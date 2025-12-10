@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle, AlertTriangle, Database, RefreshCw, ChevronLeft, ChevronRight, CalendarIcon, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { da } from "date-fns/locale";
@@ -25,14 +26,16 @@ interface Sale {
   customer_phone: string | null;
   source: string | null;
   integration_type: string | null;
+  campaign_name: string | null;
 }
 
 const PAGE_SIZE = 50;
 
-type SortColumn = "integration_type" | "source" | "adversus_external_id" | "agent_name" | "customer_company" | "sale_datetime" | "adversus_opp_number";
+type SortColumn = "integration_type" | "source" | "adversus_external_id" | "agent_name" | "customer_company" | "sale_datetime" | "adversus_opp_number" | "campaign_name";
 type SortDirection = "asc" | "desc";
 
 export default function DialerData() {
+  const [activeTab, setActiveTab] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [page, setPage] = useState(0);
@@ -89,19 +92,28 @@ export default function DialerData() {
   });
 
   const { data: salesData, isLoading, refetch } = useQuery({
-    queryKey: ["dialer-sales", sourceFilter, page, dateFrom, dateTo, searchTerm, sortColumn, sortDirection],
+    queryKey: ["dialer-sales", activeTab, sourceFilter, page, dateFrom, dateTo, searchTerm, sortColumn, sortDirection],
     queryFn: async () => {
       const fromDate = dateFrom ? startOfDay(dateFrom).toISOString() : undefined;
       const toDate = dateTo ? endOfDay(dateTo).toISOString() : undefined;
 
       let query = supabase
         .from("sales")
-        .select("id, adversus_external_id, agent_name, sale_datetime, adversus_opp_number, customer_company, customer_phone, source, integration_type", { count: "exact" })
-        .order(sortColumn, { ascending: sortDirection === "asc", nullsFirst: false })
+        .select(`
+          id, adversus_external_id, agent_name, sale_datetime, adversus_opp_number, 
+          customer_company, customer_phone, source, integration_type,
+          client_campaigns(name)
+        `, { count: "exact" })
+        .order(sortColumn === "campaign_name" ? "sale_datetime" : sortColumn, { ascending: sortDirection === "asc", nullsFirst: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
+      // Apply tab filter
+      if (activeTab !== "all") {
+        query = query.eq("integration_type", activeTab);
+      }
+
       if (sourceFilter !== "all") {
-        query = query.eq("integration_type", sourceFilter);
+        query = query.eq("source", sourceFilter);
       }
 
       if (fromDate) {
@@ -118,7 +130,15 @@ export default function DialerData() {
 
       const { data, error, count } = await query;
       if (error) throw error;
-      return { sales: data as Sale[], totalCount: count || 0 };
+      
+      // Transform data to include campaign_name
+      const transformedData = (data || []).map((sale: any) => ({
+        ...sale,
+        campaign_name: sale.client_campaigns?.name || null,
+        client_campaigns: undefined
+      }));
+      
+      return { sales: transformedData as Sale[], totalCount: count || 0 };
     },
   });
 
@@ -170,6 +190,20 @@ export default function DialerData() {
       ? <ArrowUp className="h-4 w-4 ml-1" /> 
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
+
+  // Get unique dialer names for filter
+  const { data: dialerNames } = useQuery({
+    queryKey: ["dialer-names", activeTab],
+    queryFn: async () => {
+      let query = supabase.from("sales").select("source").not("source", "is", null);
+      if (activeTab !== "all") {
+        query = query.eq("integration_type", activeTab);
+      }
+      const { data } = await query;
+      const uniqueNames = [...new Set((data || []).map(s => s.source).filter(Boolean))];
+      return uniqueNames as string[];
+    },
+  });
 
   return (
     <MainLayout>
@@ -234,59 +268,76 @@ export default function DialerData() {
           </Card>
         </div>
 
-        {/* Filters */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex flex-col md:flex-row md:items-center gap-4">
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />
-                Salgsdata
-              </CardTitle>
-              <div className="flex flex-wrap items-center gap-2 ml-auto">
-                {/* Date Presets */}
-                <div className="flex gap-1">
-                  <Button variant="outline" size="sm" onClick={() => handleDatePreset(7)}>7 dage</Button>
-                  <Button variant="outline" size="sm" onClick={() => handleDatePreset(30)}>30 dage</Button>
-                  <Button variant="outline" size="sm" onClick={() => handleDatePreset(90)}>90 dage</Button>
-                </div>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setPage(0); setSourceFilter("all"); }}>
 
-                {/* Date From */}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-[130px] justify-start text-left font-normal">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Fra"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); setPage(0); }} />
-                  </PopoverContent>
-                </Popover>
+          <TabsList>
+            <TabsTrigger value="all">Alle ({stats?.total || 0})</TabsTrigger>
+            <TabsTrigger value="adversus" className="gap-2">
+              <Badge className="bg-blue-600 text-xs">Adversus</Badge>
+              {stats?.adversus || 0}
+            </TabsTrigger>
+            <TabsTrigger value="enreach" className="gap-2">
+              <Badge className="bg-purple-600 text-xs">Enreach</Badge>
+              {stats?.enreach || 0}
+            </TabsTrigger>
+          </TabsList>
 
-                {/* Date To */}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-[130px] justify-start text-left font-normal">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateTo ? format(dateTo, "dd/MM/yyyy") : "Til"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); setPage(0); }} />
-                  </PopoverContent>
-                </Popover>
+          <TabsContent value={activeTab} className="mt-4">
+            {/* Filters */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex flex-col md:flex-row md:items-center gap-4">
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5" />
+                    Salgsdata
+                  </CardTitle>
+                  <div className="flex flex-wrap items-center gap-2 ml-auto">
+                    {/* Date Presets */}
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" onClick={() => handleDatePreset(7)}>7 dage</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDatePreset(30)}>30 dage</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDatePreset(90)}>90 dage</Button>
+                    </div>
 
-                {/* Source Filter */}
-                <Select value={sourceFilter} onValueChange={(v) => { setSourceFilter(v); setPage(0); }}>
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Kilde" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Alle kilder</SelectItem>
-                    <SelectItem value="adversus">Adversus</SelectItem>
-                    <SelectItem value="enreach">Enreach</SelectItem>
-                  </SelectContent>
-                </Select>
+                    {/* Date From */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-[130px] justify-start text-left font-normal">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Fra"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); setPage(0); }} />
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* Date To */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-[130px] justify-start text-left font-normal">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dateTo ? format(dateTo, "dd/MM/yyyy") : "Til"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); setPage(0); }} />
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* Dialer Filter */}
+                    <Select value={sourceFilter} onValueChange={(v) => { setSourceFilter(v); setPage(0); }}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Dialer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle dialere</SelectItem>
+                        {dialerNames?.map((name) => (
+                          <SelectItem key={name} value={name}>{name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
                 {/* Search */}
                 <div className="relative">
@@ -309,113 +360,119 @@ export default function DialerData() {
               </div>
             ) : (
               <>
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("integration_type")}>
-                          <div className="flex items-center">Integration<SortIcon column="integration_type" /></div>
-                        </TableHead>
-                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("source")}>
-                          <div className="flex items-center">Dialer<SortIcon column="source" /></div>
-                        </TableHead>
-                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("adversus_external_id")}>
-                          <div className="flex items-center">Dialer ID<SortIcon column="adversus_external_id" /></div>
-                        </TableHead>
-                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("agent_name")}>
-                          <div className="flex items-center">Agent<SortIcon column="agent_name" /></div>
-                        </TableHead>
-                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("customer_company")}>
-                          <div className="flex items-center">Kunde<SortIcon column="customer_company" /></div>
-                        </TableHead>
-                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("sale_datetime")}>
-                          <div className="flex items-center">Tidspunkt<SortIcon column="sale_datetime" /></div>
-                        </TableHead>
-                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("adversus_opp_number")}>
-                          <div className="flex items-center">OPP Status<SortIcon column="adversus_opp_number" /></div>
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sales.map((sale) => (
-                        <TableRow
-                          key={sale.id}
-                          className="cursor-pointer hover:bg-muted/50"
-                          onClick={() => setSelectedSale(sale)}
-                        >
-                        <TableCell>{getIntegrationBadge(sale.integration_type)}</TableCell>
-                        <TableCell className="text-sm">{sale.source || "-"}</TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {sale.adversus_external_id || "-"}
-                        </TableCell>
-                          <TableCell>{sale.agent_name || "-"}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{sale.customer_company || "-"}</TableCell>
-                          <TableCell>
-                            {sale.sale_datetime
-                              ? format(new Date(sale.sale_datetime), "dd. MMM yyyy HH:mm", { locale: da })
-                              : "-"}
-                          </TableCell>
-                          <TableCell>
-                            {sale.integration_type === "enreach" ? (
-                              <Badge variant="secondary" className="text-xs">Ej relevant</Badge>
-                            ) : sale.adversus_opp_number ? (
-                              <div className="flex items-center gap-2 text-green-500">
-                                <CheckCircle className="h-4 w-4" />
-                                <span className="font-mono text-xs">{sale.adversus_opp_number}</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1 text-yellow-500">
-                                <AlertTriangle className="h-4 w-4" />
-                                <span className="text-xs">Mangler</span>
-                              </div>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    {sales.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                          Ingen salg fundet
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("integration_type")}>
+                              <div className="flex items-center">Integration<SortIcon column="integration_type" /></div>
+                            </TableHead>
+                            <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("source")}>
+                              <div className="flex items-center">Dialer<SortIcon column="source" /></div>
+                            </TableHead>
+                            <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("campaign_name")}>
+                              <div className="flex items-center">Kampagne<SortIcon column="campaign_name" /></div>
+                            </TableHead>
+                            <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("adversus_external_id")}>
+                              <div className="flex items-center">Dialer ID<SortIcon column="adversus_external_id" /></div>
+                            </TableHead>
+                            <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("agent_name")}>
+                              <div className="flex items-center">Agent<SortIcon column="agent_name" /></div>
+                            </TableHead>
+                            <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("customer_company")}>
+                              <div className="flex items-center">Kunde<SortIcon column="customer_company" /></div>
+                            </TableHead>
+                            <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("sale_datetime")}>
+                              <div className="flex items-center">Tidspunkt<SortIcon column="sale_datetime" /></div>
+                            </TableHead>
+                            <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("adversus_opp_number")}>
+                              <div className="flex items-center">OPP Status<SortIcon column="adversus_opp_number" /></div>
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sales.map((sale) => (
+                            <TableRow
+                              key={sale.id}
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => setSelectedSale(sale)}
+                            >
+                              <TableCell>{getIntegrationBadge(sale.integration_type)}</TableCell>
+                              <TableCell className="text-sm">{sale.source || "-"}</TableCell>
+                              <TableCell className="text-sm max-w-[120px] truncate">{sale.campaign_name || "-"}</TableCell>
+                              <TableCell className="font-mono text-sm">
+                                {sale.adversus_external_id || "-"}
+                              </TableCell>
+                              <TableCell>{sale.agent_name || "-"}</TableCell>
+                              <TableCell className="max-w-[150px] truncate">{sale.customer_company || "-"}</TableCell>
+                              <TableCell>
+                                {sale.sale_datetime
+                                  ? format(new Date(sale.sale_datetime), "dd. MMM yyyy HH:mm", { locale: da })
+                                  : "-"}
+                              </TableCell>
+                              <TableCell>
+                                {sale.integration_type === "enreach" ? (
+                                  <Badge variant="secondary" className="text-xs">Ej relevant</Badge>
+                                ) : sale.adversus_opp_number ? (
+                                  <div className="flex items-center gap-2 text-green-500">
+                                    <CheckCircle className="h-4 w-4" />
+                                    <span className="font-mono text-xs">{sale.adversus_opp_number}</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 text-yellow-500">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <span className="text-xs">Mangler</span>
+                                  </div>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {sales.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                                Ingen salg fundet
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
 
-                {/* Pagination */}
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-sm text-muted-foreground">
-                    Viser {sales.length} af {totalCount} salg
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage(p => Math.max(0, p - 1))}
-                      disabled={page === 0}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      Forrige
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                      Side {page + 1} af {Math.max(1, totalPages)}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage(p => p + 1)}
-                      disabled={page >= totalPages - 1}
-                    >
-                      Næste
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                    {/* Pagination */}
+                    <div className="flex items-center justify-between mt-4">
+                      <p className="text-sm text-muted-foreground">
+                        Viser {sales.length} af {totalCount} salg
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage(p => Math.max(0, p - 1))}
+                          disabled={page === 0}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          Forrige
+                        </Button>
+                        <span className="text-sm text-muted-foreground">
+                          Side {page + 1} af {Math.max(1, totalPages)}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage(p => p + 1)}
+                          disabled={page >= totalPages - 1}
+                        >
+                          Næste
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Sale Detail Dialog */}
         <Dialog open={!!selectedSale} onOpenChange={() => setSelectedSale(null)}>
