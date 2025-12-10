@@ -6,7 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAllPulseSurveys, usePulseSurveyResults, useActivatePulseSurvey } from "@/hooks/usePulseSurvey";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { TrendingUp, Users, Building, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -90,25 +92,38 @@ function AveragesChart({ averages }: { averages: Record<string, number> | null }
 export default function PulseSurveyResults() {
   const { data: surveys, isLoading: surveysLoading } = useAllPulseSurveys();
   const [selectedSurveyId, setSelectedSurveyId] = useState<string>();
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const { data: responses, isLoading: responsesLoading } = usePulseSurveyResults(selectedSurveyId);
   const activateSurvey = useActivatePulseSurvey();
 
+  // Fetch all teams
+  const { data: teams } = useQuery({
+    queryKey: ['teams-for-pulse'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('teams')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data;
+    }
+  });
+
   const selectedSurvey = surveys?.find(s => s.id === selectedSurveyId);
 
-  // Get unique departments
-  const departments = useMemo(() => {
-    if (!responses) return [];
-    const depts = [...new Set(responses.map(r => r.department).filter(Boolean))];
-    return depts.sort();
-  }, [responses]);
+  // Get teams that have responses
+  const teamsWithResponses = useMemo(() => {
+    if (!responses || !teams) return [];
+    const teamIds = new Set(responses.map(r => r.team_id).filter(Boolean));
+    return teams.filter(t => teamIds.has(t.id));
+  }, [responses, teams]);
 
-  // Filter responses by department
+  // Filter responses by team
   const filteredResponses = useMemo(() => {
     if (!responses) return [];
-    if (selectedDepartment === 'all') return responses;
-    return responses.filter(r => r.department === selectedDepartment);
-  }, [responses, selectedDepartment]);
+    if (selectedTeamId === 'all') return responses;
+    return responses.filter(r => r.team_id === selectedTeamId);
+  }, [responses, selectedTeamId]);
 
   // Calculate averages
   const averages = useMemo(() => calculateAverages(filteredResponses), [filteredResponses]);
@@ -196,21 +211,19 @@ export default function PulseSurveyResults() {
             </Select>
           </div>
           
-          {departments.length > 0 && (
-            <div className="w-48">
-              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Vælg afdeling" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Alle afdelinger</SelectItem>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div className="w-48">
+            <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Vælg team" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle teams (samlet)</SelectItem>
+                {teamsWithResponses.map((team) => (
+                  <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {responsesLoading ? (
@@ -237,7 +250,7 @@ export default function PulseSurveyResults() {
                 <CardContent>
                   <div className="text-2xl font-bold">{filteredResponses.length}</div>
                   <p className="text-xs text-muted-foreground">
-                    {selectedDepartment === 'all' ? 'Total' : selectedDepartment}
+                    {selectedTeamId === 'all' ? 'Alle teams' : teamsWithResponses.find(t => t.id === selectedTeamId)?.name}
                   </p>
                 </CardContent>
               </Card>
@@ -270,11 +283,11 @@ export default function PulseSurveyResults() {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Afdelinger</CardTitle>
+                  <CardTitle className="text-sm font-medium">Teams</CardTitle>
                   <Building className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{departments.length || 1}</div>
+                  <div className="text-2xl font-bold">{teamsWithResponses.length || 0}</div>
                   <p className="text-xs text-muted-foreground">Med besvarelser</p>
                 </CardContent>
               </Card>
@@ -291,9 +304,9 @@ export default function PulseSurveyResults() {
                 <Card>
                   <CardHeader>
                     <CardTitle>Gennemsnit pr. spørgsmål</CardTitle>
-                    <CardDescription>
-                      {selectedDepartment === 'all' ? 'Alle afdelinger' : selectedDepartment} - {filteredResponses.length} besvarelser
-                    </CardDescription>
+                  <CardDescription>
+                    {selectedTeamId === 'all' ? 'Alle teams' : teamsWithResponses.find(t => t.id === selectedTeamId)?.name} - {filteredResponses.length} besvarelser
+                  </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <AveragesChart averages={averages} />
@@ -355,7 +368,11 @@ export default function PulseSurveyResults() {
                         <div key={i} className="p-3 bg-muted rounded-lg">
                           <div className="flex items-center gap-2 mb-1">
                             <Badge variant="outline">NPS: {r.nps_score}</Badge>
-                            {r.department && <Badge variant="secondary">{r.department}</Badge>}
+                            {r.team_id && teams && (
+                              <Badge variant="secondary">
+                                {teams.find(t => t.id === r.team_id)?.name}
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-sm">{r.nps_comment}</p>
                         </div>
@@ -377,8 +394,10 @@ export default function PulseSurveyResults() {
                       .filter(r => r.improvement_suggestions)
                       .map((r, i) => (
                         <div key={i} className="p-3 bg-muted rounded-lg">
-                          {r.department && (
-                            <Badge variant="secondary" className="mb-2">{r.department}</Badge>
+                          {r.team_id && teams && (
+                            <Badge variant="secondary" className="mb-2">
+                              {teams.find(t => t.id === r.team_id)?.name}
+                            </Badge>
                           )}
                           <p className="text-sm">{r.improvement_suggestions}</p>
                         </div>

@@ -165,8 +165,7 @@ export default function PulseSurvey() {
           ...formData as PulseSurveyResponse,
           nps_comment: npsComment || undefined,
           improvement_suggestions: improvementSuggestions || undefined,
-        },
-        department: employee?.department || undefined
+        }
       });
 
       toast.success('Tak for din besvarelse!');

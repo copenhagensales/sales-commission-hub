@@ -98,29 +98,30 @@ export function useSubmitPulseSurvey() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ surveyId, response, department }: { 
+    mutationFn: async ({ surveyId, response }: { 
       surveyId: string; 
       response: PulseSurveyResponse;
-      department?: string;
     }) => {
-      // Insert anonymous response
+      // Get employee data including team
+      const { data: employee } = await supabase
+        .from('employee_master_data')
+        .select('id, team_id, team:teams(name)')
+        .eq('private_email', user?.email)
+        .single();
+
+      // Insert anonymous response with team_id
       const { error: responseError } = await supabase
         .from('pulse_survey_responses')
         .insert({
           survey_id: surveyId,
-          department,
+          team_id: employee?.team_id || null,
+          department: (employee?.team as any)?.name || null,
           ...response
         });
 
       if (responseError) throw responseError;
 
-      // Get employee ID and mark as completed
-      const { data: employee } = await supabase
-        .from('employee_master_data')
-        .select('id')
-        .eq('private_email', user?.email)
-        .single();
-
+      // Mark as completed
       if (employee) {
         const { error: completionError } = await supabase
           .from('pulse_survey_completions')
