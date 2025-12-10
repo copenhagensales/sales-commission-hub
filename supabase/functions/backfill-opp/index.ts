@@ -21,6 +21,35 @@ function formatDuration(ms: number): string {
   return minutes > 0 ? `${minutes}m ${remainingSeconds}s` : `${seconds}s`;
 }
 
+/**
+ * Validates if a value is a valid OPP number.
+ * Valid OPP numbers are:
+ * - Starts with "OPP-" (case insensitive)
+ * - Is exactly 4-6 digits long
+ * 
+ * Invalid examples (Lead IDs): 950265538 (9 digits)
+ */
+function isValidOppNumber(value: string | null | undefined): boolean {
+  if (!value || typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  
+  // Valid if starts with "OPP-" (case insensitive)
+  if (trimmed.toUpperCase().startsWith('OPP-')) {
+    return true;
+  }
+  
+  // Valid if exactly 4-6 digits (pure numeric OPP codes)
+  const digitsOnly = /^\d{4,6}$/;
+  if (digitsOnly.test(trimmed)) {
+    return true;
+  }
+  
+  // Anything else (like 9-digit Lead IDs) is invalid
+  console.log(`   ⚠️ Valor rechazado como OPP (parece Lead ID): "${trimmed}" (${trimmed.length} caracteres)`);
+  return false;
+}
+
 serve(async (req) => {
   const startTime = Date.now();
   
@@ -206,7 +235,7 @@ serve(async (req) => {
           continue;
         }
 
-        // Extract OPP number
+        // Extract OPP number with strict validation
         let oppNumber: string | null = null;
         const resultData = Array.isArray(lead.resultData) ? lead.resultData : [];
 
@@ -217,7 +246,13 @@ serve(async (req) => {
           );
 
           if (byId) {
-            oppNumber = (byId.value as string).trim();
+            const candidateValue = (byId.value as string).trim();
+            // Validate before accepting
+            if (isValidOppNumber(candidateValue)) {
+              oppNumber = candidateValue;
+            } else {
+              console.log(`   ⚠️ Campo ${OPP_FIELD_ID} contiene valor inválido: "${candidateValue}"`);
+            }
           } else {
             const byLabel = resultData.find(
               (rd: { label?: string; value?: string }) =>
@@ -229,7 +264,13 @@ serve(async (req) => {
             );
 
             if (byLabel) {
-              oppNumber = (byLabel.value as string).trim();
+              const candidateValue = (byLabel.value as string).trim();
+              // Validate before accepting
+              if (isValidOppNumber(candidateValue)) {
+                oppNumber = candidateValue;
+              } else {
+                console.log(`   ⚠️ Campo OPP por label contiene valor inválido: "${candidateValue}"`);
+              }
             }
           }
         }
