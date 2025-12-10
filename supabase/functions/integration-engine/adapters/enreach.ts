@@ -498,7 +498,8 @@ export class EnreachAdapter implements DialerAdapter {
 
   /**
    * GDPR-Compliant CDR fetch - only IDs and metadata, NO personal Lead data
-   * Uses HeroBase /calls or /activities endpoint for Call Detail Records
+   * Uses HeroBase /activities endpoint for Call Detail Records
+   * HeroBase doesn't have a dedicated /calls endpoint - calls are activities
    */
   async fetchCalls(days: number): Promise<StandardCall[]> {
     try {
@@ -510,77 +511,102 @@ export class EnreachAdapter implements DialerAdapter {
 
       let allCalls: Record<string, unknown>[] = [];
 
-      // Try /calls endpoint first (standard HeroBase)
-      try {
-        const endpoint = `/calls?ModifiedFrom=${modifiedFrom}`;
-        console.log(`[EnreachAdapter] Fetching from: ${endpoint}`);
-        const data = await this.get(endpoint) as unknown;
-        
-        if (Array.isArray(data)) {
-          allCalls = data as Record<string, unknown>[];
-        } else if (data && typeof data === 'object') {
-          const wrapper = data as Record<string, unknown>;
-          allCalls = (wrapper.Results || wrapper.results || wrapper.Calls || wrapper.calls || wrapper.Data || wrapper.data || []) as Record<string, unknown>[];
-        }
-      } catch (primaryError) {
-        console.warn("[EnreachAdapter] /calls failed, trying /activities:", primaryError);
-        
-        // Fallback to activities endpoint
+      // HeroBase uses /activities endpoint for call records
+      // Try different endpoint variations that HeroBase might support
+      const endpoints = [
+        `/activities?ModifiedFrom=${modifiedFrom}&Type=Call`,
+        `/activities?ModifiedFrom=${modifiedFrom}`,
+        `/callhistory?ModifiedFrom=${modifiedFrom}`,
+        `/calls?ModifiedFrom=${modifiedFrom}`,
+      ];
+
+      for (const endpoint of endpoints) {
         try {
-          const fallbackEndpoint = `/activities/completed?ModifiedFrom=${modifiedFrom}&ActivityType=Call`;
-          const data = await this.get(fallbackEndpoint) as unknown;
+          console.log(`[EnreachAdapter] Trying endpoint: ${endpoint}`);
+          const data = await this.get(endpoint) as unknown;
+          
+          let records: Record<string, unknown>[] = [];
           
           if (Array.isArray(data)) {
-            allCalls = data as Record<string, unknown>[];
+            records = data as Record<string, unknown>[];
           } else if (data && typeof data === 'object') {
             const wrapper = data as Record<string, unknown>;
-            allCalls = (wrapper.Results || wrapper.results || wrapper.Activities || wrapper.activities || []) as Record<string, unknown>[];
+            records = (
+              wrapper.Results || wrapper.results || 
+              wrapper.Calls || wrapper.calls || 
+              wrapper.Activities || wrapper.activities ||
+              wrapper.Data || wrapper.data || 
+              []
+            ) as Record<string, unknown>[];
           }
-        } catch (fallbackError) {
-          console.error("[EnreachAdapter] Fallback /activities also failed:", fallbackError);
-          return [];
+
+          if (records.length > 0) {
+            console.log(`[EnreachAdapter] Found ${records.length} records from ${endpoint}`);
+            allCalls = records;
+            break; // Found data, stop trying other endpoints
+          } else {
+            console.log(`[EnreachAdapter] Endpoint ${endpoint} returned empty array`);
+          }
+        } catch (endpointError) {
+          const errMsg = endpointError instanceof Error ? endpointError.message : String(endpointError);
+          console.log(`[EnreachAdapter] Endpoint ${endpoint} failed: ${errMsg}`);
+          // Continue to next endpoint
         }
       }
 
-      console.log(`[EnreachAdapter] Fetched ${allCalls.length} call records`);
+      if (allCalls.length === 0) {
+        console.log("[EnreachAdapter] No call records found from any endpoint");
+        console.log("[EnreachAdapter] HeroBase may not have call history API enabled for this account");
+        return [];
+      }
+
+      console.log(`[EnreachAdapter] Processing ${allCalls.length} call records`);
+      
+      // Log sample record structure for debugging
+      if (allCalls.length > 0) {
+        console.log(`[EnreachAdapter] Sample call record keys: ${Object.keys(allCalls[0]).slice(0, 15).join(', ')}`);
+      }
 
       // Map to StandardCall (GDPR-compliant - only IDs)
       return allCalls.map((call) => {
         const status = this.mapEnreachEndCause(
-          this.getStr(call, ['endCause', 'EndCause', 'status', 'Status', 'result', 'Result'])
+          this.getStr(call, ['endCause', 'EndCause', 'status', 'Status', 'result', 'Result', 'outcome', 'Outcome'])
         );
         
         const startTime = this.getStr(call, [
-          'startTime', 'StartTime', 'callStart', 'CallStart', 'started', 'Started', 'createdTime', 'CreatedTime'
+          'startTime', 'StartTime', 'callStart', 'CallStart', 'started', 'Started', 
+          'createdTime', 'CreatedTime', 'created', 'Created', 'timestamp', 'Timestamp'
         ]) || new Date().toISOString();
         
         const endTime = this.getStr(call, [
-          'endTime', 'EndTime', 'callEnd', 'CallEnd', 'ended', 'Ended'
+          'endTime', 'EndTime', 'callEnd', 'CallEnd', 'ended', 'Ended', 
+          'completedTime', 'CompletedTime'
         ]) || startTime;
 
         // Duration extraction - HeroBase uses seconds or durationSeconds
         const durationSeconds = Number(
-          this.getValue(call, ['seconds', 'Seconds', 'durationSeconds', 'DurationSeconds', 'talkTime', 'TalkTime']) || 0
+          this.getValue(call, ['seconds', 'Seconds', 'durationSeconds', 'DurationSeconds', 'talkTime', 'TalkTime', 'duration', 'Duration']) || 0
         );
         const totalDurationSeconds = Number(
-          this.getValue(call, ['totalSeconds', 'TotalSeconds', 'duration', 'Duration', 'totalDuration', 'TotalDuration']) || durationSeconds
+          this.getValue(call, ['totalSeconds', 'TotalSeconds', 'totalDuration', 'TotalDuration', 'ringTime', 'RingTime']) || durationSeconds
         );
 
         // Extract user/agent info (nested objects in HeroBase)
         const userObj = (call.user || call.User || call.agent || call.Agent || call.processedByUser || call.ProcessedByUser) as Record<string, unknown> | undefined;
         const agentExternalId = userObj 
           ? this.getStr(userObj, ['uniqueId', 'UniqueId', 'orgCode', 'OrgCode', 'id', 'Id'])
-          : this.getStr(call, ['userId', 'UserId', 'agentId', 'AgentId', 'userOrgCode', 'UserOrgCode']);
+          : this.getStr(call, ['userId', 'UserId', 'agentId', 'AgentId', 'userOrgCode', 'UserOrgCode', 'agent', 'Agent']);
 
         // Campaign info (nested object)
         const campaignObj = (call.campaign || call.Campaign || call.project || call.Project) as Record<string, unknown> | undefined;
         const campaignExternalId = campaignObj
           ? this.getStr(campaignObj, ['uniqueId', 'UniqueId', 'code', 'Code', 'id', 'Id'])
-          : this.getStr(call, ['campaignId', 'CampaignId', 'projectId', 'ProjectId']);
+          : this.getStr(call, ['campaignId', 'CampaignId', 'projectId', 'ProjectId', 'projectCode', 'ProjectCode']);
 
         // Lead ID - ONLY the ID, never the nested lead data (GDPR)
         const leadExternalId = this.getStr(call, [
-          'leadUniqueId', 'LeadUniqueId', 'leadId', 'LeadId', 'contactId', 'ContactId', 'uniqueId', 'UniqueId'
+          'leadUniqueId', 'LeadUniqueId', 'leadId', 'LeadId', 'contactId', 'ContactId', 
+          'uniqueId', 'UniqueId', 'id', 'Id'
         ]);
 
         // Recording URL (requires auth to access)
@@ -589,7 +615,7 @@ export class EnreachAdapter implements DialerAdapter {
         ]) || undefined;
 
         return {
-          externalId: this.getStr(call, ['uniqueId', 'UniqueId', 'id', 'Id', 'callId', 'CallId']),
+          externalId: this.getStr(call, ['uniqueId', 'UniqueId', 'id', 'Id', 'callId', 'CallId', 'activityId', 'ActivityId']),
           integrationType: "enreach" as const,
           dialerName: this.dialerName,
           
@@ -611,7 +637,7 @@ export class EnreachAdapter implements DialerAdapter {
           metadata: {
             endCause: this.getStr(call, ['endCause', 'EndCause']),
             direction: this.getStr(call, ['direction', 'Direction']),
-            callType: this.getStr(call, ['callType', 'CallType', 'type', 'Type']),
+            callType: this.getStr(call, ['callType', 'CallType', 'type', 'Type', 'activityType', 'ActivityType']),
             disposition: this.getStr(call, ['disposition', 'Disposition']),
           },
         };
