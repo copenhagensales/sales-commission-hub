@@ -181,25 +181,40 @@ serve(async (req) => {
       );
     }
 
+    const { integration_id } = await req.json().catch(() => ({}));
+    
     const engine = new IngestionEngine();
     
     // Fetch campaign mappings ONCE at the start for reference extraction
     const campaignMappings = await engine.getCampaignMappings();
     console.log(`[Integration Engine] Loaded ${campaignMappings.length} campaign mappings for reference extraction`);
 
-    // Buscar todas las integraciones activas del tipo solicitado
-    const { data: integrations, error } = await supabase
+    // Build query - if integration_id is provided, only fetch that specific one
+    let query = supabase
       .from("dialer_integrations")
       .select("*")
-      .eq("provider", source)
       .eq("is_active", true);
+    
+    if (integration_id) {
+      // Sync specific integration by ID
+      console.log(`[Integration Engine] Fetching specific integration: ${integration_id}`);
+      query = query.eq("id", integration_id);
+    } else if (source) {
+      // Sync all integrations of a specific provider type
+      console.log(`[Integration Engine] Fetching all ${source} integrations`);
+      query = query.eq("provider", source);
+    }
+
+    const { data: integrations, error } = await query;
 
     if (error) throw error;
     if (!integrations || integrations.length === 0) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: `No hay integraciones activas para ${source}`,
+          message: integration_id 
+            ? `Integración no encontrada o inactiva: ${integration_id}` 
+            : `No hay integraciones activas para ${source}`,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
