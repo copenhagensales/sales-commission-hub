@@ -138,7 +138,7 @@ export class AdversusAdapter implements DialerAdapter {
     });
   }
 
-  // Nueva estrategia: Construir mapa leadId -> OPP desde /leads con filtros por campaña (PARALELO)
+  // Construir mapa leadId -> OPP desde /leads con filtros por campaña (SECUENCIAL para evitar rate limit)
   private async buildLeadOppMap(
     sales: any[], 
     campaignConfigMap: Map<string, CampaignMappingConfig>
@@ -147,7 +147,7 @@ export class AdversusAdapter implements DialerAdapter {
 
     // 1. Obtener campaignIds únicos de las ventas
     const campaignIds = [...new Set(sales.map(s => s.campaignId).filter(Boolean))];
-    console.log(`[Adversus] Found ${campaignIds.length} unique campaigns, fetching leads in parallel...`);
+    console.log(`[Adversus] Found ${campaignIds.length} unique campaigns, fetching leads SEQUENTIALLY...`);
 
     // 2. Preparar configs para cada campaña
     const campaignConfigs = campaignIds.map(campaignId => {
@@ -162,8 +162,11 @@ export class AdversusAdapter implements DialerAdapter {
       return { campaignId, oppFieldId };
     });
 
-    // 3. Fetch paralelo de leads por campaña (todas las campañas a la vez)
-    const fetchPromises = campaignConfigs.map(async ({ campaignId, oppFieldId }) => {
+    // 3. Fetch SECUENCIAL de leads por campaña (evitar rate limit)
+    let totalLeads = 0;
+    let totalOpps = 0;
+
+    for (const { campaignId, oppFieldId } of campaignConfigs) {
       try {
         const filters = JSON.stringify({ campaignId: { "$eq": campaignId } });
         const url = `${this.baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=5000`;
@@ -173,8 +176,12 @@ export class AdversusAdapter implements DialerAdapter {
         });
 
         if (!res.ok) {
-          console.log(`[Adversus] Failed to fetch leads for campaign ${campaignId}: ${res.status}`);
-          return { campaignId, leads: [], oppsFound: 0 };
+          console.log(`[Adversus] Campaign ${campaignId}: Failed (${res.status})`);
+          // Delay extra si es rate limit
+          if (res.status === 429) {
+            await new Promise(r => setTimeout(r, 1000));
+          }
+          continue;
         }
 
         const data = await res.json();
@@ -198,7 +205,7 @@ export class AdversusAdapter implements DialerAdapter {
               }
             }
             
-            // Fallback: buscar patrón OPP-XXXXX
+            // Fallback: buscar patrón OPP-XXXXX en cualquier campo
             if (!oppValue) {
               for (const field of resultData) {
                 if (field.value) {
@@ -218,21 +225,18 @@ export class AdversusAdapter implements DialerAdapter {
           }
         }
 
-        return { campaignId, leads: leads.length, oppsFound };
+        totalLeads += leads.length;
+        totalOpps += oppsFound;
+        console.log(`[Adversus] Campaign ${campaignId}: ${leads.length} leads, ${oppsFound} OPPs`);
+
+        // Delay entre requests para evitar rate limit
+        await new Promise(r => setTimeout(r, 100));
       } catch (e) {
         console.error(`[Adversus] Error fetching leads for campaign ${campaignId}:`, e);
-        return { campaignId, leads: 0, oppsFound: 0 };
       }
-    });
-
-    // Ejecutar todos los fetches en paralelo
-    const results = await Promise.all(fetchPromises);
-    
-    // Log resultados
-    for (const r of results) {
-      console.log(`[Adversus] Campaign ${r.campaignId}: ${r.leads} leads, ${r.oppsFound} OPPs`);
     }
 
+    console.log(`[Adversus] Built OPP map with ${leadIdToOpp.size} entries (from ${totalLeads} leads, ${totalOpps} OPPs found)`);
     return leadIdToOpp;
   }
 
