@@ -54,6 +54,7 @@ export default function AdversusData() {
   const queryClient = useQueryClient();
   const [showAllEvents, setShowAllEvents] = useState(false);
   const [isRepairing, setIsRepairing] = useState(false);
+  const [isBackfilling, setIsBackfilling] = useState(false);
 
   const { data: missingOppCount } = useQuery({
     queryKey: ["missing-opp-count"],
@@ -103,6 +104,38 @@ export default function AdversusData() {
       toast.error("Fejl ved reparation: " + (error instanceof Error ? error.message : "Ukendt fejl"));
     } finally {
       setIsRepairing(false);
+    }
+  };
+
+  const handleBackfillOpp = async () => {
+    setIsBackfilling(true);
+    
+    try {
+      toast.info("Starter backfill af OPP numre (én ad gangen)...");
+      
+      const response = await supabase.functions.invoke("backfill-opp", {
+        body: { limit: 100 }
+      });
+      
+      console.log("backfill-opp response:", response);
+      
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+      
+      const data = response.data;
+      
+      if (!data.success) {
+        throw new Error(data.error || "Ukendt fejl");
+      }
+      
+      toast.success(`Backfill færdig! Opdateret ${data.updated} salg, ${data.skipped} uændret, ${data.errors} fejl.`);
+      queryClient.invalidateQueries({ queryKey: ["missing-opp-count"] });
+    } catch (error) {
+      console.error("Backfill OPP error:", error);
+      toast.error("Fejl ved backfill: " + (error instanceof Error ? error.message : "Ukendt fejl"));
+    } finally {
+      setIsBackfilling(false);
     }
   };
 
@@ -319,15 +352,26 @@ export default function AdversusData() {
                       Bulk synkronisering henter 100+ salg pr. API-kald (hurtig)
                     </p>
                   </div>
-                  <Button 
-                    onClick={handleRepairHistory} 
-                    disabled={isRepairing}
-                    variant="outline"
-                    className="border-amber-500 text-amber-500 hover:bg-amber-500/10"
-                  >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${isRepairing ? 'animate-spin' : ''}`} />
-                    {isRepairing ? 'Reparerer...' : 'Reparer Historik (Bulk)'}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handleRepairHistory} 
+                      disabled={isRepairing || isBackfilling}
+                      variant="outline"
+                      className="border-amber-500 text-amber-500 hover:bg-amber-500/10"
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-2 ${isRepairing ? 'animate-spin' : ''}`} />
+                      {isRepairing ? 'Reparerer...' : 'Reparer Historik (Bulk)'}
+                    </Button>
+                    <Button 
+                      onClick={handleBackfillOpp} 
+                      disabled={isRepairing || isBackfilling}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-2 ${isBackfilling ? 'animate-spin' : ''}`} />
+                      {isBackfilling ? 'Backfill...' : 'Backfill OPP'}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
