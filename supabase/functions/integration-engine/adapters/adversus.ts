@@ -71,6 +71,12 @@ export class AdversusAdapter implements DialerAdapter {
     const campaignConfigMap = new Map<string, CampaignMappingConfig>();
     campaignMappings?.forEach(m => campaignConfigMap.set(m.adversusCampaignId, m));
 
+    // Fetch users first to build a user lookup map
+    const users = await this.fetchUsers();
+    const userMap = new Map<string, StandardUser>();
+    users.forEach(u => userMap.set(u.externalId, u));
+    console.log(`[Adversus] Loaded ${users.length} users for agent lookup`);
+
     // Fetch secuencial con pageSize grande (1000) - más estable que paralelo
     const rawSales = await this.fetchSalesSequential(filterStr);
     console.log(`[Adversus] Fetched ${rawSales.length} sales`);
@@ -81,12 +87,26 @@ export class AdversusAdapter implements DialerAdapter {
     const leadIdToOpp = await this.buildLeadOppMap(rawSales, campaignConfigMap);
     console.log(`[Adversus] Built OPP map with ${leadIdToOpp.size} entries`);
 
-    // Mapeo a StandardSale usando el mapa de OPPs
+    // Mapeo a StandardSale usando el mapa de OPPs y el mapa de usuarios
     return rawSales.map((s: any) => {
       const agentObj = s.ownedBy || s.createdBy;
-      const agentId = typeof agentObj === "object" ? agentObj.id : agentObj;
-      const agentEmail = typeof agentObj === "object" ? agentObj.email : `agent-${agentId}@adversus.local`;
-      const agentName = typeof agentObj === "object" ? agentObj.name || agentObj.displayName : "Desconocido";
+      const agentId = typeof agentObj === "object" ? String(agentObj.id) : String(agentObj);
+      
+      // First try to get from the embedded object, then from userMap lookup
+      let agentEmail: string;
+      let agentName: string;
+      
+      if (typeof agentObj === "object" && agentObj.email) {
+        agentEmail = agentObj.email;
+        agentName = agentObj.name || agentObj.displayName || "Desconocido";
+      } else if (userMap.has(agentId)) {
+        const user = userMap.get(agentId)!;
+        agentEmail = user.email;
+        agentName = user.name;
+      } else {
+        agentEmail = `agent-${agentId}@adversus.local`;
+        agentName = "Desconocido";
+      }
 
       const campaignId = s.campaignId ? String(s.campaignId) : undefined;
       const leadId = s.leadId ? String(s.leadId) : undefined;
