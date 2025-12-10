@@ -8,7 +8,7 @@ export interface VagtEmployee {
   email: string | null;
   phone: string | null;
   is_active: boolean;
-  team: string | null;
+  team: string | null; // Maps to department field
 }
 
 export function useVagtEmployee() {
@@ -21,7 +21,7 @@ export function useVagtEmployee() {
 
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, private_email, private_phone, is_active, team_id")
+        .select("id, first_name, last_name, private_email, private_phone, is_active, department")
         .eq("id", user.id)
         .eq("job_title", "Fieldmarketing")
         .maybeSingle();
@@ -35,7 +35,7 @@ export function useVagtEmployee() {
         email: data.private_email,
         phone: data.private_phone,
         is_active: data.is_active ?? true,
-        team: null, // Team relationship handled separately
+        team: data.department, // Use department as team
       } as VagtEmployee;
     },
     enabled: !!user,
@@ -48,7 +48,7 @@ export function useVagtEmployees() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, private_email, private_phone, is_active")
+        .select("id, first_name, last_name, private_email, private_phone, is_active, department")
         .eq("job_title", "Fieldmarketing")
         .eq("is_active", true)
         .order("first_name");
@@ -61,7 +61,7 @@ export function useVagtEmployees() {
         email: emp.private_email,
         phone: emp.private_phone,
         is_active: emp.is_active ?? true,
-        team: null,
+        team: emp.department, // Use department as team
       })) as VagtEmployee[];
     },
   });

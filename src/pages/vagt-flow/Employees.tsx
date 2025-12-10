@@ -73,43 +73,45 @@ export default function VagtEmployees() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, private_email, private_phone, is_active")
+        .select("id, first_name, last_name, private_email, private_phone, is_active, department")
         .eq("job_title", "Fieldmarketing")
         .order("first_name");
 
       if (error) throw error;
       
-      // Map to expected format with full_name
+      // Map to expected format with full_name, using department as team
       return (data || []).map(emp => ({
         id: emp.id,
         full_name: `${emp.first_name} ${emp.last_name}`,
         email: emp.private_email,
         phone: emp.private_phone,
         is_active: emp.is_active ?? true,
-        team: null,
+        team: emp.department, // Use department as team
         role: "employee",
       }));
     },
   });
 
+  // Fetch absences from absence_request_v2 (same system as all employees)
   const { data: absences } = useQuery({
-    queryKey: ["vagt-week-absences", year, weekNumber],
+    queryKey: ["vagt-week-absences-v2", year, weekNumber],
     queryFn: async () => {
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
       const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
       const { data, error } = await supabase
-        .from("employee_absence")
-        .select("*")
+        .from("absence_request_v2")
+        .select("id, employee_id, type, start_date, end_date, status, comment")
         .lte("start_date", weekEndStr)
-        .gte("end_date", weekStartStr);
+        .gte("end_date", weekStartStr)
+        .in("status", ["approved", "pending"]);
 
       if (error) throw error;
       return data;
     },
   });
 
-  // Find absence ID for a specific employee and day
+  // Find absence for a specific employee and day (from absence_request_v2)
   const getAbsenceForDay = (employeeId: string, dayIndex: number) => {
     const date = weekDates[dayIndex];
     return absences?.find(a => {
@@ -120,6 +122,7 @@ export default function VagtEmployees() {
     });
   };
 
+  // Toggle day absence using absence_request_v2
   const toggleDayAbsenceMutation = useMutation({
     mutationFn: async (data: { employeeId: string; dayIndex: number; isAbsent: boolean; absenceId?: string }) => {
       const date = weekDates[data.dayIndex];
@@ -134,50 +137,50 @@ export default function VagtEmployees() {
           
           if (absenceStart === absenceEnd) {
             // Single day absence - just delete it
-            const { error } = await supabase.from("employee_absence").delete().eq("id", data.absenceId);
+            const { error } = await supabase.from("absence_request_v2").delete().eq("id", data.absenceId);
             if (error) throw error;
           } else if (absenceStart === dateStr) {
             // First day of multi-day - move start forward
             const newStart = format(addDays(date, 1), "yyyy-MM-dd");
-            const { error } = await supabase.from("employee_absence").update({ start_date: newStart }).eq("id", data.absenceId);
+            const { error } = await supabase.from("absence_request_v2").update({ start_date: newStart }).eq("id", data.absenceId);
             if (error) throw error;
           } else if (absenceEnd === dateStr) {
             // Last day of multi-day - move end backward
             const newEnd = format(addDays(date, -1), "yyyy-MM-dd");
-            const { error } = await supabase.from("employee_absence").update({ end_date: newEnd }).eq("id", data.absenceId);
+            const { error } = await supabase.from("absence_request_v2").update({ end_date: newEnd }).eq("id", data.absenceId);
             if (error) throw error;
           } else {
             // Middle of multi-day - split into two
-            const { error: updateError } = await supabase.from("employee_absence")
+            const { error: updateError } = await supabase.from("absence_request_v2")
               .update({ end_date: format(addDays(date, -1), "yyyy-MM-dd") })
               .eq("id", data.absenceId);
             if (updateError) throw updateError;
             
-            const { error: insertError } = await supabase.from("employee_absence").insert({
+            const { error: insertError } = await supabase.from("absence_request_v2").insert({
               employee_id: data.employeeId,
               start_date: format(addDays(date, 1), "yyyy-MM-dd"),
               end_date: absenceEnd,
-              reason: absence.reason,
+              type: absence.type,
               status: absence.status,
-              note: absence.note,
+              comment: absence.comment,
             });
             if (insertError) throw insertError;
           }
         }
       } else {
-        // Add absence for this day
-        const { error } = await supabase.from("employee_absence").insert({
+        // Add absence for this day using absence_request_v2
+        const { error } = await supabase.from("absence_request_v2").insert({
           employee_id: data.employeeId,
           start_date: dateStr,
           end_date: dateStr,
-          reason: "Andet" as const,
-          status: "APPROVED",
+          type: "vacation" as const,
+          status: "approved",
         });
         if (error) throw error;
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vagt-week-absences"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-week-absences-v2"] });
       toast({ title: "Tilgængelighed opdateret" });
     },
     onError: (error: any) => {
@@ -223,13 +226,20 @@ export default function VagtEmployees() {
     },
   });
 
+  // Add absence using absence_request_v2
   const addAbsenceMutation = useMutation({
     mutationFn: async (data: { employee_id: string; selectedDays: number[]; reason: "Ferie" | "Syg" | "Barn syg" | "Andet"; note: string; weekStart: Date }) => {
-      console.log("Adding absence with data:", data);
-      
       if (!data.selectedDays || data.selectedDays.length === 0) {
         throw new Error("Ingen dage valgt");
       }
+      
+      // Map reason to absence_type_v2 enum
+      const typeMap: Record<string, "vacation" | "sick"> = {
+        "Ferie": "vacation",
+        "Syg": "sick",
+        "Barn syg": "sick",
+        "Andet": "vacation",
+      };
       
       // Create individual absences for each selected day
       const absencesToInsert = data.selectedDays.map(dayIndex => {
@@ -239,28 +249,22 @@ export default function VagtEmployees() {
           employee_id: data.employee_id,
           start_date: dateStr,
           end_date: dateStr,
-          reason: data.reason,
-          note: data.note || null,
-          status: "APPROVED",
+          type: typeMap[data.reason] || "vacation",
+          comment: data.note || null,
+          status: "approved" as const,
         };
       });
 
-      console.log("Absences to insert:", absencesToInsert);
-
-      const { error } = await supabase.from("employee_absence").insert(absencesToInsert);
-      if (error) {
-        console.error("Supabase error:", error);
-        throw error;
-      }
+      const { error } = await supabase.from("absence_request_v2").insert(absencesToInsert);
+      if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vagt-week-absences"] });
+      queryClient.invalidateQueries({ queryKey: ["vagt-week-absences-v2"] });
       setShowAbsenceDialog(null);
       setAbsenceForm({ selectedDays: [], reason: "Ferie", note: "" });
       toast({ title: "Fravær tilføjet" });
     },
     onError: (error: any) => {
-      console.error("Mutation error:", error);
       toast({ title: "Fejl ved oprettelse af fravær", description: error.message, variant: "destructive" });
     },
   });
@@ -289,7 +293,7 @@ export default function VagtEmployees() {
   };
 
   const getEmployeeAbsenceDays = (employeeId: string) => {
-    const employeeAbsences = absences?.filter(a => a.employee_id === employeeId && a.status === "APPROVED") || [];
+    const employeeAbsences = absences?.filter(a => a.employee_id === employeeId && (a.status === "approved" || a.status === "pending")) || [];
     const absentDays: number[] = [];
 
     employeeAbsences.forEach(absence => {
@@ -357,13 +361,15 @@ export default function VagtEmployees() {
               className="w-[200px]"
             />
             <Select value={teamFilter} onValueChange={setTeamFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Alle teams" />
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Alle afdelinger" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Alle teams</SelectItem>
-                <SelectItem value="Eesy">Eesy</SelectItem>
-                <SelectItem value="YouSee">YouSee</SelectItem>
+                <SelectItem value="all">Alle afdelinger</SelectItem>
+                {/* Dynamic departments from employees */}
+                {[...new Set(employees?.map(e => e.team).filter(Boolean))].sort().map(dept => (
+                  <SelectItem key={dept} value={dept!}>{dept}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <div className="flex items-center gap-2 text-muted-foreground">
