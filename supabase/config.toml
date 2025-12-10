@@ -92,3 +92,6 @@ verify_jwt = true
 
 [functions.adversus-diagnostics]
 verify_jwt = false
+
+[functions.enreach-diagnostics]
+verify_jwt = false

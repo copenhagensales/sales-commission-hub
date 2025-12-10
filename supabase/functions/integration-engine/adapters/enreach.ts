@@ -208,7 +208,6 @@ export class EnreachAdapter implements DialerAdapter {
       
       if (allLeads.length > 0) {
         console.log(`[EnreachAdapter] Sample lead keys: ${Object.keys(allLeads[0]).slice(0, 15).join(', ')}`);
-        console.log(`[EnreachAdapter] Sample lead (first 500 chars): ${JSON.stringify(allLeads[0]).substring(0, 500)}`);
       }
 
       const mappingLookup = new Map<string, CampaignMappingConfig>();
@@ -220,58 +219,100 @@ export class EnreachAdapter implements DialerAdapter {
       }
 
       const sales = allLeads.map((lead: HeroBaseLead) => {
-        const externalId = this.getStr(lead, [
-          'uniqueId', 'UniqueId', 'LeadUniqueId', 'leadUniqueId',
-          'Id', 'id', 'LeadId', 'leadId', 'ExternalId', 'externalId'
-        ]);
+        // ===== HEROBASE SPECIFIC FIELD EXTRACTION =====
+        // The structure is: uniqueId, campaign: {uniqueId, code}, data: {Navn1, Navn2, Telefon1...}, firstProcessedByUser: {orgCode}
+        
+        // External ID - top level uniqueId
+        const externalId = this.getStr(lead, ['uniqueId', 'UniqueId']);
 
-        const agentObj = (lead.Agent || lead.agent || lead.User || lead.user || {}) as Record<string, unknown>;
-        const agentEmail = this.getStr(agentObj, ['email', 'Email', 'EmailAddress']) ||
-                          this.getStr(lead, ['AgentEmail', 'agentEmail', 'UserEmail', 'userEmail', 'Agent.Email']);
-        const agentName = this.getStr(agentObj, ['name', 'Name', 'FullName']) ||
-                         this.getStr(lead, ['AgentName', 'agentName', 'UserName', 'userName', 'Agent.Name']);
-        const agentId = this.getStr(agentObj, ['uniqueId', 'UniqueId', 'Id', 'id']) ||
-                       this.getStr(lead, ['AgentId', 'agentId', 'UserId', 'userId']);
+        // Campaign info - nested in campaign object
+        const campaignObj = (lead.campaign || lead.Campaign) as Record<string, unknown> | undefined;
+        const campaignId = campaignObj ? this.getStr(campaignObj, ['uniqueId', 'UniqueId', 'code']) : "";
+        const campaignCode = campaignObj ? this.getStr(campaignObj, ['code', 'Code']) : "";
+        
+        // Agent info - from firstProcessedByUser.orgCode (this is the agent email)
+        const firstProcessedByUser = (lead.firstProcessedByUser || lead.FirstProcessedByUser) as Record<string, unknown> | undefined;
+        const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
+        
+        const agentEmail = firstProcessedByUser?.orgCode as string || 
+                          lastModifiedByUser?.orgCode as string || 
+                          this.getStr(lead, ['agentEmail', 'AgentEmail', 'userEmail', 'UserEmail']);
+        
+        // Extract agent name from email (e.g., "noif@copenhagensales.dk" -> "noif")
+        const agentName = agentEmail ? agentEmail.split('@')[0] : "";
 
-        const campaignObj = (lead.Campaign || lead.campaign || lead.Project || lead.project || {}) as Record<string, unknown>;
-        const campaignId = this.getStr(campaignObj, ['uniqueId', 'UniqueId', 'Id', 'id']) ||
-                          this.getStr(lead, ['CampaignId', 'campaignId', 'ProjectId', 'projectId', 'CampaignUniqueId']);
-        const campaignName = this.getStr(campaignObj, ['name', 'Name']) ||
-                            this.getStr(lead, ['CampaignName', 'campaignName', 'ProjectName', 'projectName', 'FlowName', 'flowName']);
+        // Customer data - nested in 'data' object (HeroBase specific)
+        const dataObj = (lead.data || lead.Data) as Record<string, unknown> | undefined;
+        
+        let customerName = "";
+        let customerPhone = "";
+        let customerAddress = "";
+        
+        if (dataObj) {
+          // Name: Navn1 (first name) + Navn2 (last name)
+          const firstName = this.getStr(dataObj, ['Navn1', 'navn1', 'FirstName', 'firstName']);
+          const lastName = this.getStr(dataObj, ['Navn2', 'navn2', 'LastName', 'lastName']);
+          customerName = [firstName, lastName].filter(Boolean).join(' ').trim();
+          
+          // Phone: Telefon1, Telefon2, Telefon3 (try in order)
+          customerPhone = this.getStr(dataObj, ['Telefon1', 'telefon1', 'Phone1', 'phone1']) ||
+                         this.getStr(dataObj, ['Telefon2', 'telefon2', 'Phone2', 'phone2']) ||
+                         this.getStr(dataObj, ['Telefon3', 'telefon3', 'Phone3', 'phone3']) ||
+                         this.getStr(dataObj, ['Telefon', 'telefon', 'Phone', 'phone', 'Mobile', 'mobile']);
+          
+          // Address (for context)
+          const address = this.getStr(dataObj, ['Adresse', 'adresse', 'Address', 'address']);
+          const city = this.getStr(dataObj, ['By', 'by', 'City', 'city']);
+          const postalCode = this.getStr(dataObj, ['Postnummer', 'postnummer', 'PostalCode', 'postalCode', 'Zip', 'zip']);
+          customerAddress = [address, postalCode, city].filter(Boolean).join(', ');
+        }
+        
+        // Fallback to top-level fields if data object extraction failed
+        if (!customerName) {
+          customerName = this.getStr(lead, ['company', 'Company', 'name', 'Name', 'customerName', 'CustomerName']);
+        }
+        if (!customerPhone) {
+          customerPhone = this.getStr(lead, ['phone', 'Phone', 'phoneNumber', 'PhoneNumber', 'mobile', 'Mobile']);
+        }
 
-        const customerName = this.getStr(lead, [
-          'company', 'Company', 'CompanyName', 'companyName',
-          'name', 'Name', 'CustomerName', 'customerName', 'LeadName', 'leadName'
-        ]);
-        const customerPhone = this.getStr(lead, [
-          'phone', 'Phone', 'PhoneNumber', 'phoneNumber',
-          'Telephone', 'telephone', 'Mobile', 'mobile', 'CellPhone', 'cellPhone'
-        ]);
-
+        // Sale date - firstProcessedTime (when the sale was made)
         const saleDate = this.getStr(lead, [
-          'soldTime', 'SoldTime', 'SoldDate', 'soldDate',
-          'closedTime', 'ClosedTime', 'ClosedDate', 'closedDate',
-          'modifiedTime', 'ModifiedTime', 'updatedTime', 'UpdatedTime',
-          'createdTime', 'CreatedTime', 'created', 'Created', 'CreatedDate', 'createdDate'
+          'firstProcessedTime', 'FirstProcessedTime',
+          'lastModifiedTime', 'LastModifiedTime', 
+          'soldTime', 'SoldTime', 'soldDate', 'SoldDate',
+          'closedTime', 'ClosedTime', 'createdTime', 'CreatedTime'
         ]) || new Date().toISOString();
 
         const mapping = mappingLookup.get(campaignId);
         
-        const dataObj = (lead.data || lead.Data || lead.customFields || lead.CustomFields || {}) as Record<string, unknown>;
-        const variables = { ...dataObj, ...lead };
+        // External reference - check data object for SerioID, KVHXR, or OPP patterns
         let externalReference: string | null = null;
         
+        // First try config-based extraction
         if (mapping?.referenceConfig) {
-          externalReference = this.extractReference(variables as Record<string, unknown>, mapping.referenceConfig);
+          const allVariables = { ...dataObj, ...lead };
+          externalReference = this.extractReference(allVariables as Record<string, unknown>, mapping.referenceConfig);
           if (externalReference) {
             console.log(`[EnreachAdapter] Extracted reference via config: ${externalReference}`);
           }
-        } 
+        }
         
+        // Then try HeroBase specific fields
+        if (!externalReference && dataObj) {
+          externalReference = this.getStr(dataObj, ['SerioID', 'serioID', 'SERIO_ID']) ||
+                             this.getStr(dataObj, ['KVHXR', 'kvhxr']) ||
+                             this.getStr(dataObj, ['OrderId', 'orderId', 'order_id', 'OrdreId']) ||
+                             this.getStr(dataObj, ['Reference', 'reference', 'Ref', 'ref']) ||
+                             null;
+        }
+        
+        // Finally search for OPP patterns
         if (!externalReference) {
-          externalReference = this.searchForOppInVariables(variables as Record<string, unknown>);
+          const allVariables = { ...dataObj, ...lead };
+          externalReference = this.searchForOppInVariables(allVariables as Record<string, unknown>);
         }
 
+        // Products - not typically present in HeroBase simpleleads, create from campaign
         const productsArray = (lead.Products || lead.products || lead.Items || lead.items || []) as unknown[];
         let products: StandardProduct[] = [];
         
@@ -288,9 +329,8 @@ export class EnreachAdapter implements DialerAdapter {
         }
 
         if (products.length === 0) {
-          const productTitle = campaignName || 
-                              this.getStr(lead, ['ProductName', 'productName', 'FlowName', 'flowName', 'ServiceName', 'serviceName']) ||
-                              "Unknown Product";
+          // Create product from campaign info
+          const productTitle = campaignCode || campaignId || "Unknown Product";
           products.push({
             name: productTitle,
             externalId: campaignId || "unknown",
@@ -299,13 +339,17 @@ export class EnreachAdapter implements DialerAdapter {
           });
         }
 
+        // Owner org unit - for metadata
+        const ownerOrgUnit = (lead.ownerOrgUnit || lead.OwnerOrgUnit) as Record<string, unknown> | undefined;
+        const organization = ownerOrgUnit?.orgCode as string || "";
+
         const sale: StandardSale = {
           externalId,
           integrationType: "enreach" as const,
           dialerName: this.dialerName,
           saleDate,
           agentEmail,
-          agentExternalId: agentId || undefined,
+          agentExternalId: agentEmail || undefined, // Use email as ID for HeroBase
           agentName: agentName || undefined,
           customerName: customerName || undefined,
           customerPhone: customerPhone || undefined,
@@ -315,18 +359,23 @@ export class EnreachAdapter implements DialerAdapter {
           products,
           metadata: {
             source: "enreach",
-            campaignName,
-            variables: dataObj,
+            campaignName: campaignCode,
+            campaignId,
+            organization,
+            customerAddress,
+            rawData: dataObj,
           },
         };
 
         return sale;
       });
 
+      // Log extraction stats
       const withExternalId = sales.filter(s => s.externalId).length;
       const withAgent = sales.filter(s => s.agentName || s.agentEmail).length;
       const withCustomer = sales.filter(s => s.customerName || s.customerPhone).length;
-      console.log(`[EnreachAdapter] Extraction results: ${withExternalId}/${sales.length} with ID, ${withAgent} with agent, ${withCustomer} with customer`);
+      const withReference = sales.filter(s => s.externalReference).length;
+      console.log(`[EnreachAdapter] Extraction results: ${withExternalId}/${sales.length} with ID, ${withAgent} with agent, ${withCustomer} with customer, ${withReference} with reference`);
 
       return sales;
     } catch (error) {
