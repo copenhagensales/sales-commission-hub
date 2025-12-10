@@ -68,9 +68,10 @@ Deno.serve(async (req) => {
     
     console.log(`[Diagnostics] Using integration: ${integrationName}`);
 
-    // Fetch first page of sales to get lead IDs
-    const salesUrl = `${baseUrl}/sales?pageSize=200&page=1`;
-    console.log(`[Diagnostics] Fetching sales: ${salesUrl}`);
+    // CORRECT APPROACH: Use /leads endpoint with filters - it has resultData!
+    // First get unique campaign IDs from recent sales
+    const salesUrl = `${baseUrl}/sales?pageSize=100&page=1`;
+    console.log(`[Diagnostics] Fetching sales to get campaigns: ${salesUrl}`);
     
     const salesRes = await fetch(salesUrl, {
       headers: { Authorization: authHeader, "Content-Type": "application/json" },
@@ -87,79 +88,74 @@ Deno.serve(async (req) => {
     const sales = Array.isArray(salesData) ? salesData : (salesData.sales || []);
     console.log(`[Diagnostics] Got ${sales.length} sales`);
 
-    // For each sale, fetch the lead details to get resultData
+    // Get unique campaign IDs from sales (cast to number)
+    const campaignIds: number[] = [...new Set(sales.map((s: any) => s.campaignId).filter(Boolean))] as number[];
+    console.log(`[Diagnostics] Found ${campaignIds.length} unique campaigns:`, campaignIds);
+
+    // Now fetch leads directly using filters - this is the key!
     const oppPattern = /OPP-\d{4,6}/;
-    const salesWithOpp: { saleId: number; leadId: number; opp: string; fieldId: number; campaignId: number }[] = [];
+    const salesWithOpp: { leadId: number; opp: string; fieldId: number; campaignId: number }[] = [];
     const allFieldIds = new Set<number>();
     const fieldValueSamples: Record<number, string[]> = {};
-    const leadInspections: { leadId: number; saleId: number; campaignId: number; fieldCount: number; oppFound: string | null }[] = [];
+    const campaignStats: Record<number, { leadsFound: number; oppsFound: number }> = {};
+    let totalLeadsInspected = 0;
     
-    // Take sample of sales to inspect leads
-    const samplesToInspect = sales.slice(0, sampleSize);
-    console.log(`[Diagnostics] Inspecting ${samplesToInspect.length} leads for resultData`);
-    
-    for (const sale of samplesToInspect) {
-      const leadId = sale.leadId;
-      if (!leadId) continue;
+    // Fetch leads for each campaign (max 5 for testing)
+    for (const campaignId of campaignIds.slice(0, 5)) {
+      const filters = JSON.stringify({ campaignId: { "$eq": campaignId } });
+      const leadsUrl = `${baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=500`;
       
-      // Fetch lead details
-      const leadUrl = `${baseUrl}/leads/${leadId}`;
-      const leadRes = await fetch(leadUrl, {
+      console.log(`[Diagnostics] Fetching leads for campaign ${campaignId}...`);
+      
+      const leadsRes = await fetch(leadsUrl, {
         headers: { Authorization: authHeader, "Content-Type": "application/json" },
       });
       
-      if (!leadRes.ok) {
-        console.log(`[Diagnostics] Failed to fetch lead ${leadId}: ${leadRes.status}`);
+      if (!leadsRes.ok) {
+        console.log(`[Diagnostics] Failed for campaign ${campaignId}: ${leadsRes.status}`);
         continue;
       }
       
-      const leadData = await leadRes.json();
-      // API returns {leads: [...]} with lead inside
-      const lead = Array.isArray(leadData.leads) && leadData.leads.length > 0 ? leadData.leads[0] : leadData;
+      const leadsData = await leadsRes.json();
+      const leads = Array.isArray(leadsData) ? leadsData : (leadsData.leads || []);
       
-      const resultData = lead.resultData || [];
-      let oppFound: string | null = null;
+      campaignStats[campaignId] = { leadsFound: leads.length, oppsFound: 0 };
+      totalLeadsInspected += leads.length;
+      console.log(`[Diagnostics] Campaign ${campaignId}: Got ${leads.length} leads`);
       
-      if (Array.isArray(resultData)) {
-        for (const field of resultData) {
-          if (field && field.id !== undefined) {
-            allFieldIds.add(field.id);
-            
-            // Collect samples
-            if (!fieldValueSamples[field.id]) {
-              fieldValueSamples[field.id] = [];
-            }
-            if (fieldValueSamples[field.id].length < 5 && field.value) {
-              fieldValueSamples[field.id].push(String(field.value).substring(0, 100));
-            }
-            
-            // Check for OPP
-            const value = String(field.value || '');
-            const match = value.match(oppPattern);
-            if (match) {
-              oppFound = match[0];
-              salesWithOpp.push({
-                saleId: sale.id,
-                leadId: leadId,
-                opp: match[0],
-                fieldId: field.id,
-                campaignId: sale.campaignId,
-              });
+      // Check each lead for OPP in resultData
+      for (const lead of leads) {
+        const resultData = lead.resultData || [];
+        
+        if (Array.isArray(resultData)) {
+          for (const field of resultData) {
+            if (field && field.id !== undefined) {
+              allFieldIds.add(field.id);
+              
+              // Collect samples
+              if (!fieldValueSamples[field.id]) {
+                fieldValueSamples[field.id] = [];
+              }
+              if (fieldValueSamples[field.id].length < 5 && field.value) {
+                fieldValueSamples[field.id].push(String(field.value).substring(0, 100));
+              }
+              
+              // Check for OPP pattern
+              const value = String(field.value || '');
+              const match = value.match(oppPattern);
+              if (match) {
+                campaignStats[campaignId].oppsFound++;
+                salesWithOpp.push({
+                  leadId: lead.id,
+                  opp: match[0],
+                  fieldId: field.id,
+                  campaignId,
+                });
+              }
             }
           }
         }
       }
-      
-      leadInspections.push({
-        leadId,
-        saleId: sale.id,
-        campaignId: sale.campaignId,
-        fieldCount: Array.isArray(resultData) ? resultData.length : 0,
-        oppFound
-      });
-      
-      // Small delay to avoid rate limiting
-      await new Promise(r => setTimeout(r, 50));
     }
 
     // Get unique OPP numbers
@@ -187,17 +183,17 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       integrationName,
       totalSalesInPage: sales.length,
-      leadsInspected: leadInspections.length,
-      leadsWithResultData: leadInspections.filter(l => l.fieldCount > 0).length,
-      salesWithOpp: salesWithOpp.length,
+      campaignsAnalyzed: campaignIds.slice(0, 5),
+      totalLeadsInspected,
+      salesWithOppCount: salesWithOpp.length,
       uniqueOppNumbers: uniqueOpps.length,
       allFieldIdsFound: [...allFieldIds].sort((a, b) => a - b),
       fieldDetails: fieldDetails.filter(f => f.sampleValues.length > 0),
       oppFieldIds,
       oppByCampaign,
+      campaignStats,
       sampleOpps: uniqueOpps.slice(0, 20),
       sampleSalesWithOpp: salesWithOpp.slice(0, 10),
-      inspectionSummary: leadInspections.slice(0, 20)
     }, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
