@@ -479,15 +479,6 @@ export default function EmployeeDetail() {
                 </Button>
               </>
             )}
-            <div className="flex items-center gap-2 border-l pl-4">
-              <Switch 
-                checked={employee.is_active} 
-                onCheckedChange={(checked) => handleSave("is_active", checked)} 
-              />
-              <Badge variant={employee.is_active ? "default" : "secondary"}>
-                {employee.is_active ? "Aktiv" : "Inaktiv"}
-              </Badge>
-            </div>
             <Button 
               variant="outline" 
               size="sm"
@@ -581,6 +572,15 @@ export default function EmployeeDetail() {
                 Sæt ny kode
               </Button>
             )}
+            <div className="flex items-center gap-2 border-l pl-4 ml-2">
+              <Switch 
+                checked={employee.is_active} 
+                onCheckedChange={(checked) => handleSave("is_active", checked)} 
+              />
+              <Badge variant={employee.is_active ? "default" : "secondary"}>
+                {employee.is_active ? "Aktiv" : "Inaktiv"}
+              </Badge>
+            </div>
           </div>
         </div>
 
