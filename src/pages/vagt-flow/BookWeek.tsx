@@ -118,6 +118,7 @@ export default function VagtBookWeek() {
         year: selectedYear,
         expected_staff_count: 2,
         status: "Planlagt",
+        booked_days: sortedDays,
       });
 
       if (error) throw error;

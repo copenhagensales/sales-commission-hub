@@ -344,6 +344,7 @@ export type Database = {
       }
       booking: {
         Row: {
+          booked_days: number[] | null
           brand_id: string
           comment: string | null
           created_at: string | null
@@ -358,6 +359,7 @@ export type Database = {
           year: number
         }
         Insert: {
+          booked_days?: number[] | null
           brand_id: string
           comment?: string | null
           created_at?: string | null
@@ -372,6 +374,7 @@ export type Database = {
           year: number
         }
         Update: {
+          booked_days?: number[] | null
           brand_id?: string
           comment?: string | null
           created_at?: string | null

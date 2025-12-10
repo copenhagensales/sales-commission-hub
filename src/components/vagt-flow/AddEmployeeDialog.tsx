@@ -32,6 +32,7 @@ interface Booking {
   brand?: { name: string };
   start_date: string;
   end_date: string;
+  booked_days?: number[] | null;
 }
 
 interface EmployeeAbsence {
@@ -192,6 +193,10 @@ export function AddEmployeeDialog({
 
   const isDayInBookingRange = (dayIndex: number) => {
     if (!booking) return false;
+    // Use booked_days if available, otherwise fall back to date range
+    if (booking.booked_days && booking.booked_days.length > 0) {
+      return booking.booked_days.includes(dayIndex);
+    }
     const dayDateStr = format(addDays(weekStart, dayIndex), "yyyy-MM-dd");
     // Compare dates as strings to avoid timezone issues
     return dayDateStr >= booking.start_date && dayDateStr <= booking.end_date;
