@@ -298,6 +298,8 @@ export class AdversusAdapter implements DialerAdapter {
           hasMore = false; // Última página incompleta = fin de datos
         } else {
           currentPage += parallelBatch;
+          // Pequeño delay entre batches para evitar rate limit
+          await new Promise(r => setTimeout(r, 200));
         }
       }
     }
