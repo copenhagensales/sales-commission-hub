@@ -38,7 +38,7 @@ interface EmployeeAbsence {
   employee_id: string;
   start_date: string;
   end_date: string;
-  reason: string;
+  type: string;
   status: string;
 }
 
@@ -68,22 +68,27 @@ export function AddEmployeeDialog({
   const [selectedEmployees, setSelectedEmployees] = useState<(string | null)[]>([null]);
   const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
 
-  // Fetch absences for the week period
+  // Fetch absences for the week period from absence_request_v2
   const weekEnd = addDays(weekStart, 6);
+  const employeeIds = employees?.map(e => e.id) || [];
+  
   const { data: absences = [] } = useQuery({
-    queryKey: ["employee-absences-week", format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd")],
+    queryKey: ["employee-absences-week-v2", format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd"), employeeIds],
     queryFn: async () => {
+      if (employeeIds.length === 0) return [];
+      
       const { data, error } = await supabase
-        .from("employee_absence")
-        .select("id, employee_id, start_date, end_date, reason, status")
-        .in("status", ["APPROVED", "PENDING"])
+        .from("absence_request_v2")
+        .select("id, employee_id, start_date, end_date, type, status")
+        .in("employee_id", employeeIds)
+        .in("status", ["approved", "pending"])
         .lte("start_date", format(weekEnd, "yyyy-MM-dd"))
         .gte("end_date", format(weekStart, "yyyy-MM-dd"));
       
       if (error) throw error;
       return data as EmployeeAbsence[];
     },
-    enabled: open,
+    enabled: open && employeeIds.length > 0,
   });
 
   // Create a map of employee absences by day

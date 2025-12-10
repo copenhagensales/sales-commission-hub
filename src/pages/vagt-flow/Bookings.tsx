@@ -63,19 +63,44 @@ export default function VagtBookings() {
   const { data: bookings, isLoading } = useQuery({
     queryKey: ["vagt-bookings-list", selectedWeek, selectedYear],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First fetch bookings with assignments
+      const { data: bookingData, error } = await supabase
         .from("booking")
         .select(`
           *,
           location(name, address_city, type),
           brand(name, color_hex),
-          booking_assignment(id, date, employee_id, employee:employee(full_name))
+          booking_assignment(id, date, employee_id)
         `)
         .eq("week_number", selectedWeek)
         .eq("year", selectedYear)
         .order("start_date");
       if (error) throw error;
-      return data;
+      
+      // Get unique employee IDs from assignments
+      const employeeIds = [...new Set(
+        bookingData?.flatMap(b => b.booking_assignment?.map((a: any) => a.employee_id) || []) || []
+      )];
+      
+      // Fetch employee names from employee_master_data
+      let employeeMap = new Map<string, string>();
+      if (employeeIds.length > 0) {
+        const { data: empData } = await supabase
+          .from("employee_master_data")
+          .select("id, first_name, last_name")
+          .in("id", employeeIds);
+        
+        employeeMap = new Map(empData?.map(e => [e.id, `${e.first_name} ${e.last_name}`]) || []);
+      }
+      
+      // Merge employee names into assignments
+      return bookingData?.map(booking => ({
+        ...booking,
+        booking_assignment: booking.booking_assignment?.map((a: any) => ({
+          ...a,
+          employee: { full_name: employeeMap.get(a.employee_id) || "Ukendt" }
+        }))
+      }));
     },
   });
 
@@ -88,28 +113,64 @@ export default function VagtBookings() {
     },
   });
 
-  const { data: absences } = useQuery({
-    queryKey: ["vagt-absences-week", selectedWeek, selectedYear],
+  // Fetch Fieldmarketing employee IDs first
+  const { data: fieldmarketingEmployeeIds } = useQuery({
+    queryKey: ["fieldmarketing-employee-ids"],
     queryFn: async () => {
-      const weekEndDate = addDays(weekStart, 6);
-      // Get absences that overlap with the week (start before week ends AND end after week starts)
       const { data, error } = await supabase
-        .from("employee_absence")
+        .from("employee_master_data")
+        .select("id")
+        .eq("job_title", "Fieldmarketing")
+        .eq("is_active", true);
+      if (error) throw error;
+      return data?.map(e => e.id) || [];
+    },
+  });
+
+  const { data: absences } = useQuery({
+    queryKey: ["vagt-absences-week-v2", selectedWeek, selectedYear, fieldmarketingEmployeeIds],
+    queryFn: async () => {
+      if (!fieldmarketingEmployeeIds || fieldmarketingEmployeeIds.length === 0) return [];
+      
+      const weekEndDate = addDays(weekStart, 6);
+      // Get absences from absence_request_v2 for Fieldmarketing employees
+      const { data, error } = await supabase
+        .from("absence_request_v2")
         .select(`
           id,
           employee_id,
           start_date,
           end_date,
-          reason,
+          type,
           status,
-          employee:employee_id(full_name, team)
+          comment
         `)
+        .in("employee_id", fieldmarketingEmployeeIds)
         .lte("start_date", format(weekEndDate, "yyyy-MM-dd"))
         .gte("end_date", format(weekStart, "yyyy-MM-dd"))
-        .in("status", ["APPROVED", "PENDING"]);
+        .in("status", ["approved", "pending"]);
       if (error) throw error;
-      return data;
+      
+      // Fetch employee names separately
+      const employeeIds = [...new Set(data?.map(a => a.employee_id) || [])];
+      if (employeeIds.length === 0) return [];
+      
+      const { data: employeeData } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, department")
+        .in("id", employeeIds);
+      
+      const employeeMap = new Map(employeeData?.map(e => [e.id, { 
+        full_name: `${e.first_name} ${e.last_name}`,
+        team: e.department 
+      }]));
+      
+      return data?.map(a => ({
+        ...a,
+        employee: employeeMap.get(a.employee_id),
+      })) || [];
     },
+    enabled: !!fieldmarketingEmployeeIds && fieldmarketingEmployeeIds.length > 0,
   });
 
   const { data: vehicles } = useQuery({
@@ -135,16 +196,22 @@ export default function VagtBookings() {
     },
   });
 
+  // Fetch Fieldmarketing employees from employee_master_data
   const { data: employees } = useQuery({
-    queryKey: ["vagt-employees-active"],
+    queryKey: ["vagt-employees-active-master"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("employee")
-        .select("id, full_name, team")
+        .from("employee_master_data")
+        .select("id, first_name, last_name, department")
+        .eq("job_title", "Fieldmarketing")
         .eq("is_active", true)
-        .order("full_name");
+        .order("first_name");
       if (error) throw error;
-      return data;
+      return data?.map(e => ({
+        id: e.id,
+        full_name: `${e.first_name} ${e.last_name}`,
+        team: e.department,
+      })) || [];
     },
   });
 
