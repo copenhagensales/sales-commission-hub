@@ -188,40 +188,25 @@ export class AdversusAdapter implements DialerAdapter {
         const leads = data.leads || data || [];
         let oppsFound = 0;
 
+        // Usar misma lógica que adversus-diagnostics (que funcionó perfectamente)
+        const oppPattern = /OPP-\d{4,6}/;
+        
         for (const lead of leads) {
           const leadId = String(lead.id);
           const resultData = lead.resultData || [];
-          let oppValue: string | null = null;
           
           if (Array.isArray(resultData)) {
-            // Buscar en el field configurado
             for (const field of resultData) {
-              if (String(field.id) === oppFieldId && field.value) {
-                const val = String(field.value).trim();
-                if (this.isValidOppNumber(val)) {
-                  oppValue = val;
-                  break;
+              if (field && field.value) {
+                const value = String(field.value);
+                const match = value.match(oppPattern);
+                if (match) {
+                  leadIdToOpp.set(leadId, match[0]);
+                  oppsFound++;
+                  break; // Solo el primer OPP encontrado
                 }
               }
             }
-            
-            // Fallback: buscar patrón OPP-XXXXX en cualquier campo
-            if (!oppValue) {
-              for (const field of resultData) {
-                if (field.value) {
-                  const val = String(field.value).trim();
-                  if (val.match(/^OPP-\d{4,6}$/)) {
-                    oppValue = val;
-                    break;
-                  }
-                }
-              }
-            }
-          }
-
-          if (oppValue) {
-            leadIdToOpp.set(leadId, oppValue);
-            oppsFound++;
           }
         }
 
