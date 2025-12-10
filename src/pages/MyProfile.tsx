@@ -109,7 +109,6 @@ export default function MyProfile() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
-  const [showConsentDialog, setShowConsentDialog] = useState(false);
   const { hasConsent, isLoading: consentLoading } = useHasDataProcessingConsent();
 
   // Fetch current user's employee data
@@ -498,12 +497,8 @@ export default function MyProfile() {
     return <Badge variant={variant}>{label}</Badge>;
   };
 
-  // Check if consent is needed
-  useEffect(() => {
-    if (!consentLoading && employee && !hasConsent) {
-      setShowConsentDialog(true);
-    }
-  }, [consentLoading, hasConsent, employee]);
+  // Calculate if consent is needed - no local state needed
+  const needsConsent = !consentLoading && !!employee && !hasConsent;
 
   if (isLoading || consentLoading) {
     return (
@@ -533,8 +528,8 @@ export default function MyProfile() {
     <MainLayout>
       {/* GDPR Consent Dialog */}
       <GdprConsentDialog 
-        open={showConsentDialog} 
-        onConsent={() => setShowConsentDialog(false)} 
+        open={needsConsent} 
+        onConsent={() => queryClient.invalidateQueries({ queryKey: ["gdpr-consents"] })} 
       />
 
       <div className="space-y-6">

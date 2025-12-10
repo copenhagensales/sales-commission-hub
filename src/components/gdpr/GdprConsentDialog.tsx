@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useGiveConsent } from "@/hooks/useGdpr";
 import { useToast } from "@/hooks/use-toast";
 import { Shield } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface GdprConsentDialogProps {
   open: boolean;
@@ -23,6 +24,7 @@ export function GdprConsentDialog({ open, onConsent }: GdprConsentDialogProps) {
   const [accepted, setAccepted] = useState(false);
   const giveConsent = useGiveConsent();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const handleConsent = async () => {
     try {
@@ -31,6 +33,8 @@ export function GdprConsentDialog({ open, onConsent }: GdprConsentDialogProps) {
         title: "Samtykke registreret",
         description: "Dit samtykke til databehandling er blevet registreret.",
       });
+      // Invalidate queries to refresh consent status everywhere
+      await queryClient.invalidateQueries({ queryKey: ["gdpr-consents"] });
       onConsent();
     } catch (error: any) {
       toast({
