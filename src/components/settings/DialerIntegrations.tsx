@@ -593,16 +593,16 @@ export function DialerIntegrations() {
                               <Webhook className="h-4 w-4" />
                             </Button>
                           </DialogTrigger>
-                          <DialogContent>
+                          <DialogContent className="max-w-lg">
                             <DialogHeader>
-                              <DialogTitle>Enreach Webhook Setup</DialogTitle>
+                              <DialogTitle>Enreach Webhook Opsætning</DialogTitle>
                               <DialogDescription>
-                                Konfigurer webhook i dit Enreach/HeroBase admin panel
+                                Webhooks konfigureres via Enreach support
                               </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4 py-4">
                               <div>
-                                <Label className="text-sm font-medium">Webhook URL</Label>
+                                <Label className="text-sm font-medium">Webhook Endpoint URL</Label>
                                 <div className="flex items-center gap-2 mt-1">
                                   <Input 
                                     readOnly 
@@ -619,21 +619,40 @@ export function DialerIntegrations() {
                                 </div>
                               </div>
                               <Separator />
-                              <div className="space-y-2 text-sm">
-                                <p className="font-medium">Sådan opsætter du webhook i Enreach:</p>
-                                <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                                  <li>Log ind på dit HeroBase admin panel</li>
-                                  <li>Gå til Settings → Webhooks</li>
-                                  <li>Klik "Add subscription"</li>
-                                  <li>Vælg events: <code className="bg-muted px-1 rounded">SimpleLead</code></li>
-                                  <li>Indsæt URL'en ovenfor</li>
-                                  <li>Gem konfigurationen</li>
+                              <div className="space-y-3 text-sm">
+                                <p className="font-medium">Sådan får du webhooks aktiveret:</p>
+                                <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-md">
+                                  <p className="text-amber-600 dark:text-amber-400 text-xs">
+                                    <strong>Vigtigt:</strong> Enreach webhooks konfigureres <strong>kun</strong> af Enreach support - ikke self-service.
+                                  </p>
+                                </div>
+                                <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+                                  <li>Kontakt Enreach support med følgende info:</li>
                                 </ol>
+                                <div className="ml-4 space-y-2 text-xs">
+                                  <div className="bg-muted p-2 rounded font-mono">
+                                    <p><strong>Endpoint:</strong> {getWebhookUrl(integration.id)}</p>
+                                    <p><strong>InsecureSSL:</strong> false</p>
+                                    <p><strong>Secret:</strong> (valgfrit - bed dem tilføje)</p>
+                                  </div>
+                                </div>
+                                <ol start={2} className="list-decimal list-inside space-y-2 text-muted-foreground">
+                                  <li>Bed dem abonnere på relevante events:</li>
+                                </ol>
+                                <div className="ml-4 flex flex-wrap gap-1">
+                                  {['QueueCallInCompleted', 'QueueCallOutCompleted', 'CallListCallCompleted'].map(evt => (
+                                    <code key={evt} className="bg-muted px-1.5 py-0.5 rounded text-xs">{evt}</code>
+                                  ))}
+                                </div>
                               </div>
-                              <div className="bg-muted/50 p-3 rounded-md">
+                              <div className="bg-muted/50 p-3 rounded-md space-y-1">
                                 <p className="text-xs text-muted-foreground">
-                                  <strong>Tip:</strong> Enreach sender automatisk <code>X-Benemen-Event</code> header som vi bruger til at identificere webhook-typen.
+                                  <strong>Headers vi håndterer:</strong>
                                 </p>
+                                <ul className="text-xs text-muted-foreground list-disc list-inside">
+                                  <li><code>X-Benemen-Event</code> - Event type identifikation</li>
+                                  <li><code>X-Benemen-Token</code> - Secret token (hvis konfigureret)</li>
+                                </ul>
                               </div>
                             </div>
                           </DialogContent>
