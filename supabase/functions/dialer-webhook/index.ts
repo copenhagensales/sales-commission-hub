@@ -167,7 +167,13 @@ serve(async (req) => {
 
     console.log('Parsed webhook payload:', JSON.stringify(body, null, 2).substring(0, 2000));
 
-    const externalId = String(body.payload.result_id);
+    // Extract external_id from result_id, lead.id, or resultData.orderId
+    const externalId = String(
+      body.payload.result_id || 
+      body.payload.lead?.id || 
+      (body.payload as any).resultData?.orderId ||
+      `webhook-${Date.now()}`
+    );
 
     // Handle same-day corrections
     const newEventDate = body.event_time ? getDateOnly(body.event_time) : getDateOnly(new Date().toISOString());
