@@ -102,9 +102,9 @@ export function AddEmployeeDialog({
     enabled: open && employeeIds.length > 0,
   });
 
-  // Create a map of employee absences by day
+  // Create a map of employee absences by day with type info
   const absencesByEmployeeAndDay = useMemo(() => {
-    const map = new Map<string, Set<number>>();
+    const map = new Map<string, Map<number, string>>();
     
     absences.forEach((absence) => {
       const absenceStart = parseISO(absence.start_date);
@@ -115,9 +115,9 @@ export function AddEmployeeDialog({
         if (isWithinInterval(dayDate, { start: absenceStart, end: absenceEnd })) {
           const key = absence.employee_id;
           if (!map.has(key)) {
-            map.set(key, new Set());
+            map.set(key, new Map());
           }
-          map.get(key)!.add(dayIndex);
+          map.get(key)!.set(dayIndex, absence.type);
         }
       }
     });
@@ -127,13 +127,15 @@ export function AddEmployeeDialog({
 
   // Get employees with absence in the selected days
   const employeesWithAbsence = useMemo(() => {
-    const result: { employeeId: string; employeeName: string; days: number[] }[] = [];
+    const result: { employeeId: string; employeeName: string; days: { dayIndex: number; type: string }[] }[] = [];
     
     selectedEmployees.forEach((empId) => {
       if (!empId) return;
       const absenceDays = absencesByEmployeeAndDay.get(empId);
       if (absenceDays) {
-        const overlappingDays = Array.from(selectedDays).filter((d) => absenceDays.has(d));
+        const overlappingDays = Array.from(selectedDays)
+          .filter((d) => absenceDays.has(d))
+          .map((d) => ({ dayIndex: d, type: absenceDays.get(d) || "Fravær" }));
         if (overlappingDays.length > 0) {
           const emp = filteredEmployees.find((e) => e.id === empId);
           if (emp) {
@@ -153,6 +155,11 @@ export function AddEmployeeDialog({
   // Check if a specific employee has absence on a specific day
   const hasAbsenceOnDay = (employeeId: string, dayIndex: number) => {
     return absencesByEmployeeAndDay.get(employeeId)?.has(dayIndex) || false;
+  };
+
+  // Get absence type for employee on day
+  const getAbsenceTypeOnDay = (employeeId: string, dayIndex: number) => {
+    return absencesByEmployeeAndDay.get(employeeId)?.get(dayIndex) || null;
   };
 
   // Check if any selected employee has absence on a specific day
@@ -247,35 +254,52 @@ export function AddEmployeeDialog({
             
             {selectedEmployees.map((emp, index) => {
               const hasAbsence = emp && absencesByEmployeeAndDay.has(emp);
+              const absenceTypes = emp && hasAbsence 
+                ? [...new Set(Array.from(absencesByEmployeeAndDay.get(emp)!.values()))]
+                : [];
               return (
                 <div key={index} className="flex items-center gap-2">
                   <Select
                     value={emp || ""}
                     onValueChange={(value) => updateEmployee(index, value)}
                   >
-                    <SelectTrigger className={`flex-1 bg-background text-foreground ${hasAbsence ? "border-amber-500" : ""}`}>
+                    <SelectTrigger className={`flex-1 bg-background text-foreground ${hasAbsence ? "border-red-500 bg-red-50 dark:bg-red-950/20" : ""}`}>
                       <SelectValue placeholder={`Medarbejder ${index + 1} (valgfri)`} />
                     </SelectTrigger>
                     <SelectContent className="bg-popover">
                       {filteredEmployees
                         .filter(e => !selectedEmployees.includes(e.id) || e.id === emp)
                         .map((employee) => {
-                          const empHasAbsence = absencesByEmployeeAndDay.has(employee.id);
+                          const empAbsences = absencesByEmployeeAndDay.get(employee.id);
+                          const empHasAbsence = !!empAbsences;
+                          const empAbsenceTypes = empHasAbsence 
+                            ? [...new Set(Array.from(empAbsences.values()))]
+                            : [];
                           return (
                             <SelectItem 
                               key={employee.id} 
                               value={employee.id} 
-                              className={`text-popover-foreground ${empHasAbsence ? "text-amber-600" : ""}`}
+                              className={`text-popover-foreground ${empHasAbsence ? "text-red-600 bg-red-50 dark:bg-red-950/20" : ""}`}
                             >
                               <span className="flex items-center gap-2">
                                 {employee.full_name}
-                                {empHasAbsence && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                                {empHasAbsence && (
+                                  <>
+                                    <AlertTriangle className="h-3 w-3 text-red-500" />
+                                    <span className="text-xs text-red-500">({empAbsenceTypes.join(", ")})</span>
+                                  </>
+                                )}
                               </span>
                             </SelectItem>
                           );
                         })}
                     </SelectContent>
                   </Select>
+                  {hasAbsence && (
+                    <span className="text-xs text-red-600 whitespace-nowrap">
+                      {absenceTypes.join(", ")}
+                    </span>
+                  )}
                   {selectedEmployees.length > 1 && (
                     <Button
                       variant="ghost"
@@ -304,17 +328,26 @@ export function AddEmployeeDialog({
 
           {/* Warning for employees with absence */}
           {employeesWithAbsence.length > 0 && (
-            <div className="rounded-lg border border-amber-500 bg-amber-50 dark:bg-amber-950/20 p-3">
+            <div className="rounded-lg border border-red-500 bg-red-50 dark:bg-red-950/20 p-3">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
                 <div className="text-sm">
-                  <p className="font-medium text-amber-800 dark:text-amber-200">
-                    Følgende medarbejdere har fravær i denne periode:
+                  <p className="font-semibold text-red-800 dark:text-red-200">
+                    ⚠️ Fravær registreret - følgende medarbejdere kan ikke bookes:
                   </p>
-                  <ul className="mt-1 text-amber-700 dark:text-amber-300">
-                    {employeesWithAbsence.map((e) => (
-                      <li key={e.employeeId}>{e.employeeName}</li>
-                    ))}
+                  <ul className="mt-2 space-y-1 text-red-700 dark:text-red-300">
+                    {employeesWithAbsence.map((e) => {
+                      const absenceTypes = [...new Set(e.days.map(d => d.type))];
+                      const dayNames = e.days.map(d => DAY_NAMES[d.dayIndex]).join(", ");
+                      return (
+                        <li key={e.employeeId} className="flex flex-col">
+                          <span className="font-medium">{e.employeeName}</span>
+                          <span className="text-xs">
+                            {absenceTypes.join(", ")} - {dayNames}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               </div>
