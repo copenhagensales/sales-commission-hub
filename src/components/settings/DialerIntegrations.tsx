@@ -582,6 +582,63 @@ export function DialerIntegrations() {
                           </Button>
                         </>
                       )}
+                      {integration.provider === 'enreach' && (
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              title="Webhook Setup"
+                            >
+                              <Webhook className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Enreach Webhook Setup</DialogTitle>
+                              <DialogDescription>
+                                Konfigurer webhook i dit Enreach/HeroBase admin panel
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div>
+                                <Label className="text-sm font-medium">Webhook URL</Label>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Input 
+                                    readOnly 
+                                    value={getWebhookUrl(integration.id)}
+                                    className="font-mono text-xs"
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => copyWebhookUrl(integration.id)}
+                                  >
+                                    {copiedUrl ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </Button>
+                                </div>
+                              </div>
+                              <Separator />
+                              <div className="space-y-2 text-sm">
+                                <p className="font-medium">Sådan opsætter du webhook i Enreach:</p>
+                                <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                                  <li>Log ind på dit HeroBase admin panel</li>
+                                  <li>Gå til Settings → Webhooks</li>
+                                  <li>Klik "Add subscription"</li>
+                                  <li>Vælg events: <code className="bg-muted px-1 rounded">SimpleLead</code></li>
+                                  <li>Indsæt URL'en ovenfor</li>
+                                  <li>Gem konfigurationen</li>
+                                </ol>
+                              </div>
+                              <div className="bg-muted/50 p-3 rounded-md">
+                                <p className="text-xs text-muted-foreground">
+                                  <strong>Tip:</strong> Enreach sender automatisk <code>X-Benemen-Event</code> header som vi bruger til at identificere webhook-typen.
+                                </p>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
