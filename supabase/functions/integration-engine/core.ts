@@ -27,6 +27,54 @@ export class IngestionEngine {
     }));
   }
 
+  // Auto-create campaign mappings for any new campaigns encountered in sales
+  private async ensureCampaignMappings(sales: StandardSale[]) {
+    // Extract unique campaigns from sales
+    const uniqueCampaigns = new Map<string, { id: string; name: string }>();
+    for (const sale of sales) {
+      if (sale.campaignId && !uniqueCampaigns.has(sale.campaignId)) {
+        uniqueCampaigns.set(sale.campaignId, {
+          id: sale.campaignId,
+          name: sale.campaignName || sale.campaignId,
+        });
+      }
+    }
+
+    if (uniqueCampaigns.size === 0) return;
+
+    this.log("INFO", `Verificando ${uniqueCampaigns.size} campañas únicas...`);
+
+    // Check which campaigns already exist
+    const campaignIds = Array.from(uniqueCampaigns.keys());
+    const { data: existingMappings } = await this.supabase
+      .from("adversus_campaign_mappings")
+      .select("adversus_campaign_id")
+      .in("adversus_campaign_id", campaignIds);
+
+    const existingIds = new Set(existingMappings?.map(m => m.adversus_campaign_id) || []);
+
+    // Insert new campaign mappings
+    const newCampaigns = Array.from(uniqueCampaigns.values())
+      .filter(c => !existingIds.has(c.id));
+
+    if (newCampaigns.length > 0) {
+      this.log("INFO", `Creando ${newCampaigns.length} nuevos mapeos de campaña...`);
+      
+      const { error } = await this.supabase.from("adversus_campaign_mappings").insert(
+        newCampaigns.map(c => ({
+          adversus_campaign_id: c.id,
+          adversus_campaign_name: c.name,
+        }))
+      );
+
+      if (error) {
+        this.log("WARN", `Error creando mapeos de campaña: ${error.message}`);
+      } else {
+        this.log("INFO", `Creados ${newCampaigns.length} mapeos de campaña: ${newCampaigns.map(c => c.name).join(", ")}`);
+      }
+    }
+  }
+
   // --- 1. PROCESAR USUARIOS (Agentes) ---
   async processUsers(users: StandardUser[]) {
     if (users.length === 0) return { processed: 0, errors: 0 };
@@ -110,6 +158,9 @@ export class IngestionEngine {
     
     const sampleSale = sales[0];
     this.log("INFO", `Procesando ${sales.length} ventas de ${sampleSale.dialerName} (${sampleSale.integrationType}) en lotes de ${batchSize}...`);
+
+    // AUTO-CREATE CAMPAIGN MAPPINGS for any new campaigns encountered
+    await this.ensureCampaignMappings(sales);
 
     // A. Cargar Cachés (Optimización de rendimiento)
     const { data: dbProducts } = await this.supabase.from("products").select("id, name, commission_dkk, revenue_dkk");

@@ -354,6 +354,7 @@ export class EnreachAdapter implements DialerAdapter {
           customerName: customerName || undefined,
           customerPhone: customerPhone || undefined,
           campaignId,
+          campaignName: campaignCode || campaignId || undefined,
           externalReference,
           clientCampaignId: mapping?.clientCampaignId || null,
           products,

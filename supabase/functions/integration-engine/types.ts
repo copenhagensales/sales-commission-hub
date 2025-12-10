@@ -32,6 +32,7 @@ export interface StandardSale {
   customerName?: string;
   customerPhone?: string;
   campaignId?: string;
+  campaignName?: string;
   // Explicit external reference (OPP number) - extracted by adapter
   externalReference?: string | null;
   // Client campaign ID - resolved by adapter
