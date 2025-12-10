@@ -71,9 +71,9 @@ export class AdversusAdapter implements DialerAdapter {
     const campaignConfigMap = new Map<string, CampaignMappingConfig>();
     campaignMappings?.forEach(m => campaignConfigMap.set(m.adversusCampaignId, m));
 
-    // OPTIMIZACIÓN: Fetch paralelo de páginas (10 páginas a la vez)
-    const rawSales = await this.fetchSalesParallel(filterStr);
-    console.log(`[Adversus] Fetched ${rawSales.length} sales via parallel fetch`);
+    // Fetch secuencial con pageSize grande (1000) - más estable que paralelo
+    const rawSales = await this.fetchSalesSequential(filterStr);
+    console.log(`[Adversus] Fetched ${rawSales.length} sales`);
 
     console.log(`[Adversus] Fetched ${rawSales.length} sales, now building OPP map from leads...`);
 
@@ -245,62 +245,44 @@ export class AdversusAdapter implements DialerAdapter {
     return false;
   }
 
-  // OPTIMIZACIÓN: Fetch paralelo de ventas (5 páginas a la vez para evitar rate limit)
-  private async fetchSalesParallel(filterStr: string): Promise<any[]> {
+  // Fetch secuencial de ventas con pageSize grande - más estable que paralelo
+  private async fetchSalesSequential(filterStr: string): Promise<any[]> {
     const allSales: any[] = [];
-    const pageSize = 500;
-    const parallelBatch = 5; // 5 páginas en paralelo (más conservador)
-    let currentPage = 1;
+    const pageSize = 1000; // Máximo pageSize soportado por Adversus
+    let page = 1;
     let hasMore = true;
 
-    while (hasMore && currentPage <= 200) {
-      // Crear batch de promesas para páginas paralelas
-      const pagePromises: Promise<{ page: number; data: any[] }>[] = [];
+    while (hasMore && page <= 100) { // Max 100,000 ventas
+      const url = `${this.baseUrl}/sales?pageSize=${pageSize}&page=${page}&filters=${filterStr}`;
       
-      for (let i = 0; i < parallelBatch && currentPage + i <= 200; i++) {
-        const page = currentPage + i;
-        const url = `${this.baseUrl}/sales?pageSize=${pageSize}&page=${page}&filters=${filterStr}`;
+      try {
+        const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
         
-        pagePromises.push(
-          fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } })
-            .then(res => res.ok ? res.json() : { sales: [] })
-            .then(data => ({ page, data: data.sales || data || [] }))
-            .catch(() => ({ page, data: [] }))
-        );
-      }
-
-      // Ejecutar batch en paralelo
-      const results = await Promise.all(pagePromises);
-      
-      // Ordenar por página para procesar en orden correcto
-      results.sort((a, b) => a.page - b.page);
-      
-      let totalInBatch = 0;
-      let lastNonEmptyPage = 0;
-      
-      for (const { page, data } of results) {
-        if (data.length > 0) {
-          allSales.push(...data);
-          totalInBatch += data.length;
-          lastNonEmptyPage = page;
+        if (!res.ok) {
+          console.log(`[Adversus] Page ${page} failed with status ${res.status}`);
+          break;
         }
-      }
-
-      console.log(`[Adversus] Batch ${currentPage}-${currentPage + parallelBatch - 1}: got ${totalInBatch} sales (total: ${allSales.length})`);
-
-      // Parar si el batch entero está vacío o la última página con datos tiene menos de pageSize
-      if (totalInBatch === 0) {
-        hasMore = false;
-      } else {
-        // Encontrar la última página con datos y ver si está incompleta
-        const lastPageData = results.find(r => r.page === lastNonEmptyPage);
-        if (lastPageData && lastPageData.data.length < pageSize) {
-          hasMore = false; // Última página incompleta = fin de datos
+        
+        const data = await res.json();
+        const pageData = data.sales || data || [];
+        
+        if (pageData.length === 0) {
+          hasMore = false;
         } else {
-          currentPage += parallelBatch;
-          // Pequeño delay entre batches para evitar rate limit
-          await new Promise(r => setTimeout(r, 200));
+          allSales.push(...pageData);
+          console.log(`[Adversus] Page ${page}: ${pageData.length} sales (total: ${allSales.length})`);
+          
+          if (pageData.length < pageSize) {
+            hasMore = false; // Última página incompleta
+          } else {
+            page++;
+            // Pequeño delay para evitar rate limit
+            await new Promise(r => setTimeout(r, 50));
+          }
         }
+      } catch (e) {
+        console.error(`[Adversus] Error fetching page ${page}:`, e);
+        break;
       }
     }
 
