@@ -230,16 +230,37 @@ export class EnreachAdapter implements DialerAdapter {
         const campaignId = campaignObj ? this.getStr(campaignObj, ['uniqueId', 'UniqueId', 'code']) : "";
         const campaignCode = campaignObj ? this.getStr(campaignObj, ['code', 'Code']) : "";
         
-        // Agent info - from firstProcessedByUser.orgCode (this is the agent email)
+        // Agent info - from firstProcessedByUser object
         const firstProcessedByUser = (lead.firstProcessedByUser || lead.FirstProcessedByUser) as Record<string, unknown> | undefined;
         const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
         
-        const agentEmail = firstProcessedByUser?.orgCode as string || 
-                          lastModifiedByUser?.orgCode as string || 
-                          this.getStr(lead, ['agentEmail', 'AgentEmail', 'userEmail', 'UserEmail']);
+        // Try to get full name from user object first
+        let agentName = "";
+        if (firstProcessedByUser) {
+          agentName = this.getStr(firstProcessedByUser, ['name', 'Name', 'fullName', 'FullName', 'displayName', 'DisplayName']);
+        }
+        if (!agentName && lastModifiedByUser) {
+          agentName = this.getStr(lastModifiedByUser, ['name', 'Name', 'fullName', 'FullName', 'displayName', 'DisplayName']);
+        }
         
-        // Extract agent name from email (e.g., "noif@copenhagensales.dk" -> "noif")
-        const agentName = agentEmail ? agentEmail.split('@')[0] : "";
+        // Get orgCode as a fallback identifier and email
+        const agentOrgCode = (firstProcessedByUser?.orgCode as string) || 
+                           (lastModifiedByUser?.orgCode as string) || "";
+        
+        const agentEmail = this.getStr(firstProcessedByUser || {}, ['email', 'Email', 'emailAddress', 'EmailAddress']) ||
+                          this.getStr(lastModifiedByUser || {}, ['email', 'Email', 'emailAddress', 'EmailAddress']) ||
+                          this.getStr(lead, ['agentEmail', 'AgentEmail', 'userEmail', 'UserEmail']) ||
+                          agentOrgCode; // Use orgCode as fallback
+        
+        // If we still don't have a name, use orgCode as the name
+        if (!agentName) {
+          agentName = agentOrgCode;
+        }
+        
+        // Log for debugging first few leads
+        if (allLeads.indexOf(lead) < 3) {
+          console.log(`[EnreachAdapter] Agent extraction - orgCode: ${agentOrgCode}, name: ${agentName}, email: ${agentEmail}, firstProcessedByUser keys: ${firstProcessedByUser ? Object.keys(firstProcessedByUser).join(', ') : 'null'}`);
+        }
 
         // Customer data - nested in 'data' object (HeroBase specific)
         const dataObj = (lead.data || lead.Data) as Record<string, unknown> | undefined;
