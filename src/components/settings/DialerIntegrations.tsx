@@ -9,8 +9,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check, List, ExternalLink } from "lucide-react";
+import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check, List, ExternalLink, Mail, FileJson } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
@@ -53,6 +55,17 @@ const ADVERSUS_WEBHOOK_EVENTS = [
   { value: "note_added", label: "Note Added" },
 ];
 
+// Enreach webhook events based on official documentation
+const ENREACH_WEBHOOK_EVENTS = [
+  { value: "QueueCallInConnected", label: "Queue Call In Connected", description: "Indgående opkald tilsluttet" },
+  { value: "QueueCallInAllocated", label: "Queue Call In Allocated", description: "Indgående opkald tildelt kø" },
+  { value: "QueueCallInUserAllocated", label: "Queue Call In User Allocated", description: "Indgående opkald tildelt agent" },
+  { value: "QueueCallInCompleted", label: "Queue Call In Completed", description: "Indgående opkald afsluttet" },
+  { value: "QueueCallOutConnected", label: "Queue Call Out Connected", description: "Udgående opkald tilsluttet" },
+  { value: "QueueCallOutCompleted", label: "Queue Call Out Completed", description: "Udgående opkald afsluttet" },
+  { value: "CallListCallCompleted", label: "Call List Call Completed", description: "Opkaldsliste opkald afsluttet (salgsrelevant)" },
+];
+
 export function DialerIntegrations() {
   const queryClient = useQueryClient();
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -75,7 +88,7 @@ export function DialerIntegrations() {
   const [manualLimit, setManualLimit] = useState("100");
   const [isExecuting, setIsExecuting] = useState(false);
 
-  // Webhook creation state
+  // Webhook creation state (Adversus)
   const [webhookDialogOpen, setWebhookDialogOpen] = useState(false);
   const [webhookIntegrationId, setWebhookIntegrationId] = useState<string | null>(null);
   const [webhookIntegrationName, setWebhookIntegrationName] = useState<string>("");
@@ -83,7 +96,16 @@ export function DialerIntegrations() {
   const [isCreatingWebhook, setIsCreatingWebhook] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
-  // Webhook management state
+  // Enreach webhook configuration state
+  const [enreachWebhookDialogOpen, setEnreachWebhookDialogOpen] = useState(false);
+  const [enreachWebhookIntegrationId, setEnreachWebhookIntegrationId] = useState<string | null>(null);
+  const [enreachWebhookIntegrationName, setEnreachWebhookIntegrationName] = useState<string>("");
+  const [enreachSelectedEvents, setEnreachSelectedEvents] = useState<string[]>(["QueueCallOutCompleted", "CallListCallCompleted"]);
+  const [enreachSecretToken, setEnreachSecretToken] = useState("");
+  const [enreachWebhookDescription, setEnreachWebhookDescription] = useState("");
+  const [isSavingEnreachConfig, setIsSavingEnreachConfig] = useState(false);
+
+  // Webhook management state (Adversus)
   const [manageWebhooksDialogOpen, setManageWebhooksDialogOpen] = useState(false);
   const [manageWebhooksIntegrationId, setManageWebhooksIntegrationId] = useState<string | null>(null);
   const [manageWebhooksIntegrationName, setManageWebhooksIntegrationName] = useState<string>("");
@@ -326,6 +348,38 @@ export function DialerIntegrations() {
     setManageWebhooksIntegrationName(integrationName);
     setManageWebhooksDialogOpen(true);
     loadWebhooks(integrationId);
+  };
+
+  // Load existing Enreach webhook config
+  const loadEnreachWebhookConfig = async (integrationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("dialer_integrations")
+        .select("config")
+        .eq("id", integrationId)
+        .single();
+      
+      if (error) throw error;
+      
+      // deno-lint-ignore no-explicit-any
+      const config = data?.config as any;
+      if (config?.webhook) {
+        setEnreachSelectedEvents(config.webhook.events || ["QueueCallOutCompleted", "CallListCallCompleted"]);
+        setEnreachSecretToken(config.webhook.secret || "");
+        setEnreachWebhookDescription(config.webhook.description || "");
+      } else {
+        // Reset to defaults
+        setEnreachSelectedEvents(["QueueCallOutCompleted", "CallListCallCompleted"]);
+        setEnreachSecretToken("");
+        setEnreachWebhookDescription("");
+      }
+    } catch (err) {
+      console.error("Error loading Enreach config:", err);
+      // Reset to defaults
+      setEnreachSelectedEvents(["QueueCallOutCompleted", "CallListCallCompleted"]);
+      setEnreachSecretToken("");
+      setEnreachWebhookDescription("");
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -583,80 +637,19 @@ export function DialerIntegrations() {
                         </>
                       )}
                       {integration.provider === 'enreach' && (
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              title="Webhook Setup"
-                            >
-                              <Webhook className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-lg">
-                            <DialogHeader>
-                              <DialogTitle>Enreach Webhook Opsætning</DialogTitle>
-                              <DialogDescription>
-                                Webhooks konfigureres via Enreach support
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <div>
-                                <Label className="text-sm font-medium">Webhook Endpoint URL</Label>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <Input 
-                                    readOnly 
-                                    value={getWebhookUrl(integration.id)}
-                                    className="font-mono text-xs"
-                                  />
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => copyWebhookUrl(integration.id)}
-                                  >
-                                    {copiedUrl ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                  </Button>
-                                </div>
-                              </div>
-                              <Separator />
-                              <div className="space-y-3 text-sm">
-                                <p className="font-medium">Sådan får du webhooks aktiveret:</p>
-                                <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-md">
-                                  <p className="text-amber-600 dark:text-amber-400 text-xs">
-                                    <strong>Vigtigt:</strong> Enreach webhooks konfigureres <strong>kun</strong> af Enreach support - ikke self-service.
-                                  </p>
-                                </div>
-                                <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                                  <li>Kontakt Enreach support med følgende info:</li>
-                                </ol>
-                                <div className="ml-4 space-y-2 text-xs">
-                                  <div className="bg-muted p-2 rounded font-mono">
-                                    <p><strong>Endpoint:</strong> {getWebhookUrl(integration.id)}</p>
-                                    <p><strong>InsecureSSL:</strong> false</p>
-                                    <p><strong>Secret:</strong> (valgfrit - bed dem tilføje)</p>
-                                  </div>
-                                </div>
-                                <ol start={2} className="list-decimal list-inside space-y-2 text-muted-foreground">
-                                  <li>Bed dem abonnere på relevante events:</li>
-                                </ol>
-                                <div className="ml-4 flex flex-wrap gap-1">
-                                  {['QueueCallInCompleted', 'QueueCallOutCompleted', 'CallListCallCompleted'].map(evt => (
-                                    <code key={evt} className="bg-muted px-1.5 py-0.5 rounded text-xs">{evt}</code>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="bg-muted/50 p-3 rounded-md space-y-1">
-                                <p className="text-xs text-muted-foreground">
-                                  <strong>Headers vi håndterer:</strong>
-                                </p>
-                                <ul className="text-xs text-muted-foreground list-disc list-inside">
-                                  <li><code>X-Benemen-Event</code> - Event type identifikation</li>
-                                  <li><code>X-Benemen-Token</code> - Secret token (hvis konfigureret)</li>
-                                </ul>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Konfigurer Webhook"
+                          onClick={() => {
+                            setEnreachWebhookIntegrationId(integration.id);
+                            setEnreachWebhookIntegrationName(integration.name);
+                            loadEnreachWebhookConfig(integration.id);
+                            setEnreachWebhookDialogOpen(true);
+                          }}
+                        >
+                          <Webhook className="h-4 w-4" />
+                        </Button>
                       )}
                       <Button
                         variant="ghost"
@@ -853,6 +846,213 @@ export function DialerIntegrations() {
                 Luk
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Enreach Webhook Configuration Dialog */}
+        <Dialog open={enreachWebhookDialogOpen} onOpenChange={setEnreachWebhookDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Webhook className="h-5 w-5" />
+                Enreach Webhook Konfiguration - {enreachWebhookIntegrationName}
+              </DialogTitle>
+              <DialogDescription>
+                Konfigurer webhook-indstillinger til Enreach support.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 py-4">
+              {/* Webhook URL */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Webhook Endpoint URL</Label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    readOnly 
+                    value={enreachWebhookIntegrationId ? getWebhookUrl(enreachWebhookIntegrationId) : ''}
+                    className="font-mono text-xs"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => enreachWebhookIntegrationId && copyWebhookUrl(enreachWebhookIntegrationId)}
+                  >
+                    {copiedUrl ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Event Selection */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Vælg Events at abonnere på</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  {ENREACH_WEBHOOK_EVENTS.map((event) => (
+                    <div key={event.value} className="flex items-start space-x-3 p-2 rounded-md hover:bg-muted/50">
+                      <Checkbox
+                        id={event.value}
+                        checked={enreachSelectedEvents.includes(event.value)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setEnreachSelectedEvents([...enreachSelectedEvents, event.value]);
+                          } else {
+                            setEnreachSelectedEvents(enreachSelectedEvents.filter(e => e !== event.value));
+                          }
+                        }}
+                      />
+                      <div className="grid gap-0.5 leading-none">
+                        <label htmlFor={event.value} className="text-sm font-medium cursor-pointer">
+                          {event.label}
+                        </label>
+                        <p className="text-xs text-muted-foreground">{event.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Secret Token */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Secret Token (valgfrit)</Label>
+                <Input 
+                  value={enreachSecretToken}
+                  onChange={(e) => setEnreachSecretToken(e.target.value)}
+                  placeholder="f.eks. MySecretString123"
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Hvis du angiver en secret, vil Enreach sende den i <code className="bg-muted px-1 rounded">X-Benemen-Token</code> header.
+                </p>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Beskrivelse (valgfrit)</Label>
+                <Input 
+                  value={enreachWebhookDescription}
+                  onChange={(e) => setEnreachWebhookDescription(e.target.value)}
+                  placeholder="f.eks. CPH Sales webhook integration"
+                />
+              </div>
+
+              <Separator />
+
+              {/* Generated JSON Config */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Konfiguration til Enreach Support</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const config = {
+                        Webhook: {
+                          Endpoint: enreachWebhookIntegrationId ? getWebhookUrl(enreachWebhookIntegrationId) : '',
+                          InsecureSSL: false,
+                          ...(enreachSecretToken && { Secret: enreachSecretToken }),
+                          ...(enreachWebhookDescription && { Description: enreachWebhookDescription }),
+                        },
+                        Subscriptions: enreachSelectedEvents.map(evt => ({
+                          EventType: evt,
+                          AllEntities: true
+                        }))
+                      };
+                      navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+                      toast.success("JSON kopieret til udklipsholder");
+                    }}
+                  >
+                    <FileJson className="h-4 w-4 mr-1" />
+                    Kopier JSON
+                  </Button>
+                </div>
+                <Textarea
+                  readOnly
+                  className="font-mono text-xs h-48"
+                  value={JSON.stringify({
+                    Webhook: {
+                      Endpoint: enreachWebhookIntegrationId ? getWebhookUrl(enreachWebhookIntegrationId) : '',
+                      InsecureSSL: false,
+                      ...(enreachSecretToken && { Secret: enreachSecretToken }),
+                      ...(enreachWebhookDescription && { Description: enreachWebhookDescription }),
+                    },
+                    Subscriptions: enreachSelectedEvents.map(evt => ({
+                      EventType: evt,
+                      AllEntities: true
+                    }))
+                  }, null, 2)}
+                />
+              </div>
+
+              {/* Warning */}
+              <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-md">
+                <p className="text-amber-600 dark:text-amber-400 text-xs">
+                  <strong>Vigtigt:</strong> Send ovenstående JSON til Enreach support for at få webhook aktiveret. 
+                  De vil konfigurere det i deres system.
+                </p>
+              </div>
+
+              {/* Email template button */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    const config = {
+                      Webhook: {
+                        Endpoint: enreachWebhookIntegrationId ? getWebhookUrl(enreachWebhookIntegrationId) : '',
+                        InsecureSSL: false,
+                        ...(enreachSecretToken && { Secret: enreachSecretToken }),
+                        ...(enreachWebhookDescription && { Description: enreachWebhookDescription }),
+                      },
+                      Subscriptions: enreachSelectedEvents.map(evt => ({
+                        EventType: evt,
+                        AllEntities: true
+                      }))
+                    };
+                    const subject = encodeURIComponent("Webhook Configuration Request");
+                    const body = encodeURIComponent(`Hej Enreach Support,\n\nVi vil gerne have konfigureret en webhook med følgende indstillinger:\n\n${JSON.stringify(config, null, 2)}\n\nVenlig hilsen`);
+                    window.open(`mailto:support@enreach.com?subject=${subject}&body=${body}`, '_blank');
+                  }}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Åbn Email Skabelon
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!enreachWebhookIntegrationId) return;
+                    setIsSavingEnreachConfig(true);
+                    try {
+                      const config = {
+                        webhook: {
+                          events: enreachSelectedEvents,
+                          secret: enreachSecretToken || null,
+                          description: enreachWebhookDescription || null,
+                          configured_at: new Date().toISOString(),
+                        }
+                      };
+                      await supabase
+                        .from("dialer_integrations")
+                        .update({ config })
+                        .eq("id", enreachWebhookIntegrationId);
+                      
+                      toast.success("Webhook konfiguration gemt");
+                      setEnreachWebhookDialogOpen(false);
+                    } catch (err) {
+                      toast.error("Fejl ved gemning af konfiguration");
+                    } finally {
+                      setIsSavingEnreachConfig(false);
+                    }
+                  }}
+                  disabled={isSavingEnreachConfig || enreachSelectedEvents.length === 0}
+                >
+                  {isSavingEnreachConfig && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  Gem Konfiguration
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
 
