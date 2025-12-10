@@ -457,7 +457,7 @@ export type Database = {
             foreignKeyName: "booking_assignment_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
-            referencedRelation: "employee"
+            referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
           },
         ]
@@ -1659,7 +1659,7 @@ export type Database = {
             foreignKeyName: "employee_absence_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
-            referencedRelation: "employee"
+            referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
           },
         ]
