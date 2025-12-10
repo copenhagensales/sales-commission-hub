@@ -27,6 +27,7 @@ interface Sale {
   source: string | null;
   integration_type: string | null;
   campaign_name: string | null;
+  dialer_campaign_id: string | null;
 }
 
 const PAGE_SIZE = 50;
@@ -91,8 +92,19 @@ export default function DialerData() {
     },
   });
 
+  // Fetch campaign mappings for lookup
+  const { data: campaignMappings } = useQuery({
+    queryKey: ["campaign-mappings"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("adversus_campaign_id, adversus_campaign_name");
+      return new Map((data || []).map(m => [m.adversus_campaign_id, m.adversus_campaign_name]));
+    },
+  });
+
   const { data: salesData, isLoading, refetch } = useQuery({
-    queryKey: ["dialer-sales", activeTab, sourceFilter, page, dateFrom, dateTo, searchTerm, sortColumn, sortDirection],
+    queryKey: ["dialer-sales", activeTab, sourceFilter, page, dateFrom, dateTo, searchTerm, sortColumn, sortDirection, campaignMappings],
     queryFn: async () => {
       const fromDate = dateFrom ? startOfDay(dateFrom).toISOString() : undefined;
       const toDate = dateTo ? endOfDay(dateTo).toISOString() : undefined;
@@ -101,7 +113,7 @@ export default function DialerData() {
         .from("sales")
         .select(`
           id, adversus_external_id, agent_name, sale_datetime, adversus_opp_number, 
-          customer_company, customer_phone, source, integration_type,
+          customer_company, customer_phone, source, integration_type, dialer_campaign_id,
           client_campaigns(name)
         `, { count: "exact" })
         .order(sortColumn === "campaign_name" ? "sale_datetime" : sortColumn, { ascending: sortDirection === "asc", nullsFirst: false })
@@ -131,15 +143,18 @@ export default function DialerData() {
       const { data, error, count } = await query;
       if (error) throw error;
       
-      // Transform data to include campaign_name
+      // Transform data to include campaign_name from either client_campaigns or adversus_campaign_mappings
       const transformedData = (data || []).map((sale: any) => ({
         ...sale,
-        campaign_name: sale.client_campaigns?.name || null,
+        campaign_name: sale.client_campaigns?.name || 
+                       (sale.dialer_campaign_id && campaignMappings?.get(sale.dialer_campaign_id)) || 
+                       null,
         client_campaigns: undefined
       }));
       
       return { sales: transformedData as Sale[], totalCount: count || 0 };
     },
+    enabled: !!campaignMappings,
   });
 
   const sales = salesData?.sales || [];

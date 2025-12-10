@@ -2779,6 +2779,7 @@ export type Database = {
           created_at: string | null
           customer_company: string | null
           customer_phone: string | null
+          dialer_campaign_id: string | null
           id: string
           integration_type: string | null
           sale_datetime: string
@@ -2797,6 +2798,7 @@ export type Database = {
           created_at?: string | null
           customer_company?: string | null
           customer_phone?: string | null
+          dialer_campaign_id?: string | null
           id?: string
           integration_type?: string | null
           sale_datetime?: string
@@ -2815,6 +2817,7 @@ export type Database = {
           created_at?: string | null
           customer_company?: string | null
           customer_phone?: string | null
+          dialer_campaign_id?: string | null
           id?: string
           integration_type?: string | null
           sale_datetime?: string

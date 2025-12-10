@@ -235,6 +235,7 @@ export class IngestionEngine {
           customer_phone: sale.customerPhone,
           adversus_opp_number: oppNumber,
           client_campaign_id: sale.clientCampaignId || null,
+          dialer_campaign_id: sale.campaignId || null,
           source: sale.dialerName,
           integration_type: sale.integrationType,
           updated_at: new Date().toISOString(),
