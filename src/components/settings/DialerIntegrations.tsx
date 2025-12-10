@@ -699,10 +699,11 @@ export function DialerIntegrations() {
                           <Button
                             variant="outline"
                             size="sm"
-                            title="Webhook Instruktioner"
+                            title="Opret Webhook"
                             onClick={() => {
                               setEnreachWebhookIntegrationId(integration.id);
                               setEnreachWebhookIntegrationName(integration.name);
+                              setEnreachWebhookDescription("");
                               setEnreachWebhookDialogOpen(true);
                             }}
                           >
@@ -916,28 +917,21 @@ export function DialerIntegrations() {
           </DialogContent>
         </Dialog>
 
-        {/* Enreach Webhook Instructions Dialog */}
+        {/* Enreach Webhook Creation Dialog */}
         <Dialog open={enreachWebhookDialogOpen} onOpenChange={setEnreachWebhookDialogOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Webhook className="h-5 w-5" />
-                Konfigurer Webhook i HeroBase
+                Opret Webhook i HeroBase
               </DialogTitle>
               <DialogDescription>
-                Webhooks for HeroBase skal oprettes manuelt i HeroBase admin panelet.
+                Opret en webhook i HeroBase for "{enreachWebhookIntegrationName}" der sender events til dit system.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                <p className="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>Bemærk:</strong> HeroBase kræver specielle rettigheder for at oprette webhooks via API. 
-                  Du skal oprette webhook manuelt i HeroBase admin panelet.
-                </p>
-              </div>
-              
               <div className="space-y-2">
-                <Label>Webhook URL til HeroBase</Label>
+                <Label>Webhook URL (automatisk)</Label>
                 <div className="flex gap-2">
                   <Input
                     readOnly
@@ -952,22 +946,27 @@ export function DialerIntegrations() {
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Denne URL bruges automatisk - den inkluderer dialer_id parameteren.
+                </p>
               </div>
               
               <div className="space-y-2">
-                <Label>Instruktioner</Label>
-                <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                  <li>Kopier webhook URL'en ovenfor</li>
-                  <li>Log ind på HeroBase admin panel</li>
-                  <li>Gå til Webhooks/Hooks sektionen</li>
-                  <li>Opret en ny webhook med den kopierede URL</li>
-                  <li>Vælg de events du vil modtage (f.eks. salg)</li>
-                </ol>
+                <Label>Beskrivelse (valgfrit)</Label>
+                <Input
+                  value={enreachWebhookDescription}
+                  onChange={(e) => setEnreachWebhookDescription(e.target.value)}
+                  placeholder="f.eks. CPH Sales salgswebhook"
+                />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEnreachWebhookDialogOpen(false)}>
-                Luk
+                Annuller
+              </Button>
+              <Button onClick={createEnreachWebhook} disabled={isCreatingEnreachWebhook}>
+                {isCreatingEnreachWebhook && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Opret Webhook
               </Button>
             </DialogFooter>
           </DialogContent>
