@@ -29,6 +29,7 @@ interface Employee {
 interface Booking {
   id: string;
   location?: { name: string };
+  brand?: { name: string };
   start_date: string;
   end_date: string;
 }
@@ -67,6 +68,15 @@ export function AddEmployeeDialog({
 }: AddEmployeeDialogProps) {
   const [selectedEmployees, setSelectedEmployees] = useState<(string | null)[]>([null]);
   const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
+
+  // Filter employees by brand/department match
+  const brandName = booking?.brand?.name?.toLowerCase();
+  const filteredEmployees = employees.filter((emp) => {
+    if (!brandName) return true;
+    const empTeam = emp.team?.toLowerCase();
+    // Match if employee's department/team matches the brand name
+    return empTeam === brandName || empTeam?.includes(brandName) || brandName.includes(empTeam || "");
+  });
 
   // Fetch absences for the week period from absence_request_v2
   const weekEnd = addDays(weekStart, 6);
@@ -124,7 +134,7 @@ export function AddEmployeeDialog({
       if (absenceDays) {
         const overlappingDays = Array.from(selectedDays).filter((d) => absenceDays.has(d));
         if (overlappingDays.length > 0) {
-          const emp = employees.find((e) => e.id === empId);
+          const emp = filteredEmployees.find((e) => e.id === empId);
           if (emp) {
             result.push({
               employeeId: empId,
@@ -137,7 +147,7 @@ export function AddEmployeeDialog({
     });
     
     return result;
-  }, [selectedEmployees, selectedDays, absencesByEmployeeAndDay, employees]);
+  }, [selectedEmployees, selectedDays, absencesByEmployeeAndDay, filteredEmployees]);
 
   // Check if a specific employee has absence on a specific day
   const hasAbsenceOnDay = (employeeId: string, dayIndex: number) => {
@@ -242,7 +252,7 @@ export function AddEmployeeDialog({
                       <SelectValue placeholder={`Medarbejder ${index + 1} (valgfri)`} />
                     </SelectTrigger>
                     <SelectContent className="bg-popover">
-                      {employees
+                      {filteredEmployees
                         .filter(e => !selectedEmployees.includes(e.id) || e.id === emp)
                         .map((employee) => {
                           const empHasAbsence = absencesByEmployeeAndDay.has(employee.id);
@@ -275,7 +285,7 @@ export function AddEmployeeDialog({
               );
             })}
             
-            {selectedEmployees.length < employees.length && (
+            {selectedEmployees.length < filteredEmployees.length && (
               <Button
                 variant="outline"
                 size="sm"
