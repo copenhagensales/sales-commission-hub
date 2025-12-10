@@ -114,7 +114,6 @@ const vagtFlowNavigation = [
   { name: "Book uge", href: "/vagt-flow/book-week", icon: Calendar },
   { name: "Vagtplan", href: "/vagt-flow/bookings", icon: Calendar },
   { name: "Lokationer", href: "/vagt-flow/locations", icon: MapPin },
-  { name: "Fravær", href: "/vagt-flow/time-off", icon: Clock },
   { name: "Køretøjer", href: "/vagt-flow/vehicles", icon: Car },
   { name: "Fakturering", href: "/vagt-flow/billing", icon: Receipt },
 ];
