@@ -5,21 +5,29 @@ import { AdversusAdapter } from "./adapters/adversus.ts";
 import { EnreachAdapter } from "./adapters/enreach.ts";
 import { DialerAdapter } from "./adapters/interface.ts";
 
+// Declare EdgeRuntime for background tasks
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper to create Supabase client
+function getSupabase() {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  return createClient(supabaseUrl, supabaseKey);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { source, action, actions, days = 1, campaignId } = await req.json();
+    const body = await req.json();
+    const { source, action, actions, days = 1, campaignId, integration_id, background = false } = body;
 
-    // Inicializar Supabase para buscar configuraciones
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = getSupabase();
 
     // Handle fetch-sample-fields action - returns raw field data for UI inspection
     if (action === "fetch-sample-fields") {
@@ -97,76 +105,118 @@ serve(async (req) => {
 
     // Handle repair-history action - bulk fetch and update historical sales
     if (action === "repair-history") {
-      console.log(`[Integration Engine] Starting historical repair (${days} days)`);
+      console.log(`[Integration Engine] Starting historical repair (${days} days)${integration_id ? ` for integration: ${integration_id}` : ''}${background ? ' [BACKGROUND]' : ''}`);
       const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY");
       
-      // Get all active Adversus integrations
-      const { data: integrations, error: intError } = await supabase
+      // Build query - support specific integration or all active Adversus integrations
+      let query = supabase
         .from("dialer_integrations")
         .select("*")
-        .eq("provider", "adversus")
         .eq("is_active", true);
+      
+      if (integration_id) {
+        query = query.eq("id", integration_id);
+      } else {
+        query = query.eq("provider", "adversus");
+      }
+      
+      const { data: integrations, error: intError } = await query;
 
       if (intError) throw intError;
       if (!integrations || integrations.length === 0) {
         return new Response(
-          JSON.stringify({ success: false, error: "No active Adversus integrations found" }),
+          JSON.stringify({ success: false, error: integration_id ? "Integration not found or inactive" : "No active Adversus integrations found" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      const engine = new IngestionEngine();
-      const campaignMappings = await engine.getCampaignMappings();
-      
-      let totalProcessed = 0;
-      let totalErrors = 0;
-      const results = [];
+      // Background processing function
+      async function runRepairHistory() {
+        const engine = new IngestionEngine();
+        const campaignMappings = await engine.getCampaignMappings();
+        
+        let totalProcessed = 0;
+        let totalErrors = 0;
+        const results: { name: string; status: string; processed?: number; errors?: number; error?: string }[] = [];
 
-      for (const integration of integrations) {
-        try {
-          console.log(`[Integration Engine] Processing integration: ${integration.name}`);
-          
-          const { data: credentials } = await supabase.rpc("get_dialer_credentials", {
-            p_integration_id: integration.id,
-            p_encryption_key: encryptionKey,
-          });
+        for (const integration of integrations!) {
+          try {
+            console.log(`[Integration Engine] Processing integration: ${integration.name}`);
+            
+            const { data: credentials } = await supabase.rpc("get_dialer_credentials", {
+              p_integration_id: integration.id,
+              p_encryption_key: encryptionKey,
+            });
 
-          const adapter = new AdversusAdapter(credentials, integration.name);
-          
-          // Fetch all sales for the specified period (default 90 days for repair)
-          const sales = await adapter.fetchSales(days || 90, campaignMappings);
-          console.log(`[Integration Engine] Fetched ${sales.length} sales for ${integration.name}`);
-          
-          // Process sales - core.ts handles non-destructive OPP updates
-          const result = await engine.processSales(sales);
-          
-          totalProcessed += result.processed;
-          totalErrors += result.errors;
-          
-          results.push({ 
-            name: integration.name, 
-            status: "success", 
-            processed: result.processed,
-            errors: result.errors 
-          });
+            const adapter = new AdversusAdapter(credentials, integration.name);
+            
+            // Fetch all sales for the specified period (default 90 days for repair)
+            const sales = await adapter.fetchSales(days || 90, campaignMappings);
+            console.log(`[Integration Engine] Fetched ${sales.length} sales for ${integration.name}`);
+            
+            // Process sales - core.ts handles non-destructive OPP updates
+            const result = await engine.processSales(sales);
+            
+            totalProcessed += result.processed;
+            totalErrors += result.errors;
+            
+            results.push({ 
+              name: integration.name, 
+              status: "success", 
+              processed: result.processed,
+              errors: result.errors 
+            });
 
-          // Log success
-          await supabase.from("integration_logs").insert({
-            integration_type: "dialer",
-            integration_id: integration.id,
-            integration_name: integration.name,
-            status: "success",
-            message: `Historical repair: ${result.processed} sales processed`,
-            details: { action: "repair-history", days, processed: result.processed, errors: result.errors },
-          });
+            // Log success
+            await supabase.from("integration_logs").insert({
+              integration_type: "dialer",
+              integration_id: integration.id,
+              integration_name: integration.name,
+              status: "success",
+              message: `Historical repair: ${result.processed} sales processed`,
+              details: { action: "repair-history", days, processed: result.processed, errors: result.errors },
+            });
 
-        } catch (e) {
-          const errMsg = e instanceof Error ? e.message : String(e);
-          console.error(`[Integration Engine] Error in ${integration.name}:`, e);
-          totalErrors++;
-          results.push({ name: integration.name, status: "error", error: errMsg });
+          } catch (e) {
+            const errMsg = e instanceof Error ? e.message : String(e);
+            console.error(`[Integration Engine] Error in ${integration.name}:`, e);
+            totalErrors++;
+            results.push({ name: integration.name, status: "error", error: errMsg });
+            
+            // Log error
+            await supabase.from("integration_logs").insert({
+              integration_type: "dialer",
+              integration_id: integration.id,
+              integration_name: integration.name,
+              status: "error",
+              message: `Historical repair failed: ${errMsg}`,
+              details: { action: "repair-history", days, error: errMsg },
+            });
+          }
         }
+        
+        console.log(`[Integration Engine] Repair complete: ${totalProcessed} processed, ${totalErrors} errors`);
+        return { totalProcessed, totalErrors, results };
       }
+
+      // If background mode, use waitUntil and return immediately
+      if (background) {
+        EdgeRuntime.waitUntil(runRepairHistory());
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            action: "repair-history",
+            background: true,
+            message: `Started background repair for ${integrations.length} integration(s). Check logs for progress.`,
+            integrations: integrations.map(i => i.name),
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Synchronous mode - wait for completion
+      const { totalProcessed, totalErrors, results } = await runRepairHistory();
 
       return new Response(
         JSON.stringify({ 
@@ -181,7 +231,7 @@ serve(async (req) => {
       );
     }
 
-    const { integration_id } = await req.json().catch(() => ({}));
+    // integration_id already parsed from body above
     
     const engine = new IngestionEngine();
     
