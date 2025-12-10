@@ -452,10 +452,10 @@ export default function CarQuiz() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4 pl-14">
-              <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 p-4 text-sm space-y-2 border border-amber-200 dark:border-amber-800/50">
-                <p>Der sidder en chip/GPS-enhed i Copenhagen Sales' biler, som registrerer bl.a. fart og kørsel.</p>
-                <p>Copenhagen Sales kan se, hvor hurtigt bilen er blevet ført, og hvordan den er blevet brugt.</p>
-                <p className="font-medium">Formålet er sikkerhed, dokumentation og kontrol.</p>
+              <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 p-4 text-sm space-y-3 border border-amber-200 dark:border-amber-800/50">
+                <p className="text-amber-900 dark:text-amber-100 leading-relaxed">Der sidder en chip/GPS-enhed i Copenhagen Sales' biler, som registrerer bl.a. fart og kørsel.</p>
+                <p className="text-amber-900 dark:text-amber-100 leading-relaxed">Copenhagen Sales kan se, hvor hurtigt bilen er blevet ført, og hvordan den er blevet brugt.</p>
+                <p className="font-semibold text-amber-800 dark:text-amber-200 leading-relaxed">Formålet er sikkerhed, dokumentation og kontrol.</p>
               </div>
 
               <div 
