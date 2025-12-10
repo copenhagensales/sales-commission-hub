@@ -324,58 +324,57 @@ export class AdversusAdapter implements DialerAdapter {
 
   /**
    * GDPR-Compliant CDR fetch - only IDs and metadata, NO personal Lead data
-   * Uses Adversus /cdr endpoint for Call Detail Records
+   * Tries multiple Adversus endpoints for Call Detail Records
    */
   async fetchCalls(days: number): Promise<StandardCall[]> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
+    const startDateStr = startDate.toISOString().split('T')[0];
     
-    const filterStr = encodeURIComponent(JSON.stringify({ 
-      created: { $gt: startDate.toISOString() } 
-    }));
-
-    console.log(`[Adversus] Fetching CDR for last ${days} days`);
+    console.log(`[Adversus] Fetching calls for last ${days} days from ${startDateStr}`);
     
-    const allCdrs: any[] = [];
-    const pageSize = 1000;
-    let page = 1;
-    let hasMore = true;
-
-    while (hasMore && page <= 50) { // Max 50,000 CDRs
+    // Try multiple potential endpoints
+    const endpoints = [
+      `/calls?from=${startDateStr}&pageSize=1000`,
+      `/cdr?from=${startDateStr}&pageSize=1000`,
+      `/activity?from=${startDateStr}&type=call&pageSize=1000`,
+    ];
+    
+    for (const endpoint of endpoints) {
+      console.log(`[Adversus] Trying endpoint: ${endpoint}`);
       try {
-        const url = `${this.baseUrl}/cdr?pageSize=${pageSize}&page=${page}&filters=${filterStr}`;
+        const url = `${this.baseUrl}${endpoint}`;
         const res = await fetch(url, { 
           headers: { Authorization: `Basic ${this.authHeader}` } 
         });
         
         if (!res.ok) {
-          console.log(`[Adversus] CDR page ${page} failed: ${res.status}`);
-          break;
+          const errorText = await res.text();
+          console.log(`[Adversus] Endpoint ${endpoint} failed: ${res.status} - ${errorText.substring(0, 200)}`);
+          continue;
         }
         
         const data = await res.json();
-        const pageData = data.cdr || data.cdrs || data || [];
+        console.log(`[Adversus] Response keys: ${Object.keys(data).join(', ')}`);
         
-        if (pageData.length === 0) {
-          hasMore = false;
-        } else {
-          allCdrs.push(...pageData);
-          console.log(`[Adversus] CDR page ${page}: ${pageData.length} records (total: ${allCdrs.length})`);
-          
-          if (pageData.length < pageSize) {
-            hasMore = false;
-          } else {
-            page++;
-            await new Promise(r => setTimeout(r, 50)); // Rate limit delay
-          }
+        const records = data.calls || data.cdr || data.cdrs || data.activities || data.data || [];
+        
+        if (Array.isArray(records) && records.length > 0) {
+          console.log(`[Adversus] Found ${records.length} call records via ${endpoint}`);
+          console.log(`[Adversus] Sample record keys: ${Object.keys(records[0]).join(', ')}`);
+          return this.mapCdrsToStandardCalls(records);
         }
       } catch (e) {
-        console.error(`[Adversus] CDR page ${page} error:`, e);
-        break;
+        console.error(`[Adversus] Error with endpoint ${endpoint}:`, e);
       }
     }
+    
+    console.log(`[Adversus] No call data found from any endpoint`);
+    return [];
+  }
 
-    console.log(`[Adversus] Total CDRs fetched: ${allCdrs.length}`);
+  private mapCdrsToStandardCalls(allCdrs: any[]): StandardCall[] {
+    console.log(`[Adversus] Mapping ${allCdrs.length} CDRs to StandardCall format`);
 
     // Map to StandardCall (GDPR-compliant - only IDs)
     return allCdrs.map((cdr: any) => {
