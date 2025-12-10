@@ -142,7 +142,7 @@ export class IngestionEngine {
     return { processed: totalProcessed, errors: totalErrors };
   }
 
-  // Process a single batch of sales
+  // Process a single batch of sales using BULK operations for speed
   private async processSalesBatch(
     sales: StandardSale[], 
     productMapByName: Map<string, any>,
@@ -152,9 +152,23 @@ export class IngestionEngine {
     let processed = 0;
     let errors = 0;
 
+    // OPTIMIZATION: Fetch all existing sales in ONE query
+    const externalIds = sales.map(s => s.externalId);
+    const { data: existingSales } = await this.supabase
+      .from("sales")
+      .select("id, adversus_external_id, adversus_opp_number")
+      .in("adversus_external_id", externalIds);
+    
+    const existingSalesMap = new Map(existingSales?.map(s => [s.adversus_external_id, s]) || []);
+
+    // Prepare bulk data
+    const salesToInsert: any[] = [];
+    const salesToUpdate: { id: string; data: any }[] = [];
+    const saleItemsToInsert: any[] = [];
+    const saleIdsToDeleteItems: string[] = [];
+
     for (const sale of sales) {
       try {
-        // External reference (OPP) is now pre-extracted by the adapter
         const saleData = {
           adversus_external_id: sale.externalId,
           sale_datetime: sale.saleDate,
@@ -163,93 +177,121 @@ export class IngestionEngine {
           customer_phone: sale.customerPhone,
           adversus_opp_number: sale.externalReference || null,
           client_campaign_id: sale.clientCampaignId || null,
-          source: sale.dialerName, // The dialer/account name (e.g., "Lovablecph", "tryg")
-          integration_type: sale.integrationType, // The integration system (adversus, enreach)
+          source: sale.dialerName,
+          integration_type: sale.integrationType,
           updated_at: new Date().toISOString(),
         };
 
-        // B. Safe Sync Venta (Non-Destructive Update for OPP)
-        let saleId: string | null = null;
-        const { data: existingSale } = await this.supabase
-          .from("sales")
-          .select("id, adversus_opp_number")
-          .eq("adversus_external_id", sale.externalId)
-          .maybeSingle();
+        const existingSale = existingSalesMap.get(sale.externalId);
 
         if (existingSale) {
-          // NON-DESTRUCTIVE: Only update OPP if new value is valid AND old is null
-          // This prevents overwriting good OPP data with null/invalid data
+          // NON-DESTRUCTIVE: Keep existing OPP if new one is empty
           const updateData = { ...saleData };
           if (existingSale.adversus_opp_number && !sale.externalReference) {
-            // Keep existing OPP if new one is empty
             updateData.adversus_opp_number = existingSale.adversus_opp_number;
           }
+          salesToUpdate.push({ id: existingSale.id, data: updateData });
+          saleIdsToDeleteItems.push(existingSale.id);
           
-          await this.supabase.from("sales").update(updateData).eq("id", existingSale.id);
-          saleId = existingSale.id;
-          // Limpiar items viejos para evitar duplicados
-          await this.supabase.from("sale_items").delete().eq("sale_id", saleId);
+          // Prepare items with existing sale ID
+          this.prepareSaleItems(sale, existingSale.id, productMapByExtId, productMapByName, dbProducts, saleItemsToInsert);
         } else {
-          const { data: newSale, error: insertError } = await this.supabase
-            .from("sales")
-            .insert(saleData)
-            .select("id")
-            .single();
-
-          if (insertError) throw insertError;
-          saleId = newSale.id;
+          salesToInsert.push(saleData);
         }
-
-        // C. Procesar Productos
-        const itemsToInsert = sale.products.map((p: StandardProduct) => {
-          // 1. Intentar match por ID Externo
-          let productId = productMapByExtId.get(p.externalId);
-
-          // 2. Intentar match por Nombre (Fallback)
-          if (!productId && p.name) {
-            const prod = productMapByName.get(p.name.toLowerCase());
-            if (prod) productId = prod.id;
-          }
-
-          // 3. Calcular Finanzas
-          let commission = 0;
-          let revenue = 0;
-          const qty = p.quantity || 1;
-
-          if (productId) {
-            const fullProduct = dbProducts?.find((x) => x.id === productId);
-            if (fullProduct) {
-              commission = (fullProduct.commission_dkk || 0) * qty;
-              revenue = (fullProduct.revenue_dkk || 0) * qty;
-            }
-          }
-
-          return {
-            sale_id: saleId,
-            product_id: productId || null,
-            adversus_external_id: p.externalId,
-            adversus_product_title: p.name,
-            quantity: qty,
-            unit_price: p.unitPrice,
-            mapped_commission: commission,
-            mapped_revenue: revenue,
-            needs_mapping: !productId,
-          };
-        });
-
-        if (itemsToInsert.length > 0) {
-          const { error: itemsError } = await this.supabase.from("sale_items").insert(itemsToInsert);
-          if (itemsError) throw itemsError;
-        }
-
         processed++;
       } catch (e) {
         errors++;
         const errMsg = e instanceof Error ? e.message : String(e);
-        this.log("ERROR", `Fallo venta ${sale.externalId}`, errMsg);
+        this.log("ERROR", `Error preparando venta ${sale.externalId}`, errMsg);
       }
     }
 
+    // BULK OPERATIONS
+    try {
+      // 1. Delete old items for existing sales (bulk)
+      if (saleIdsToDeleteItems.length > 0) {
+        await this.supabase.from("sale_items").delete().in("sale_id", saleIdsToDeleteItems);
+      }
+
+      // 2. Update existing sales (batch of individual updates - Supabase doesn't support bulk update)
+      for (const { id, data } of salesToUpdate) {
+        await this.supabase.from("sales").update(data).eq("id", id);
+      }
+
+      // 3. Insert new sales and get their IDs
+      if (salesToInsert.length > 0) {
+        const { data: newSales, error: insertError } = await this.supabase
+          .from("sales")
+          .insert(salesToInsert)
+          .select("id, adversus_external_id");
+        
+        if (insertError) throw insertError;
+
+        // Prepare items for new sales
+        const newSalesMap = new Map(newSales?.map(s => [s.adversus_external_id, s.id]) || []);
+        for (const sale of sales) {
+          const newSaleId = newSalesMap.get(sale.externalId);
+          if (newSaleId) {
+            this.prepareSaleItems(sale, newSaleId, productMapByExtId, productMapByName, dbProducts, saleItemsToInsert);
+          }
+        }
+      }
+
+      // 4. Bulk insert all sale items
+      if (saleItemsToInsert.length > 0) {
+        const { error: itemsError } = await this.supabase.from("sale_items").insert(saleItemsToInsert);
+        if (itemsError) throw itemsError;
+      }
+
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      this.log("ERROR", `Error en operaciones bulk`, errMsg);
+      errors += sales.length; // Mark all as errors
+      processed = 0;
+    }
+
     return { processed, errors };
+  }
+
+  // Helper to prepare sale items
+  private prepareSaleItems(
+    sale: StandardSale,
+    saleId: string,
+    productMapByExtId: Map<string, string>,
+    productMapByName: Map<string, any>,
+    dbProducts: any[] | null,
+    itemsArray: any[]
+  ) {
+    for (const p of sale.products) {
+      let productId = productMapByExtId.get(p.externalId);
+      if (!productId && p.name) {
+        const prod = productMapByName.get(p.name.toLowerCase());
+        if (prod) productId = prod.id;
+      }
+
+      let commission = 0;
+      let revenue = 0;
+      const qty = p.quantity || 1;
+
+      if (productId) {
+        const fullProduct = dbProducts?.find((x) => x.id === productId);
+        if (fullProduct) {
+          commission = (fullProduct.commission_dkk || 0) * qty;
+          revenue = (fullProduct.revenue_dkk || 0) * qty;
+        }
+      }
+
+      itemsArray.push({
+        sale_id: saleId,
+        product_id: productId || null,
+        adversus_external_id: p.externalId,
+        adversus_product_title: p.name,
+        quantity: qty,
+        unit_price: p.unitPrice,
+        mapped_commission: commission,
+        mapped_revenue: revenue,
+        needs_mapping: !productId,
+      });
+    }
   }
 }
