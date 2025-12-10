@@ -281,11 +281,9 @@ export function DialerIntegrations() {
 
       if (error) throw error;
       
-      if (data?.webhooks && Array.isArray(data.webhooks)) {
-        setWebhooksList(data.webhooks);
-      } else {
-        setWebhooksList([]);
-      }
+      // Adversus API returns { webhooks: [...] }, our function wraps it as { success, webhooks: adversusResponse }
+      const webhooksArray = data?.webhooks?.webhooks || data?.webhooks || [];
+      setWebhooksList(Array.isArray(webhooksArray) ? webhooksArray : []);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
       toast.error(`Fejl ved hentning af webhooks: ${errorMessage}`);
