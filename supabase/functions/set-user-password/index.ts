@@ -50,16 +50,58 @@ serve(async (req) => {
       );
     }
 
-    const user = users.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    let user = users.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
     
+    // If user doesn't exist, create them
     if (!user) {
+      console.log(`User not found, creating new user for: ${email}`);
+      
+      // Get employee name from employee_master_data for user metadata
+      const { data: employee } = await supabaseAdmin
+        .from("employee_master_data")
+        .select("first_name, last_name")
+        .eq("private_email", email)
+        .maybeSingle();
+      
+      const fullName = employee 
+        ? `${employee.first_name} ${employee.last_name}` 
+        : email.split("@")[0];
+      
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: email,
+        password: newPassword,
+        email_confirm: true,
+        user_metadata: {
+          name: fullName,
+        }
+      });
+
+      if (createError) {
+        console.error("Error creating user:", createError);
+        return new Response(
+          JSON.stringify({ error: "Kunne ikke oprette bruger: " + createError.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Assign medarbejder role
+      if (newUser?.user) {
+        const { error: roleError } = await supabaseAdmin
+          .from("system_roles")
+          .insert({ user_id: newUser.user.id, role: "medarbejder" });
+        
+        if (roleError) {
+          console.error("Error assigning role:", roleError);
+        }
+      }
+
       return new Response(
-        JSON.stringify({ error: "Bruger ikke fundet med denne email" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: true, message: "Bruger oprettet med adgangskode", created: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Update user password
+    // Update existing user's password
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       user.id,
       { password: newPassword }
