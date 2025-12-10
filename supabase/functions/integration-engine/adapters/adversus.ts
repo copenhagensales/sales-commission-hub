@@ -1,5 +1,5 @@
 import { DialerAdapter } from "./interface.ts";
-import { StandardSale, StandardUser, StandardCampaign, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";
+import { StandardSale, StandardUser, StandardCampaign, StandardCall, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";
 
 export class AdversusAdapter implements DialerAdapter {
   private authHeader: string;
@@ -320,5 +320,123 @@ export class AdversusAdapter implements DialerAdapter {
       console.error(`[Adversus] Error fetching leads for campaign ${campaignId}:`, e);
       return [];
     }
+  }
+
+  /**
+   * GDPR-Compliant CDR fetch - only IDs and metadata, NO personal Lead data
+   * Uses Adversus /cdr endpoint for Call Detail Records
+   */
+  async fetchCalls(days: number): Promise<StandardCall[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    const filterStr = encodeURIComponent(JSON.stringify({ 
+      created: { $gt: startDate.toISOString() } 
+    }));
+
+    console.log(`[Adversus] Fetching CDR for last ${days} days`);
+    
+    const allCdrs: any[] = [];
+    const pageSize = 1000;
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore && page <= 50) { // Max 50,000 CDRs
+      try {
+        const url = `${this.baseUrl}/cdr?pageSize=${pageSize}&page=${page}&filters=${filterStr}`;
+        const res = await fetch(url, { 
+          headers: { Authorization: `Basic ${this.authHeader}` } 
+        });
+        
+        if (!res.ok) {
+          console.log(`[Adversus] CDR page ${page} failed: ${res.status}`);
+          break;
+        }
+        
+        const data = await res.json();
+        const pageData = data.cdr || data.cdrs || data || [];
+        
+        if (pageData.length === 0) {
+          hasMore = false;
+        } else {
+          allCdrs.push(...pageData);
+          console.log(`[Adversus] CDR page ${page}: ${pageData.length} records (total: ${allCdrs.length})`);
+          
+          if (pageData.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+            await new Promise(r => setTimeout(r, 50)); // Rate limit delay
+          }
+        }
+      } catch (e) {
+        console.error(`[Adversus] CDR page ${page} error:`, e);
+        break;
+      }
+    }
+
+    console.log(`[Adversus] Total CDRs fetched: ${allCdrs.length}`);
+
+    // Map to StandardCall (GDPR-compliant - only IDs)
+    return allCdrs.map((cdr: any) => {
+      const status = this.mapAdversusHangupCause(cdr.hangupCause || cdr.hangup_cause || cdr.status);
+      
+      return {
+        externalId: String(cdr.id || cdr.uniqueId || cdr.uuid),
+        integrationType: "adversus" as const,
+        dialerName: this.dialerName,
+        
+        startTime: cdr.started || cdr.startTime || cdr.created || new Date().toISOString(),
+        endTime: cdr.ended || cdr.endTime || cdr.created || new Date().toISOString(),
+        
+        // billsec = talk time, duration = total time incl. ringing
+        durationSeconds: Number(cdr.billsec || cdr.talkTime || 0),
+        totalDurationSeconds: Number(cdr.duration || cdr.totalDuration || cdr.billsec || 0),
+        
+        status,
+        
+        // ONLY IDs - No personal data (GDPR compliant)
+        agentExternalId: String(cdr.userId || cdr.agentId || cdr.ownedBy?.id || ""),
+        campaignExternalId: String(cdr.campaignId || ""),
+        leadExternalId: String(cdr.contactId || cdr.leadId || ""),
+        
+        recordingUrl: cdr.recordingUrl || cdr.recording || undefined,
+        
+        metadata: {
+          direction: cdr.direction,
+          callType: cdr.callType || cdr.type,
+          hangupCause: cdr.hangupCause || cdr.hangup_cause,
+          disposition: cdr.disposition,
+        },
+      };
+    });
+  }
+
+  /**
+   * Map Adversus hangup_cause to unified status enum
+   */
+  private mapAdversusHangupCause(cause: string | undefined): StandardCall['status'] {
+    if (!cause) return 'OTHER';
+    
+    const c = cause.toUpperCase();
+    
+    // Answered / Success
+    if (c.includes('NORMAL_CLEARING') || c.includes('SUCCESS') || c.includes('ANSWERED')) {
+      return 'ANSWERED';
+    }
+    // No Answer
+    if (c.includes('NO_USER_RESPONSE') || c.includes('NO_ANSWER') || c.includes('TIMEOUT')) {
+      return 'NO_ANSWER';
+    }
+    // Busy
+    if (c.includes('BUSY') || c.includes('USER_BUSY')) {
+      return 'BUSY';
+    }
+    // Failed
+    if (c.includes('CALL_REJECTED') || c.includes('FAIL') || c.includes('UNALLOCATED') || c.includes('INVALID')) {
+      return 'FAILED';
+    }
+    
+    return 'OTHER';
   }
 }

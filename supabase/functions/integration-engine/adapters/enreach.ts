@@ -1,5 +1,5 @@
 import { DialerAdapter } from "./interface.ts";
-import { StandardSale, StandardUser, StandardCampaign, StandardProduct, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";
+import { StandardSale, StandardUser, StandardCampaign, StandardProduct, StandardCall, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";
 
 interface EnreachCredentials {
   username?: string;
@@ -494,5 +494,159 @@ export class EnreachAdapter implements DialerAdapter {
       console.error(`[EnreachAdapter] Error fetching lead data for ${resultId}:`, error);
       return {};
     }
+  }
+
+  /**
+   * GDPR-Compliant CDR fetch - only IDs and metadata, NO personal Lead data
+   * Uses HeroBase /calls or /activities endpoint for Call Detail Records
+   */
+  async fetchCalls(days: number): Promise<StandardCall[]> {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+      const modifiedFrom = cutoffDate.toISOString().split('T')[0];
+
+      console.log(`[EnreachAdapter] Fetching calls for last ${days} days from ${modifiedFrom}`);
+
+      let allCalls: Record<string, unknown>[] = [];
+
+      // Try /calls endpoint first (standard HeroBase)
+      try {
+        const endpoint = `/calls?ModifiedFrom=${modifiedFrom}`;
+        console.log(`[EnreachAdapter] Fetching from: ${endpoint}`);
+        const data = await this.get(endpoint) as unknown;
+        
+        if (Array.isArray(data)) {
+          allCalls = data as Record<string, unknown>[];
+        } else if (data && typeof data === 'object') {
+          const wrapper = data as Record<string, unknown>;
+          allCalls = (wrapper.Results || wrapper.results || wrapper.Calls || wrapper.calls || wrapper.Data || wrapper.data || []) as Record<string, unknown>[];
+        }
+      } catch (primaryError) {
+        console.warn("[EnreachAdapter] /calls failed, trying /activities:", primaryError);
+        
+        // Fallback to activities endpoint
+        try {
+          const fallbackEndpoint = `/activities/completed?ModifiedFrom=${modifiedFrom}&ActivityType=Call`;
+          const data = await this.get(fallbackEndpoint) as unknown;
+          
+          if (Array.isArray(data)) {
+            allCalls = data as Record<string, unknown>[];
+          } else if (data && typeof data === 'object') {
+            const wrapper = data as Record<string, unknown>;
+            allCalls = (wrapper.Results || wrapper.results || wrapper.Activities || wrapper.activities || []) as Record<string, unknown>[];
+          }
+        } catch (fallbackError) {
+          console.error("[EnreachAdapter] Fallback /activities also failed:", fallbackError);
+          return [];
+        }
+      }
+
+      console.log(`[EnreachAdapter] Fetched ${allCalls.length} call records`);
+
+      // Map to StandardCall (GDPR-compliant - only IDs)
+      return allCalls.map((call) => {
+        const status = this.mapEnreachEndCause(
+          this.getStr(call, ['endCause', 'EndCause', 'status', 'Status', 'result', 'Result'])
+        );
+        
+        const startTime = this.getStr(call, [
+          'startTime', 'StartTime', 'callStart', 'CallStart', 'started', 'Started', 'createdTime', 'CreatedTime'
+        ]) || new Date().toISOString();
+        
+        const endTime = this.getStr(call, [
+          'endTime', 'EndTime', 'callEnd', 'CallEnd', 'ended', 'Ended'
+        ]) || startTime;
+
+        // Duration extraction - HeroBase uses seconds or durationSeconds
+        const durationSeconds = Number(
+          this.getValue(call, ['seconds', 'Seconds', 'durationSeconds', 'DurationSeconds', 'talkTime', 'TalkTime']) || 0
+        );
+        const totalDurationSeconds = Number(
+          this.getValue(call, ['totalSeconds', 'TotalSeconds', 'duration', 'Duration', 'totalDuration', 'TotalDuration']) || durationSeconds
+        );
+
+        // Extract user/agent info (nested objects in HeroBase)
+        const userObj = (call.user || call.User || call.agent || call.Agent || call.processedByUser || call.ProcessedByUser) as Record<string, unknown> | undefined;
+        const agentExternalId = userObj 
+          ? this.getStr(userObj, ['uniqueId', 'UniqueId', 'orgCode', 'OrgCode', 'id', 'Id'])
+          : this.getStr(call, ['userId', 'UserId', 'agentId', 'AgentId', 'userOrgCode', 'UserOrgCode']);
+
+        // Campaign info (nested object)
+        const campaignObj = (call.campaign || call.Campaign || call.project || call.Project) as Record<string, unknown> | undefined;
+        const campaignExternalId = campaignObj
+          ? this.getStr(campaignObj, ['uniqueId', 'UniqueId', 'code', 'Code', 'id', 'Id'])
+          : this.getStr(call, ['campaignId', 'CampaignId', 'projectId', 'ProjectId']);
+
+        // Lead ID - ONLY the ID, never the nested lead data (GDPR)
+        const leadExternalId = this.getStr(call, [
+          'leadUniqueId', 'LeadUniqueId', 'leadId', 'LeadId', 'contactId', 'ContactId', 'uniqueId', 'UniqueId'
+        ]);
+
+        // Recording URL (requires auth to access)
+        const recordingUrl = this.getStr(call, [
+          'recordingUrl', 'RecordingUrl', 'recording', 'Recording', 'audioUrl', 'AudioUrl'
+        ]) || undefined;
+
+        return {
+          externalId: this.getStr(call, ['uniqueId', 'UniqueId', 'id', 'Id', 'callId', 'CallId']),
+          integrationType: "enreach" as const,
+          dialerName: this.dialerName,
+          
+          startTime,
+          endTime,
+          
+          durationSeconds,
+          totalDurationSeconds,
+          
+          status,
+          
+          // ONLY IDs - No personal data (GDPR compliant)
+          agentExternalId,
+          campaignExternalId,
+          leadExternalId,
+          
+          recordingUrl,
+          
+          metadata: {
+            endCause: this.getStr(call, ['endCause', 'EndCause']),
+            direction: this.getStr(call, ['direction', 'Direction']),
+            callType: this.getStr(call, ['callType', 'CallType', 'type', 'Type']),
+            disposition: this.getStr(call, ['disposition', 'Disposition']),
+          },
+        };
+      });
+    } catch (error) {
+      console.error("[EnreachAdapter] Error fetching calls:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Map Enreach/HeroBase endCause to unified status enum
+   */
+  private mapEnreachEndCause(cause: string | undefined): StandardCall['status'] {
+    if (!cause) return 'OTHER';
+    
+    const c = cause.toUpperCase();
+    
+    // Answered / Success
+    if (c.includes('SUCCESS') || c.includes('ANSWERED') || c.includes('COMPLETED') || c.includes('NORMAL')) {
+      return 'ANSWERED';
+    }
+    // No Answer
+    if (c.includes('NO_ANSWER') || c.includes('NOANSWER') || c.includes('TIMEOUT') || c.includes('RING')) {
+      return 'NO_ANSWER';
+    }
+    // Busy
+    if (c.includes('BUSY') || c.includes('ENGAGED')) {
+      return 'BUSY';
+    }
+    // Failed
+    if (c.includes('FAIL') || c.includes('REJECTED') || c.includes('ERROR') || c.includes('INVALID')) {
+      return 'FAILED';
+    }
+    
+    return 'OTHER';
   }
 }

@@ -61,3 +61,34 @@ export interface StandardCampaign {
   name: string;
   isActive: boolean;
 }
+
+// GDPR-Compliant Call Detail Record (CDR)
+// Only contains identifiers and metadata - NO personal data from Lead
+export interface StandardCall {
+  // Identificadores únicos
+  externalId: string;           // ID único de la llamada (CDR)
+  integrationType: 'adversus' | 'enreach' | 'other';
+  dialerName: string;
+
+  // Temporalidad
+  startTime: string;            // Hora de inicio (ISO-8601)
+  endTime: string;              // Hora de fin (ISO-8601)
+
+  // Métricas de Telefonía
+  durationSeconds: number;      // Duración de la conversación (hablada/billsec)
+  totalDurationSeconds: number; // Duración total del registro (incl. timbrado)
+  
+  // Estatus Unificado
+  status: 'ANSWERED' | 'NO_ANSWER' | 'BUSY' | 'FAILED' | 'OTHER'; 
+  
+  // Referencias Anónimas (IDs - GDPR Compliant)
+  agentExternalId: string;      // ID del agente (para cruce con StandardUser)
+  campaignExternalId: string;   // ID de la campaña (para cruce con StandardCampaign)
+  leadExternalId: string;       // ID del lead (para cruce posterior con SALE)
+
+  // Grabación (opcional)
+  recordingUrl?: string;        // URL directa o token para obtener la grabación
+
+  // Metadatos (Campos específicos brutos, si se necesitan para debugging)
+  metadata?: Record<string, unknown>;
+}
