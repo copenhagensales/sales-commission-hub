@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
 export function useGdprConsents() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   // Use the same RPC function as useGiveConsent for consistency
   const { data: employeeId, isLoading: employeeIdLoading } = useQuery({
@@ -34,8 +34,8 @@ export function useGdprConsents() {
     enabled: !!employeeId,
   });
 
-  // Combine loading states - still loading if either query is loading OR employeeId query hasn't returned yet
-  const isLoading = employeeIdLoading || (!employeeId && !!user?.id) || consentsQuery.isLoading;
+  // CRITICAL: Include authLoading to prevent showing dialog before auth state is known
+  const isLoading = authLoading || employeeIdLoading || (!employeeId && !!user?.id) || consentsQuery.isLoading;
 
   return {
     data: consentsQuery.data,

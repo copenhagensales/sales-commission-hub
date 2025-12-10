@@ -497,9 +497,7 @@ export default function MyProfile() {
     return <Badge variant={variant}>{label}</Badge>;
   };
 
-  // Calculate if consent is needed - no local state needed
-  const needsConsent = !consentLoading && !!employee && !hasConsent;
-
+  // Wait for BOTH employee AND consent status to be fully loaded before rendering anything
   if (isLoading || consentLoading) {
     return (
       <MainLayout>
@@ -509,6 +507,9 @@ export default function MyProfile() {
       </MainLayout>
     );
   }
+
+  // Calculate if consent is needed - only after all data is loaded
+  const needsConsent = !!employee && !hasConsent;
 
   if (!employee) {
     return (
