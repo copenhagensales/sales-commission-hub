@@ -245,49 +245,61 @@ export class AdversusAdapter implements DialerAdapter {
     return false;
   }
 
-  // OPTIMIZACIÓN: Fetch paralelo de ventas (10 páginas a la vez)
+  // OPTIMIZACIÓN: Fetch paralelo de ventas (5 páginas a la vez para evitar rate limit)
   private async fetchSalesParallel(filterStr: string): Promise<any[]> {
     const allSales: any[] = [];
     const pageSize = 500;
-    const parallelBatch = 10; // 10 páginas en paralelo
+    const parallelBatch = 5; // 5 páginas en paralelo (más conservador)
     let currentPage = 1;
     let hasMore = true;
 
-    while (hasMore && currentPage <= 100) {
+    while (hasMore && currentPage <= 200) {
       // Crear batch de promesas para páginas paralelas
-      const pagePromises: Promise<any[]>[] = [];
+      const pagePromises: Promise<{ page: number; data: any[] }>[] = [];
       
-      for (let i = 0; i < parallelBatch && currentPage + i <= 100; i++) {
+      for (let i = 0; i < parallelBatch && currentPage + i <= 200; i++) {
         const page = currentPage + i;
         const url = `${this.baseUrl}/sales?pageSize=${pageSize}&page=${page}&filters=${filterStr}`;
         
         pagePromises.push(
           fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } })
             .then(res => res.ok ? res.json() : { sales: [] })
-            .then(data => data.sales || data || [])
-            .catch(() => [])
+            .then(data => ({ page, data: data.sales || data || [] }))
+            .catch(() => ({ page, data: [] }))
         );
       }
 
       // Ejecutar batch en paralelo
       const results = await Promise.all(pagePromises);
       
-      let batchEmpty = true;
-      for (const pageData of results) {
-        if (pageData.length > 0) {
-          allSales.push(...pageData);
-          batchEmpty = false;
+      // Ordenar por página para procesar en orden correcto
+      results.sort((a, b) => a.page - b.page);
+      
+      let totalInBatch = 0;
+      let lastNonEmptyPage = 0;
+      
+      for (const { page, data } of results) {
+        if (data.length > 0) {
+          allSales.push(...data);
+          totalInBatch += data.length;
+          lastNonEmptyPage = page;
         }
       }
 
-      // Si alguna página del batch vino vacía, terminamos
-      if (batchEmpty || results.some(r => r.length < pageSize)) {
+      console.log(`[Adversus] Batch ${currentPage}-${currentPage + parallelBatch - 1}: got ${totalInBatch} sales (total: ${allSales.length})`);
+
+      // Parar si el batch entero está vacío o la última página con datos tiene menos de pageSize
+      if (totalInBatch === 0) {
         hasMore = false;
       } else {
-        currentPage += parallelBatch;
+        // Encontrar la última página con datos y ver si está incompleta
+        const lastPageData = results.find(r => r.page === lastNonEmptyPage);
+        if (lastPageData && lastPageData.data.length < pageSize) {
+          hasMore = false; // Última página incompleta = fin de datos
+        } else {
+          currentPage += parallelBatch;
+        }
       }
-
-      console.log(`[Adversus] Parallel fetch: ${allSales.length} sales so far (pages ${currentPage}-${currentPage + parallelBatch - 1})`);
     }
 
     return allSales;
