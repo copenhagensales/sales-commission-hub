@@ -1142,8 +1142,10 @@ export default function EmployeeDetail() {
                       });
                     } else {
                       toast({ 
-                        title: "Adgangskode opdateret", 
-                        description: `Ny adgangskode er sat for ${employee.private_email}` 
+                        title: data?.created ? "Bruger oprettet" : "Adgangskode opdateret", 
+                        description: data?.created 
+                          ? `Ny bruger oprettet for ${employee.private_email} med den angivne adgangskode`
+                          : `Ny adgangskode er sat for ${employee.private_email}` 
                       });
                       setSetPasswordOpen(false);
                       setNewPassword("");
