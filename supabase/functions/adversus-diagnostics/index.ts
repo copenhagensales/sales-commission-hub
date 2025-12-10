@@ -13,6 +13,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const integrationName = body.integration_name || "Lovablecph";
+    const sampleSize = body.sample_size || 50; // How many leads to inspect
     
     // Get credentials from dialer_integrations
     const supabase = createClient(
@@ -67,72 +68,136 @@ Deno.serve(async (req) => {
     
     console.log(`[Diagnostics] Using integration: ${integrationName}`);
 
-    // Fetch leads in bulk - max 10000
-    const pageSize = 1000;
-    const maxPages = 10;
-    const allLeads: any[] = [];
+    // Fetch first page of sales to get lead IDs
+    const salesUrl = `${baseUrl}/sales?pageSize=200&page=1`;
+    console.log(`[Diagnostics] Fetching sales: ${salesUrl}`);
     
-    for (let page = 1; page <= maxPages; page++) {
-      const leadsUrl = `${baseUrl}/leads?pageSize=${pageSize}&page=${page}`;
-      console.log(`[Diagnostics] Fetching page ${page}: ${leadsUrl}`);
-      
-      const leadsRes = await fetch(leadsUrl, {
-        headers: { Authorization: authHeader, "Content-Type": "application/json" },
+    const salesRes = await fetch(salesUrl, {
+      headers: { Authorization: authHeader, "Content-Type": "application/json" },
+    });
+
+    if (!salesRes.ok) {
+      return new Response(JSON.stringify({ error: `Sales API error: ${salesRes.status}` }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-
-      if (!leadsRes.ok) {
-        console.error(`[Diagnostics] API error on page ${page}: ${leadsRes.status}`);
-        break;
-      }
-
-      const data = await leadsRes.json();
-      const leads = data.leads || [];
-      
-      if (leads.length === 0) {
-        console.log(`[Diagnostics] No more leads on page ${page}`);
-        break;
-      }
-      
-      allLeads.push(...leads);
-      console.log(`[Diagnostics] Page ${page}: ${leads.length} leads, total: ${allLeads.length}`);
     }
 
-    // Extract OPP numbers from resultData
+    const salesData = await salesRes.json();
+    const sales = Array.isArray(salesData) ? salesData : (salesData.sales || []);
+    console.log(`[Diagnostics] Got ${sales.length} sales`);
+
+    // For each sale, fetch the lead details to get resultData
     const oppPattern = /OPP-\d{4,6}/;
-    const leadsWithOpp: { leadId: number; opp: string; fieldId: number }[] = [];
+    const salesWithOpp: { saleId: number; leadId: number; opp: string; fieldId: number; campaignId: number }[] = [];
+    const allFieldIds = new Set<number>();
+    const fieldValueSamples: Record<number, string[]> = {};
+    const leadInspections: { leadId: number; saleId: number; campaignId: number; fieldCount: number; oppFound: string | null }[] = [];
     
-    for (const lead of allLeads) {
+    // Take sample of sales to inspect leads
+    const samplesToInspect = sales.slice(0, sampleSize);
+    console.log(`[Diagnostics] Inspecting ${samplesToInspect.length} leads for resultData`);
+    
+    for (const sale of samplesToInspect) {
+      const leadId = sale.leadId;
+      if (!leadId) continue;
+      
+      // Fetch lead details
+      const leadUrl = `${baseUrl}/leads/${leadId}`;
+      const leadRes = await fetch(leadUrl, {
+        headers: { Authorization: authHeader, "Content-Type": "application/json" },
+      });
+      
+      if (!leadRes.ok) {
+        console.log(`[Diagnostics] Failed to fetch lead ${leadId}: ${leadRes.status}`);
+        continue;
+      }
+      
+      const leadData = await leadRes.json();
+      // API returns {leads: [...]} with lead inside
+      const lead = Array.isArray(leadData.leads) && leadData.leads.length > 0 ? leadData.leads[0] : leadData;
+      
       const resultData = lead.resultData || [];
-      for (const field of resultData) {
-        const value = String(field.value || '');
-        const match = value.match(oppPattern);
-        if (match) {
-          leadsWithOpp.push({
-            leadId: lead.id,
-            opp: match[0],
-            fieldId: field.id,
-          });
-          break; // Only count once per lead
+      let oppFound: string | null = null;
+      
+      if (Array.isArray(resultData)) {
+        for (const field of resultData) {
+          if (field && field.id !== undefined) {
+            allFieldIds.add(field.id);
+            
+            // Collect samples
+            if (!fieldValueSamples[field.id]) {
+              fieldValueSamples[field.id] = [];
+            }
+            if (fieldValueSamples[field.id].length < 5 && field.value) {
+              fieldValueSamples[field.id].push(String(field.value).substring(0, 100));
+            }
+            
+            // Check for OPP
+            const value = String(field.value || '');
+            const match = value.match(oppPattern);
+            if (match) {
+              oppFound = match[0];
+              salesWithOpp.push({
+                saleId: sale.id,
+                leadId: leadId,
+                opp: match[0],
+                fieldId: field.id,
+                campaignId: sale.campaignId,
+              });
+            }
+          }
         }
       }
+      
+      leadInspections.push({
+        leadId,
+        saleId: sale.id,
+        campaignId: sale.campaignId,
+        fieldCount: Array.isArray(resultData) ? resultData.length : 0,
+        oppFound
+      });
+      
+      // Small delay to avoid rate limiting
+      await new Promise(r => setTimeout(r, 50));
     }
 
     // Get unique OPP numbers
-    const uniqueOpps = [...new Set(leadsWithOpp.map(l => l.opp))];
+    const uniqueOpps = [...new Set(salesWithOpp.map(l => l.opp))];
     
     // Get field IDs used for OPP
-    const fieldIdCounts: Record<number, number> = {};
-    for (const l of leadsWithOpp) {
-      fieldIdCounts[l.fieldId] = (fieldIdCounts[l.fieldId] || 0) + 1;
+    const oppFieldIds: Record<number, number> = {};
+    for (const s of salesWithOpp) {
+      oppFieldIds[s.fieldId] = (oppFieldIds[s.fieldId] || 0) + 1;
     }
 
+    // Campaign distribution of OPPs
+    const oppByCampaign: Record<number, number> = {};
+    for (const s of salesWithOpp) {
+      oppByCampaign[s.campaignId] = (oppByCampaign[s.campaignId] || 0) + 1;
+    }
+
+    // Convert allFieldIds to array with samples
+    const fieldDetails = [...allFieldIds].sort((a, b) => a - b).map(id => ({
+      id,
+      sampleValues: fieldValueSamples[id] || [],
+      oppCount: oppFieldIds[id] || 0
+    }));
+
     return new Response(JSON.stringify({
-      totalLeadsFetched: allLeads.length,
-      leadsWithOpp: leadsWithOpp.length,
+      integrationName,
+      totalSalesInPage: sales.length,
+      leadsInspected: leadInspections.length,
+      leadsWithResultData: leadInspections.filter(l => l.fieldCount > 0).length,
+      salesWithOpp: salesWithOpp.length,
       uniqueOppNumbers: uniqueOpps.length,
-      oppFieldIds: fieldIdCounts,
+      allFieldIdsFound: [...allFieldIds].sort((a, b) => a - b),
+      fieldDetails: fieldDetails.filter(f => f.sampleValues.length > 0),
+      oppFieldIds,
+      oppByCampaign,
       sampleOpps: uniqueOpps.slice(0, 20),
-      sampleLeadsWithOpp: leadsWithOpp.slice(0, 10),
+      sampleSalesWithOpp: salesWithOpp.slice(0, 10),
+      inspectionSummary: leadInspections.slice(0, 20)
     }, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
