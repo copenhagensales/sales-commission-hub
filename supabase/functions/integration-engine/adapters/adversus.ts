@@ -75,7 +75,7 @@ export class AdversusAdapter implements DialerAdapter {
     const campaignConfigMap = new Map<string, CampaignMappingConfig>();
     campaignMappings?.forEach(m => campaignConfigMap.set(m.adversusCampaignId, m));
 
-    // Paginación segura
+    // Paginación segura para obtener ventas
     while (hasMore && page <= 50) {
       const url = `${this.baseUrl}/sales?pageSize=100&page=${page}&filters=${filterStr}`;
       const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
@@ -89,51 +89,36 @@ export class AdversusAdapter implements DialerAdapter {
         rawSales = [...rawSales, ...pageData];
         page++;
       }
-      // Pequeño delay para no saturar la API
       await new Promise((r) => setTimeout(r, 100));
     }
 
-    // Mapeo a StandardSale with reference extraction
+    console.log(`[Adversus] Fetched ${rawSales.length} sales, now building OPP map from leads...`);
+
+    // NUEVA ESTRATEGIA: Obtener OPPs desde /leads con filtros por campaña
+    const leadIdToOpp = await this.buildLeadOppMap(rawSales, campaignConfigMap);
+    console.log(`[Adversus] Built OPP map with ${leadIdToOpp.size} entries`);
+
+    // Mapeo a StandardSale usando el mapa de OPPs
     return rawSales.map((s: any) => {
-      // Extraer agente de forma segura
       const agentObj = s.ownedBy || s.createdBy;
       const agentId = typeof agentObj === "object" ? agentObj.id : agentObj;
       const agentEmail = typeof agentObj === "object" ? agentObj.email : `agent-${agentId}@adversus.local`;
       const agentName = typeof agentObj === "object" ? agentObj.name || agentObj.displayName : "Desconocido";
 
-      // Extract lead resultData for reference extraction
-      // Adversus returns resultData as array of {id, value} - convert to flat object
-      const rawResultData = s.lead?.resultData || s.resultData || [];
-      const resultData: Record<string, unknown> = {};
-      
-      if (Array.isArray(rawResultData)) {
-        for (const field of rawResultData) {
-          if (field && field.id !== undefined) {
-            resultData[`result_${field.id}`] = field.value;
-          }
-        }
-      } else if (typeof rawResultData === 'object') {
-        Object.assign(resultData, rawResultData);
-      }
-      
       const campaignId = s.campaignId ? String(s.campaignId) : undefined;
+      const leadId = s.leadId ? String(s.leadId) : undefined;
 
-      // Extract external reference (OPP) using campaign config
+      // Obtener OPP del mapa preconstruido
       let externalReference: string | null = null;
       let clientCampaignId: string | null = null;
 
       if (campaignId && campaignConfigMap.has(campaignId)) {
-        const mapping = campaignConfigMap.get(campaignId)!;
-        clientCampaignId = mapping.clientCampaignId;
-
-        if (mapping.referenceConfig) {
-          externalReference = this.extractReference(resultData, mapping.referenceConfig);
-        }
+        clientCampaignId = campaignConfigMap.get(campaignId)!.clientCampaignId;
       }
 
-      // Fallback: search for common OPP patterns if no config match
-      if (!externalReference) {
-        externalReference = this.searchForOppInResultData(resultData);
+      // Buscar OPP en el mapa por leadId
+      if (leadId && leadIdToOpp.has(leadId)) {
+        externalReference = leadIdToOpp.get(leadId)!;
       }
       
       return {
@@ -164,232 +149,137 @@ export class AdversusAdapter implements DialerAdapter {
         metadata: {
           campaignId: s.campaignId,
           leadId: s.leadId,
-          resultData: resultData,
           lead: s.lead,
         },
       };
     });
   }
 
-  // Fetch a specific lead's resultData (for field inspection)
-  async fetchLeadResultData(leadId: string): Promise<Record<string, unknown>> {
+  // Nueva estrategia: Construir mapa leadId -> OPP desde /leads con filtros por campaña
+  private async buildLeadOppMap(
+    sales: any[], 
+    campaignConfigMap: Map<string, CampaignMappingConfig>
+  ): Promise<Map<string, string>> {
+    const leadIdToOpp = new Map<string, string>();
+
+    // 1. Obtener campaignIds únicos de las ventas
+    const campaignIds = [...new Set(sales.map(s => s.campaignId).filter(Boolean))];
+    console.log(`[Adversus] Found ${campaignIds.length} unique campaigns in sales`);
+
+    // 2. Para cada campaña, obtener leads con filtro y extraer OPPs
+    for (const campaignId of campaignIds) {
+      const campaignIdStr = String(campaignId);
+      const config = campaignConfigMap.get(campaignIdStr);
+      
+      // Determinar qué field ID usar para OPP
+      let oppFieldId: string | null = null;
+      
+      if (config?.referenceConfig?.type === 'field_id') {
+        // Usar el field configurado (puede ser "result_80862" o solo "80862")
+        oppFieldId = config.referenceConfig.value.replace('result_', '');
+      } else {
+        // Default: usar field 80862 (campo OPP común en TDC)
+        oppFieldId = '80862';
+      }
+
+      try {
+        const filters = JSON.stringify({ campaignId: { "$eq": campaignId } });
+        const url = `${this.baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=5000`;
+        
+        console.log(`[Adversus] Fetching leads for campaign ${campaignId}...`);
+        const res = await fetch(url, { 
+          headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" } 
+        });
+
+        if (!res.ok) {
+          console.log(`[Adversus] Failed to fetch leads for campaign ${campaignId}: ${res.status}`);
+          continue;
+        }
+
+        const data = await res.json();
+        const leads = data.leads || data || [];
+        let oppsFound = 0;
+
+        for (const lead of leads) {
+          const leadId = String(lead.id);
+          const resultData = lead.resultData || [];
+          
+          // Buscar OPP en resultData
+          let oppValue: string | null = null;
+          
+          if (Array.isArray(resultData)) {
+            for (const field of resultData) {
+              if (String(field.id) === oppFieldId && field.value) {
+                const val = String(field.value).trim();
+                if (this.isValidOppNumber(val)) {
+                  oppValue = val;
+                  break;
+                }
+              }
+            }
+          }
+
+          // Fallback: buscar patrón OPP-XXXXX en cualquier campo
+          if (!oppValue && Array.isArray(resultData)) {
+            for (const field of resultData) {
+              if (field.value) {
+                const val = String(field.value).trim();
+                if (val.match(/^OPP-\d{4,6}$/)) {
+                  oppValue = val;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (oppValue) {
+            leadIdToOpp.set(leadId, oppValue);
+            oppsFound++;
+          }
+        }
+
+        console.log(`[Adversus] Campaign ${campaignId}: ${leads.length} leads, ${oppsFound} OPPs found`);
+        
+        // Pequeño delay entre campañas
+        await new Promise(r => setTimeout(r, 100));
+        
+      } catch (e) {
+        console.error(`[Adversus] Error fetching leads for campaign ${campaignId}:`, e);
+      }
+    }
+
+    return leadIdToOpp;
+  }
+
+  // Validar que el OPP tenga formato correcto
+  private isValidOppNumber(value: string): boolean {
+    if (!value) return false;
+    // OPP-XXXXX o 4-6 dígitos
+    if (value.match(/^OPP-\d{4,6}$/)) return true;
+    if (value.match(/^\d{4,6}$/)) return true;
+    return false;
+  }
+
+  // Fetch leads for a campaign (used by field inspector)
+  async fetchLeadsForCampaign(campaignId: string, pageSize = 100): Promise<any[]> {
     try {
-      const url = `${this.baseUrl}/leads/${leadId}`;
+      const filters = JSON.stringify({ campaignId: { "$eq": Number(campaignId) } });
+      const url = `${this.baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=${pageSize}`;
+      
       const res = await fetch(url, { 
         headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" } 
       });
-      
+
       if (!res.ok) {
-        console.log(`[Adversus] Failed to fetch lead ${leadId}: ${res.status}`);
-        return {};
+        console.log(`[Adversus] Failed to fetch leads for campaign ${campaignId}: ${res.status}`);
+        return [];
       }
-      
+
       const data = await res.json();
-      console.log(`[Adversus] Lead ${leadId} raw response keys: ${Object.keys(data).join(', ')}`);
-      
-      // Adversus API returns { leads: [...] } - the lead data is inside the array
-      const lead = Array.isArray(data.leads) && data.leads.length > 0 ? data.leads[0] : data;
-      console.log(`[Adversus] Lead ${leadId} object keys: ${Object.keys(lead).join(', ')}`);
-      
-      // Adversus returns resultData as an array of {id, value} objects
-      const resultDataArray = lead.resultData || [];
-      const masterDataArray = lead.masterData || [];
-      
-      console.log(`[Adversus] Lead ${leadId} resultData type: ${typeof resultDataArray}, isArray: ${Array.isArray(resultDataArray)}, length: ${Array.isArray(resultDataArray) ? resultDataArray.length : 'N/A'}`);
-      
-      const result: Record<string, unknown> = {};
-      
-      // Add resultData fields (these are the custom fields we want)
-      if (Array.isArray(resultDataArray)) {
-        for (const field of resultDataArray) {
-          if (field.id !== undefined) {
-            result[`result_${field.id}`] = field.value;
-          }
-        }
-        console.log(`[Adversus] Parsed ${resultDataArray.length} resultData fields`);
-      }
-      
-      // Also add masterData fields for reference
-      if (Array.isArray(masterDataArray)) {
-        for (const field of masterDataArray) {
-          if (field.id !== undefined) {
-            result[`master_${field.id}`] = field.value;
-          }
-        }
-        console.log(`[Adversus] Parsed ${masterDataArray.length} masterData fields`);
-      }
-      
-      return result;
+      return data.leads || data || [];
     } catch (e) {
-      console.error(`[Adversus] Error fetching lead ${leadId}:`, e);
-      return {};
-    }
-  }
-
-  // Fetch sales with enriched lead data (for field inspection)
-  async fetchSalesWithLeadData(days: number, campaignId?: string): Promise<{ sale: any; resultData: Record<string, unknown> }[]> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-
-    // Adversus API doesn't support campaignId filter well (returns 500), so we fetch all and filter client-side
-    const filterObj = { created: { $gt: startDate.toISOString() } };
-    const filterStr = encodeURIComponent(JSON.stringify(filterObj));
-
-    console.log(`[Adversus] Fetching recent sales (last ${days} days) to find campaign ${campaignId}`);
-    
-    // Fetch more sales to increase chance of finding matching campaign
-    const url = `${this.baseUrl}/sales?pageSize=100&page=1&filters=${filterStr}`;
-    const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
-
-    if (!res.ok) {
-      console.log(`[Adversus] Failed to fetch sales: ${res.status}`);
+      console.error(`[Adversus] Error fetching leads for campaign ${campaignId}:`, e);
       return [];
     }
-
-    const data = await res.json();
-    const allSales = data.sales || data || [];
-
-    console.log(`[Adversus] Fetched ${allSales.length} total sales`);
-
-    // Filter by campaignId if provided
-    let matchingSales = allSales;
-    if (campaignId) {
-      matchingSales = allSales.filter((s: any) => String(s.campaignId) === campaignId);
-      console.log(`[Adversus] Found ${matchingSales.length} sales for campaign ${campaignId}`);
-    }
-
-    if (matchingSales.length === 0) {
-      // List available campaigns from fetched sales for debugging
-      const campaignIds = [...new Set(allSales.map((s: any) => s.campaignId))];
-      console.log(`[Adversus] Available campaigns in fetched data: ${campaignIds.join(', ')}`);
-      return [];
-    }
-
-    return this.enrichSalesWithLeadData(matchingSales);
-  }
-
-  // Helper to enrich sales with lead resultData
-  private async enrichSalesWithLeadData(sales: any[]): Promise<{ sale: any; resultData: Record<string, unknown> }[]> {
-    const results: { sale: any; resultData: Record<string, unknown> }[] = [];
-    
-    for (const sale of sales.slice(0, 5)) { // Check first 5 sales to find one with data
-      const leadId = sale.leadId;
-      console.log(`[Adversus] Checking sale ${sale.id} with leadId: ${leadId}`);
-      
-      if (!leadId) {
-        console.log(`[Adversus] Sale ${sale.id} has no leadId`);
-        continue;
-      }
-
-      const resultData = await this.fetchLeadResultData(String(leadId));
-      console.log(`[Adversus] Lead ${leadId} resultData keys: ${Object.keys(resultData).join(', ') || '(empty)'}`);
-      
-      if (Object.keys(resultData).length > 0) {
-        results.push({ sale, resultData });
-        console.log(`[Adversus] Found ${Object.keys(resultData).length} fields in lead ${leadId}`);
-        break; // Found one with data, stop
-      }
-      
-      // Small delay between requests
-      await new Promise((r) => setTimeout(r, 100));
-    }
-
-    // If no lead data found, still return the first sale with inline resultData
-    if (results.length === 0 && sales.length > 0) {
-      const inlineResultData = sales[0].lead?.resultData || {};
-      console.log(`[Adversus] Using inline resultData from sale, keys: ${Object.keys(inlineResultData).join(', ') || '(empty)'}`);
-      results.push({ 
-        sale: sales[0], 
-        resultData: inlineResultData 
-      });
-    }
-
-    return results;
-  }
-
-  // Extract reference value based on config type
-  private extractReference(resultData: Record<string, unknown>, config: ReferenceExtractionConfig): string | null {
-    const { type, value } = config;
-
-    switch (type) {
-      case "field_id": {
-        // Direct field ID lookup in resultData
-        const fieldValue = resultData[value];
-        if (fieldValue !== undefined && fieldValue !== null) {
-          const strValue = String(fieldValue).trim();
-          if (strValue && strValue !== 'null' && strValue !== 'undefined') {
-            console.log(`[Adversus] Found reference via field_id ${value}: ${strValue}`);
-            return strValue;
-          }
-        }
-        break;
-      }
-      case "json_path": {
-        // Simple dot-notation path traversal
-        const parts = value.split(".");
-        let current: any = resultData;
-        for (const part of parts) {
-          if (current === undefined || current === null) break;
-          current = current[part];
-        }
-        if (current !== undefined && current !== null) {
-          const strValue = String(current).trim();
-          if (strValue && strValue !== 'null' && strValue !== 'undefined') {
-            console.log(`[Adversus] Found reference via json_path ${value}: ${strValue}`);
-            return strValue;
-          }
-        }
-        break;
-      }
-      case "regex": {
-        // Search all string values in resultData for regex match
-        const regex = new RegExp(value);
-        for (const [, fieldValue] of Object.entries(resultData)) {
-          if (typeof fieldValue === "string") {
-            const match = fieldValue.match(regex);
-            if (match) {
-              console.log(`[Adversus] Found reference via regex ${value}: ${match[0]}`);
-              return match[0];
-            }
-          }
-        }
-        break;
-      }
-      case "static": {
-        // Static value (rarely used, but supported)
-        return value;
-      }
-    }
-
-    return null;
-  }
-
-  // Fallback: Search for OPP-like values in resultData
-  private searchForOppInResultData(resultData: Record<string, unknown>): string | null {
-    const oppPatterns = ['opp', 'order', 'ordre', 'reference', 'policy', 'ref'];
-    
-    for (const [key, value] of Object.entries(resultData)) {
-      if (value === null || value === undefined) continue;
-      
-      const keyLower = key.toLowerCase();
-      
-      // Check if key matches common patterns
-      for (const pattern of oppPatterns) {
-        if (keyLower.includes(pattern)) {
-          const strValue = String(value).trim();
-          if (strValue && strValue !== 'null' && strValue !== 'undefined') {
-            return strValue;
-          }
-        }
-      }
-      
-      // Check if value looks like an OPP
-      const strValue = String(value).trim();
-      if (strValue.toUpperCase().startsWith('OPP-') || strValue.toUpperCase().startsWith('OPP')) {
-        return strValue;
-      }
-    }
-    
-    return null;
   }
 }
