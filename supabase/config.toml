@@ -9,6 +9,12 @@ verify_jwt = false
 [functions.adversus-webhook]
 verify_jwt = false
 
+[functions.dialer-webhook]
+verify_jwt = false
+
+[functions.adversus-create-webhook]
+verify_jwt = true
+
 [functions.import-products]
 verify_jwt = false
 
