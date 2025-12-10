@@ -182,6 +182,10 @@ serve(async (req) => {
     }
 
     const engine = new IngestionEngine();
+    
+    // Fetch campaign mappings ONCE at the start for reference extraction
+    const campaignMappings = await engine.getCampaignMappings();
+    console.log(`[Integration Engine] Loaded ${campaignMappings.length} campaign mappings for reference extraction`);
 
     // Buscar todas las integraciones activas del tipo solicitado
     const { data: integrations, error } = await supabase
@@ -244,7 +248,8 @@ serve(async (req) => {
         }
 
         if (actionList.includes("sales") || action === "sync") {
-          let sales = await adapter.fetchSales(days);
+          // Pass campaignMappings to adapter for reference extraction
+          let sales = await adapter.fetchSales(days, campaignMappings);
           
           // Filter by campaignId if provided (for retroactive sync)
           if (campaignId) {
