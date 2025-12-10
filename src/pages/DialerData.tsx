@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CheckCircle, AlertTriangle, Database, RefreshCw, ChevronLeft, ChevronRight, CalendarIcon, Search } from "lucide-react";
+import { CheckCircle, AlertTriangle, Database, RefreshCw, ChevronLeft, ChevronRight, CalendarIcon, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,9 @@ interface Sale {
 
 const PAGE_SIZE = 50;
 
+type SortColumn = "integration_type" | "source" | "adversus_external_id" | "agent_name" | "customer_company" | "sale_datetime" | "adversus_opp_number";
+type SortDirection = "asc" | "desc";
+
 export default function DialerData() {
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
@@ -36,6 +39,8 @@ export default function DialerData() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(subDays(new Date(), 7));
   const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortColumn, setSortColumn] = useState<SortColumn>("sale_datetime");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   // Fetch real counts from database
   const { data: stats } = useQuery({
@@ -79,7 +84,7 @@ export default function DialerData() {
   });
 
   const { data: salesData, isLoading, refetch } = useQuery({
-    queryKey: ["dialer-sales", sourceFilter, page, dateFrom, dateTo, searchTerm],
+    queryKey: ["dialer-sales", sourceFilter, page, dateFrom, dateTo, searchTerm, sortColumn, sortDirection],
     queryFn: async () => {
       const fromDate = dateFrom ? startOfDay(dateFrom).toISOString() : undefined;
       const toDate = dateTo ? endOfDay(dateTo).toISOString() : undefined;
@@ -87,7 +92,7 @@ export default function DialerData() {
       let query = supabase
         .from("sales")
         .select("id, adversus_external_id, agent_name, sale_datetime, adversus_opp_number, customer_company, customer_phone, source, integration_type", { count: "exact" })
-        .order("sale_datetime", { ascending: false })
+        .order(sortColumn, { ascending: sortDirection === "asc", nullsFirst: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (sourceFilter !== "all") {
@@ -142,6 +147,23 @@ export default function DialerData() {
     setDateFrom(subDays(new Date(), days));
     setDateTo(new Date());
     setPage(0);
+  };
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+    setPage(0);
+  };
+
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    return sortDirection === "asc" 
+      ? <ArrowUp className="h-4 w-4 ml-1" /> 
+      : <ArrowDown className="h-4 w-4 ml-1" />;
   };
 
   return (
@@ -286,13 +308,27 @@ export default function DialerData() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Integration</TableHead>
-                        <TableHead>Dialer</TableHead>
-                        <TableHead>Dialer ID</TableHead>
-                        <TableHead>Agent</TableHead>
-                        <TableHead>Kunde</TableHead>
-                        <TableHead>Tidspunkt</TableHead>
-                        <TableHead>OPP Status</TableHead>
+                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("integration_type")}>
+                          <div className="flex items-center">Integration<SortIcon column="integration_type" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("source")}>
+                          <div className="flex items-center">Dialer<SortIcon column="source" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("adversus_external_id")}>
+                          <div className="flex items-center">Dialer ID<SortIcon column="adversus_external_id" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("agent_name")}>
+                          <div className="flex items-center">Agent<SortIcon column="agent_name" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("customer_company")}>
+                          <div className="flex items-center">Kunde<SortIcon column="customer_company" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("sale_datetime")}>
+                          <div className="flex items-center">Tidspunkt<SortIcon column="sale_datetime" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("adversus_opp_number")}>
+                          <div className="flex items-center">OPP Status<SortIcon column="adversus_opp_number" /></div>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
