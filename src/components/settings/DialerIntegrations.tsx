@@ -310,7 +310,7 @@ export function DialerIntegrations() {
               <TableRow>
                 <TableHead>Navn</TableHead>
                 <TableHead>Provider</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Auto-sync</TableHead>
                 <TableHead>Sidst synkroniseret</TableHead>
                 <TableHead className="text-right">Handlinger</TableHead>
               </TableRow>
@@ -332,9 +332,57 @@ export function DialerIntegrations() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={integration.is_active ? "default" : "secondary"}>
-                      {integration.is_active ? "Aktiv" : "Inaktiv"}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={String(integration.sync_frequency_minutes || "0")}
+                        onValueChange={async (value) => {
+                          const freq = parseInt(value);
+                          try {
+                            // Update database
+                            await supabase
+                              .from("dialer_integrations")
+                              .update({ 
+                                sync_frequency_minutes: freq || null,
+                                is_active: freq > 0
+                              })
+                              .eq("id", integration.id);
+                            
+                            // Update cron job
+                            await supabase.functions.invoke("update-cron-schedule", {
+                              body: {
+                                integration_type: "dialer",
+                                integration_id: integration.id,
+                                provider: integration.provider,
+                                frequency_minutes: freq,
+                                is_active: freq > 0,
+                              },
+                            });
+                            
+                            toast.success(freq > 0 ? `Auto-sync sat til hver ${freq} min` : "Auto-sync deaktiveret");
+                            queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
+                          } catch (err) {
+                            toast.error("Fejl ved opdatering af sync-frekvens");
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-[130px] h-8">
+                          <SelectValue placeholder="Vælg..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">Deaktiveret</SelectItem>
+                          <SelectItem value="15">Hver 15 min</SelectItem>
+                          <SelectItem value="30">Hver 30 min</SelectItem>
+                          <SelectItem value="60">Hver time</SelectItem>
+                          <SelectItem value="120">Hver 2. time</SelectItem>
+                          <SelectItem value="360">Hver 6. time</SelectItem>
+                          <SelectItem value="720">Hver 12. time</SelectItem>
+                          <SelectItem value="1440">Dagligt</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Badge variant={integration.is_active && integration.sync_frequency_minutes ? "default" : "secondary"} className="text-xs">
+                        {integration.is_active && integration.sync_frequency_minutes ? "Aktiv" : "Manuel"}
+                      </Badge>
+                    </div>
                   </TableCell>
                   <TableCell>
                     {integration.last_sync_at ? (
@@ -358,7 +406,7 @@ export function DialerIntegrations() {
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={!integration.is_active || syncingId === integration.id}
+                        disabled={syncingId === integration.id}
                         onClick={() => syncMutation.mutate({ 
                           integrationId: integration.id, 
                           provider: integration.provider,

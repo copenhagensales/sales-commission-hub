@@ -16,18 +16,6 @@ const frequencyToCron: Record<number, string> = {
   1440: "0 6 * * *",       // Daily at 6 AM
 };
 
-// Map integration type to edge function name
-const typeToFunction: Record<string, string> = {
-  adversus: "integration-engine",
-  economic: "sync-economic",
-};
-
-// Map integration type to payload
-const typeToPayload: Record<string, object> = {
-  adversus: { source: "adversus", actions: ["sales"], days: 1 },
-  economic: {},
-};
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -40,32 +28,64 @@ Deno.serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { integration_type, frequency_minutes, is_active } = await req.json();
+    const { integration_type, integration_id, provider, frequency_minutes, is_active } = await req.json();
 
-    if (!integration_type) {
-      return new Response(
-        JSON.stringify({ error: "integration_type is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    console.log(`[update-cron-schedule] type=${integration_type}, id=${integration_id}, freq=${frequency_minutes}, active=${is_active}`);
+
+    // For dialer integrations, use integration_id in job name
+    let jobName: string;
+    let functionName: string;
+    let payload: object;
+
+    if (integration_type === "dialer") {
+      if (!integration_id) {
+        return new Response(
+          JSON.stringify({ error: "integration_id is required for dialer type" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      jobName = `dialer-${integration_id.slice(0, 8)}-sync`;
+      functionName = "integration-engine";
+      payload = { 
+        source: provider || "adversus", 
+        integration_id, 
+        action: "sync", 
+        days: 1 
+      };
+    } else {
+      // Legacy support for other integration types
+      const typeToFunction: Record<string, string> = {
+        adversus: "integration-engine",
+        economic: "sync-economic",
+      };
+      
+      if (!integration_type || !typeToFunction[integration_type]) {
+        return new Response(
+          JSON.stringify({ error: `Unknown integration type: ${integration_type}` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      jobName = `${integration_type}-sync-scheduled`;
+      functionName = typeToFunction[integration_type];
+      payload = integration_type === "adversus" 
+        ? { source: "adversus", action: "sync", days: 1 }
+        : {};
     }
 
-    const functionName = typeToFunction[integration_type];
-    if (!functionName) {
-      return new Response(
-        JSON.stringify({ error: `Unknown integration type: ${integration_type}` }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const jobName = `${integration_type}-sync-scheduled`;
-    console.log(`Updating cron job: ${jobName}, frequency: ${frequency_minutes}, active: ${is_active}`);
+    console.log(`[update-cron-schedule] jobName=${jobName}, function=${functionName}`);
 
     // First, try to unschedule any existing job with this name
     try {
-      await supabase.rpc("cron_unschedule", { job_name: jobName });
-      console.log(`Unscheduled existing job: ${jobName}`);
+      const { error: unscheduleError } = await supabase.rpc("unschedule_integration_sync", { 
+        p_job_name: jobName 
+      });
+      if (unscheduleError) {
+        console.log(`Could not unschedule existing job (may not exist): ${unscheduleError.message}`);
+      } else {
+        console.log(`Unscheduled existing job: ${jobName}`);
+      }
     } catch (e) {
-      // Job might not exist, that's okay
       console.log(`No existing job to unschedule: ${jobName}`);
     }
 
@@ -74,48 +94,24 @@ Deno.serve(async (req) => {
       const cronExpression = frequencyToCron[frequency_minutes];
       const functionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
       
-      // Build the SQL command for the cron job
-      const payload = typeToPayload[integration_type] || {};
-      const sqlCommand = `
-        SELECT net.http_post(
-          url := '${functionUrl}',
-          headers := '{"Content-Type": "application/json", "Authorization": "Bearer ${anonKey}"}'::jsonb,
-          body := '${JSON.stringify(payload)}'::jsonb
-        ) AS request_id;
-      `;
+      console.log(`[update-cron-schedule] Scheduling: ${cronExpression} -> ${functionUrl}`);
+      console.log(`[update-cron-schedule] Payload: ${JSON.stringify(payload)}`);
 
-      // Schedule the new cron job using raw SQL
-      const { error: scheduleError } = await supabase.rpc("cron_schedule", {
-        job_name: jobName,
-        schedule: cronExpression,
-        command: sqlCommand,
+      // Schedule the new cron job using the RPC function
+      const { data: scheduleData, error: scheduleError } = await supabase.rpc("schedule_integration_sync", {
+        p_job_name: jobName,
+        p_schedule: cronExpression,
+        p_function_url: functionUrl,
+        p_anon_key: anonKey,
+        p_client_id: integration_id || "00000000-0000-0000-0000-000000000000",
       });
 
       if (scheduleError) {
-        console.error("Error scheduling cron job:", scheduleError);
-        
-        // Fallback: Try direct SQL execution
-        const { error: directError } = await supabase
-          .from("_internal_cron")
-          .select("*")
-          .limit(0);
-          
-        if (directError) {
-          console.log("Direct approach not available, using alternative method");
-        }
-        
-        // Use the cron.schedule function directly via SQL
-        const { data, error: sqlError } = await supabase.rpc("exec_sql", {
-          sql: `SELECT cron.schedule('${jobName}', '${cronExpression}', $$ ${sqlCommand} $$);`
-        });
-        
-        if (sqlError) {
-          console.error("SQL execution error:", sqlError);
-          throw new Error(`Failed to schedule cron job: ${sqlError.message}`);
-        }
+        console.error("Error scheduling cron job via RPC:", scheduleError);
+        throw new Error(`Failed to schedule cron job: ${scheduleError.message}`);
       }
 
-      console.log(`Scheduled new cron job: ${jobName} with schedule: ${cronExpression}`);
+      console.log(`Scheduled new cron job: ${jobName} with schedule: ${cronExpression}, jobId: ${scheduleData}`);
       
       return new Response(
         JSON.stringify({ 
@@ -123,6 +119,7 @@ Deno.serve(async (req) => {
           message: `Cron job updated: ${jobName}`,
           schedule: cronExpression,
           function: functionName,
+          jobId: scheduleData,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -138,10 +135,11 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
-  } catch (error: any) {
-    console.error("Error updating cron schedule:", error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error updating cron schedule:", errorMessage);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
