@@ -34,6 +34,7 @@ interface AdversusPayload {
       company: string;
     };
     products: AdversusProduct[];
+    resultData?: Record<string, unknown>;
   };
 }
 
@@ -134,7 +135,8 @@ serve(async (req) => {
 
   try {
     const rawBody = await req.text();
-    console.log('Content-Type:', req.headers.get('content-type'));
+    const contentType = req.headers.get('content-type') || '';
+    console.log('Content-Type:', contentType);
     console.log('Raw body length:', rawBody.length);
     console.log('Raw body:', rawBody.substring(0, 1000) || '(empty)');
     console.log('================================');
@@ -148,19 +150,67 @@ serve(async (req) => {
       );
     }
 
-    // Parse JSON
+    // Parse body based on Content-Type
     let body: AdversusPayload;
     try {
-      body = JSON.parse(rawBody);
+      if (contentType?.includes('multipart/form-data')) {
+        // Parse multipart form data
+        const formData: Record<string, string> = {};
+        const boundary = contentType.split('boundary=')[1];
+        if (boundary) {
+          const parts = rawBody.split(`--${boundary}`);
+          for (const part of parts) {
+            const match = part.match(/name="([^"]+)"\r\n\r\n([^\r\n]*)/);
+            if (match) {
+              formData[match[1]] = match[2].trim();
+            }
+          }
+        }
+        console.log('Parsed form data:', JSON.stringify(formData));
+        
+        // Convert form data to AdversusPayload format
+        const leadId = parseInt(formData['leadid'] || formData['lead_id'] || '0', 10);
+        body = {
+          type: formData['status'] || 'leadClosedSuccess',
+          event_time: new Date().toISOString(),
+          payload: {
+            result_id: leadId,
+            campaign: {
+              id: formData['campaign_id'] || formData['campaignid'] || '',
+              name: formData['campaign_name'] || formData['campaignname'] || '',
+            },
+            user: {
+              id: formData['userid'] || formData['user_id'] || '',
+              name: formData['username'] || formData['user_name'] || '',
+              email: formData['useremail'] || formData['user_email'] || '',
+            },
+            lead: {
+              id: leadId,
+              phone: formData['Live Nummer'] || formData['Kontakt nummer'] || formData['phone'] || '',
+              company: formData['company'] || formData['CVR'] || '',
+            },
+            products: [],
+            resultData: {
+              orderId: formData['OPP nr'] || formData['ordre_id'] || formData['orderId'] || '',
+              cvr: formData['CVR'] || '',
+              omstilling: formData['Omstilling'] || '',
+            },
+          },
+        };
+      } else {
+        // Parse as JSON
+        body = JSON.parse(rawBody);
+      }
     } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      await logIntegration(supabase, 'error', 'Invalid JSON body received', {
+      console.error('Parse error:', parseError);
+      await logIntegration(supabase, 'error', 'Failed to parse request body', {
         dialer_id: dialerId,
         dialer_name: dialerInfo?.name,
+        content_type: contentType,
         body_preview: rawBody.substring(0, 500),
       });
       return new Response(
-        JSON.stringify({ success: false, error: 'Invalid JSON body' }),
+        JSON.stringify({ success: false, error: 'Failed to parse request body' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
