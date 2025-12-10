@@ -35,6 +35,115 @@ const motivationalQuotes = {
   ],
 };
 
+// Oscar & Kasper happiness levels with granular progression
+const getHappinessLevel = (percentage: number) => {
+  if (percentage >= 150) return { 
+    emoji: "🔥🤯🔥", 
+    text: "Oscar & Kasper er LEGENDARISKE!!!", 
+    bg: "bg-gradient-to-r from-orange-500/40 to-red-500/40 border-orange-500/60",
+    textColor: "text-orange-700 dark:text-orange-300",
+    animate: "animate-pulse"
+  };
+  if (percentage >= 130) return { 
+    emoji: "🔥🚀🔥", 
+    text: "Oscar & Kasper er ON FIRE!!!", 
+    bg: "bg-gradient-to-r from-red-500/30 to-orange-500/30 border-red-500/50",
+    textColor: "text-red-700 dark:text-red-300",
+    animate: "animate-pulse"
+  };
+  if (percentage >= 120) return { 
+    emoji: "🤯", 
+    text: "Oscar & Kaspers hoveder EKSPLODERER!", 
+    bg: "bg-purple-500/30 border border-purple-500/50",
+    textColor: "text-purple-700 dark:text-purple-300",
+    animate: "animate-bounce"
+  };
+  if (percentage >= 110) return { 
+    emoji: "🤩", 
+    text: "Oscar & Kasper er VILDE med det!", 
+    bg: "bg-green-500/30 border border-green-500/50",
+    textColor: "text-green-700 dark:text-green-300",
+    animate: ""
+  };
+  if (percentage >= 100) return { 
+    emoji: "🙌", 
+    text: "Oscar & Kasper high-fiver!", 
+    bg: "bg-green-500/20 border border-green-500/40",
+    textColor: "text-green-600 dark:text-green-400",
+    animate: ""
+  };
+  if (percentage >= 90) return { 
+    emoji: "🤗", 
+    text: "Oscar & Kasper krammer hinanden!", 
+    bg: "bg-emerald-500/20 border border-emerald-500/40",
+    textColor: "text-emerald-600 dark:text-emerald-400",
+    animate: ""
+  };
+  if (percentage >= 80) return { 
+    emoji: "😁", 
+    text: "Oscar & Kasper jubler!", 
+    bg: "bg-teal-500/20 border border-teal-500/40",
+    textColor: "text-teal-600 dark:text-teal-400",
+    animate: ""
+  };
+  if (percentage >= 70) return { 
+    emoji: "😀", 
+    text: "Oscar & Kasper er begejstrede!", 
+    bg: "bg-cyan-500/20 border border-cyan-500/40",
+    textColor: "text-cyan-600 dark:text-cyan-400",
+    animate: ""
+  };
+  if (percentage >= 60) return { 
+    emoji: "😊", 
+    text: "Oscar & Kasper smiler!", 
+    bg: "bg-blue-500/20 border border-blue-500/40",
+    textColor: "text-blue-600 dark:text-blue-400",
+    animate: ""
+  };
+  if (percentage >= 50) return { 
+    emoji: "🙂", 
+    text: "Oscar & Kasper ser håb!", 
+    bg: "bg-indigo-500/20 border border-indigo-500/40",
+    textColor: "text-indigo-600 dark:text-indigo-400",
+    animate: ""
+  };
+  if (percentage >= 40) return { 
+    emoji: "😐", 
+    text: "Oscar & Kasper holder vejret...", 
+    bg: "bg-amber-500/20 border border-amber-500/40",
+    textColor: "text-amber-600 dark:text-amber-400",
+    animate: ""
+  };
+  if (percentage >= 30) return { 
+    emoji: "😕", 
+    text: "Oscar & Kasper kigger bekymret...", 
+    bg: "bg-orange-500/20 border border-orange-500/40",
+    textColor: "text-orange-600 dark:text-orange-400",
+    animate: ""
+  };
+  if (percentage >= 20) return { 
+    emoji: "😟", 
+    text: "Oscar & Kasper venter nervøst...", 
+    bg: "bg-red-500/20 border border-red-500/40",
+    textColor: "text-red-600 dark:text-red-400",
+    animate: ""
+  };
+  if (percentage >= 10) return { 
+    emoji: "😰", 
+    text: "Oscar & Kasper sveder...", 
+    bg: "bg-red-500/25 border border-red-500/45",
+    textColor: "text-red-700 dark:text-red-300",
+    animate: ""
+  };
+  return { 
+    emoji: "🤒", 
+    text: "Oscar & Kasper er syge af bekymring...", 
+    bg: "bg-red-500/30 border border-red-500/50",
+    textColor: "text-red-700 dark:text-red-300",
+    animate: ""
+  };
+};
+
 export function SomeOverallProgress({
   tiktokDone,
   tiktokTarget,
@@ -43,7 +152,7 @@ export function SomeOverallProgress({
   postsDone,
   postsTarget,
 }: SomeOverallProgressProps) {
-  const { percentage, quote, Icon, level } = useMemo(() => {
+  const { percentage, displayPercentage, quote, Icon, level, happiness } = useMemo(() => {
     const totalDone = tiktokDone + storiesDone + postsDone;
     const totalTarget = tiktokTarget + storiesTarget + postsTarget;
     const pct = totalTarget > 0 ? Math.round((totalDone / totalTarget) * 100) : 0;
@@ -59,9 +168,11 @@ export function SomeOverallProgress({
 
     return {
       percentage: Math.min(pct, 100),
+      displayPercentage: pct,
       quote: randomQuote.quote,
       Icon: randomQuote.icon,
       level: lvl,
+      happiness: getHappinessLevel(pct),
     };
   }, [tiktokDone, tiktokTarget, storiesDone, storiesTarget, postsDone, postsTarget]);
 
@@ -88,26 +199,11 @@ export function SomeOverallProgress({
             <div className="flex items-center justify-between">
               <p className="font-semibold text-sm">Samlet ugeprogression</p>
               <div className="flex items-center gap-3">
-                <span className="text-lg font-bold">{percentage}%</span>
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
-                  percentage >= 110 ? "bg-green-500/30 border border-green-500/50" :
-                  percentage >= 100 ? "bg-green-500/20 border border-green-500/40" :
-                  percentage >= 70 ? "bg-amber-500/20 border border-amber-500/40" :
-                  "bg-red-500/20 border border-red-500/40"
-                }`}>
-                  <span className="text-2xl">
-                    {percentage >= 110 ? "🤩" : percentage >= 100 ? "😄" : percentage >= 70 ? "😐" : "😟"}
-                  </span>
-                  <span className={`text-xs font-bold ${
-                    percentage >= 110 ? "text-green-700 dark:text-green-300" :
-                    percentage >= 100 ? "text-green-600 dark:text-green-400" :
-                    percentage >= 70 ? "text-amber-700 dark:text-amber-300" :
-                    "text-red-700 dark:text-red-300"
-                  }`}>
-                    {percentage >= 110 ? "Oscar & Kasper ELSKEDE det!" :
-                     percentage >= 100 ? "Oscar & Kasper er glade!" :
-                     percentage >= 70 ? "Næsten i mål..." :
-                     "Oscar & Kasper venter..."}
+                <span className="text-lg font-bold">{displayPercentage}%</span>
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${happiness.bg} ${happiness.animate}`}>
+                  <span className="text-2xl">{happiness.emoji}</span>
+                  <span className={`text-xs font-bold ${happiness.textColor}`}>
+                    {happiness.text}
                   </span>
                 </div>
               </div>
