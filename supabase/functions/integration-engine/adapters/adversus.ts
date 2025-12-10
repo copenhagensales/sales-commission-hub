@@ -75,9 +75,9 @@ export class AdversusAdapter implements DialerAdapter {
     const campaignConfigMap = new Map<string, CampaignMappingConfig>();
     campaignMappings?.forEach(m => campaignConfigMap.set(m.adversusCampaignId, m));
 
-    // Paginación segura para obtener ventas
-    while (hasMore && page <= 50) {
-      const url = `${this.baseUrl}/sales?pageSize=100&page=${page}&filters=${filterStr}`;
+    // Paginación: pageSize=500 y hasta 100 páginas = max 50,000 ventas
+    while (hasMore && page <= 100) {
+      const url = `${this.baseUrl}/sales?pageSize=500&page=${page}&filters=${filterStr}`;
       const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
 
       if (!res.ok) break;
