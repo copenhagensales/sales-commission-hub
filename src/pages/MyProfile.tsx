@@ -610,7 +610,11 @@ export default function MyProfile() {
                       </div>
                       <div>
                         <label className="text-xs text-muted-foreground">Land</label>
-                        <DisplayField value={employee.address_country || "Danmark"} />
+                        <EditableContactField 
+                          value={employee.address_country || "Danmark"} 
+                          placeholder="Land"
+                          onSave={(v) => handleSaveContact("address_country", v)} 
+                        />
                       </div>
                     </div>
                   </div>
