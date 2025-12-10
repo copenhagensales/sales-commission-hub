@@ -5,6 +5,65 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// OPP pattern: OPP- followed by 5+ digits
+const OPP_PATTERN = /OPP-\d{5,}/gi;
+
+// Find ALL occurrences of OPP pattern in any value, tracking the path
+function findOppInValue(value: unknown, path: string, results: Map<string, string[]>): void {
+  if (value === null || value === undefined) return;
+  
+  if (typeof value === 'string') {
+    const matches = value.match(OPP_PATTERN);
+    if (matches) {
+      if (!results.has(path)) {
+        results.set(path, []);
+      }
+      matches.forEach(m => {
+        if (!results.get(path)!.includes(m)) {
+          results.get(path)!.push(m);
+        }
+      });
+    }
+  } else if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      findOppInValue(item, `${path}[${index}]`, results);
+    });
+  } else if (typeof value === 'object') {
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      findOppInValue(val, path ? `${path}.${key}` : key, results);
+    }
+  }
+}
+
+// Flatten object to show all paths and values
+function flattenObject(obj: unknown, prefix = ''): Record<string, string> {
+  const result: Record<string, string> = {};
+  
+  if (obj === null || obj === undefined) return result;
+  
+  if (typeof obj !== 'object') {
+    result[prefix] = String(obj);
+    return result;
+  }
+  
+  if (Array.isArray(obj)) {
+    obj.forEach((item, idx) => {
+      Object.assign(result, flattenObject(item, `${prefix}[${idx}]`));
+    });
+  } else {
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      const newKey = prefix ? `${prefix}.${key}` : key;
+      if (typeof value === 'object' && value !== null) {
+        Object.assign(result, flattenObject(value, newKey));
+      } else {
+        result[newKey] = String(value);
+      }
+    }
+  }
+  
+  return result;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -19,259 +78,238 @@ serve(async (req) => {
     }
 
     const authHeader = `Basic ${btoa(`${username}:${password}`)}`;
-    const baseUrl = 'https://api.adversus.io/v1';
+    const baseUrl = 'https://api.adversus.io';
 
     const body = await req.json().catch(() => ({}));
     const days = body.days || 7;
     const sampleSize = body.sampleSize || 50;
+    const deepLeadScan = body.deepLeadScan !== false; // Default true
 
-    // 1. Fetch recent sales using same format as integration-engine
+    // 1. Fetch recent sales
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     const filterStr = encodeURIComponent(JSON.stringify({ created: { $gt: startDate.toISOString() } }));
 
-    console.log(`[DIAG] Fetching sales from last ${days} days, sample size: ${sampleSize}`);
+    console.log(`[DEEP-DIAG] Analyzing last ${days} days, sample: ${sampleSize}, deepLeadScan: ${deepLeadScan}`);
 
     const salesUrl = `${baseUrl}/sales?pageSize=${sampleSize}&page=1&filters=${filterStr}`;
-    console.log(`[DIAG] Sales URL: ${salesUrl}`);
-    
     const salesRes = await fetch(salesUrl, {
       headers: { Authorization: authHeader, 'Content-Type': 'application/json' }
     });
 
-    console.log(`[DIAG] Sales response status: ${salesRes.status}`);
-    
     if (!salesRes.ok) {
       const errorText = await salesRes.text();
-      console.log(`[DIAG] Sales API error body: ${errorText}`);
       throw new Error(`Sales API error: ${salesRes.status} - ${errorText}`);
     }
 
     const salesData = await salesRes.json();
     const sales = salesData.sales || salesData || [];
+    console.log(`[DEEP-DIAG] Fetched ${sales.length} sales`);
 
-    console.log(`[DIAG] Got ${sales.length} sales from API`);
-
-    // 2. Analyze each sale's data structure
-    const analysis = {
-      totalSales: sales.length,
-      withResultData: 0,
-      withResultDataArray: 0,
-      withLeadId: 0,
-      oppFieldStats: {
-        found: 0,
-        notFound: 0,
-        fieldIds: {} as Record<string, number>,
+    // Results structure
+    const results = {
+      summary: {
+        salesFetched: sales.length,
+        salesWithOppInData: 0,
+        leadsChecked: 0,
+        leadsWithOpp: 0,
+        oppPercentage: 0,
+        uniqueOppPaths: [] as string[],
       },
-      sampleSales: [] as any[],
-      leadDataSamples: [] as any[],
-      rawSaleStructure: null as any, // Full structure of first sale
-      rawLeadStructure: null as any, // Full structure of first lead
+      oppLocations: [] as { path: string; count: number; samples: string[] }[],
+      salesAnalysis: [] as any[],
+      leadsAnalysis: [] as any[],
+      allFieldsFound: {} as Record<string, number>,
+      sampleSaleFlattened: null as Record<string, string> | null,
+      sampleLeadFlattened: null as Record<string, string> | null,
     };
 
-    // Known OPP field IDs to check
-    const knownOppFieldIds = ['80862', '80863', '80864'];
-
-    // Show full structure of first sale
-    if (sales.length > 0) {
-      analysis.rawSaleStructure = {
-        keys: Object.keys(sales[0]),
-        sample: sales[0],
-      };
-    }
-
-    for (const sale of sales.slice(0, 10)) {
-      const sampleInfo: any = {
-        saleId: sale.id,
-        hasResultData: !!sale.resultData,
-        resultDataType: typeof sale.resultData,
-        resultDataLength: Array.isArray(sale.resultData) ? sale.resultData.length : null,
-        leadId: sale.lead?.id || sale.leadId || null,
-        campaignId: sale.campaign?.id,
-        campaignName: sale.campaign?.name,
-      };
-
-      if (sale.resultData) {
-        analysis.withResultData++;
-        if (Array.isArray(sale.resultData)) {
-          analysis.withResultDataArray++;
-          
-          // Check for OPP in resultData
-          for (const field of sale.resultData) {
-            const fieldId = String(field.id || field.fieldId);
-            if (!analysis.oppFieldStats.fieldIds[fieldId]) {
-              analysis.oppFieldStats.fieldIds[fieldId] = 0;
-            }
-            analysis.oppFieldStats.fieldIds[fieldId]++;
-            
-            if (knownOppFieldIds.includes(fieldId)) {
-              sampleInfo.oppFieldId = fieldId;
-              sampleInfo.oppValue = field.value;
-              analysis.oppFieldStats.found++;
-            }
+    // 2. Deep scan each sale for OPP patterns
+    const oppPathCounts = new Map<string, string[]>();
+    
+    for (const sale of sales) {
+      const saleOpp = new Map<string, string[]>();
+      findOppInValue(sale, 'sale', saleOpp);
+      
+      if (saleOpp.size > 0) {
+        results.summary.salesWithOppInData++;
+        saleOpp.forEach((values, path) => {
+          if (!oppPathCounts.has(path)) {
+            oppPathCounts.set(path, []);
           }
-
-          // Show first 5 fields as sample
-          sampleInfo.resultDataSample = sale.resultData.slice(0, 5).map((f: any) => ({
-            id: f.id,
-            label: f.label,
-            value: f.value
-          }));
-        }
-      }
-
-      if (sale.lead?.id || sale.leadId) {
-        analysis.withLeadId++;
-      }
-
-      analysis.sampleSales.push(sampleInfo);
-    }
-
-    // 3. For ALL sales with leadId, fetch lead data and check for OPP
-    const leadsToCheck = Math.min(sales.length, 30); // Check up to 30 leads
-    console.log(`[DIAG] Fetching lead data for ${leadsToCheck} samples...`);
-    
-    let oppFoundCount = 0;
-    let oppMissingCount = 0;
-    let leadFetchErrors = 0;
-    
-    for (const sale of sales.slice(0, leadsToCheck)) {
-      const leadId = sale.leadId || sale.lead?.id;
-      if (!leadId) {
-        console.log(`[DIAG] Sale ${sale.id} has no leadId`);
-        continue;
-      }
-
-      try {
-        const leadUrl = `${baseUrl}/leads/${leadId}`;
-        const leadRes = await fetch(leadUrl, {
-          headers: { Authorization: authHeader, 'Content-Type': 'application/json' }
+          values.forEach(v => {
+            if (!oppPathCounts.get(path)!.includes(v)) {
+              oppPathCounts.get(path)!.push(v);
+            }
+          });
         });
 
-        console.log(`[DIAG] Lead ${leadId} response status: ${leadRes.status}`);
+        results.salesAnalysis.push({
+          saleId: sale.id,
+          leadId: sale.leadId,
+          oppPaths: Array.from(saleOpp.keys()),
+          oppValues: Array.from(saleOpp.values()).flat(),
+        });
+      }
 
-        if (leadRes.ok) {
-          const leadData = await leadRes.json();
-          console.log(`[DIAG] Lead ${leadId} response keys: ${Object.keys(leadData).join(', ')}`);
-          
-          // Store full structure of first lead
-          if (!analysis.rawLeadStructure) {
-            analysis.rawLeadStructure = {
-              keys: Object.keys(leadData),
-              hasLeads: !!leadData.leads,
-              leadsCount: leadData.leads?.length,
-              firstLeadKeys: leadData.leads?.[0] ? Object.keys(leadData.leads[0]) : null,
-              sample: leadData,
-            };
-          }
-          
-          // Check both root and leads[0]
-          const lead = leadData.leads?.[0] || leadData;
-          
-          const leadSample: any = {
-            leadId,
-            saleId: sale.id,
-            responseKeys: Object.keys(leadData),
-            leadObjectKeys: Object.keys(lead),
-            hasResultData: !!lead.resultData,
-            resultDataType: typeof lead.resultData,
-            oppFound: false,
-            oppValue: null,
-            oppFieldId: null,
-          };
+      // Track all field paths
+      const flat = flattenObject(sale, 'sale');
+      for (const key of Object.keys(flat)) {
+        results.allFieldsFound[key] = (results.allFieldsFound[key] || 0) + 1;
+      }
+    }
 
-          if (lead.resultData) {
-            if (Array.isArray(lead.resultData)) {
-              leadSample.resultDataLength = lead.resultData.length;
-              leadSample.sampleFields = lead.resultData.slice(0, 10).map((f: any) => ({
-                id: f.id,
-                label: f.label,
-                value: f.value
-              }));
+    // Flatten first sale for inspection
+    if (sales.length > 0) {
+      results.sampleSaleFlattened = flattenObject(sales[0], 'sale');
+    }
 
-              // Check for OPP in field 80862 or by label
-              for (const field of lead.resultData) {
-                const fieldId = String(field.id || field.fieldId);
-                if (knownOppFieldIds.includes(fieldId)) {
-                  leadSample.oppFound = true;
-                  leadSample.oppValue = field.value;
-                  leadSample.oppFieldId = fieldId;
-                  break;
-                }
-                // Also check by label
-                const label = String(field.label || '').toLowerCase();
-                if (label.includes('opp') && !leadSample.oppFound) {
-                  leadSample.oppFound = true;
-                  leadSample.oppValue = field.value;
-                  leadSample.oppFieldId = fieldId;
-                  leadSample.oppLabel = field.label;
-                }
+    // 3. Deep scan leads if enabled
+    if (deepLeadScan && sales.length > 0) {
+      const leadsToCheck = sales.slice(0, Math.min(30, sales.length));
+      console.log(`[DEEP-DIAG] Scanning ${leadsToCheck.length} leads...`);
+
+      for (const sale of leadsToCheck) {
+        const leadId = sale.leadId || sale.lead?.id;
+        const campaignId = sale.campaignId || sale.campaign?.id;
+        
+        if (!leadId) continue;
+
+        results.summary.leadsChecked++;
+
+        try {
+          // Try different lead endpoints
+          let leadData = null;
+          const leadUrls = [
+            `${baseUrl}/leads/${leadId}`,
+            campaignId ? `${baseUrl}/campaigns/${campaignId}/leads/${leadId}` : null,
+          ].filter(Boolean);
+
+          for (const url of leadUrls) {
+            try {
+              console.log(`[DEEP-DIAG] Trying: ${url}`);
+              const res = await fetch(url!, {
+                headers: { Authorization: authHeader, 'Content-Type': 'application/json' }
+              });
+              if (res.ok) {
+                leadData = await res.json();
+                console.log(`[DEEP-DIAG] Success from ${url}`);
+                break;
               }
+            } catch (e) {
+              console.log(`[DEEP-DIAG] Failed ${url}: ${e}`);
             }
           }
 
-          // Track OPP stats
-          if (leadSample.oppFound && leadSample.oppValue) {
-            oppFoundCount++;
-          } else {
-            oppMissingCount++;
+          if (!leadData) {
+            results.leadsAnalysis.push({ leadId, error: 'Failed to fetch' });
+            continue;
           }
 
-          analysis.leadDataSamples.push(leadSample);
-        } else {
-          leadFetchErrors++;
+          // Get the actual lead object (might be wrapped in leads array)
+          const lead = leadData.leads?.[0] || leadData.lead || leadData;
+
+          // Flatten for inspection (only first one)
+          if (!results.sampleLeadFlattened) {
+            results.sampleLeadFlattened = flattenObject(lead, 'lead');
+          }
+
+          // Find OPP patterns
+          const leadOpp = new Map<string, string[]>();
+          findOppInValue(lead, 'lead', leadOpp);
+
+          // Track all field paths from leads
+          const flat = flattenObject(lead, 'lead');
+          for (const key of Object.keys(flat)) {
+            results.allFieldsFound[key] = (results.allFieldsFound[key] || 0) + 1;
+          }
+
+          if (leadOpp.size > 0) {
+            results.summary.leadsWithOpp++;
+            leadOpp.forEach((values, path) => {
+              if (!oppPathCounts.has(path)) {
+                oppPathCounts.set(path, []);
+              }
+              values.forEach(v => {
+                if (!oppPathCounts.get(path)!.includes(v)) {
+                  oppPathCounts.get(path)!.push(v);
+                }
+              });
+            });
+
+            results.leadsAnalysis.push({
+              leadId,
+              saleId: sale.id,
+              hasOpp: true,
+              oppPaths: Array.from(leadOpp.keys()),
+              oppValues: Array.from(leadOpp.values()).flat(),
+            });
+          } else {
+            results.leadsAnalysis.push({
+              leadId,
+              saleId: sale.id,
+              hasOpp: false,
+              resultDataExists: !!lead.resultData,
+              resultDataType: Array.isArray(lead.resultData) ? 'array' : typeof lead.resultData,
+              resultDataLength: Array.isArray(lead.resultData) ? lead.resultData.length : null,
+            });
+          }
+
+          // Rate limiting
+          await new Promise(r => setTimeout(r, 100));
+        } catch (e) {
+          console.log(`[DEEP-DIAG] Error on lead ${leadId}: ${e}`);
         }
-      } catch (e) {
-        console.log(`[DIAG] Error fetching lead ${leadId}:`, e);
-        leadFetchErrors++;
       }
-      
-      // Small delay to avoid rate limiting
-      await new Promise(r => setTimeout(r, 50));
     }
 
-    // Add OPP stats to analysis
-    analysis.oppFieldStats.found = oppFoundCount;
-    analysis.oppFieldStats.notFound = oppMissingCount;
+    // 4. Compile OPP location summary
+    oppPathCounts.forEach((values, path) => {
+      results.oppLocations.push({
+        path,
+        count: values.length,
+        samples: values.slice(0, 5),
+      });
+    });
+    results.oppLocations.sort((a, b) => b.count - a.count);
+    results.summary.uniqueOppPaths = results.oppLocations.map(l => l.path);
 
-    // 4. Summary with percentages
-    const leadsChecked = oppFoundCount + oppMissingCount;
-    const oppPercentage = leadsChecked > 0 ? Math.round((oppFoundCount / leadsChecked) * 100) : 0;
-    
-    const summary = {
-      message: 'Adversus Data Diagnostics Complete',
-      salesAnalyzed: sales.length,
-      leadsChecked: leadsChecked,
-      leadFetchErrors: leadFetchErrors,
-      oppStats: {
-        found: oppFoundCount,
-        missing: oppMissingCount,
-        percentage: `${oppPercentage}%`,
-      },
-      conclusion: '',
-    };
-
-    if (oppFoundCount > 0 && oppMissingCount === 0) {
-      summary.conclusion = `✅ 100% de leads tienen OPP (${oppFoundCount}/${leadsChecked})`;
-    } else if (oppFoundCount > 0) {
-      summary.conclusion = `⚠️ Solo ${oppPercentage}% tienen OPP (${oppFoundCount}/${leadsChecked}). ${oppMissingCount} sin OPP.`;
-    } else {
-      summary.conclusion = `❌ Ningún lead tiene OPP en field 80862. Verificar configuración.`;
+    // Calculate percentage
+    if (results.summary.leadsChecked > 0) {
+      results.summary.oppPercentage = Math.round(
+        (100 * results.summary.leadsWithOpp) / results.summary.leadsChecked
+      );
     }
 
-    console.log(`[DIAG] Summary:`, JSON.stringify(summary, null, 2));
+    // 5. Find fields that might contain OPP (check for any field containing "opp" in name)
+    const potentialOppFields: string[] = [];
+    for (const key of Object.keys(results.allFieldsFound)) {
+      if (key.toLowerCase().includes('opp') || key.includes('80862')) {
+        potentialOppFields.push(key);
+      }
+    }
+
+    console.log(`[DEEP-DIAG] Complete. OPP found in ${results.summary.leadsWithOpp}/${results.summary.leadsChecked} leads`);
 
     return new Response(JSON.stringify({
-      summary,
-      analysis,
+      success: true,
+      summary: results.summary,
+      oppLocations: results.oppLocations,
+      potentialOppFields,
+      salesWithOpp: results.salesAnalysis.slice(0, 10),
+      leadsAnalysis: results.leadsAnalysis.slice(0, 20),
+      sampleSaleFlattened: results.sampleSaleFlattened,
+      sampleLeadFlattened: results.sampleLeadFlattened,
+      totalFieldsDiscovered: Object.keys(results.allFieldsFound).length,
     }, null, 2), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('[DIAG] Error:', err);
+    console.error('[DEEP-DIAG] Error:', err);
     return new Response(JSON.stringify({ 
+      success: false,
       error: err.message,
       stack: err.stack 
     }), {
