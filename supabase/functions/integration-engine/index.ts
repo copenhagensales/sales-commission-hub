@@ -356,12 +356,26 @@ serve(async (req) => {
 
         // Log success to integration_logs
         const salesData = runResults["sales"] as { processed?: number } | undefined;
+        const callsData = runResults["calls"] as { processed?: number; matched?: number } | undefined;
+        
+        // Build message based on what was synced
+        const messageParts: string[] = [];
+        if (salesData?.processed !== undefined) {
+          messageParts.push(`${salesData.processed} sales`);
+        }
+        if (callsData?.processed !== undefined) {
+          messageParts.push(`${callsData.processed} calls (${callsData.matched || 0} matched)`);
+        }
+        const syncMessage = messageParts.length > 0 
+          ? `Sync completed: ${messageParts.join(', ')}`
+          : 'Sync completed: No data processed';
+        
         await supabase.from("integration_logs").insert({
           integration_type: "dialer",
           integration_id: integration.id,
           integration_name: integration.name,
           status: "success",
-          message: `Sync completed: ${salesData?.processed || 0} sales processed`,
+          message: syncMessage,
           details: {
             source,
             days,
