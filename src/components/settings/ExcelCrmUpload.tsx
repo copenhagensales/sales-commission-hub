@@ -129,6 +129,33 @@ const defaultMapping: ColumnMapping = {
   amount_deduct: "",
 };
 
+// Convert Excel serial date to readable date string
+function excelDateToString(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  
+  // If it's already a Date object (from cellDates: true)
+  if (value instanceof Date) {
+    const day = String(value.getDate()).padStart(2, '0');
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const year = value.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+  
+  // If it's a number, treat it as Excel serial date
+  if (typeof value === 'number' && value > 25000 && value < 60000) {
+    // Excel serial date: days since 1900-01-01 (with Excel's leap year bug)
+    const excelEpoch = new Date(1899, 11, 30); // Dec 30, 1899
+    const date = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+  
+  // If it's already a string, return as-is
+  return String(value);
+}
+
 // Auto-suggest mapping based on column names
 function suggestMapping(columns: string[]): Partial<ColumnMapping> {
   const suggestions: Partial<ColumnMapping> = {};
@@ -202,10 +229,10 @@ export function ExcelCrmUpload() {
     reader.onload = (event) => {
       try {
         const data = event.target?.result;
-        const workbook = XLSX.read(data, { type: "binary" });
+        const workbook = XLSX.read(data, { type: "binary", cellDates: true });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json<ParsedRow>(sheet, { defval: null });
+        const jsonData = XLSX.utils.sheet_to_json<ParsedRow>(sheet, { defval: null, raw: false });
 
         if (jsonData.length > 0) {
           const cols = Object.keys(jsonData[0]);
@@ -262,7 +289,7 @@ export function ExcelCrmUpload() {
         opp_number: columnMapping.opp_number ? String(row[columnMapping.opp_number] || "") : null,
         external_id: columnMapping.external_id ? String(row[columnMapping.external_id] || "") : null,
         phone_number: columnMapping.phone_number ? String(row[columnMapping.phone_number] || "") : null,
-        date: columnMapping.date ? String(row[columnMapping.date] || "") : null,
+        date: columnMapping.date ? excelDateToString(row[columnMapping.date]) : null,
         status: columnMapping.status ? String(row[columnMapping.status] || "") : null,
         customer_name: columnMapping.customer_name ? String(row[columnMapping.customer_name] || "") : null,
         action_type: columnMapping.action_type ? String(row[columnMapping.action_type] || "") : null,
