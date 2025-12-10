@@ -14,6 +14,8 @@ import { SomeGoalsSettings } from "@/components/some/SomeGoalsSettings";
 import { SomeWeeklyMetricsCard } from "@/components/some/SomeWeeklyMetricsCard";
 import { SomeMetricsChart } from "@/components/some/SomeMetricsChart";
 import { SomeOverallProgress } from "@/components/some/SomeOverallProgress";
+import { SomeKpiCards } from "@/components/some/SomeKpiCards";
+import { SomeCombinedActivityChart } from "@/components/some/SomeCombinedActivityChart";
 
 import { useSomeContent, getWeekStartDate, ContentItem, ContentStatus, ContentType } from "@/hooks/useSomeContent";
 import { useSomeMetrics } from "@/hooks/useSomeMetrics";
@@ -215,6 +217,15 @@ export default function Some() {
           </DndContext>
         </div>
 
+        {/* KPI Cards with trends */}
+        <SomeKpiCards
+          currentMetrics={currentMetrics}
+          previousMetrics={previousMetrics}
+        />
+
+        {/* Combined Activity Chart - 30 days */}
+        <SomeCombinedActivityChart historicalMetrics={historicalMetrics} />
+
         {/* Weekly Metrics Section */}
         <SomeWeeklyMetricsCard
           weekStartDate={weekStartDate}
@@ -223,7 +234,7 @@ export default function Some() {
           onSave={upsertMetrics}
         />
 
-        {/* Metrics Chart */}
+        {/* Historical Metrics Chart */}
         <SomeMetricsChart historicalMetrics={historicalMetrics} />
       </div>
 
