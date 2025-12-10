@@ -296,16 +296,16 @@ export function ExcelCrmUpload() {
                       <div key={target.value} className="space-y-1">
                         <Label className="text-xs">{target.label}</Label>
                         <Select
-                          value={columnMapping[target.value as keyof ColumnMapping]}
+                          value={columnMapping[target.value as keyof ColumnMapping] || "__none__"}
                           onValueChange={(val) =>
-                            setColumnMapping((prev) => ({ ...prev, [target.value]: val }))
+                            setColumnMapping((prev) => ({ ...prev, [target.value]: val === "__none__" ? "" : val }))
                           }
                         >
                           <SelectTrigger className="h-8">
                             <SelectValue placeholder="Vælg..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">-- Ingen --</SelectItem>
+                            <SelectItem value="__none__">-- Ingen --</SelectItem>
                             {columns.map((col) => (
                               <SelectItem key={col} value={col}>
                                 {col}
@@ -328,16 +328,16 @@ export function ExcelCrmUpload() {
                       <div key={target.value} className="space-y-1">
                         <Label className="text-xs">{target.label}</Label>
                         <Select
-                          value={columnMapping[target.value as keyof ColumnMapping]}
+                          value={columnMapping[target.value as keyof ColumnMapping] || "__none__"}
                           onValueChange={(val) =>
-                            setColumnMapping((prev) => ({ ...prev, [target.value]: val }))
+                            setColumnMapping((prev) => ({ ...prev, [target.value]: val === "__none__" ? "" : val }))
                           }
                         >
                           <SelectTrigger className="h-8">
                             <SelectValue placeholder="Vælg..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">-- Ingen --</SelectItem>
+                            <SelectItem value="__none__">-- Ingen --</SelectItem>
                             {columns.map((col) => (
                               <SelectItem key={col} value={col}>
                                 {col}
@@ -360,16 +360,16 @@ export function ExcelCrmUpload() {
                       <div key={target.value} className="space-y-1">
                         <Label className="text-xs">{target.label}</Label>
                         <Select
-                          value={columnMapping[target.value as keyof ColumnMapping]}
+                          value={columnMapping[target.value as keyof ColumnMapping] || "__none__"}
                           onValueChange={(val) =>
-                            setColumnMapping((prev) => ({ ...prev, [target.value]: val }))
+                            setColumnMapping((prev) => ({ ...prev, [target.value]: val === "__none__" ? "" : val }))
                           }
                         >
                           <SelectTrigger className="h-8">
                             <SelectValue placeholder="Vælg..." />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">-- Ingen --</SelectItem>
+                            <SelectItem value="__none__">-- Ingen --</SelectItem>
                             {columns.map((col) => (
                               <SelectItem key={col} value={col}>
                                 {col}
