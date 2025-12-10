@@ -117,16 +117,29 @@ Deno.serve(async (req) => {
     const importRows = (rows || []) as ImportRow[];
     console.log(`[validate-excel-import] Found ${importRows.length} rows to validate`);
 
-    // Get sales for this client (last 180 days for phone matching)
-    const { data: sales, error: salesError } = await supabase
-      .from("sales")
-      .select("id, adversus_external_id, adversus_opp_number, customer_phone, sale_datetime, agent_name")
-      .eq("client_campaign_id", client_id)
-      .gte("sale_datetime", new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString());
+    // Get campaign IDs for this client
+    const { data: campaigns, error: campaignsError } = await supabase
+      .from("client_campaigns")
+      .select("id")
+      .eq("client_id", client_id);
 
-    if (salesError) throw salesError;
+    if (campaignsError) throw campaignsError;
 
-    const salesData = (sales || []) as Sale[];
+    const campaignIds = (campaigns || []).map((c: { id: string }) => c.id);
+    console.log(`[validate-excel-import] Found ${campaignIds.length} campaigns for client`);
+
+    // Get sales for this client's campaigns (last 180 days for phone matching)
+    let salesData: Sale[] = [];
+    if (campaignIds.length > 0) {
+      const { data: sales, error: salesError } = await supabase
+        .from("sales")
+        .select("id, adversus_external_id, adversus_opp_number, customer_phone, sale_datetime, agent_name")
+        .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString());
+
+      if (salesError) throw salesError;
+      salesData = (sales || []) as Sale[];
+    }
     console.log(`[validate-excel-import] Found ${salesData.length} sales to match against`);
 
     // Create lookup maps
