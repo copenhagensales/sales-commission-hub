@@ -118,6 +118,7 @@ export class AdversusAdapter implements DialerAdapter {
         customerPhone: s.lead?.phone || "",
         
         campaignId: campaignId,
+        campaignName: s.campaign?.name || undefined,
         externalReference: externalReference,
         clientCampaignId: clientCampaignId,
 
