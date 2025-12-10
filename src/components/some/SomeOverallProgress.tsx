@@ -79,18 +79,32 @@ export function SomeOverallProgress({
 
   return (
     <Card className={`bg-gradient-to-r ${bgGradient}`}>
-      <CardContent className="p-4">
+      <CardContent className="p-5">
         <div className="flex items-center gap-4">
-          <div className={`p-3 rounded-full ${progressColor}`}>
+          <div className={`p-3 rounded-full ${progressColor} shadow-lg`}>
             <Icon className="h-6 w-6 text-white" />
           </div>
-          <div className="flex-1 space-y-2">
+          <div className="flex-1 space-y-3">
             <div className="flex items-center justify-between">
               <p className="font-semibold text-sm">Samlet ugeprogression</p>
               <span className="text-lg font-bold">{percentage}%</span>
             </div>
             <Progress value={percentage} className="h-3" />
-            <p className="text-sm text-muted-foreground italic">{quote}</p>
+            <div className={`p-3 rounded-lg ${
+              level === "complete" ? "bg-green-500/20" :
+              level === "high" ? "bg-emerald-500/20" :
+              level === "medium" ? "bg-amber-500/20" :
+              "bg-blue-500/20"
+            }`}>
+              <p className={`text-base font-semibold ${
+                level === "complete" ? "text-green-700 dark:text-green-300" :
+                level === "high" ? "text-emerald-700 dark:text-emerald-300" :
+                level === "medium" ? "text-amber-700 dark:text-amber-300" :
+                "text-blue-700 dark:text-blue-300"
+              }`}>
+                "{quote}"
+              </p>
+            </div>
           </div>
         </div>
       </CardContent>
