@@ -100,10 +100,10 @@ Deno.serve(async (req) => {
     const campaignStats: Record<number, { leadsFound: number; oppsFound: number }> = {};
     let totalLeadsInspected = 0;
     
-    // Fetch leads for each campaign (max 5 for testing)
-    for (const campaignId of campaignIds.slice(0, 5)) {
+    // Fetch leads for ALL campaigns with pageSize 5000
+    for (const campaignId of campaignIds) {
       const filters = JSON.stringify({ campaignId: { "$eq": campaignId } });
-      const leadsUrl = `${baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=500`;
+      const leadsUrl = `${baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=5000`;
       
       console.log(`[Diagnostics] Fetching leads for campaign ${campaignId}...`);
       
