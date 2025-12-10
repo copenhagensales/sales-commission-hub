@@ -413,7 +413,7 @@ export function ExcelCrmUpload() {
                       </p>
                     </div>
                     {hasMatchField ? (
-                      <Badge variant="default" className="bg-green-600 hover:bg-green-700 flex items-center gap-1">
+                      <Badge variant="default" className="bg-success hover:bg-success/90 flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3" />
                         Klar til import
                       </Badge>
@@ -446,7 +446,7 @@ export function ExcelCrmUpload() {
                             key={target.value} 
                             className={`p-3 rounded-lg border-2 transition-all ${
                               isMapped 
-                                ? 'border-green-500 bg-green-50 dark:bg-green-950/30' 
+                                ? 'border-success bg-success/10' 
                                 : 'border-border bg-background hover:border-muted-foreground/50'
                             }`}
                           >
@@ -464,7 +464,7 @@ export function ExcelCrmUpload() {
                                       <p className="text-xs"><strong>Eksempler:</strong> {target.examples.join(", ")}</p>
                                     </TooltipContent>
                                   </Tooltip>
-                                  {isMapped && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                                  {isMapped && <CheckCircle2 className="h-4 w-4 text-success" />}
                                 </div>
                                 <p className="text-xs text-muted-foreground">{target.description}</p>
                                 {sampleValue && (
@@ -479,7 +479,7 @@ export function ExcelCrmUpload() {
                                   setColumnMapping((prev) => ({ ...prev, [target.value]: val === "__none__" ? "" : val }))
                                 }
                               >
-                                <SelectTrigger className={`w-48 ${isMapped ? 'border-green-500' : ''}`}>
+                                <SelectTrigger className={`w-48 ${isMapped ? 'border-success' : ''}`}>
                                   <SelectValue placeholder="Vælg kolonne..." />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -518,7 +518,7 @@ export function ExcelCrmUpload() {
                           <div 
                             key={target.value} 
                             className={`p-3 rounded-lg border transition-all ${
-                              isMapped ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-border'
+                              isMapped ? 'border-primary bg-primary/10' : 'border-border'
                             }`}
                           >
                             <div className="flex items-center gap-2 mb-2">
@@ -538,7 +538,7 @@ export function ExcelCrmUpload() {
                                 setColumnMapping((prev) => ({ ...prev, [target.value]: val === "__none__" ? "" : val }))
                               }
                             >
-                              <SelectTrigger className={`w-full ${isMapped ? 'border-blue-500' : ''}`}>
+                              <SelectTrigger className={`w-full ${isMapped ? 'border-primary' : ''}`}>
                                 <SelectValue placeholder="Vælg kolonne..." />
                               </SelectTrigger>
                               <SelectContent>
