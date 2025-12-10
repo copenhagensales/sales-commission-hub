@@ -110,6 +110,15 @@ export default function VagtMinUge() {
     return assignments?.filter((a: any) => isSameDay(parseISO(a.date), day)) || [];
   };
 
+  // Get open markets for a specific day
+  const getOpenMarketsForDay = (day: Date) => {
+    return openMarkets?.filter((m: any) => {
+      const start = parseISO(m.start_date);
+      const end = parseISO(m.end_date);
+      return day >= start && day <= end;
+    }) || [];
+  };
+
   const navigateMonth = (direction: number) => {
     setCurrentDate(addMonths(currentDate, direction));
   };
@@ -172,6 +181,26 @@ export default function VagtMinUge() {
           /* Month Calendar View */
           <Card>
             <CardContent className="p-2 sm:p-4">
+              {/* Legend */}
+              <div className="flex flex-wrap gap-3 mb-3 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-orange-500/20 border-l-2 border-orange-500" />
+                  <span className="text-muted-foreground">Vagt</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-purple-500/20 border-l-2 border-purple-500" />
+                  <span className="text-muted-foreground">Åbent marked</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-blue-500/20 border-l-2 border-blue-500" />
+                  <span className="text-muted-foreground">Ansøgt</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-green-500/20 border-l-2 border-green-500" />
+                  <span className="text-muted-foreground">Godkendt</span>
+                </div>
+              </div>
+              
               {/* Weekday headers */}
               <div className="grid grid-cols-7 mb-1">
                 {WEEKDAY_NAMES.map((day) => (
@@ -185,19 +214,21 @@ export default function VagtMinUge() {
               <div className="grid grid-cols-7 gap-1">
                 {calendarDays.map((day) => {
                   const dayAssignments = getAssignmentsForDay(day);
+                  const dayMarkets = getOpenMarketsForDay(day);
                   const isCurrentMonth = isSameMonth(day, currentDate);
                   const hasShift = dayAssignments.length > 0;
+                  const hasMarkets = dayMarkets.length > 0;
                   
                   return (
                     <div
                       key={day.toISOString()}
-                      onClick={() => hasShift && setSelectedDay(day)}
+                      onClick={() => (hasShift || hasMarkets) && setSelectedDay(day)}
                       className={cn(
                         "min-h-[60px] sm:min-h-[80px] p-1 rounded-lg border transition-all",
                         !isCurrentMonth && "opacity-40",
                         isToday(day) && "ring-2 ring-primary",
-                        hasShift && "cursor-pointer hover:bg-accent",
-                        !hasShift && "bg-muted/20"
+                        (hasShift || hasMarkets) && "cursor-pointer hover:bg-accent",
+                        !hasShift && !hasMarkets && "bg-muted/20"
                       )}
                     >
                       <div className={cn(
@@ -226,6 +257,34 @@ export default function VagtMinUge() {
                         {dayAssignments.length > 2 && (
                           <div className="text-[10px] text-muted-foreground px-1">
                             +{dayAssignments.length - 2} mere
+                          </div>
+                        )}
+                        
+                        {/* Open market indicators */}
+                        {dayMarkets.slice(0, hasShift ? 1 : 2).map((market: any) => {
+                          const applied = hasApplied(market.id);
+                          const status = getApplicationStatus(market.id);
+                          return (
+                            <div
+                              key={`market-${market.id}`}
+                              className={cn(
+                                "text-[10px] sm:text-xs px-1 py-0.5 rounded truncate flex items-center gap-0.5",
+                                applied 
+                                  ? status === "approved" 
+                                    ? "bg-green-500/20 text-green-600 border-l-2 border-green-500"
+                                    : "bg-blue-500/20 text-blue-600 border-l-2 border-blue-500"
+                                  : "bg-purple-500/20 text-purple-600 border-l-2 border-purple-500"
+                              )}
+                            >
+                              <Users className="h-2.5 w-2.5 flex-shrink-0" />
+                              <span className="truncate">{market.location?.name?.split(" ")[0]}</span>
+                              {applied && <span className="text-[8px]">✓</span>}
+                            </div>
+                          );
+                        })}
+                        {dayMarkets.length > (hasShift ? 1 : 2) && (
+                          <div className="text-[10px] text-purple-600 px-1">
+                            +{dayMarkets.length - (hasShift ? 1 : 2)} marked
                           </div>
                         )}
                       </div>
@@ -438,35 +497,95 @@ export default function VagtMinUge() {
                   {format(selectedDay, "EEEE d. MMMM", { locale: da })}
                 </DialogTitle>
               </DialogHeader>
-              <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-                {getAssignmentsForDay(selectedDay).map((assignment: any) => (
-                  <div
-                    key={assignment.id}
-                    onClick={() => {
-                      setSelectedDay(null);
-                      setSelectedAssignment(assignment);
-                    }}
-                    className="p-3 rounded-lg border hover:bg-accent cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-1">
-                        <BrandBadge
-                          brandName={assignment.booking.brand.name}
-                          brandColor={assignment.booking.brand.color_hex}
-                        />
-                        <p className="font-medium">{assignment.booking.location.name}</p>
-                        <p className="text-sm text-muted-foreground">{assignment.booking.location.address_city}</p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          {assignment.start_time?.slice(0, 5)} - {assignment.end_time?.slice(0, 5)}
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+                {/* Assignments */}
+                {getAssignmentsForDay(selectedDay).length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-muted-foreground">Dine vagter</h4>
+                    {getAssignmentsForDay(selectedDay).map((assignment: any) => (
+                      <div
+                        key={assignment.id}
+                        onClick={() => {
+                          setSelectedDay(null);
+                          setSelectedAssignment(assignment);
+                        }}
+                        className="p-3 rounded-lg border hover:bg-accent cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-1">
+                            <BrandBadge
+                              brandName={assignment.booking.brand.name}
+                              brandColor={assignment.booking.brand.color_hex}
+                            />
+                            <p className="font-medium">{assignment.booking.location.name}</p>
+                            <p className="text-sm text-muted-foreground">{assignment.booking.location.address_city}</p>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              {assignment.start_time?.slice(0, 5)} - {assignment.end_time?.slice(0, 5)}
+                            </div>
+                          </div>
+                          {assignment.on_my_way_at && (
+                            <span className="text-xs text-green-600 font-medium">✓ På vej</span>
+                          )}
                         </div>
                       </div>
-                      {assignment.on_my_way_at && (
-                        <span className="text-xs text-green-600 font-medium">✓ På vej</span>
-                      )}
-                    </div>
+                    ))}
                   </div>
-                ))}
+                )}
+                
+                {/* Open Markets */}
+                {getOpenMarketsForDay(selectedDay).length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      Åbne markeder
+                    </h4>
+                    {getOpenMarketsForDay(selectedDay).map((market: any) => {
+                      const applied = hasApplied(market.id);
+                      const status = getApplicationStatus(market.id);
+                      return (
+                        <div
+                          key={`dialog-market-${market.id}`}
+                          className="p-3 rounded-lg border bg-purple-500/5 border-purple-500/20"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-1">
+                              <BrandBadge
+                                brandName={market.brand?.name}
+                                brandColor={market.brand?.color_hex}
+                              />
+                              <p className="font-medium">{market.location?.name}</p>
+                              <p className="text-sm text-muted-foreground">{market.location?.address_city}</p>
+                            </div>
+                            {applied ? (
+                              <Badge 
+                                variant={status === "approved" ? "default" : status === "rejected" ? "destructive" : "secondary"}
+                              >
+                                {status === "approved" ? "Godkendt" : status === "rejected" ? "Afvist" : "Ansøgt"}
+                              </Badge>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  applyMutation.mutate(market.id);
+                                }}
+                                disabled={applyMutation.isPending}
+                              >
+                                <Send className="h-3 w-3 mr-1" />
+                                Ansøg
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                
+                {getAssignmentsForDay(selectedDay).length === 0 && getOpenMarketsForDay(selectedDay).length === 0 && (
+                  <p className="text-center text-muted-foreground py-4">Ingen vagter eller markeder denne dag</p>
+                )}
               </div>
             </>
           )}
