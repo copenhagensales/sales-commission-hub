@@ -266,8 +266,7 @@ serve(async (req) => {
       });
     }
 
-    // Resolve agent
-    const agentId = await resolveAgent(supabase, body.payload.user.id, body.payload.user.email);
+    // Agent info extracted directly from payload (no separate agent_id column)
 
     // Create sale record with dialer source
     const { data: saleData, error: saleError } = await supabase
@@ -275,8 +274,8 @@ serve(async (req) => {
       .insert({
         adversus_event_id: eventData.id,
         client_campaign_id: campaignMapping?.client_campaign_id || null,
-        agent_id: agentId,
         agent_name: body.payload.user.name,
+        agent_email: body.payload.user.email || null,
         agent_external_id: body.payload.user.id,
         customer_company: body.payload.lead.company,
         customer_phone: body.payload.lead.phone,
