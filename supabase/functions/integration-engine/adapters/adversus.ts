@@ -67,30 +67,13 @@ export class AdversusAdapter implements DialerAdapter {
 
     const filterStr = encodeURIComponent(JSON.stringify({ created: { $gt: startDate.toISOString() } }));
 
-    let page = 1;
-    let rawSales: any[] = [];
-    let hasMore = true;
-
     // Build campaign lookup maps
     const campaignConfigMap = new Map<string, CampaignMappingConfig>();
     campaignMappings?.forEach(m => campaignConfigMap.set(m.adversusCampaignId, m));
 
-    // Paginación: pageSize=500 y hasta 100 páginas = max 50,000 ventas
-    while (hasMore && page <= 100) {
-      const url = `${this.baseUrl}/sales?pageSize=500&page=${page}&filters=${filterStr}`;
-      const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
-
-      if (!res.ok) break;
-      const data = await res.json();
-      const pageData = data.sales || data || [];
-
-      if (pageData.length === 0) hasMore = false;
-      else {
-        rawSales = [...rawSales, ...pageData];
-        page++;
-      }
-      await new Promise((r) => setTimeout(r, 100));
-    }
+    // OPTIMIZACIÓN: Fetch paralelo de páginas (10 páginas a la vez)
+    const rawSales = await this.fetchSalesParallel(filterStr);
+    console.log(`[Adversus] Fetched ${rawSales.length} sales via parallel fetch`);
 
     console.log(`[Adversus] Fetched ${rawSales.length} sales, now building OPP map from leads...`);
 
@@ -155,7 +138,7 @@ export class AdversusAdapter implements DialerAdapter {
     });
   }
 
-  // Nueva estrategia: Construir mapa leadId -> OPP desde /leads con filtros por campaña
+  // Nueva estrategia: Construir mapa leadId -> OPP desde /leads con filtros por campaña (PARALELO)
   private async buildLeadOppMap(
     sales: any[], 
     campaignConfigMap: Map<string, CampaignMappingConfig>
@@ -164,36 +147,34 @@ export class AdversusAdapter implements DialerAdapter {
 
     // 1. Obtener campaignIds únicos de las ventas
     const campaignIds = [...new Set(sales.map(s => s.campaignId).filter(Boolean))];
-    console.log(`[Adversus] Found ${campaignIds.length} unique campaigns in sales`);
+    console.log(`[Adversus] Found ${campaignIds.length} unique campaigns, fetching leads in parallel...`);
 
-    // 2. Para cada campaña, obtener leads con filtro y extraer OPPs
-    for (const campaignId of campaignIds) {
+    // 2. Preparar configs para cada campaña
+    const campaignConfigs = campaignIds.map(campaignId => {
       const campaignIdStr = String(campaignId);
       const config = campaignConfigMap.get(campaignIdStr);
-      
-      // Determinar qué field ID usar para OPP
-      let oppFieldId: string | null = null;
+      let oppFieldId = '80862'; // Default
       
       if (config?.referenceConfig?.type === 'field_id') {
-        // Usar el field configurado (puede ser "result_80862" o solo "80862")
         oppFieldId = config.referenceConfig.value.replace('result_', '');
-      } else {
-        // Default: usar field 80862 (campo OPP común en TDC)
-        oppFieldId = '80862';
       }
+      
+      return { campaignId, oppFieldId };
+    });
 
+    // 3. Fetch paralelo de leads por campaña (todas las campañas a la vez)
+    const fetchPromises = campaignConfigs.map(async ({ campaignId, oppFieldId }) => {
       try {
         const filters = JSON.stringify({ campaignId: { "$eq": campaignId } });
         const url = `${this.baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=5000`;
         
-        console.log(`[Adversus] Fetching leads for campaign ${campaignId}...`);
         const res = await fetch(url, { 
           headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" } 
         });
 
         if (!res.ok) {
           console.log(`[Adversus] Failed to fetch leads for campaign ${campaignId}: ${res.status}`);
-          continue;
+          return { campaignId, leads: [], oppsFound: 0 };
         }
 
         const data = await res.json();
@@ -203,11 +184,10 @@ export class AdversusAdapter implements DialerAdapter {
         for (const lead of leads) {
           const leadId = String(lead.id);
           const resultData = lead.resultData || [];
-          
-          // Buscar OPP en resultData
           let oppValue: string | null = null;
           
           if (Array.isArray(resultData)) {
+            // Buscar en el field configurado
             for (const field of resultData) {
               if (String(field.id) === oppFieldId && field.value) {
                 const val = String(field.value).trim();
@@ -217,16 +197,16 @@ export class AdversusAdapter implements DialerAdapter {
                 }
               }
             }
-          }
-
-          // Fallback: buscar patrón OPP-XXXXX en cualquier campo
-          if (!oppValue && Array.isArray(resultData)) {
-            for (const field of resultData) {
-              if (field.value) {
-                const val = String(field.value).trim();
-                if (val.match(/^OPP-\d{4,6}$/)) {
-                  oppValue = val;
-                  break;
+            
+            // Fallback: buscar patrón OPP-XXXXX
+            if (!oppValue) {
+              for (const field of resultData) {
+                if (field.value) {
+                  const val = String(field.value).trim();
+                  if (val.match(/^OPP-\d{4,6}$/)) {
+                    oppValue = val;
+                    break;
+                  }
                 }
               }
             }
@@ -238,14 +218,19 @@ export class AdversusAdapter implements DialerAdapter {
           }
         }
 
-        console.log(`[Adversus] Campaign ${campaignId}: ${leads.length} leads, ${oppsFound} OPPs found`);
-        
-        // Pequeño delay entre campañas
-        await new Promise(r => setTimeout(r, 100));
-        
+        return { campaignId, leads: leads.length, oppsFound };
       } catch (e) {
         console.error(`[Adversus] Error fetching leads for campaign ${campaignId}:`, e);
+        return { campaignId, leads: 0, oppsFound: 0 };
       }
+    });
+
+    // Ejecutar todos los fetches en paralelo
+    const results = await Promise.all(fetchPromises);
+    
+    // Log resultados
+    for (const r of results) {
+      console.log(`[Adversus] Campaign ${r.campaignId}: ${r.leads} leads, ${r.oppsFound} OPPs`);
     }
 
     return leadIdToOpp;
@@ -258,6 +243,54 @@ export class AdversusAdapter implements DialerAdapter {
     if (value.match(/^OPP-\d{4,6}$/)) return true;
     if (value.match(/^\d{4,6}$/)) return true;
     return false;
+  }
+
+  // OPTIMIZACIÓN: Fetch paralelo de ventas (10 páginas a la vez)
+  private async fetchSalesParallel(filterStr: string): Promise<any[]> {
+    const allSales: any[] = [];
+    const pageSize = 500;
+    const parallelBatch = 10; // 10 páginas en paralelo
+    let currentPage = 1;
+    let hasMore = true;
+
+    while (hasMore && currentPage <= 100) {
+      // Crear batch de promesas para páginas paralelas
+      const pagePromises: Promise<any[]>[] = [];
+      
+      for (let i = 0; i < parallelBatch && currentPage + i <= 100; i++) {
+        const page = currentPage + i;
+        const url = `${this.baseUrl}/sales?pageSize=${pageSize}&page=${page}&filters=${filterStr}`;
+        
+        pagePromises.push(
+          fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } })
+            .then(res => res.ok ? res.json() : { sales: [] })
+            .then(data => data.sales || data || [])
+            .catch(() => [])
+        );
+      }
+
+      // Ejecutar batch en paralelo
+      const results = await Promise.all(pagePromises);
+      
+      let batchEmpty = true;
+      for (const pageData of results) {
+        if (pageData.length > 0) {
+          allSales.push(...pageData);
+          batchEmpty = false;
+        }
+      }
+
+      // Si alguna página del batch vino vacía, terminamos
+      if (batchEmpty || results.some(r => r.length < pageSize)) {
+        hasMore = false;
+      } else {
+        currentPage += parallelBatch;
+      }
+
+      console.log(`[Adversus] Parallel fetch: ${allSales.length} sales so far (pages ${currentPage}-${currentPage + parallelBatch - 1})`);
+    }
+
+    return allSales;
   }
 
   // Fetch leads for a campaign (used by field inspector)
