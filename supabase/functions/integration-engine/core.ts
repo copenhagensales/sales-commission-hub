@@ -104,11 +104,12 @@ export class IngestionEngine {
 
   // --- 3. PROCESAR VENTAS (La lógica pesada) ---
   // Core is now adapter-agnostic: it receives StandardSale with externalReference already extracted
-  async processSales(sales: StandardSale[]) {
+  // Processes in batches to avoid CPU timeout on large datasets
+  async processSales(sales: StandardSale[], batchSize = 500) {
     if (sales.length === 0) return { processed: 0, errors: 0 };
     
     const sampleSale = sales[0];
-    this.log("INFO", `Procesando ${sales.length} ventas de ${sampleSale.dialerName} (${sampleSale.integrationType})...`);
+    this.log("INFO", `Procesando ${sales.length} ventas de ${sampleSale.dialerName} (${sampleSale.integrationType}) en lotes de ${batchSize}...`);
 
     // A. Cargar Cachés (Optimización de rendimiento)
     const { data: dbProducts } = await this.supabase.from("products").select("id, name, commission_dkk, revenue_dkk");
@@ -118,6 +119,36 @@ export class IngestionEngine {
     const productMapByName = new Map(dbProducts?.map((p) => [p.name.toLowerCase(), p]));
     const productMapByExtId = new Map(dbMappings?.map((m) => [m.adversus_external_id, m.product_id]));
 
+    let totalProcessed = 0;
+    let totalErrors = 0;
+
+    // Process in batches
+    const totalBatches = Math.ceil(sales.length / batchSize);
+    
+    for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
+      const start = batchNum * batchSize;
+      const end = Math.min(start + batchSize, sales.length);
+      const batch = sales.slice(start, end);
+      
+      this.log("INFO", `Procesando lote ${batchNum + 1}/${totalBatches} (${batch.length} ventas)...`);
+      
+      const { processed, errors } = await this.processSalesBatch(batch, productMapByName, productMapByExtId, dbProducts);
+      totalProcessed += processed;
+      totalErrors += errors;
+      
+      this.log("INFO", `Lote ${batchNum + 1} completado: ${processed} procesadas, ${errors} errores. Total: ${totalProcessed}/${sales.length}`);
+    }
+
+    return { processed: totalProcessed, errors: totalErrors };
+  }
+
+  // Process a single batch of sales
+  private async processSalesBatch(
+    sales: StandardSale[], 
+    productMapByName: Map<string, any>,
+    productMapByExtId: Map<string, string>,
+    dbProducts: any[] | null
+  ) {
     let processed = 0;
     let errors = 0;
 
