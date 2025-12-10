@@ -10,8 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check, List, ExternalLink } from "lucide-react";
+import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check, List, ExternalLink, MoreVertical, PhoneCall } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 
 interface DialerIntegration {
@@ -109,6 +111,10 @@ export function DialerIntegrations() {
   const [isLoadingWebhooks, setIsLoadingWebhooks] = useState(false);
   const [isDeletingWebhookId, setIsDeletingWebhookId] = useState<number | null>(null);
 
+  // Fetch calls state
+  const [fetchingCallsId, setFetchingCallsId] = useState<string | null>(null);
+  const [callsDays, setCallsDays] = useState<Record<string, string>>({});
+
   // Fetch Dialer Integrations from new table
   const { data: integrations, isLoading } = useQuery({
     queryKey: ["dialer-integrations"],
@@ -120,6 +126,50 @@ export function DialerIntegrations() {
 
       if (error) throw error;
       return data as DialerIntegration[];
+    },
+  });
+
+  // Fetch dialer calls grouped by agent
+  const { data: callsByAgent, isLoading: isLoadingCalls, refetch: refetchCalls } = useQuery({
+    queryKey: ["dialer-calls-by-agent"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("dialer_calls")
+        .select(`
+          id,
+          external_id,
+          dialer_name,
+          integration_type,
+          start_time,
+          end_time,
+          duration_seconds,
+          total_duration_seconds,
+          status,
+          agent_external_id,
+          agent_id,
+          campaign_external_id,
+          agents (id, name, email)
+        `)
+        .order("start_time", { ascending: false })
+        .limit(500);
+
+      if (error) throw error;
+      
+      // Group by agent
+      const grouped: Record<string, { agent: { id: string; name: string; email: string } | null; calls: typeof data }> = {};
+      
+      data?.forEach((call) => {
+        const agentKey = call.agent_id || call.agent_external_id || "unknown";
+        if (!grouped[agentKey]) {
+          grouped[agentKey] = {
+            agent: call.agents as { id: string; name: string; email: string } | null,
+            calls: []
+          };
+        }
+        grouped[agentKey].calls.push(call);
+      });
+      
+      return grouped;
     },
   });
 
@@ -200,6 +250,36 @@ export function DialerIntegrations() {
     },
     onSettled: () => {
       setSyncingId(null);
+    },
+  });
+
+  // Fetch Calls
+  const fetchCallsMutation = useMutation({
+    mutationFn: async ({ integrationId, provider, days }: { integrationId: string; provider: string; days: number }) => {
+      setFetchingCallsId(integrationId);
+      const { data, error } = await supabase.functions.invoke("integration-engine", {
+        body: {
+          source: provider,
+          integration_id: integrationId,
+          actions: ["calls"],
+          days,
+        },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success("Calls hentet", {
+        description: `Resultat: ${data.calls?.created || 0} oprettet, ${data.calls?.updated || 0} opdateret`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["dialer-calls-by-agent"] });
+    },
+    onError: (error) => {
+      toast.error(`Fejl ved hentning af calls: ${error.message}`);
+    },
+    onSettled: () => {
+      setFetchingCallsId(null);
     },
   });
 
@@ -549,215 +629,332 @@ export function DialerIntegrations() {
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <div className="text-center py-8">Indlæser integrationer...</div>
-        ) : !integrations || integrations.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Ingen dialer integrationer konfigureret. Klik "Tilføj" for at oprette en.
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Navn</TableHead>
-                <TableHead>Provider</TableHead>
-                <TableHead>Auto-sync</TableHead>
-                <TableHead>Sidst synkroniseret</TableHead>
-                <TableHead className="text-right">Handlinger</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {integrations.map((integration) => (
-                <TableRow key={integration.id}>
-                  <TableCell className="font-medium">{integration.name}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-0.5">
-                      <Badge variant="outline" className="capitalize w-fit">
-                        {integration.provider}
-                      </Badge>
-                      {integration.api_url && (
-                        <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                          {integration.api_url}
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={String(integration.sync_frequency_minutes || "0")}
-                        onValueChange={async (value) => {
-                          const freq = parseInt(value);
-                          try {
-                            // Update database
-                            await supabase
-                              .from("dialer_integrations")
-                              .update({ 
-                                sync_frequency_minutes: freq || null,
-                                is_active: freq > 0
-                              })
-                              .eq("id", integration.id);
-                            
-                            // Update cron job
-                            await supabase.functions.invoke("update-cron-schedule", {
-                              body: {
-                                integration_type: "dialer",
-                                integration_id: integration.id,
-                                provider: integration.provider,
-                                frequency_minutes: freq,
-                                is_active: freq > 0,
-                              },
-                            });
-                            
-                            toast.success(freq > 0 ? `Auto-sync sat til hver ${freq} min` : "Auto-sync deaktiveret");
-                            queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
-                          } catch (err) {
-                            toast.error("Fejl ved opdatering af sync-frekvens");
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-[130px] h-8">
-                          <SelectValue placeholder="Vælg..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">Deaktiveret</SelectItem>
-                          <SelectItem value="15">Hver 15 min</SelectItem>
-                          <SelectItem value="30">Hver 30 min</SelectItem>
-                          <SelectItem value="60">Hver time</SelectItem>
-                          <SelectItem value="120">Hver 2. time</SelectItem>
-                          <SelectItem value="360">Hver 6. time</SelectItem>
-                          <SelectItem value="720">Hver 12. time</SelectItem>
-                          <SelectItem value="1440">Dagligt</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Badge variant={integration.is_active && integration.sync_frequency_minutes ? "default" : "secondary"} className="text-xs">
-                        {integration.is_active && integration.sync_frequency_minutes ? "Aktiv" : "Manuel"}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {integration.last_sync_at ? (
-                      <span className="text-sm">{new Date(integration.last_sync_at).toLocaleString("da-DK")}</span>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">Aldrig</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Input
-                        type="number"
-                        className="w-16 h-8 text-xs"
-                        placeholder="7"
-                        min="1"
-                        max="365"
-                        value={syncDays[integration.id] || ""}
-                        onChange={(e) => setSyncDays((prev) => ({ ...prev, [integration.id]: e.target.value }))}
-                      />
-                      <span className="text-xs text-muted-foreground">d</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={syncingId === integration.id}
-                        onClick={() => syncMutation.mutate({ 
-                          integrationId: integration.id, 
-                          provider: integration.provider,
-                          days: parseInt(syncDays[integration.id]) || 7
-                        })}
-                      >
-                        {syncingId === integration.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+        <Tabs defaultValue="integrations" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="integrations">Integrationer</TabsTrigger>
+            <TabsTrigger value="calls" className="flex items-center gap-1">
+              <PhoneCall className="h-4 w-4" />
+              Calls
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="integrations">
+            {isLoading ? (
+              <div className="text-center py-8">Indlæser integrationer...</div>
+            ) : !integrations || integrations.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Ingen dialer integrationer konfigureret. Klik "Tilføj" for at oprette en.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Navn</TableHead>
+                    <TableHead>Provider</TableHead>
+                    <TableHead>Auto-sync</TableHead>
+                    <TableHead>Sidst synkroniseret</TableHead>
+                    <TableHead className="text-right">Handlinger</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {integrations.map((integration) => (
+                    <TableRow key={integration.id}>
+                      <TableCell className="font-medium">{integration.name}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <Badge variant="outline" className="capitalize w-fit">
+                            {integration.provider}
+                          </Badge>
+                          {integration.api_url && (
+                            <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                              {integration.api_url}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={String(integration.sync_frequency_minutes || "0")}
+                            onValueChange={async (value) => {
+                              const freq = parseInt(value);
+                              try {
+                                await supabase
+                                  .from("dialer_integrations")
+                                  .update({ 
+                                    sync_frequency_minutes: freq || null,
+                                    is_active: freq > 0
+                                  })
+                                  .eq("id", integration.id);
+                                
+                                await supabase.functions.invoke("update-cron-schedule", {
+                                  body: {
+                                    integration_type: "dialer",
+                                    integration_id: integration.id,
+                                    provider: integration.provider,
+                                    frequency_minutes: freq,
+                                    is_active: freq > 0,
+                                  },
+                                });
+                                
+                                toast.success(freq > 0 ? `Auto-sync sat til hver ${freq} min` : "Auto-sync deaktiveret");
+                                queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
+                              } catch (err) {
+                                toast.error("Fejl ved opdatering af sync-frekvens");
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-[130px] h-8">
+                              <SelectValue placeholder="Vælg..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">Deaktiveret</SelectItem>
+                              <SelectItem value="15">Hver 15 min</SelectItem>
+                              <SelectItem value="30">Hver 30 min</SelectItem>
+                              <SelectItem value="60">Hver time</SelectItem>
+                              <SelectItem value="120">Hver 2. time</SelectItem>
+                              <SelectItem value="360">Hver 6. time</SelectItem>
+                              <SelectItem value="720">Hver 12. time</SelectItem>
+                              <SelectItem value="1440">Dagligt</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Badge variant={integration.is_active && integration.sync_frequency_minutes ? "default" : "secondary"} className="text-xs">
+                            {integration.is_active && integration.sync_frequency_minutes ? "Aktiv" : "Manuel"}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {integration.last_sync_at ? (
+                          <span className="text-sm">{new Date(integration.last_sync_at).toLocaleString("da-DK")}</span>
                         ) : (
-                          <Play className="h-4 w-4" />
+                          <span className="text-muted-foreground text-sm">Aldrig</span>
                         )}
-                      </Button>
-                      {integration.provider === 'adversus' && (
-                        <>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Input
+                            type="number"
+                            className="w-16 h-8 text-xs"
+                            placeholder="7"
+                            min="1"
+                            max="365"
+                            value={syncDays[integration.id] || ""}
+                            onChange={(e) => setSyncDays((prev) => ({ ...prev, [integration.id]: e.target.value }))}
+                          />
+                          <span className="text-xs text-muted-foreground">d</span>
                           <Button
                             variant="outline"
                             size="sm"
-                            title="Opret Webhook"
+                            disabled={syncingId === integration.id}
+                            onClick={() => syncMutation.mutate({ 
+                              integrationId: integration.id, 
+                              provider: integration.provider,
+                              days: parseInt(syncDays[integration.id]) || 7
+                            })}
+                          >
+                            {syncingId === integration.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
+                          </Button>
+                          {integration.provider === 'adversus' && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                title="Opret Webhook"
+                                onClick={() => {
+                                  setWebhookIntegrationId(integration.id);
+                                  setWebhookIntegrationName(integration.name);
+                                  setWebhookDialogOpen(true);
+                                }}
+                              >
+                                <Webhook className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                title="Administrer Webhooks"
+                                onClick={() => openManageWebhooksDialog(integration.id, integration.name)}
+                              >
+                                <List className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          {integration.provider === 'enreach' && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                title="Opret Webhook"
+                                onClick={() => {
+                                  setEnreachWebhookIntegrationId(integration.id);
+                                  setEnreachWebhookIntegrationName(integration.name);
+                                  setEnreachWebhookDescription("");
+                                  setEnreachWebhookDialogOpen(true);
+                                }}
+                              >
+                                <Webhook className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                title="Administrer Webhooks"
+                                onClick={() => openManageEnreachWebhooksDialog(integration.id, integration.name)}
+                              >
+                                <List className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Kopier Webhook URL"
+                            onClick={() => copyWebhookUrl(integration.id)}
+                          >
+                            {copiedUrl ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => {
-                              setWebhookIntegrationId(integration.id);
-                              setWebhookIntegrationName(integration.name);
-                              setWebhookDialogOpen(true);
+                              setEditingId(integration.id);
+                              setFormData({
+                                name: integration.name,
+                                provider: integration.provider,
+                                username: "",
+                                password: "",
+                                api_url: integration.api_url || "",
+                              });
+                              setIsDialogOpen(true);
                             }}
                           >
-                            <Webhook className="h-4 w-4" />
+                            <Pencil className="h-4 w-4" />
                           </Button>
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            title="Administrer Webhooks"
-                            onClick={() => openManageWebhooksDialog(integration.id, integration.name)}
+                            onClick={() => deleteMutation.mutate(integration.id)}
                           >
-                            <List className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
-                        </>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                disabled={fetchingCallsId === integration.id}
+                                onClick={() => fetchCallsMutation.mutate({
+                                  integrationId: integration.id,
+                                  provider: integration.provider,
+                                  days: parseInt(callsDays[integration.id]) || 7
+                                })}
+                              >
+                                {fetchingCallsId === integration.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                ) : (
+                                  <PhoneCall className="h-4 w-4 mr-2" />
+                                )}
+                                Hent Calls
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </TabsContent>
+
+          <TabsContent value="calls">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Calls grupperet efter agent. Brug 3-prikker menuen på en integration for at hente calls.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchCalls()}
+                  disabled={isLoadingCalls}
+                >
+                  {isLoadingCalls ? <Loader2 className="h-4 w-4 animate-spin" /> : "Opdater"}
+                </Button>
+              </div>
+              
+              {isLoadingCalls ? (
+                <div className="text-center py-8">Indlæser calls...</div>
+              ) : !callsByAgent || Object.keys(callsByAgent).length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Ingen calls fundet. Hent calls fra en integration via 3-prikker menuen.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {Object.entries(callsByAgent).map(([agentKey, { agent, calls }]) => (
+                    <div key={agentKey} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="font-medium">
+                            {agent?.name || agentKey}
+                          </Badge>
+                          {agent?.email && (
+                            <span className="text-xs text-muted-foreground">{agent.email}</span>
+                          )}
+                        </div>
+                        <Badge>{calls.length} calls</Badge>
+                      </div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Start</TableHead>
+                            <TableHead>Varighed</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Dialer</TableHead>
+                            <TableHead>Campaign</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {calls.slice(0, 10).map((call) => (
+                            <TableRow key={call.id}>
+                              <TableCell className="text-sm">
+                                {new Date(call.start_time).toLocaleString("da-DK")}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary">
+                                  {Math.floor(call.duration_seconds / 60)}:{String(call.duration_seconds % 60).padStart(2, '0')}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={call.status === 'completed' ? 'default' : 'outline'}>
+                                  {call.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm">{call.dialer_name}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground truncate max-w-[150px]">
+                                {call.campaign_external_id}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      {calls.length > 10 && (
+                        <p className="text-xs text-muted-foreground mt-2 text-center">
+                          ...og {calls.length - 10} flere calls
+                        </p>
                       )}
-                      {integration.provider === 'enreach' && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            title="Opret Webhook"
-                            onClick={() => {
-                              setEnreachWebhookIntegrationId(integration.id);
-                              setEnreachWebhookIntegrationName(integration.name);
-                              setEnreachWebhookDescription("");
-                              setEnreachWebhookDialogOpen(true);
-                            }}
-                          >
-                            <Webhook className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            title="Administrer Webhooks"
-                            onClick={() => openManageEnreachWebhooksDialog(integration.id, integration.name)}
-                          >
-                            <List className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        title="Kopier Webhook URL"
-                        onClick={() => copyWebhookUrl(integration.id)}
-                      >
-                        {copiedUrl ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditingId(integration.id);
-                          setFormData({
-                            name: integration.name,
-                            provider: integration.provider,
-                            username: "",
-                            password: "",
-                            api_url: integration.api_url || "",
-                          });
-                          setIsDialogOpen(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteMutation.mutate(integration.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
 
         {/* Webhook Creation Dialog */}
         <Dialog open={webhookDialogOpen} onOpenChange={setWebhookDialogOpen}>
