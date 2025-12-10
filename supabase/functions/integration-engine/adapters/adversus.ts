@@ -378,19 +378,22 @@ export class AdversusAdapter implements DialerAdapter {
 
     // Map to StandardCall (GDPR-compliant - only IDs)
     return allCdrs.map((cdr: any) => {
-      const status = this.mapAdversusHangupCause(cdr.hangupCause || cdr.hangup_cause || cdr.status);
+      // Map disposition to status - Adversus uses disposition field primarily
+      const status = this.mapAdversusDisposition(cdr.disposition) || 
+                     this.mapAdversusHangupCause(cdr.hangupCause || cdr.hangup_cause);
       
       return {
         externalId: String(cdr.id || cdr.uniqueId || cdr.uuid),
         integrationType: "adversus" as const,
         dialerName: this.dialerName,
         
-        startTime: cdr.started || cdr.startTime || cdr.created || new Date().toISOString(),
-        endTime: cdr.ended || cdr.endTime || cdr.created || new Date().toISOString(),
+        // Adversus uses startTime, answerTime, endTime
+        startTime: cdr.startTime || cdr.started || cdr.created || new Date().toISOString(),
+        endTime: cdr.endTime || cdr.ended || cdr.created || new Date().toISOString(),
         
-        // billsec = talk time, duration = total time incl. ringing
-        durationSeconds: Number(cdr.billsec || cdr.talkTime || 0),
-        totalDurationSeconds: Number(cdr.duration || cdr.totalDuration || cdr.billsec || 0),
+        // Adversus fields: conversationSeconds = talk time, durationSeconds = total time
+        durationSeconds: Number(cdr.conversationSeconds || cdr.billsec || cdr.talkTime || 0),
+        totalDurationSeconds: Number(cdr.durationSeconds || cdr.duration || cdr.totalDuration || 0),
         
         status,
         
@@ -399,16 +402,48 @@ export class AdversusAdapter implements DialerAdapter {
         campaignExternalId: String(cdr.campaignId || ""),
         leadExternalId: String(cdr.contactId || cdr.leadId || ""),
         
-        recordingUrl: cdr.recordingUrl || cdr.recording || undefined,
+        recordingUrl: cdr.recordingUrl || cdr.recording || (cdr.links?.recording) || undefined,
         
         metadata: {
-          direction: cdr.direction,
-          callType: cdr.callType || cdr.type,
-          hangupCause: cdr.hangupCause || cdr.hangup_cause,
+          direction: cdr.source ? "outbound" : "inbound",
+          callType: cdr.type,
+          hangupCause: cdr.hangupCause,
           disposition: cdr.disposition,
+          answerTime: cdr.answerTime,
         },
       };
     });
+  }
+
+  /**
+   * Map Adversus disposition to unified status enum
+   */
+  private mapAdversusDisposition(disposition: string | undefined): StandardCall['status'] | null {
+    if (!disposition) return null;
+    
+    const d = disposition.toLowerCase();
+    
+    // Answered / Success dispositions
+    if (d.includes('answered') || d.includes('success') || d.includes('connected') || d.includes('sale') || d === 'answer') {
+      return 'ANSWERED';
+    }
+    // No Answer
+    if (d.includes('no answer') || d.includes('noanswer') || d.includes('no_answer') || d === 'ring') {
+      return 'NO_ANSWER';
+    }
+    // Busy
+    if (d.includes('busy')) {
+      return 'BUSY';
+    }
+    // Failed / Voicemail / Other
+    if (d.includes('voicemail') || d.includes('machine') || d.includes('answering')) {
+      return 'NO_ANSWER'; // Map voicemail to no_answer since VOICEMAIL not in type
+    }
+    if (d.includes('fail') || d.includes('error') || d.includes('invalid')) {
+      return 'FAILED';
+    }
+    
+    return null; // Let hangup cause handle it
   }
 
   /**
