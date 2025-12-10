@@ -924,7 +924,7 @@ export default function MyProfile() {
           <TabsContent value="vagthistorik" className="mt-6">
             <div className="space-y-6">
               {/* Stats Cards */}
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
@@ -954,6 +954,32 @@ export default function MyProfile() {
                 <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-amber-500/10">
+                        <Palmtree className="h-5 w-5 text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Feriedage brugt</p>
+                        <p className="text-2xl font-bold">{absenceStats.vacationDaysInPeriod}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-red-500/10">
+                        <Thermometer className="h-5 w-5 text-red-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Sygedage</p>
+                        <p className="text-2xl font-bold">{absenceStats.sickDaysInPeriod}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
                       <div className="p-2 rounded-full bg-emerald-500/10">
                         <Wallet className="h-5 w-5 text-emerald-600" />
                       </div>
@@ -964,21 +990,6 @@ export default function MyProfile() {
                     </div>
                   </CardContent>
                 </Card>
-                {shiftStats.hourlyRate > 0 && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-full bg-muted">
-                          <Clock className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Timeløn</p>
-                          <p className="text-2xl font-bold">{shiftStats.hourlyRate.toLocaleString('da-DK')} kr</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
               </div>
 
               {/* Time Stamps History */}
@@ -1087,8 +1098,53 @@ export default function MyProfile() {
                 </Card>
               )}
 
+              {/* Absence History */}
+              {absences.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Palmtree className="h-4 w-4 text-amber-500" />
+                      Fraværshistorik
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {absences.slice(0, 20).map((absence) => {
+                        const startDate = new Date(absence.start_date);
+                        const endDate = new Date(absence.end_date);
+                        const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                        const isVacation = absence.type === "vacation";
+                        return (
+                          <div key={absence.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                            <div className="flex items-center gap-3">
+                              {isVacation ? (
+                                <Palmtree className="h-4 w-4 text-amber-500" />
+                              ) : (
+                                <Thermometer className="h-4 w-4 text-red-500" />
+                              )}
+                              <div>
+                                <span className="text-sm font-medium">
+                                  {format(startDate, "d. MMM", { locale: da })}
+                                  {absence.start_date !== absence.end_date && ` - ${format(endDate, "d. MMM", { locale: da })}`}
+                                </span>
+                                <span className="text-xs text-muted-foreground ml-2">
+                                  {isVacation ? "Ferie" : "Sygdom"}
+                                </span>
+                              </div>
+                            </div>
+                            <Badge variant={isVacation ? "secondary" : "destructive"} className={isVacation ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : ""}>
+                              {days} dag{days > 1 ? "e" : ""}
+                            </Badge>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Empty state */}
-              {deduplicatedTimeStamps.length === 0 && bookingAssignments.length === 0 && (
+              {deduplicatedTimeStamps.length === 0 && bookingAssignments.length === 0 && absences.length === 0 && (
                 <Card>
                   <CardContent className="py-12 text-center">
                     <History className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
