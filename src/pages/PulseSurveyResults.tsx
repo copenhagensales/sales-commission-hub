@@ -5,23 +5,51 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAllPulseSurveys, usePulseSurveyResults, useActivatePulseSurvey } from "@/hooks/usePulseSurvey";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { TrendingUp, Users, Building, Plus } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
+import { TrendingUp, Users, Building, Plus, Info } from "lucide-react";
 import { toast } from "sonner";
 
-const QUESTION_LABELS: Record<string, string> = {
-  nps_score: 'NPS',
-  development_score: 'Udvikling',
-  leadership_score: 'Ledelse',
-  recognition_score: 'Anerkendelse',
-  energy_score: 'Energi',
-  seriousness_score: 'Seriøsitet',
-  leader_availability_score: 'Leder tid',
-  wellbeing_score: 'Trivsel',
-  psychological_safety_score: 'Tryghed',
+const QUESTION_DATA: Record<string, { label: string; fullQuestion: string }> = {
+  nps_score: { 
+    label: 'NPS', 
+    fullQuestion: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?' 
+  },
+  development_score: { 
+    label: 'Udvikling', 
+    fullQuestion: 'I hvor høj grad oplever du, at du bliver uddannet, trænet og udviklet som sælger i dit team?' 
+  },
+  leadership_score: { 
+    label: 'Ledelse', 
+    fullQuestion: 'Hvor tilfreds er du med den måde, din teamleder leder teamet på?' 
+  },
+  recognition_score: { 
+    label: 'Anerkendelse', 
+    fullQuestion: 'I hvor høj grad oplever du, at dine præstationer bliver anerkendt og belønnet på en fair måde?' 
+  },
+  energy_score: { 
+    label: 'Energi', 
+    fullQuestion: 'Hvordan vil du vurdere energien og stemningen i dit team lige nu?' 
+  },
+  seriousness_score: { 
+    label: 'Seriøsitet', 
+    fullQuestion: 'I hvor høj grad oplever du, at der arbejdes seriøst og målrettet i dit team?' 
+  },
+  leader_availability_score: { 
+    label: 'Leder tid', 
+    fullQuestion: 'I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?' 
+  },
+  wellbeing_score: { 
+    label: 'Trivsel', 
+    fullQuestion: 'Hvor godt trives du samlet set i Copenhagen Sales lige nu?' 
+  },
+  psychological_safety_score: { 
+    label: 'Tryghed', 
+    fullQuestion: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?' 
+  },
 };
 
 const TENURE_LABELS: Record<string, string> = {
@@ -55,7 +83,7 @@ function calculateNpsScore(responses: any[]) {
 function calculateAverages(responses: any[]) {
   if (!responses || responses.length === 0) return null;
 
-  const scoreKeys = Object.keys(QUESTION_LABELS).filter(k => k !== 'nps_score');
+  const scoreKeys = Object.keys(QUESTION_DATA).filter(k => k !== 'nps_score');
   const averages: Record<string, number> = {};
 
   scoreKeys.forEach(key => {
@@ -72,20 +100,36 @@ function AveragesChart({ averages }: { averages: Record<string, number> | null }
   if (!averages) return <p className="text-muted-foreground">Ingen data</p>;
 
   const data = Object.entries(averages).map(([key, value]) => ({
-    name: QUESTION_LABELS[key],
+    name: QUESTION_DATA[key]?.label || key,
+    fullQuestion: QUESTION_DATA[key]?.fullQuestion || '',
     score: value,
   }));
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={data} layout="vertical" margin={{ left: 80, right: 20 }}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis type="number" domain={[0, 10]} />
-        <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
-        <Tooltip />
-        <Bar dataKey="score" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
+    <TooltipProvider>
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={data} layout="vertical" margin={{ left: 80, right: 20 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis type="number" domain={[0, 10]} />
+          <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
+          <ChartTooltip 
+            content={({ active, payload }) => {
+              if (active && payload && payload.length) {
+                const data = payload[0].payload;
+                return (
+                  <div className="bg-popover border rounded-lg p-3 shadow-lg max-w-xs">
+                    <p className="font-medium text-sm">{data.name}: {data.score}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{data.fullQuestion}</p>
+                  </div>
+                );
+              }
+              return null;
+            }}
+          />
+          <Bar dataKey="score" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </TooltipProvider>
   );
 }
 
@@ -331,27 +375,39 @@ export default function PulseSurveyResults() {
               </TabsContent>
 
               <TabsContent value="details" className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-3">
-                  {averages && Object.entries(averages).map(([key, value]) => (
-                    <Card key={key}>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">{QUESTION_LABELS[key]}</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-3xl font-bold">{value}</span>
-                          <span className="text-muted-foreground">/ 10</span>
-                        </div>
-                        <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary transition-all" 
-                            style={{ width: `${(value / 10) * 100}%` }}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                <TooltipProvider>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    {averages && Object.entries(averages).map(([key, value]) => (
+                      <Card key={key}>
+                        <CardHeader className="pb-2">
+                          <UITooltip>
+                            <TooltipTrigger asChild>
+                              <CardTitle className="text-sm font-medium flex items-center gap-1 cursor-help">
+                                {QUESTION_DATA[key]?.label || key}
+                                <Info className="h-3 w-3 text-muted-foreground" />
+                              </CardTitle>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-sm">{QUESTION_DATA[key]?.fullQuestion}</p>
+                            </TooltipContent>
+                          </UITooltip>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-3xl font-bold">{value}</span>
+                            <span className="text-muted-foreground">/ 10</span>
+                          </div>
+                          <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary transition-all" 
+                              style={{ width: `${(value / 10) * 100}%` }}
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </TooltipProvider>
               </TabsContent>
 
               <TabsContent value="comments" className="space-y-4">
