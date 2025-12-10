@@ -1511,6 +1511,74 @@ export type Database = {
         }
         Relationships: []
       }
+      dialer_calls: {
+        Row: {
+          agent_external_id: string
+          agent_id: string | null
+          campaign_external_id: string
+          created_at: string
+          dialer_name: string
+          duration_seconds: number
+          end_time: string
+          external_id: string
+          id: string
+          integration_type: string
+          lead_external_id: string
+          metadata: Json | null
+          recording_url: string | null
+          start_time: string
+          status: string
+          total_duration_seconds: number
+          updated_at: string
+        }
+        Insert: {
+          agent_external_id: string
+          agent_id?: string | null
+          campaign_external_id: string
+          created_at?: string
+          dialer_name: string
+          duration_seconds?: number
+          end_time: string
+          external_id: string
+          id?: string
+          integration_type: string
+          lead_external_id: string
+          metadata?: Json | null
+          recording_url?: string | null
+          start_time: string
+          status: string
+          total_duration_seconds?: number
+          updated_at?: string
+        }
+        Update: {
+          agent_external_id?: string
+          agent_id?: string | null
+          campaign_external_id?: string
+          created_at?: string
+          dialer_name?: string
+          duration_seconds?: number
+          end_time?: string
+          external_id?: string
+          id?: string
+          integration_type?: string
+          lead_external_id?: string
+          metadata?: Json | null
+          recording_url?: string | null
+          start_time?: string
+          status?: string
+          total_duration_seconds?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dialer_calls_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dialer_integrations: {
         Row: {
           api_url: string | null
