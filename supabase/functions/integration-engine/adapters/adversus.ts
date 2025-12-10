@@ -102,7 +102,20 @@ export class AdversusAdapter implements DialerAdapter {
       const agentName = typeof agentObj === "object" ? agentObj.name || agentObj.displayName : "Desconocido";
 
       // Extract lead resultData for reference extraction
-      const resultData = s.lead?.resultData || s.resultData || {};
+      // Adversus returns resultData as array of {id, value} - convert to flat object
+      const rawResultData = s.lead?.resultData || s.resultData || [];
+      const resultData: Record<string, unknown> = {};
+      
+      if (Array.isArray(rawResultData)) {
+        for (const field of rawResultData) {
+          if (field && field.id !== undefined) {
+            resultData[`result_${field.id}`] = field.value;
+          }
+        }
+      } else if (typeof rawResultData === 'object') {
+        Object.assign(resultData, rawResultData);
+      }
+      
       const campaignId = s.campaignId ? String(s.campaignId) : undefined;
 
       // Extract external reference (OPP) using campaign config
