@@ -3680,6 +3680,10 @@ export type Database = {
         Returns: string
       }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
+      get_auth_email_by_work_email: {
+        Args: { _work_email: string }
+        Returns: string
+      }
       get_auth_user_id_by_email: { Args: { _email: string }; Returns: string }
       get_current_employee_id: { Args: never; Returns: string }
       get_customer_credentials: {
