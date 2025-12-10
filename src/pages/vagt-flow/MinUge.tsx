@@ -269,20 +269,25 @@ export default function VagtMinUge() {
                           const applied = hasApplied(market.id);
                           const status = getApplicationStatus(market.id);
                           return (
-                            <div
-                              key={`market-${market.id}`}
-                              className={cn(
-                                "text-[10px] sm:text-xs px-1 py-0.5 rounded truncate flex items-center gap-0.5",
-                                applied 
-                                  ? status === "approved" 
-                                    ? "bg-green-500/20 text-green-700 border-l-2 border-green-500 font-medium"
-                                    : "bg-blue-500/20 text-blue-700 border-l-2 border-blue-500"
-                                  : "bg-gradient-to-r from-purple-500/30 to-pink-500/30 text-purple-700 font-semibold animate-pulse"
+                            <div key={`market-${market.id}`} className="space-y-0.5">
+                              <div
+                                className={cn(
+                                  "text-[10px] sm:text-xs px-1 py-0.5 rounded truncate flex items-center gap-0.5",
+                                  applied 
+                                    ? status === "approved" 
+                                      ? "bg-green-500/20 text-green-700 border-l-2 border-green-500 font-medium"
+                                      : "bg-blue-500/20 text-blue-700 border-l-2 border-blue-500"
+                                    : "bg-gradient-to-r from-purple-500/30 to-pink-500/30 text-purple-700 font-semibold"
+                                )}
+                              >
+                                <span className="truncate">{market.location?.name}</span>
+                                {applied && <CheckCircle className="h-2.5 w-2.5 flex-shrink-0" />}
+                              </div>
+                              {!applied && (
+                                <div className="text-[8px] sm:text-[9px] px-1 py-0.5 rounded bg-purple-600 text-white font-bold text-center animate-pulse">
+                                  Ansøg nu
+                                </div>
                               )}
-                            >
-                              {!applied && <Send className="h-2.5 w-2.5 flex-shrink-0" />}
-                              <span className="truncate">{market.location?.name}</span>
-                              {applied && <CheckCircle className="h-2.5 w-2.5 flex-shrink-0" />}
                             </div>
                           );
                         })}
