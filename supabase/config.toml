@@ -89,3 +89,6 @@ verify_jwt = true
 
 [functions.validate-excel-import]
 verify_jwt = true
+
+[functions.adversus-diagnostics]
+verify_jwt = false
