@@ -22,9 +22,9 @@ Deno.serve(async (req) => {
     const authHeader = `Basic ${btoa(`${user}:${pass}`)}`;
     const baseUrl = "https://api.adversus.io/v1";
 
-    // Fetch leads in bulk - max 3000
+    // Fetch leads in bulk - max 10000
     const pageSize = 1000;
-    const maxPages = 3;
+    const maxPages = 10;
     const allLeads: any[] = [];
     
     for (let page = 1; page <= maxPages; page++) {
