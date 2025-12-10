@@ -2,15 +2,15 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useVagtEmployee } from "@/hooks/useVagtEmployee";
+import { useOpenMarkets, useMyApplications, useApplyToMarket } from "@/hooks/useMarketApplications";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BrandBadge } from "@/components/vagt-flow/BrandBadge";
-import { ChevronLeft, ChevronRight, MapPin, Clock, Phone, Navigation, Calendar, List } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Clock, Phone, Navigation, Calendar, List, Users, Send, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { 
   startOfWeek, 
   endOfWeek, 
-  addWeeks, 
   addMonths, 
   format, 
   isSameDay, 
@@ -19,20 +19,26 @@ import {
   parseISO,
   startOfMonth,
   endOfMonth,
-  isToday
+  isToday,
+  differenceInDays
 } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 
 export default function VagtMinUge() {
   const { data: vagtEmployee } = useVagtEmployee();
+  const { data: openMarkets } = useOpenMarkets();
+  const { data: myApplications } = useMyApplications();
+  const applyMutation = useApplyToMarket();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"month" | "list">("month");
+  const [viewMode, setViewMode] = useState<"month" | "list" | "markets">("month");
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [selectedMarket, setSelectedMarket] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -42,6 +48,15 @@ export default function VagtMinUge() {
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+
+  // Check if user has already applied to a market
+  const hasApplied = (bookingId: string) => {
+    return myApplications?.some(app => app.booking_id === bookingId);
+  };
+
+  const getApplicationStatus = (bookingId: string) => {
+    return myApplications?.find(app => app.booking_id === bookingId)?.status;
+  };
 
   const { data: assignments, isLoading } = useQuery({
     queryKey: ["vagt-my-assignments", vagtEmployee?.id, format(calendarStart, "yyyy-MM-dd"), format(calendarEnd, "yyyy-MM-dd")],
@@ -117,13 +132,21 @@ export default function VagtMinUge() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "month" | "list")}>
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "month" | "list" | "markets")}>
               <TabsList className="h-9">
                 <TabsTrigger value="month" className="px-3">
                   <Calendar className="h-4 w-4" />
                 </TabsTrigger>
                 <TabsTrigger value="list" className="px-3">
                   <List className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="markets" className="px-3 gap-1">
+                  <Users className="h-4 w-4" />
+                  {openMarkets && openMarkets.length > 0 && (
+                    <Badge variant="secondary" className="h-5 min-w-5 px-1 text-xs">
+                      {openMarkets.length}
+                    </Badge>
+                  )}
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -212,7 +235,7 @@ export default function VagtMinUge() {
               </div>
             </CardContent>
           </Card>
-        ) : (
+        ) : viewMode === "list" ? (
           /* List View */
           <div className="space-y-2">
             {calendarDays
@@ -280,7 +303,129 @@ export default function VagtMinUge() {
               </Card>
             )}
           </div>
-        )}
+        ) : viewMode === "markets" ? (
+          /* Markets View */
+          <div className="space-y-4">
+            <div className="text-center pb-2">
+              <h2 className="font-semibold">Åbne markeder</h2>
+              <p className="text-sm text-muted-foreground">Ansøg om at deltage i kommende markeder</p>
+            </div>
+            
+            {openMarkets && openMarkets.length > 0 ? (
+              <div className="space-y-3">
+                {openMarkets.map((market: any) => {
+                  const applied = hasApplied(market.id);
+                  const status = getApplicationStatus(market.id);
+                  const daysUntilDeadline = market.application_deadline
+                    ? differenceInDays(parseISO(market.application_deadline), new Date())
+                    : null;
+
+                  return (
+                    <Card 
+                      key={market.id} 
+                      className={cn(
+                        "cursor-pointer hover:bg-accent/50 transition-colors",
+                        applied && "border-primary/50"
+                      )}
+                      onClick={() => setSelectedMarket(market)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <BrandBadge
+                                brandName={market.brand?.name}
+                                brandColor={market.brand?.color_hex}
+                              />
+                              {applied && (
+                                <Badge 
+                                  variant={status === "approved" ? "default" : status === "rejected" ? "destructive" : "secondary"}
+                                  className="text-xs"
+                                >
+                                  {status === "approved" ? "Godkendt" : status === "rejected" ? "Afvist" : "Ansøgt"}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="font-medium">{market.location?.name}</p>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {market.location?.address_city}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {format(parseISO(market.start_date), "d. MMM", { locale: da })}
+                              </span>
+                            </div>
+                            {daysUntilDeadline !== null && daysUntilDeadline >= 0 && (
+                              <p className={cn(
+                                "text-xs",
+                                daysUntilDeadline <= 3 ? "text-orange-600" : "text-muted-foreground"
+                              )}>
+                                <AlertCircle className="h-3 w-3 inline mr-1" />
+                                Tilmeldingsfrist: {daysUntilDeadline === 0 ? "I dag" : `${daysUntilDeadline} dage`}
+                              </p>
+                            )}
+                          </div>
+                          {!applied && (
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                applyMutation.mutate(market.id);
+                              }}
+                              disabled={applyMutation.isPending}
+                            >
+                              <Send className="h-4 w-4 mr-1" />
+                              Ansøg
+                            </Button>
+                          )}
+                          {status === "approved" && (
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                          )}
+                          {status === "rejected" && (
+                            <XCircle className="h-5 w-5 text-red-600" />
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  Ingen åbne markeder lige nu
+                </CardContent>
+              </Card>
+            )}
+
+            {/* My Applications */}
+            {myApplications && myApplications.length > 0 && (
+              <div className="pt-4 border-t">
+                <h3 className="font-medium mb-3">Mine ansøgninger</h3>
+                <div className="space-y-2">
+                  {myApplications.map((app: any) => (
+                    <div key={app.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                      <div>
+                        <p className="font-medium text-sm">{app.booking?.location?.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {app.booking?.start_date && format(parseISO(app.booking.start_date), "d. MMM yyyy", { locale: da })}
+                        </p>
+                      </div>
+                      <Badge 
+                        variant={app.status === "approved" ? "default" : app.status === "rejected" ? "destructive" : "secondary"}
+                      >
+                        {app.status === "approved" ? "Godkendt" : app.status === "rejected" ? "Afvist" : "Afventer"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
 
       {/* Day Detail Dialog */}

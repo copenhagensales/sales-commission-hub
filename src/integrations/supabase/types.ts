@@ -344,6 +344,7 @@ export type Database = {
       }
       booking: {
         Row: {
+          application_deadline: string | null
           booked_days: number[] | null
           brand_id: string
           comment: string | null
@@ -352,13 +353,16 @@ export type Database = {
           expected_staff_count: number | null
           id: string
           location_id: string
+          open_for_applications: boolean | null
           start_date: string
           status: Database["public"]["Enums"]["booking_status"] | null
           updated_at: string | null
+          visible_from: string | null
           week_number: number
           year: number
         }
         Insert: {
+          application_deadline?: string | null
           booked_days?: number[] | null
           brand_id: string
           comment?: string | null
@@ -367,13 +371,16 @@ export type Database = {
           expected_staff_count?: number | null
           id?: string
           location_id: string
+          open_for_applications?: boolean | null
           start_date: string
           status?: Database["public"]["Enums"]["booking_status"] | null
           updated_at?: string | null
+          visible_from?: string | null
           week_number: number
           year: number
         }
         Update: {
+          application_deadline?: string | null
           booked_days?: number[] | null
           brand_id?: string
           comment?: string | null
@@ -382,9 +389,11 @@ export type Database = {
           expected_staff_count?: number | null
           id?: string
           location_id?: string
+          open_for_applications?: boolean | null
           start_date?: string
           status?: Database["public"]["Enums"]["booking_status"] | null
           updated_at?: string | null
+          visible_from?: string | null
           week_number?: number
           year?: number
         }
@@ -461,6 +470,45 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booking_vehicle: {
+        Row: {
+          booking_id: string
+          created_at: string | null
+          date: string
+          id: string
+          vehicle_id: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string | null
+          date: string
+          id?: string
+          vehicle_id: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string | null
+          date?: string
+          id?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_vehicle_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_vehicle_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle"
             referencedColumns: ["id"]
           },
         ]
@@ -2231,6 +2279,67 @@ export type Database = {
         }
         Relationships: []
       }
+      market_application: {
+        Row: {
+          applied_at: string
+          booking_id: string
+          created_at: string | null
+          employee_id: string
+          id: string
+          note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["market_application_status"]
+          updated_at: string | null
+        }
+        Insert: {
+          applied_at?: string
+          booking_id: string
+          created_at?: string | null
+          employee_id: string
+          id?: string
+          note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["market_application_status"]
+          updated_at?: string | null
+        }
+        Update: {
+          applied_at?: string
+          booking_id?: string
+          created_at?: string | null
+          employee_id?: string
+          id?: string
+          note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["market_application_status"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "market_application_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "booking"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_application_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_application_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       master_employee: {
         Row: {
           created_at: string | null
@@ -3846,6 +3955,7 @@ export type Database = {
       leadership_interest: "yes" | "maybe" | "no"
       leadership_role_type: "junior_teamleder" | "teamleder" | "coach" | "other"
       location_status: "Ny" | "Aktiv" | "Pause" | "Sortlistet"
+      market_application_status: "pending" | "approved" | "rejected"
       payroll_status: "draft" | "approved" | "exported"
       salary_type: "provision" | "fixed" | "hourly"
       sale_status: "pending" | "active" | "cancelled" | "clawbacked"
@@ -4030,6 +4140,7 @@ export const Constants = {
       leadership_interest: ["yes", "maybe", "no"],
       leadership_role_type: ["junior_teamleder", "teamleder", "coach", "other"],
       location_status: ["Ny", "Aktiv", "Pause", "Sortlistet"],
+      market_application_status: ["pending", "approved", "rejected"],
       payroll_status: ["draft", "approved", "exported"],
       salary_type: ["provision", "fixed", "hourly"],
       sale_status: ["pending", "active", "cancelled", "clawbacked"],

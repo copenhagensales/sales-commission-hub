@@ -60,6 +60,9 @@ export default function VagtBookWeek() {
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4]);
+  const [openForApplications, setOpenForApplications] = useState(false);
+  const [applicationDeadlineDays, setApplicationDeadlineDays] = useState(7);
+  const [visibleFromWeeks, setVisibleFromWeeks] = useState(4);
 
   const DAYS = [
     { label: "Mandag", value: 0 },
@@ -109,6 +112,18 @@ export default function VagtBookWeek() {
       const endDate = new Date(weekStart);
       endDate.setDate(endDate.getDate() + lastDay);
 
+      // Calculate visible_from and application_deadline
+      let visibleFrom = null;
+      let applicationDeadline = null;
+
+      if (openForApplications) {
+        visibleFrom = new Date(startDate);
+        visibleFrom.setDate(visibleFrom.getDate() - (visibleFromWeeks * 7));
+
+        applicationDeadline = new Date(startDate);
+        applicationDeadline.setDate(applicationDeadline.getDate() - applicationDeadlineDays);
+      }
+
       const { error } = await supabase.from("booking").insert({
         location_id: locationId,
         brand_id: brandId,
@@ -119,6 +134,9 @@ export default function VagtBookWeek() {
         expected_staff_count: 2,
         status: "Planlagt",
         booked_days: sortedDays,
+        open_for_applications: openForApplications,
+        visible_from: visibleFrom ? format(visibleFrom, "yyyy-MM-dd") : null,
+        application_deadline: applicationDeadline ? format(applicationDeadline, "yyyy-MM-dd") : null,
       });
 
       if (error) throw error;
@@ -127,6 +145,7 @@ export default function VagtBookWeek() {
       toast({ title: "Booking oprettet!" });
       setBookingDialogOpen(false);
       setSelectedLocation(null);
+      setOpenForApplications(false);
       queryClient.invalidateQueries({ queryKey: ["vagt-locations-bookweek"] });
       queryClient.invalidateQueries({ queryKey: ["vagt-week-bookings-capacity"] });
     },
@@ -520,6 +539,53 @@ export default function VagtBookWeek() {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Open for applications toggle */}
+            <div className="border-t pt-4 mt-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-sm">Åben for ansøgninger</p>
+                  <p className="text-xs text-muted-foreground">Lad medarbejdere ansøge om at deltage</p>
+                </div>
+                <Checkbox
+                  checked={openForApplications}
+                  onCheckedChange={(checked) => setOpenForApplications(!!checked)}
+                />
+              </div>
+
+              {openForApplications && (
+                <div className="space-y-3 pl-4 border-l-2 border-primary/20">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm">Synlig fra</label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={12}
+                        value={visibleFromWeeks}
+                        onChange={(e) => setVisibleFromWeeks(parseInt(e.target.value) || 4)}
+                        className="w-16 h-8 text-center"
+                      />
+                      <span className="text-sm text-muted-foreground">uger før</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm">Tilmeldingsfrist</label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={applicationDeadlineDays}
+                        onChange={(e) => setApplicationDeadlineDays(parseInt(e.target.value) || 7)}
+                        className="w-16 h-8 text-center"
+                      />
+                      <span className="text-sm text-muted-foreground">dage før</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
