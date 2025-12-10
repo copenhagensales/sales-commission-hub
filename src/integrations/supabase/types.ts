@@ -1269,38 +1269,53 @@ export type Database = {
       }
       crm_excel_import_rows: {
         Row: {
+          action_type: string | null
+          amount_deduct: string | null
           created_at: string
           customer_name: string | null
+          date: string | null
+          external_id: string | null
           id: string
           import_id: string
           is_matched: boolean | null
           matched_sale_id: string | null
           opp_number: string | null
           ordre_id: string | null
+          phone_number: string | null
           raw_data: Json | null
           status: string | null
         }
         Insert: {
+          action_type?: string | null
+          amount_deduct?: string | null
           created_at?: string
           customer_name?: string | null
+          date?: string | null
+          external_id?: string | null
           id?: string
           import_id: string
           is_matched?: boolean | null
           matched_sale_id?: string | null
           opp_number?: string | null
           ordre_id?: string | null
+          phone_number?: string | null
           raw_data?: Json | null
           status?: string | null
         }
         Update: {
+          action_type?: string | null
+          amount_deduct?: string | null
           created_at?: string
           customer_name?: string | null
+          date?: string | null
+          external_id?: string | null
           id?: string
           import_id?: string
           is_matched?: boolean | null
           matched_sale_id?: string | null
           opp_number?: string | null
           ordre_id?: string | null
+          phone_number?: string | null
           raw_data?: Json | null
           status?: string | null
         }
