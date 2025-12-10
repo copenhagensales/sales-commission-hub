@@ -137,16 +137,24 @@ export class IngestionEngine {
           updated_at: new Date().toISOString(),
         };
 
-        // B. Safe Sync Venta
+        // B. Safe Sync Venta (Non-Destructive Update for OPP)
         let saleId: string | null = null;
         const { data: existingSale } = await this.supabase
           .from("sales")
-          .select("id")
+          .select("id, adversus_opp_number")
           .eq("adversus_external_id", sale.externalId)
           .maybeSingle();
 
         if (existingSale) {
-          await this.supabase.from("sales").update(saleData).eq("id", existingSale.id);
+          // NON-DESTRUCTIVE: Only update OPP if new value is valid AND old is null
+          // This prevents overwriting good OPP data with null/invalid data
+          const updateData = { ...saleData };
+          if (existingSale.adversus_opp_number && !sale.externalReference) {
+            // Keep existing OPP if new one is empty
+            updateData.adversus_opp_number = existingSale.adversus_opp_number;
+          }
+          
+          await this.supabase.from("sales").update(updateData).eq("id", existingSale.id);
           saleId = existingSale.id;
           // Limpiar items viejos para evitar duplicados
           await this.supabase.from("sale_items").delete().eq("sale_id", saleId);

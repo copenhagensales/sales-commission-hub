@@ -95,6 +95,92 @@ serve(async (req) => {
       );
     }
 
+    // Handle repair-history action - bulk fetch and update historical sales
+    if (action === "repair-history") {
+      console.log(`[Integration Engine] Starting historical repair (${days} days)`);
+      const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY");
+      
+      // Get all active Adversus integrations
+      const { data: integrations, error: intError } = await supabase
+        .from("dialer_integrations")
+        .select("*")
+        .eq("provider", "adversus")
+        .eq("is_active", true);
+
+      if (intError) throw intError;
+      if (!integrations || integrations.length === 0) {
+        return new Response(
+          JSON.stringify({ success: false, error: "No active Adversus integrations found" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const engine = new IngestionEngine();
+      const campaignMappings = await engine.getCampaignMappings();
+      
+      let totalProcessed = 0;
+      let totalErrors = 0;
+      const results = [];
+
+      for (const integration of integrations) {
+        try {
+          console.log(`[Integration Engine] Processing integration: ${integration.name}`);
+          
+          const { data: credentials } = await supabase.rpc("get_dialer_credentials", {
+            p_integration_id: integration.id,
+            p_encryption_key: encryptionKey,
+          });
+
+          const adapter = new AdversusAdapter(credentials, integration.name);
+          
+          // Fetch all sales for the specified period (default 90 days for repair)
+          const sales = await adapter.fetchSales(days || 90, campaignMappings);
+          console.log(`[Integration Engine] Fetched ${sales.length} sales for ${integration.name}`);
+          
+          // Process sales - core.ts handles non-destructive OPP updates
+          const result = await engine.processSales(sales);
+          
+          totalProcessed += result.processed;
+          totalErrors += result.errors;
+          
+          results.push({ 
+            name: integration.name, 
+            status: "success", 
+            processed: result.processed,
+            errors: result.errors 
+          });
+
+          // Log success
+          await supabase.from("integration_logs").insert({
+            integration_type: "dialer",
+            integration_id: integration.id,
+            integration_name: integration.name,
+            status: "success",
+            message: `Historical repair: ${result.processed} sales processed`,
+            details: { action: "repair-history", days, processed: result.processed, errors: result.errors },
+          });
+
+        } catch (e) {
+          const errMsg = e instanceof Error ? e.message : String(e);
+          console.error(`[Integration Engine] Error in ${integration.name}:`, e);
+          totalErrors++;
+          results.push({ name: integration.name, status: "error", error: errMsg });
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          action: "repair-history",
+          days,
+          totalProcessed,
+          totalErrors,
+          results 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const engine = new IngestionEngine();
 
     // Buscar todas las integraciones activas del tipo solicitado
