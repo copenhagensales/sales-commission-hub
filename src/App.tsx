@@ -26,6 +26,7 @@ const TdcErhverv = lazyWithRetry(() => import("./pages/TdcErhverv"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const AdversusData = lazy(() => import("./pages/AdversusData"));
 const DialerData = lazyWithRetry(() => import("./pages/DialerData"));
+const CallsData = lazyWithRetry(() => import("./pages/CallsData"));
 const Logikker = lazyWithRetry(() => import("./pages/Logikker"));
 const EmployeeMasterData = lazyWithRetry(() => import("./pages/EmployeeMasterData"));
 const EmployeeDetail = lazyWithRetry(() => import("./pages/EmployeeDetail"));
@@ -232,6 +233,7 @@ const App = () => (
               <Route path="/km-test" element={<RoleProtectedRoute requireTeamlederOrAbove><KmTest /></RoleProtectedRoute>} />
               <Route path="/adversus-data" element={<RoleProtectedRoute requireTeamlederOrAbove><AdversusData /></RoleProtectedRoute>} />
               <Route path="/dialer-data" element={<RoleProtectedRoute requireTeamlederOrAbove><DialerData /></RoleProtectedRoute>} />
+              <Route path="/calls-data" element={<RoleProtectedRoute requireTeamlederOrAbove><CallsData /></RoleProtectedRoute>} />
               <Route path="/logikker" element={<RoleProtectedRoute requireTeamlederOrAbove><Logikker /></RoleProtectedRoute>} />
               <Route path="/employees" element={<RoleProtectedRoute requireTeamlederOrAbove><EmployeeMasterData /></RoleProtectedRoute>} />
               <Route path="/employees/:id" element={<RoleProtectedRoute requireTeamlederOrAbove><EmployeeDetail /></RoleProtectedRoute>} />
