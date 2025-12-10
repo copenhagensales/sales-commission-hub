@@ -1,7 +1,7 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useVagtEmployee } from "@/hooks/useVagtEmployee";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BrandBadge } from "@/components/vagt-flow/BrandBadge";
@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function VagtMinUge() {
-  const { user } = useAuth();
+  const { data: vagtEmployee } = useVagtEmployee();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<"month" | "list">("month");
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
@@ -42,23 +42,6 @@ export default function VagtMinUge() {
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
-
-  // First, get the employee record for this user by email
-  const { data: vagtEmployee } = useQuery({
-    queryKey: ["vagt-employee-by-email", user?.email],
-    queryFn: async () => {
-      if (!user?.email) return null;
-      const { data, error } = await supabase
-        .from("employee")
-        .select("id, full_name, email")
-        .eq("email", user.email)
-        .eq("is_active", true)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.email,
-  });
 
   const { data: assignments, isLoading } = useQuery({
     queryKey: ["vagt-my-assignments", vagtEmployee?.id, format(calendarStart, "yyyy-MM-dd"), format(calendarEnd, "yyyy-MM-dd")],
