@@ -50,7 +50,7 @@ serve(async (req) => {
       });
 
       // Create adapter and fetch sales with enriched lead data
-      const adapter = new AdversusAdapter(credentials);
+      const adapter = new AdversusAdapter(credentials, integration.name);
       const salesWithData = await adapter.fetchSalesWithLeadData(days || 30, campaignId);
 
       if (salesWithData.length === 0) {
@@ -132,9 +132,11 @@ serve(async (req) => {
 
         let dialerAdapter: DialerAdapter;
         if (source === "adversus") {
-          dialerAdapter = new AdversusAdapter(credentials);
+          // Pass the integration name as the dialer name
+          dialerAdapter = new AdversusAdapter(credentials, integration.name);
         } else if (source === "enreach") {
-          dialerAdapter = new EnreachAdapter(credentials);
+          // Pass the integration name as the dialer name
+          dialerAdapter = new EnreachAdapter(credentials, integration.name);
         } else {
           throw new Error(`Fuente no soportada: ${source}`);
         }
@@ -166,7 +168,7 @@ serve(async (req) => {
             console.log(`[Integration Engine] Filtered ${beforeCount} -> ${sales.length} sales for campaign ${campaignId}`);
           }
           
-          runResults["sales"] = await engine.processSales(sales, integration.name);
+          runResults["sales"] = await engine.processSales(sales);
         }
 
         // Actualizar timestamp de última sincronización

@@ -21,7 +21,10 @@ export interface CampaignMappingConfig {
 
 export interface StandardSale {
   externalId: string;
-  sourceSystem: "adversus" | "enreach" | "other";
+  // The integration type (adversus, enreach, etc.)
+  integrationType: "adversus" | "enreach" | "other";
+  // The dialer/account name (e.g., "Lovablecph", "tryg", "try enreach")
+  dialerName: string;
   saleDate: string;
   agentEmail: string;
   agentExternalId?: string;
