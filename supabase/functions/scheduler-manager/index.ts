@@ -110,12 +110,18 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Update api_url after RPC creation (RPC may not support api_url param)
-        if (api_url && data) {
-          await supabase
+        // Always update api_url after RPC creation since RPC doesn't support api_url param
+        if (data) {
+          const { error: updateApiUrlError } = await supabase
             .from("dialer_integrations")
-            .update({ api_url })
+            .update({ api_url: api_url || null })
             .eq("id", data);
+          
+          if (updateApiUrlError) {
+            console.error(`[scheduler-manager] Failed to update api_url for ${data}:`, updateApiUrlError);
+          } else {
+            console.log(`[scheduler-manager] Updated api_url to: ${api_url || 'null'} for ${data}`);
+          }
         }
 
         console.log(`[scheduler-manager] Created dialer integration: ${data}`);
