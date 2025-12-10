@@ -57,47 +57,50 @@ serve(async (req) => {
         p_encryption_key: encryptionKey,
       });
 
-      // Create adapter and fetch sales with enriched lead data
+      // Create adapter and fetch leads for the campaign
       const adapter = new AdversusAdapter(credentials, integration.name);
-      const salesWithData = await adapter.fetchSalesWithLeadData(days || 30, campaignId);
+      const leads = await adapter.fetchLeadsForCampaign(campaignId, 100);
 
-      if (salesWithData.length === 0) {
-        console.log(`[Integration Engine] No sales with lead data found for campaign ${campaignId}`);
+      if (leads.length === 0) {
+        console.log(`[Integration Engine] No leads found for campaign ${campaignId}`);
         return new Response(
           JSON.stringify({ 
             success: true, 
             fields: [], 
-            message: `No sales found for campaign ${campaignId} in last ${days || 30} days` 
+            message: `No leads found for campaign ${campaignId}` 
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Extract resultData fields from first sale with data
-      const { sale, resultData } = salesWithData[0];
-
-      // Format fields for the UI
+      // Extract resultData fields from first lead with data
       const fields: { fieldId: string; label: string; sampleValue: string }[] = [];
-      for (const [key, value] of Object.entries(resultData)) {
-        fields.push({
-          fieldId: key,
-          label: key, // Adversus doesn't provide labels separately
-          sampleValue: value !== null && value !== undefined ? String(value) : "(empty)",
-        });
+      const sampleLead = leads.find((l: any) => l.resultData && l.resultData.length > 0) || leads[0];
+      const resultData = sampleLead?.resultData || [];
+
+      if (Array.isArray(resultData)) {
+        for (const field of resultData) {
+          if (field.id !== undefined) {
+            fields.push({
+              fieldId: `result_${field.id}`,
+              label: `Field ${field.id}`,
+              sampleValue: field.value !== null && field.value !== undefined ? String(field.value) : "(empty)",
+            });
+          }
+        }
       }
 
       // Sort fields alphabetically by fieldId
       fields.sort((a, b) => a.fieldId.localeCompare(b.fieldId));
 
-      console.log(`[Integration Engine] Found ${fields.length} fields in sample sale (leadId: ${sale.leadId})`);
+      console.log(`[Integration Engine] Found ${fields.length} fields from ${leads.length} leads`);
 
       return new Response(
         JSON.stringify({ 
           success: true, 
           fields,
-          saleCount: salesWithData.length,
-          sampleSaleId: sale.id,
-          leadId: sale.leadId,
+          leadCount: leads.length,
+          sampleLeadId: sampleLead?.id,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
