@@ -188,8 +188,8 @@ export default function VagtMinUge() {
                   <span className="text-muted-foreground">Vagt</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded bg-purple-500/20 border-l-2 border-purple-500" />
-                  <span className="text-muted-foreground">Åbent marked</span>
+                  <div className="w-3 h-3 rounded bg-gradient-to-r from-purple-500 to-pink-500 animate-pulse" />
+                  <span className="text-muted-foreground font-medium">Åbent marked - ansøg!</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-3 h-3 rounded bg-blue-500/20 border-l-2 border-blue-500" />
@@ -218,17 +218,19 @@ export default function VagtMinUge() {
                   const isCurrentMonth = isSameMonth(day, currentDate);
                   const hasShift = dayAssignments.length > 0;
                   const hasMarkets = dayMarkets.length > 0;
+                  const hasUnappliedMarkets = dayMarkets.some((m: any) => !hasApplied(m.id));
                   
                   return (
                     <div
                       key={day.toISOString()}
                       onClick={() => (hasShift || hasMarkets) && setSelectedDay(day)}
                       className={cn(
-                        "min-h-[60px] sm:min-h-[80px] p-1 rounded-lg border transition-all",
+                        "min-h-[70px] sm:min-h-[90px] p-1 rounded-lg border transition-all",
                         !isCurrentMonth && "opacity-40",
                         isToday(day) && "ring-2 ring-primary",
                         (hasShift || hasMarkets) && "cursor-pointer hover:bg-accent",
-                        !hasShift && !hasMarkets && "bg-muted/20"
+                        !hasShift && !hasMarkets && "bg-muted/20",
+                        hasUnappliedMarkets && "ring-2 ring-purple-500/50 bg-purple-500/5"
                       )}
                     >
                       <div className={cn(
@@ -250,8 +252,10 @@ export default function VagtMinUge() {
                               borderLeft: `2px solid ${assignment.booking.brand.color_hex}`
                             }}
                           >
-                            <span className="hidden sm:inline">{assignment.start_time?.slice(0, 5)} </span>
-                            {assignment.booking.location.name.split(" ")[0]}
+                            <span className="font-medium">{assignment.booking.location.name}</span>
+                            <span className="hidden sm:inline text-[9px] opacity-70 ml-1">
+                              {assignment.start_time?.slice(0, 5)}
+                            </span>
                           </div>
                         ))}
                         {dayAssignments.length > 2 && (
@@ -271,19 +275,19 @@ export default function VagtMinUge() {
                                 "text-[10px] sm:text-xs px-1 py-0.5 rounded truncate flex items-center gap-0.5",
                                 applied 
                                   ? status === "approved" 
-                                    ? "bg-green-500/20 text-green-600 border-l-2 border-green-500"
-                                    : "bg-blue-500/20 text-blue-600 border-l-2 border-blue-500"
-                                  : "bg-purple-500/20 text-purple-600 border-l-2 border-purple-500"
+                                    ? "bg-green-500/20 text-green-700 border-l-2 border-green-500 font-medium"
+                                    : "bg-blue-500/20 text-blue-700 border-l-2 border-blue-500"
+                                  : "bg-gradient-to-r from-purple-500/30 to-pink-500/30 text-purple-700 font-semibold animate-pulse"
                               )}
                             >
-                              <Users className="h-2.5 w-2.5 flex-shrink-0" />
-                              <span className="truncate">{market.location?.name?.split(" ")[0]}</span>
-                              {applied && <span className="text-[8px]">✓</span>}
+                              {!applied && <Send className="h-2.5 w-2.5 flex-shrink-0" />}
+                              <span className="truncate">{market.location?.name}</span>
+                              {applied && <CheckCircle className="h-2.5 w-2.5 flex-shrink-0" />}
                             </div>
                           );
                         })}
                         {dayMarkets.length > (hasShift ? 1 : 2) && (
-                          <div className="text-[10px] text-purple-600 px-1">
+                          <div className="text-[10px] text-purple-700 font-medium px-1">
                             +{dayMarkets.length - (hasShift ? 1 : 2)} marked
                           </div>
                         )}
@@ -366,13 +370,21 @@ export default function VagtMinUge() {
           /* Markets View */
           <div className="space-y-4">
             <div className="text-center pb-2">
-              <h2 className="font-semibold">Åbne markeder</h2>
+              <h2 className="text-xl font-bold">Åbne markeder</h2>
               <p className="text-sm text-muted-foreground">Ansøg om at deltage i kommende markeder</p>
             </div>
             
             {openMarkets && openMarkets.length > 0 ? (
               <div className="space-y-3">
-                {openMarkets.map((market: any) => {
+                {/* Sort: unapplied first, then by deadline */}
+                {[...openMarkets]
+                  .sort((a, b) => {
+                    const aApplied = hasApplied(a.id);
+                    const bApplied = hasApplied(b.id);
+                    if (aApplied !== bApplied) return aApplied ? 1 : -1;
+                    return 0;
+                  })
+                  .map((market: any) => {
                   const applied = hasApplied(market.id);
                   const status = getApplicationStatus(market.id);
                   const daysUntilDeadline = market.application_deadline
@@ -383,15 +395,30 @@ export default function VagtMinUge() {
                     <Card 
                       key={market.id} 
                       className={cn(
-                        "cursor-pointer hover:bg-accent/50 transition-colors",
-                        applied && "border-primary/50"
+                        "cursor-pointer transition-all overflow-hidden",
+                        applied 
+                          ? status === "approved" 
+                            ? "border-green-500/50 bg-green-500/5" 
+                            : "border-blue-500/50 bg-blue-500/5"
+                          : "border-purple-500 ring-2 ring-purple-500/30 bg-gradient-to-r from-purple-500/10 to-pink-500/10 hover:ring-purple-500/50"
                       )}
                       onClick={() => setSelectedMarket(market)}
                     >
+                      {!applied && (
+                        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-semibold py-1.5 px-4 flex items-center gap-2">
+                          <Send className="h-3 w-3" />
+                          <span>ANSØG NU</span>
+                          {daysUntilDeadline !== null && daysUntilDeadline >= 0 && daysUntilDeadline <= 3 && (
+                            <span className="ml-auto bg-white/20 rounded px-2 py-0.5">
+                              {daysUntilDeadline === 0 ? "Sidste dag!" : `${daysUntilDeadline} dage tilbage`}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <BrandBadge
                                 brandName={market.brand?.name}
                                 brandColor={market.brand?.color_hex}
@@ -399,51 +426,52 @@ export default function VagtMinUge() {
                               {applied && (
                                 <Badge 
                                   variant={status === "approved" ? "default" : status === "rejected" ? "destructive" : "secondary"}
-                                  className="text-xs"
+                                  className={cn(
+                                    "text-xs",
+                                    status === "approved" && "bg-green-600"
+                                  )}
                                 >
-                                  {status === "approved" ? "Godkendt" : status === "rejected" ? "Afvist" : "Ansøgt"}
+                                  {status === "approved" ? "✓ Godkendt" : status === "rejected" ? "Afvist" : "⏳ Afventer svar"}
                                 </Badge>
                               )}
                             </div>
-                            <p className="font-medium">{market.location?.name}</p>
+                            <p className="font-bold text-lg">{market.location?.name}</p>
                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
                               <span className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
+                                <MapPin className="h-4 w-4" />
                                 {market.location?.address_city}
                               </span>
                               <span className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {format(parseISO(market.start_date), "d. MMM", { locale: da })}
+                                <Calendar className="h-4 w-4" />
+                                Uge {market.week_number} - {format(parseISO(market.start_date), "d. MMM", { locale: da })}
                               </span>
                             </div>
-                            {daysUntilDeadline !== null && daysUntilDeadline >= 0 && (
-                              <p className={cn(
-                                "text-xs",
-                                daysUntilDeadline <= 3 ? "text-orange-600" : "text-muted-foreground"
-                              )}>
+                            {!applied && daysUntilDeadline !== null && daysUntilDeadline >= 0 && daysUntilDeadline > 3 && (
+                              <p className="text-xs text-muted-foreground">
                                 <AlertCircle className="h-3 w-3 inline mr-1" />
-                                Tilmeldingsfrist: {daysUntilDeadline === 0 ? "I dag" : `${daysUntilDeadline} dage`}
+                                Tilmeldingsfrist om {daysUntilDeadline} dage
                               </p>
                             )}
                           </div>
                           {!applied && (
                             <Button
-                              size="sm"
+                              size="lg"
+                              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 applyMutation.mutate(market.id);
                               }}
                               disabled={applyMutation.isPending}
                             >
-                              <Send className="h-4 w-4 mr-1" />
+                              <Send className="h-4 w-4 mr-2" />
                               Ansøg
                             </Button>
                           )}
                           {status === "approved" && (
-                            <CheckCircle className="h-5 w-5 text-green-600" />
+                            <CheckCircle className="h-6 w-6 text-green-600" />
                           )}
                           {status === "rejected" && (
-                            <XCircle className="h-5 w-5 text-red-600" />
+                            <XCircle className="h-6 w-6 text-red-600" />
                           )}
                         </div>
                       </CardContent>
