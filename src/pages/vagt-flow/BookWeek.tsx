@@ -36,6 +36,7 @@ import { format, startOfWeek, getWeek, getYear, differenceInWeeks } from "date-f
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CapacityPanel } from "@/components/vagt-flow/CapacityPanel";
+import { MarketApplicationsManager } from "@/components/vagt-flow/MarketApplicationsManager";
 
 type LocationTab = "mulige" | "cooldown" | "utilgaengelige";
 
@@ -287,6 +288,9 @@ export default function VagtBookWeek() {
           weekNumber={selectedWeek}
           year={selectedYear}
         />
+
+        {/* Market Applications Manager */}
+        <MarketApplicationsManager />
 
         {/* Filters */}
         <Card>
