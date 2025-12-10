@@ -87,7 +87,30 @@ export function SomeOverallProgress({
           <div className="flex-1 space-y-3">
             <div className="flex items-center justify-between">
               <p className="font-semibold text-sm">Samlet ugeprogression</p>
-              <span className="text-lg font-bold">{percentage}%</span>
+              <div className="flex items-center gap-3">
+                <span className="text-lg font-bold">{percentage}%</span>
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
+                  percentage >= 110 ? "bg-green-500/30 border border-green-500/50" :
+                  percentage >= 100 ? "bg-green-500/20 border border-green-500/40" :
+                  percentage >= 70 ? "bg-amber-500/20 border border-amber-500/40" :
+                  "bg-red-500/20 border border-red-500/40"
+                }`}>
+                  <span className="text-2xl">
+                    {percentage >= 110 ? "🤩" : percentage >= 100 ? "😄" : percentage >= 70 ? "😐" : "😟"}
+                  </span>
+                  <span className={`text-xs font-bold ${
+                    percentage >= 110 ? "text-green-700 dark:text-green-300" :
+                    percentage >= 100 ? "text-green-600 dark:text-green-400" :
+                    percentage >= 70 ? "text-amber-700 dark:text-amber-300" :
+                    "text-red-700 dark:text-red-300"
+                  }`}>
+                    {percentage >= 110 ? "Oscar & Kasper ELSKEDE det!" :
+                     percentage >= 100 ? "Oscar & Kasper er glade!" :
+                     percentage >= 70 ? "Næsten i mål..." :
+                     "Oscar & Kasper venter..."}
+                  </span>
+                </div>
+              </div>
             </div>
             <Progress value={percentage} className="h-3" />
             <div className={`p-3 rounded-lg ${
