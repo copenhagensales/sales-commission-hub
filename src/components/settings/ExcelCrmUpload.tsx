@@ -18,8 +18,13 @@ interface ParsedRow {
 interface ColumnMapping {
   ordre_id: string;
   opp_number: string;
+  external_id: string;
+  phone_number: string;
+  date: string;
   status: string;
   customer_name: string;
+  action_type: string;
+  amount_deduct: string;
 }
 
 interface ExcelImport {
@@ -33,23 +38,35 @@ interface ExcelImport {
 }
 
 const MAPPING_TARGETS = [
-  { value: "ordre_id", label: "Ordre ID (adversus_external_id)" },
-  { value: "opp_number", label: "OPP Nummer" },
-  { value: "status", label: "Status" },
-  { value: "customer_name", label: "Kundenavn" },
+  { value: "ordre_id", label: "Ordre ID (adversus_external_id)", category: "match" },
+  { value: "external_id", label: "Dialer/External ID", category: "match" },
+  { value: "opp_number", label: "OPP Nummer", category: "match" },
+  { value: "phone_number", label: "Teléfono Cliente", category: "match" },
+  { value: "date", label: "Fecha Venta", category: "match" },
+  { value: "status", label: "Status (legacy)", category: "data" },
+  { value: "customer_name", label: "Kundenavn", category: "data" },
+  { value: "action_type", label: "Tipo Acción (Annullering/Retur)", category: "action" },
+  { value: "amount_deduct", label: "Monto a descontar (Clawback)", category: "action" },
 ];
+
+const defaultMapping: ColumnMapping = {
+  ordre_id: "",
+  opp_number: "",
+  external_id: "",
+  phone_number: "",
+  date: "",
+  status: "",
+  customer_name: "",
+  action_type: "",
+  amount_deduct: "",
+};
 
 export function ExcelCrmUpload() {
   const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
-  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
-    ordre_id: "",
-    opp_number: "",
-    status: "",
-    customer_name: "",
-  });
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>(defaultMapping);
   const [selectedClient, setSelectedClient] = useState<string>("");
 
   // Fetch clients
@@ -108,6 +125,10 @@ export function ExcelCrmUpload() {
     reader.readAsBinaryString(selectedFile);
   }, []);
 
+  // Check if at least one match field is mapped
+  const hasMatchField = columnMapping.ordre_id || columnMapping.external_id || 
+                        columnMapping.opp_number || columnMapping.phone_number;
+
   // Save import mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -119,8 +140,13 @@ export function ExcelCrmUpload() {
       const transformedRows = parsedData.map((row) => ({
         ordre_id: columnMapping.ordre_id ? String(row[columnMapping.ordre_id] || "") : null,
         opp_number: columnMapping.opp_number ? String(row[columnMapping.opp_number] || "") : null,
+        external_id: columnMapping.external_id ? String(row[columnMapping.external_id] || "") : null,
+        phone_number: columnMapping.phone_number ? String(row[columnMapping.phone_number] || "") : null,
+        date: columnMapping.date ? String(row[columnMapping.date] || "") : null,
         status: columnMapping.status ? String(row[columnMapping.status] || "") : null,
         customer_name: columnMapping.customer_name ? String(row[columnMapping.customer_name] || "") : null,
+        action_type: columnMapping.action_type ? String(row[columnMapping.action_type] || "") : null,
+        amount_deduct: columnMapping.amount_deduct ? String(row[columnMapping.amount_deduct] || "") : null,
         raw_data: row,
       }));
 
@@ -160,7 +186,7 @@ export function ExcelCrmUpload() {
       setFile(null);
       setParsedData([]);
       setColumns([]);
-      setColumnMapping({ ordre_id: "", opp_number: "", status: "", customer_name: "" });
+      setColumnMapping(defaultMapping);
     },
     onError: (error) => toast.error(`Fejl: ${error.message}`),
   });
@@ -176,7 +202,7 @@ export function ExcelCrmUpload() {
     },
     onSuccess: (data) => {
       toast.success(
-        `Validering færdig: ${data.matched} matchet, ${data.cancelled} annulleret`,
+        `Validering færdig: ${data.matched} matchet, ${data.cancelled} annulleret, ${data.clawbacks_created || 0} clawbacks`,
         { duration: 6000 }
       );
       queryClient.invalidateQueries({ queryKey: ["crm-excel-imports"] });
@@ -198,6 +224,10 @@ export function ExcelCrmUpload() {
     onError: (error) => toast.error(`Fejl: ${error.message}`),
   });
 
+  const matchFields = MAPPING_TARGETS.filter(t => t.category === "match");
+  const dataFields = MAPPING_TARGETS.filter(t => t.category === "data");
+  const actionFields = MAPPING_TARGETS.filter(t => t.category === "action");
+
   return (
     <Card>
       <CardHeader>
@@ -206,7 +236,7 @@ export function ExcelCrmUpload() {
           Excel CRM Validering
         </CardTitle>
         <CardDescription>
-          Upload Excel/CSV med annulleringer og valider mod salgsdata.
+          Upload Excel/CSV med annulleringer. Søger via External ID → OPP → Telefon+Dato.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -255,30 +285,101 @@ export function ExcelCrmUpload() {
             {columns.length > 0 && (
               <div className="space-y-4 p-4 border rounded-md bg-muted/30">
                 <h4 className="font-medium">Kolonne Mapping</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  {MAPPING_TARGETS.map((target) => (
-                    <div key={target.value} className="space-y-1">
-                      <Label className="text-xs">{target.label}</Label>
-                      <Select
-                        value={columnMapping[target.value as keyof ColumnMapping]}
-                        onValueChange={(val) =>
-                          setColumnMapping((prev) => ({ ...prev, [target.value]: val }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Vælg kolonne..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">-- Ingen --</SelectItem>
-                          {columns.map((col) => (
-                            <SelectItem key={col} value={col}>
-                              {col}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ))}
+                
+                {/* Match Fields */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Søgefelter (prioritet: External ID → OPP → Telefon+Dato)
+                  </Label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {matchFields.map((target) => (
+                      <div key={target.value} className="space-y-1">
+                        <Label className="text-xs">{target.label}</Label>
+                        <Select
+                          value={columnMapping[target.value as keyof ColumnMapping]}
+                          onValueChange={(val) =>
+                            setColumnMapping((prev) => ({ ...prev, [target.value]: val }))
+                          }
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Vælg..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">-- Ingen --</SelectItem>
+                            {columns.map((col) => (
+                              <SelectItem key={col} value={col}>
+                                {col}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Action Fields */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Aktion & Clawback
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {actionFields.map((target) => (
+                      <div key={target.value} className="space-y-1">
+                        <Label className="text-xs">{target.label}</Label>
+                        <Select
+                          value={columnMapping[target.value as keyof ColumnMapping]}
+                          onValueChange={(val) =>
+                            setColumnMapping((prev) => ({ ...prev, [target.value]: val }))
+                          }
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Vælg..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">-- Ingen --</SelectItem>
+                            {columns.map((col) => (
+                              <SelectItem key={col} value={col}>
+                                {col}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Data Fields */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                    Ekstra data (valgfrit)
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {dataFields.map((target) => (
+                      <div key={target.value} className="space-y-1">
+                        <Label className="text-xs">{target.label}</Label>
+                        <Select
+                          value={columnMapping[target.value as keyof ColumnMapping]}
+                          onValueChange={(val) =>
+                            setColumnMapping((prev) => ({ ...prev, [target.value]: val }))
+                          }
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Vælg..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">-- Ingen --</SelectItem>
+                            {columns.map((col) => (
+                              <SelectItem key={col} value={col}>
+                                {col}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Preview Table */}
@@ -313,11 +414,16 @@ export function ExcelCrmUpload() {
                 {/* Save Button */}
                 <Button
                   onClick={() => saveMutation.mutate()}
-                  disabled={saveMutation.isPending || !columnMapping.ordre_id}
+                  disabled={saveMutation.isPending || !hasMatchField}
                 >
                   {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Gem Import
                 </Button>
+                {!hasMatchField && (
+                  <p className="text-xs text-destructive">
+                    Map mindst én søgefelt (External ID, OPP, eller Telefon)
+                  </p>
+                )}
               </div>
             )}
 
