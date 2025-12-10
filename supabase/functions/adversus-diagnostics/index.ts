@@ -22,31 +22,33 @@ Deno.serve(async (req) => {
     const authHeader = `Basic ${btoa(`${user}:${pass}`)}`;
     const baseUrl = "https://api.adversus.io/v1";
 
-    // Fetch raw sales data - just 3 sales to see the structure
-    const salesUrl = `${baseUrl}/sales?pageSize=3&page=1`;
-    console.log(`[Diagnostics] Calling: ${salesUrl}`);
+    // Fetch raw leads data - bulk endpoint
+    const leadsUrl = `${baseUrl}/leads?pageSize=5`;
+    console.log(`[Diagnostics] Calling: ${leadsUrl}`);
     
-    const salesRes = await fetch(salesUrl, {
+    const leadsRes = await fetch(leadsUrl, {
       headers: { Authorization: authHeader, "Content-Type": "application/json" },
     });
 
-    if (!salesRes.ok) {
+    if (!leadsRes.ok) {
       return new Response(JSON.stringify({ 
-        error: `Adversus API error: ${salesRes.status}`,
-        statusText: salesRes.statusText 
+        error: `Adversus API error: ${leadsRes.status}`,
+        statusText: leadsRes.statusText 
       }), {
-        status: salesRes.status,
+        status: leadsRes.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const salesData = await salesRes.json();
+    const leadsData = await leadsRes.json();
     
-    // Return the RAW response - no processing
+    // Return raw structure to see format
     return new Response(JSON.stringify({
-      endpoint: "/v1/sales?pageSize=3&page=1",
-      rawResponseKeys: Object.keys(salesData),
-      rawResponse: salesData,
+      endpoint: "/v1/leads?pageSize=5",
+      responseType: typeof leadsData,
+      isArray: Array.isArray(leadsData),
+      keys: Object.keys(leadsData),
+      rawResponse: leadsData,
     }, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
