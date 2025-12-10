@@ -110,14 +110,11 @@ export default function Auth() {
         // Check if email is a work_email and get the auth email (private_email)
         let authEmail = email;
         
-        const { data: employeeByWork } = await supabase
-          .from("employee_master_data")
-          .select("private_email")
-          .eq("work_email", email.toLowerCase())
-          .maybeSingle();
+        const { data: privateEmail } = await supabase
+          .rpc('get_auth_email_by_work_email', { _work_email: email });
         
-        if (employeeByWork?.private_email) {
-          authEmail = employeeByWork.private_email;
+        if (privateEmail) {
+          authEmail = privateEmail;
         }
         
         const { error } = await supabase.auth.signInWithPassword({
