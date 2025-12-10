@@ -142,7 +142,7 @@ export class IngestionEngine {
     return { processed: totalProcessed, errors: totalErrors };
   }
 
-  // Process a single batch of sales using BULK operations for speed
+  // Process a single batch of sales using BULK UPSERT for maximum speed
   private async processSalesBatch(
     sales: StandardSale[], 
     productMapByName: Map<string, any>,
@@ -152,7 +152,7 @@ export class IngestionEngine {
     let processed = 0;
     let errors = 0;
 
-    // OPTIMIZATION: Fetch all existing sales in ONE query
+    // OPTIMIZATION: Fetch all existing sales in ONE query (to preserve OPP numbers)
     const externalIds = sales.map(s => s.externalId);
     const { data: existingSales } = await this.supabase
       .from("sales")
@@ -161,43 +161,40 @@ export class IngestionEngine {
     
     const existingSalesMap = new Map(existingSales?.map(s => [s.adversus_external_id, s]) || []);
 
-    // Prepare bulk data
-    const salesToInsert: any[] = [];
-    const salesToUpdate: { id: string; data: any }[] = [];
+    // Prepare ALL sales for UPSERT
+    const allSalesData: any[] = [];
     const saleItemsToInsert: any[] = [];
-    const saleIdsToDeleteItems: string[] = [];
+    const existingSaleIds: string[] = [];
 
     for (const sale of sales) {
       try {
+        const existingSale = existingSalesMap.get(sale.externalId);
+        
+        // NON-DESTRUCTIVE: Keep existing OPP if new one is empty
+        let oppNumber = sale.externalReference || null;
+        if (existingSale?.adversus_opp_number && !sale.externalReference) {
+          oppNumber = existingSale.adversus_opp_number;
+        }
+
         const saleData = {
           adversus_external_id: sale.externalId,
           sale_datetime: sale.saleDate,
           agent_name: sale.agentName || sale.agentEmail,
           customer_company: sale.customerName,
           customer_phone: sale.customerPhone,
-          adversus_opp_number: sale.externalReference || null,
+          adversus_opp_number: oppNumber,
           client_campaign_id: sale.clientCampaignId || null,
           source: sale.dialerName,
           integration_type: sale.integrationType,
           updated_at: new Date().toISOString(),
         };
 
-        const existingSale = existingSalesMap.get(sale.externalId);
-
+        allSalesData.push(saleData);
+        
         if (existingSale) {
-          // NON-DESTRUCTIVE: Keep existing OPP if new one is empty
-          const updateData = { ...saleData };
-          if (existingSale.adversus_opp_number && !sale.externalReference) {
-            updateData.adversus_opp_number = existingSale.adversus_opp_number;
-          }
-          salesToUpdate.push({ id: existingSale.id, data: updateData });
-          saleIdsToDeleteItems.push(existingSale.id);
-          
-          // Prepare items with existing sale ID
-          this.prepareSaleItems(sale, existingSale.id, productMapByExtId, productMapByName, dbProducts, saleItemsToInsert);
-        } else {
-          salesToInsert.push(saleData);
+          existingSaleIds.push(existingSale.id);
         }
+        
         processed++;
       } catch (e) {
         errors++;
@@ -206,38 +203,38 @@ export class IngestionEngine {
       }
     }
 
-    // BULK OPERATIONS
+    // BULK OPERATIONS - minimal queries
     try {
-      // 1. Delete old items for existing sales (bulk)
-      if (saleIdsToDeleteItems.length > 0) {
-        await this.supabase.from("sale_items").delete().in("sale_id", saleIdsToDeleteItems);
+      // 1. Delete old items for existing sales (1 query)
+      if (existingSaleIds.length > 0) {
+        await this.supabase.from("sale_items").delete().in("sale_id", existingSaleIds);
       }
 
-      // 2. Update existing sales (batch of individual updates - Supabase doesn't support bulk update)
-      for (const { id, data } of salesToUpdate) {
-        await this.supabase.from("sales").update(data).eq("id", id);
-      }
-
-      // 3. Insert new sales and get their IDs
-      if (salesToInsert.length > 0) {
-        const { data: newSales, error: insertError } = await this.supabase
+      // 2. BULK UPSERT all sales (1 query instead of N queries!)
+      if (allSalesData.length > 0) {
+        const { data: upsertedSales, error: upsertError } = await this.supabase
           .from("sales")
-          .insert(salesToInsert)
+          .upsert(allSalesData, { 
+            onConflict: "adversus_external_id",
+            ignoreDuplicates: false 
+          })
           .select("id, adversus_external_id");
         
-        if (insertError) throw insertError;
+        if (upsertError) throw upsertError;
 
-        // Prepare items for new sales
-        const newSalesMap = new Map(newSales?.map(s => [s.adversus_external_id, s.id]) || []);
+        // Build ID map for sale items
+        const saleIdMap = new Map(upsertedSales?.map(s => [s.adversus_external_id, s.id]) || []);
+        
+        // Prepare all sale items
         for (const sale of sales) {
-          const newSaleId = newSalesMap.get(sale.externalId);
-          if (newSaleId) {
-            this.prepareSaleItems(sale, newSaleId, productMapByExtId, productMapByName, dbProducts, saleItemsToInsert);
+          const saleId = saleIdMap.get(sale.externalId);
+          if (saleId) {
+            this.prepareSaleItems(sale, saleId, productMapByExtId, productMapByName, dbProducts, saleItemsToInsert);
           }
         }
       }
 
-      // 4. Bulk insert all sale items
+      // 3. Bulk insert all sale items (1 query)
       if (saleItemsToInsert.length > 0) {
         const { error: itemsError } = await this.supabase.from("sale_items").insert(saleItemsToInsert);
         if (itemsError) throw itemsError;
@@ -246,7 +243,7 @@ export class IngestionEngine {
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       this.log("ERROR", `Error en operaciones bulk`, errMsg);
-      errors += sales.length; // Mark all as errors
+      errors += sales.length;
       processed = 0;
     }
 
