@@ -116,8 +116,39 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const body: AdversusPayload = await req.json();
-    console.log('Received webhook:', JSON.stringify(body, null, 2));
+    // Log raw request details before parsing
+    const rawBody = await req.text();
+    console.log('=== ADVERSUS WEBHOOK RAW REQUEST ===');
+    console.log('Method:', req.method);
+    console.log('Content-Type:', req.headers.get('content-type'));
+    console.log('Content-Length:', req.headers.get('content-length'));
+    console.log('Raw body length:', rawBody.length);
+    console.log('Raw body:', rawBody || '(empty)');
+    console.log('=====================================');
+
+    // Handle empty body
+    if (!rawBody || rawBody.trim() === '') {
+      console.log('Empty body received - returning 200 OK');
+      return new Response(
+        JSON.stringify({ success: true, message: 'Empty body received, ignoring' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Parse JSON
+    let body: AdversusPayload;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Failed to parse body:', rawBody.substring(0, 500));
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid JSON body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Parsed webhook payload:', JSON.stringify(body, null, 2));
 
     const externalId = String(body.payload.result_id);
 
