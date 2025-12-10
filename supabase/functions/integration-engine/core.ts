@@ -231,6 +231,7 @@ export class IngestionEngine {
           adversus_external_id: sale.externalId,
           sale_datetime: sale.saleDate,
           agent_name: sale.agentName || sale.agentEmail,
+          agent_email: sale.agentEmail || null,
           customer_company: sale.customerName,
           customer_phone: sale.customerPhone,
           adversus_opp_number: oppNumber,
