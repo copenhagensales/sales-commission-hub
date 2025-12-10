@@ -15,15 +15,16 @@ export function useVagtEmployee() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["vagt-employee", user?.id],
+    queryKey: ["vagt-employee", user?.email],
     queryFn: async () => {
-      if (!user) return null;
+      if (!user?.email) return null;
 
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, private_email, private_phone, is_active, department")
-        .eq("id", user.id)
+        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
         .eq("job_title", "Fieldmarketing")
+        .eq("is_active", true)
         .maybeSingle();
 
       if (error) throw error;
