@@ -234,10 +234,11 @@ export function ExcelCrmUpload() {
         const sheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<ParsedRow>(sheet, { defval: null, raw: false });
 
-        if (jsonData.length > 0) {
+      if (jsonData.length > 0) {
           const cols = Object.keys(jsonData[0]);
           setColumns(cols);
-          setParsedData(jsonData.slice(0, 100));
+          // Store ALL rows, not just first 100
+          setParsedData(jsonData);
           
           // Auto-suggest mappings based on column names
           const suggestions = suggestMapping(cols);
