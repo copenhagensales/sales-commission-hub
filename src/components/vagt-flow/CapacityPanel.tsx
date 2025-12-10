@@ -22,41 +22,55 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   const { data: allEmployees } = useQuery({
-    queryKey: ["vagt-active-employees-capacity"],
+    queryKey: ["vagt-active-employees-capacity-master"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("employee")
-        .select("id, full_name, team, is_active")
+        .from("employee_master_data")
+        .select("id, first_name, last_name, department")
+        .eq("job_title", "Fieldmarketing")
         .eq("is_active", true)
-        .not("team", "is", null);
+        .not("department", "is", null);
 
       if (error) throw error;
-      return data;
+      return data?.map(e => ({
+        id: e.id,
+        full_name: `${e.first_name} ${e.last_name}`,
+        team: e.department, // Map department to team for compatibility
+        is_active: true,
+      }));
     },
   });
 
+  // Fetch Fieldmarketing employee IDs for filtering absences
+  const fieldmarketingIds = allEmployees?.map(e => e.id) || [];
+
   const { data: absencesData, isLoading: absencesLoading } = useQuery({
-    queryKey: ["vagt-week-absences-capacity", year, weekNumber],
+    queryKey: ["vagt-week-absences-capacity-v2", year, weekNumber, fieldmarketingIds],
     queryFn: async () => {
+      if (fieldmarketingIds.length === 0) return [];
+      
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
       const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
       const { data: absences, error: absencesError } = await supabase
-        .from("employee_absence")
-        .select(`
-          id,
-          employee_id,
-          start_date,
-          end_date,
-          employee:employee_id (id, team, is_active)
-        `)
-        .eq("status", "APPROVED")
+        .from("absence_request_v2")
+        .select("id, employee_id, start_date, end_date, status")
+        .in("employee_id", fieldmarketingIds)
+        .in("status", ["approved", "pending"])
         .lte("start_date", weekEndStr)
         .gte("end_date", weekStartStr);
 
       if (absencesError) throw absencesError;
-      return absences;
+      
+      // Map employee info from our already-fetched employees
+      const employeeMap = new Map(allEmployees?.map(e => [e.id, { id: e.id, team: e.team, is_active: true }]));
+      
+      return absences?.map(a => ({
+        ...a,
+        employee: employeeMap.get(a.employee_id),
+      }));
     },
+    enabled: fieldmarketingIds.length > 0,
   });
 
   const { data: weekBookings } = useQuery({
@@ -74,8 +88,9 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
     },
   });
 
-  const eesyTotal = allEmployees?.filter(e => e.team === "Eesy").length || 0;
-  const youseeTotal = allEmployees?.filter(e => e.team === "YouSee").length || 0;
+  // Match department that contains eesy or yousee (case-insensitive)
+  const eesyTotal = allEmployees?.filter(e => e.team?.toLowerCase().includes("eesy")).length || 0;
+  const youseeTotal = allEmployees?.filter(e => e.team?.toLowerCase().includes("yousee")).length || 0;
 
   const bookingsByDayAndBrand = weekDates.map((date) => {
     let eesyBooked = 0;
@@ -106,8 +121,9 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
       const absenceEnd = parseISO(absence.end_date);
 
       if (isWithinInterval(date, { start: absenceStart, end: absenceEnd })) {
-        if (employee.team === "Eesy") eesyAbsent++;
-        else if (employee.team === "YouSee") youseeAbsent++;
+        const teamLower = employee.team?.toLowerCase() || "";
+        if (teamLower.includes("eesy")) eesyAbsent++;
+        else if (teamLower.includes("yousee")) youseeAbsent++;
       }
     });
 

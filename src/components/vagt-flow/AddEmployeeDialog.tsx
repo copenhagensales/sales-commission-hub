@@ -70,13 +70,13 @@ export function AddEmployeeDialog({
   const [selectedEmployees, setSelectedEmployees] = useState<(string | null)[]>([null]);
   const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
 
-  // Filter employees by brand/department match
+  // Filter employees by brand/department match (department contains brand name)
   const brandName = booking?.brand?.name?.toLowerCase();
   const filteredEmployees = employees.filter((emp) => {
     if (!brandName) return true;
-    const empTeam = emp.team?.toLowerCase();
-    // Match if employee's department/team matches the brand name
-    return empTeam === brandName || empTeam?.includes(brandName) || brandName.includes(empTeam || "");
+    const empTeam = emp.team?.toLowerCase() || "";
+    // Match if employee's department/team contains the brand name
+    return empTeam.includes(brandName);
   });
 
   // Fetch absences for the week period from absence_request_v2
