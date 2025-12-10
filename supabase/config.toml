@@ -15,6 +15,9 @@ verify_jwt = false
 [functions.adversus-create-webhook]
 verify_jwt = true
 
+[functions.adversus-manage-webhooks]
+verify_jwt = true
+
 [functions.import-products]
 verify_jwt = false
 
