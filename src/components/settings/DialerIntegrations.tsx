@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal } from "lucide-react";
+import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 interface DialerIntegration {
@@ -30,6 +30,27 @@ interface FormData {
   password: string;
   api_url: string;
 }
+
+const ADVERSUS_WEBHOOK_EVENTS = [
+  { value: "lead_saved", label: "Lead Saved" },
+  { value: "call_ended", label: "Call Ended" },
+  { value: "callAnswered", label: "Call Answered" },
+  { value: "leadClosedSuccess", label: "Lead Closed Success" },
+  { value: "leadClosedAutomaticRedial", label: "Lead Closed Automatic Redial" },
+  { value: "leadClosedPrivateRedial", label: "Lead Closed Private Redial" },
+  { value: "leadClosedNotInterested", label: "Lead Closed Not Interested" },
+  { value: "leadClosedInvalid", label: "Lead Closed Invalid" },
+  { value: "leadClosedUnqualified", label: "Lead Closed Unqualified" },
+  { value: "leadClosedSystem", label: "Lead Closed System" },
+  { value: "leads_deactivated", label: "Leads Deactivated" },
+  { value: "leads_inserted", label: "Leads Inserted" },
+  { value: "mail_activity", label: "Mail Activity" },
+  { value: "sms_sent", label: "SMS Sent" },
+  { value: "sms_received", label: "SMS Received" },
+  { value: "appointment_added", label: "Appointment Added" },
+  { value: "appointment_updated", label: "Appointment Updated" },
+  { value: "note_added", label: "Note Added" },
+];
 
 export function DialerIntegrations() {
   const queryClient = useQueryClient();
@@ -52,6 +73,14 @@ export function DialerIntegrations() {
   const [manualDays, setManualDays] = useState("30");
   const [manualLimit, setManualLimit] = useState("100");
   const [isExecuting, setIsExecuting] = useState(false);
+
+  // Webhook creation state
+  const [webhookDialogOpen, setWebhookDialogOpen] = useState(false);
+  const [webhookIntegrationId, setWebhookIntegrationId] = useState<string | null>(null);
+  const [webhookIntegrationName, setWebhookIntegrationName] = useState<string>("");
+  const [selectedWebhookEvent, setSelectedWebhookEvent] = useState("leadClosedSuccess");
+  const [isCreatingWebhook, setIsCreatingWebhook] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
 
   // Fetch Dialer Integrations from new table
   const { data: integrations, isLoading } = useQuery({
@@ -187,6 +216,47 @@ export function DialerIntegrations() {
     } finally {
       setIsExecuting(false);
     }
+  };
+
+  // Create webhook in Adversus
+  const createWebhook = async () => {
+    if (!webhookIntegrationId) return;
+    
+    setIsCreatingWebhook(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("adversus-create-webhook", {
+        body: {
+          integration_id: webhookIntegrationId,
+          event: selectedWebhookEvent,
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success("Webhook oprettet i Adversus", {
+        description: `Event: ${selectedWebhookEvent}`,
+      });
+      setWebhookDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
+      toast.error(`Fejl ved oprettelse af webhook: ${errorMessage}`);
+    } finally {
+      setIsCreatingWebhook(false);
+    }
+  };
+
+  const getWebhookUrl = (integrationId: string) => {
+    const projectId = "jwlimmeijpfmaksvmuru";
+    return `https://${projectId}.supabase.co/functions/v1/dialer-webhook?dialer_id=${integrationId}`;
+  };
+
+  const copyWebhookUrl = (integrationId: string) => {
+    const url = getWebhookUrl(integrationId);
+    navigator.clipboard.writeText(url);
+    setCopiedUrl(true);
+    toast.success("Webhook URL kopieret");
+    setTimeout(() => setCopiedUrl(false), 2000);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -419,6 +489,28 @@ export function DialerIntegrations() {
                           <Play className="h-4 w-4" />
                         )}
                       </Button>
+                      {integration.provider === 'adversus' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Opret Webhook"
+                          onClick={() => {
+                            setWebhookIntegrationId(integration.id);
+                            setWebhookIntegrationName(integration.name);
+                            setWebhookDialogOpen(true);
+                          }}
+                        >
+                          <Webhook className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Kopier Webhook URL"
+                        onClick={() => copyWebhookUrl(integration.id)}
+                      >
+                        {copiedUrl ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -450,6 +542,71 @@ export function DialerIntegrations() {
             </TableBody>
           </Table>
         )}
+
+        {/* Webhook Creation Dialog */}
+        <Dialog open={webhookDialogOpen} onOpenChange={setWebhookDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Webhook className="h-5 w-5" />
+                Opret Webhook i Adversus
+              </DialogTitle>
+              <DialogDescription>
+                Opret en webhook i Adversus for "{webhookIntegrationName}" der sender events til dit system.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Webhook URL (automatisk)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    value={webhookIntegrationId ? getWebhookUrl(webhookIntegrationId) : ""}
+                    className="font-mono text-xs"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => webhookIntegrationId && copyWebhookUrl(webhookIntegrationId)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Denne URL bruges automatisk - den inkluderer dialer_id parameteren.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Event Type</Label>
+                <Select value={selectedWebhookEvent} onValueChange={setSelectedWebhookEvent}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ADVERSUS_WEBHOOK_EVENTS.map((event) => (
+                      <SelectItem key={event.value} value={event.value}>
+                        {event.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Vælg hvilken type event webhook'en skal triggere på.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setWebhookDialogOpen(false)}>
+                Annuller
+              </Button>
+              <Button onClick={createWebhook} disabled={isCreatingWebhook}>
+                {isCreatingWebhook && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Opret Webhook
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Separator className="my-6" />
 
