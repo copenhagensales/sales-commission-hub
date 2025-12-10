@@ -107,8 +107,21 @@ export default function Auth() {
         setIsResetMode(false);
         setExpiredLinkError(false);
       } else {
+        // Check if email is a work_email and get the auth email (private_email)
+        let authEmail = email;
+        
+        const { data: employeeByWork } = await supabase
+          .from("employee_master_data")
+          .select("private_email")
+          .eq("work_email", email.toLowerCase())
+          .maybeSingle();
+        
+        if (employeeByWork?.private_email) {
+          authEmail = employeeByWork.private_email;
+        }
+        
         const { error } = await supabase.auth.signInWithPassword({
-          email,
+          email: authEmail,
           password,
         });
         if (error) throw error;
@@ -244,7 +257,7 @@ export default function Auth() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="din@email.dk"
+                    placeholder="Privat eller arbejdsemail"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10"
