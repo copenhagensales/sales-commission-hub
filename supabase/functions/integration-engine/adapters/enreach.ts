@@ -28,8 +28,9 @@ interface HeroBaseLead {
 export class EnreachAdapter implements DialerAdapter {
   private baseUrl: string;
   private headers: Record<string, string>;
+  private dialerName: string;
 
-  constructor(credentials: EnreachCredentials) {
+  constructor(credentials: EnreachCredentials, dialerName?: string) {
     // Default to wshero01.herobase.com/api if not provided
     const providedUrl = credentials.api_url || "https://wshero01.herobase.com/api";
     // Ensure no trailing slash
@@ -39,7 +40,8 @@ export class EnreachAdapter implements DialerAdapter {
       this.baseUrl = this.baseUrl + '/api';
     }
     
-    console.log(`[EnreachAdapter] Base URL: ${this.baseUrl}`);
+    this.dialerName = dialerName || "Enreach";
+    console.log(`[EnreachAdapter] Base URL: ${this.baseUrl}, Dialer: ${this.dialerName}`);
     
     // Determine auth method: Basic (username/password) or Bearer (api_token)
     let authHeader: string;
@@ -59,6 +61,10 @@ export class EnreachAdapter implements DialerAdapter {
       "Content-Type": "application/json; charset=utf-8",
       "Accept": "application/json",
     };
+  }
+
+  setDialerName(name: string) {
+    this.dialerName = name;
   }
 
   /**
@@ -92,34 +98,7 @@ export class EnreachAdapter implements DialerAdapter {
     return String(val);
   }
 
-  /**
-   * Get nested object value (e.g., agent.email)
-   */
-  private getNestedStr(obj: Record<string, unknown> | null | undefined, path: string, fallback = ""): string {
-    if (!obj) return fallback;
-    
-    const parts = path.split('.');
-    let current: unknown = obj;
-    
-    for (const part of parts) {
-      if (current && typeof current === 'object') {
-        // Try multiple casing variations for each part
-        const found = this.getValue(current as Record<string, unknown>, [part, part.toLowerCase(), part.charAt(0).toUpperCase() + part.slice(1)]);
-        if (found !== null) {
-          current = found;
-        } else {
-          return fallback;
-        }
-      } else {
-        return fallback;
-      }
-    }
-    
-    return current ? String(current) : fallback;
-  }
-
   private async get(endpoint: string): Promise<unknown> {
-    // Endpoint already includes leading slash, e.g., /campaigns
     const url = `${this.baseUrl}${endpoint}`;
     console.log(`[EnreachAdapter] GET ${url}`);
     
@@ -139,7 +118,6 @@ export class EnreachAdapter implements DialerAdapter {
 
   async fetchUsers(): Promise<StandardUser[]> {
     try {
-      // HeroBase returns array directly
       const data = await this.get("/users") as unknown[];
 
       const users = Array.isArray(data) ? data : ((data as Record<string, unknown>).users as unknown[] || []);
@@ -162,7 +140,6 @@ export class EnreachAdapter implements DialerAdapter {
 
   async fetchCampaigns(): Promise<StandardCampaign[]> {
     try {
-      // HeroBase uses /campaigns endpoint and returns array directly
       const data = await this.get("/campaigns") as unknown;
 
       const campaigns = Array.isArray(data) ? data : ((data as Record<string, unknown>).campaigns as unknown[] || []);
@@ -191,16 +168,13 @@ export class EnreachAdapter implements DialerAdapter {
     try {
       console.log(`[EnreachAdapter] Fetching sales for last ${days} days`);
 
-      // HeroBase uses /simpleleads endpoint for exporting leads
-      // Format: /simpleleads?Projects=*&ModifiedFrom=YYYY-MM-DD&Statuses=UserProcessed&LeadClosures=Success
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - days);
-      const modifiedFrom = cutoffDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const modifiedFrom = cutoffDate.toISOString().split('T')[0];
       
       let allLeads: HeroBaseLead[] = [];
       
       try {
-        // Primary attempt: fetch successful/sold leads
         const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&Statuses=UserProcessed&LeadClosures=Success`;
         console.log(`[EnreachAdapter] Fetching from: ${endpoint}`);
         const data = await this.get(endpoint) as unknown;
@@ -208,14 +182,12 @@ export class EnreachAdapter implements DialerAdapter {
         if (Array.isArray(data)) {
           allLeads = data as HeroBaseLead[];
         } else if (data && typeof data === 'object') {
-          // Try common response wrapper keys
           const wrapper = data as Record<string, unknown>;
           allLeads = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || wrapper.Data || wrapper.data || []) as HeroBaseLead[];
         }
       } catch (primaryError) {
         console.warn("[EnreachAdapter] Primary fetch failed, trying alternative endpoint:", primaryError);
         try {
-          // Fallback: try just with Projects=* and ModifiedFrom
           const fallbackEndpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}`;
           console.log(`[EnreachAdapter] Fallback fetch from: ${fallbackEndpoint}`);
           const data = await this.get(fallbackEndpoint) as unknown;
@@ -234,13 +206,11 @@ export class EnreachAdapter implements DialerAdapter {
 
       console.log(`[EnreachAdapter] Fetched ${allLeads.length} total leads`);
       
-      // Log first lead structure for debugging
       if (allLeads.length > 0) {
         console.log(`[EnreachAdapter] Sample lead keys: ${Object.keys(allLeads[0]).slice(0, 15).join(', ')}`);
         console.log(`[EnreachAdapter] Sample lead (first 500 chars): ${JSON.stringify(allLeads[0]).substring(0, 500)}`);
       }
 
-      // Build campaign mapping lookup by external campaign ID
       const mappingLookup = new Map<string, CampaignMappingConfig>();
       if (campaignMappings) {
         for (const mapping of campaignMappings) {
@@ -250,13 +220,11 @@ export class EnreachAdapter implements DialerAdapter {
       }
 
       const sales = allLeads.map((lead: HeroBaseLead) => {
-        // Extract external ID with multiple key variations
         const externalId = this.getStr(lead, [
           'uniqueId', 'UniqueId', 'LeadUniqueId', 'leadUniqueId',
           'Id', 'id', 'LeadId', 'leadId', 'ExternalId', 'externalId'
         ]);
 
-        // Extract agent info - try nested objects first, then flat keys
         const agentObj = (lead.Agent || lead.agent || lead.User || lead.user || {}) as Record<string, unknown>;
         const agentEmail = this.getStr(agentObj, ['email', 'Email', 'EmailAddress']) ||
                           this.getStr(lead, ['AgentEmail', 'agentEmail', 'UserEmail', 'userEmail', 'Agent.Email']);
@@ -265,14 +233,12 @@ export class EnreachAdapter implements DialerAdapter {
         const agentId = this.getStr(agentObj, ['uniqueId', 'UniqueId', 'Id', 'id']) ||
                        this.getStr(lead, ['AgentId', 'agentId', 'UserId', 'userId']);
 
-        // Extract campaign info
         const campaignObj = (lead.Campaign || lead.campaign || lead.Project || lead.project || {}) as Record<string, unknown>;
         const campaignId = this.getStr(campaignObj, ['uniqueId', 'UniqueId', 'Id', 'id']) ||
                           this.getStr(lead, ['CampaignId', 'campaignId', 'ProjectId', 'projectId', 'CampaignUniqueId']);
         const campaignName = this.getStr(campaignObj, ['name', 'Name']) ||
                             this.getStr(lead, ['CampaignName', 'campaignName', 'ProjectName', 'projectName', 'FlowName', 'flowName']);
 
-        // Extract customer info
         const customerName = this.getStr(lead, [
           'company', 'Company', 'CompanyName', 'companyName',
           'name', 'Name', 'CustomerName', 'customerName', 'LeadName', 'leadName'
@@ -282,7 +248,6 @@ export class EnreachAdapter implements DialerAdapter {
           'Telephone', 'telephone', 'Mobile', 'mobile', 'CellPhone', 'cellPhone'
         ]);
 
-        // Extract sale date
         const saleDate = this.getStr(lead, [
           'soldTime', 'SoldTime', 'SoldDate', 'soldDate',
           'closedTime', 'ClosedTime', 'ClosedDate', 'closedDate',
@@ -290,10 +255,8 @@ export class EnreachAdapter implements DialerAdapter {
           'createdTime', 'CreatedTime', 'created', 'Created', 'CreatedDate', 'createdDate'
         ]) || new Date().toISOString();
 
-        // Get mapping config for this campaign
         const mapping = mappingLookup.get(campaignId);
         
-        // Extract external reference (OPP) from customFields or data
         const dataObj = (lead.data || lead.Data || lead.customFields || lead.CustomFields || {}) as Record<string, unknown>;
         const variables = { ...dataObj, ...lead };
         let externalReference: string | null = null;
@@ -306,11 +269,9 @@ export class EnreachAdapter implements DialerAdapter {
         } 
         
         if (!externalReference) {
-          // Fallback: search for common OPP field patterns
           externalReference = this.searchForOppInVariables(variables as Record<string, unknown>);
         }
 
-        // Map products - try multiple structures
         const productsArray = (lead.Products || lead.products || lead.Items || lead.items || []) as unknown[];
         let products: StandardProduct[] = [];
         
@@ -326,7 +287,6 @@ export class EnreachAdapter implements DialerAdapter {
           });
         }
 
-        // If no products found, use campaign/flow name as product
         if (products.length === 0) {
           const productTitle = campaignName || 
                               this.getStr(lead, ['ProductName', 'productName', 'FlowName', 'flowName', 'ServiceName', 'serviceName']) ||
@@ -341,7 +301,8 @@ export class EnreachAdapter implements DialerAdapter {
 
         const sale: StandardSale = {
           externalId,
-          sourceSystem: "enreach" as const,
+          integrationType: "enreach" as const,
+          dialerName: this.dialerName,
           saleDate,
           agentEmail,
           agentExternalId: agentId || undefined,
@@ -362,7 +323,6 @@ export class EnreachAdapter implements DialerAdapter {
         return sale;
       });
 
-      // Log extraction results for debugging
       const withExternalId = sales.filter(s => s.externalId).length;
       const withAgent = sales.filter(s => s.agentName || s.agentEmail).length;
       const withCustomer = sales.filter(s => s.customerName || s.customerPhone).length;
@@ -375,9 +335,6 @@ export class EnreachAdapter implements DialerAdapter {
     }
   }
 
-  /**
-   * Extract reference using configured extraction method
-   */
   private extractReference(
     variables: Record<string, unknown>,
     config: ReferenceExtractionConfig
@@ -385,7 +342,6 @@ export class EnreachAdapter implements DialerAdapter {
     try {
       switch (config.type) {
         case "field_id": {
-          // Try case-insensitive lookup
           const value = this.getValue(variables, [config.value, config.value.toLowerCase(), config.value.toUpperCase()]);
           return value ? String(value) : null;
         }
@@ -422,9 +378,6 @@ export class EnreachAdapter implements DialerAdapter {
     }
   }
 
-  /**
-   * Fallback search for OPP-like values in lead data/customFields
-   */
   private searchForOppInVariables(variables: Record<string, unknown>): string | null {
     const commonFields = [
       "opp", "OPP", "Opp", "opp_number", "OppNumber", "oppNumber",
@@ -441,7 +394,6 @@ export class EnreachAdapter implements DialerAdapter {
       }
     }
 
-    // Search for OPP pattern in all string values
     const oppPattern = /OPP-?\d{5,}/i;
     for (const [key, value] of Object.entries(variables)) {
       if (typeof value === "string") {
@@ -456,9 +408,6 @@ export class EnreachAdapter implements DialerAdapter {
     return null;
   }
 
-  /**
-   * Fetch detailed lead data for enrichment
-   */
   async fetchResultData(resultId: string): Promise<Record<string, unknown>> {
     try {
       const data = await this.get(`/leads/${resultId}`) as Record<string, unknown>;

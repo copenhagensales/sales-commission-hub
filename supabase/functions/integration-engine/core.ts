@@ -104,9 +104,11 @@ export class IngestionEngine {
 
   // --- 3. PROCESAR VENTAS (La lógica pesada) ---
   // Core is now adapter-agnostic: it receives StandardSale with externalReference already extracted
-  async processSales(sales: StandardSale[], sourceSystem: string) {
+  async processSales(sales: StandardSale[]) {
     if (sales.length === 0) return { processed: 0, errors: 0 };
-    this.log("INFO", `Procesando ${sales.length} ventas de ${sourceSystem}...`);
+    
+    const sampleSale = sales[0];
+    this.log("INFO", `Procesando ${sales.length} ventas de ${sampleSale.dialerName} (${sampleSale.integrationType})...`);
 
     // A. Cargar Cachés (Optimización de rendimiento)
     const { data: dbProducts } = await this.supabase.from("products").select("id, name, commission_dkk, revenue_dkk");
@@ -130,7 +132,8 @@ export class IngestionEngine {
           customer_phone: sale.customerPhone,
           adversus_opp_number: sale.externalReference || null,
           client_campaign_id: sale.clientCampaignId || null,
-          source: sourceSystem, // Track which dialer system the sale came from
+          source: sale.dialerName, // The dialer/account name (e.g., "Lovablecph", "tryg")
+          integration_type: sale.integrationType, // The integration system (adversus, enreach)
           updated_at: new Date().toISOString(),
         };
 

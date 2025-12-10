@@ -4,8 +4,9 @@ import { StandardSale, StandardUser, StandardCampaign, CampaignMappingConfig, Re
 export class AdversusAdapter implements DialerAdapter {
   private authHeader: string;
   private baseUrl = "https://api.adversus.io/v1";
+  private dialerName: string;
 
-  constructor(secrets?: Record<string, string> | string[] | null) {
+  constructor(secrets?: Record<string, string> | string[] | null, dialerName?: string) {
     // Support both object secrets and env vars
     let user: string | undefined;
     let pass: string | undefined;
@@ -21,6 +22,11 @@ export class AdversusAdapter implements DialerAdapter {
 
     if (!user || !pass) throw new Error("Credenciales Adversus faltantes");
     this.authHeader = btoa(`${user}:${pass}`);
+    this.dialerName = dialerName || "Lovablecph";
+  }
+
+  setDialerName(name: string) {
+    this.dialerName = name;
   }
 
   private async get(endpoint: string) {
@@ -119,7 +125,8 @@ export class AdversusAdapter implements DialerAdapter {
       
       return {
         externalId: String(s.id),
-        sourceSystem: "adversus" as const,
+        integrationType: "adversus" as const,
+        dialerName: this.dialerName,
         saleDate: s.closedTime || s.createdTime,
 
         agentExternalId: String(agentId),

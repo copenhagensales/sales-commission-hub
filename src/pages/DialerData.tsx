@@ -24,6 +24,7 @@ interface Sale {
   customer_company: string | null;
   customer_phone: string | null;
   source: string | null;
+  integration_type: string | null;
 }
 
 const PAGE_SIZE = 50;
@@ -49,14 +50,14 @@ export default function DialerData() {
       if (toDate) totalQuery = totalQuery.lte("sale_datetime", toDate);
       const { count: total } = await totalQuery;
 
-      // Get adversus count
-      let adversusQuery = supabase.from("sales").select("id", { count: "exact", head: true }).eq("source", "adversus");
+      // Get adversus count (by integration_type)
+      let adversusQuery = supabase.from("sales").select("id", { count: "exact", head: true }).eq("integration_type", "adversus");
       if (fromDate) adversusQuery = adversusQuery.gte("sale_datetime", fromDate);
       if (toDate) adversusQuery = adversusQuery.lte("sale_datetime", toDate);
       const { count: adversus } = await adversusQuery;
 
-      // Get enreach count
-      let enreachQuery = supabase.from("sales").select("id", { count: "exact", head: true }).eq("source", "enreach");
+      // Get enreach count (by integration_type)
+      let enreachQuery = supabase.from("sales").select("id", { count: "exact", head: true }).eq("integration_type", "enreach");
       if (fromDate) enreachQuery = enreachQuery.gte("sale_datetime", fromDate);
       if (toDate) enreachQuery = enreachQuery.lte("sale_datetime", toDate);
       const { count: enreach } = await enreachQuery;
@@ -85,12 +86,12 @@ export default function DialerData() {
 
       let query = supabase
         .from("sales")
-        .select("id, adversus_external_id, agent_name, sale_datetime, adversus_opp_number, customer_company, customer_phone, source", { count: "exact" })
+        .select("id, adversus_external_id, agent_name, sale_datetime, adversus_opp_number, customer_company, customer_phone, source, integration_type", { count: "exact" })
         .order("sale_datetime", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (sourceFilter !== "all") {
-        query = query.eq("source", sourceFilter);
+        query = query.eq("integration_type", sourceFilter);
       }
 
       if (fromDate) {
@@ -130,8 +131,8 @@ export default function DialerData() {
     enabled: !!selectedSale,
   });
 
-  const getSourceBadge = (source: string | null) => {
-    if (source === "enreach") {
+  const getIntegrationBadge = (integrationType: string | null) => {
+    if (integrationType === "enreach") {
       return <Badge className="bg-purple-600 hover:bg-purple-700">Enreach</Badge>;
     }
     return <Badge className="bg-blue-600 hover:bg-blue-700">Adversus</Badge>;
@@ -285,7 +286,8 @@ export default function DialerData() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Kilde</TableHead>
+                        <TableHead>Integration</TableHead>
+                        <TableHead>Dialer</TableHead>
                         <TableHead>Dialer ID</TableHead>
                         <TableHead>Agent</TableHead>
                         <TableHead>Kunde</TableHead>
@@ -300,10 +302,11 @@ export default function DialerData() {
                           className="cursor-pointer hover:bg-muted/50"
                           onClick={() => setSelectedSale(sale)}
                         >
-                          <TableCell>{getSourceBadge(sale.source)}</TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {sale.adversus_external_id || "-"}
-                          </TableCell>
+                        <TableCell>{getIntegrationBadge(sale.integration_type)}</TableCell>
+                        <TableCell className="text-sm">{sale.source || "-"}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {sale.adversus_external_id || "-"}
+                        </TableCell>
                           <TableCell>{sale.agent_name || "-"}</TableCell>
                           <TableCell className="max-w-[150px] truncate">{sale.customer_company || "-"}</TableCell>
                           <TableCell>
@@ -326,10 +329,10 @@ export default function DialerData() {
                           </TableCell>
                         </TableRow>
                       ))}
-                      {sales.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                            Ingen salg fundet
+                    {sales.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                          Ingen salg fundet
                           </TableCell>
                         </TableRow>
                       )}
@@ -377,7 +380,7 @@ export default function DialerData() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
                 Salgsdetaljer
-                {selectedSale && getSourceBadge(selectedSale.source)}
+                {selectedSale && getIntegrationBadge(selectedSale.integration_type)}
               </DialogTitle>
             </DialogHeader>
             {selectedSale && (
