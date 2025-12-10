@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check } from "lucide-react";
+import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check, List, ExternalLink } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
 interface DialerIntegration {
@@ -81,6 +82,14 @@ export function DialerIntegrations() {
   const [selectedWebhookEvent, setSelectedWebhookEvent] = useState("leadClosedSuccess");
   const [isCreatingWebhook, setIsCreatingWebhook] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
+
+  // Webhook management state
+  const [manageWebhooksDialogOpen, setManageWebhooksDialogOpen] = useState(false);
+  const [manageWebhooksIntegrationId, setManageWebhooksIntegrationId] = useState<string | null>(null);
+  const [manageWebhooksIntegrationName, setManageWebhooksIntegrationName] = useState<string>("");
+  const [webhooksList, setWebhooksList] = useState<Array<{ id: number; url: string; event: string; authKey?: string }>>([]);
+  const [isLoadingWebhooks, setIsLoadingWebhooks] = useState(false);
+  const [isDeletingWebhookId, setIsDeletingWebhookId] = useState<number | null>(null);
 
   // Fetch Dialer Integrations from new table
   const { data: integrations, isLoading } = useQuery({
@@ -257,6 +266,68 @@ export function DialerIntegrations() {
     setCopiedUrl(true);
     toast.success("Webhook URL kopieret");
     setTimeout(() => setCopiedUrl(false), 2000);
+  };
+
+  // Load webhooks from Adversus
+  const loadWebhooks = async (integrationId: string) => {
+    setIsLoadingWebhooks(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("adversus-manage-webhooks", {
+        body: {
+          integration_id: integrationId,
+          action: "list",
+        },
+      });
+
+      if (error) throw error;
+      
+      if (data?.webhooks && Array.isArray(data.webhooks)) {
+        setWebhooksList(data.webhooks);
+      } else {
+        setWebhooksList([]);
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
+      toast.error(`Fejl ved hentning af webhooks: ${errorMessage}`);
+      setWebhooksList([]);
+    } finally {
+      setIsLoadingWebhooks(false);
+    }
+  };
+
+  // Delete webhook from Adversus
+  const deleteWebhook = async (webhookId: number) => {
+    if (!manageWebhooksIntegrationId) return;
+    
+    setIsDeletingWebhookId(webhookId);
+    try {
+      const { data, error } = await supabase.functions.invoke("adversus-manage-webhooks", {
+        body: {
+          integration_id: manageWebhooksIntegrationId,
+          action: "delete",
+          webhook_id: webhookId,
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success("Webhook slettet");
+      // Refresh the list
+      loadWebhooks(manageWebhooksIntegrationId);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
+      toast.error(`Fejl ved sletning af webhook: ${errorMessage}`);
+    } finally {
+      setIsDeletingWebhookId(null);
+    }
+  };
+
+  // Open manage webhooks dialog
+  const openManageWebhooksDialog = (integrationId: string, integrationName: string) => {
+    setManageWebhooksIntegrationId(integrationId);
+    setManageWebhooksIntegrationName(integrationName);
+    setManageWebhooksDialogOpen(true);
+    loadWebhooks(integrationId);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -490,18 +561,28 @@ export function DialerIntegrations() {
                         )}
                       </Button>
                       {integration.provider === 'adversus' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          title="Opret Webhook"
-                          onClick={() => {
-                            setWebhookIntegrationId(integration.id);
-                            setWebhookIntegrationName(integration.name);
-                            setWebhookDialogOpen(true);
-                          }}
-                        >
-                          <Webhook className="h-4 w-4" />
-                        </Button>
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            title="Opret Webhook"
+                            onClick={() => {
+                              setWebhookIntegrationId(integration.id);
+                              setWebhookIntegrationName(integration.name);
+                              setWebhookDialogOpen(true);
+                            }}
+                          >
+                            <Webhook className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            title="Administrer Webhooks"
+                            onClick={() => openManageWebhooksDialog(integration.id, integration.name)}
+                          >
+                            <List className="h-4 w-4" />
+                          </Button>
+                        </>
                       )}
                       <Button
                         variant="ghost"
@@ -603,6 +684,99 @@ export function DialerIntegrations() {
               <Button onClick={createWebhook} disabled={isCreatingWebhook}>
                 {isCreatingWebhook && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Opret Webhook
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Webhook Management Dialog */}
+        <Dialog open={manageWebhooksDialogOpen} onOpenChange={setManageWebhooksDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <List className="h-5 w-5" />
+                Webhooks i Adversus - {manageWebhooksIntegrationName}
+              </DialogTitle>
+              <DialogDescription>
+                Se og administrer alle webhooks konfigureret i din Adversus konto.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="py-4">
+              {isLoadingWebhooks ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span>Indlæser webhooks...</span>
+                </div>
+              ) : webhooksList.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Ingen webhooks fundet i Adversus.
+                </div>
+              ) : (
+                <ScrollArea className="h-[300px] pr-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Event</TableHead>
+                        <TableHead className="max-w-[200px]">URL</TableHead>
+                        <TableHead className="text-right">Handlinger</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {webhooksList.map((webhook) => (
+                        <TableRow key={webhook.id}>
+                          <TableCell className="font-mono text-sm">{webhook.id}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{webhook.event}</Badge>
+                          </TableCell>
+                          <TableCell className="max-w-[200px]">
+                            <div className="flex items-center gap-1">
+                              <span className="truncate text-xs font-mono">{webhook.url}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => window.open(webhook.url, '_blank')}
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteWebhook(webhook.id)}
+                              disabled={isDeletingWebhookId === webhook.id}
+                            >
+                              {isDeletingWebhookId === webhook.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              )}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              )}
+            </div>
+            
+            <DialogFooter className="flex justify-between items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => manageWebhooksIntegrationId && loadWebhooks(manageWebhooksIntegrationId)}
+                disabled={isLoadingWebhooks}
+              >
+                {isLoadingWebhooks ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                Genindlæs
+              </Button>
+              <Button variant="outline" onClick={() => setManageWebhooksDialogOpen(false)}>
+                Luk
               </Button>
             </DialogFooter>
           </DialogContent>
