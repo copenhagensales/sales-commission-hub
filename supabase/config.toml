@@ -18,6 +18,9 @@ verify_jwt = true
 [functions.adversus-manage-webhooks]
 verify_jwt = true
 
+[functions.enreach-manage-webhooks]
+verify_jwt = true
+
 [functions.import-products]
 verify_jwt = false
 
