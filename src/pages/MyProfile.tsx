@@ -308,21 +308,60 @@ export default function MyProfile() {
     );
   }, [timeStamps]);
 
-  // Calculate shift statistics using deduplicated stamps and effective hours
-  const shiftStats = useMemo(() => {
+  // Generate expected work schedule for current month
+  const expectedSchedule = useMemo(() => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const dailyHours = (employee?.weekly_hours || 37) / 5; // 5 working days
+    const startTime = employee?.standard_start_time || "09:00";
+    
+    const schedule: Array<{
+      date: string;
+      status: "work" | "vacation" | "sick";
+      hours: number;
+      startTime: string;
+    }> = [];
+    
+    // Generate all weekdays in the month
+    const current = new Date(monthStart);
+    while (current <= monthEnd && current <= now) {
+      const dayOfWeek = current.getDay();
+      // Only include weekdays (Mon-Fri = 1-5)
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        const dateStr = current.toISOString().split('T')[0];
+        
+        // Check if there's an absence on this day
+        const absence = absences.find(a => {
+          const start = new Date(a.start_date);
+          const end = new Date(a.end_date);
+          return current >= start && current <= end;
+        });
+        
+        schedule.push({
+          date: dateStr,
+          status: absence ? (absence.type === "vacation" ? "vacation" : "sick") : "work",
+          hours: absence ? 0 : dailyHours,
+          startTime: absence ? "" : startTime,
+        });
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return schedule.reverse(); // Most recent first
+  }, [employee?.weekly_hours, employee?.standard_start_time, absences]);
+
+  // Calculate shift statistics using expected schedule
+  const shiftStats = useMemo(() => {
     const hourlyRate = employee?.salary_amount || 0;
     
-    // Time stamps stats - use effective_hours (manager edits) when available
-    const monthStamps = deduplicatedTimeStamps.filter(t => new Date(t.clock_in) >= monthStart);
-    const totalHoursThisMonth = monthStamps.reduce((sum, t) => {
-      const hours = t.effective_hours || 0;
-      return sum + hours;
-    }, 0);
+    const workDays = expectedSchedule.filter(d => d.status === "work");
+    const totalHoursThisMonth = workDays.reduce((sum, d) => sum + d.hours, 0);
     const totalSalaryThisMonth = totalHoursThisMonth * hourlyRate;
     
-    // Booking assignments stats  
+    // Booking assignments stats (for fieldmarketing)
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthBookings = bookingAssignments.filter(b => new Date(b.date) >= monthStart);
     const totalBookingHours = monthBookings.reduce((sum, b) => {
       const start = new Date(`1970-01-01T${b.start_time}`);
@@ -333,7 +372,7 @@ export default function MyProfile() {
     const totalBookingSalary = totalBookingHours * hourlyRate;
     
     return {
-      stampCount: monthStamps.length,
+      stampCount: workDays.length,
       stampHours: totalHoursThisMonth,
       stampSalary: totalSalaryThisMonth,
       bookingCount: monthBookings.length,
@@ -341,7 +380,7 @@ export default function MyProfile() {
       bookingSalary: totalBookingSalary,
       hourlyRate,
     };
-  }, [deduplicatedTimeStamps, bookingAssignments, employee?.salary_amount]);
+  }, [expectedSchedule, bookingAssignments, employee?.salary_amount]);
 
   // Calculate absence statistics
   const absenceStats = useMemo(() => {
@@ -992,58 +1031,74 @@ export default function MyProfile() {
                 </Card>
               </div>
 
-              {/* Time Stamps History */}
-              {deduplicatedTimeStamps.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Stemplet tid
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {deduplicatedTimeStamps.slice(0, 20).map((stamp) => {
-                        const clockIn = new Date(stamp.clock_in);
-                        const clockOut = stamp.clock_out ? new Date(stamp.clock_out) : null;
-                        const effectiveIn = stamp.effective_clock_in ? new Date(stamp.effective_clock_in) : null;
-                        const effectiveOut = stamp.effective_clock_out ? new Date(stamp.effective_clock_out) : null;
-                        const hours = stamp.effective_hours || 0;
-                        const dailySalary = hours * shiftStats.hourlyRate;
-                        const wasEdited = effectiveIn || effectiveOut;
-                        
-                        return (
-                          <div key={stamp.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-medium">
-                                {format(clockIn, "EEEE d. MMM", { locale: da })}
+              {/* Expected Schedule - based on standard work hours */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Månedsoversigt
+                    <span className="text-xs font-normal text-muted-foreground ml-2">
+                      (Baseret på {employee?.weekly_hours || 37} timer/uge)
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {expectedSchedule.slice(0, 25).map((day) => {
+                      const date = new Date(day.date);
+                      const dailySalary = day.hours * shiftStats.hourlyRate;
+                      
+                      return (
+                        <div key={day.date} className="flex items-center justify-between py-2 border-b last:border-0">
+                          <div className="flex items-center gap-3">
+                            {day.status === "work" ? (
+                              <div className="w-3 h-3 rounded-full bg-green-500" />
+                            ) : day.status === "vacation" ? (
+                              <Palmtree className="h-4 w-4 text-amber-500" />
+                            ) : (
+                              <Thermometer className="h-4 w-4 text-red-500" />
+                            )}
+                            <span className="text-sm font-medium">
+                              {format(date, "EEEE d. MMM", { locale: da })}
+                            </span>
+                            {day.status === "work" && day.startTime && (
+                              <span className="text-xs text-muted-foreground">
+                                fra {day.startTime}
                               </span>
-                              <div className="flex flex-col">
-                                <span className="text-xs text-muted-foreground">
-                                  {effectiveIn ? format(effectiveIn, "HH:mm") : format(clockIn, "HH:mm")} - {effectiveOut ? format(effectiveOut, "HH:mm") : (clockOut ? format(clockOut, "HH:mm") : "...")}
-                                </span>
-                                {wasEdited && (
-                                  <span className="text-xs text-blue-500">Rettet af leder</span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline">
-                                {hours.toFixed(1)} timer
-                              </Badge>
-                              {shiftStats.hourlyRate > 0 && (
-                                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                  {dailySalary.toLocaleString('da-DK')} kr
-                                </Badge>
-                              )}
-                            </div>
+                            )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                          <div className="flex items-center gap-2">
+                            {day.status === "work" ? (
+                              <>
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
+                                  {day.hours.toFixed(1)} timer
+                                </Badge>
+                                {shiftStats.hourlyRate > 0 && (
+                                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                    {dailySalary.toLocaleString('da-DK')} kr
+                                  </Badge>
+                                )}
+                              </>
+                            ) : (
+                              <Badge 
+                                variant={day.status === "vacation" ? "secondary" : "destructive"}
+                                className={day.status === "vacation" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : ""}
+                              >
+                                {day.status === "vacation" ? "Ferie" : "Syg"}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {expectedSchedule.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Ingen arbejdsdage endnu denne måned
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Booking Assignments History */}
               {bookingAssignments.length > 0 && (
