@@ -20,6 +20,7 @@ interface Sale {
   id: string;
   adversus_external_id: string | null;
   agent_name: string | null;
+  agent_email: string | null;
   sale_datetime: string | null;
   adversus_opp_number: string | null;
   customer_company: string | null;
@@ -112,7 +113,7 @@ export default function DialerData() {
       let query = supabase
         .from("sales")
         .select(`
-          id, adversus_external_id, agent_name, sale_datetime, adversus_opp_number, 
+          id, adversus_external_id, agent_name, agent_email, sale_datetime, adversus_opp_number, 
           customer_company, customer_phone, source, integration_type, dialer_campaign_id,
           client_campaigns(name)
         `, { count: "exact" })
@@ -394,6 +395,9 @@ export default function DialerData() {
                             <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("agent_name")}>
                               <div className="flex items-center">Agent<SortIcon column="agent_name" /></div>
                             </TableHead>
+                            <TableHead>
+                              <div className="flex items-center">Email</div>
+                            </TableHead>
                             <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("customer_company")}>
                               <div className="flex items-center">Kunde<SortIcon column="customer_company" /></div>
                             </TableHead>
@@ -419,6 +423,7 @@ export default function DialerData() {
                                 {sale.adversus_external_id || "-"}
                               </TableCell>
                               <TableCell>{sale.agent_name || "-"}</TableCell>
+                              <TableCell className="text-sm max-w-[150px] truncate">{sale.agent_email || "-"}</TableCell>
                               <TableCell className="max-w-[150px] truncate">{sale.customer_company || "-"}</TableCell>
                               <TableCell>
                                 {sale.sale_datetime
@@ -444,7 +449,7 @@ export default function DialerData() {
                           ))}
                           {sales.length === 0 && (
                             <TableRow>
-                              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                                 Ingen salg fundet
                               </TableCell>
                             </TableRow>
@@ -508,6 +513,10 @@ export default function DialerData() {
                   <div>
                     <span className="text-muted-foreground">Agent:</span>
                     <p>{selectedSale.agent_name || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Agent Email:</span>
+                    <p className="text-sm">{selectedSale.agent_email || "-"}</p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Kunde:</span>
