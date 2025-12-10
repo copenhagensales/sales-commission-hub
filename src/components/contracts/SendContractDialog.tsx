@@ -241,6 +241,9 @@ export function SendContractDialog({
 
       const { data: user } = await supabase.auth.getUser();
       
+      // Always merge content fresh to ensure employee data is included
+      const mergedContent = mergeContent(template.content);
+      
       // Create contract
       const { data: contract, error: contractError } = await supabase
         .from("contracts")
@@ -249,7 +252,7 @@ export function SendContractDialog({
           employee_id: employee.id,
           type: template.type,
           title: customTitle || template.name,
-          content: previewContent,
+          content: mergedContent,
           status: "pending_employee",
           sent_at: new Date().toISOString(),
           sent_by: user.user?.id,
