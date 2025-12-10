@@ -37,7 +37,6 @@ const VagtBookWeek = lazyWithRetry(() => import("./pages/vagt-flow/BookWeek"));
 const VagtLocations = lazyWithRetry(() => import("./pages/vagt-flow/Locations"));
 const VagtBookings = lazyWithRetry(() => import("./pages/vagt-flow/Bookings"));
 const VagtMinUge = lazyWithRetry(() => import("./pages/vagt-flow/MinUge"));
-const VagtEmployees = lazyWithRetry(() => import("./pages/vagt-flow/Employees"));
 const VagtVehicles = lazyWithRetry(() => import("./pages/vagt-flow/Vehicles"));
 const VagtTimeOffRequests = lazyWithRetry(() => import("./pages/vagt-flow/TimeOffRequests"));
 const VagtLocationDetail = lazyWithRetry(() => import("./pages/vagt-flow/LocationDetail"));
@@ -243,7 +242,6 @@ const App = () => (
               <Route path="/vagt-flow/locations/:id" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtLocationDetail /></RoleProtectedRoute>} />
               <Route path="/vagt-flow/bookings" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtBookings /></RoleProtectedRoute>} />
               <Route path="/vagt-flow/min-uge" element={<ProtectedRoute><VagtMinUge /></ProtectedRoute>} />
-              <Route path="/vagt-flow/employees" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtEmployees /></RoleProtectedRoute>} />
               <Route path="/vagt-flow/vehicles" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtVehicles /></RoleProtectedRoute>} />
               <Route path="/vagt-flow/time-off" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtTimeOffRequests /></RoleProtectedRoute>} />
               <Route path="/vagt-flow/billing" element={<RoleProtectedRoute requireTeamlederOrAbove><VagtBilling /></RoleProtectedRoute>} />
