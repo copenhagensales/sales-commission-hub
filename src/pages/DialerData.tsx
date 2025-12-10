@@ -67,18 +67,23 @@ export default function DialerData() {
       if (toDate) enreachQuery = enreachQuery.lte("sale_datetime", toDate);
       const { count: enreach } = await enreachQuery;
 
-      // Get OPP present count
-      let oppQuery = supabase.from("sales").select("id", { count: "exact", head: true }).not("adversus_opp_number", "is", null);
+      // Get OPP present count (only for Adversus sales)
+      let oppQuery = supabase.from("sales").select("id", { count: "exact", head: true })
+        .eq("integration_type", "adversus")
+        .not("adversus_opp_number", "is", null);
       if (fromDate) oppQuery = oppQuery.gte("sale_datetime", fromDate);
       if (toDate) oppQuery = oppQuery.lte("sale_datetime", toDate);
       const { count: withOpp } = await oppQuery;
+
+      // Missing OPP only counts Adversus sales without OPP (Enreach doesn't use OPP)
+      const missingOpp = (adversus || 0) - (withOpp || 0);
 
       return {
         total: total || 0,
         adversus: adversus || 0,
         enreach: enreach || 0,
         withOpp: withOpp || 0,
-        missingOpp: (total || 0) - (withOpp || 0),
+        missingOpp: missingOpp,
       };
     },
   });
@@ -351,7 +356,9 @@ export default function DialerData() {
                               : "-"}
                           </TableCell>
                           <TableCell>
-                            {sale.adversus_opp_number ? (
+                            {sale.integration_type === "enreach" ? (
+                              <Badge variant="secondary" className="text-xs">Ej relevant</Badge>
+                            ) : sale.adversus_opp_number ? (
                               <div className="flex items-center gap-2 text-green-500">
                                 <CheckCircle className="h-4 w-4" />
                                 <span className="font-mono text-xs">{sale.adversus_opp_number}</span>
