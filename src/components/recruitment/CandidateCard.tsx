@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -113,6 +114,7 @@ const roleColors: Record<string, string> = {
 };
 
 export function CandidateCard({ candidate, applications = [], onUpdate }: CandidateCardProps) {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
@@ -184,7 +186,7 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
   };
 
   const handleCardClick = () => {
-    setIsOpen(!isOpen);
+    navigate(`/recruitment/candidates/${candidate.id}`);
   };
 
   const position = candidate.applied_position?.toLowerCase() || "";
