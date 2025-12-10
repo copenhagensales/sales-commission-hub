@@ -127,17 +127,20 @@ serve(async (req) => {
       analysis.sampleSales.push(sampleInfo);
     }
 
-    // 3. For sales with leadId, fetch full lead data to check resultData there
-    console.log(`[DIAG] Fetching lead data for ${Math.min(5, sales.length)} samples...`);
+    // 3. For ALL sales with leadId, fetch lead data and check for OPP
+    const leadsToCheck = Math.min(sales.length, 30); // Check up to 30 leads
+    console.log(`[DIAG] Fetching lead data for ${leadsToCheck} samples...`);
     
-    for (const sale of sales.slice(0, 5)) {
+    let oppFoundCount = 0;
+    let oppMissingCount = 0;
+    let leadFetchErrors = 0;
+    
+    for (const sale of sales.slice(0, leadsToCheck)) {
       const leadId = sale.leadId || sale.lead?.id;
       if (!leadId) {
         console.log(`[DIAG] Sale ${sale.id} has no leadId`);
         continue;
       }
-
-      console.log(`[DIAG] Fetching lead ${leadId}...`);
 
       try {
         const leadUrl = `${baseUrl}/leads/${leadId}`;
@@ -178,16 +181,16 @@ serve(async (req) => {
           };
 
           if (lead.resultData) {
-            if (Array.isArray(leadData.resultData)) {
-              leadSample.resultDataLength = leadData.resultData.length;
-              leadSample.sampleFields = leadData.resultData.slice(0, 10).map((f: any) => ({
+            if (Array.isArray(lead.resultData)) {
+              leadSample.resultDataLength = lead.resultData.length;
+              leadSample.sampleFields = lead.resultData.slice(0, 10).map((f: any) => ({
                 id: f.id,
                 label: f.label,
                 value: f.value
               }));
 
-              // Check for OPP
-              for (const field of leadData.resultData) {
+              // Check for OPP in field 80862 or by label
+              for (const field of lead.resultData) {
                 const fieldId = String(field.id || field.fieldId);
                 if (knownOppFieldIds.includes(fieldId)) {
                   leadSample.oppFound = true;
@@ -197,51 +200,63 @@ serve(async (req) => {
                 }
                 // Also check by label
                 const label = String(field.label || '').toLowerCase();
-                if (label.includes('opp') || label.includes('ordre')) {
+                if (label.includes('opp') && !leadSample.oppFound) {
                   leadSample.oppFound = true;
                   leadSample.oppValue = field.value;
                   leadSample.oppFieldId = fieldId;
                   leadSample.oppLabel = field.label;
                 }
               }
-            } else if (typeof leadData.resultData === 'object') {
-              leadSample.resultDataKeys = Object.keys(leadData.resultData).slice(0, 10);
-              // Check object-style resultData
-              for (const [key, value] of Object.entries(leadData.resultData)) {
-                if (knownOppFieldIds.includes(key)) {
-                  leadSample.oppFound = true;
-                  leadSample.oppValue = value;
-                  leadSample.oppFieldId = key;
-                }
-              }
             }
           }
 
+          // Track OPP stats
+          if (leadSample.oppFound && leadSample.oppValue) {
+            oppFoundCount++;
+          } else {
+            oppMissingCount++;
+          }
+
           analysis.leadDataSamples.push(leadSample);
+        } else {
+          leadFetchErrors++;
         }
       } catch (e) {
         console.log(`[DIAG] Error fetching lead ${leadId}:`, e);
+        leadFetchErrors++;
       }
+      
+      // Small delay to avoid rate limiting
+      await new Promise(r => setTimeout(r, 50));
     }
 
-    // 4. Summary
+    // Add OPP stats to analysis
+    analysis.oppFieldStats.found = oppFoundCount;
+    analysis.oppFieldStats.notFound = oppMissingCount;
+
+    // 4. Summary with percentages
+    const leadsChecked = oppFoundCount + oppMissingCount;
+    const oppPercentage = leadsChecked > 0 ? Math.round((oppFoundCount / leadsChecked) * 100) : 0;
+    
     const summary = {
       message: 'Adversus Data Diagnostics Complete',
       salesAnalyzed: sales.length,
-      salesWithResultData: analysis.withResultData,
-      salesWithResultDataArray: analysis.withResultDataArray,
-      salesWithLeadId: analysis.withLeadId,
-      oppInSalesData: analysis.oppFieldStats.found,
-      oppInLeadData: analysis.leadDataSamples.filter(l => l.oppFound).length,
+      leadsChecked: leadsChecked,
+      leadFetchErrors: leadFetchErrors,
+      oppStats: {
+        found: oppFoundCount,
+        missing: oppMissingCount,
+        percentage: `${oppPercentage}%`,
+      },
       conclusion: '',
     };
 
-    if (analysis.oppFieldStats.found > 0) {
-      summary.conclusion = `OPP found directly in ${analysis.oppFieldStats.found}/${sales.length} sales API responses`;
-    } else if (analysis.leadDataSamples.some(l => l.oppFound)) {
-      summary.conclusion = `OPP NOT in sales API, but FOUND in lead API - need extra call per sale`;
+    if (oppFoundCount > 0 && oppMissingCount === 0) {
+      summary.conclusion = `✅ 100% de leads tienen OPP (${oppFoundCount}/${leadsChecked})`;
+    } else if (oppFoundCount > 0) {
+      summary.conclusion = `⚠️ Solo ${oppPercentage}% tienen OPP (${oppFoundCount}/${leadsChecked}). ${oppMissingCount} sin OPP.`;
     } else {
-      summary.conclusion = `OPP NOT found in either sales or lead API responses - check field IDs`;
+      summary.conclusion = `❌ Ningún lead tiene OPP en field 80862. Verificar configuración.`;
     }
 
     console.log(`[DIAG] Summary:`, JSON.stringify(summary, null, 2));
