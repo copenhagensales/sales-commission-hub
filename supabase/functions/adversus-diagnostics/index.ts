@@ -1,3 +1,5 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -9,18 +11,61 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const user = Deno.env.get("ADVERSUS_API_USERNAME");
-    const pass = Deno.env.get("ADVERSUS_API_PASSWORD");
+    const body = await req.json().catch(() => ({}));
+    const integrationName = body.integration_name || "Lovablecph";
+    
+    // Get credentials from dialer_integrations
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
-    if (!user || !pass) {
-      return new Response(JSON.stringify({ error: "Credenciales Adversus no configuradas" }), {
+    // Get the integration by name
+    const { data: integration, error: intError } = await supabase
+      .from("dialer_integrations")
+      .select("id, name, encrypted_credentials")
+      .ilike("name", integrationName)
+      .single();
+
+    if (intError || !integration) {
+      return new Response(JSON.stringify({ 
+        error: `No se encontró integración: ${integrationName}`,
+        details: intError?.message 
+      }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const authHeader = `Basic ${btoa(`${user}:${pass}`)}`;
+    // Decrypt credentials using RPC with encryption key
+    const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY");
+    if (!encryptionKey) {
+      return new Response(JSON.stringify({ error: "DB_ENCRYPTION_KEY not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: creds, error: decryptError } = await supabase.rpc("get_dialer_credentials", {
+      p_integration_id: integration.id,
+      p_encryption_key: encryptionKey
+    });
+
+    if (decryptError || !creds) {
+      return new Response(JSON.stringify({ 
+        error: `No se pudieron descifrar credenciales`,
+        details: decryptError?.message 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { username, password } = creds;
+    const authHeader = `Basic ${btoa(`${username}:${password}`)}`;
     const baseUrl = "https://api.adversus.io/v1";
+    
+    console.log(`[Diagnostics] Using integration: ${integrationName}`);
 
     // Fetch leads in bulk - max 10000
     const pageSize = 1000;
