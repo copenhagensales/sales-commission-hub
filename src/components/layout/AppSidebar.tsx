@@ -37,6 +37,7 @@ const mgNavigation = [
   { name: "TDC Erhverv", href: "/tdc-erhverv", icon: Building2 },
   { name: "Codan", href: "/codan", icon: Shield },
   { name: "MG test", href: "/mg-test", icon: Percent },
+  { name: "Dialer Data", href: "/dialer-data", icon: Database },
   { name: "Datakilder info", href: "/adversus-data", icon: Database },
 ];
 
@@ -148,7 +149,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const [mgOpen, setMgOpen] = useState(
-    ["/payroll", "/tdc-erhverv", "/codan", "/mg-test", "/adversus-data"].includes(location.pathname)
+    ["/payroll", "/tdc-erhverv", "/codan", "/mg-test", "/dialer-data", "/adversus-data"].includes(location.pathname)
   );
   const [timeTrackingOpen, setTimeTrackingOpen] = useState(
     location.pathname === "/shift-planning/time-tracking" || 
