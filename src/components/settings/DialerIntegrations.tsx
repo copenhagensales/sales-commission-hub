@@ -44,6 +44,9 @@ export function DialerIntegrations() {
     api_url: "",
   });
 
+  // Per-integration sync days state
+  const [syncDays, setSyncDays] = useState<Record<string, string>>({});
+
   // Manual function execution state
   const [manualFunction, setManualFunction] = useState("backfill-opp");
   const [manualDays, setManualDays] = useState("30");
@@ -116,14 +119,14 @@ export function DialerIntegrations() {
 
   // Trigger Sync
   const syncMutation = useMutation({
-    mutationFn: async ({ integrationId, provider }: { integrationId: string; provider: string }) => {
+    mutationFn: async ({ integrationId, provider, days }: { integrationId: string; provider: string; days: number }) => {
       setSyncingId(integrationId);
       const { data, error } = await supabase.functions.invoke("integration-engine", {
         body: {
           source: provider,
           integration_id: integrationId,
           action: "sync",
-          days: 7,
+          days,
         },
       });
 
@@ -340,43 +343,59 @@ export function DialerIntegrations() {
                       <span className="text-muted-foreground text-sm">Aldrig</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right space-x-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={!integration.is_active || syncingId === integration.id}
-                      onClick={() => syncMutation.mutate({ integrationId: integration.id, provider: integration.provider })}
-                    >
-                      {syncingId === integration.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Play className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setEditingId(integration.id);
-                        setFormData({
-                          name: integration.name,
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Input
+                        type="number"
+                        className="w-16 h-8 text-xs"
+                        placeholder="7"
+                        min="1"
+                        max="365"
+                        value={syncDays[integration.id] || ""}
+                        onChange={(e) => setSyncDays((prev) => ({ ...prev, [integration.id]: e.target.value }))}
+                      />
+                      <span className="text-xs text-muted-foreground">d</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!integration.is_active || syncingId === integration.id}
+                        onClick={() => syncMutation.mutate({ 
+                          integrationId: integration.id, 
                           provider: integration.provider,
-                          username: "",
-                          password: "",
-                          api_url: integration.api_url || "",
-                        });
-                        setIsDialogOpen(true);
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteMutation.mutate(integration.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                          days: parseInt(syncDays[integration.id]) || 7
+                        })}
+                      >
+                        {syncingId === integration.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Play className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingId(integration.id);
+                          setFormData({
+                            name: integration.name,
+                            provider: integration.provider,
+                            username: "",
+                            password: "",
+                            api_url: integration.api_url || "",
+                          });
+                          setIsDialogOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteMutation.mutate(integration.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
