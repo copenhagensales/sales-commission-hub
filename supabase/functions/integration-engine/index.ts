@@ -289,14 +289,19 @@ serve(async (req) => {
         });
 
         let dialerAdapter: DialerAdapter;
-        if (source === "adversus") {
+        if (integration.provider === "adversus" || source === "adversus") {
           // Pass the integration name as the dialer name
           dialerAdapter = new AdversusAdapter(credentials, integration.name);
-        } else if (source === "enreach") {
-          // Pass the integration name as the dialer name
-          dialerAdapter = new EnreachAdapter(credentials, integration.name);
+        } else if (integration.provider === "enreach" || source === "enreach") {
+          // Pass the integration name as the dialer name and api_url from the integration record
+          const enreachCredentials = {
+            ...credentials,
+            api_url: integration.api_url, // Include the api_url from the integration record
+          };
+          console.log(`[Integration Engine] Enreach api_url from DB: ${integration.api_url}`);
+          dialerAdapter = new EnreachAdapter(enreachCredentials, integration.name);
         } else {
-          throw new Error(`Fuente no soportada: ${source}`);
+          throw new Error(`Fuente no soportada: ${source || integration.provider}`);
         }
         adapter = dialerAdapter;
 
