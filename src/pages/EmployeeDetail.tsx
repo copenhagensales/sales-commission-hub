@@ -762,6 +762,35 @@ export default function EmployeeDetail() {
                   />
                 </div>
               )}
+
+              {/* Calendar Overview - full width */}
+              <div className="md:col-span-2">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center justify-between">
+                      <span>Tilstedeværelse (sidste 4 uger)</span>
+                      <div className="flex gap-4 text-xs font-normal">
+                        <span className="flex items-center gap-1">
+                          <div className="w-3 h-3 rounded bg-amber-500/20 border border-amber-500/30" />
+                          Ferie
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <div className="w-3 h-3 rounded bg-red-500/20 border border-red-500/30" />
+                          Syg
+                        </span>
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <EmployeeCalendar 
+                      standardStartTime={employee?.standard_start_time || null}
+                      absences={absences.map(a => ({ id: a.id, type: a.type, start_date: a.start_date, end_date: a.end_date }))}
+                      latenessRecords={latenessRecords.map(l => ({ id: l.id, date: l.date, minutes: l.minutes }))}
+                      weeksToShow={4}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </TabsContent>
 

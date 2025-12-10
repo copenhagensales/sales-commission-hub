@@ -53,10 +53,9 @@ export function EmployeeCalendar({
 
   // Check if a date falls within an absence period
   const getAbsenceForDate = (date: Date): Absence | undefined => {
+    const dateStr = format(date, "yyyy-MM-dd");
     return absences.find(absence => {
-      const start = new Date(absence.start_date);
-      const end = new Date(absence.end_date);
-      return date >= start && date <= end;
+      return dateStr >= absence.start_date && dateStr <= absence.end_date;
     });
   };
 
