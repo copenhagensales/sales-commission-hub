@@ -96,6 +96,8 @@ export function DialerIntegrations() {
   const [enreachWebhookIntegrationName, setEnreachWebhookIntegrationName] = useState<string>("");
   const [enreachWebhookDescription, setEnreachWebhookDescription] = useState("");
   const [enreachWebhookCampaignCode, setEnreachWebhookCampaignCode] = useState("");
+  const [enreachCampaigns, setEnreachCampaigns] = useState<Array<{ code: string; name: string }>>([]);
+  const [isLoadingEnreachCampaigns, setIsLoadingEnreachCampaigns] = useState(false);
   const [isCreatingEnreachWebhook, setIsCreatingEnreachWebhook] = useState(false);
   
   // Enreach webhook management state
@@ -457,6 +459,34 @@ export function DialerIntegrations() {
     }
   };
 
+  // Fetch campaigns from HeroBase for dropdown
+  const loadEnreachCampaigns = async (integrationId: string) => {
+    setIsLoadingEnreachCampaigns(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("enreach-manage-webhooks", {
+        body: {
+          integration_id: integrationId,
+          action: "campaigns",
+        },
+      });
+
+      if (error) throw error;
+
+      // Map campaigns to code/name pairs
+      const campaigns = data?.campaigns || [];
+      setEnreachCampaigns(campaigns.map((c: { code?: string; name?: string; Code?: string; Name?: string }) => ({
+        code: c.code || c.Code || '',
+        name: c.name || c.Name || c.code || c.Code || 'Unknown',
+      })));
+    } catch (err: unknown) {
+      console.error("Failed to load campaigns:", err);
+      toast.error("Kunne ikke hente kampagner fra HeroBase");
+      setEnreachCampaigns([]);
+    } finally {
+      setIsLoadingEnreachCampaigns(false);
+    }
+  };
+
   // Create webhook in Enreach/HeroBase
   const createEnreachWebhook = async () => {
     if (!enreachWebhookIntegrationId) return;
@@ -806,6 +836,9 @@ export function DialerIntegrations() {
                                   setEnreachWebhookIntegrationId(integration.id);
                                   setEnreachWebhookIntegrationName(integration.name);
                                   setEnreachWebhookDescription("");
+                                  setEnreachWebhookCampaignCode("");
+                                  setEnreachCampaigns([]);
+                                  loadEnreachCampaigns(integration.id);
                                   setEnreachWebhookDialogOpen(true);
                                 }}
                               >
@@ -1164,15 +1197,30 @@ export function DialerIntegrations() {
               </div>
               
               <div className="space-y-2">
-                <Label>Campaign Code (påkrævet)</Label>
-                <Input
-                  value={enreachWebhookCampaignCode}
-                  onChange={(e) => setEnreachWebhookCampaignCode(e.target.value)}
-                  placeholder="f.eks. CAMPAIGN001"
-                />
-                <p className="text-xs text-muted-foreground">
-                  HeroBase kræver en kampagnekode. Find den i HeroBase admin.
-                </p>
+                <Label>Kampagne (påkrævet)</Label>
+                {isLoadingEnreachCampaigns ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Henter kampagner...
+                  </div>
+                ) : enreachCampaigns.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">
+                    Ingen kampagner fundet. Tjek credentials og prøv igen.
+                  </div>
+                ) : (
+                  <Select value={enreachWebhookCampaignCode} onValueChange={setEnreachWebhookCampaignCode}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vælg kampagne" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {enreachCampaigns.map((campaign) => (
+                        <SelectItem key={campaign.code} value={campaign.code}>
+                          {campaign.name} ({campaign.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               
               <div className="space-y-2">
