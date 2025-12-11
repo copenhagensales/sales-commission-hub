@@ -498,129 +498,157 @@ export class EnreachAdapter implements DialerAdapter {
 
   /**
    * GDPR-Compliant CDR fetch - only IDs and metadata, NO personal Lead data
-   * Uses HeroBase /activities endpoint for Call Detail Records
-   * HeroBase doesn't have a dedicated /calls endpoint - calls are activities
+   * Uses HeroBase /calls endpoint for Call Detail Records
+   * API Docs: https://wsheroXX.herobase.com/api-docs/index.html#!/calls
    */
   async fetchCalls(days: number): Promise<StandardCall[]> {
     try {
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - days);
-      const modifiedFrom = cutoffDate.toISOString().split('T')[0];
+      // Calculate start time for the query
+      const startTime = new Date();
+      startTime.setDate(startTime.getDate() - days);
+      const startTimeStr = startTime.toISOString();
+      
+      // TimeSpan format for Enreach: "d.hh:mm:ss" 
+      const timeSpan = `${days}.00:00:00`;
 
-      console.log(`[EnreachAdapter] Fetching calls for last ${days} days from ${modifiedFrom}`);
+      console.log(`[EnreachAdapter] Fetching calls for last ${days} days from ${startTimeStr}`);
 
       let allCalls: Record<string, unknown>[] = [];
 
-      // HeroBase uses /activities endpoint for call records
-      // Try different endpoint variations that HeroBase might support
-      const endpoints = [
-        `/activities?ModifiedFrom=${modifiedFrom}&Type=Call`,
-        `/activities?ModifiedFrom=${modifiedFrom}`,
-        `/callhistory?ModifiedFrom=${modifiedFrom}`,
-        `/calls?ModifiedFrom=${modifiedFrom}`,
-      ];
-
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`[EnreachAdapter] Trying endpoint: ${endpoint}`);
-          const data = await this.get(endpoint) as unknown;
-          
-          let records: Record<string, unknown>[] = [];
-          
-          if (Array.isArray(data)) {
-            records = data as Record<string, unknown>[];
-          } else if (data && typeof data === 'object') {
-            const wrapper = data as Record<string, unknown>;
-            records = (
-              wrapper.Results || wrapper.results || 
-              wrapper.Calls || wrapper.calls || 
-              wrapper.Activities || wrapper.activities ||
-              wrapper.Data || wrapper.data || 
-              []
-            ) as Record<string, unknown>[];
+      // Primary endpoint: /calls with Include parameter for user and campaign data
+      // API docs specify: StartTime (datetime) and TimeSpan (timespan)
+      const primaryEndpoint = `/calls?StartTime=${encodeURIComponent(startTimeStr)}&TimeSpan=${encodeURIComponent(timeSpan)}&Include=campaign,user&Limit=1000`;
+      
+      try {
+        console.log(`[EnreachAdapter] Fetching from: ${primaryEndpoint}`);
+        const data = await this.get(primaryEndpoint) as unknown;
+        
+        if (Array.isArray(data)) {
+          allCalls = data as Record<string, unknown>[];
+        } else if (data && typeof data === 'object') {
+          const wrapper = data as Record<string, unknown>;
+          allCalls = (
+            wrapper.Results || wrapper.results || 
+            wrapper.Calls || wrapper.calls || 
+            wrapper.Data || wrapper.data || 
+            []
+          ) as Record<string, unknown>[];
+        }
+        
+        console.log(`[EnreachAdapter] Found ${allCalls.length} calls from primary endpoint`);
+      } catch (primaryError) {
+        const errMsg = primaryError instanceof Error ? primaryError.message : String(primaryError);
+        console.warn(`[EnreachAdapter] Primary endpoint failed: ${errMsg}`);
+        
+        // Fallback endpoints
+        const fallbackEndpoints = [
+          `/calls?StartTime=${encodeURIComponent(startTimeStr)}&TimeSpan=${encodeURIComponent(timeSpan)}`,
+          `/calls?StartTime=${encodeURIComponent(startTimeStr.split('T')[0])}`,
+        ];
+        
+        for (const endpoint of fallbackEndpoints) {
+          try {
+            console.log(`[EnreachAdapter] Trying fallback: ${endpoint}`);
+            const data = await this.get(endpoint) as unknown;
+            
+            if (Array.isArray(data)) {
+              allCalls = data as Record<string, unknown>[];
+            } else if (data && typeof data === 'object') {
+              const wrapper = data as Record<string, unknown>;
+              allCalls = (wrapper.Results || wrapper.Calls || wrapper.Data || []) as Record<string, unknown>[];
+            }
+            
+            if (allCalls.length > 0) {
+              console.log(`[EnreachAdapter] Found ${allCalls.length} calls from fallback`);
+              break;
+            }
+          } catch (e) {
+            continue;
           }
-
-          if (records.length > 0) {
-            console.log(`[EnreachAdapter] Found ${records.length} records from ${endpoint}`);
-            allCalls = records;
-            break; // Found data, stop trying other endpoints
-          } else {
-            console.log(`[EnreachAdapter] Endpoint ${endpoint} returned empty array`);
-          }
-        } catch (endpointError) {
-          const errMsg = endpointError instanceof Error ? endpointError.message : String(endpointError);
-          console.log(`[EnreachAdapter] Endpoint ${endpoint} failed: ${errMsg}`);
-          // Continue to next endpoint
         }
       }
 
       if (allCalls.length === 0) {
-        console.log("[EnreachAdapter] No call records found from any endpoint");
-        console.log("[EnreachAdapter] HeroBase may not have call history API enabled for this account");
+        console.log("[EnreachAdapter] No call records found");
         return [];
       }
 
-      console.log(`[EnreachAdapter] Processing ${allCalls.length} call records`);
-      
       // Log sample record structure for debugging
       if (allCalls.length > 0) {
-        console.log(`[EnreachAdapter] Sample call record keys: ${Object.keys(allCalls[0]).slice(0, 15).join(', ')}`);
+        console.log(`[EnreachAdapter] Sample call keys: ${Object.keys(allCalls[0]).slice(0, 20).join(', ')}`);
       }
 
       // Map to StandardCall (GDPR-compliant - only IDs)
       return allCalls.map((call) => {
-        const status = this.mapEnreachEndCause(
-          this.getStr(call, ['endCause', 'EndCause', 'status', 'Status', 'result', 'Result', 'outcome', 'Outcome'])
+        // Determine status from endCause and connected flag
+        // endCause: 'NotApplicable', 'NormalDisconnect', 'NoResponse', 'Busy', 'VoiceMail', 'DroppedCall', 'DialingCancelled'
+        const connected = Boolean(this.getValue(call, ['connected', 'Connected']));
+        const endCause = this.getStr(call, ['endCause', 'EndCause']);
+        const status = this.mapEnreachEndCause(endCause, connected);
+        
+        // Times - API provides startTime, connectTime (optional), endTime (optional)
+        const callStartTime = this.getStr(call, ['startTime', 'StartTime']) || new Date().toISOString();
+        const connectTime = this.getStr(call, ['connectTime', 'ConnectTime']);
+        const callEndTime = this.getStr(call, ['endTime', 'EndTime']) || callStartTime;
+
+        // Duration extraction - HeroBase uses TimeSpan format like "00:01:30" or seconds
+        // conversationDuration: talk time (only if connected)
+        // dialingDuration: time spent dialing
+        // wrapUpDuration: wrap up time
+        const conversationDuration = this.parseTimeSpan(
+          this.getValue(call, ['conversationDuration', 'ConversationDuration'])
+        );
+        const dialingDuration = this.parseTimeSpan(
+          this.getValue(call, ['dialingDuration', 'DialingDuration'])
+        );
+        const wrapUpDuration = this.parseTimeSpan(
+          this.getValue(call, ['wrapUpDuration', 'WrapUpDuration'])
         );
         
-        const startTime = this.getStr(call, [
-          'startTime', 'StartTime', 'callStart', 'CallStart', 'started', 'Started', 
-          'createdTime', 'CreatedTime', 'created', 'Created', 'timestamp', 'Timestamp'
-        ]) || new Date().toISOString();
+        // durationSeconds = conversation time (talk time)
+        // totalDurationSeconds = dialing + conversation + wrapup
+        const durationSeconds = conversationDuration;
+        const totalDurationSeconds = dialingDuration + conversationDuration + wrapUpDuration;
+
+        // Extract user/agent info from nested user object
+        // user: { uniqueId, username, name, orgCode, email }
+        const userObj = (call.user || call.User) as Record<string, unknown> | undefined;
+        let agentExternalId = "";
+        let agentEmail = "";
+        let agentName = "";
         
-        const endTime = this.getStr(call, [
-          'endTime', 'EndTime', 'callEnd', 'CallEnd', 'ended', 'Ended', 
-          'completedTime', 'CompletedTime'
-        ]) || startTime;
+        if (userObj) {
+          agentExternalId = this.getStr(userObj, ['uniqueId', 'UniqueId', 'orgCode', 'OrgCode']);
+          agentEmail = this.getStr(userObj, ['email', 'Email']);
+          agentName = this.getStr(userObj, ['name', 'Name', 'username', 'Username']);
+        }
 
-        // Duration extraction - HeroBase uses seconds or durationSeconds
-        const durationSeconds = Number(
-          this.getValue(call, ['seconds', 'Seconds', 'durationSeconds', 'DurationSeconds', 'talkTime', 'TalkTime', 'duration', 'Duration']) || 0
-        );
-        const totalDurationSeconds = Number(
-          this.getValue(call, ['totalSeconds', 'TotalSeconds', 'totalDuration', 'TotalDuration', 'ringTime', 'RingTime']) || durationSeconds
-        );
+        // Campaign info from nested campaign object
+        // campaign: { uniqueId, name, code, project }
+        const campaignObj = (call.campaign || call.Campaign) as Record<string, unknown> | undefined;
+        let campaignExternalId = "";
+        let campaignName = "";
+        
+        if (campaignObj) {
+          campaignExternalId = this.getStr(campaignObj, ['uniqueId', 'UniqueId', 'code', 'Code']);
+          campaignName = this.getStr(campaignObj, ['name', 'Name', 'code', 'Code']);
+        }
 
-        // Extract user/agent info (nested objects in HeroBase)
-        const userObj = (call.user || call.User || call.agent || call.Agent || call.processedByUser || call.ProcessedByUser) as Record<string, unknown> | undefined;
-        const agentExternalId = userObj 
-          ? this.getStr(userObj, ['uniqueId', 'UniqueId', 'orgCode', 'OrgCode', 'id', 'Id'])
-          : this.getStr(call, ['userId', 'UserId', 'agentId', 'AgentId', 'userOrgCode', 'UserOrgCode', 'agent', 'Agent']);
+        // Lead ID - uniqueLeadId from API (ONLY the ID, never personal data - GDPR)
+        const leadExternalId = this.getStr(call, ['uniqueLeadId', 'UniqueLeadId', 'leadId', 'LeadId']);
 
-        // Campaign info (nested object)
-        const campaignObj = (call.campaign || call.Campaign || call.project || call.Project) as Record<string, unknown> | undefined;
-        const campaignExternalId = campaignObj
-          ? this.getStr(campaignObj, ['uniqueId', 'UniqueId', 'code', 'Code', 'id', 'Id'])
-          : this.getStr(call, ['campaignId', 'CampaignId', 'projectId', 'ProjectId', 'projectCode', 'ProjectCode']);
-
-        // Lead ID - ONLY the ID, never the nested lead data (GDPR)
-        const leadExternalId = this.getStr(call, [
-          'leadUniqueId', 'LeadUniqueId', 'leadId', 'LeadId', 'contactId', 'ContactId', 
-          'uniqueId', 'UniqueId', 'id', 'Id'
-        ]);
-
-        // Recording URL (requires auth to access)
-        const recordingUrl = this.getStr(call, [
-          'recordingUrl', 'RecordingUrl', 'recording', 'Recording', 'audioUrl', 'AudioUrl'
-        ]) || undefined;
+        // Recording URL - needs separate /calls/{UniqueId}/recordings endpoint
+        // For now, construct potential URL pattern
+        const callUniqueId = this.getStr(call, ['uniqueId', 'UniqueId']);
+        const recordingUrl = callUniqueId ? `${this.baseUrl}/calls/${callUniqueId}/recordings` : undefined;
 
         return {
-          externalId: this.getStr(call, ['uniqueId', 'UniqueId', 'id', 'Id', 'callId', 'CallId', 'activityId', 'ActivityId']),
+          externalId: callUniqueId,
           integrationType: "enreach" as const,
           dialerName: this.dialerName,
           
-          startTime,
-          endTime,
+          startTime: callStartTime,
+          endTime: callEndTime,
           
           durationSeconds,
           totalDurationSeconds,
@@ -635,10 +663,16 @@ export class EnreachAdapter implements DialerAdapter {
           recordingUrl,
           
           metadata: {
-            endCause: this.getStr(call, ['endCause', 'EndCause']),
-            direction: this.getStr(call, ['direction', 'Direction']),
-            callType: this.getStr(call, ['callType', 'CallType', 'type', 'Type', 'activityType', 'ActivityType']),
-            disposition: this.getStr(call, ['disposition', 'Disposition']),
+            endCause,
+            connected,
+            connectTime,
+            incoming: Boolean(this.getValue(call, ['incoming', 'Incoming'])),
+            leadStatus: this.getStr(call, ['leadStatus', 'LeadStatus']),
+            leadClosure: this.getStr(call, ['leadClosure', 'LeadClosure']),
+            campaignType: this.getStr(call, ['campaignType', 'CampaignType']),
+            agentEmail,
+            agentName,
+            campaignName,
           },
         };
       });
@@ -649,30 +683,84 @@ export class EnreachAdapter implements DialerAdapter {
   }
 
   /**
-   * Map Enreach/HeroBase endCause to unified status enum
+   * Parse TimeSpan format (d.hh:mm:ss or hh:mm:ss or seconds) to total seconds
    */
-  private mapEnreachEndCause(cause: string | undefined): StandardCall['status'] {
-    if (!cause) return 'OTHER';
+  private parseTimeSpan(value: unknown): number {
+    if (!value) return 0;
     
-    const c = cause.toUpperCase();
+    // If already a number, return it
+    if (typeof value === 'number') return value;
     
-    // Answered / Success
-    if (c.includes('SUCCESS') || c.includes('ANSWERED') || c.includes('COMPLETED') || c.includes('NORMAL')) {
+    const str = String(value);
+    
+    // Try parsing as "d.hh:mm:ss" or "hh:mm:ss" or "mm:ss"
+    const parts = str.split(':');
+    
+    if (parts.length === 3) {
+      // hh:mm:ss or d.hh:mm:ss
+      let hours = 0;
+      let days = 0;
+      
+      // Check for days prefix like "1.02:30:00"
+      if (parts[0].includes('.')) {
+        const dayHour = parts[0].split('.');
+        days = parseInt(dayHour[0], 10) || 0;
+        hours = parseInt(dayHour[1], 10) || 0;
+      } else {
+        hours = parseInt(parts[0], 10) || 0;
+      }
+      
+      const minutes = parseInt(parts[1], 10) || 0;
+      const seconds = parseInt(parts[2], 10) || 0;
+      
+      return (days * 24 * 3600) + (hours * 3600) + (minutes * 60) + seconds;
+    } else if (parts.length === 2) {
+      // mm:ss
+      const minutes = parseInt(parts[0], 10) || 0;
+      const seconds = parseInt(parts[1], 10) || 0;
+      return (minutes * 60) + seconds;
+    }
+    
+    // Try parsing as plain number
+    return parseInt(str, 10) || 0;
+  }
+
+  /**
+   * Map Enreach/HeroBase endCause to unified status enum
+   * endCause values: 'NotApplicable', 'NormalDisconnect', 'NoResponse', 'Busy', 'VoiceMail', 'DroppedCall', 'DialingCancelled'
+   */
+  private mapEnreachEndCause(cause: string | undefined, connected?: boolean): StandardCall['status'] {
+    // If connected is true and normal disconnect, it was answered
+    if (connected) {
       return 'ANSWERED';
     }
-    // No Answer
-    if (c.includes('NO_ANSWER') || c.includes('NOANSWER') || c.includes('TIMEOUT') || c.includes('RING')) {
-      return 'NO_ANSWER';
-    }
-    // Busy
-    if (c.includes('BUSY') || c.includes('ENGAGED')) {
-      return 'BUSY';
-    }
-    // Failed
-    if (c.includes('FAIL') || c.includes('REJECTED') || c.includes('ERROR') || c.includes('INVALID')) {
-      return 'FAILED';
-    }
     
-    return 'OTHER';
+    if (!cause) return 'OTHER';
+    
+    const c = cause.toLowerCase();
+    
+    switch (c) {
+      case 'normaldisconnect':
+        return connected ? 'ANSWERED' : 'NO_ANSWER';
+      case 'noresponse':
+        return 'NO_ANSWER';
+      case 'busy':
+        return 'BUSY';
+      case 'voicemail':
+        return 'NO_ANSWER'; // Voicemail = didn't reach person
+      case 'droppedcall':
+        return 'FAILED';
+      case 'dialingcancelled':
+        return 'FAILED';
+      case 'notapplicable':
+        return 'OTHER';
+      default:
+        // Fallback pattern matching
+        if (c.includes('answer')) return 'ANSWERED';
+        if (c.includes('busy')) return 'BUSY';
+        if (c.includes('no_answer') || c.includes('noanswer')) return 'NO_ANSWER';
+        if (c.includes('fail') || c.includes('error')) return 'FAILED';
+        return 'OTHER';
+    }
   }
 }
