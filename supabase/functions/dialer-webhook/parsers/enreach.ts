@@ -58,18 +58,25 @@ interface EnreachWebhookPayload {
 
 export class EnreachWebhookParser implements WebhookParser {
   
-  canHandle(_rawBody: string, contentType: string, headers: Headers): boolean {
+  canHandle(rawBody: string, contentType: string, headers: Headers): boolean {
     // Primary: Enreach sends X-Benemen-Event header
     const eventHeader = headers.get('X-Benemen-Event');
     if (eventHeader) {
-      console.log(`[EnreachParser] Detected via X-Benemen-Event: ${eventHeader}`);
-      return true;
+      // Verify we can actually parse the body as JSON
+      try {
+        JSON.parse(rawBody);
+        console.log(`[EnreachParser] Detected via X-Benemen-Event: ${eventHeader}`);
+        return true;
+      } catch {
+        console.log(`[EnreachParser] X-Benemen-Event header present but body is not valid JSON`);
+        return false;
+      }
     }
     
     // Secondary: Check for Enreach-specific JSON structure
     if (contentType.includes('application/json')) {
       try {
-        const json = JSON.parse(_rawBody);
+        const json = JSON.parse(rawBody);
         // Enreach payloads always have RootEntityType and EntityType
         if (json.RootEntityType && json.EntityType && json.EventType) {
           console.log(`[EnreachParser] Detected via payload structure: ${json.EventType}`);
@@ -84,7 +91,14 @@ export class EnreachWebhookParser implements WebhookParser {
   }
 
   parse(rawBody: string, _contentType: string, headers: Headers): StandardWebhookPayload {
-    const body: EnreachWebhookPayload = JSON.parse(rawBody);
+    let body: EnreachWebhookPayload;
+    
+    try {
+      body = JSON.parse(rawBody);
+    } catch (e) {
+      console.error(`[EnreachParser] Failed to parse JSON body: ${rawBody.substring(0, 200)}`);
+      throw new Error(`Invalid JSON payload for Enreach webhook: ${e}`);
+    }
     
     // Get event type from header (preferred) or body
     const eventType = headers.get('X-Benemen-Event') || body.EventType || 'unknown';
