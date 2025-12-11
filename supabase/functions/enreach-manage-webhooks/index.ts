@@ -237,14 +237,14 @@ serve(async (req) => {
         });
 
         // Build payload - LeadStatus is REQUIRED by HeroBase API
-        // Using "Closed" which is broader than "UserProcessed" to match more leads for /example
+        // Valid values: UserProcessed, SystemProcessed, etc.
         const payload: Record<string, unknown> = {
           Name: webhook_config.description || "CPH Sales Webhook",
           Method: "POST",
           UrlTemplate: webhook_config.url,
           Format: "Json",
           ContentTemplate: contentTemplate,
-          LeadStatus: webhook_config.leadStatus || "Closed",
+          LeadStatus: webhook_config.leadStatus || "UserProcessed",
         };
 
         // Only add CampaignCode if explicitly specified (not empty string)
