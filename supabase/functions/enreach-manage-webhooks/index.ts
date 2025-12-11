@@ -236,24 +236,26 @@ serve(async (req) => {
           Result: "{Result}",
         });
 
+        // Build payload - only include filters if explicitly provided
+        // Not specifying CampaignCode or LeadStatus makes the webhook match ALL leads
+        // which allows the /example endpoint to find data for testing
         const payload: Record<string, unknown> = {
           Name: webhook_config.description || "CPH Sales Webhook",
-          CampaignCode: webhook_config.campaignCode,
-          LeadStatus: webhook_config.leadStatus || "UserProcessed",
           Method: "POST",
           UrlTemplate: webhook_config.url,
           Format: "Json",
           ContentTemplate: contentTemplate,
         };
 
-        // CAMBIO 3: LeadReleaseType comentado - causa "Sequence contains no matching element"
-        // si el valor exacto no existe en la lista de resultados de la campaña
-        // Es mejor crear el webhook abierto y filtrar en el código receptor
-        /*
-        if (webhook_config.leadReleaseType) {
-          payload.LeadReleaseType = webhook_config.leadReleaseType;
+        // Only add CampaignCode if explicitly specified (not empty string)
+        if (webhook_config.campaignCode && webhook_config.campaignCode.trim() !== "") {
+          payload.CampaignCode = webhook_config.campaignCode;
         }
-        */
+
+        // Only add LeadStatus if explicitly specified (not the default)
+        if (webhook_config.leadStatus && webhook_config.leadStatus.trim() !== "") {
+          payload.LeadStatus = webhook_config.leadStatus;
+        }
 
         console.log("Creating HeroBase webhook with payload:", JSON.stringify(payload));
 
