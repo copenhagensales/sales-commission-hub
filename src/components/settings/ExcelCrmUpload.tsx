@@ -31,6 +31,11 @@ interface ColumnMapping {
   customer_name: string;
   action_type: string;
   amount_deduct: string;
+  // Dynamic custom fields for any CRM
+  custom_match_field_1: string;
+  custom_match_field_2: string;
+  custom_data_field_1: string;
+  custom_data_field_2: string;
 }
 
 interface ExcelImport {
@@ -55,64 +60,94 @@ interface MappingTarget {
 const MAPPING_TARGETS: MappingTarget[] = [
   { 
     value: "opp_number", 
-    label: "OPP Nummer", 
-    description: "TDC's ordrenummer (starter med OPP-). Bruges til at finde salget i systemet.",
-    examples: ["OPPNR", "OPP", "OPP Nummer", "Ordrenummer"],
+    label: "OPP / Ordrenummer", 
+    description: "Unikt ordrenummer fra CRM (f.eks. OPP-123, ORD-456).",
+    examples: ["OPPNR", "OPP", "Order Number", "Ordrenummer", "Order ID"],
     category: "match",
     priority: 1
   },
   { 
-    value: "phone_number", 
-    label: "Kundens telefonnummer", 
-    description: "Bruges til at matche salg når der ikke er OPP nummer (f.eks. Codan).",
-    examples: ["Phone Number", "Telefon", "Tlf", "Mobilnummer"],
+    value: "external_id", 
+    label: "Externt ID / Dialer ID", 
+    description: "ID fra dialeren (Adversus, Enreach, etc.).",
+    examples: ["Id", "External ID", "Dialer ID", "Sale ID", "Lead ID"],
     category: "match",
     priority: 2
   },
   { 
-    value: "external_id", 
-    label: "Externt ID / Ordre ID", 
-    description: "ID fra dialeren (Adversus). Bruges som backup-søgning.",
-    examples: ["Id", "External ID", "Ordre ID", "Sale ID"],
+    value: "phone_number", 
+    label: "Kundens telefonnummer", 
+    description: "Bruges til at matche salg når der ikke er unikt ID.",
+    examples: ["Phone Number", "Telefon", "Tlf", "Mobile", "Kundetelefon"],
     category: "match",
     priority: 3
   },
   { 
     value: "date", 
-    label: "Salgsdato", 
-    description: "Datoen for det oprindelige salg. Hjælper med at matche korrekt salg.",
-    examples: ["Dato", "Creation Date", "Salgsdato", "Date"],
+    label: "Salgsdato / Oprettelsesdato", 
+    description: "Datoen for det oprindelige salg. Hjælper med at matche korrekt.",
+    examples: ["Dato", "Creation Date", "Salgsdato", "Date", "Created"],
     category: "match",
     priority: 4
   },
+  {
+    value: "custom_match_field_1",
+    label: "Brugerdefineret søgefelt 1",
+    description: "Ekstra felt til matching specifikt for din CRM.",
+    examples: ["Contract ID", "Reference", "Case Number", "Ticket ID"],
+    category: "match",
+    priority: 5
+  },
+  {
+    value: "custom_match_field_2",
+    label: "Brugerdefineret søgefelt 2",
+    description: "Andet ekstra felt til matching.",
+    examples: ["Policy Number", "Account ID", "Customer ID"],
+    category: "match",
+    priority: 6
+  },
   { 
     value: "action_type", 
-    label: "Handling / Årsag", 
-    description: "Hvad skal der ske? F.eks. 'Annullering', 'Nedlagt', 'Retur'.",
-    examples: ["Hvilken Type Annullering", "Current Status", "Årsag", "Action"],
+    label: "Handling / Status / Årsag", 
+    description: "Hvad skal der ske? Systemet registrerer automatisk annulleringer.",
+    examples: ["Status", "Action", "Årsag", "Type", "Result", "Outcome"],
     category: "action",
     priority: 1
   },
   { 
     value: "amount_deduct", 
-    label: "Clawback beløb", 
-    description: "Beløb der skal trækkes fra sælgers provision (valgfrit).",
-    examples: ["Hvilket beløb skal trækkes", "Clawback", "Træk beløb"],
+    label: "Clawback / Træk beløb", 
+    description: "Beløb der skal trækkes fra provision (valgfrit).",
+    examples: ["Amount", "Clawback", "Træk beløb", "Deduction", "Fee"],
     category: "action",
     priority: 2
   },
   { 
     value: "customer_name", 
-    label: "Kundenavn", 
+    label: "Kundenavn / Firma", 
     description: "Kundens navn (valgfrit, kun til reference).",
-    examples: ["Firmanavn", "Kundenavn", "Company", "Navn"],
+    examples: ["Firmanavn", "Kundenavn", "Company", "Name", "Account Name"],
     category: "data"
   },
   { 
     value: "status", 
-    label: "Status", 
-    description: "Nuværende status (valgfrit).",
-    examples: ["Status", "Current Status", "State"],
+    label: "CRM Status", 
+    description: "Status fra CRM systemet (valgfrit).",
+    examples: ["Status", "State", "Stage", "Disposition"],
+    category: "data"
+  },
+  {
+    value: "custom_data_field_1",
+    label: "Brugerdefineret datafelt 1",
+    description: "Ekstra datafelt specifikt for din CRM.",
+    examples: ["Notes", "Comments", "Description", "Reason"],
+    category: "data"
+  },
+  {
+    value: "custom_data_field_2",
+    label: "Brugerdefineret datafelt 2",
+    description: "Andet ekstra datafelt.",
+    examples: ["Agent", "Team", "Campaign", "Source"],
     category: "data"
   },
 ];
@@ -127,6 +162,10 @@ const defaultMapping: ColumnMapping = {
   customer_name: "",
   action_type: "",
   amount_deduct: "",
+  custom_match_field_1: "",
+  custom_match_field_2: "",
+  custom_data_field_1: "",
+  custom_data_field_2: "",
 };
 
 // Convert Excel serial date to readable date string
@@ -162,13 +201,15 @@ function suggestMapping(columns: string[]): Partial<ColumnMapping> {
   const lowerColumns = columns.map(c => c.toLowerCase().trim());
   
   const mappingRules: { key: keyof ColumnMapping; patterns: string[] }[] = [
-    { key: "opp_number", patterns: ["opp", "oppnr", "opp nummer", "opp-"] },
-    { key: "phone_number", patterns: ["phone", "telefon", "tlf", "mobil", "phone number"] },
-    { key: "external_id", patterns: ["external", "ordre", "order", "sale id"] },
-    { key: "date", patterns: ["dato", "date", "creation", "salgsdato"] },
-    { key: "action_type", patterns: ["annullering", "status", "handling", "årsag", "action", "type"] },
-    { key: "amount_deduct", patterns: ["beløb", "træk", "clawback", "amount"] },
-    { key: "customer_name", patterns: ["firma", "kunde", "company", "customer", "navn"] },
+    { key: "opp_number", patterns: ["opp", "oppnr", "opp nummer", "opp-", "order number", "ordrenummer", "order id"] },
+    { key: "external_id", patterns: ["external", "ordre", "order", "sale id", "lead id", "dialer"] },
+    { key: "phone_number", patterns: ["phone", "telefon", "tlf", "mobil", "phone number", "mobile"] },
+    { key: "date", patterns: ["dato", "date", "creation", "salgsdato", "created", "oprettet"] },
+    { key: "action_type", patterns: ["annullering", "status", "handling", "årsag", "action", "type", "result", "outcome", "disposition"] },
+    { key: "amount_deduct", patterns: ["beløb", "træk", "clawback", "amount", "deduction", "fee"] },
+    { key: "customer_name", patterns: ["firma", "kunde", "company", "customer", "navn", "name", "account"] },
+    { key: "custom_match_field_1", patterns: ["contract", "reference", "case", "ticket", "policy"] },
+    { key: "custom_match_field_2", patterns: ["account id", "customer id"] },
   ];
   
   for (const rule of mappingRules) {
@@ -284,7 +325,7 @@ export function ExcelCrmUpload() {
         throw new Error("Manglende data");
       }
 
-      // Transform data based on column mapping
+      // Transform data based on column mapping - flexible for any CRM
       const transformedRows = parsedData.map((row) => ({
         ordre_id: columnMapping.ordre_id ? String(row[columnMapping.ordre_id] || "") : null,
         opp_number: columnMapping.opp_number ? String(row[columnMapping.opp_number] || "") : null,
@@ -295,7 +336,14 @@ export function ExcelCrmUpload() {
         customer_name: columnMapping.customer_name ? String(row[columnMapping.customer_name] || "") : null,
         action_type: columnMapping.action_type ? String(row[columnMapping.action_type] || "") : null,
         amount_deduct: columnMapping.amount_deduct ? String(row[columnMapping.amount_deduct] || "") : null,
-        raw_data: row,
+        // Store custom fields in raw_data for flexible access
+        raw_data: {
+          ...row,
+          _custom_match_1: columnMapping.custom_match_field_1 ? String(row[columnMapping.custom_match_field_1] || "") : null,
+          _custom_match_2: columnMapping.custom_match_field_2 ? String(row[columnMapping.custom_match_field_2] || "") : null,
+          _custom_data_1: columnMapping.custom_data_field_1 ? String(row[columnMapping.custom_data_field_1] || "") : null,
+          _custom_data_2: columnMapping.custom_data_field_2 ? String(row[columnMapping.custom_data_field_2] || "") : null,
+        },
       }));
 
       // Insert main import record
