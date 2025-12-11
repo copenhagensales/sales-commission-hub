@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { BrandBadge } from "./BrandBadge";
 import { format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
-import { Check, X, Users, MapPin, Calendar, Loader2 } from "lucide-react";
+import { Check, X, Users, MapPin, Calendar, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,10 +16,12 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export function MarketApplicationsManager() {
   const { data: applications, isLoading } = usePendingApplications();
   const reviewMutation = useReviewApplication();
+  const [isOpen, setIsOpen] = useState(true);
   const [reviewDialog, setReviewDialog] = useState<{
     open: boolean;
     application: any;
@@ -72,62 +74,75 @@ export function MarketApplicationsManager() {
   return (
     <>
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Afventende ansøgninger
-            <Badge variant="secondary">{applications.length}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {applications.map((app: any) => (
-            <div
-              key={app.id}
-              className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="space-y-1">
-                  <div className="font-medium">
-                    {app.employee?.first_name} {app.employee?.last_name}
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          <CardHeader className="pb-0">
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center gap-2 w-full text-left hover:opacity-80 transition-opacity">
+                {isOpen ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Afventende ansøgninger
+                  <Badge variant="secondary">{applications.length}</Badge>
+                </CardTitle>
+              </button>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="space-y-3 pt-4">
+              {applications.map((app: any) => (
+                <div
+                  key={app.id}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="space-y-1">
+                      <div className="font-medium">
+                        {app.employee?.first_name} {app.employee?.last_name}
+                      </div>
+                      <div className="text-sm text-muted-foreground flex items-center gap-2">
+                        <MapPin className="h-3 w-3" />
+                        {app.booking?.location?.name}
+                      </div>
+                      <div className="text-sm text-muted-foreground flex items-center gap-2">
+                        <Calendar className="h-3 w-3" />
+                        {format(parseISO(app.booking?.start_date), "d. MMM", { locale: da })}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground flex items-center gap-2">
-                    <MapPin className="h-3 w-3" />
-                    {app.booking?.location?.name}
-                  </div>
-                  <div className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Calendar className="h-3 w-3" />
-                    {format(parseISO(app.booking?.start_date), "d. MMM", { locale: da })}
+                  <div className="flex items-center gap-2">
+                    <BrandBadge
+                      brandName={app.booking?.brand?.name}
+                      brandColor={app.booking?.brand?.color_hex}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 hover:bg-red-50"
+                      onClick={() =>
+                        setReviewDialog({ open: true, application: app, action: "reject" })
+                      }
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={() =>
+                        setReviewDialog({ open: true, application: app, action: "approve" })
+                      }
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <BrandBadge
-                  brandName={app.booking?.brand?.name}
-                  brandColor={app.booking?.brand?.color_hex}
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-red-600 hover:bg-red-50"
-                  onClick={() =>
-                    setReviewDialog({ open: true, application: app, action: "reject" })
-                  }
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={() =>
-                    setReviewDialog({ open: true, application: app, action: "approve" })
-                  }
-                >
-                  <Check className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </CardContent>
+              ))}
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
       </Card>
 
       {/* Review Dialog */}
