@@ -17,6 +17,7 @@ interface ManageWebhooksRequest {
     events?: string[];
     leadStatus?: string;
     leadReleaseType?: string;
+    campaignCode?: string;
   };
 }
 
@@ -159,6 +160,8 @@ serve(async (req) => {
           ContentTemplate: '{"event": "lead_closed", "data": {}}',
           // Default to UserProcessed status for sales webhooks
           LeadStatus: webhook_config.leadStatus || 'UserProcessed',
+          // Campaign code is required by HeroBase
+          CampaignCode: webhook_config.campaignCode,
         };
 
         if (webhook_config.description) {

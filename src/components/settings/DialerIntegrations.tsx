@@ -95,6 +95,7 @@ export function DialerIntegrations() {
   const [enreachWebhookIntegrationId, setEnreachWebhookIntegrationId] = useState<string | null>(null);
   const [enreachWebhookIntegrationName, setEnreachWebhookIntegrationName] = useState<string>("");
   const [enreachWebhookDescription, setEnreachWebhookDescription] = useState("");
+  const [enreachWebhookCampaignCode, setEnreachWebhookCampaignCode] = useState("");
   const [isCreatingEnreachWebhook, setIsCreatingEnreachWebhook] = useState(false);
   
   // Enreach webhook management state
@@ -471,6 +472,7 @@ export function DialerIntegrations() {
           webhook_config: {
             url: webhookUrl,
             description: enreachWebhookDescription || `CPH Sales webhook - ${enreachWebhookIntegrationName}`,
+            campaignCode: enreachWebhookCampaignCode,
           },
         },
       });
@@ -482,6 +484,7 @@ export function DialerIntegrations() {
       });
       setEnreachWebhookDialogOpen(false);
       setEnreachWebhookDescription("");
+      setEnreachWebhookCampaignCode("");
       queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
@@ -1161,6 +1164,18 @@ export function DialerIntegrations() {
               </div>
               
               <div className="space-y-2">
+                <Label>Campaign Code (påkrævet)</Label>
+                <Input
+                  value={enreachWebhookCampaignCode}
+                  onChange={(e) => setEnreachWebhookCampaignCode(e.target.value)}
+                  placeholder="f.eks. CAMPAIGN001"
+                />
+                <p className="text-xs text-muted-foreground">
+                  HeroBase kræver en kampagnekode. Find den i HeroBase admin.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
                 <Label>Beskrivelse (valgfrit)</Label>
                 <Input
                   value={enreachWebhookDescription}
@@ -1173,7 +1188,7 @@ export function DialerIntegrations() {
               <Button variant="outline" onClick={() => setEnreachWebhookDialogOpen(false)}>
                 Annuller
               </Button>
-              <Button onClick={createEnreachWebhook} disabled={isCreatingEnreachWebhook}>
+              <Button onClick={createEnreachWebhook} disabled={isCreatingEnreachWebhook || !enreachWebhookCampaignCode}>
                 {isCreatingEnreachWebhook && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Opret Webhook
               </Button>
