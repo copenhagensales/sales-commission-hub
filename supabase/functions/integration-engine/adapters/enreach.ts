@@ -6,6 +6,7 @@ interface EnreachCredentials {
   password?: string;
   api_token?: string;
   api_url?: string; // Full base URL like https://wshero01.herobase.com/api
+  org_code?: string; // Optional OrgCode for calls endpoint
 }
 
 // HeroBase API response types (flexible for different casing)
@@ -29,6 +30,8 @@ export class EnreachAdapter implements DialerAdapter {
   private baseUrl: string;
   private headers: Record<string, string>;
   private dialerName: string;
+  private orgCode: string | null;
+  private username: string | null;
 
   constructor(credentials: EnreachCredentials, dialerName?: string) {
     // Default to wshero01.herobase.com/api if not provided
@@ -41,7 +44,9 @@ export class EnreachAdapter implements DialerAdapter {
     }
     
     this.dialerName = dialerName || "Enreach";
-    console.log(`[EnreachAdapter] Base URL: ${this.baseUrl}, Dialer: ${this.dialerName}`);
+    this.orgCode = credentials.org_code || null;
+    this.username = credentials.username || null;
+    console.log(`[EnreachAdapter] Base URL: ${this.baseUrl}, Dialer: ${this.dialerName}, OrgCode from config: ${this.orgCode || 'not set'}`);
     
     // Determine auth method: Basic (username/password) or Bearer (api_token)
     let authHeader: string;
@@ -498,131 +503,114 @@ export class EnreachAdapter implements DialerAdapter {
 
   /**
    * GDPR-Compliant CDR fetch - only IDs and metadata, NO personal Lead data
-   * Uses HeroBase /calls endpoint for Call Detail Records
-   * API Docs: https://wsheroXX.herobase.com/api-docs/index.html#!/calls
-   * 
-   * IMPORTANT: /calls endpoint requires OrgCode parameter
+   * Uses HeroBase /calls or /contacthistories endpoint for Call Detail Records
    */
   async fetchCalls(days: number): Promise<StandardCall[]> {
     try {
-      // /calls endpoint REQUIRES OrgCode parameter per API docs
-      // First, we need to get available OrgCodes from users or organizational units
-      
-      let orgCodes: string[] = [];
-      
-      // Strategy 1: Get OrgCodes from /users endpoint
-      try {
-        console.log("[EnreachAdapter] Fetching users to get OrgCodes...");
-        const usersData = await this.get("/users") as unknown;
-        const users = Array.isArray(usersData) ? usersData : 
-                      ((usersData as Record<string, unknown>).users as unknown[] || 
-                       (usersData as Record<string, unknown>).Users as unknown[] || []);
-        
-        for (const user of users) {
-          const u = user as Record<string, unknown>;
-          const code = this.getStr(u, ['orgCode', 'OrgCode']);
-          if (code && !orgCodes.includes(code)) {
-            orgCodes.push(code);
-          }
-        }
-        console.log(`[EnreachAdapter] Found ${orgCodes.length} unique OrgCodes from users: ${orgCodes.slice(0, 5).join(', ')}...`);
-      } catch (usersError) {
-        console.warn(`[EnreachAdapter] Could not fetch users: ${usersError}`);
-      }
-      
-      // Strategy 2: Get OrgCodes from /organizationalunits if no users found
-      if (orgCodes.length === 0) {
-        try {
-          console.log("[EnreachAdapter] Fetching organizational units...");
-          const orgsData = await this.get("/organizationalunits") as unknown;
-          const orgs = Array.isArray(orgsData) ? orgsData : 
-                       ((orgsData as Record<string, unknown>).results as unknown[] || 
-                        (orgsData as Record<string, unknown>).Results as unknown[] || []);
-          
-          for (const org of orgs) {
-            const o = org as Record<string, unknown>;
-            const code = this.getStr(o, ['orgCode', 'OrgCode', 'code', 'Code']);
-            if (code && !orgCodes.includes(code)) {
-              orgCodes.push(code);
-            }
-          }
-          console.log(`[EnreachAdapter] Found ${orgCodes.length} OrgCodes from organizational units`);
-        } catch (orgsError) {
-          console.warn(`[EnreachAdapter] Could not fetch organizational units: ${orgsError}`);
-        }
-      }
-      
-      if (orgCodes.length === 0) {
-        console.error("[EnreachAdapter] No OrgCodes found - cannot fetch calls without OrgCode parameter");
-        return [];
-      }
-
       // Calculate date range for the query
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
       const startDateOnly = startDate.toISOString().split('T')[0];
+      const endDate = new Date();
+      const endDateOnly = endDate.toISOString().split('T')[0];
       
       // TimeSpan format: "d.hh:mm:ss" (e.g., "7.00:00:00" for 7 days)
       const timeSpan = `${days}.00:00:00`;
 
-      console.log(`[EnreachAdapter] Fetching calls for last ${days} days from ${startDateOnly}`);
+      console.log(`[EnreachAdapter] Fetching calls for last ${days} days from ${startDateOnly} to ${endDateOnly}`);
 
       let allCalls: Record<string, unknown>[] = [];
-
-      // Use first OrgCode to fetch calls (typically org-wide access)
-      const orgCode = orgCodes[0];
-      console.log(`[EnreachAdapter] Using OrgCode: ${orgCode}`);
       
-      // Try different endpoint patterns
+      // Build endpoints list - prioritize ones that don't require OrgCode
       const endpoints = [
-        // Standard /calls with OrgCode, StartTime, TimeSpan
-        `/calls?OrgCode=${encodeURIComponent(orgCode)}&StartTime=${startDateOnly}&TimeSpan=${encodeURIComponent(timeSpan)}&Include=campaign,user&Limit=1000`,
-        // Try with full datetime format
-        `/calls?OrgCode=${encodeURIComponent(orgCode)}&StartTime=${startDate.toISOString()}&TimeSpan=${encodeURIComponent(timeSpan)}&Include=campaign,user&Limit=1000`,
-        // Alternative: use organizational units endpoint
-        `/organizationalunits/${encodeURIComponent(orgCode)}/calls?StartTime=${startDateOnly}&TimeSpan=${encodeURIComponent(timeSpan)}&Limit=1000`,
-        // User-specific calls endpoint
-        `/users/${encodeURIComponent(orgCode)}/calls?StartTime=${startDateOnly}&TimeSpan=${encodeURIComponent(timeSpan)}&Limit=1000`,
+        // Try contacthistories endpoint (may not require OrgCode)
+        `/contacthistories?StartTime=${startDateOnly}&EndTime=${endDateOnly}&Limit=1000`,
+        `/contacthistories?StartTime=${startDateOnly}&TimeSpan=${encodeURIComponent(timeSpan)}&Limit=1000`,
+        // Try callhistories 
+        `/callhistories?StartTime=${startDateOnly}&EndTime=${endDateOnly}&Limit=1000`,
+        // Try activities endpoint
+        `/activities?StartTime=${startDateOnly}&EndTime=${endDateOnly}&Type=Call&Limit=1000`,
+        // Try calls without OrgCode
+        `/calls?StartTime=${startDateOnly}&EndTime=${endDateOnly}&Include=campaign,user&Limit=1000`,
       ];
       
+      // If we have an OrgCode (from config or derived), add OrgCode endpoints
+      let orgCode = this.orgCode;
+      
+      // Try to derive OrgCode from username if not set
+      if (!orgCode && this.username) {
+        // Some usernames contain the orgCode or can be used as one
+        const userParts = this.username.split('@');
+        if (userParts.length > 0) {
+          orgCode = userParts[0]; // Try using first part of email
+          console.log(`[EnreachAdapter] Derived potential OrgCode from username: ${orgCode}`);
+        }
+      }
+      
+      if (orgCode) {
+        console.log(`[EnreachAdapter] Adding OrgCode endpoints with: ${orgCode}`);
+        endpoints.unshift(
+          // Prioritize OrgCode endpoints if we have one
+          `/calls?OrgCode=${encodeURIComponent(orgCode)}&StartTime=${startDateOnly}&EndTime=${endDateOnly}&Include=campaign,user&Limit=1000`,
+          `/calls?OrgCode=${encodeURIComponent(orgCode)}&StartTime=${startDateOnly}&TimeSpan=${encodeURIComponent(timeSpan)}&Include=campaign,user&Limit=1000`,
+          `/organizationalunits/${encodeURIComponent(orgCode)}/calls?StartTime=${startDateOnly}&EndTime=${endDateOnly}&Limit=1000`,
+          `/users/${encodeURIComponent(orgCode)}/calls?StartTime=${startDateOnly}&EndTime=${endDateOnly}&Limit=1000`,
+        );
+      }
+      
+      // Try each endpoint
       for (const endpoint of endpoints) {
         try {
           console.log(`[EnreachAdapter] Trying: ${endpoint}`);
           const data = await this.get(endpoint) as unknown;
           
+          // Log raw response type for debugging
+          console.log(`[EnreachAdapter] Response type: ${typeof data}, isArray: ${Array.isArray(data)}`);
+          
           if (Array.isArray(data)) {
             allCalls = data as Record<string, unknown>[];
           } else if (data && typeof data === 'object') {
             const wrapper = data as Record<string, unknown>;
+            // Log keys for debugging
+            console.log(`[EnreachAdapter] Response keys: ${Object.keys(wrapper).slice(0, 10).join(', ')}`);
+            
             allCalls = (
               wrapper.Results || wrapper.results || 
               wrapper.Calls || wrapper.calls || 
+              wrapper.ContactHistories || wrapper.contactHistories ||
               wrapper.Data || wrapper.data || 
+              wrapper.Items || wrapper.items ||
               []
             ) as Record<string, unknown>[];
           }
           
           if (allCalls.length > 0) {
-            console.log(`[EnreachAdapter] Found ${allCalls.length} calls from endpoint`);
+            console.log(`[EnreachAdapter] SUCCESS! Found ${allCalls.length} calls from endpoint: ${endpoint.split('?')[0]}`);
             break;
           } else {
             console.log(`[EnreachAdapter] Endpoint returned empty array, trying next...`);
           }
         } catch (endpointError) {
           const errMsg = endpointError instanceof Error ? endpointError.message : String(endpointError);
-          console.warn(`[EnreachAdapter] Endpoint failed: ${errMsg}`);
+          // Only log as warning if it's a client error, not a server config error
+          if (errMsg.includes('403') || errMsg.includes('401')) {
+            console.log(`[EnreachAdapter] Access denied for endpoint, trying next...`);
+          } else {
+            console.warn(`[EnreachAdapter] Endpoint failed: ${errMsg}`);
+          }
           continue;
         }
       }
 
       if (allCalls.length === 0) {
-        console.log("[EnreachAdapter] No call records found from any endpoint");
+        console.log("[EnreachAdapter] No call records found from any endpoint - this may be expected if no calls exist or API access is limited");
         return [];
       }
 
       // Log sample record structure for debugging
       if (allCalls.length > 0) {
         console.log(`[EnreachAdapter] Sample call keys: ${Object.keys(allCalls[0]).slice(0, 20).join(', ')}`);
+        console.log(`[EnreachAdapter] Sample call data: ${JSON.stringify(allCalls[0]).substring(0, 500)}`);
       }
 
       // Map to StandardCall (GDPR-compliant - only IDs)
