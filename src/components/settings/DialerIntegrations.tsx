@@ -104,7 +104,7 @@ export function DialerIntegrations() {
   const [manageEnreachWebhooksDialogOpen, setManageEnreachWebhooksDialogOpen] = useState(false);
   const [manageEnreachWebhooksIntegrationId, setManageEnreachWebhooksIntegrationId] = useState<string | null>(null);
   const [manageEnreachWebhooksIntegrationName, setManageEnreachWebhooksIntegrationName] = useState<string>("");
-  const [enreachWebhooksList, setEnreachWebhooksList] = useState<Array<{ id: string; url: string; description?: string; createdDate?: string }>>([]);
+  const [enreachWebhooksList, setEnreachWebhooksList] = useState<Array<{ id: string; urlTemplate?: string; name?: string; campaignCode?: string; leadStatus?: string; isActive?: boolean }>>([]);
   const [isLoadingEnreachWebhooks, setIsLoadingEnreachWebhooks] = useState(false);
   const [isDeletingEnreachWebhookId, setIsDeletingEnreachWebhookId] = useState<string | null>(null);
 
@@ -1274,31 +1274,31 @@ export function DialerIntegrations() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead className="max-w-[300px]">URL</TableHead>
-                        <TableHead>Beskrivelse</TableHead>
+                        <TableHead>Navn</TableHead>
+                        <TableHead>Kampagne</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Aktiv</TableHead>
                         <TableHead className="text-right">Handlinger</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {enreachWebhooksList.map((webhook) => (
                         <TableRow key={webhook.id}>
-                          <TableCell className="font-mono text-sm">{webhook.id}</TableCell>
-                          <TableCell className="max-w-[300px]">
-                            <div className="flex items-center gap-1">
-                              <span className="truncate text-xs font-mono">{webhook.url}</span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0"
-                                onClick={() => window.open(webhook.url, '_blank')}
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                              </Button>
-                            </div>
+                          <TableCell className="font-medium text-sm">
+                            {webhook.name || webhook.id}
                           </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {webhook.description || '-'}
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {webhook.campaignCode || '-'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {webhook.leadStatus || '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={webhook.isActive ? "default" : "secondary"}>
+                              {webhook.isActive ? "Aktiv" : "Inaktiv"}
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <Button
