@@ -150,17 +150,20 @@ serve(async (req) => {
         }
 
         // Build the webhook payload for HeroBase
-        // HeroBase requires either LeadStatus or LeadReleaseType (PascalCase)
+        // HeroBase requires either LeadStatus or LeadReleaseType
+        // Valid LeadStatus: UserProcessed, RedialAutomatic, RedialManualCommon, etc.
+        // Valid LeadClosure (when LeadStatus=UserProcessed): Success, NotInterested, InvalidLead, Unqualified
         const payload: Record<string, unknown> = {
           Url: webhook_config.url,
-          // Default to Success status for sales webhooks if not specified
-          LeadStatus: webhook_config.leadStatus || 'Success',
+          // Default to UserProcessed status for sales webhooks
+          LeadStatus: webhook_config.leadStatus || 'UserProcessed',
         };
 
         if (webhook_config.description) {
           payload.Description = webhook_config.description;
         }
         
+        // Also filter by LeadClosure = Success for successful sales
         if (webhook_config.leadReleaseType) {
           payload.LeadReleaseType = webhook_config.leadReleaseType;
         }
