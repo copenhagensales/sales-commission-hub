@@ -675,12 +675,12 @@ export function ExcelCrmUpload() {
 
                   {/* Preview Table */}
                   <div className="mt-4">
-                    <h5 className="text-sm font-medium mb-2">Preview (første 5 rækker)</h5>
-                    <div className="overflow-x-auto border rounded">
+                    <h5 className="text-sm font-medium mb-2">Preview (første 5 rækker) - {columns.length} kolonner</h5>
+                    <div className="overflow-x-auto border rounded max-h-64">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            {columns.slice(0, 6).map((col) => (
+                            {columns.map((col) => (
                               <TableHead key={col} className="text-xs whitespace-nowrap">
                                 {col}
                               </TableHead>
@@ -690,8 +690,8 @@ export function ExcelCrmUpload() {
                         <TableBody>
                           {parsedData.slice(0, 5).map((row, idx) => (
                             <TableRow key={idx}>
-                              {columns.slice(0, 6).map((col) => (
-                                <TableCell key={col} className="text-xs">
+                              {columns.map((col) => (
+                                <TableCell key={col} className="text-xs whitespace-nowrap max-w-48 truncate">
                                   {String(row[col] ?? "")}
                                 </TableCell>
                               ))}
