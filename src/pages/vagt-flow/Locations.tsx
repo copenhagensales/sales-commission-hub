@@ -62,7 +62,6 @@ export default function VagtLocations() {
     can_book_eesy: false,
     can_book_yousee: false,
     daily_rate: 1000,
-    is_active: true,
   });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -116,7 +115,6 @@ export default function VagtLocations() {
         can_book_eesy: false,
         can_book_yousee: false,
         daily_rate: 1000,
-        is_active: true,
       });
     },
     onError: (error: any) => {
