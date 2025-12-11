@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useVagtEmployee } from "./useVagtEmployee";
 import { useToast } from "./use-toast";
+import { useAuth } from "./useAuth";
 
 export type MarketApplicationStatus = "pending" | "approved" | "rejected";
 
@@ -175,7 +176,7 @@ export function useApplyToMarket() {
 
 // Review application (approve/reject)
 export function useReviewApplication() {
-  const { data: employee } = useVagtEmployee();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -191,7 +192,20 @@ export function useReviewApplication() {
       note?: string;
       createAssignment?: boolean;
     }) => {
-      if (!employee?.id) throw new Error("Ikke logget ind");
+      if (!user?.email) throw new Error("Ikke logget ind");
+
+      // Get the current user's employee ID (works for any job_title)
+      const { data: employeeData, error: empError } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (empError) throw empError;
+      if (!employeeData?.id) throw new Error("Medarbejder ikke fundet");
+
+      const employeeId = employeeData.id;
 
       // Update application status
       const { data: application, error: updateError } = await supabase
@@ -199,7 +213,7 @@ export function useReviewApplication() {
         .update({
           status,
           reviewed_at: new Date().toISOString(),
-          reviewed_by: employee.id,
+          reviewed_by: employeeId,
           note,
         })
         .eq("id", applicationId)
