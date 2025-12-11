@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface ManageWebhooksRequest {
   integration_id: string;
-  action: 'list' | 'create' | 'delete' | 'meta';
+  action: 'list' | 'create' | 'delete' | 'meta' | 'campaigns';
   webhook_id?: string;
   webhook_config?: {
     url: string;
@@ -117,6 +117,31 @@ serve(async (req) => {
         );
       }
 
+      case 'campaigns': {
+        // Fetch available campaigns from HeroBase
+        const response = await fetch(`${apiBaseUrl}/campaigns`, {
+          method: 'GET',
+          headers: {
+            'Authorization': authHeader,
+            'Accept': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`HeroBase campaigns error: ${response.status} - ${errorText}`);
+          throw new Error(`HeroBase API error: ${response.status} - ${errorText}`);
+        }
+
+        const campaigns = await response.json();
+        console.log(`Found ${Array.isArray(campaigns) ? campaigns.length : 0} campaigns`);
+
+        return new Response(
+          JSON.stringify({ success: true, campaigns }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       case 'meta': {
         // Get metadata about webhook configuration options
         const response = await fetch(`${apiBaseUrl}/hooks/meta`, {
@@ -150,27 +175,19 @@ serve(async (req) => {
           );
         }
 
-        // Build the webhook payload for HeroBase
-        // HeroBase requires either LeadStatus or LeadReleaseType
-        // Valid LeadStatus: UserProcessed, RedialAutomatic, RedialManualCommon, etc.
-        // Valid LeadClosure (when LeadStatus=UserProcessed): Success, NotInterested, InvalidLead, Unqualified
+        // Build the webhook payload for HeroBase (camelCase per API docs)
         const payload: Record<string, unknown> = {
-          UrlTemplate: webhook_config.url,
-          Method: 'POST',
-          ContentTemplate: '{"event": "lead_closed", "data": {}}',
-          // Default to UserProcessed status for sales webhooks
-          LeadStatus: webhook_config.leadStatus || 'UserProcessed',
-          // Campaign code is required by HeroBase
-          CampaignCode: webhook_config.campaignCode,
+          name: webhook_config.description || 'CPH Sales Webhook',
+          campaignCode: webhook_config.campaignCode,
+          leadStatus: webhook_config.leadStatus || 'UserProcessed',
+          method: 'POST',
+          urlTemplate: webhook_config.url,
+          contentTemplate: '{"event": "lead_closed", "data": {}}',
         };
 
-        if (webhook_config.description) {
-          payload.Description = webhook_config.description;
-        }
-        
-        // Also filter by LeadClosure = Success for successful sales
+        // leadClosure filters for successful sales
         if (webhook_config.leadReleaseType) {
-          payload.LeadReleaseType = webhook_config.leadReleaseType;
+          payload.leadReleaseType = webhook_config.leadReleaseType;
         }
 
         console.log('Creating HeroBase webhook with payload:', JSON.stringify(payload));
