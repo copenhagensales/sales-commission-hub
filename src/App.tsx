@@ -279,9 +279,9 @@ const App = () => (
               <Route path="/recruitment/upcoming-hires" element={<RoleProtectedRoute requireTeamlederOrAbove><UpcomingHires /></RoleProtectedRoute>} />
               {/* SOME route - accessible to SOME employees and teamleder+ */}
               <Route path="/some" element={<ProtectedRoute><Some /></ProtectedRoute>} />
-              {/* Boards routes */}
-              <Route path="/boards/test" element={<RoleProtectedRoute requireTeamlederOrAbove><TestBoard /></RoleProtectedRoute>} />
-              <Route path="/boards/economic" element={<RoleProtectedRoute requireTeamlederOrAbove><EconomicBoard /></RoleProtectedRoute>} />
+              {/* Boards routes - public for TV display */}
+              <Route path="/boards/test" element={<TestBoard />} />
+              <Route path="/boards/economic" element={<EconomicBoard />} />
               {/* Admin route - owner only */}
               <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
