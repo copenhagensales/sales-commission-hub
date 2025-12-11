@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { DollarSign, ShoppingCart, Trophy, TrendingUp, Users } from "lucide-react";
+import { DollarSign, ShoppingCart, Trophy, TrendingUp, Users, Maximize, Minimize } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 
 interface TopAgent {
   name: string;
@@ -26,6 +27,25 @@ export default function Wallboard() {
     revenueThisMonth: 0,
     activeAgents: 0,
   });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = async () => {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      await document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   const fetchData = async () => {
     const today = new Date();
@@ -150,13 +170,24 @@ export default function Wallboard() {
           </div>
           <h1 className="text-4xl font-bold text-foreground">CPH Sales Live</h1>
         </div>
-        <div className="text-right">
-          <p className="text-5xl font-bold tabular-nums text-foreground">
-            {time.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}
-          </p>
-          <p className="text-xl text-muted-foreground">
-            {time.toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long" })}
-          </p>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={toggleFullscreen}
+            className="h-12 w-12"
+            title={isFullscreen ? "Afslut fuldskærm" : "Fuldskærm"}
+          >
+            {isFullscreen ? <Minimize className="h-6 w-6" /> : <Maximize className="h-6 w-6" />}
+          </Button>
+          <div className="text-right">
+            <p className="text-5xl font-bold tabular-nums text-foreground">
+              {time.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}
+            </p>
+            <p className="text-xl text-muted-foreground">
+              {time.toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long" })}
+            </p>
+          </div>
         </div>
       </header>
 
