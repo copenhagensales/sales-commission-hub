@@ -22,7 +22,7 @@ async function logIntegration(
 ) {
   try {
     await supabase.from('integration_logs').insert({
-      integration_type: 'webhook',
+      integration_type: 'dialer',
       integration_name: details.dialer_name || 'Dialer Webhook',
       status,
       message,
@@ -290,6 +290,14 @@ serve(async (req) => {
   console.log('authKey:', authKey ? '***' : '(none)');
   console.log('Method:', req.method);
 
+  // Log all headers for debugging
+  console.log('=== HEADERS ===');
+  const headerEntries: Record<string, string> = {};
+  req.headers.forEach((value, key) => {
+    headerEntries[key] = value;
+    console.log(`  ${key}: ${value}`);
+  });
+
   // Fetch dialer integration info to know provider type
   let dialerInfo: { id: string; name: string; provider: string } | null = null;
   if (dialerId) {
@@ -303,18 +311,57 @@ serve(async (req) => {
   }
 
   try {
-    const rawBody = await req.text();
+    // Read body - try multiple methods for robustness
+    let rawBody = '';
     const contentType = req.headers.get('content-type') || '';
+    const contentLength = req.headers.get('content-length');
+    const transferEncoding = req.headers.get('transfer-encoding');
+    
     console.log('Content-Type:', contentType);
+    console.log('Content-Length:', contentLength);
+    console.log('Transfer-Encoding:', transferEncoding);
+    
+    // Clone request to read body safely
+    const clonedReq = req.clone();
+    
+    try {
+      // Try reading as text first
+      rawBody = await clonedReq.text();
+    } catch (textError) {
+      console.log('Failed to read as text, trying arrayBuffer:', textError);
+      // Fallback to arrayBuffer
+      try {
+        const buffer = await req.arrayBuffer();
+        rawBody = new TextDecoder().decode(buffer);
+      } catch (bufferError) {
+        console.log('Failed to read as arrayBuffer:', bufferError);
+      }
+    }
+    
+    console.log('=== RAW BODY ===');
     console.log('Raw body length:', rawBody.length);
-    console.log('Raw body:', rawBody.substring(0, 1000) || '(empty)');
+    console.log('Raw body (full):', rawBody);
+    console.log('Raw body hex (first 100):', Array.from(rawBody.slice(0, 100)).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join(' '));
+    
+    // Check if data might be in query params (some webhooks do this)
+    console.log('=== QUERY PARAMS ===');
+    url.searchParams.forEach((value, key) => {
+      if (key !== 'dialer_id' && key !== 'authKey') {
+        console.log(`  ${key}: ${value.substring(0, 200)}`);
+      }
+    });
     console.log('================================');
 
     // Handle empty body (health checks, verification)
     if (!rawBody || rawBody.trim() === '') {
       console.log('Empty body received - returning 200 OK');
       return new Response(
-        JSON.stringify({ success: true, message: 'Webhook endpoint active', dialer_id: dialerId }),
+        JSON.stringify({ 
+          success: true, 
+          message: 'Webhook endpoint active', 
+          dialer_id: dialerId,
+          headers_received: headerEntries,
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -325,14 +372,38 @@ serve(async (req) => {
     
     if (!parseResult) {
       console.error('Could not parse webhook payload');
-      await logIntegration(supabase, 'error', 'Could not parse webhook payload', {
-        dialer_id: dialerId,
-        dialer_name: dialerInfo?.name,
-        content_type: contentType,
-        body_preview: rawBody.substring(0, 500),
-      });
+      
+      // Store raw event anyway for debugging
+      try {
+        await supabase.from('adversus_events').insert({
+          external_id: `unparsed-${Date.now()}`,
+          event_type: 'unparsed_webhook',
+          payload: {
+            raw_body: rawBody,
+            content_type: contentType,
+            headers: headerEntries,
+            dialer_id: dialerId,
+            dialer_name: dialerInfo?.name,
+            provider: dialerInfo?.provider,
+            received_at: new Date().toISOString(),
+          },
+          processed: false,
+          received_at: new Date().toISOString(),
+        });
+        console.log('Stored unparsed event for debugging');
+      } catch (storeErr) {
+        console.error('Failed to store unparsed event:', storeErr);
+      }
+      
       return new Response(
-        JSON.stringify({ success: false, error: 'Could not parse webhook payload' }),
+        JSON.stringify({ 
+          success: false, 
+          error: 'Could not parse webhook payload',
+          body_received: rawBody,
+          body_length: rawBody.length,
+          content_type: contentType,
+          headers: headerEntries,
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -355,12 +426,6 @@ serve(async (req) => {
   } catch (error) {
     console.error('Webhook error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-    await logIntegration(supabase, 'error', `Webhook failed: ${errorMessage}`, {
-      error: errorMessage,
-      dialer_id: dialerId,
-      dialer_name: dialerInfo?.name,
-    });
 
     return new Response(
       JSON.stringify({ success: false, error: errorMessage }),
