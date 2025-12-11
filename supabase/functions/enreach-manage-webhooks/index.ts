@@ -241,9 +241,7 @@ serve(async (req) => {
           CampaignCode: webhook_config.campaignCode,
           LeadStatus: webhook_config.leadStatus || "UserProcessed",
           Method: "POST",
-          // CAMBIO 1: Usar "Url" en lugar de "UrlTemplate"
-          Url: webhook_config.url,
-          // CAMBIO 2: Especificar Format explícitamente
+          UrlTemplate: webhook_config.url,
           Format: "Json",
           ContentTemplate: contentTemplate,
         };
