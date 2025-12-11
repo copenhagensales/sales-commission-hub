@@ -176,32 +176,13 @@ serve(async (req) => {
         }
 
         // Build the webhook payload for HeroBase (camelCase per API docs)
-        // contentTemplate uses HeroBase merge fields: {{Lead}} for full lead JSON, {{LeadId}}, {{CampaignCode}}, etc.
-        const contentTemplate = JSON.stringify({
-          event: "lead_closed",
-          leadId: "{{LeadId}}",
-          campaignCode: "{{CampaignCode}}",
-          agentEmail: "{{AgentEmail}}",
-          agentName: "{{AgentName}}",
-          leadStatus: "{{LeadStatus}}",
-          leadClosure: "{{LeadClosure}}",
-          phone: "{{Phone}}",
-          company: "{{Company}}",
-          externalId: "{{ExternalId}}",
-          customFields: "{{CustomFieldsJson}}",
-          createdDate: "{{CreatedDate}}",
-          modifiedDate: "{{ModifiedDate}}",
-        });
-
         const payload: Record<string, unknown> = {
           name: webhook_config.description || 'CPH Sales Webhook',
           campaignCode: webhook_config.campaignCode,
           leadStatus: webhook_config.leadStatus || 'UserProcessed',
-          leadClosure: 'Success', // Filter to only successful sales
           method: 'POST',
           urlTemplate: webhook_config.url,
-          contentTemplate: contentTemplate,
-          isActive: true,
+          contentTemplate: '{"event": "lead_closed", "data": {}}',
         };
 
         // leadClosure filters for successful sales
@@ -281,21 +262,12 @@ serve(async (req) => {
           );
         }
 
-        // HeroBase DELETE requires both path param AND body with DeleteHook object
-        const deletePayload = {
-          id: webhook_id,
-        };
-
-        console.log(`Deleting webhook ${webhook_id} with payload:`, JSON.stringify(deletePayload));
-
         const response = await fetch(`${apiBaseUrl}/hooks/${webhook_id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': authHeader,
-            'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
-          body: JSON.stringify(deletePayload),
         });
 
         if (!response.ok) {
