@@ -281,12 +281,21 @@ serve(async (req) => {
           );
         }
 
+        // HeroBase DELETE requires both path param AND body with DeleteHook object
+        const deletePayload = {
+          id: webhook_id,
+        };
+
+        console.log(`Deleting webhook ${webhook_id} with payload:`, JSON.stringify(deletePayload));
+
         const response = await fetch(`${apiBaseUrl}/hooks/${webhook_id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': authHeader,
+            'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
+          body: JSON.stringify(deletePayload),
         });
 
         if (!response.ok) {
