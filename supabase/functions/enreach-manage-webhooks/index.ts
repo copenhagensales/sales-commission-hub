@@ -150,19 +150,19 @@ serve(async (req) => {
         }
 
         // Build the webhook payload for HeroBase
-        // HeroBase requires either LeadStatus or LeadReleaseType
+        // HeroBase requires either LeadStatus or LeadReleaseType (PascalCase)
         const payload: Record<string, unknown> = {
-          url: webhook_config.url,
+          Url: webhook_config.url,
           // Default to Success status for sales webhooks if not specified
-          leadStatus: webhook_config.leadStatus || 'Success',
+          LeadStatus: webhook_config.leadStatus || 'Success',
         };
 
         if (webhook_config.description) {
-          payload.description = webhook_config.description;
+          payload.Description = webhook_config.description;
         }
         
         if (webhook_config.leadReleaseType) {
-          payload.leadReleaseType = webhook_config.leadReleaseType;
+          payload.LeadReleaseType = webhook_config.leadReleaseType;
         }
 
         console.log('Creating HeroBase webhook with payload:', JSON.stringify(payload));
