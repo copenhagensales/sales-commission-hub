@@ -156,6 +156,7 @@ serve(async (req) => {
         const payload: Record<string, unknown> = {
           UrlTemplate: webhook_config.url,
           Method: 'POST',
+          ContentTemplate: '{"event": "lead_closed", "data": {}}',
           // Default to UserProcessed status for sales webhooks
           LeadStatus: webhook_config.leadStatus || 'UserProcessed',
         };
