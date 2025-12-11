@@ -1,58 +1,63 @@
-import { WebhookParser, StandardWebhookPayload, StandardWebhookProduct } from "./interface.ts";
+import { WebhookParser, StandardWebhookPayload } from "./interface.ts";
 
 /**
- * Enreach (formerly Benemen) webhook payload structure
- * Based on official documentation: https://doc.enreachvoice.com/webhooks/
+ * HeroBase SimpleLead webhook payload structure
+ * This is the actual format sent by HeroBase webhooks
  * 
- * Webhooks are configured by Enreach support, not self-service.
- * Headers: X-Benemen-Event (event type), X-Benemen-Token (secret)
- * 
- * Common events:
- * - QueueCallInConnected: Inbound call connected
- * - QueueCallInAllocated: Call allocated to agent
- * - QueueCallInUserAllocated: Call allocated to specific user
- * - QueueCallInCompleted: Call completed
- * - QueueCallOutConnected: Outbound call connected
- * - QueueCallOutCompleted: Outbound call completed
- * - CallListCallCompleted: Call list call completed (sales relevant)
+ * Example payload:
+ * {
+ *   "uniqueId": "1S3064",
+ *   "campaignId": "CAMP2048S3064",
+ *   "status": "UserProcessed",
+ *   "closure": "Success",
+ *   "lastModifiedUser": "new_API@cphsales.dk",
+ *   ...
+ * }
  */
-interface EnreachWebhookPayload {
-  // Common properties (all events)
-  Id: string;
-  Timestamp: string;
-  RootEntityType: string; // "Organization"
-  RootEntityId: string;
-  EntityType: string; // "User", "Queue", "CallList"
-  EntityId: string;
-  EventType: string;
+interface HeroBaseLeadPayload {
+  uniqueId?: string;
+  UniqueId?: string;
+  nextDialTime?: string;
+  orgCode?: string;
+  campaignId?: string;
+  CampaignId?: string;
+  campaignCode?: string;
+  CampaignCode?: string;
+  campaignName?: string;
+  CampaignName?: string;
+  status?: string;
+  Status?: string;
+  closure?: string;
+  Closure?: string;
+  priority?: string;
+  lastModifiedTime?: string;
+  lastModifiedUser?: string;
+  firstProcessedByUser?: string;
+  firstProcessedTime?: string;
+  uploadTime?: string;
+  data?: Record<string, string> | string;
   
-  // Call-specific fields
-  CallId?: string;
-  QueueId?: string;
-  QueueName?: string;
-  QueueNumber?: string;
-  UserId?: string;
-  Username?: string; // Often the agent email
-  CallerNumber?: string;
-  TargetNumber?: string;
-  OrganizationId?: string;
+  // Agent fields
+  agentEmail?: string;
+  AgentEmail?: string;
+  userName?: string;
+  UserName?: string;
   
-  // Call result fields
-  Duration?: number;
-  Result?: string; // Call result/outcome
-  ResultCode?: string;
+  // Customer fields
+  phoneNumber?: string;
+  PhoneNumber?: string;
+  contactName?: string;
+  ContactName?: string;
+  company?: string;
+  Company?: string;
   
-  // Call list / outbound specific
-  CallListId?: string;
-  CallListName?: string;
-  ContactId?: string;
+  // Result fields
+  result?: string;
+  Result?: string;
+  closedDate?: string;
+  ClosedDate?: string;
   
-  // Variables can contain custom data from the call
-  Variables?: Record<string, unknown>;
-  CallVariables?: Record<string, unknown>;
-  Data?: Record<string, unknown>;
-  
-  // Additional data that might be present
+  // Allow any additional fields
   [key: string]: unknown;
 }
 
@@ -62,7 +67,6 @@ export class EnreachWebhookParser implements WebhookParser {
     // Primary: Enreach sends X-Benemen-Event header
     const eventHeader = headers.get('X-Benemen-Event');
     if (eventHeader) {
-      // Verify we can actually parse the body as JSON
       try {
         JSON.parse(rawBody);
         console.log(`[EnreachParser] Detected via X-Benemen-Event: ${eventHeader}`);
@@ -73,13 +77,18 @@ export class EnreachWebhookParser implements WebhookParser {
       }
     }
     
-    // Secondary: Check for Enreach-specific JSON structure
+    // Secondary: Check for HeroBase SimpleLead payload structure
     if (contentType.includes('application/json')) {
       try {
         const json = JSON.parse(rawBody);
-        // Enreach payloads always have RootEntityType and EntityType
-        if (json.RootEntityType && json.EntityType && json.EventType) {
-          console.log(`[EnreachParser] Detected via payload structure: ${json.EventType}`);
+        // HeroBase payloads have uniqueId and typically campaignId or status
+        if (json.uniqueId && (json.campaignId || json.status || json.closure)) {
+          console.log(`[EnreachParser] Detected HeroBase SimpleLead payload: uniqueId=${json.uniqueId}`);
+          return true;
+        }
+        // Also check for uppercase variants
+        if (json.UniqueId && (json.CampaignId || json.Status || json.Closure)) {
+          console.log(`[EnreachParser] Detected HeroBase payload (PascalCase): UniqueId=${json.UniqueId}`);
           return true;
         }
       } catch {
@@ -91,7 +100,7 @@ export class EnreachWebhookParser implements WebhookParser {
   }
 
   parse(rawBody: string, _contentType: string, headers: Headers): StandardWebhookPayload {
-    let body: EnreachWebhookPayload;
+    let body: HeroBaseLeadPayload;
     
     try {
       body = JSON.parse(rawBody);
@@ -100,74 +109,53 @@ export class EnreachWebhookParser implements WebhookParser {
       throw new Error(`Invalid JSON payload for Enreach webhook: ${e}`);
     }
     
-    // Get event type from header (preferred) or body
-    const eventType = headers.get('X-Benemen-Event') || body.EventType || 'unknown';
+    // Get event type from header or derive from payload
+    const eventHeader = headers.get('X-Benemen-Event');
+    const eventType = eventHeader || this.getStr(body, ['status', 'Status']) || 'HeroBaseLead';
     
     console.log(`[EnreachParser] Processing event: ${eventType}`);
-    console.log(`[EnreachParser] EntityType: ${body.EntityType}, Id: ${body.Id}`);
+    console.log(`[EnreachParser] Payload keys: ${Object.keys(body).join(', ')}`);
     
-    // External ID - use call or contact identifiers
-    const externalId = body.CallId || body.ContactId || body.EntityId || body.Id || `enreach-${Date.now()}`;
+    // External ID - uniqueId is the primary identifier
+    const externalId = this.getStr(body, ['uniqueId', 'UniqueId']) || `enreach-${Date.now()}`;
     
-    // Agent info - UserId and Username are the primary fields
-    const agentId = body.UserId || '';
-    const agentName = body.Username || ''; // Username is often the email in Enreach
-    const agentEmail = body.Username || ''; // Username typically IS the email
+    // Agent info - check multiple possible field names
+    const agentEmail = this.getStr(body, ['agentEmail', 'AgentEmail', 'lastModifiedUser', 'firstProcessedByUser']);
+    const agentName = this.getStr(body, ['userName', 'UserName', 'agentName', 'AgentName']) || agentEmail;
     
-    // Campaign/Queue info
-    const campaignId = body.CallListId || body.QueueId || '';
-    const campaignName = body.CallListName || body.QueueName || '';
+    // Campaign info
+    const campaignId = this.getStr(body, ['campaignId', 'CampaignId', 'campaignCode', 'CampaignCode']);
+    const campaignName = this.getStr(body, ['campaignName', 'CampaignName']) || campaignId;
     
-    // Customer phone - CallerNumber for inbound, TargetNumber for outbound
-    const customerPhone = body.CallerNumber || body.TargetNumber || '';
+    // Customer info
+    const customerPhone = this.getStr(body, ['phoneNumber', 'PhoneNumber', 'phone', 'Phone']);
+    const customerCompany = this.getStr(body, ['company', 'Company', 'contactName', 'ContactName']);
     
-    // Try to extract additional data from Variables
-    const variables = body.Variables || body.CallVariables || body.Data || {};
+    // Result/closure info
+    const result = this.getStr(body, ['result', 'Result', 'closure', 'Closure']);
     
-    // Customer company from variables
-    let customerCompany = '';
-    if (variables) {
-      customerCompany = String(
-        variables.Company || 
-        variables.company || 
-        variables.CustomerName ||
-        variables.customerName ||
-        variables.Firma ||
-        variables.firma ||
-        ''
-      );
-    }
+    // Timestamp - parse HeroBase date format (DD-MM-YYYY HH:mm:ss)
+    const rawTime = this.getStr(body, ['closedDate', 'ClosedDate', 'lastModifiedTime', 'firstProcessedTime']);
+    const eventTime = this.parseHeroBaseDate(rawTime) || new Date().toISOString();
     
-    // External reference (OPP, order number, etc.) from variables
+    // Try to extract external reference from data field
     let externalReference: string | null = null;
-    if (variables) {
+    const dataField = body.data;
+    if (dataField && typeof dataField === 'object') {
       // Check common field names for order/reference IDs
-      const refValue = 
-        variables.OrderId ||
-        variables.orderId ||
-        variables.OPP ||
-        variables.opp ||
-        variables.Reference ||
-        variables.reference ||
-        variables.SerioID ||
-        variables.KVHXR ||
-        variables.OrderNumber ||
-        variables.orderNumber ||
-        null;
+      externalReference = this.getStr(dataField as Record<string, unknown>, [
+        'OrderId', 'orderId', 'OPP', 'opp', 'Reference', 'reference',
+        'SerioID', 'KVHXR', 'OrderNumber', 'orderNumber'
+      ]) || null;
       
-      if (refValue) {
-        externalReference = String(refValue);
-        console.log(`[EnreachParser] Found reference in variables: ${externalReference}`);
-      }
-      
-      // If still no reference, search all variables for OPP-like patterns
+      // Search for OPP pattern in data values
       if (!externalReference) {
-        for (const [key, value] of Object.entries(variables)) {
+        for (const [key, value] of Object.entries(dataField)) {
           if (value && typeof value === 'string') {
             const oppMatch = value.match(/\b(OPP-?\d+|\d{6,})\b/i);
             if (oppMatch) {
               externalReference = oppMatch[1];
-              console.log(`[EnreachParser] Found OPP pattern in ${key}: ${externalReference}`);
+              console.log(`[EnreachParser] Found OPP pattern in data.${key}: ${externalReference}`);
               break;
             }
           }
@@ -175,31 +163,24 @@ export class EnreachWebhookParser implements WebhookParser {
       }
     }
     
-    // Products - Enreach webhooks typically don't include product data
-    // Products would need to be fetched via API or from variables
-    const products: StandardWebhookProduct[] = [];
-    
-    // Check if there's product info in variables
-    if (variables.Products && Array.isArray(variables.Products)) {
-      for (const p of variables.Products) {
-        products.push({
-          externalId: String(p.Id || p.id || 'unknown'),
-          title: String(p.Name || p.name || p.Title || p.title || 'Unknown Product'),
-          quantity: Number(p.Quantity || p.quantity || 1),
-          unitPrice: Number(p.Price || p.price || p.UnitPrice || 0),
-        });
-      }
-    }
-    
-    // Log what we extracted for debugging
-    console.log(`[EnreachParser] Extracted - Agent: ${agentName}, Campaign: ${campaignName}, Phone: ${customerPhone}, Ref: ${externalReference}`);
+    // Log extracted values for debugging
+    console.log(`[EnreachParser] Extracted values:`);
+    console.log(`  - externalId: ${externalId}`);
+    console.log(`  - agentEmail: ${agentEmail}`);
+    console.log(`  - agentName: ${agentName}`);
+    console.log(`  - campaignId: ${campaignId}`);
+    console.log(`  - customerPhone: ${customerPhone}`);
+    console.log(`  - customerCompany: ${customerCompany}`);
+    console.log(`  - result: ${result}`);
+    console.log(`  - externalReference: ${externalReference}`);
+    console.log(`  - eventTime: ${eventTime}`);
     
     return {
       externalId,
       eventType,
-      eventTime: body.Timestamp || new Date().toISOString(),
+      eventTime,
       
-      agentId,
+      agentId: agentEmail, // Use email as ID
       agentName,
       agentEmail,
       
@@ -211,9 +192,49 @@ export class EnreachWebhookParser implements WebhookParser {
       
       externalReference,
       
-      products,
+      products: [], // HeroBase webhooks typically don't include product data inline
       
       rawPayload: body as unknown as Record<string, unknown>,
     };
+  }
+  
+  /**
+   * Helper to get string value with multiple possible field names
+   */
+  private getStr(obj: Record<string, unknown> | null | undefined, keys: string[], fallback = ""): string {
+    if (!obj) return fallback;
+    for (const key of keys) {
+      const value = obj[key];
+      if (value !== undefined && value !== null && value !== '') {
+        return String(value);
+      }
+    }
+    return fallback;
+  }
+  
+  /**
+   * Parse HeroBase date format (DD-MM-YYYY HH:mm:ss) to ISO string
+   */
+  private parseHeroBaseDate(dateStr: string): string | null {
+    if (!dateStr) return null;
+    
+    // Try parsing DD-MM-YYYY HH:mm:ss format
+    const match = dateStr.match(/^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+    if (match) {
+      const [, day, month, year, hour, minute, second] = match;
+      return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`).toISOString();
+    }
+    
+    // Try parsing as ISO or other standard format
+    try {
+      const date = new Date(dateStr);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString();
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    
+    return null;
   }
 }
