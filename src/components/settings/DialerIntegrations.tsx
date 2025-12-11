@@ -1213,11 +1213,13 @@ export function DialerIntegrations() {
                       <SelectValue placeholder="Vælg kampagne" />
                     </SelectTrigger>
                     <SelectContent>
-                      {enreachCampaigns.map((campaign) => (
-                        <SelectItem key={campaign.code} value={campaign.code}>
-                          {campaign.name} ({campaign.code})
-                        </SelectItem>
-                      ))}
+                      {enreachCampaigns
+                        .filter((campaign) => campaign.code && campaign.code.trim() !== "")
+                        .map((campaign) => (
+                          <SelectItem key={campaign.code} value={campaign.code}>
+                            {campaign.name} ({campaign.code})
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 )}
