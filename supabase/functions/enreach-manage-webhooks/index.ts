@@ -154,7 +154,7 @@ serve(async (req) => {
         // Valid LeadStatus: UserProcessed, RedialAutomatic, RedialManualCommon, etc.
         // Valid LeadClosure (when LeadStatus=UserProcessed): Success, NotInterested, InvalidLead, Unqualified
         const payload: Record<string, unknown> = {
-          Url: webhook_config.url,
+          UrlTemplate: webhook_config.url,
           // Default to UserProcessed status for sales webhooks
           LeadStatus: webhook_config.leadStatus || 'UserProcessed',
         };
