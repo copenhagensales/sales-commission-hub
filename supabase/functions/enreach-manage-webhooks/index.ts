@@ -181,7 +181,7 @@ serve(async (req) => {
           method: "POST",
           urlTemplate: webhook_config.url,
           format: "Json",
-          standardTemplateName: "StandardTemplate.PostJson",
+          standardTemplateName: "StandardTemplate.Zapier",
         };
 
         // leadClosure filters for successful sales
