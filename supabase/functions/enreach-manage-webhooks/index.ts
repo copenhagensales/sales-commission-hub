@@ -192,7 +192,7 @@ serve(async (req) => {
             return new Response(JSON.stringify({ 
               success: true, 
               example: null,
-              message: "No hay datos de ejemplo disponibles. El webhook necesita recibir al menos un evento para generar un ejemplo."
+              message: "Ingen eksempeldata tilgængelig. Webhook'en skal modtage mindst én hændelse for at generere et eksempel."
             }), {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
