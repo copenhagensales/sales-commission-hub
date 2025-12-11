@@ -26,7 +26,6 @@ interface Sale {
   customer_phone: string | null;
   sale_datetime: string | null;
   agent_name: string | null;
-  customer_name: string | null;
 }
 
 interface SaleItem {
@@ -225,7 +224,7 @@ Deno.serve(async (req) => {
       
       const { data: sales, error: salesError } = await supabase
         .from("sales")
-        .select("id, adversus_external_id, adversus_opp_number, customer_phone, sale_datetime, agent_name, customer_name")
+        .select("id, adversus_external_id, adversus_opp_number, customer_phone, sale_datetime, agent_name")
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", dateFilter);
 
@@ -246,7 +245,6 @@ Deno.serve(async (req) => {
         adversus_opp_number: sale.adversus_opp_number,
         customer_phone: sale.customer_phone,
         sale_datetime: sale.sale_datetime,
-        customer_name: sale.customer_name,
       }));
     });
 
@@ -254,7 +252,6 @@ Deno.serve(async (req) => {
     const salesByExternalId = new Map<string, Sale>();
     const salesByOpp = new Map<string, Sale>();
     const salesByPhone = new Map<string, Sale[]>();
-    const salesByCustomerName = new Map<string, Sale[]>(); // New: for name-based matching
 
     for (const sale of salesData) {
       // External ID lookup
@@ -278,23 +275,12 @@ Deno.serve(async (req) => {
           salesByPhone.set(normalizedPhone, existing);
         }
       }
-      
-      // Customer name lookup (for CRMs that only have name)
-      if (sale.customer_name) {
-        const normalizedName = normalizeId(sale.customer_name);
-        if (normalizedName.length >= 3) {
-          const existing = salesByCustomerName.get(normalizedName) || [];
-          existing.push(sale);
-          salesByCustomerName.set(normalizedName, existing);
-        }
-      }
     }
 
     console.log("Lookup maps created:");
     console.log(`  - salesByExternalId: ${salesByExternalId.size} entries`);
     console.log(`  - salesByOpp: ${salesByOpp.size} entries`);
     console.log(`  - salesByPhone: ${salesByPhone.size} entries`);
-    console.log(`  - salesByCustomerName: ${salesByCustomerName.size} entries`);
 
     let matchedCount = 0;
     let cancelledCount = 0;
@@ -448,47 +434,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Attempt 7: Match by Customer Name + Date (last resort for some CRMs)
-      if (!matchedSale && row.customer_name && row.date) {
-        const normalizedName = normalizeId(row.customer_name);
-        console.log(`  Attempt 7 - customer_name lookup: "${normalizedName}"`);
-        
-        if (normalizedName.length >= 3) {
-          const candidates = salesByCustomerName.get(normalizedName) || [];
-          console.log(`  Found ${candidates.length} candidates with matching name`);
-          
-          if (candidates.length === 1) {
-            matchedSale = candidates[0];
-            matchMethod = "name_single";
-            console.log(`  ✓ MATCHED via customer_name (single match): sale ${matchedSale.id}`);
-          } else if (candidates.length > 1) {
-            const rowDate = parseDate(row.date);
-            if (rowDate) {
-              let bestMatch: Sale | null = null;
-              let bestDiff = Infinity;
-              
-              for (const candidate of candidates) {
-                if (candidate.sale_datetime) {
-                  const saleDate = new Date(candidate.sale_datetime);
-                  const diff = Math.abs(saleDate.getTime() - rowDate.getTime());
-                  const daysDiff = diff / (1000 * 60 * 60 * 24);
-                  
-                  if (daysDiff <= 30 && diff < bestDiff) {
-                    bestDiff = diff;
-                    bestMatch = candidate;
-                  }
-                }
-              }
-              
-              if (bestMatch) {
-                matchedSale = bestMatch;
-                matchMethod = "name_date";
-                console.log(`  ✓ MATCHED via customer_name+date: sale ${matchedSale.id}`);
-              }
-            }
-          }
-        }
-      }
+      // Note: Customer name matching removed - sales table doesn't have customer_name column
 
       if (!matchedSale) {
         console.log(`  ✗ NO MATCH FOUND for row ${row.id}`);
