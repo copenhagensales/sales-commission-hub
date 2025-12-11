@@ -505,66 +505,85 @@ export class EnreachAdapter implements DialerAdapter {
    */
   async fetchCalls(days: number): Promise<StandardCall[]> {
     try {
-      // First, get the account info to find the root OrgCode
-      let orgCode = "";
+      // /calls endpoint REQUIRES OrgCode parameter per API docs
+      // First, we need to get available OrgCodes from users or organizational units
+      
+      let orgCodes: string[] = [];
+      
+      // Strategy 1: Get OrgCodes from /users endpoint
       try {
-        const accountData = await this.get("/myaccount") as Record<string, unknown>;
-        console.log(`[EnreachAdapter] Account data keys: ${Object.keys(accountData).join(', ')}`);
+        console.log("[EnreachAdapter] Fetching users to get OrgCodes...");
+        const usersData = await this.get("/users") as unknown;
+        const users = Array.isArray(usersData) ? usersData : 
+                      ((usersData as Record<string, unknown>).users as unknown[] || 
+                       (usersData as Record<string, unknown>).Users as unknown[] || []);
         
-        // Try to extract orgCode from account
-        orgCode = this.getStr(accountData, ['orgCode', 'OrgCode', 'organizationCode', 'OrganizationCode']);
-        
-        // If not found directly, check nested user object
-        if (!orgCode) {
-          const userObj = (accountData.user || accountData.User) as Record<string, unknown> | undefined;
-          if (userObj) {
-            orgCode = this.getStr(userObj, ['orgCode', 'OrgCode']);
+        for (const user of users) {
+          const u = user as Record<string, unknown>;
+          const code = this.getStr(u, ['orgCode', 'OrgCode']);
+          if (code && !orgCodes.includes(code)) {
+            orgCodes.push(code);
           }
         }
-        
-        // Try parent org unit
-        if (!orgCode) {
-          const parentObj = (accountData.parent || accountData.Parent) as Record<string, unknown> | undefined;
-          if (parentObj) {
-            orgCode = this.getStr(parentObj, ['orgCode', 'OrgCode']);
+        console.log(`[EnreachAdapter] Found ${orgCodes.length} unique OrgCodes from users: ${orgCodes.slice(0, 5).join(', ')}...`);
+      } catch (usersError) {
+        console.warn(`[EnreachAdapter] Could not fetch users: ${usersError}`);
+      }
+      
+      // Strategy 2: Get OrgCodes from /organizationalunits if no users found
+      if (orgCodes.length === 0) {
+        try {
+          console.log("[EnreachAdapter] Fetching organizational units...");
+          const orgsData = await this.get("/organizationalunits") as unknown;
+          const orgs = Array.isArray(orgsData) ? orgsData : 
+                       ((orgsData as Record<string, unknown>).results as unknown[] || 
+                        (orgsData as Record<string, unknown>).Results as unknown[] || []);
+          
+          for (const org of orgs) {
+            const o = org as Record<string, unknown>;
+            const code = this.getStr(o, ['orgCode', 'OrgCode', 'code', 'Code']);
+            if (code && !orgCodes.includes(code)) {
+              orgCodes.push(code);
+            }
           }
+          console.log(`[EnreachAdapter] Found ${orgCodes.length} OrgCodes from organizational units`);
+        } catch (orgsError) {
+          console.warn(`[EnreachAdapter] Could not fetch organizational units: ${orgsError}`);
         }
-        
-        console.log(`[EnreachAdapter] Found OrgCode: ${orgCode || '(none)'}`);
-      } catch (accountError) {
-        console.warn(`[EnreachAdapter] Could not fetch /myaccount: ${accountError}`);
+      }
+      
+      if (orgCodes.length === 0) {
+        console.error("[EnreachAdapter] No OrgCodes found - cannot fetch calls without OrgCode parameter");
+        return [];
       }
 
       // Calculate date range for the query
-      const endDate = new Date();
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
-      
-      // HeroBase API expects ISO 8601 format: YYYY-MM-DDTHH:mm:ss
-      const startTimeStr = startDate.toISOString().split('.')[0]; // Remove milliseconds
-      const endTimeStr = endDate.toISOString().split('.')[0];
-      
-      // Also prepare simple date format as fallback
       const startDateOnly = startDate.toISOString().split('T')[0];
+      
+      // TimeSpan format: "d.hh:mm:ss" (e.g., "7.00:00:00" for 7 days)
+      const timeSpan = `${days}.00:00:00`;
 
-      console.log(`[EnreachAdapter] Fetching calls from ${startTimeStr} to ${endTimeStr}`);
+      console.log(`[EnreachAdapter] Fetching calls for last ${days} days from ${startDateOnly}`);
 
       let allCalls: Record<string, unknown>[] = [];
 
-      // Build OrgCode param if available
-      const orgCodeParam = orgCode ? `&OrgCode=${encodeURIComponent(orgCode)}` : '';
+      // Use first OrgCode to fetch calls (typically org-wide access)
+      const orgCode = orgCodes[0];
+      console.log(`[EnreachAdapter] Using OrgCode: ${orgCode}`);
       
-      // Try different endpoint variations - HeroBase API accepts various formats
+      // Try different endpoint patterns
       const endpoints = [
-        // Option 1: StartTime + EndTime (most reliable per API docs)
-        `/calls?StartTime=${encodeURIComponent(startTimeStr)}&EndTime=${encodeURIComponent(endTimeStr)}&Include=campaign,user&Limit=1000${orgCodeParam}`,
-        // Option 2: Just StartTime with date only
-        `/calls?StartTime=${startDateOnly}&Include=campaign,user&Limit=1000${orgCodeParam}`,
-        // Option 3: StartTime with OrgCode first
-        orgCode ? `/calls?OrgCode=${encodeURIComponent(orgCode)}&StartTime=${startDateOnly}&Include=campaign,user&Limit=1000` : null,
-        // Option 4: Organization units endpoint
-        orgCode ? `/organizationalunits/${encodeURIComponent(orgCode)}/calls?StartTime=${startDateOnly}&Limit=1000` : null,
-      ].filter(Boolean) as string[];
+        // Standard /calls with OrgCode, StartTime, TimeSpan
+        `/calls?OrgCode=${encodeURIComponent(orgCode)}&StartTime=${startDateOnly}&TimeSpan=${encodeURIComponent(timeSpan)}&Include=campaign,user&Limit=1000`,
+        // Try with full datetime format
+        `/calls?OrgCode=${encodeURIComponent(orgCode)}&StartTime=${startDate.toISOString()}&TimeSpan=${encodeURIComponent(timeSpan)}&Include=campaign,user&Limit=1000`,
+        // Alternative: use organizational units endpoint
+        `/organizationalunits/${encodeURIComponent(orgCode)}/calls?StartTime=${startDateOnly}&TimeSpan=${encodeURIComponent(timeSpan)}&Limit=1000`,
+        // User-specific calls endpoint
+        `/users/${encodeURIComponent(orgCode)}/calls?StartTime=${startDateOnly}&TimeSpan=${encodeURIComponent(timeSpan)}&Limit=1000`,
+      ];
       
       for (const endpoint of endpoints) {
         try {
