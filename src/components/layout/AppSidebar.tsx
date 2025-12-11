@@ -621,8 +621,8 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             </Collapsible>
           )}
 
-          {/* Boards menu - for owners */}
-          {isOwner && (
+          {/* Boards menu - for teamleder or above */}
+          {isTeamlederOrAbove && (
             <Collapsible open={boardsOpen} onOpenChange={setBoardsOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
