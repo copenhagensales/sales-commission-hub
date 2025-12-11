@@ -535,30 +535,35 @@ export class EnreachAdapter implements DialerAdapter {
         console.warn(`[EnreachAdapter] Could not fetch /myaccount: ${accountError}`);
       }
 
-      // Calculate start time for the query
-      const startTime = new Date();
-      startTime.setDate(startTime.getDate() - days);
-      // Format as ISO date only (YYYY-MM-DD) - simpler format for API
-      const startDateStr = startTime.toISOString().split('T')[0];
+      // Calculate date range for the query
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
       
-      // TimeSpan format for Enreach: "d.hh:mm:ss" 
-      const timeSpan = `${days}.00:00:00`;
+      // HeroBase API expects ISO 8601 format: YYYY-MM-DDTHH:mm:ss
+      const startTimeStr = startDate.toISOString().split('.')[0]; // Remove milliseconds
+      const endTimeStr = endDate.toISOString().split('.')[0];
+      
+      // Also prepare simple date format as fallback
+      const startDateOnly = startDate.toISOString().split('T')[0];
 
-      console.log(`[EnreachAdapter] Fetching calls for last ${days} days from ${startDateStr}`);
+      console.log(`[EnreachAdapter] Fetching calls from ${startTimeStr} to ${endTimeStr}`);
 
       let allCalls: Record<string, unknown>[] = [];
 
-      // Build endpoint with OrgCode if available (REQUIRED parameter per API docs)
-      const orgCodeParam = orgCode ? `OrgCode=${encodeURIComponent(orgCode)}&` : '';
+      // Build OrgCode param if available
+      const orgCodeParam = orgCode ? `&OrgCode=${encodeURIComponent(orgCode)}` : '';
       
-      // Try different endpoint variations
+      // Try different endpoint variations - HeroBase API accepts various formats
       const endpoints = [
-        // With OrgCode and full params
-        `/calls?${orgCodeParam}StartTime=${startDateStr}&TimeSpan=${encodeURIComponent(timeSpan)}&Include=campaign,user&Limit=1000`,
-        // Without OrgCode (some accounts may allow this)
-        `/calls?StartTime=${startDateStr}&TimeSpan=${encodeURIComponent(timeSpan)}&Include=campaign,user&Limit=1000`,
-        // Alternative: use organizational units endpoint
-        orgCode ? `/organizationalunits/${encodeURIComponent(orgCode)}/calls?StartTime=${startDateStr}&TimeSpan=${encodeURIComponent(timeSpan)}` : null,
+        // Option 1: StartTime + EndTime (most reliable per API docs)
+        `/calls?StartTime=${encodeURIComponent(startTimeStr)}&EndTime=${encodeURIComponent(endTimeStr)}&Include=campaign,user&Limit=1000${orgCodeParam}`,
+        // Option 2: Just StartTime with date only
+        `/calls?StartTime=${startDateOnly}&Include=campaign,user&Limit=1000${orgCodeParam}`,
+        // Option 3: StartTime with OrgCode first
+        orgCode ? `/calls?OrgCode=${encodeURIComponent(orgCode)}&StartTime=${startDateOnly}&Include=campaign,user&Limit=1000` : null,
+        // Option 4: Organization units endpoint
+        orgCode ? `/organizationalunits/${encodeURIComponent(orgCode)}/calls?StartTime=${startDateOnly}&Limit=1000` : null,
       ].filter(Boolean) as string[];
       
       for (const endpoint of endpoints) {
@@ -579,10 +584,10 @@ export class EnreachAdapter implements DialerAdapter {
           }
           
           if (allCalls.length > 0) {
-            console.log(`[EnreachAdapter] Found ${allCalls.length} calls`);
+            console.log(`[EnreachAdapter] Found ${allCalls.length} calls from endpoint`);
             break;
           } else {
-            console.log(`[EnreachAdapter] Endpoint returned empty array`);
+            console.log(`[EnreachAdapter] Endpoint returned empty array, trying next...`);
           }
         } catch (endpointError) {
           const errMsg = endpointError instanceof Error ? endpointError.message : String(endpointError);
