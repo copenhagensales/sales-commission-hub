@@ -187,6 +187,16 @@ serve(async (req) => {
         console.log(`HeroBase example response: ${responseText}`);
 
         if (!response.ok) {
+          // Check for common error cases
+          if (responseText.includes("Sequence contains no matching element")) {
+            return new Response(JSON.stringify({ 
+              success: true, 
+              example: null,
+              message: "No hay datos de ejemplo disponibles. El webhook necesita recibir al menos un evento para generar un ejemplo."
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
           throw new Error(`HeroBase API error: ${response.status} - ${responseText}`);
         }
 

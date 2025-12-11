@@ -111,6 +111,7 @@ export function DialerIntegrations() {
   // Webhook example state
   const [webhookExampleDialogOpen, setWebhookExampleDialogOpen] = useState(false);
   const [webhookExampleData, setWebhookExampleData] = useState<unknown>(null);
+  const [webhookExampleMessage, setWebhookExampleMessage] = useState<string | null>(null);
   const [isLoadingWebhookExample, setIsLoadingWebhookExample] = useState(false);
   const [webhookExampleId, setWebhookExampleId] = useState<string | null>(null);
 
@@ -575,6 +576,7 @@ export function DialerIntegrations() {
       if (error) throw error;
 
       setWebhookExampleData(data?.example);
+      setWebhookExampleMessage(data?.message || null);
       setWebhookExampleDialogOpen(true);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
@@ -1400,13 +1402,19 @@ export function DialerIntegrations() {
             </DialogHeader>
             
             <div className="py-4">
-              <ScrollArea className="h-[400px]">
-                <pre className="text-xs bg-muted p-4 rounded-md overflow-auto">
-                  {webhookExampleData 
-                    ? JSON.stringify(webhookExampleData, null, 2) 
-                    : "Ingen data"}
-                </pre>
-              </ScrollArea>
+              {webhookExampleMessage && !webhookExampleData ? (
+                <div className="text-center py-8 text-muted-foreground bg-muted rounded-md p-4">
+                  <p>{webhookExampleMessage}</p>
+                </div>
+              ) : (
+                <ScrollArea className="h-[400px]">
+                  <pre className="text-xs bg-muted p-4 rounded-md overflow-auto">
+                    {webhookExampleData 
+                      ? JSON.stringify(webhookExampleData, null, 2) 
+                      : "Ingen data"}
+                  </pre>
+                </ScrollArea>
+              )}
             </div>
             
             <DialogFooter>
