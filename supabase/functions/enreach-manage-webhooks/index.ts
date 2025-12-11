@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface ManageWebhooksRequest {
   integration_id: string;
-  action: "list" | "create" | "delete" | "meta" | "campaigns";
+  action: "list" | "create" | "delete" | "meta" | "campaigns" | "example";
   webhook_id?: string;
   webhook_config?: {
     url: string;
@@ -160,6 +160,45 @@ serve(async (req) => {
         console.log("HeroBase hooks meta:", JSON.stringify(meta));
 
         return new Response(JSON.stringify({ success: true, meta }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "example": {
+        if (!webhook_id) {
+          return new Response(
+            JSON.stringify({ success: false, error: "webhook_id is required for example action" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+
+        console.log(`Fetching example payload for webhook ${webhook_id}`);
+
+        const response = await fetch(`${apiBaseUrl}/hooks/${webhook_id}/example`, {
+          method: "GET",
+          headers: {
+            Authorization: authHeader,
+            Accept: "application/json",
+          },
+        });
+
+        const responseText = await response.text();
+        console.log(`HeroBase example response status: ${response.status}`);
+        console.log(`HeroBase example response: ${responseText}`);
+
+        if (!response.ok) {
+          throw new Error(`HeroBase API error: ${response.status} - ${responseText}`);
+        }
+
+        let example: unknown = null;
+        try {
+          example = JSON.parse(responseText);
+        } catch {
+          // If not JSON, return as text
+          example = responseText;
+        }
+
+        return new Response(JSON.stringify({ success: true, example }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

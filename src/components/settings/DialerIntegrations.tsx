@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check, List, ExternalLink, MoreVertical, PhoneCall } from "lucide-react";
+import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check, List, ExternalLink, MoreVertical, PhoneCall, Eye } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -107,6 +107,12 @@ export function DialerIntegrations() {
   const [enreachWebhooksList, setEnreachWebhooksList] = useState<Array<{ id: string; urlTemplate?: string; name?: string; campaignCode?: string; leadStatus?: string; isActive?: boolean }>>([]);
   const [isLoadingEnreachWebhooks, setIsLoadingEnreachWebhooks] = useState(false);
   const [isDeletingEnreachWebhookId, setIsDeletingEnreachWebhookId] = useState<string | null>(null);
+  
+  // Webhook example state
+  const [webhookExampleDialogOpen, setWebhookExampleDialogOpen] = useState(false);
+  const [webhookExampleData, setWebhookExampleData] = useState<unknown>(null);
+  const [isLoadingWebhookExample, setIsLoadingWebhookExample] = useState(false);
+  const [webhookExampleId, setWebhookExampleId] = useState<string | null>(null);
 
   // Webhook management state (Adversus)
   const [manageWebhooksDialogOpen, setManageWebhooksDialogOpen] = useState(false);
@@ -548,6 +554,34 @@ export function DialerIntegrations() {
       toast.error(`Fejl ved sletning af webhook: ${errorMessage}`);
     } finally {
       setIsDeletingEnreachWebhookId(null);
+    }
+  };
+
+  // Fetch webhook example from HeroBase
+  const fetchWebhookExample = async (webhookId: string) => {
+    if (!manageEnreachWebhooksIntegrationId) return;
+    
+    setIsLoadingWebhookExample(true);
+    setWebhookExampleId(webhookId);
+    try {
+      const { data, error } = await supabase.functions.invoke("enreach-manage-webhooks", {
+        body: {
+          integration_id: manageEnreachWebhooksIntegrationId,
+          action: "example",
+          webhook_id: webhookId,
+        },
+      });
+
+      if (error) throw error;
+
+      setWebhookExampleData(data?.example);
+      setWebhookExampleDialogOpen(true);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
+      toast.error(`Fejl ved hentning af eksempel: ${errorMessage}`);
+    } finally {
+      setIsLoadingWebhookExample(false);
+      setWebhookExampleId(null);
     }
   };
 
@@ -1300,7 +1334,20 @@ export function DialerIntegrations() {
                               {webhook.isActive ? "Aktiv" : "Inaktiv"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right flex gap-1 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => fetchWebhookExample(webhook.id)}
+                              disabled={isLoadingWebhookExample && webhookExampleId === webhook.id}
+                              title="Ver ejemplo de payload"
+                            >
+                              {isLoadingWebhookExample && webhookExampleId === webhook.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -1333,6 +1380,48 @@ export function DialerIntegrations() {
                 Genindlæs
               </Button>
               <Button variant="outline" onClick={() => setManageEnreachWebhooksDialogOpen(false)}>
+                Luk
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Webhook Example Dialog */}
+        <Dialog open={webhookExampleDialogOpen} onOpenChange={setWebhookExampleDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Webhook Payload Eksempel
+              </DialogTitle>
+              <DialogDescription>
+                Dette er et eksempel på de data, som webhook'en vil sende.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="py-4">
+              <ScrollArea className="h-[400px]">
+                <pre className="text-xs bg-muted p-4 rounded-md overflow-auto">
+                  {webhookExampleData 
+                    ? JSON.stringify(webhookExampleData, null, 2) 
+                    : "Ingen data"}
+                </pre>
+              </ScrollArea>
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(JSON.stringify(webhookExampleData, null, 2));
+                  toast.success("Kopieret til udklipsholder");
+                }}
+              >
+                <Copy className="h-4 w-4 mr-1" />
+                Kopier
+              </Button>
+              <Button variant="outline" onClick={() => setWebhookExampleDialogOpen(false)}>
                 Luk
               </Button>
             </DialogFooter>
