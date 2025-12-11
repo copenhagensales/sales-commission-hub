@@ -16,17 +16,56 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const payload = await req.json();
-    console.log('Received e-conomic webhook:', JSON.stringify(payload, null, 2));
+    const contentType = req.headers.get('content-type') || '';
+    let payload: Record<string, any> = {};
+
+    // Handle different content types from e-conomic
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+      const text = await req.text();
+      console.log('Received form-urlencoded data:', text);
+      
+      const params = new URLSearchParams(text);
+      for (const [key, value] of params.entries()) {
+        payload[key] = value;
+      }
+    } else if (contentType.includes('application/json')) {
+      payload = await req.json();
+      console.log('Received JSON data:', JSON.stringify(payload, null, 2));
+    } else {
+      // Try to read as text and parse
+      const text = await req.text();
+      console.log('Received raw data:', text);
+      
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        // Try form-urlencoded
+        const params = new URLSearchParams(text);
+        for (const [key, value] of params.entries()) {
+          payload[key] = value;
+        }
+      }
+    }
+
+    console.log('Parsed payload:', JSON.stringify(payload, null, 2));
+
+    // Determine event type from payload
+    const eventType = payload.eventType || payload.type || payload.event || 'invoice_booked';
 
     // Store raw event
-    await supabase
+    const { error: eventError } = await supabase
       .from('economic_events')
       .insert({
-        event_type: payload.eventType || payload.type || 'unknown',
+        event_type: eventType,
         payload: payload,
         processed: false
       });
+
+    if (eventError) {
+      console.error('Error storing event:', eventError);
+    } else {
+      console.log('Event stored successfully');
+    }
 
     // Get accounts map for categorization
     const { data: accountsMap } = await supabase
@@ -39,90 +78,39 @@ serve(async (req) => {
 
     let inserted = 0;
 
-    // Process webhook data directly into transactions
-    // Handle different e-conomic event types
-    if (payload.data) {
-      const data = payload.data;
-      
-      // Handle invoice events
-      if (data.invoiceNumber || data.invoice) {
-        const invoice = data.invoice || data;
-        const accountNumber = invoice.accountNumber?.toString() || '';
-        const mapping = accountLookup.get(accountNumber) || { category: 'Ukendt', type: 'revenue' };
-        
-        const transaction = {
-          date: invoice.date || new Date().toISOString().split('T')[0],
-          amount: Math.abs(invoice.netAmount || invoice.amount || 0),
-          account_number: accountNumber,
-          text: invoice.text || invoice.description || `Faktura ${invoice.invoiceNumber || data.invoiceNumber}`,
-          voucher_id: (invoice.invoiceNumber || data.invoiceNumber)?.toString() || null,
-          type: 'revenue',
-          category: mapping.category,
-          source_id: `economic-invoice-${invoice.invoiceNumber || data.invoiceNumber}`,
-        };
+    // Extract invoice data from e-conomic webhook
+    // e-conomic sends data like: INVOICENO=12345, amount, date, etc.
+    const invoiceNumber = payload.INVOICENO || payload.invoiceNumber || payload.invoice_number;
+    const amount = parseFloat(payload.amount || payload.netAmount || payload.grossAmount || '0');
+    const date = payload.date || payload.invoiceDate || new Date().toISOString().split('T')[0];
+    const accountNumber = payload.accountNumber || payload.account || '';
+    const text = payload.text || payload.description || `Faktura ${invoiceNumber}`;
 
-        const { error } = await supabase
-          .from('transactions')
-          .upsert(transaction, { onConflict: 'source_id' });
+    if (invoiceNumber) {
+      const mapping = accountLookup.get(accountNumber) || { category: 'Faktura', type: 'revenue' };
 
-        if (!error) inserted++;
-        else console.error('Error inserting invoice transaction:', error);
-      }
+      const transaction = {
+        date: date,
+        amount: Math.abs(amount),
+        account_number: accountNumber,
+        text: text,
+        voucher_id: invoiceNumber.toString(),
+        type: mapping.type || 'revenue',
+        category: mapping.category || 'Faktura',
+        source_id: `economic-invoice-${invoiceNumber}`,
+      };
 
-      // Handle journal entry events
-      if (data.entries || data.journalEntry) {
-        const entries = data.entries || [data.journalEntry];
-        
-        for (const entry of entries) {
-          const accountNumber = entry.account?.accountNumber?.toString() || entry.accountNumber?.toString() || '';
-          const mapping = accountLookup.get(accountNumber) || { 
-            category: 'Ukendt', 
-            type: (entry.amount || 0) < 0 ? 'expense' : 'revenue' 
-          };
+      console.log('Inserting transaction:', transaction);
 
-          const transaction = {
-            date: entry.date || new Date().toISOString().split('T')[0],
-            amount: Math.abs(entry.amount || 0),
-            account_number: accountNumber,
-            text: entry.text || entry.description || '',
-            voucher_id: entry.voucherNumber?.toString() || entry.entryNumber?.toString() || null,
-            type: (entry.amount || 0) < 0 ? 'expense' : 'revenue',
-            category: mapping.category,
-            source_id: `economic-entry-${entry.entryNumber || entry.journalEntryNumber || Date.now()}`,
-          };
+      const { error } = await supabase
+        .from('transactions')
+        .upsert(transaction, { onConflict: 'source_id' });
 
-          const { error } = await supabase
-            .from('transactions')
-            .upsert(transaction, { onConflict: 'source_id' });
-
-          if (!error) inserted++;
-          else console.error('Error inserting journal entry:', error);
-        }
-      }
-
-      // Handle supplier invoice / expense events
-      if (data.supplierInvoice || data.expense) {
-        const expense = data.supplierInvoice || data.expense;
-        const accountNumber = expense.accountNumber?.toString() || '';
-        const mapping = accountLookup.get(accountNumber) || { category: 'Ukendt', type: 'expense' };
-
-        const transaction = {
-          date: expense.date || expense.invoiceDate || new Date().toISOString().split('T')[0],
-          amount: Math.abs(expense.netAmount || expense.amount || 0),
-          account_number: accountNumber,
-          text: expense.text || expense.description || expense.supplierName || '',
-          voucher_id: expense.invoiceNumber?.toString() || null,
-          type: 'expense',
-          category: mapping.category,
-          source_id: `economic-expense-${expense.invoiceNumber || Date.now()}`,
-        };
-
-        const { error } = await supabase
-          .from('transactions')
-          .upsert(transaction, { onConflict: 'source_id' });
-
-        if (!error) inserted++;
-        else console.error('Error inserting expense:', error);
+      if (!error) {
+        inserted++;
+        console.log('Transaction inserted successfully');
+      } else {
+        console.error('Error inserting transaction:', error);
       }
     }
 
@@ -136,7 +124,7 @@ serve(async (req) => {
 
     console.log(`Webhook processed. Inserted/updated ${inserted} transactions`);
 
-    return new Response(JSON.stringify({ success: true, inserted }), {
+    return new Response(JSON.stringify({ success: true, inserted, eventType }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200
     });
