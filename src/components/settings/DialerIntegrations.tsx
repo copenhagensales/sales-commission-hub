@@ -32,6 +32,7 @@ interface FormData {
   username: string;
   password: string;
   api_url: string;
+  org_code: string;
 }
 
 const ADVERSUS_WEBHOOK_EVENTS = [
@@ -69,6 +70,7 @@ export function DialerIntegrations() {
     username: "",
     password: "",
     api_url: "",
+    org_code: "",
   });
 
   // Per-integration sync days state
@@ -187,6 +189,7 @@ export function DialerIntegrations() {
             username: data.username,
             password: data.password,
             api_url: data.api_url || null,
+            org_code: data.org_code || null,
           },
         },
       });
@@ -284,7 +287,7 @@ export function DialerIntegrations() {
   });
 
   const resetForm = () => {
-    setFormData({ name: "", provider: "adversus", username: "", password: "", api_url: "" });
+    setFormData({ name: "", provider: "adversus", username: "", password: "", api_url: "", org_code: "" });
     setEditingId(null);
     setIsDialogOpen(false);
   };
@@ -589,6 +592,20 @@ export function DialerIntegrations() {
                       Kun nødvendig for Enreach/HeroBase. Lad stå tom for standard Adversus.
                     </p>
                   </div>
+                  {formData.provider === 'enreach' && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="org_code">OrgCode / Organisation ID</Label>
+                      <Input
+                        id="org_code"
+                        placeholder="f.eks. cph.sales"
+                        value={formData.org_code}
+                        onChange={(e) => setFormData({ ...formData, org_code: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Påkrævet for at hente calls fra HeroBase. Find det i din HeroBase konto.
+                      </p>
+                    </div>
+                  )}
                   <div className="grid gap-2">
                     <Label htmlFor="username">Brugernavn / API Key</Label>
                     <Input
@@ -826,6 +843,7 @@ export function DialerIntegrations() {
                                 username: "",
                                 password: "",
                                 api_url: integration.api_url || "",
+                                org_code: "",
                               });
                               setIsDialogOpen(true);
                             }}
