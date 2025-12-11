@@ -155,6 +155,7 @@ serve(async (req) => {
         // Valid LeadClosure (when LeadStatus=UserProcessed): Success, NotInterested, InvalidLead, Unqualified
         const payload: Record<string, unknown> = {
           UrlTemplate: webhook_config.url,
+          Method: 'POST',
           // Default to UserProcessed status for sales webhooks
           LeadStatus: webhook_config.leadStatus || 'UserProcessed',
         };
