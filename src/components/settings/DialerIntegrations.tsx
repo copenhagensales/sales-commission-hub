@@ -518,7 +518,15 @@ export function DialerIntegrations() {
       queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
-      toast.error(`Fejl ved oprettelse af webhook: ${errorMessage}`);
+      // Check if it's a 403 permission error
+      if (errorMessage.includes("403") || errorMessage.includes("Access denied")) {
+        toast.error("Webhook API adgang begrænset", {
+          description: "Din HeroBase konto har ikke tilladelse til at oprette webhooks via API. Kontakt Enreach support for at få webhooks oprettet manuelt.",
+          duration: 8000,
+        });
+      } else {
+        toast.error(`Fejl ved oprettelse af webhook: ${errorMessage}`);
+      }
     } finally {
       setIsCreatingEnreachWebhook(false);
     }
@@ -545,7 +553,15 @@ export function DialerIntegrations() {
       loadEnreachWebhooks(manageEnreachWebhooksIntegrationId);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
-      toast.error(`Fejl ved sletning af webhook: ${errorMessage}`);
+      // Check if it's a 403 permission error
+      if (errorMessage.includes("403") || errorMessage.includes("Access denied")) {
+        toast.error("Webhook API adgang begrænset", {
+          description: "Din HeroBase konto har ikke tilladelse til at slette webhooks via API. Kontakt Enreach support for at få webhooks slettet manuelt.",
+          duration: 8000,
+        });
+      } else {
+        toast.error(`Fejl ved sletning af webhook: ${errorMessage}`);
+      }
     } finally {
       setIsDeletingEnreachWebhookId(null);
     }
