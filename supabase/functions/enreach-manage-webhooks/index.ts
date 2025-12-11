@@ -221,9 +221,7 @@ serve(async (req) => {
           );
         }
 
-        // Build the webhook payload for HeroBase
-        // HeroBase uses PascalCase for API fields
-        // ContentTemplate defines the JSON body sent to our webhook
+        // ContentTemplate con variables estándar de Enreach/HeroBase
         const contentTemplate = JSON.stringify({
           UniqueId: "{UniqueId}",
           AgentEmail: "{AgentEmail}",
@@ -243,15 +241,21 @@ serve(async (req) => {
           CampaignCode: webhook_config.campaignCode,
           LeadStatus: webhook_config.leadStatus || "UserProcessed",
           Method: "POST",
-          UrlTemplate: webhook_config.url,
-          ContentType: "application/json",
+          // CAMBIO 1: Usar "Url" en lugar de "UrlTemplate"
+          Url: webhook_config.url,
+          // CAMBIO 2: Especificar Format explícitamente
+          Format: "Json",
           ContentTemplate: contentTemplate,
         };
 
-        // LeadReleaseType filters for successful sales
+        // CAMBIO 3: LeadReleaseType comentado - causa "Sequence contains no matching element"
+        // si el valor exacto no existe en la lista de resultados de la campaña
+        // Es mejor crear el webhook abierto y filtrar en el código receptor
+        /*
         if (webhook_config.leadReleaseType) {
           payload.LeadReleaseType = webhook_config.leadReleaseType;
         }
+        */
 
         console.log("Creating HeroBase webhook with payload:", JSON.stringify(payload));
 
