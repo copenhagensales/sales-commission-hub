@@ -75,7 +75,10 @@ serve(async (req) => {
       throw new Error(`Failed to get credentials: ${credError?.message || 'No credentials'}`);
     }
 
-    const { username, password } = credentials as { username: string; password: string };
+    const { username, password, org_code } = credentials as { username: string; password: string; org_code?: string };
+    
+    // For Enreach, org_code is the same as username if not explicitly set
+    const orgCode = org_code || username;
     
     // HeroBase uses HTTP Basic Auth
     const authHeader = 'Basic ' + btoa(`${username}:${password}`);
@@ -83,7 +86,7 @@ serve(async (req) => {
     // Get API base URL from integration or use default
     const apiBaseUrl = integration.api_url || 'https://wshero01.herobase.com/api';
     
-    console.log(`Using HeroBase API at: ${apiBaseUrl}`);
+    console.log(`Using HeroBase API at: ${apiBaseUrl}, orgCode: ${orgCode}`);
 
     // Execute the requested action
     switch (action) {
