@@ -21,15 +21,30 @@ serve(async (req) => {
 
     console.log('Starting e-conomic sync...');
 
-    // Get last sync state
-    const { data: syncState } = await supabase
-      .from('sync_state')
-      .select('*')
-      .eq('id', 1)
-      .maybeSingle();
-
-    const lastEntryDate = syncState?.last_entry_date || '2024-01-01';
-    console.log('Last entry date:', lastEntryDate);
+    // Parse request body for custom date range
+    let fromDate: string;
+    try {
+      const body = await req.json();
+      if (body.fromDate) {
+        fromDate = body.fromDate;
+      } else if (body.days) {
+        const daysAgo = new Date();
+        daysAgo.setDate(daysAgo.getDate() - body.days);
+        fromDate = daysAgo.toISOString().split('T')[0];
+      } else {
+        // Default to last 30 days
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        fromDate = thirtyDaysAgo.toISOString().split('T')[0];
+      }
+    } catch {
+      // Default to last 30 days if no body
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      fromDate = thirtyDaysAgo.toISOString().split('T')[0];
+    }
+    
+    console.log('Fetching data from date:', fromDate);
 
     // Get accounts map for categorization
     const { data: accountsMap } = await supabase
@@ -48,7 +63,7 @@ serve(async (req) => {
     };
 
     // Fetch journal entries (kassekladder)
-    const entriesUrl = `https://restapi.e-conomic.com/journals-experimental/entries?filter=date$gte:${lastEntryDate}&pagesize=1000`;
+    const entriesUrl = `https://restapi.e-conomic.com/journals-experimental/entries?filter=date$gte:${fromDate}&pagesize=1000`;
     console.log('Fetching entries from:', entriesUrl);
 
     const entriesResponse = await fetch(entriesUrl, { headers: economicHeaders });
