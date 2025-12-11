@@ -15,119 +15,122 @@ import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
 import { useIsSomeEmployee } from "@/hooks/useSomeEmployee";
 import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
+import { useTranslation } from "react-i18next";
 
-// Navigation items for owners only (full access)
-const ownerNavigation = [
-  { name: "Medarbejdere", href: "/employees", icon: Users },
-  { name: "Teams", href: "/teams", icon: Users },
-  { name: "Kontrakter", href: "/contracts", icon: FileText },
-  { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
-  { name: "Karriereønsker", href: "/career-wishes-overview", icon: Sparkles },
-  { name: "SOME", href: "/some", icon: Video },
-  { name: "Salg", href: "/sales", icon: ShoppingCart },
-  { name: "Provision og CPO", href: "/commission-cpo", icon: Percent },
-  { name: "Logikker", href: "/logikker", icon: ListChecks },
-  { name: "Bil-quiz overblik", href: "/car-quiz-admin", icon: Car },
-  { name: "Code of Conduct overblik", href: "/code-of-conduct-admin", icon: Shield },
+// Navigation items - using translation keys instead of hardcoded names
+const getOwnerNavigation = (t: (key: string) => string) => [
+  { name: t("sidebar.employees"), href: "/employees", icon: Users },
+  { name: t("sidebar.teams"), href: "/teams", icon: Users },
+  { name: t("sidebar.contracts"), href: "/contracts", icon: FileText },
+  { name: t("sidebar.myContracts"), href: "/my-contracts", icon: FileText },
+  { name: t("sidebar.careerWishesOverview"), href: "/career-wishes-overview", icon: Sparkles },
+  { name: t("sidebar.some"), href: "/some", icon: Video },
+  { name: t("sidebar.sales"), href: "/sales", icon: ShoppingCart },
+  { name: t("sidebar.commissionCpo"), href: "/commission-cpo", icon: Percent },
+  { name: t("sidebar.logics"), href: "/logikker", icon: ListChecks },
+  { name: t("sidebar.carQuizAdmin"), href: "/car-quiz-admin", icon: Car },
+  { name: t("sidebar.codeOfConductAdmin"), href: "/code-of-conduct-admin", icon: Shield },
 ];
 
 // MG submenu navigation
-const mgNavigation = [
-  { name: "Lønkørsel", href: "/payroll", icon: Wallet },
-  { name: "TDC Erhverv", href: "/tdc-erhverv", icon: Building2 },
-  { name: "Codan", href: "/codan", icon: Shield },
-  { name: "MG test", href: "/mg-test", icon: Percent },
-  { name: "Dialer Data", href: "/dialer-data", icon: Database },
-  { name: "Opkaldsdata", href: "/calls-data", icon: Phone },
-  { name: "Datakilder info", href: "/adversus-data", icon: Database },
+const getMgNavigation = (t: (key: string) => string) => [
+  { name: t("sidebar.payroll"), href: "/payroll", icon: Wallet },
+  { name: t("sidebar.tdcErhverv"), href: "/tdc-erhverv", icon: Building2 },
+  { name: t("sidebar.codan"), href: "/codan", icon: Shield },
+  { name: t("sidebar.mgTest"), href: "/mg-test", icon: Percent },
+  { name: t("sidebar.dialerData"), href: "/dialer-data", icon: Database },
+  { name: t("sidebar.callsData"), href: "/calls-data", icon: Phone },
+  { name: t("sidebar.dataSourcesInfo"), href: "/adversus-data", icon: Database },
 ];
 
 // Navigation items for teamleder (limited team-related access)
-const teamlederNavigation = [
-  { name: "Vagtplan", href: "/shift-planning", icon: ClipboardList },
-  { name: "Min profil", href: "/my-profile", icon: User },
-  { name: "Godkend fravær", href: "/shift-planning/absence", icon: Clock, badgeKey: "pendingAbsence" },
-  { name: "Mit team", href: "/employees", icon: Users },
-  { name: "Kontrakter", href: "/contracts", icon: FileText },
-  { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
+const getTeamlederNavigation = (t: (key: string) => string) => [
+  { name: t("sidebar.shiftPlan"), href: "/shift-planning", icon: ClipboardList },
+  { name: t("sidebar.myProfile"), href: "/my-profile", icon: User },
+  { name: t("sidebar.approveAbsence"), href: "/shift-planning/absence", icon: Clock, badgeKey: "pendingAbsence" },
+  { name: t("sidebar.myTeam"), href: "/employees", icon: Users },
+  { name: t("sidebar.contracts"), href: "/contracts", icon: FileText },
+  { name: t("sidebar.myContracts"), href: "/my-contracts", icon: FileText },
 ];
 
 // Navigation items for rekruttering role (without Rekruttering - that's in submenu)
-const rekrutteringNavigation = [
-  { name: "Medarbejdere", href: "/employees", icon: Users },
-  { name: "Teams", href: "/teams", icon: Users },
-  { name: "Kontrakter", href: "/contracts", icon: FileText },
-  { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
-  { name: "Karriereønsker", href: "/career-wishes-overview", icon: Sparkles },
-  { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
-  { name: "Min profil", href: "/my-profile", icon: User },
+const getRekrutteringNavigation = (t: (key: string) => string) => [
+  { name: t("sidebar.employees"), href: "/employees", icon: Users },
+  { name: t("sidebar.teams"), href: "/teams", icon: Users },
+  { name: t("sidebar.contracts"), href: "/contracts", icon: FileText },
+  { name: t("sidebar.myContracts"), href: "/my-contracts", icon: FileText },
+  { name: t("sidebar.careerWishesOverview"), href: "/career-wishes-overview", icon: Sparkles },
+  { name: t("sidebar.myCalendar"), href: "/my-schedule", icon: UserCheck },
+  { name: t("sidebar.myProfile"), href: "/my-profile", icon: User },
 ];
 
 // Rekruttering submenu navigation
-const recruitmentNavigation = [
-  { name: "Dashboard", href: "/recruitment", icon: LayoutDashboard },
-  { name: "Kandidater", href: "/recruitment/candidates", icon: Users },
-  { name: "Kommende samtaler", href: "/recruitment/upcoming-interviews", icon: CalendarClock },
-  { name: "Winback", href: "/recruitment/winback", icon: RefreshCcw },
-  { name: "Ansættelser", href: "/recruitment/upcoming-hires", icon: UserCog },
-  { name: "Beskeder", href: "/recruitment/messages", icon: FileText },
-  { name: "SMS-skabeloner", href: "/recruitment/sms-templates", icon: FileText },
-  { name: "Email-skabeloner", href: "/recruitment/email-templates", icon: FileText },
+const getRecruitmentNavigation = (t: (key: string) => string) => [
+  { name: t("sidebar.dashboard"), href: "/recruitment", icon: LayoutDashboard },
+  { name: t("sidebar.candidates"), href: "/recruitment/candidates", icon: Users },
+  { name: t("sidebar.upcomingInterviews"), href: "/recruitment/upcoming-interviews", icon: CalendarClock },
+  { name: t("sidebar.winback"), href: "/recruitment/winback", icon: RefreshCcw },
+  { name: t("sidebar.hires"), href: "/recruitment/upcoming-hires", icon: UserCog },
+  { name: t("sidebar.messages"), href: "/recruitment/messages", icon: FileText },
+  { name: t("sidebar.smsTemplates"), href: "/recruitment/sms-templates", icon: FileText },
+  { name: t("sidebar.emailTemplates"), href: "/recruitment/email-templates", icon: FileText },
 ];
 
 // Navigation items for employees
-const employeeNavigation = [
-  { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
-  { name: "Min profil", href: "/my-profile", icon: Users },
-  { name: "Min kontrakt", href: "/my-contracts", icon: FileText },
-  { name: "Teamønsker & karriere", href: "/career-wishes", icon: Sparkles },
-  { name: "Pulsmåling", href: "/pulse-survey", icon: HeartHandshake },
+const getEmployeeNavigation = (t: (key: string) => string) => [
+  { name: t("sidebar.myCalendar"), href: "/my-schedule", icon: UserCheck },
+  { name: t("sidebar.myProfile"), href: "/my-profile", icon: Users },
+  { name: t("sidebar.myContract"), href: "/my-contracts", icon: FileText },
+  { name: t("sidebar.teamWishesCareer"), href: "/career-wishes", icon: Sparkles },
+  { name: t("sidebar.pulseSurvey"), href: "/pulse-survey", icon: HeartHandshake },
 ];
 
 // Navigation items for SOME employees (dedicated)
-const someEmployeeNavigation = [
-  { name: "SOME", href: "/some", icon: Video },
-  { name: "Min kalender", href: "/my-schedule", icon: UserCheck },
-  { name: "Min profil", href: "/my-profile", icon: Users },
-  { name: "Mine kontrakter", href: "/my-contracts", icon: FileText },
+const getSomeEmployeeNavigation = (t: (key: string) => string) => [
+  { name: t("sidebar.some"), href: "/some", icon: Video },
+  { name: t("sidebar.myCalendar"), href: "/my-schedule", icon: UserCheck },
+  { name: t("sidebar.myProfile"), href: "/my-profile", icon: Users },
+  { name: t("sidebar.myContracts"), href: "/my-contracts", icon: FileText },
 ];
 
 // Teamleder extra navigation (pulse survey results, code of conduct for their team)
-const teamlederExtraNavigation = [
-  { name: "Pulsmåling resultater", href: "/pulse-survey-results", icon: BarChart3 },
+const getTeamlederExtraNavigation = (t: (key: string) => string) => [
+  { name: t("sidebar.pulseSurveyResults"), href: "/pulse-survey-results", icon: BarChart3 },
 ];
 
 // Code of conduct admin - only for teamleders (owners already have it in ownerNavigation)
-const teamlederCodeOfConductNav = [
-  { name: "Code of Conduct overblik", href: "/code-of-conduct-admin", icon: Shield },
+const getTeamlederCodeOfConductNav = (t: (key: string) => string) => [
+  { name: t("sidebar.codeOfConductAdmin"), href: "/code-of-conduct-admin", icon: Shield },
 ];
 
-const shiftPlanningNavigation = [
-  { name: "Vagtplan (leder)", href: "/shift-planning", icon: Calendar },
-  { name: "Min kalender", href: "/shift-planning/my-schedule", icon: UserCheck },
-  { name: "Fravær", href: "/shift-planning/absence", icon: Clock },
-  { name: "Tidsregistrering", href: "/shift-planning/time-tracking", icon: Timer },
+const getShiftPlanningNavigation = (t: (key: string) => string) => [
+  { name: t("sidebar.shiftPlanLeader"), href: "/shift-planning", icon: Calendar },
+  { name: t("sidebar.mySchedule"), href: "/shift-planning/my-schedule", icon: UserCheck },
+  { name: t("sidebar.absence"), href: "/shift-planning/absence", icon: Clock },
+  { name: t("sidebar.timeTracking"), href: "/shift-planning/time-tracking", icon: Timer },
 ];
 
 // Fieldmarketing (vagt-flow) navigation - only for teamleder and above
-const vagtFlowNavigation = [
-  { name: "Oversigt", href: "/vagt-flow", icon: LayoutDashboard },
-  { name: "Min uge", href: "/vagt-flow/min-uge", icon: UserCheck },
-  { name: "Book uge", href: "/vagt-flow/book-week", icon: Calendar },
-  { name: "Vagtplan", href: "/vagt-flow/bookings", icon: Calendar },
-  { name: "Lokationer", href: "/vagt-flow/locations", icon: MapPin },
-  { name: "Køretøjer", href: "/vagt-flow/vehicles", icon: Car },
-  { name: "Fakturering", href: "/vagt-flow/billing", icon: Receipt },
+const getVagtFlowNavigation = (t: (key: string) => string) => [
+  { name: t("sidebar.overview"), href: "/vagt-flow", icon: LayoutDashboard },
+  { name: t("sidebar.myWeek"), href: "/vagt-flow/min-uge", icon: UserCheck },
+  { name: t("sidebar.bookWeek"), href: "/vagt-flow/book-week", icon: Calendar },
+  { name: t("sidebar.bookings"), href: "/vagt-flow/bookings", icon: Calendar },
+  { name: t("sidebar.locations"), href: "/vagt-flow/locations", icon: MapPin },
+  { name: t("sidebar.vehicles"), href: "/vagt-flow/vehicles", icon: Car },
+  { name: t("sidebar.billing"), href: "/vagt-flow/billing", icon: Receipt },
 ];
 
 // Boards navigation
-const boardsNavigation = [
-  { name: "Test", href: "/boards/test", icon: Tv },
-  { name: "E-conomic", href: "/boards/economic", icon: Wallet },
+const getBoardsNavigation = (t: (key: string) => string) => [
+  { name: t("sidebar.test"), href: "/boards/test", icon: Tv },
+  { name: t("sidebar.economic"), href: "/boards/economic", icon: Wallet },
 ];
 
+type NavItem = { name: string; href: string; icon: typeof Users; badgeKey?: string };
+
 // Employee-only shift planning items (empty - employees don't see shift planning menu)
-const employeeShiftPlanningNavigation: typeof shiftPlanningNavigation = [];
+const employeeShiftPlanningNavigation: NavItem[] = [];
 
 interface AppSidebarProps {
   isMobile?: boolean;
@@ -135,6 +138,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -307,10 +311,10 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   
   // Build navigation based on ALL roles the user has (not just one)
   const buildCombinedNavigation = () => {
-    const navItems: typeof ownerNavigation = [];
+    const navItems: NavItem[] = [];
     const seenHrefs = new Set<string>();
 
-    const addItems = (items: typeof ownerNavigation) => {
+    const addItems = (items: NavItem[]) => {
       items.forEach(item => {
         if (!seenHrefs.has(item.href)) {
           seenHrefs.add(item.href);
@@ -321,21 +325,21 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
 
     // Add items based on each role the user has
     if (isOwner) {
-      addItems([...ownerNavigation, ...teamlederExtraNavigation]);
+      addItems([...getOwnerNavigation(t), ...getTeamlederExtraNavigation(t)]);
     } else {
       // Non-owner users get items based on their roles
       if (isTeamleder) {
-        addItems([...teamlederNavigation, ...teamlederExtraNavigation, ...teamlederCodeOfConductNav]);
+        addItems([...getTeamlederNavigation(t), ...getTeamlederExtraNavigation(t), ...getTeamlederCodeOfConductNav(t)]);
       }
       if (isRekruttering) {
-        addItems(rekrutteringNavigation);
+        addItems(getRekrutteringNavigation(t));
       }
       if (isSomeEmployee || isSome) {
-        addItems(someEmployeeNavigation);
+        addItems(getSomeEmployeeNavigation(t));
       }
       // If user has no special roles, give employee navigation
       if (!isTeamleder && !isRekruttering && !(isSomeEmployee || isSome)) {
-        addItems(employeeNavigation.filter(item => item.href !== '/pulse-survey' || showPulseSurvey));
+        addItems(getEmployeeNavigation(t).filter(item => item.href !== '/pulse-survey' || showPulseSurvey));
       }
     }
 
@@ -367,30 +371,34 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   
   // Add opt-in menu items if user has been granted access
   if (isMenuItemGranted("time-stamp")) {
-    mainNavigation = [...mainNavigation, { name: "Stempelur", href: "/time-stamp", icon: Clock }];
+    mainNavigation = [...mainNavigation, { name: t("sidebar.timeClock"), href: "/time-stamp", icon: Clock }];
   }
   
   // Add SOME menu item if granted via individual permissions and not already in navigation
   if (hasSomeAccess && !mainNavigation.some(item => item.href === "/some")) {
-    mainNavigation = [...mainNavigation, { name: "SOME", href: "/some", icon: Video }];
+    mainNavigation = [...mainNavigation, { name: t("sidebar.some"), href: "/some", icon: Video }];
   }
   
   // Add car-quiz-admin if granted
   if (isMenuItemGranted("car-quiz-admin") && !mainNavigation.some(item => item.href === "/car-quiz-admin")) {
-    mainNavigation = [...mainNavigation, { name: "Bil-quiz overblik", href: "/car-quiz-admin", icon: Car }];
+    mainNavigation = [...mainNavigation, { name: t("sidebar.carQuizAdmin"), href: "/car-quiz-admin", icon: Car }];
   }
   
   // Add code of conduct admin if granted
   if (isMenuItemGranted("coc-admin") && !mainNavigation.some(item => item.href === "/code-of-conduct-admin")) {
-    mainNavigation = [...mainNavigation, { name: "Code of Conduct overblik", href: "/code-of-conduct-admin", icon: Shield }];
+    mainNavigation = [...mainNavigation, { name: t("sidebar.codeOfConductAdmin"), href: "/code-of-conduct-admin", icon: Shield }];
   }
   
   // Add pulse survey results if granted
   if (isMenuItemGranted("pulse-results") && !mainNavigation.some(item => item.href === "/pulse-survey-results")) {
-    mainNavigation = [...mainNavigation, { name: "Pulsmåling resultater", href: "/pulse-survey-results", icon: BarChart3 }];
+    mainNavigation = [...mainNavigation, { name: t("sidebar.pulseSurveyResults"), href: "/pulse-survey-results", icon: BarChart3 }];
   }
   
-  const currentShiftPlanningNav = isOwner ? shiftPlanningNavigation : employeeShiftPlanningNavigation;
+  const currentShiftPlanningNav = isOwner ? getShiftPlanningNavigation(t) : employeeShiftPlanningNavigation;
+  const vagtFlowNav = getVagtFlowNavigation(t);
+  const mgNav = getMgNavigation(t);
+  const boardsNav = getBoardsNavigation(t);
+  const recruitmentNav = getRecruitmentNavigation(t);
 
   const handleNavClick = () => {
     if (isMobile && onNavigate) {
@@ -417,7 +425,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             </div>
           )}
           <div className="flex-1 flex items-center justify-center">
-            <div className="animate-pulse text-muted-foreground">Indlæser...</div>
+            <div className="animate-pulse text-muted-foreground">{t("sidebar.loading")}</div>
           </div>
         </div>
       </aside>
@@ -465,7 +473,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 </div>
                 {showBadge && (
                   <Badge variant={item.href === "/pulse-survey" ? "default" : "destructive"} className="h-5 min-w-5 px-1.5 text-xs">
-                    {item.href === "/pulse-survey" ? "Ny" : badgeCount}
+                    {item.href === "/pulse-survey" ? t("sidebar.new") : badgeCount}
                   </Badge>
                 )}
               </NavLink>
@@ -484,7 +492,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             >
               <div className="flex items-center gap-3">
                 <Car className="h-5 w-5" />
-                Firmabil
+                {t("sidebar.companyCar")}
               </div>
               {!carQuizCompletion && (
                 <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
@@ -506,7 +514,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             >
               <div className="flex items-center gap-3">
                 <Shield className="h-5 w-5" />
-                Code of Conduct
+                {t("sidebar.codeOfConduct")}
               </div>
               {codeOfConductRequired && (
                 <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
@@ -525,7 +533,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               )}>
                 <div className="flex items-center gap-3">
                   <ClipboardList className="h-5 w-5" />
-                  Vagtplan
+                  {t("sidebar.shiftPlan")}
                 </div>
                 {shiftPlanningOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
@@ -560,12 +568,12 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               )}>
                 <div className="flex items-center gap-3">
                   <Calendar className="h-5 w-5" />
-                  Fieldmarketing
+                  {t("sidebar.fieldmarketing")}
                 </div>
                 {vagtFlowOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {vagtFlowNavigation.map((item) => {
+                {vagtFlowNav.map((item) => {
                   const isActive = location.pathname === item.href;
                   return (
                     <NavLink
@@ -595,12 +603,12 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               )}>
                 <div className="flex items-center gap-3">
                   <Percent className="h-5 w-5" />
-                  MG
+                  {t("sidebar.mg")}
                 </div>
                 {mgOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {mgNavigation.map((item) => {
+                {mgNav.map((item) => {
                   const isActive = location.pathname === item.href;
                   return (
                     <NavLink
@@ -630,12 +638,12 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               )}>
                 <div className="flex items-center gap-3">
                   <Monitor className="h-5 w-5" />
-                  Boards
+                  {t("sidebar.boards")}
                 </div>
                 {boardsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {boardsNavigation.map((item) => {
+                {boardsNav.map((item) => {
                   const isActive = location.pathname === item.href;
                   return (
                     <NavLink
@@ -669,13 +677,13 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 >
                   <div className="flex items-center gap-3">
                     <UserPlus className="h-5 w-5" />
-                    Rekruttering
+                    {t("sidebar.recruitment")}
                   </div>
                   {recruitmentOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {recruitmentNavigation.map((item) => {
+                {recruitmentNav.map((item) => {
                   const isActive = location.pathname === item.href;
                   return (
                     <NavLink
@@ -706,7 +714,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               )}
             >
               <Crown className="h-5 w-5" />
-              Administration
+              {t("sidebar.administration")}
             </NavLink>
           )}
 
@@ -720,7 +728,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               )}
             >
               <Settings className="h-5 w-5" />
-              Indstillinger
+              {t("sidebar.settings")}
             </NavLink>
           )}
         </nav>
@@ -735,14 +743,14 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}
-            title="Tidsregistrering"
+            title={t("sidebar.timeTracking")}
           >
             <Timer className="h-5 w-5" />
           </NavLink>
 
           <button onClick={() => { handleLogout(); handleNavClick(); }} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50">
             <LogOut className="h-5 w-5" />
-            Log ud
+            {t("sidebar.logout")}
           </button>
           <div className="flex items-center gap-2 px-3 py-1 text-xs text-sidebar-foreground/70">
             <User className="h-3 w-3" />
