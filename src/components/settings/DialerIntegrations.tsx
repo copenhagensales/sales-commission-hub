@@ -178,6 +178,9 @@ export function DialerIntegrations() {
   // Save integration (create or update)
   const saveMutation = useMutation({
     mutationFn: async (data: FormData & { id?: string }) => {
+      // For Enreach, org_code is the same as username
+      const orgCode = data.provider === 'enreach' ? data.username : (data.org_code || null);
+      
       const { data: result, error } = await supabase.functions.invoke("scheduler-manager", {
         body: {
           action: "save_dialer",
@@ -189,7 +192,7 @@ export function DialerIntegrations() {
             username: data.username,
             password: data.password,
             api_url: data.api_url || null,
-            org_code: data.org_code || null,
+            org_code: orgCode,
           },
         },
       });
@@ -593,18 +596,9 @@ export function DialerIntegrations() {
                     </p>
                   </div>
                   {formData.provider === 'enreach' && (
-                    <div className="grid gap-2">
-                      <Label htmlFor="org_code">OrgCode / Organisation ID</Label>
-                      <Input
-                        id="org_code"
-                        placeholder="f.eks. cph.sales"
-                        value={formData.org_code}
-                        onChange={(e) => setFormData({ ...formData, org_code: e.target.value })}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Påkrævet for at hente calls fra HeroBase. Find det i din HeroBase konto.
-                      </p>
-                    </div>
+                    <p className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                      OrgCode sættes automatisk til brugernavnet for Enreach integrationer.
+                    </p>
                   )}
                   <div className="grid gap-2">
                     <Label htmlFor="username">Brugernavn / API Key</Label>
