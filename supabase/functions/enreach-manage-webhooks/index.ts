@@ -173,20 +173,35 @@ serve(async (req) => {
         }
 
         // Build the webhook payload for HeroBase
-        // Use StandardTemplateName instead of custom ContentTemplate for simpler maintenance
+        // HeroBase uses PascalCase for API fields
+        // ContentTemplate defines the JSON body sent to our webhook
+        const contentTemplate = JSON.stringify({
+          UniqueId: "{UniqueId}",
+          AgentEmail: "{AgentEmail}",
+          AgentName: "{UserName}",
+          CampaignCode: "{CampaignCode}",
+          CampaignName: "{CampaignName}",
+          LeadStatus: "{LeadStatus}",
+          CustomerPhone: "{PhoneNumber}",
+          CustomerName: "{ContactName}",
+          CustomerCompany: "{Company}",
+          ClosedDate: "{ClosedDate}",
+          Result: "{Result}",
+        });
+
         const payload: Record<string, unknown> = {
-          name: webhook_config.description || "CPH Sales Webhook",
-          campaignCode: webhook_config.campaignCode,
-          leadStatus: webhook_config.leadStatus || "UserProcessed",
-          method: "POST",
-          urlTemplate: webhook_config.url,
-          format: "Json",
-          standardTemplateName: "StandardTemplate.Zapier",
+          Name: webhook_config.description || "CPH Sales Webhook",
+          CampaignCode: webhook_config.campaignCode,
+          LeadStatus: webhook_config.leadStatus || "UserProcessed",
+          Method: "POST",
+          UrlTemplate: webhook_config.url,
+          ContentType: "application/json",
+          ContentTemplate: contentTemplate,
         };
 
-        // leadClosure filters for successful sales
+        // LeadReleaseType filters for successful sales
         if (webhook_config.leadReleaseType) {
-          payload.leadReleaseType = webhook_config.leadReleaseType;
+          payload.LeadReleaseType = webhook_config.leadReleaseType;
         }
 
         console.log("Creating HeroBase webhook with payload:", JSON.stringify(payload));
