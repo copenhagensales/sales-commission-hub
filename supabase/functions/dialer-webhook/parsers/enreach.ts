@@ -56,6 +56,25 @@ interface EnreachWebhookPayload {
   [key: string]: unknown;
 }
 
+/**
+ * Our custom contentTemplate format (used when creating webhooks via API)
+ */
+interface EnreachCustomPayload {
+  event: string;
+  leadId?: string;
+  campaignCode?: string;
+  agentEmail?: string;
+  agentName?: string;
+  leadStatus?: string;
+  leadClosure?: string;
+  phone?: string;
+  company?: string;
+  externalId?: string;
+  customFields?: string; // JSON string
+  createdDate?: string;
+  modifiedDate?: string;
+}
+
 export class EnreachWebhookParser implements WebhookParser {
   
   canHandle(rawBody: string, contentType: string, headers: Headers): boolean {
@@ -82,6 +101,11 @@ export class EnreachWebhookParser implements WebhookParser {
           console.log(`[EnreachParser] Detected via payload structure: ${json.EventType}`);
           return true;
         }
+        // Check for our custom contentTemplate format
+        if (json.event === 'lead_closed' && (json.leadId || json.campaignCode)) {
+          console.log(`[EnreachParser] Detected via custom contentTemplate format`);
+          return true;
+        }
       } catch {
         return false;
       }
@@ -91,7 +115,7 @@ export class EnreachWebhookParser implements WebhookParser {
   }
 
   parse(rawBody: string, _contentType: string, headers: Headers): StandardWebhookPayload {
-    let body: EnreachWebhookPayload;
+    let body: EnreachWebhookPayload | EnreachCustomPayload;
     
     try {
       body = JSON.parse(rawBody);
@@ -100,10 +124,70 @@ export class EnreachWebhookParser implements WebhookParser {
       throw new Error(`Invalid JSON payload for Enreach webhook: ${e}`);
     }
     
+    // Check if this is our custom contentTemplate format
+    if ('event' in body && body.event === 'lead_closed') {
+      return this.parseCustomFormat(body as EnreachCustomPayload);
+    }
+    
+    // Otherwise, parse the native Enreach format
+    return this.parseNativeFormat(body as EnreachWebhookPayload, headers);
+  }
+
+  private parseCustomFormat(body: EnreachCustomPayload): StandardWebhookPayload {
+    console.log(`[EnreachParser] Processing custom format - leadId: ${body.leadId}, campaign: ${body.campaignCode}`);
+    
+    // Parse customFields if present (it's a JSON string)
+    let customFields: Record<string, unknown> = {};
+    if (body.customFields) {
+      try {
+        customFields = JSON.parse(body.customFields);
+      } catch {
+        console.log(`[EnreachParser] Could not parse customFields JSON`);
+      }
+    }
+    
+    // External reference from externalId or customFields
+    let externalReference: string | null = body.externalId || null;
+    if (!externalReference && customFields) {
+      externalReference = String(
+        customFields.OrderId || 
+        customFields.OPP || 
+        customFields.Reference || 
+        customFields.SerioID ||
+        ''
+      ) || null;
+    }
+    
+    console.log(`[EnreachParser] Custom format extracted - Agent: ${body.agentName}, Campaign: ${body.campaignCode}, Phone: ${body.phone}, Ref: ${externalReference}`);
+    
+    return {
+      externalId: body.leadId || `enreach-${Date.now()}`,
+      eventType: body.event || 'lead_closed',
+      eventTime: body.modifiedDate || body.createdDate || new Date().toISOString(),
+      
+      agentId: '',
+      agentName: body.agentName || '',
+      agentEmail: body.agentEmail || '',
+      
+      campaignId: body.campaignCode || '',
+      campaignName: body.campaignCode || '', // HeroBase uses code as name
+      
+      customerPhone: body.phone || '',
+      customerCompany: body.company || '',
+      
+      externalReference,
+      
+      products: [], // Products not in webhook, need API fetch
+      
+      rawPayload: { ...body, customFields } as unknown as Record<string, unknown>,
+    };
+  }
+
+  private parseNativeFormat(body: EnreachWebhookPayload, headers: Headers): StandardWebhookPayload {
     // Get event type from header (preferred) or body
     const eventType = headers.get('X-Benemen-Event') || body.EventType || 'unknown';
     
-    console.log(`[EnreachParser] Processing event: ${eventType}`);
+    console.log(`[EnreachParser] Processing native format - event: ${eventType}`);
     console.log(`[EnreachParser] EntityType: ${body.EntityType}, Id: ${body.Id}`);
     
     // External ID - use call or contact identifiers
@@ -192,7 +276,7 @@ export class EnreachWebhookParser implements WebhookParser {
     }
     
     // Log what we extracted for debugging
-    console.log(`[EnreachParser] Extracted - Agent: ${agentName}, Campaign: ${campaignName}, Phone: ${customerPhone}, Ref: ${externalReference}`);
+    console.log(`[EnreachParser] Native format extracted - Agent: ${agentName}, Campaign: ${campaignName}, Phone: ${customerPhone}, Ref: ${externalReference}`);
     
     return {
       externalId,

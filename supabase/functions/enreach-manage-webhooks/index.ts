@@ -176,13 +176,32 @@ serve(async (req) => {
         }
 
         // Build the webhook payload for HeroBase (camelCase per API docs)
+        // contentTemplate uses HeroBase merge fields: {{Lead}} for full lead JSON, {{LeadId}}, {{CampaignCode}}, etc.
+        const contentTemplate = JSON.stringify({
+          event: "lead_closed",
+          leadId: "{{LeadId}}",
+          campaignCode: "{{CampaignCode}}",
+          agentEmail: "{{AgentEmail}}",
+          agentName: "{{AgentName}}",
+          leadStatus: "{{LeadStatus}}",
+          leadClosure: "{{LeadClosure}}",
+          phone: "{{Phone}}",
+          company: "{{Company}}",
+          externalId: "{{ExternalId}}",
+          customFields: "{{CustomFieldsJson}}",
+          createdDate: "{{CreatedDate}}",
+          modifiedDate: "{{ModifiedDate}}",
+        });
+
         const payload: Record<string, unknown> = {
           name: webhook_config.description || 'CPH Sales Webhook',
           campaignCode: webhook_config.campaignCode,
           leadStatus: webhook_config.leadStatus || 'UserProcessed',
+          leadClosure: 'Success', // Filter to only successful sales
           method: 'POST',
           urlTemplate: webhook_config.url,
-          contentTemplate: '{"event": "lead_closed", "data": {}}',
+          contentTemplate: contentTemplate,
+          isActive: true,
         };
 
         // leadClosure filters for successful sales
