@@ -236,25 +236,20 @@ serve(async (req) => {
           Result: "{Result}",
         });
 
-        // Build payload - only include filters if explicitly provided
-        // Not specifying CampaignCode or LeadStatus makes the webhook match ALL leads
-        // which allows the /example endpoint to find data for testing
+        // Build payload - LeadStatus is REQUIRED by HeroBase API
+        // Using "Closed" which is broader than "UserProcessed" to match more leads for /example
         const payload: Record<string, unknown> = {
           Name: webhook_config.description || "CPH Sales Webhook",
           Method: "POST",
           UrlTemplate: webhook_config.url,
           Format: "Json",
           ContentTemplate: contentTemplate,
+          LeadStatus: webhook_config.leadStatus || "Closed",
         };
 
         // Only add CampaignCode if explicitly specified (not empty string)
         if (webhook_config.campaignCode && webhook_config.campaignCode.trim() !== "") {
           payload.CampaignCode = webhook_config.campaignCode;
-        }
-
-        // Only add LeadStatus if explicitly specified (not the default)
-        if (webhook_config.leadStatus && webhook_config.leadStatus.trim() !== "") {
-          payload.LeadStatus = webhook_config.leadStatus;
         }
 
         console.log("Creating HeroBase webhook with payload:", JSON.stringify(payload));
