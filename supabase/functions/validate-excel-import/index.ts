@@ -15,6 +15,7 @@ interface ImportRow {
   status: string | null;
   action_type: string | null;
   amount_deduct: string | null;
+  customer_name: string | null;
   raw_data: Record<string, unknown> | null;
 }
 
@@ -25,6 +26,7 @@ interface Sale {
   customer_phone: string | null;
   sale_datetime: string | null;
   agent_name: string | null;
+  customer_name: string | null;
 }
 
 interface SaleItem {
@@ -38,24 +40,39 @@ function normalizePhone(phone: string | null): string {
   return phone.replace(/[\s\-\+\(\)]/g, "").replace(/^(45|0045)/, "");
 }
 
+// Normalize any ID for comparison (case-insensitive, trimmed)
+function normalizeId(id: string | null): string {
+  if (!id) return "";
+  return id.trim().toLowerCase();
+}
+
+// Normalize OPP number (remove common prefixes)
+function normalizeOpp(opp: string | null): string {
+  if (!opp) return "";
+  return opp.trim().toLowerCase().replace(/^(opp-?|ord-?|order-?)/i, "");
+}
+
 // Parse date from various formats
 function parseDate(dateStr: string | null): Date | null {
   if (!dateStr) return null;
   
   // Try various formats
   const formats = [
-    /^(\d{4})-(\d{2})-(\d{2})/, // ISO
+    /^(\d{4})-(\d{2})-(\d{2})/, // ISO: YYYY-MM-DD
     /^(\d{2})\/(\d{2})\/(\d{4})/, // DD/MM/YYYY
     /^(\d{2})-(\d{2})-(\d{4})/, // DD-MM-YYYY
+    /^(\d{2})\.(\d{2})\.(\d{4})/, // DD.MM.YYYY
+    /^(\d{4})\/(\d{2})\/(\d{2})/, // YYYY/MM/DD
   ];
   
   for (const fmt of formats) {
     const match = dateStr.match(fmt);
     if (match) {
-      if (fmt === formats[0]) {
+      if (fmt === formats[0] || fmt === formats[4]) {
+        // ISO or YYYY/MM/DD
         return new Date(dateStr);
       } else {
-        // DD/MM/YYYY or DD-MM-YYYY
+        // DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
         return new Date(`${match[3]}-${match[2]}-${match[1]}`);
       }
     }
@@ -66,17 +83,56 @@ function parseDate(dateStr: string | null): Date | null {
   return isNaN(parsed.getTime()) ? null : parsed;
 }
 
-// Check if action indicates cancellation
-function isCancellation(actionType: string | null): boolean {
-  if (!actionType) return true; // Default: assume cancellation import
-  const lower = actionType.toLowerCase();
-  return (
-    lower.includes("annuller") ||
-    lower.includes("cancel") ||
-    lower.includes("opsagt") ||
-    lower.includes("retur") ||
-    lower.includes("rettelse")
-  );
+// Extended list of cancellation keywords (multi-language support)
+const CANCELLATION_KEYWORDS = [
+  // Danish
+  "annuller", "annulleret", "annullering", "opsagt", "opsigelse", "retur", "rettelse", "nedlagt", "aflyst", "afvist",
+  // English
+  "cancel", "cancelled", "canceled", "cancellation", "refund", "refunded", "returned", "voided", "void", "rejected",
+  // German
+  "storniert", "stornierung", "abgebrochen",
+  // Spanish
+  "cancelado", "cancelación", "anulado",
+  // Generic status words
+  "churn", "churned", "lost", "failed", "declined", "reversed"
+];
+
+// Check if action indicates cancellation - more flexible
+function isCancellation(actionType: string | null, status: string | null): boolean {
+  // If no action type provided, check status
+  const textToCheck = [actionType, status].filter(Boolean).join(" ").toLowerCase();
+  
+  // If nothing to check, default to cancellation (assume import is for cancellations)
+  if (!textToCheck) return true;
+  
+  return CANCELLATION_KEYWORDS.some(keyword => textToCheck.includes(keyword));
+}
+
+// Extract numeric amount from various formats
+function extractAmount(amountStr: string | null): number {
+  if (!amountStr) return 0;
+  
+  // Handle different number formats: 1.234,56 (EU) or 1,234.56 (US) or plain
+  let cleaned = amountStr.toString();
+  
+  // Remove currency symbols and whitespace
+  cleaned = cleaned.replace(/[^\d.,\-]/g, "");
+  
+  // Detect format and normalize
+  const hasCommaDecimal = /,\d{2}$/.test(cleaned); // EU format: 1.234,56
+  const hasDotDecimal = /\.\d{2}$/.test(cleaned);   // US format: 1,234.56
+  
+  if (hasCommaDecimal) {
+    cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+  } else if (hasDotDecimal) {
+    cleaned = cleaned.replace(/,/g, "");
+  } else {
+    // Ambiguous - try to parse as-is
+    cleaned = cleaned.replace(/,/g, "");
+  }
+  
+  const amount = parseFloat(cleaned);
+  return isNaN(amount) ? 0 : amount;
 }
 
 Deno.serve(async (req) => {
@@ -139,6 +195,10 @@ Deno.serve(async (req) => {
         date: row.date,
         action_type: row.action_type,
         amount_deduct: row.amount_deduct,
+        raw_custom_fields: row.raw_data ? {
+          _custom_match_1: row.raw_data._custom_match_1,
+          _custom_match_2: row.raw_data._custom_match_2,
+        } : null,
       }));
     });
 
@@ -156,17 +216,16 @@ Deno.serve(async (req) => {
     const campaignIds = (campaigns || []).map((c: { id: string }) => c.id);
     console.log(`Found ${campaignIds.length} campaigns for client`);
     console.log("Campaign IDs:", JSON.stringify(campaignIds));
-    console.log("Campaigns:", JSON.stringify(campaigns));
 
-    // Get sales for this client's campaigns (last 180 days for phone matching)
+    // Get sales for this client's campaigns (last 365 days for broader matching)
     let salesData: Sale[] = [];
     if (campaignIds.length > 0) {
-      const dateFilter = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
+      const dateFilter = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
       console.log(`Fetching sales from: ${dateFilter}`);
       
       const { data: sales, error: salesError } = await supabase
         .from("sales")
-        .select("id, adversus_external_id, adversus_opp_number, customer_phone, sale_datetime, agent_name")
+        .select("id, adversus_external_id, adversus_opp_number, customer_phone, sale_datetime, agent_name, customer_name")
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", dateFilter);
 
@@ -187,23 +246,30 @@ Deno.serve(async (req) => {
         adversus_opp_number: sale.adversus_opp_number,
         customer_phone: sale.customer_phone,
         sale_datetime: sale.sale_datetime,
+        customer_name: sale.customer_name,
       }));
     });
 
-    // Create lookup maps
+    // Create flexible lookup maps
     const salesByExternalId = new Map<string, Sale>();
     const salesByOpp = new Map<string, Sale>();
     const salesByPhone = new Map<string, Sale[]>();
+    const salesByCustomerName = new Map<string, Sale[]>(); // New: for name-based matching
 
     for (const sale of salesData) {
+      // External ID lookup
       if (sale.adversus_external_id) {
-        const key = sale.adversus_external_id.trim().toLowerCase();
+        const key = normalizeId(sale.adversus_external_id);
         salesByExternalId.set(key, sale);
       }
+      
+      // OPP number lookup
       if (sale.adversus_opp_number) {
-        const normalizedOpp = sale.adversus_opp_number.trim().toLowerCase().replace(/^opp-?/i, "");
+        const normalizedOpp = normalizeOpp(sale.adversus_opp_number);
         salesByOpp.set(normalizedOpp, sale);
       }
+      
+      // Phone lookup
       if (sale.customer_phone) {
         const normalizedPhone = normalizePhone(sale.customer_phone);
         if (normalizedPhone.length >= 8) {
@@ -212,12 +278,23 @@ Deno.serve(async (req) => {
           salesByPhone.set(normalizedPhone, existing);
         }
       }
+      
+      // Customer name lookup (for CRMs that only have name)
+      if (sale.customer_name) {
+        const normalizedName = normalizeId(sale.customer_name);
+        if (normalizedName.length >= 3) {
+          const existing = salesByCustomerName.get(normalizedName) || [];
+          existing.push(sale);
+          salesByCustomerName.set(normalizedName, existing);
+        }
+      }
     }
 
     console.log("Lookup maps created:");
     console.log(`  - salesByExternalId: ${salesByExternalId.size} entries`);
     console.log(`  - salesByOpp: ${salesByOpp.size} entries`);
     console.log(`  - salesByPhone: ${salesByPhone.size} entries`);
+    console.log(`  - salesByCustomerName: ${salesByCustomerName.size} entries`);
 
     let matchedCount = 0;
     let cancelledCount = 0;
@@ -239,9 +316,17 @@ Deno.serve(async (req) => {
       console.log(`  action_type: "${row.action_type}"`);
       console.log(`  amount_deduct: "${row.amount_deduct}"`);
 
+      // Get custom match fields from raw_data
+      const customMatch1 = row.raw_data?._custom_match_1 as string | null;
+      const customMatch2 = row.raw_data?._custom_match_2 as string | null;
+      console.log(`  custom_match_1: "${customMatch1}"`);
+      console.log(`  custom_match_2: "${customMatch2}"`);
+
+      // === MATCHING STRATEGY (Priority Order) ===
+
       // Attempt 1: Match by External ID
       if (!matchedSale && row.external_id) {
-        const normalizedId = row.external_id.trim().toLowerCase();
+        const normalizedId = normalizeId(row.external_id);
         console.log(`  Attempt 1 - external_id lookup: "${normalizedId}"`);
         matchedSale = salesByExternalId.get(normalizedId) || null;
         if (matchedSale) {
@@ -252,9 +337,9 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Attempt 2: Match by ordre_id (also external ID)
+      // Attempt 2: Match by ordre_id (also check in external ID map)
       if (!matchedSale && row.ordre_id) {
-        const normalizedId = row.ordre_id.trim().toLowerCase();
+        const normalizedId = normalizeId(row.ordre_id);
         console.log(`  Attempt 2 - ordre_id lookup: "${normalizedId}"`);
         matchedSale = salesByExternalId.get(normalizedId) || null;
         if (matchedSale) {
@@ -267,7 +352,7 @@ Deno.serve(async (req) => {
 
       // Attempt 3: Match by OPP number
       if (!matchedSale && row.opp_number) {
-        const normalizedOpp = row.opp_number.trim().toLowerCase().replace(/^opp-?/i, "");
+        const normalizedOpp = normalizeOpp(row.opp_number);
         console.log(`  Attempt 3 - opp_number lookup: "${normalizedOpp}"`);
         matchedSale = salesByOpp.get(normalizedOpp) || null;
         if (matchedSale) {
@@ -278,10 +363,40 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Attempt 4: Match by Phone + Date (fuzzy)
+      // Attempt 4: Match by Custom Field 1 (try as external ID and OPP)
+      if (!matchedSale && customMatch1) {
+        const normalizedCustom = normalizeId(customMatch1);
+        const normalizedAsOpp = normalizeOpp(customMatch1);
+        console.log(`  Attempt 4 - custom_match_1 lookup: "${normalizedCustom}" / "${normalizedAsOpp}"`);
+        
+        matchedSale = salesByExternalId.get(normalizedCustom) || salesByOpp.get(normalizedAsOpp) || null;
+        if (matchedSale) {
+          matchMethod = "custom_field_1";
+          console.log(`  ✓ MATCHED via custom_field_1: sale ${matchedSale.id}`);
+        } else {
+          console.log(`  ✗ No match for custom_match_1`);
+        }
+      }
+
+      // Attempt 5: Match by Custom Field 2
+      if (!matchedSale && customMatch2) {
+        const normalizedCustom = normalizeId(customMatch2);
+        const normalizedAsOpp = normalizeOpp(customMatch2);
+        console.log(`  Attempt 5 - custom_match_2 lookup: "${normalizedCustom}" / "${normalizedAsOpp}"`);
+        
+        matchedSale = salesByExternalId.get(normalizedCustom) || salesByOpp.get(normalizedAsOpp) || null;
+        if (matchedSale) {
+          matchMethod = "custom_field_2";
+          console.log(`  ✓ MATCHED via custom_field_2: sale ${matchedSale.id}`);
+        } else {
+          console.log(`  ✗ No match for custom_match_2`);
+        }
+      }
+
+      // Attempt 6: Match by Phone + Date (fuzzy)
       if (!matchedSale && row.phone_number) {
         const normalizedPhone = normalizePhone(row.phone_number);
-        console.log(`  Attempt 4 - phone lookup: "${normalizedPhone}" (original: "${row.phone_number}")`);
+        console.log(`  Attempt 6 - phone lookup: "${normalizedPhone}" (original: "${row.phone_number}")`);
         
         if (normalizedPhone.length >= 8) {
           const candidates = salesByPhone.get(normalizedPhone) || [];
@@ -307,7 +422,8 @@ Deno.serve(async (req) => {
                   const daysDiff = diff / (1000 * 60 * 60 * 24);
                   console.log(`    Candidate ${candidate.id}: sale_date=${saleDate.toISOString()}, daysDiff=${daysDiff.toFixed(2)}`);
                   
-                  if (daysDiff <= 5 && diff < bestDiff) {
+                  // Increased tolerance to 30 days for flexibility
+                  if (daysDiff <= 30 && diff < bestDiff) {
                     bestDiff = diff;
                     bestMatch = candidate;
                   }
@@ -319,7 +435,7 @@ Deno.serve(async (req) => {
                 matchMethod = "phone_date";
                 console.log(`  ✓ MATCHED via phone+date: sale ${matchedSale.id}`);
               } else {
-                console.log(`  ✗ No match within 5 days date range`);
+                console.log(`  ✗ No match within 30 days date range`);
               }
             } else {
               console.log(`  ✗ Could not parse date for disambiguation`);
@@ -329,6 +445,48 @@ Deno.serve(async (req) => {
           }
         } else {
           console.log(`  ✗ Phone too short: ${normalizedPhone.length} chars (need 8+)`);
+        }
+      }
+
+      // Attempt 7: Match by Customer Name + Date (last resort for some CRMs)
+      if (!matchedSale && row.customer_name && row.date) {
+        const normalizedName = normalizeId(row.customer_name);
+        console.log(`  Attempt 7 - customer_name lookup: "${normalizedName}"`);
+        
+        if (normalizedName.length >= 3) {
+          const candidates = salesByCustomerName.get(normalizedName) || [];
+          console.log(`  Found ${candidates.length} candidates with matching name`);
+          
+          if (candidates.length === 1) {
+            matchedSale = candidates[0];
+            matchMethod = "name_single";
+            console.log(`  ✓ MATCHED via customer_name (single match): sale ${matchedSale.id}`);
+          } else if (candidates.length > 1) {
+            const rowDate = parseDate(row.date);
+            if (rowDate) {
+              let bestMatch: Sale | null = null;
+              let bestDiff = Infinity;
+              
+              for (const candidate of candidates) {
+                if (candidate.sale_datetime) {
+                  const saleDate = new Date(candidate.sale_datetime);
+                  const diff = Math.abs(saleDate.getTime() - rowDate.getTime());
+                  const daysDiff = diff / (1000 * 60 * 60 * 24);
+                  
+                  if (daysDiff <= 30 && diff < bestDiff) {
+                    bestDiff = diff;
+                    bestMatch = candidate;
+                  }
+                }
+              }
+              
+              if (bestMatch) {
+                matchedSale = bestMatch;
+                matchMethod = "name_date";
+                console.log(`  ✓ MATCHED via customer_name+date: sale ${matchedSale.id}`);
+              }
+            }
+          }
         }
       }
 
@@ -353,9 +511,9 @@ Deno.serve(async (req) => {
       if (matchedSale) {
         matchedCount++;
 
-        // Check if this is a cancellation
-        const isCancellationAction = isCancellation(row.action_type);
-        console.log(`  Is cancellation? ${isCancellationAction} (action_type: "${row.action_type}")`);
+        // Check if this is a cancellation using flexible detection
+        const isCancellationAction = isCancellation(row.action_type, row.status);
+        console.log(`  Is cancellation? ${isCancellationAction} (action_type: "${row.action_type}", status: "${row.status}")`);
         
         if (isCancellationAction) {
           cancelledCount++;
@@ -368,15 +526,13 @@ Deno.serve(async (req) => {
           
           console.log(`  Updated sale validation_status to "cancelled": ${saleUpdateError ? `Error: ${saleUpdateError.message}` : "OK"}`);
 
-          // Calculate clawback amount
+          // Calculate clawback amount using flexible extraction
           let clawbackAmount = 0;
 
           if (row.amount_deduct) {
-            // Use provided amount (make it negative if positive)
-            const cleanedAmount = row.amount_deduct.replace(/[^\d.-]/g, "");
-            const amount = parseFloat(cleanedAmount);
-            console.log(`  amount_deduct provided: "${row.amount_deduct}" -> cleaned: "${cleanedAmount}" -> parsed: ${amount}`);
-            if (!isNaN(amount)) {
+            const amount = extractAmount(row.amount_deduct);
+            console.log(`  amount_deduct provided: "${row.amount_deduct}" -> extracted: ${amount}`);
+            if (amount !== 0) {
               clawbackAmount = Math.abs(amount) * -1;
               console.log(`  Clawback from amount_deduct: ${clawbackAmount}`);
             }
@@ -420,7 +576,7 @@ Deno.serve(async (req) => {
                 transaction_type: "clawback",
                 source: "excel_import",
                 source_reference: import_id,
-                reason: `Annullering via Excel import (${matchMethod})`,
+                reason: `Cancellation via Excel import (${matchMethod})`,
               });
 
             if (!clawbackError) {
@@ -471,12 +627,11 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("=== VALIDATE EXCEL IMPORT ERROR ===");
-    console.error("Error:", message);
-    console.error("Stack:", error instanceof Error ? error.stack : "N/A");
+    console.error("=== VALIDATION ERROR ===");
+    console.error("Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
