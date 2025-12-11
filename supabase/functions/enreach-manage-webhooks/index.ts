@@ -172,37 +172,16 @@ serve(async (req) => {
           );
         }
 
-        // Build the webhook payload for HeroBase (camelCase per API docs)
-        // ContentTemplate is REQUIRED - defines the JSON structure sent to our webhook
-        const contentTemplate = JSON.stringify({
-          event: "lead_closed",
-          data: {
-            uniqueId: "{UniqueId}",
-            agentEmail: "{AgentEmail}",
-            agentName: "{UserName}",
-            campaignCode: "{CampaignCode}",
-            campaignName: "{CampaignName}",
-            leadStatus: "{LeadStatus}",
-            leadReleaseType: "{LeadReleaseType}",
-            customerPhone: "{PhoneNumber}",
-            customerName: "{ContactName}",
-            customerCompany: "{Company}",
-            closedAt: "{ClosedDate}",
-            createdAt: "{CreatedDate}",
-            result: "{Result}",
-            notes: "{Notes}",
-            customFields: "{CustomFields}"
-          }
-        });
-
+        // Build the webhook payload for HeroBase
+        // Use StandardTemplateName instead of custom ContentTemplate for simpler maintenance
         const payload: Record<string, unknown> = {
           name: webhook_config.description || "CPH Sales Webhook",
           campaignCode: webhook_config.campaignCode,
           leadStatus: webhook_config.leadStatus || "UserProcessed",
           method: "POST",
           urlTemplate: webhook_config.url,
-          contentTemplate: contentTemplate,
-          contentType: "application/json",
+          format: "Json",
+          standardTemplateName: "StandardTemplate.PostJson",
         };
 
         // leadClosure filters for successful sales
