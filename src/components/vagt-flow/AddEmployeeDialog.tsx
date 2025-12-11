@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { format, addDays, isWithinInterval, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
-import { Trash2, AlertTriangle, Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -70,7 +69,6 @@ export function AddEmployeeDialog({
 }: AddEmployeeDialogProps) {
   const [selectedEmployees, setSelectedEmployees] = useState<(string | null)[]>([null]);
   const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
-  const [searchQuery, setSearchQuery] = useState("");
 
   // Filter employees by brand/department match (department contains brand name)
   const brandName = booking?.brand?.name?.toLowerCase();
@@ -80,15 +78,6 @@ export function AddEmployeeDialog({
     // Match if employee's department/team contains the brand name
     return empTeam.includes(brandName);
   });
-
-  // Further filter by search query
-  const searchFilteredEmployees = useMemo(() => {
-    if (!searchQuery.trim()) return filteredEmployees;
-    const query = searchQuery.toLowerCase();
-    return filteredEmployees.filter((emp) => 
-      emp.full_name.toLowerCase().includes(query)
-    );
-  }, [filteredEmployees, searchQuery]);
 
   // Fetch absences for the week period from absence_request_v2
   const weekEnd = addDays(weekStart, 6);
@@ -182,7 +171,6 @@ export function AddEmployeeDialog({
     if (open) {
       setSelectedEmployees([null]);
       setSelectedDays(new Set());
-      setSearchQuery("");
     }
   }, [open]);
 
@@ -263,16 +251,6 @@ export function AddEmployeeDialog({
                 </span>
               )}
             </p>
-
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Søg efter medarbejder..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
             
             {selectedEmployees.map((emp, index) => {
               const hasAbsence = emp && absencesByEmployeeAndDay.has(emp);
@@ -288,8 +266,8 @@ export function AddEmployeeDialog({
                     <SelectTrigger className={`flex-1 bg-background text-foreground ${hasAbsence ? "border-red-500 bg-red-50 dark:bg-red-950/20" : ""}`}>
                       <SelectValue placeholder={`Medarbejder ${index + 1} (valgfri)`} />
                     </SelectTrigger>
-                    <SelectContent className="bg-popover max-h-[200px]">
-                      {searchFilteredEmployees
+                    <SelectContent className="bg-popover">
+                      {filteredEmployees
                         .filter(e => !selectedEmployees.includes(e.id) || e.id === emp)
                         .map((employee) => {
                           const empAbsences = absencesByEmployeeAndDay.get(employee.id);
