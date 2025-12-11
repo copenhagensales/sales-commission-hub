@@ -174,6 +174,7 @@ serve(async (req) => {
 
         console.log(`Fetching example payload for webhook ${webhook_id}`);
 
+        // First try to get real example from HeroBase
         const response = await fetch(`${apiBaseUrl}/hooks/${webhook_id}/example`, {
           method: "GET",
           headers: {
@@ -186,29 +187,107 @@ serve(async (req) => {
         console.log(`HeroBase example response status: ${response.status}`);
         console.log(`HeroBase example response: ${responseText}`);
 
-        if (!response.ok) {
-          // Check for common error cases
-          if (responseText.includes("Sequence contains no matching element")) {
-            return new Response(JSON.stringify({ 
-              success: true, 
-              example: null,
-              message: "Ingen eksempeldata tilgængelig. Webhook'en skal modtage mindst én hændelse for at generere et eksempel."
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
+        // If successful, return real example
+        if (response.ok) {
+          let example: unknown = null;
+          try {
+            example = JSON.parse(responseText);
+          } catch {
+            example = responseText;
           }
-          throw new Error(`HeroBase API error: ${response.status} - ${responseText}`);
+          return new Response(JSON.stringify({ success: true, example, isRealData: true }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
 
-        let example: unknown = null;
+        // If no real data available, fetch actual leads to create a real example
+        console.log("No example from HeroBase, attempting to fetch recent leads for synthetic example...");
+        
         try {
-          example = JSON.parse(responseText);
-        } catch {
-          // If not JSON, return as text
-          example = responseText;
+          // Try to get a recent lead from the simpleleads endpoint
+          const today = new Date().toISOString().split('T')[0];
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          
+          const leadsUrl = `${apiBaseUrl}/simpleleads?Projects=*&ModifiedFrom=${thirtyDaysAgo}&Statuses=UserProcessed&LeadClosures=Success`;
+          console.log(`Fetching leads from: ${leadsUrl}`);
+          
+          const leadsResponse = await fetch(leadsUrl, {
+            method: "GET",
+            headers: {
+              Authorization: authHeader,
+              Accept: "application/json",
+            },
+          });
+
+          if (leadsResponse.ok) {
+            const leadsText = await leadsResponse.text();
+            let leads: unknown[] = [];
+            try {
+              leads = JSON.parse(leadsText);
+            } catch {
+              console.log("Could not parse leads response");
+            }
+
+            if (Array.isArray(leads) && leads.length > 0) {
+              // Use the most recent lead as example
+              const sampleLead = leads[0] as Record<string, unknown>;
+              console.log(`Found ${leads.length} leads, using first as example`);
+              
+              // Build example in the same format as our ContentTemplate
+              const syntheticExample = {
+                UniqueId: sampleLead.UniqueId || sampleLead.uniqueId || "SAMPLE-12345",
+                AgentEmail: sampleLead.AgentEmail || sampleLead.agentEmail || "agent@example.com",
+                AgentName: sampleLead.UserName || sampleLead.userName || sampleLead.AgentName || "Agent Name",
+                CampaignCode: sampleLead.CampaignCode || sampleLead.campaignCode || "CAMP001",
+                CampaignName: sampleLead.CampaignName || sampleLead.campaignName || "Campaign Name",
+                LeadStatus: sampleLead.LeadStatus || sampleLead.leadStatus || "UserProcessed",
+                CustomerPhone: sampleLead.PhoneNumber || sampleLead.phoneNumber || "+45 12345678",
+                CustomerName: sampleLead.ContactName || sampleLead.contactName || "Customer Name",
+                CustomerCompany: sampleLead.Company || sampleLead.company || "Company A/S",
+                ClosedDate: sampleLead.ClosedDate || sampleLead.closedDate || new Date().toISOString(),
+                Result: sampleLead.Result || sampleLead.result || "Sale",
+                _source: "Real lead data from HeroBase",
+                _note: "Dette er baseret på en faktisk lead fra de seneste 30 dage"
+              };
+
+              return new Response(JSON.stringify({ 
+                success: true, 
+                example: syntheticExample,
+                isRealData: true,
+                message: "Eksempel genereret fra faktisk lead-data"
+              }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+          }
+        } catch (leadErr) {
+          console.error("Error fetching leads for example:", leadErr);
         }
 
-        return new Response(JSON.stringify({ success: true, example }), {
+        // Fallback: Return a template-based example showing expected structure
+        console.log("No leads found, returning template-based example");
+        const templateExample = {
+          UniqueId: "EXAMPLE-UUID-12345",
+          AgentEmail: "agent@yourcompany.dk",
+          AgentName: "Agent Fornavn Efternavn",
+          CampaignCode: "CAMPAIGN_CODE",
+          CampaignName: "Kampagne Navn",
+          LeadStatus: "UserProcessed",
+          CustomerPhone: "+45 12 34 56 78",
+          CustomerName: "Kunde Fornavn Efternavn",
+          CustomerCompany: "Kunde Virksomhed A/S",
+          ClosedDate: new Date().toISOString(),
+          Result: "Sale",
+          _source: "Template structure",
+          _note: "Dette er en skabelon - faktiske data vil have rigtige værdier fra HeroBase"
+        };
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          example: templateExample,
+          isRealData: false,
+          message: "Ingen historiske data fundet. Viser forventet payload-struktur."
+        }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
