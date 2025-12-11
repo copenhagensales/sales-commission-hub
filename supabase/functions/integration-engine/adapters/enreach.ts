@@ -500,76 +500,99 @@ export class EnreachAdapter implements DialerAdapter {
    * GDPR-Compliant CDR fetch - only IDs and metadata, NO personal Lead data
    * Uses HeroBase /calls endpoint for Call Detail Records
    * API Docs: https://wsheroXX.herobase.com/api-docs/index.html#!/calls
+   * 
+   * IMPORTANT: /calls endpoint requires OrgCode parameter
    */
   async fetchCalls(days: number): Promise<StandardCall[]> {
     try {
+      // First, get the account info to find the root OrgCode
+      let orgCode = "";
+      try {
+        const accountData = await this.get("/myaccount") as Record<string, unknown>;
+        console.log(`[EnreachAdapter] Account data keys: ${Object.keys(accountData).join(', ')}`);
+        
+        // Try to extract orgCode from account
+        orgCode = this.getStr(accountData, ['orgCode', 'OrgCode', 'organizationCode', 'OrganizationCode']);
+        
+        // If not found directly, check nested user object
+        if (!orgCode) {
+          const userObj = (accountData.user || accountData.User) as Record<string, unknown> | undefined;
+          if (userObj) {
+            orgCode = this.getStr(userObj, ['orgCode', 'OrgCode']);
+          }
+        }
+        
+        // Try parent org unit
+        if (!orgCode) {
+          const parentObj = (accountData.parent || accountData.Parent) as Record<string, unknown> | undefined;
+          if (parentObj) {
+            orgCode = this.getStr(parentObj, ['orgCode', 'OrgCode']);
+          }
+        }
+        
+        console.log(`[EnreachAdapter] Found OrgCode: ${orgCode || '(none)'}`);
+      } catch (accountError) {
+        console.warn(`[EnreachAdapter] Could not fetch /myaccount: ${accountError}`);
+      }
+
       // Calculate start time for the query
       const startTime = new Date();
       startTime.setDate(startTime.getDate() - days);
-      const startTimeStr = startTime.toISOString();
+      // Format as ISO date only (YYYY-MM-DD) - simpler format for API
+      const startDateStr = startTime.toISOString().split('T')[0];
       
       // TimeSpan format for Enreach: "d.hh:mm:ss" 
       const timeSpan = `${days}.00:00:00`;
 
-      console.log(`[EnreachAdapter] Fetching calls for last ${days} days from ${startTimeStr}`);
+      console.log(`[EnreachAdapter] Fetching calls for last ${days} days from ${startDateStr}`);
 
       let allCalls: Record<string, unknown>[] = [];
 
-      // Primary endpoint: /calls with Include parameter for user and campaign data
-      // API docs specify: StartTime (datetime) and TimeSpan (timespan)
-      const primaryEndpoint = `/calls?StartTime=${encodeURIComponent(startTimeStr)}&TimeSpan=${encodeURIComponent(timeSpan)}&Include=campaign,user&Limit=1000`;
+      // Build endpoint with OrgCode if available (REQUIRED parameter per API docs)
+      const orgCodeParam = orgCode ? `OrgCode=${encodeURIComponent(orgCode)}&` : '';
       
-      try {
-        console.log(`[EnreachAdapter] Fetching from: ${primaryEndpoint}`);
-        const data = await this.get(primaryEndpoint) as unknown;
-        
-        if (Array.isArray(data)) {
-          allCalls = data as Record<string, unknown>[];
-        } else if (data && typeof data === 'object') {
-          const wrapper = data as Record<string, unknown>;
-          allCalls = (
-            wrapper.Results || wrapper.results || 
-            wrapper.Calls || wrapper.calls || 
-            wrapper.Data || wrapper.data || 
-            []
-          ) as Record<string, unknown>[];
-        }
-        
-        console.log(`[EnreachAdapter] Found ${allCalls.length} calls from primary endpoint`);
-      } catch (primaryError) {
-        const errMsg = primaryError instanceof Error ? primaryError.message : String(primaryError);
-        console.warn(`[EnreachAdapter] Primary endpoint failed: ${errMsg}`);
-        
-        // Fallback endpoints
-        const fallbackEndpoints = [
-          `/calls?StartTime=${encodeURIComponent(startTimeStr)}&TimeSpan=${encodeURIComponent(timeSpan)}`,
-          `/calls?StartTime=${encodeURIComponent(startTimeStr.split('T')[0])}`,
-        ];
-        
-        for (const endpoint of fallbackEndpoints) {
-          try {
-            console.log(`[EnreachAdapter] Trying fallback: ${endpoint}`);
-            const data = await this.get(endpoint) as unknown;
-            
-            if (Array.isArray(data)) {
-              allCalls = data as Record<string, unknown>[];
-            } else if (data && typeof data === 'object') {
-              const wrapper = data as Record<string, unknown>;
-              allCalls = (wrapper.Results || wrapper.Calls || wrapper.Data || []) as Record<string, unknown>[];
-            }
-            
-            if (allCalls.length > 0) {
-              console.log(`[EnreachAdapter] Found ${allCalls.length} calls from fallback`);
-              break;
-            }
-          } catch (e) {
-            continue;
+      // Try different endpoint variations
+      const endpoints = [
+        // With OrgCode and full params
+        `/calls?${orgCodeParam}StartTime=${startDateStr}&TimeSpan=${encodeURIComponent(timeSpan)}&Include=campaign,user&Limit=1000`,
+        // Without OrgCode (some accounts may allow this)
+        `/calls?StartTime=${startDateStr}&TimeSpan=${encodeURIComponent(timeSpan)}&Include=campaign,user&Limit=1000`,
+        // Alternative: use organizational units endpoint
+        orgCode ? `/organizationalunits/${encodeURIComponent(orgCode)}/calls?StartTime=${startDateStr}&TimeSpan=${encodeURIComponent(timeSpan)}` : null,
+      ].filter(Boolean) as string[];
+      
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`[EnreachAdapter] Trying: ${endpoint}`);
+          const data = await this.get(endpoint) as unknown;
+          
+          if (Array.isArray(data)) {
+            allCalls = data as Record<string, unknown>[];
+          } else if (data && typeof data === 'object') {
+            const wrapper = data as Record<string, unknown>;
+            allCalls = (
+              wrapper.Results || wrapper.results || 
+              wrapper.Calls || wrapper.calls || 
+              wrapper.Data || wrapper.data || 
+              []
+            ) as Record<string, unknown>[];
           }
+          
+          if (allCalls.length > 0) {
+            console.log(`[EnreachAdapter] Found ${allCalls.length} calls`);
+            break;
+          } else {
+            console.log(`[EnreachAdapter] Endpoint returned empty array`);
+          }
+        } catch (endpointError) {
+          const errMsg = endpointError instanceof Error ? endpointError.message : String(endpointError);
+          console.warn(`[EnreachAdapter] Endpoint failed: ${errMsg}`);
+          continue;
         }
       }
 
       if (allCalls.length === 0) {
-        console.log("[EnreachAdapter] No call records found");
+        console.log("[EnreachAdapter] No call records found from any endpoint");
         return [];
       }
 
