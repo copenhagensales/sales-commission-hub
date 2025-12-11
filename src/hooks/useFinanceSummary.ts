@@ -45,23 +45,27 @@ export function useFinanceSummary(options: UseFinanceSummaryOptions = {}) {
   return useQuery({
     queryKey: ['finance-summary', from, to, salary],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('finance-summary', {
-        body: null,
-        headers: {},
-      });
-
-      // Use query params via URL
+      // Get session for auth header
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
       const response = await fetch(
-        `https://jwlimmeijpfmaksvmuru.supabase.co/functions/v1/finance-summary?from=${from}&to=${to}&salary=${salary}`,
+        `${supabaseUrl}/functions/v1/finance-summary?from=${from}&to=${to}&salary=${salary}`,
         {
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token || anonKey}`,
+            'apikey': anonKey,
           },
         }
       );
 
       if (!response.ok) {
-        throw new Error('Failed to fetch finance summary');
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to fetch finance summary');
       }
 
       return response.json() as Promise<FinanceSummaryData>;

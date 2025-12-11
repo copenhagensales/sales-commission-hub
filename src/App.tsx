@@ -77,6 +77,7 @@ const Some = lazyWithRetry(() => import("./pages/Some"));
 const TimeStamp = lazyWithRetry(() => import("./pages/TimeStamp"));
 // Boards pages
 const TestBoard = lazyWithRetry(() => import("./pages/boards/TestBoard"));
+const EconomicBoard = lazyWithRetry(() => import("./pages/boards/EconomicBoard"));
 
 const queryClient = new QueryClient();
 
@@ -280,6 +281,7 @@ const App = () => (
               <Route path="/some" element={<ProtectedRoute><Some /></ProtectedRoute>} />
               {/* Boards routes */}
               <Route path="/boards/test" element={<RoleProtectedRoute requireTeamlederOrAbove><TestBoard /></RoleProtectedRoute>} />
+              <Route path="/boards/economic" element={<RoleProtectedRoute requireTeamlederOrAbove><EconomicBoard /></RoleProtectedRoute>} />
               {/* Admin route - owner only */}
               <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
