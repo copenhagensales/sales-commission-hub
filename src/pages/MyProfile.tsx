@@ -307,19 +307,28 @@ export default function MyProfile() {
     );
   }, [timeStamps]);
 
-  // Generate expected work schedule for current month
+  // Generate expected work schedule for current month - using actual time stamps when available
   const expectedSchedule = useMemo(() => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     const dailyHours = (employee?.weekly_hours || 37) / 5; // 5 working days
-    const startTime = employee?.standard_start_time || "09:00";
+    const defaultStartTime = employee?.standard_start_time || "09:00";
+    
+    // Create a map of actual time stamps by date for quick lookup
+    const timeStampsByDate = new Map<string, typeof deduplicatedTimeStamps[0]>();
+    deduplicatedTimeStamps.forEach(stamp => {
+      const dateKey = stamp.clock_in.split('T')[0];
+      timeStampsByDate.set(dateKey, stamp);
+    });
     
     const schedule: Array<{
       date: string;
       status: "work" | "vacation" | "sick";
       hours: number;
       startTime: string;
+      endTime: string;
+      hasActualStamp: boolean;
     }> = [];
     
     // Generate all weekdays in the month
@@ -337,18 +346,56 @@ export default function MyProfile() {
           return current >= start && current <= end;
         });
         
-        schedule.push({
-          date: dateStr,
-          status: absence ? (absence.type === "vacation" ? "vacation" : "sick") : "work",
-          hours: absence ? 0 : dailyHours,
-          startTime: absence ? "" : startTime,
-        });
+        // Check for actual time stamp on this date
+        const actualStamp = timeStampsByDate.get(dateStr);
+        
+        if (absence) {
+          schedule.push({
+            date: dateStr,
+            status: absence.type === "vacation" ? "vacation" : "sick",
+            hours: 0,
+            startTime: "",
+            endTime: "",
+            hasActualStamp: false,
+          });
+        } else if (actualStamp) {
+          // Use actual clock_in/clock_out times
+          const clockIn = new Date(actualStamp.clock_in);
+          const clockOut = actualStamp.clock_out ? new Date(actualStamp.clock_out) : null;
+          const actualStartTime = clockIn.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+          const actualEndTime = clockOut ? clockOut.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }) : null;
+          
+          // Calculate actual hours worked
+          let actualHours = dailyHours;
+          if (clockOut) {
+            actualHours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+          }
+          
+          schedule.push({
+            date: dateStr,
+            status: "work",
+            hours: actualHours,
+            startTime: actualStartTime,
+            endTime: actualEndTime || "",
+            hasActualStamp: true,
+          });
+        } else {
+          // Use default schedule (no actual stamp yet)
+          schedule.push({
+            date: dateStr,
+            status: "work",
+            hours: dailyHours,
+            startTime: defaultStartTime,
+            endTime: "",
+            hasActualStamp: false,
+          });
+        }
       }
       current.setDate(current.getDate() + 1);
     }
     
     return schedule.reverse(); // Most recent first
-  }, [employee?.weekly_hours, employee?.standard_start_time, absences]);
+  }, [employee?.weekly_hours, employee?.standard_start_time, absences, deduplicatedTimeStamps]);
 
   // Calculate shift statistics using expected schedule
   const shiftStats = useMemo(() => {
@@ -1059,7 +1106,10 @@ export default function MyProfile() {
                             </span>
                             {day.status === "work" && day.startTime && (
                               <span className="text-xs text-muted-foreground">
-                                fra {day.startTime}
+                                {day.hasActualStamp 
+                                  ? `${day.startTime}${day.endTime ? ` - ${day.endTime}` : ' (ikke udstemplet)'}`
+                                  : `fra ${day.startTime}`
+                                }
                               </span>
                             )}
                           </div>
