@@ -71,6 +71,8 @@ export interface StandardSale {
   externalReference?: string | null;
   // Client campaign ID - resolved by adapter
   clientCampaignId?: string | null;
+  // Lead ID from dialer - used to match webhook-created records
+  leadId?: string | null;
   products: StandardProduct[];
   // Complete raw JSON payload from dialer for debugging/auditing
   rawPayload?: Record<string, unknown>;
