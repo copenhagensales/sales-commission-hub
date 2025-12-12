@@ -153,7 +153,8 @@ export class IngestionEngine {
   // --- 3. PROCESAR VENTAS (La lógica pesada) ---
   // Core is now adapter-agnostic: it receives StandardSale with externalReference already extracted
   // Processes in batches to avoid CPU timeout on large datasets
-  async processSales(sales: StandardSale[], batchSize = 500) {
+  // MEMORY OPTIMIZATION: Reduced batch size from 500 to 200 to avoid memory limits
+  async processSales(sales: StandardSale[], batchSize = 200) {
     if (sales.length === 0) return { processed: 0, errors: 0 };
     
     const sampleSale = sales[0];
@@ -186,6 +187,11 @@ export class IngestionEngine {
       const { processed, errors } = await this.processSalesBatch(batch, productMapByName, productMapByExtId, dbProducts);
       totalProcessed += processed;
       totalErrors += errors;
+      
+      // MEMORY OPTIMIZATION: Clear processed batch reference
+      for (let i = start; i < end; i++) {
+        sales[i] = null as unknown as StandardSale;
+      }
       
       this.log("INFO", `Lote ${batchNum + 1} completado: ${processed} procesadas, ${errors} errores. Total: ${totalProcessed}/${sales.length}`);
     }

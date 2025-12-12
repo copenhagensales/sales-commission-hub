@@ -96,39 +96,32 @@ export class EnreachAdapter implements DialerAdapter {
       cutoffDate.setDate(cutoffDate.getDate() - days);
       const modifiedFrom = cutoffDate.toISOString().split('T')[0];
       
-      let allLeads: HeroBaseLead[] = [];
-      
       // FILTRADO ESTRICTO: Solo traemos ventas exitosas (LeadClosures=Success)
-      // AllClosedStatuses=true es necesario para ver leads ya procesados
       const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true&LeadClosures=Success`;
       
+      let rawData: unknown;
       try {
         console.log(`[EnreachAdapter] GET ${endpoint}`);
-        const data = await this.get(endpoint) as unknown;
-        
-        if (Array.isArray(data)) {
-          allLeads = data as HeroBaseLead[];
-        } else if (data && typeof data === 'object') {
-          const wrapper = data as Record<string, unknown>;
-          allLeads = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as HeroBaseLead[];
-        }
+        rawData = await this.get(endpoint);
       } catch (error) {
         console.error("[EnreachAdapter] Error fetching leads:", error);
         return [];
       }
 
+      // Extract array from response
+      let allLeads: HeroBaseLead[];
+      if (Array.isArray(rawData)) {
+        allLeads = rawData as HeroBaseLead[];
+      } else if (rawData && typeof rawData === 'object') {
+        const wrapper = rawData as Record<string, unknown>;
+        allLeads = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as HeroBaseLead[];
+      } else {
+        allLeads = [];
+      }
+
       console.log(`[EnreachAdapter] Fetched ${allLeads.length} raw leads from API`);
 
-      // FILTRO INTERNO: Solo procesamos leads que explícitamente tengan closure="Success"
-      // Ignoramos el status (UserProcessed) para ser más flexibles, pero el closure es mandatorio.
-      const filteredLeads = allLeads.filter((lead) => {
-        const closure = this.getStr(lead, ['closure', 'Closure']);
-        // HeroBase a veces usa 'Success' y a veces 'success', normalizamos a minúsculas para comparar
-        return closure && closure.toLowerCase() === 'success';
-      });
-
-      console.log(`[EnreachAdapter] Filtered ${allLeads.length} raw leads down to ${filteredLeads.length} valid sales`);
-
+      // Build mapping lookup once
       const mappingLookup = new Map<string, CampaignMappingConfig>();
       if (campaignMappings) {
         for (const mapping of campaignMappings) {
@@ -136,97 +129,136 @@ export class EnreachAdapter implements DialerAdapter {
         }
       }
 
-      return filteredLeads.map((lead: HeroBaseLead) => {
-        // --- 1. Identificadores Básicos ---
-        const externalId = this.getStr(lead, ['uniqueId', 'UniqueId']);
-        const campaignObj = (lead.campaign || lead.Campaign) as Record<string, unknown> | undefined;
-        const campaignId = campaignObj ? this.getStr(campaignObj, ['uniqueId', 'UniqueId', 'code']) : "";
-        const campaignCode = campaignObj ? this.getStr(campaignObj, ['code', 'Code']) : "";
+      // MEMORY OPTIMIZATION: Process leads in-place, filter and transform in one pass
+      // Don't keep both raw and transformed in memory
+      const sales: StandardSale[] = [];
+      
+      for (let i = 0; i < allLeads.length; i++) {
+        const lead = allLeads[i];
         
-        // --- 2. Agente ---
-        const firstProcessedByUser = (lead.firstProcessedByUser || lead.FirstProcessedByUser) as Record<string, unknown> | undefined;
-        const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
-        const agentOrgCode = (firstProcessedByUser?.orgCode as string) || (lastModifiedByUser?.orgCode as string) || "";
-        
-        // Nombre del agente: intenta buscar nombre real, sino usa el código
-        let agentName = this.getStr(firstProcessedByUser, ['name', 'Name', 'fullName']);
-        if (!agentName) agentName = agentOrgCode;
-
-        // --- 3. Cliente ---
-        const dataObj = (lead.data || lead.Data) as Record<string, unknown> | undefined;
-        let customerName = "";
-        let customerPhone = "";
-        
-        if (dataObj) {
-          const firstName = this.getStr(dataObj, ['Navn1', 'FirstName', 'Fornavn']);
-          const lastName = this.getStr(dataObj, ['Navn2', 'LastName', 'Efternavn']);
-          customerName = [firstName, lastName].filter(Boolean).join(' ').trim();
-          
-          if (!customerName) {
-            customerName = this.getStr(dataObj, ['Navn', 'Name', 'Company', 'Firma']);
-          }
-          
-          customerPhone = this.getStr(dataObj, ['Telefon1', 'Telefon', 'Phone', 'Mobile']);
-        }
-
-        // --- 4. Extracción de Productos (Dinámica) ---
-        const products = this.extractProducts(lead, dataObj, campaignId, campaignCode);
-
-        // --- 5. Referencia Externa (Order ID) ---
-        let externalReference: string | null = null;
-        const mapping = mappingLookup.get(campaignId);
-
-        // Intento 1: Configuración específica de la campaña
-        if (mapping?.referenceConfig && dataObj) {
-            externalReference = this.extractReference({...dataObj, ...lead}, mapping.referenceConfig);
+        // Filter: only process Success leads
+        const closure = this.getStr(lead, ['closure', 'Closure']);
+        if (!closure || closure.toLowerCase() !== 'success') {
+          continue;
         }
         
-        // Intento 2: Campos comunes (ESTRICTO - Solo OPP u OrderId reales)
-        // Eliminados: SerioID, KVHXR, Reference, Ref (para evitar IDs internos)
-        if (!externalReference && dataObj) {
-            externalReference = this.getStr(dataObj, [
-                'OPP', 'opp', 'Opp', 
-                'OPP_number', 'opp_number', 'OppNumber',
-                'OrderId', 'orderId', 'order_id', 'OrdreId', 
-                'OrderNumber', 'orderNumber'
-            ]) || null;
+        // Transform lead to StandardSale
+        const sale = this.transformLeadToSale(lead, mappingLookup);
+        if (sale) {
+          sales.push(sale);
         }
         
-        // Finalmente busca patrones OPP por regex (OPP-1234 o 123456)
-        if (!externalReference) {
-             const allVariables = { ...dataObj, ...lead };
-             externalReference = this.searchForOppInVariables(allVariables as Record<string, unknown>);
-        }
+        // Clear reference to help GC (important for large datasets)
+        allLeads[i] = null as unknown as HeroBaseLead;
+      }
 
-        const saleDate = this.getStr(lead, ['firstProcessedTime', 'lastModifiedTime']) || new Date().toISOString();
+      console.log(`[EnreachAdapter] Filtered ${allLeads.length} raw leads down to ${sales.length} valid sales`);
 
-        return {
-          externalId,
-          integrationType: "enreach",
-          dialerName: this.dialerName,
-          saleDate,
-          agentEmail: agentOrgCode, 
-          agentExternalId: agentOrgCode,
-          agentName,
-          customerName,
-          customerPhone,
-          campaignId,
-          campaignName: campaignCode,
-          externalReference,
-          clientCampaignId: mapping?.clientCampaignId || null,
-          products,
-          // Store complete raw JSON from dialer
-          rawPayload: lead,
-          metadata: {
-            source: "enreach",
-            campaignName: campaignCode,
-            campaignId,
-          },
-        };
-      });
+      return sales;
     } catch (error) {
       console.error("[EnreachAdapter] Critical error in fetchSales:", error);
       return [];
+    }
+  }
+
+  // Transform a single lead to StandardSale (extracted for memory efficiency)
+  private transformLeadToSale(lead: HeroBaseLead, mappingLookup: Map<string, CampaignMappingConfig>): StandardSale | null {
+    try {
+      // --- 1. Identificadores Básicos ---
+      const externalId = this.getStr(lead, ['uniqueId', 'UniqueId']);
+      const campaignObj = (lead.campaign || lead.Campaign) as Record<string, unknown> | undefined;
+      const campaignId = campaignObj ? this.getStr(campaignObj, ['uniqueId', 'UniqueId', 'code']) : "";
+      const campaignCode = campaignObj ? this.getStr(campaignObj, ['code', 'Code']) : "";
+      
+      // --- 2. Agente ---
+      const firstProcessedByUser = (lead.firstProcessedByUser || lead.FirstProcessedByUser) as Record<string, unknown> | undefined;
+      const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
+      const agentOrgCode = (firstProcessedByUser?.orgCode as string) || (lastModifiedByUser?.orgCode as string) || "";
+      
+      let agentName = this.getStr(firstProcessedByUser, ['name', 'Name', 'fullName']);
+      if (!agentName) agentName = agentOrgCode;
+
+      // --- 3. Cliente ---
+      const dataObj = (lead.data || lead.Data) as Record<string, unknown> | undefined;
+      let customerName = "";
+      let customerPhone = "";
+      
+      if (dataObj) {
+        const firstName = this.getStr(dataObj, ['Navn1', 'FirstName', 'Fornavn']);
+        const lastName = this.getStr(dataObj, ['Navn2', 'LastName', 'Efternavn']);
+        customerName = [firstName, lastName].filter(Boolean).join(' ').trim();
+        
+        if (!customerName) {
+          customerName = this.getStr(dataObj, ['Navn', 'Name', 'Company', 'Firma']);
+        }
+        
+        customerPhone = this.getStr(dataObj, ['Telefon1', 'Telefon', 'Phone', 'Mobile']);
+      }
+
+      // --- 4. Extracción de Productos (Dinámica) ---
+      const products = this.extractProducts(lead, dataObj, campaignId, campaignCode);
+
+      // --- 5. Referencia Externa (Order ID) ---
+      let externalReference: string | null = null;
+      const mapping = mappingLookup.get(campaignId);
+
+      if (mapping?.referenceConfig && dataObj) {
+        externalReference = this.extractReference({...dataObj, ...lead}, mapping.referenceConfig);
+      }
+      
+      if (!externalReference && dataObj) {
+        externalReference = this.getStr(dataObj, [
+          'OPP', 'opp', 'Opp', 
+          'OPP_number', 'opp_number', 'OppNumber',
+          'OrderId', 'orderId', 'order_id', 'OrdreId', 
+          'OrderNumber', 'orderNumber'
+        ]) || null;
+      }
+      
+      if (!externalReference) {
+        const allVariables = { ...dataObj, ...lead };
+        externalReference = this.searchForOppInVariables(allVariables as Record<string, unknown>);
+      }
+
+      const saleDate = this.getStr(lead, ['firstProcessedTime', 'lastModifiedTime']) || new Date().toISOString();
+
+      // MEMORY OPTIMIZATION: Store minimal raw payload - only essential fields for debugging
+      // Full payload was causing memory issues on large syncs
+      const minimalPayload = {
+        uniqueId: externalId,
+        closure: this.getStr(lead, ['closure', 'Closure']),
+        campaign: campaignCode,
+        data: dataObj ? Object.keys(dataObj).slice(0, 20).reduce((acc, key) => {
+          acc[key] = dataObj[key];
+          return acc;
+        }, {} as Record<string, unknown>) : null,
+      };
+
+      return {
+        externalId,
+        integrationType: "enreach",
+        dialerName: this.dialerName,
+        saleDate,
+        agentEmail: agentOrgCode, 
+        agentExternalId: agentOrgCode,
+        agentName,
+        customerName,
+        customerPhone,
+        campaignId,
+        campaignName: campaignCode,
+        externalReference,
+        clientCampaignId: mapping?.clientCampaignId || null,
+        products,
+        rawPayload: minimalPayload,
+        metadata: {
+          source: "enreach",
+          campaignName: campaignCode,
+          campaignId,
+        },
+      };
+    } catch (e) {
+      console.error("[EnreachAdapter] Error transforming lead:", e);
+      return null;
     }
   }
 
