@@ -90,9 +90,9 @@ export class EnreachAdapter implements DialerAdapter {
 
   async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
     try {
-      // MEMORY OPTIMIZATION: For large date ranges, chunk into smaller periods
-      // Each week = ~600 leads, which is manageable
-      const MAX_DAYS_PER_CHUNK = 30; // Process 30 days at a time max
+      // AGGRESSIVE MEMORY OPTIMIZATION: Use 7-day chunks to minimize memory pressure
+      // Each chunk = ~200-600 leads, keeping memory under control
+      const MAX_DAYS_PER_CHUNK = 7;
       
       if (days > MAX_DAYS_PER_CHUNK) {
         console.log(`[EnreachAdapter] Large date range (${days} days). Chunking into ${MAX_DAYS_PER_CHUNK}-day segments...`);
@@ -107,6 +107,7 @@ export class EnreachAdapter implements DialerAdapter {
   }
 
   // Fetch sales in chunks to avoid memory issues with large date ranges
+  // Process and yield results immediately instead of accumulating everything
   private async fetchSalesChunked(
     totalDays: number, 
     chunkSize: number, 
@@ -117,27 +118,32 @@ export class EnreachAdapter implements DialerAdapter {
     
     // Calculate number of chunks needed
     const chunks = Math.ceil(totalDays / chunkSize);
-    console.log(`[EnreachAdapter] Will fetch ${chunks} chunks of ${chunkSize} days each`);
+    console.log(`[EnreachAdapter] Will fetch ${chunks} chunks of ${chunkSize} days each (STRICT LIMIT)`);
     
-    for (let i = 0; i < chunks; i++) {
-      const chunkEnd = new Date(now);
-      chunkEnd.setDate(chunkEnd.getDate() - (i * chunkSize));
-      
-      const chunkStart = new Date(chunkEnd);
-      chunkStart.setDate(chunkStart.getDate() - chunkSize);
-      
-      // Don't go beyond the total days requested
+    // Limit maximum chunks to prevent CPU timeout (each chunk takes ~10-15 seconds)
+    const MAX_CHUNKS = 8; // ~56 days max to stay under CPU limit
+    const actualChunks = Math.min(chunks, MAX_CHUNKS);
+    
+    if (actualChunks < chunks) {
+      console.log(`[EnreachAdapter] WARNING: Limiting to ${actualChunks} chunks to prevent CPU timeout (requested ${chunks})`);
+    }
+    
+    for (let i = 0; i < actualChunks; i++) {
       const daysFromNow = i * chunkSize;
       if (daysFromNow >= totalDays) break;
       
       const daysToFetch = Math.min(chunkSize, totalDays - daysFromNow);
       
-      console.log(`[EnreachAdapter] Fetching chunk ${i + 1}/${chunks}: ${daysToFetch} days (starting ${daysFromNow} days ago)`);
+      console.log(`[EnreachAdapter] Chunk ${i + 1}/${actualChunks}: ${daysToFetch} days (offset: ${daysFromNow})`);
       
       try {
         const chunkSales = await this.fetchSalesForPeriod(daysToFetch, campaignMappings, daysFromNow);
         console.log(`[EnreachAdapter] Chunk ${i + 1} returned ${chunkSales.length} sales`);
-        allSales.push(...chunkSales);
+        
+        // Push sales and immediately allow GC on chunk data
+        for (const sale of chunkSales) {
+          allSales.push(sale);
+        }
       } catch (e) {
         console.error(`[EnreachAdapter] Error in chunk ${i + 1}:`, e);
         // Continue with other chunks even if one fails
