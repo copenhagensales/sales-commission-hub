@@ -6,6 +6,19 @@ export interface StandardProduct {
   metadata?: Record<string, unknown>;
 }
 
+// Product extraction configuration - stored in dialer_integrations.config
+export interface ProductExtractionConfig {
+  strategy: 'standard_closure' | 'data_keys_regex' | 'specific_fields';
+  regexPattern?: string;     // For extracting (Name) and (Price) from a string key
+  targetKeys?: string[];     // Array of keys to search in the 'data' object
+  defaultName?: string;      // Fallback product name if nothing found
+}
+
+// Full dialer integration config stored in JSONB
+export interface DialerIntegrationConfig {
+  productExtraction?: ProductExtractionConfig;
+}
+
 // Reference extraction config stored in DB - flexible for any adapter
 export interface ReferenceExtractionConfig {
   type: "field_id" | "json_path" | "regex" | "static";
