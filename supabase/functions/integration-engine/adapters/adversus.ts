@@ -124,8 +124,12 @@ export class AdversusAdapter implements DialerAdapter {
         externalReference = leadIdToOpp.get(leadId)!;
       }
       
+      // Use leadId as externalId to match webhook data (webhook uses result_id which is actually the leadId)
+      // This ensures integration-engine sync matches/updates webhook-created records instead of creating duplicates
+      const saleExternalId = s.leadId ? String(s.leadId) : String(s.id);
+      
       return {
-        externalId: String(s.id),
+        externalId: saleExternalId,
         integrationType: "adversus" as const,
         dialerName: this.dialerName,
         saleDate: s.closedTime || s.createdTime,
