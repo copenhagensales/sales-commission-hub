@@ -6,6 +6,13 @@ export interface StandardProduct {
   metadata?: Record<string, unknown>;
 }
 
+// Data filter rule - filters out leads that don't match criteria
+export interface DataFilterRule {
+  field: string; // Dot notation path e.g., "lastModifiedByUser.orgCode"
+  operator: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'regex' | 'notEquals' | 'notContains';
+  value: string;
+}
+
 // Conditional extraction rule - checks condition then extracts products
 export interface ConditionalExtractionRule {
   conditionKey: string;           // Key to check in data object (e.g., "Antal abonnementer", "5GI salg")
@@ -25,6 +32,7 @@ export interface ProductExtractionConfig {
   defaultName?: string;      // Fallback product name if nothing found
   validationKey?: string;    // DEPRECATED: Use conditional rules instead
   conditionalRules?: ConditionalExtractionRule[];  // For 'conditional' strategy
+  dataFilters?: DataFilterRule[];  // Filter leads before processing
 }
 
 // Full dialer integration config stored in JSONB

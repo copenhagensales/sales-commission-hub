@@ -17,6 +17,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useTranslation } from "react-i18next";
 
+// Data filter rule
+interface DataFilterRule {
+  field: string;
+  operator: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'regex' | 'notEquals' | 'notContains';
+  value: string;
+}
+
 // Conditional extraction rule
 interface ConditionalExtractionRule {
   conditionKey: string;           // Key to check in data object
@@ -35,6 +42,7 @@ interface ProductExtractionConfig {
   defaultName?: string;
   validationKey?: string;
   conditionalRules?: ConditionalExtractionRule[];
+  dataFilters?: DataFilterRule[];
 }
 
 interface DialerIntegrationConfig {
@@ -66,6 +74,7 @@ interface FormData {
   productDefaultName: string;
   productValidationKey: string;
   conditionalRules: ConditionalExtractionRule[];
+  dataFilters: DataFilterRule[];
 }
 
 const ADVERSUS_WEBHOOK_EVENTS = [
@@ -111,6 +120,7 @@ export function DialerIntegrations() {
     productDefaultName: "",
     productValidationKey: "",
     conditionalRules: [],
+    dataFilters: [],
   });
 
   // Per-integration sync days state
@@ -250,6 +260,9 @@ export function DialerIntegrations() {
       if (data.productValidationKey) {
         productExtraction.validationKey = data.productValidationKey;
       }
+      if (data.dataFilters && data.dataFilters.length > 0) {
+        productExtraction.dataFilters = data.dataFilters;
+      }
       
       const config: DialerIntegrationConfig = {
         productExtraction,
@@ -378,6 +391,7 @@ export function DialerIntegrations() {
       productDefaultName: "",
       productValidationKey: "",
       conditionalRules: [],
+      dataFilters: [],
     });
     setEditingId(null);
     setIsDialogOpen(false);
@@ -1012,6 +1026,113 @@ export function DialerIntegrations() {
                             Fallback product name if no rules match or extraction fails.
                           </p>
                         </div>
+                        
+                        {/* Data Filters Section */}
+                        <Separator className="my-4" />
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <Label className="text-sm font-medium">Data Filters</Label>
+                              <p className="text-xs text-muted-foreground">
+                                Filter leads before processing. Leads that don't match ALL filters are skipped.
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setFormData({
+                                  ...formData,
+                                  dataFilters: [
+                                    ...formData.dataFilters,
+                                    { field: "", operator: "contains", value: "" }
+                                  ]
+                                });
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-1" /> Add Filter
+                            </Button>
+                          </div>
+                          
+                          {formData.dataFilters.map((filter, index) => (
+                            <div key={index} className="border rounded-md p-3 space-y-2 bg-background">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">Filter {index + 1}</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setFormData({
+                                      ...formData,
+                                      dataFilters: formData.dataFilters.filter((_, i) => i !== index)
+                                    });
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                              
+                              <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                  <Label className="text-xs">Field (dot notation)</Label>
+                                  <Input
+                                    placeholder="e.g., lastModifiedByUser.orgCode"
+                                    value={filter.field}
+                                    onChange={(e) => {
+                                      const updated = [...formData.dataFilters];
+                                      updated[index] = { ...filter, field: e.target.value };
+                                      setFormData({ ...formData, dataFilters: updated });
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Operator</Label>
+                                  <Select
+                                    value={filter.operator}
+                                    onValueChange={(value: DataFilterRule['operator']) => {
+                                      const updated = [...formData.dataFilters];
+                                      updated[index] = { ...filter, operator: value };
+                                      setFormData({ ...formData, dataFilters: updated });
+                                    }}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="equals">Equals</SelectItem>
+                                      <SelectItem value="notEquals">Not Equals</SelectItem>
+                                      <SelectItem value="contains">Contains</SelectItem>
+                                      <SelectItem value="notContains">Not Contains</SelectItem>
+                                      <SelectItem value="startsWith">Starts With</SelectItem>
+                                      <SelectItem value="endsWith">Ends With</SelectItem>
+                                      <SelectItem value="regex">Regex</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Value</Label>
+                                  <Input
+                                    placeholder="e.g., @copenhagensales.dk"
+                                    value={filter.value}
+                                    onChange={(e) => {
+                                      const updated = [...formData.dataFilters];
+                                      updated[index] = { ...filter, value: e.target.value };
+                                      setFormData({ ...formData, dataFilters: updated });
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          
+                          {formData.dataFilters.length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-2">
+                              No filters. All leads will be processed.
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </>
                   )}
@@ -1239,6 +1360,7 @@ export function DialerIntegrations() {
                                 productDefaultName: extractionConfig?.defaultName || "",
                                 productValidationKey: extractionConfig?.validationKey || "",
                                 conditionalRules: extractionConfig?.conditionalRules || [],
+                                dataFilters: extractionConfig?.dataFilters || [],
                               });
                               setIsDialogOpen(true);
                             }}

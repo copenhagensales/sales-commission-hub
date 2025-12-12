@@ -1,5 +1,5 @@
 import { DialerAdapter } from "./interface.ts";
-import { StandardSale, StandardUser, StandardCampaign, StandardProduct, StandardCall, CampaignMappingConfig, ReferenceExtractionConfig, DialerIntegrationConfig, ConditionalExtractionRule } from "../types.ts";
+import { StandardSale, StandardUser, StandardCampaign, StandardProduct, StandardCall, CampaignMappingConfig, ReferenceExtractionConfig, DialerIntegrationConfig, ConditionalExtractionRule, DataFilterRule } from "../types.ts";
 
 interface EnreachCredentials {
   username?: string;
@@ -121,13 +121,21 @@ export class EnreachAdapter implements DialerAdapter {
 
       // FILTRO INTERNO: Solo procesamos leads que explícitamente tengan closure="Success"
       // Ignoramos el status (UserProcessed) para ser más flexibles, pero el closure es mandatorio.
-      const filteredLeads = allLeads.filter((lead) => {
+      let filteredLeads = allLeads.filter((lead) => {
         const closure = this.getStr(lead, ['closure', 'Closure']);
         // HeroBase a veces usa 'Success' y a veces 'success', normalizamos a minúsculas para comparar
         return closure && closure.toLowerCase() === 'success';
       });
 
-      console.log(`[EnreachAdapter] Filtered ${allLeads.length} raw leads down to ${filteredLeads.length} valid sales`);
+      console.log(`[EnreachAdapter] Filtered ${allLeads.length} raw leads down to ${filteredLeads.length} valid sales (closure=Success)`);
+
+      // Apply data filters if configured
+      const dataFilters = this.config?.productExtraction?.dataFilters;
+      if (dataFilters && dataFilters.length > 0) {
+        const beforeCount = filteredLeads.length;
+        filteredLeads = filteredLeads.filter((lead) => this.passesDataFilters(lead, dataFilters));
+        console.log(`[EnreachAdapter] Data filters applied: ${beforeCount} -> ${filteredLeads.length} leads`);
+      }
 
       const mappingLookup = new Map<string, CampaignMappingConfig>();
       if (campaignMappings) {
@@ -451,6 +459,71 @@ export class EnreachAdapter implements DialerAdapter {
         }
     }
     return null;
+  }
+
+  // Get nested value using dot notation (e.g., "lastModifiedByUser.orgCode")
+  private getNestedValue(obj: unknown, path: string): unknown {
+    const parts = path.split('.');
+    let current: unknown = obj;
+    
+    for (const part of parts) {
+      if (current === null || current === undefined || typeof current !== 'object') {
+        return undefined;
+      }
+      current = (current as Record<string, unknown>)[part];
+    }
+    
+    return current;
+  }
+
+  // Check if a lead passes all configured data filters
+  private passesDataFilters(lead: HeroBaseLead, filters: DataFilterRule[]): boolean {
+    for (const filter of filters) {
+      const fieldValue = this.getNestedValue(lead, filter.field);
+      const strValue = fieldValue !== undefined && fieldValue !== null ? String(fieldValue) : '';
+      const filterValue = filter.value;
+      
+      let passes = false;
+      
+      switch (filter.operator) {
+        case 'equals':
+          passes = strValue.toLowerCase() === filterValue.toLowerCase();
+          break;
+        case 'notEquals':
+          passes = strValue.toLowerCase() !== filterValue.toLowerCase();
+          break;
+        case 'contains':
+          passes = strValue.toLowerCase().includes(filterValue.toLowerCase());
+          break;
+        case 'notContains':
+          passes = !strValue.toLowerCase().includes(filterValue.toLowerCase());
+          break;
+        case 'startsWith':
+          passes = strValue.toLowerCase().startsWith(filterValue.toLowerCase());
+          break;
+        case 'endsWith':
+          passes = strValue.toLowerCase().endsWith(filterValue.toLowerCase());
+          break;
+        case 'regex':
+          try {
+            const regex = new RegExp(filterValue, 'i');
+            passes = regex.test(strValue);
+          } catch (e) {
+            console.error(`[EnreachAdapter] Invalid regex filter: ${filterValue}`, e);
+            passes = false;
+          }
+          break;
+        default:
+          passes = true;
+      }
+      
+      if (!passes) {
+        console.log(`[EnreachAdapter] Lead filtered out: ${filter.field}="${strValue}" failed ${filter.operator} "${filterValue}"`);
+        return false;
+      }
+    }
+    
+    return true;
   }
 
   async fetchUsers(): Promise<StandardUser[]> { return []; }
