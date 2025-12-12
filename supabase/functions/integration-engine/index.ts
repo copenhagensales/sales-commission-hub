@@ -293,13 +293,14 @@ serve(async (req) => {
           // Pass the integration name as the dialer name
           dialerAdapter = new AdversusAdapter(credentials, integration.name);
         } else if (integration.provider === "enreach" || source === "enreach") {
-          // Pass the integration name as the dialer name and api_url from the integration record
+          // Pass the integration name as the dialer name, api_url from the integration record, and config
           const enreachCredentials = {
             ...credentials,
             api_url: integration.api_url, // Include the api_url from the integration record
           };
           console.log(`[Integration Engine] Enreach api_url from DB: ${integration.api_url}`);
-          dialerAdapter = new EnreachAdapter(enreachCredentials, integration.name);
+          console.log(`[Integration Engine] Enreach config from DB:`, JSON.stringify(integration.config || 'not set'));
+          dialerAdapter = new EnreachAdapter(enreachCredentials, integration.name, integration.config);
         } else {
           throw new Error(`Fuente no soportada: ${source || integration.provider}`);
         }

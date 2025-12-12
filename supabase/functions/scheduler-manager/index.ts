@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
 
     // ============ DIALER INTEGRATIONS ============
     if (action === "save_dialer") {
-      const { integration_id, name, provider, credentials, api_url } = body;
+      const { integration_id, name, provider, credentials, api_url, config } = body;
 
       if (!integration_id && (!name || !provider || !credentials?.username || !credentials?.password)) {
         return new Response(
@@ -55,6 +55,7 @@ Deno.serve(async (req) => {
             name,
             provider,
             api_url: api_url || null,
+            config: config || null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", integration_id);
@@ -96,6 +97,7 @@ Deno.serve(async (req) => {
               name,
               provider,
               api_url: api_url || null,
+              config: config || null,
               encrypted_credentials: credentialsJson || "{}",
             })
             .select("id")
@@ -110,17 +112,20 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Always update api_url after RPC creation since RPC doesn't support api_url param
+        // Always update api_url and config after RPC creation since RPC doesn't support these params
         if (data) {
           const { error: updateApiUrlError } = await supabase
             .from("dialer_integrations")
-            .update({ api_url: api_url || null })
+            .update({ 
+              api_url: api_url || null,
+              config: config || null,
+            })
             .eq("id", data);
           
           if (updateApiUrlError) {
-            console.error(`[scheduler-manager] Failed to update api_url for ${data}:`, updateApiUrlError);
+            console.error(`[scheduler-manager] Failed to update api_url/config for ${data}:`, updateApiUrlError);
           } else {
-            console.log(`[scheduler-manager] Updated api_url to: ${api_url || 'null'} for ${data}`);
+            console.log(`[scheduler-manager] Updated api_url to: ${api_url || 'null'}, config set for ${data}`);
           }
         }
 

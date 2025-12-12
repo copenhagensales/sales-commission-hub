@@ -1,5 +1,5 @@
 import { DialerAdapter } from "./interface.ts";
-import { StandardSale, StandardUser, StandardCampaign, StandardProduct, StandardCall, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";
+import { StandardSale, StandardUser, StandardCampaign, StandardProduct, StandardCall, CampaignMappingConfig, ReferenceExtractionConfig, ProductExtractionConfig, DialerIntegrationConfig } from "../types.ts";
 
 interface EnreachCredentials {
   username?: string;
@@ -32,8 +32,9 @@ export class EnreachAdapter implements DialerAdapter {
   private dialerName: string;
   private orgCode: string | null;
   private username: string | null;
+  private config: DialerIntegrationConfig | null;
 
-  constructor(credentials: EnreachCredentials, dialerName?: string) {
+  constructor(credentials: EnreachCredentials, dialerName?: string, config?: DialerIntegrationConfig | null) {
     // Default to wshero01.herobase.com/api if not provided
     const providedUrl = credentials.api_url || "https://wshero01.herobase.com/api";
     // Ensure no trailing slash
@@ -46,7 +47,9 @@ export class EnreachAdapter implements DialerAdapter {
     this.dialerName = dialerName || "Enreach";
     this.orgCode = credentials.org_code || null;
     this.username = credentials.username || null;
+    this.config = config || null;
     console.log(`[EnreachAdapter] Base URL: ${this.baseUrl}, Dialer: ${this.dialerName}, OrgCode from config: ${this.orgCode || 'not set'}`);
+    console.log(`[EnreachAdapter] Product extraction config:`, JSON.stringify(this.config?.productExtraction || 'not set'));
     
     // Determine auth method: Basic (username/password) or Bearer (api_token)
     let authHeader: string;
@@ -338,32 +341,8 @@ export class EnreachAdapter implements DialerAdapter {
           externalReference = this.searchForOppInVariables(allVariables as Record<string, unknown>);
         }
 
-        // Products - not typically present in HeroBase simpleleads, create from campaign
-        const productsArray = (lead.Products || lead.products || lead.Items || lead.items || []) as unknown[];
-        let products: StandardProduct[] = [];
-        
-        if (Array.isArray(productsArray) && productsArray.length > 0) {
-          products = productsArray.map((p) => {
-            const prod = p as Record<string, unknown>;
-            return {
-              name: this.getStr(prod, ['name', 'Name', 'ProductName', 'productName', 'Title', 'title'], "Unknown Product"),
-              externalId: this.getStr(prod, ['uniqueId', 'UniqueId', 'Id', 'id', 'ProductId', 'productId'], "unknown"),
-              quantity: Number(this.getValue(prod, ['quantity', 'Quantity', 'Qty', 'qty']) || 1),
-              unitPrice: Number(this.getValue(prod, ['price', 'Price', 'UnitPrice', 'unitPrice', 'Amount', 'amount']) || 0),
-            };
-          });
-        }
-
-        if (products.length === 0) {
-          // Create product from campaign info
-          const productTitle = campaignCode || campaignId || "Unknown Product";
-          products.push({
-            name: productTitle,
-            externalId: campaignId || "unknown",
-            quantity: 1,
-            unitPrice: 0,
-          });
-        }
+        // Products - extract based on configured strategy
+        let products: StandardProduct[] = this.extractProducts(lead, dataObj, campaignId, campaignCode);
 
         // Owner org unit - for metadata
         const ownerOrgUnit = (lead.ownerOrgUnit || lead.OwnerOrgUnit) as Record<string, unknown> | undefined;
@@ -482,6 +461,127 @@ export class EnreachAdapter implements DialerAdapter {
     }
 
     return null;
+  }
+
+  /**
+   * Extract products based on configured strategy
+   */
+  private extractProducts(
+    lead: HeroBaseLead,
+    dataObj: Record<string, unknown> | undefined,
+    campaignId: string,
+    campaignCode: string
+  ): StandardProduct[] {
+    const products: StandardProduct[] = [];
+    const extractionConfig = this.config?.productExtraction;
+    
+    // First check if lead has explicit products array
+    const productsArray = (lead.Products || lead.products || lead.Items || lead.items || []) as unknown[];
+    if (Array.isArray(productsArray) && productsArray.length > 0) {
+      for (const p of productsArray) {
+        const prod = p as Record<string, unknown>;
+        products.push({
+          name: this.getStr(prod, ['name', 'Name', 'ProductName', 'productName', 'Title', 'title'], "Unknown Product"),
+          externalId: this.getStr(prod, ['uniqueId', 'UniqueId', 'Id', 'id', 'ProductId', 'productId'], "unknown"),
+          quantity: Number(this.getValue(prod, ['quantity', 'Quantity', 'Qty', 'qty']) || 1),
+          unitPrice: Number(this.getValue(prod, ['price', 'Price', 'UnitPrice', 'unitPrice', 'Amount', 'amount']) || 0),
+        });
+      }
+      return products;
+    }
+
+    // Apply extraction strategy based on config
+    const strategy = extractionConfig?.strategy || 'standard_closure';
+    
+    switch (strategy) {
+      case 'data_keys_regex': {
+        // Regex pattern to extract product name and price from data object keys
+        // Example: "Fri tale - 20 GB (5G) + 20 GB EU - 99 kr. (binding i 6 mdr.)" -> name="Fri tale - 20 GB", price=99
+        if (dataObj && extractionConfig?.regexPattern) {
+          try {
+            const regex = new RegExp(extractionConfig.regexPattern);
+            for (const [key, value] of Object.entries(dataObj)) {
+              const match = key.match(regex);
+              if (match) {
+                // match[1] = product name, match[2] = price (optional)
+                const productName = match[1]?.trim() || key;
+                const priceStr = match[2]?.replace(',', '.') || '0';
+                const price = parseFloat(priceStr) || 0;
+                
+                products.push({
+                  name: productName,
+                  externalId: key,
+                  quantity: 1,
+                  unitPrice: price,
+                  metadata: { url: typeof value === 'string' ? value : undefined },
+                });
+                
+                // Log first few matches
+                if (products.length <= 3) {
+                  console.log(`[EnreachAdapter] Regex extracted product: "${productName}" at ${price} kr from key: "${key.substring(0, 50)}..."`);
+                }
+              }
+            }
+          } catch (regexError) {
+            console.error(`[EnreachAdapter] Invalid regex pattern: ${extractionConfig.regexPattern}`, regexError);
+          }
+        }
+        break;
+      }
+      
+      case 'specific_fields': {
+        // Look for specific field names in the data object
+        if (dataObj && extractionConfig?.targetKeys?.length) {
+          for (const targetKey of extractionConfig.targetKeys) {
+            const value = this.getValue(dataObj, [targetKey, targetKey.toLowerCase(), targetKey.toUpperCase()]);
+            if (value !== null && value !== undefined && value !== '') {
+              products.push({
+                name: String(value),
+                externalId: targetKey,
+                quantity: 1,
+                unitPrice: 0,
+              });
+              console.log(`[EnreachAdapter] Extracted product from field ${targetKey}: "${String(value).substring(0, 50)}"`);
+            }
+          }
+        }
+        break;
+      }
+      
+      case 'standard_closure':
+      default: {
+        // Check closureData if available (standard Enreach/HeroBase pattern)
+        const closureData = (lead.closureData || lead.ClosureData) as unknown[];
+        if (Array.isArray(closureData) && closureData.length > 0) {
+          for (const item of closureData) {
+            const closure = item as Record<string, unknown>;
+            const productName = this.getStr(closure, ['name', 'Name', 'product', 'Product', 'value', 'Value']);
+            if (productName) {
+              products.push({
+                name: productName,
+                externalId: this.getStr(closure, ['id', 'Id', 'key', 'Key']) || productName,
+                quantity: Number(this.getValue(closure, ['quantity', 'Quantity', 'count', 'Count']) || 1),
+                unitPrice: Number(this.getValue(closure, ['price', 'Price', 'amount', 'Amount']) || 0),
+              });
+            }
+          }
+        }
+        break;
+      }
+    }
+    
+    // Fallback: create product from campaign info if nothing found
+    if (products.length === 0) {
+      const defaultName = extractionConfig?.defaultName || campaignCode || campaignId || "Unknown Product";
+      products.push({
+        name: defaultName,
+        externalId: campaignId || "unknown",
+        quantity: 1,
+        unitPrice: 0,
+      });
+    }
+    
+    return products;
   }
 
   async fetchResultData(resultId: string): Promise<Record<string, unknown>> {

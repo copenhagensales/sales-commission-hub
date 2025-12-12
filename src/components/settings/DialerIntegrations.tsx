@@ -16,6 +16,17 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 
+interface ProductExtractionConfig {
+  strategy: 'standard_closure' | 'data_keys_regex' | 'specific_fields';
+  regexPattern?: string;
+  targetKeys?: string[];
+  defaultName?: string;
+}
+
+interface DialerIntegrationConfig {
+  productExtraction?: ProductExtractionConfig;
+}
+
 interface DialerIntegration {
   id: string;
   name: string;
@@ -24,6 +35,7 @@ interface DialerIntegration {
   is_active: boolean;
   last_sync_at: string | null;
   sync_frequency_minutes: number | null;
+  config: DialerIntegrationConfig | null;
 }
 
 interface FormData {
@@ -33,6 +45,11 @@ interface FormData {
   password: string;
   api_url: string;
   org_code: string;
+  // Product extraction config
+  productExtractionStrategy: 'standard_closure' | 'data_keys_regex' | 'specific_fields';
+  productRegexPattern: string;
+  productTargetKeys: string;
+  productDefaultName: string;
 }
 
 const ADVERSUS_WEBHOOK_EVENTS = [
@@ -71,6 +88,10 @@ export function DialerIntegrations() {
     password: "",
     api_url: "",
     org_code: "",
+    productExtractionStrategy: "standard_closure",
+    productRegexPattern: "",
+    productTargetKeys: "",
+    productDefaultName: "",
   });
 
   // Per-integration sync days state
@@ -133,7 +154,7 @@ export function DialerIntegrations() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("dialer_integrations")
-        .select("id, name, provider, api_url, is_active, last_sync_at, sync_frequency_minutes")
+        .select("id, name, provider, api_url, config, is_active, last_sync_at, sync_frequency_minutes")
         .order("name");
 
       if (error) throw error;
@@ -191,6 +212,24 @@ export function DialerIntegrations() {
       // For Enreach, org_code is the same as username
       const orgCode = data.provider === 'enreach' ? data.username : (data.org_code || null);
       
+      // Build product extraction config
+      const productExtraction: ProductExtractionConfig = {
+        strategy: data.productExtractionStrategy,
+      };
+      if (data.productExtractionStrategy === 'data_keys_regex' && data.productRegexPattern) {
+        productExtraction.regexPattern = data.productRegexPattern;
+      }
+      if (data.productExtractionStrategy === 'specific_fields' && data.productTargetKeys) {
+        productExtraction.targetKeys = data.productTargetKeys.split(',').map(k => k.trim()).filter(Boolean);
+      }
+      if (data.productDefaultName) {
+        productExtraction.defaultName = data.productDefaultName;
+      }
+      
+      const config: DialerIntegrationConfig = {
+        productExtraction,
+      };
+      
       const { data: result, error } = await supabase.functions.invoke("scheduler-manager", {
         body: {
           action: "save_dialer",
@@ -198,6 +237,7 @@ export function DialerIntegrations() {
           name: data.name,
           provider: data.provider,
           api_url: data.api_url || null,
+          config,
           credentials: {
             username: data.username,
             password: data.password,
@@ -300,7 +340,18 @@ export function DialerIntegrations() {
   });
 
   const resetForm = () => {
-    setFormData({ name: "", provider: "adversus", username: "", password: "", api_url: "", org_code: "" });
+    setFormData({ 
+      name: "", 
+      provider: "adversus", 
+      username: "", 
+      password: "", 
+      api_url: "", 
+      org_code: "",
+      productExtractionStrategy: "standard_closure",
+      productRegexPattern: "",
+      productTargetKeys: "",
+      productDefaultName: "",
+    });
     setEditingId(null);
     setIsDialogOpen(false);
   };
@@ -693,6 +744,72 @@ export function DialerIntegrations() {
                       <p className="text-xs text-muted-foreground">Lad felterne være tomme for at beholde eksisterende credentials.</p>
                     )}
                   </div>
+                  
+                  {/* Product Extraction Configuration - Only for Enreach */}
+                  {formData.provider === 'enreach' && (
+                    <>
+                      <Separator className="my-2" />
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Konfiguration af produktudtræk</Label>
+                        
+                        <div className="grid gap-2">
+                          <Label htmlFor="productExtractionStrategy">Strategi</Label>
+                          <Select
+                            value={formData.productExtractionStrategy}
+                            onValueChange={(value: 'standard_closure' | 'data_keys_regex' | 'specific_fields') => 
+                              setFormData({ ...formData, productExtractionStrategy: value })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="standard_closure">Standard (closureData)</SelectItem>
+                              <SelectItem value="data_keys_regex">Regex på keys (data objekt)</SelectItem>
+                              <SelectItem value="specific_fields">Specifikke felter</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {formData.productExtractionStrategy === 'data_keys_regex' && (
+                          <div className="grid gap-2">
+                            <Label htmlFor="productRegexPattern">Regex mønster</Label>
+                            <Input
+                              id="productRegexPattern"
+                              placeholder="^(.*?)\s*-\s*(\d+(?:[.,]\d+)?)\s*kr\."
+                              value={formData.productRegexPattern}
+                              onChange={(e) => setFormData({ ...formData, productRegexPattern: e.target.value })}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Gruppe 1 = produktnavn, Gruppe 2 = pris (valgfri)
+                            </p>
+                          </div>
+                        )}
+                        
+                        {formData.productExtractionStrategy === 'specific_fields' && (
+                          <div className="grid gap-2">
+                            <Label htmlFor="productTargetKeys">Målfelter (kommasepareret)</Label>
+                            <Input
+                              id="productTargetKeys"
+                              placeholder="Abonnement1, Produkt, Kampagne_rapportering"
+                              value={formData.productTargetKeys}
+                              onChange={(e) => setFormData({ ...formData, productTargetKeys: e.target.value })}
+                            />
+                          </div>
+                        )}
+                        
+                        <div className="grid gap-2">
+                          <Label htmlFor="productDefaultName">Standardnavn (fallback)</Label>
+                          <Input
+                            id="productDefaultName"
+                            placeholder="Ukendt produkt"
+                            value={formData.productDefaultName}
+                            onChange={(e) => setFormData({ ...formData, productDefaultName: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={resetForm}>
@@ -903,6 +1020,7 @@ export function DialerIntegrations() {
                             size="sm"
                             onClick={() => {
                               setEditingId(integration.id);
+                              const extractionConfig = integration.config?.productExtraction;
                               setFormData({
                                 name: integration.name,
                                 provider: integration.provider,
@@ -910,6 +1028,10 @@ export function DialerIntegrations() {
                                 password: "",
                                 api_url: integration.api_url || "",
                                 org_code: "",
+                                productExtractionStrategy: extractionConfig?.strategy || "standard_closure",
+                                productRegexPattern: extractionConfig?.regexPattern || "",
+                                productTargetKeys: extractionConfig?.targetKeys?.join(", ") || "",
+                                productDefaultName: extractionConfig?.defaultName || "",
                               });
                               setIsDialogOpen(true);
                             }}
