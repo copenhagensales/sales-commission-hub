@@ -119,14 +119,15 @@ export class EnreachAdapter implements DialerAdapter {
 
       console.log(`[EnreachAdapter] Fetched ${allLeads.length} raw leads from API`);
 
-      // FILTRO INTERNO: Solo procesamos leads con status=UserProcessed Y closure=Success
+      // FILTRO INTERNO: Solo procesamos leads que explícitamente tengan closure="Success"
+      // Ignoramos el status (UserProcessed) para ser más flexibles, pero el closure es mandatorio.
       const filteredLeads = allLeads.filter((lead) => {
-        const status = this.getStr(lead, ['status', 'Status']);
         const closure = this.getStr(lead, ['closure', 'Closure']);
-        return status === 'UserProcessed' && closure === 'Success';
+        // HeroBase a veces usa 'Success' y a veces 'success', normalizamos a minúsculas para comparar
+        return closure && closure.toLowerCase() === 'success';
       });
 
-      console.log(`[EnreachAdapter] After internal filter (UserProcessed + Success): ${filteredLeads.length} sales`);
+      console.log(`[EnreachAdapter] Filtered ${allLeads.length} raw leads down to ${filteredLeads.length} valid sales`);
 
       const mappingLookup = new Map<string, CampaignMappingConfig>();
       if (campaignMappings) {
