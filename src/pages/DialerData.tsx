@@ -1,18 +1,19 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle, AlertTriangle, Database, RefreshCw, ChevronLeft, ChevronRight, CalendarIcon, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
-import { da } from "date-fns/locale";
+import { da, enUS } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -37,6 +38,9 @@ type SortColumn = "integration_type" | "source" | "adversus_external_id" | "agen
 type SortDirection = "asc" | "desc";
 
 export default function DialerData() {
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === "da" ? da : enUS;
+  
   const [activeTab, setActiveTab] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
@@ -226,12 +230,12 @@ export default function DialerData() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Dialer Data Overview</h1>
-            <p className="text-muted-foreground">Oversigt over salgsdata fra alle dialer-kilder</p>
+            <h1 className="text-2xl font-bold text-foreground">{t("dialerData.title")}</h1>
+            <p className="text-muted-foreground">{t("dialerData.subtitle")}</p>
           </div>
           <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            Opdater
+            {t("dialerData.refresh")}
           </Button>
         </div>
 
@@ -239,7 +243,7 @@ export default function DialerData() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Salg</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("dialerData.totalSales")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats?.total || 0}</div>
@@ -267,7 +271,7 @@ export default function DialerData() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">OPP Status</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("dialerData.oppStatus")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-4">
@@ -288,7 +292,7 @@ export default function DialerData() {
         <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setPage(0); setSourceFilter("all"); }}>
 
           <TabsList>
-            <TabsTrigger value="all">Alle ({stats?.total || 0})</TabsTrigger>
+            <TabsTrigger value="all">{t("dialerData.all")} ({stats?.total || 0})</TabsTrigger>
             <TabsTrigger value="adversus" className="gap-2">
               <Badge className="bg-blue-600 text-xs">Adversus</Badge>
               {stats?.adversus || 0}
@@ -306,14 +310,14 @@ export default function DialerData() {
                 <div className="flex flex-col md:flex-row md:items-center gap-4">
                   <CardTitle className="flex items-center gap-2">
                     <Database className="h-5 w-5" />
-                    Salgsdata
+                    {t("dialerData.salesData")}
                   </CardTitle>
                   <div className="flex flex-wrap items-center gap-2 ml-auto">
                     {/* Date Presets */}
                     <div className="flex gap-1">
-                      <Button variant="outline" size="sm" onClick={() => handleDatePreset(7)}>7 dage</Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDatePreset(30)}>30 dage</Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDatePreset(90)}>90 dage</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDatePreset(7)}>{t("dialerData.days7")}</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDatePreset(30)}>{t("dialerData.days30")}</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDatePreset(90)}>{t("dialerData.days90")}</Button>
                     </div>
 
                     {/* Date From */}
@@ -321,11 +325,11 @@ export default function DialerData() {
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="w-[130px] justify-start text-left font-normal">
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Fra"}
+                          {dateFrom ? format(dateFrom, "dd/MM/yyyy") : t("dialerData.from")}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0">
-                        <Calendar mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); setPage(0); }} />
+                        <Calendar mode="single" selected={dateFrom} onSelect={(d) => { setDateFrom(d); setPage(0); }} locale={dateLocale} />
                       </PopoverContent>
                     </Popover>
 
@@ -334,21 +338,21 @@ export default function DialerData() {
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="w-[130px] justify-start text-left font-normal">
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateTo ? format(dateTo, "dd/MM/yyyy") : "Til"}
+                          {dateTo ? format(dateTo, "dd/MM/yyyy") : t("dialerData.to")}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0">
-                        <Calendar mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); setPage(0); }} />
+                        <Calendar mode="single" selected={dateTo} onSelect={(d) => { setDateTo(d); setPage(0); }} locale={dateLocale} />
                       </PopoverContent>
                     </Popover>
 
                     {/* Dialer Filter */}
                     <Select value={sourceFilter} onValueChange={(v) => { setSourceFilter(v); setPage(0); }}>
                       <SelectTrigger className="w-[150px]">
-                        <SelectValue placeholder="Dialer" />
+                        <SelectValue placeholder={t("dialerData.dialer")} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Alle dialere</SelectItem>
+                        <SelectItem value="all">{t("dialerData.allDialers")}</SelectItem>
                         {dialerNames?.map((name) => (
                           <SelectItem key={name} value={name}>{name}</SelectItem>
                         ))}
@@ -359,7 +363,7 @@ export default function DialerData() {
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Søg ID, agent, kunde..."
+                    placeholder={t("dialerData.searchPlaceholder")}
                     className="pl-9 w-[200px]"
                     value={searchTerm}
                     onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
@@ -372,7 +376,7 @@ export default function DialerData() {
             {isLoading ? (
               <div className="flex items-center justify-center py-8 text-muted-foreground">
                 <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
-                Indlæser...
+                {t("dialerData.loading")}
               </div>
             ) : (
               <>
@@ -381,31 +385,31 @@ export default function DialerData() {
                         <TableHeader>
                           <TableRow>
                             <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("integration_type")}>
-                              <div className="flex items-center">Integration<SortIcon column="integration_type" /></div>
+                              <div className="flex items-center">{t("dialerData.integration")}<SortIcon column="integration_type" /></div>
                             </TableHead>
                             <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("source")}>
-                              <div className="flex items-center">Dialer<SortIcon column="source" /></div>
+                              <div className="flex items-center">{t("dialerData.dialer")}<SortIcon column="source" /></div>
                             </TableHead>
                             <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("campaign_name")}>
-                              <div className="flex items-center">Kampagne<SortIcon column="campaign_name" /></div>
+                              <div className="flex items-center">{t("dialerData.campaign")}<SortIcon column="campaign_name" /></div>
                             </TableHead>
                             <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("adversus_external_id")}>
-                              <div className="flex items-center">Dialer ID<SortIcon column="adversus_external_id" /></div>
+                              <div className="flex items-center">{t("dialerData.dialerId")}<SortIcon column="adversus_external_id" /></div>
                             </TableHead>
                             <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("agent_name")}>
-                              <div className="flex items-center">Agent<SortIcon column="agent_name" /></div>
+                              <div className="flex items-center">{t("dialerData.agent")}<SortIcon column="agent_name" /></div>
                             </TableHead>
                             <TableHead>
-                              <div className="flex items-center">Email</div>
+                              <div className="flex items-center">{t("dialerData.email")}</div>
                             </TableHead>
                             <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("customer_company")}>
-                              <div className="flex items-center">Kunde<SortIcon column="customer_company" /></div>
+                              <div className="flex items-center">{t("dialerData.customer")}<SortIcon column="customer_company" /></div>
                             </TableHead>
                             <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("sale_datetime")}>
-                              <div className="flex items-center">Tidspunkt<SortIcon column="sale_datetime" /></div>
+                              <div className="flex items-center">{t("dialerData.timestamp")}<SortIcon column="sale_datetime" /></div>
                             </TableHead>
                             <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("adversus_opp_number")}>
-                              <div className="flex items-center">OPP Status<SortIcon column="adversus_opp_number" /></div>
+                              <div className="flex items-center">{t("dialerData.oppStatus")}<SortIcon column="adversus_opp_number" /></div>
                             </TableHead>
                           </TableRow>
                         </TableHeader>
@@ -427,12 +431,12 @@ export default function DialerData() {
                               <TableCell className="max-w-[150px] truncate">{sale.customer_company || "-"}</TableCell>
                               <TableCell>
                                 {sale.sale_datetime
-                                  ? format(new Date(sale.sale_datetime), "dd. MMM yyyy HH:mm", { locale: da })
+                                  ? format(new Date(sale.sale_datetime), "dd. MMM yyyy HH:mm", { locale: dateLocale })
                                   : "-"}
                               </TableCell>
                               <TableCell>
                                 {sale.integration_type === "enreach" ? (
-                                  <Badge variant="secondary" className="text-xs">Ej relevant</Badge>
+                                  <Badge variant="secondary" className="text-xs">{t("dialerData.notRelevant")}</Badge>
                                 ) : sale.adversus_opp_number ? (
                                   <div className="flex items-center gap-2 text-green-500">
                                     <CheckCircle className="h-4 w-4" />
@@ -441,7 +445,7 @@ export default function DialerData() {
                                 ) : (
                                   <div className="flex items-center gap-1 text-yellow-500">
                                     <AlertTriangle className="h-4 w-4" />
-                                    <span className="text-xs">Mangler</span>
+                                    <span className="text-xs">{t("dialerData.missing")}</span>
                                   </div>
                                 )}
                               </TableCell>
@@ -450,7 +454,7 @@ export default function DialerData() {
                           {sales.length === 0 && (
                             <TableRow>
                               <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                                Ingen salg fundet
+                                {t("dialerData.noSalesFound")}
                               </TableCell>
                             </TableRow>
                           )}
@@ -461,7 +465,7 @@ export default function DialerData() {
                     {/* Pagination */}
                     <div className="flex items-center justify-between mt-4">
                       <p className="text-sm text-muted-foreground">
-                        Viser {sales.length} af {totalCount} salg
+                        {t("dialerData.showingOf", { count: sales.length, total: totalCount })}
                       </p>
                       <div className="flex items-center gap-2">
                         <Button
@@ -471,10 +475,10 @@ export default function DialerData() {
                           disabled={page === 0}
                         >
                           <ChevronLeft className="h-4 w-4" />
-                          Forrige
+                          {t("dialerData.previous")}
                         </Button>
                         <span className="text-sm text-muted-foreground">
-                          Side {page + 1} af {Math.max(1, totalPages)}
+                          {t("dialerData.pageOf", { page: page + 1, totalPages: Math.max(1, totalPages) })}
                         </span>
                         <Button
                           variant="outline"
@@ -482,7 +486,7 @@ export default function DialerData() {
                           onClick={() => setPage(p => p + 1)}
                           disabled={page >= totalPages - 1}
                         >
-                          Næste
+                          {t("dialerData.next")}
                           <ChevronRight className="h-4 w-4" />
                         </Button>
                       </div>
@@ -499,75 +503,78 @@ export default function DialerData() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
-                Salgsdetaljer
+                {t("dialerData.saleDetails")}
                 {selectedSale && getIntegrationBadge(selectedSale.integration_type)}
               </DialogTitle>
+              <DialogDescription>
+                {selectedSale?.adversus_external_id || ""}
+              </DialogDescription>
             </DialogHeader>
             {selectedSale && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-muted-foreground">Dialer ID:</span>
+                    <span className="text-muted-foreground">{t("dialerData.dialerId")}:</span>
                     <p className="font-mono">{selectedSale.adversus_external_id || "-"}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Agent:</span>
+                    <span className="text-muted-foreground">{t("dialerData.agent")}:</span>
                     <p>{selectedSale.agent_name || "-"}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Agent Email:</span>
+                    <span className="text-muted-foreground">{t("dialerData.agentEmail")}:</span>
                     <p className="text-sm">{selectedSale.agent_email || "-"}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Kunde:</span>
+                    <span className="text-muted-foreground">{t("dialerData.customer")}:</span>
                     <p>{selectedSale.customer_company || "-"}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Telefon:</span>
+                    <span className="text-muted-foreground">{t("dialerData.phone")}:</span>
                     <p>{selectedSale.customer_phone || "-"}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Tidspunkt:</span>
+                    <span className="text-muted-foreground">{t("dialerData.timestamp")}:</span>
                     <p>
                       {selectedSale.sale_datetime
-                        ? format(new Date(selectedSale.sale_datetime), "dd. MMMM yyyy HH:mm:ss", { locale: da })
+                        ? format(new Date(selectedSale.sale_datetime), "dd. MMMM yyyy HH:mm:ss", { locale: dateLocale })
                         : "-"}
                     </p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">OPP Nummer:</span>
-                    <p className="font-mono">{selectedSale.adversus_opp_number || "Ikke tilgængelig"}</p>
+                    <span className="text-muted-foreground">{t("dialerData.oppNumber")}:</span>
+                    <p className="font-mono">{selectedSale.adversus_opp_number || t("dialerData.notAvailable")}</p>
                   </div>
                 </div>
 
                 {/* Products */}
                 <div>
-                  <h4 className="font-medium mb-2">Produkter</h4>
+                  <h4 className="font-medium mb-2">{t("dialerData.products")}</h4>
                   {saleItems && saleItems.length > 0 ? (
                     <div className="rounded-md border">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Produkt</TableHead>
-                            <TableHead className="text-right">Antal</TableHead>
-                            <TableHead className="text-right">Provision</TableHead>
-                            <TableHead>Mapping</TableHead>
+                            <TableHead>{t("dialerData.product")}</TableHead>
+                            <TableHead className="text-right">{t("dialerData.quantity")}</TableHead>
+                            <TableHead className="text-right">{t("dialerData.commission")}</TableHead>
+                            <TableHead>{t("dialerData.mapping")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {saleItems.map((item) => (
                             <TableRow key={item.id}>
-                              <TableCell>{item.adversus_product_title || "Ukendt produkt"}</TableCell>
+                              <TableCell>{item.adversus_product_title || t("dialerData.unknownProduct")}</TableCell>
                               <TableCell className="text-right">{item.quantity}</TableCell>
                               <TableCell className="text-right">{item.mapped_commission} DKK</TableCell>
                               <TableCell>
                                 {item.needs_mapping ? (
                                   <Badge variant="outline" className="text-yellow-600 border-yellow-600">
-                                    Mangler mapping
+                                    {t("dialerData.needsMapping")}
                                   </Badge>
                                 ) : (
                                   <Badge variant="outline" className="text-green-600 border-green-600">
-                                    Mappet
+                                    {t("dialerData.mapped")}
                                   </Badge>
                                 )}
                               </TableCell>
@@ -577,7 +584,7 @@ export default function DialerData() {
                       </Table>
                     </div>
                   ) : (
-                    <p className="text-muted-foreground text-sm">Ingen produkter registreret</p>
+                    <p className="text-muted-foreground text-sm">{t("dialerData.noProducts")}</p>
                   )}
                 </div>
               </div>
