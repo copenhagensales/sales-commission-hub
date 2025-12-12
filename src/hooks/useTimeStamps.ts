@@ -37,6 +37,9 @@ export function parseWorkingHours(timeString: string | null): { start: string; e
 }
 
 // Calculate effective clock times based on shift schedule
+// NOTE: This function calculates effective times for payroll purposes only.
+// The actual clock_in/clock_out times are ALWAYS preserved in the database.
+// Effective times are used for calculating billable/payable hours within shift boundaries.
 export function calculateEffectiveTimes(
   clockIn: Date,
   clockOut: Date | null,
@@ -44,21 +47,27 @@ export function calculateEffectiveTimes(
   shiftEnd: string,
   breakMinutes: number = 60
 ): { effectiveIn: Date; effectiveOut: Date | null; effectiveHours: number | null } {
+  // If no shift times configured, use actual clock times
+  if (!shiftStart || !shiftEnd) {
+    let effectiveHours: number | null = null;
+    if (clockOut) {
+      const diffMs = clockOut.getTime() - clockIn.getTime();
+      effectiveHours = Math.max(0, diffMs / (1000 * 60 * 60) - (breakMinutes / 60));
+    }
+    return { effectiveIn: clockIn, effectiveOut: clockOut, effectiveHours };
+  }
+
   const today = clockIn.toISOString().split("T")[0];
-  
-  // Parse shift times
-  const [startHour, startMin] = shiftStart.split(":").map(Number);
-  const [endHour, endMin] = shiftEnd.split(":").map(Number);
   
   const shiftStartTime = new Date(today + "T" + shiftStart.padStart(5, "0") + ":00");
   const shiftEndTime = new Date(today + "T" + shiftEnd.padStart(5, "0") + ":00");
   
-  // Effective clock-in: max of actual clock-in and shift start
-  // If employee clocks in before shift, use shift start time
+  // For effective times calculation (payroll):
+  // - If clocked in before shift start, count hours from shift start
+  // - If clocked out after shift end, count hours until shift end
+  // This ensures employees are paid for their scheduled shift, not extra time
   const effectiveIn = clockIn < shiftStartTime ? shiftStartTime : clockIn;
   
-  // Effective clock-out: min of actual clock-out and shift end
-  // If employee clocks out after shift, use shift end time
   let effectiveOut: Date | null = null;
   if (clockOut) {
     effectiveOut = clockOut > shiftEndTime ? shiftEndTime : clockOut;
@@ -69,7 +78,6 @@ export function calculateEffectiveTimes(
   if (effectiveOut) {
     const diffMs = effectiveOut.getTime() - effectiveIn.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
-    // Subtract break time (1 hour for hourly workers)
     effectiveHours = Math.max(0, diffHours - (breakMinutes / 60));
   }
   
