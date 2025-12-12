@@ -774,63 +774,74 @@ export default function ShiftOverview() {
         </div>
 
         {/* Weekend Time Stamps - Collapsible */}
-        {weekendTimeStamps.length > 0 && (
-          <div className="bg-card rounded-xl border border-orange-200 dark:border-orange-800 overflow-hidden shadow-sm">
-            <button
-              onClick={() => setShowWeekendStamps(!showWeekendStamps)}
-              className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900/40">
-                  <CalendarDays className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                </div>
-                <div className="text-left">
-                  <h3 className="text-sm font-semibold text-foreground">Weekend-indstemplinger</h3>
-                  <p className="text-xs text-muted-foreground">{weekendTimeStamps.length} registrering{weekendTimeStamps.length !== 1 ? 'er' : ''} i weekenden</p>
-                </div>
+        <div className="bg-card rounded-xl border border-orange-200 dark:border-orange-800 overflow-hidden shadow-sm">
+          <button
+            onClick={() => setShowWeekendStamps(!showWeekendStamps)}
+            className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900/40">
+                <CalendarDays className="h-4 w-4 text-orange-600 dark:text-orange-400" />
               </div>
-              <ChevronDown className={cn("h-5 w-5 text-muted-foreground transition-transform", showWeekendStamps && "rotate-180")} />
-            </button>
-            
-            {showWeekendStamps && (
-              <div className="border-t border-orange-200 dark:border-orange-800 divide-y divide-border/30">
-                {weekendTimeStamps.map((item) => {
-                  const clockIn = new Date(item.timeStamp.clock_in);
-                  const clockOut = item.timeStamp.clock_out ? new Date(item.timeStamp.clock_out) : null;
-                  const startTime = clockIn.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
-                  const endTime = clockOut ? clockOut.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }) : null;
-                  const hours = clockOut ? (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60) : null;
-                  
-                  return (
-                    <div key={`${item.employee.id}-${item.date.toISOString()}`} className="flex items-center justify-between p-4 hover:bg-muted/20">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-xs font-semibold text-orange-700 dark:text-orange-300">
-                          {item.employee.first_name?.charAt(0)}{item.employee.last_name?.charAt(0)}
+              <div className="text-left">
+                <h3 className="text-sm font-semibold text-foreground">Weekend (lørdag + søndag)</h3>
+                <p className="text-xs text-muted-foreground">
+                  {weekendTimeStamps.length > 0 
+                    ? `${weekendTimeStamps.length} registrering${weekendTimeStamps.length !== 1 ? 'er' : ''} i weekenden`
+                    : 'Ingen indstemplinger i weekenden'
+                  }
+                </p>
+              </div>
+            </div>
+            <ChevronDown className={cn("h-5 w-5 text-muted-foreground transition-transform", showWeekendStamps && "rotate-180")} />
+          </button>
+          
+          {showWeekendStamps && (
+            <div className="border-t border-orange-200 dark:border-orange-800">
+              {weekendTimeStamps.length > 0 ? (
+                <div className="divide-y divide-border/30">
+                  {weekendTimeStamps.map((item) => {
+                    const clockIn = new Date(item.timeStamp.clock_in);
+                    const clockOut = item.timeStamp.clock_out ? new Date(item.timeStamp.clock_out) : null;
+                    const startTime = clockIn.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+                    const endTime = clockOut ? clockOut.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }) : null;
+                    const hours = clockOut ? (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60) : null;
+                    
+                    return (
+                      <div key={`${item.employee.id}-${item.date.toISOString()}`} className="flex items-center justify-between p-4 hover:bg-muted/20">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-xs font-semibold text-orange-700 dark:text-orange-300">
+                            {item.employee.first_name?.charAt(0)}{item.employee.last_name?.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{item.employee.first_name} {item.employee.last_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(item.date, "EEEE d. MMM", { locale: da })}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">{item.employee.first_name} {item.employee.last_name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(item.date, "EEEE d. MMM", { locale: da })}
-                          </p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            {startTime}{endTime ? ` - ${endTime}` : ' (ikke udstemplet)'}
+                          </span>
+                          {hours !== null && (
+                            <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800">
+                              {hours.toFixed(1)} timer
+                            </Badge>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          {startTime}{endTime ? ` - ${endTime}` : ' (ikke udstemplet)'}
-                        </span>
-                        {hours !== null && (
-                          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800">
-                            {hours.toFixed(1)} timer
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-8 text-center text-muted-foreground text-sm">
+                  Ingen weekend-indstemplinger denne uge
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Create Shift Dialog */}
         <CreateShiftDialog
