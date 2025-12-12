@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { useTranslation } from "react-i18next";
 
 interface ProductExtractionConfig {
   strategy: 'standard_closure' | 'data_keys_regex' | 'specific_fields';
@@ -77,6 +78,7 @@ const ADVERSUS_WEBHOOK_EVENTS = [
 // The webhook payload structure is different from Enreach Contact Center webhooks
 
 export function DialerIntegrations() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -251,12 +253,12 @@ export function DialerIntegrations() {
       return result;
     },
     onSuccess: () => {
-      toast.success(editingId ? "Integration opdateret" : "Integration oprettet");
+      toast.success(editingId ? t("dialerIntegrations.integrationUpdated") : t("dialerIntegrations.integrationCreated"));
       queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
       resetForm();
     },
     onError: (error) => {
-      toast.error(`Fejl: ${error.message}`);
+      toast.error(`${t("dialerIntegrations.error")}: ${error.message}`);
     },
   });
 
@@ -271,11 +273,11 @@ export function DialerIntegrations() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Integration slettet");
+      toast.success(t("dialerIntegrations.integrationDeleted"));
       queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
     },
     onError: (error) => {
-      toast.error(`Fejl ved sletning: ${error.message}`);
+      toast.error(`${t("dialerIntegrations.deleteError")}: ${error.message}`);
     },
   });
 
@@ -658,38 +660,38 @@ export function DialerIntegrations() {
           <div>
             <CardTitle className="flex items-center gap-2">
               <Phone className="h-5 w-5" />
-              Dialer Integrationer
+              {t("dialerIntegrations.title")}
             </CardTitle>
-            <CardDescription>Administrer forbindelser til dialers som Adversus og Enreach.</CardDescription>
+            <CardDescription>{t("dialerIntegrations.description")}</CardDescription>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-1" />
-                Tilføj
+                {t("dialerIntegrations.add")}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <form onSubmit={handleSubmit}>
                 <DialogHeader>
-                  <DialogTitle>{editingId ? "Rediger" : "Tilføj"} Dialer Integration</DialogTitle>
+                  <DialogTitle>{editingId ? t("dialerIntegrations.editIntegration") : t("dialerIntegrations.addIntegration")}</DialogTitle>
                   <DialogDescription>
-                    Indtast legitimationsoplysninger for din dialer-konto.
+                    {editingId ? t("dialerIntegrations.editDescription") : t("dialerIntegrations.addDescription")}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="name">Navn</Label>
+                    <Label htmlFor="name">{t("dialerIntegrations.name")}</Label>
                     <Input
                       id="name"
-                      placeholder="f.eks. Adversus CPH Team"
+                      placeholder={t("dialerIntegrations.namePlaceholder")}
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="provider">Provider</Label>
+                    <Label htmlFor="provider">{t("dialerIntegrations.provider")}</Label>
                     <Select
                       value={formData.provider}
                       onValueChange={(value) => setFormData({ ...formData, provider: value })}
@@ -704,44 +706,44 @@ export function DialerIntegrations() {
                     </Select>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="api_url">API Base URL (Valgfri)</Label>
+                    <Label htmlFor="api_url">{t("dialerIntegrations.apiUrl")}</Label>
                     <Input
                       id="api_url"
-                      placeholder="f.eks. https://wshero01.herobase.com/api"
+                      placeholder={t("dialerIntegrations.apiUrlPlaceholder")}
                       value={formData.api_url}
                       onChange={(e) => setFormData({ ...formData, api_url: e.target.value })}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Kun nødvendig for Enreach/HeroBase. Lad stå tom for standard Adversus.
+                      {t("dialerIntegrations.apiUrlHelp")}
                     </p>
                   </div>
                   {formData.provider === 'enreach' && (
                     <p className="text-xs text-muted-foreground bg-muted p-2 rounded">
-                      OrgCode sættes automatisk til brugernavnet for Enreach integrationer.
+                      {t("dialerIntegrations.orgCodeHelp")}
                     </p>
                   )}
                   <div className="grid gap-2">
-                    <Label htmlFor="username">Brugernavn / API Key</Label>
+                    <Label htmlFor="username">{t("dialerIntegrations.username")}</Label>
                     <Input
                       id="username"
                       value={formData.username}
                       onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                      placeholder={editingId ? "(uændret hvis tom)" : ""}
+                      placeholder={editingId ? t("dialerIntegrations.unchanged") : ""}
                       required={!editingId}
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="password">Adgangskode / API Secret</Label>
+                    <Label htmlFor="password">{t("dialerIntegrations.password")}</Label>
                     <Input
                       id="password"
                       type="password"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      placeholder={editingId ? "(uændret hvis tom)" : ""}
+                      placeholder={editingId ? t("dialerIntegrations.unchanged") : ""}
                       required={!editingId}
                     />
                     {editingId && (
-                      <p className="text-xs text-muted-foreground">Lad felterne være tomme for at beholde eksisterende credentials.</p>
+                      <p className="text-xs text-muted-foreground">{t("dialerIntegrations.keepCredentials")}</p>
                     )}
                   </div>
                   
@@ -750,10 +752,10 @@ export function DialerIntegrations() {
                     <>
                       <Separator className="my-2" />
                       <div className="space-y-3">
-                        <Label className="text-sm font-medium">Konfiguration af produktudtræk</Label>
+                        <Label className="text-sm font-medium">{t("dialerIntegrations.productExtraction")}</Label>
                         
                         <div className="grid gap-2">
-                          <Label htmlFor="productExtractionStrategy">Strategi</Label>
+                          <Label htmlFor="productExtractionStrategy">{t("dialerIntegrations.strategy")}</Label>
                           <Select
                             value={formData.productExtractionStrategy}
                             onValueChange={(value: 'standard_closure' | 'data_keys_regex' | 'specific_fields') => 
@@ -764,16 +766,16 @@ export function DialerIntegrations() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="standard_closure">Standard (closureData)</SelectItem>
-                              <SelectItem value="data_keys_regex">Regex på keys (data objekt)</SelectItem>
-                              <SelectItem value="specific_fields">Specifikke felter</SelectItem>
+                              <SelectItem value="standard_closure">{t("dialerIntegrations.strategyStandard")}</SelectItem>
+                              <SelectItem value="data_keys_regex">{t("dialerIntegrations.strategyRegex")}</SelectItem>
+                              <SelectItem value="specific_fields">{t("dialerIntegrations.strategyFields")}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                         
                         {formData.productExtractionStrategy === 'data_keys_regex' && (
                           <div className="grid gap-2">
-                            <Label htmlFor="productRegexPattern">Regex mønster</Label>
+                            <Label htmlFor="productRegexPattern">{t("dialerIntegrations.regexPattern")}</Label>
                             <Input
                               id="productRegexPattern"
                               placeholder="^(.*?)\s*-\s*(\d+(?:[.,]\d+)?)\s*kr\."
@@ -781,17 +783,17 @@ export function DialerIntegrations() {
                               onChange={(e) => setFormData({ ...formData, productRegexPattern: e.target.value })}
                             />
                             <p className="text-xs text-muted-foreground">
-                              Gruppe 1 = produktnavn, Gruppe 2 = pris (valgfri)
+                              {t("dialerIntegrations.regexHelp")}
                             </p>
                           </div>
                         )}
                         
                         {formData.productExtractionStrategy === 'specific_fields' && (
                           <div className="grid gap-2">
-                            <Label htmlFor="productTargetKeys">Målfelter (kommasepareret)</Label>
+                            <Label htmlFor="productTargetKeys">{t("dialerIntegrations.targetKeys")}</Label>
                             <Input
                               id="productTargetKeys"
-                              placeholder="Abonnement1, Produkt, Kampagne_rapportering"
+                              placeholder={t("dialerIntegrations.targetKeysPlaceholder")}
                               value={formData.productTargetKeys}
                               onChange={(e) => setFormData({ ...formData, productTargetKeys: e.target.value })}
                             />
@@ -799,10 +801,10 @@ export function DialerIntegrations() {
                         )}
                         
                         <div className="grid gap-2">
-                          <Label htmlFor="productDefaultName">Standardnavn (fallback)</Label>
+                          <Label htmlFor="productDefaultName">{t("dialerIntegrations.defaultName")}</Label>
                           <Input
                             id="productDefaultName"
-                            placeholder="Ukendt produkt"
+                            placeholder={t("dialerIntegrations.defaultNamePlaceholder")}
                             value={formData.productDefaultName}
                             onChange={(e) => setFormData({ ...formData, productDefaultName: e.target.value })}
                           />
@@ -813,11 +815,11 @@ export function DialerIntegrations() {
                 </div>
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={resetForm}>
-                    Annuller
+                    {t("dialerIntegrations.cancel")}
                   </Button>
                   <Button type="submit" disabled={saveMutation.isPending}>
                     {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                    {editingId ? "Opdater" : "Opret"}
+                    {editingId ? t("dialerIntegrations.update") : t("dialerIntegrations.create")}
                   </Button>
                 </DialogFooter>
               </form>
@@ -828,29 +830,29 @@ export function DialerIntegrations() {
       <CardContent>
         <Tabs defaultValue="integrations" className="w-full">
           <TabsList className="mb-4">
-            <TabsTrigger value="integrations">Integrationer</TabsTrigger>
+            <TabsTrigger value="integrations">{t("dialerIntegrations.integrationsTab")}</TabsTrigger>
             <TabsTrigger value="calls" className="flex items-center gap-1">
               <PhoneCall className="h-4 w-4" />
-              Calls
+              {t("dialerIntegrations.callsTab")}
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="integrations">
             {isLoading ? (
-              <div className="text-center py-8">Indlæser integrationer...</div>
+              <div className="text-center py-8">{t("dialerIntegrations.loadingIntegrations")}</div>
             ) : !integrations || integrations.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                Ingen dialer integrationer konfigureret. Klik "Tilføj" for at oprette en.
+                {t("dialerIntegrations.noIntegrations")}
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Navn</TableHead>
-                    <TableHead>Provider</TableHead>
-                    <TableHead>Auto-sync</TableHead>
-                    <TableHead>Sidst synkroniseret</TableHead>
-                    <TableHead className="text-right">Handlinger</TableHead>
+                    <TableHead>{t("dialerIntegrations.tableHeaderName")}</TableHead>
+                    <TableHead>{t("dialerIntegrations.tableHeaderProvider")}</TableHead>
+                    <TableHead>{t("dialerIntegrations.tableHeaderAutoSync")}</TableHead>
+                    <TableHead>{t("dialerIntegrations.tableHeaderLastSync")}</TableHead>
+                    <TableHead className="text-right">{t("dialerIntegrations.tableHeaderActions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -894,29 +896,29 @@ export function DialerIntegrations() {
                                   },
                                 });
                                 
-                                toast.success(freq > 0 ? `Auto-sync sat til hver ${freq} min` : "Auto-sync deaktiveret");
+                                toast.success(freq > 0 ? t("dialerIntegrations.autoSyncSet", { minutes: freq }) : t("dialerIntegrations.autoSyncDisabled"));
                                 queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
                               } catch (err) {
-                                toast.error("Fejl ved opdatering af sync-frekvens");
+                                toast.error(t("dialerIntegrations.syncFrequencyError"));
                               }
                             }}
                           >
                             <SelectTrigger className="w-[130px] h-8">
-                              <SelectValue placeholder="Vælg..." />
+                              <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="0">Deaktiveret</SelectItem>
-                              <SelectItem value="15">Hver 15 min</SelectItem>
-                              <SelectItem value="30">Hver 30 min</SelectItem>
-                              <SelectItem value="60">Hver time</SelectItem>
-                              <SelectItem value="120">Hver 2. time</SelectItem>
-                              <SelectItem value="360">Hver 6. time</SelectItem>
-                              <SelectItem value="720">Hver 12. time</SelectItem>
-                              <SelectItem value="1440">Dagligt</SelectItem>
+                              <SelectItem value="0">{t("dialerIntegrations.disabled")}</SelectItem>
+                              <SelectItem value="15">{t("dialerIntegrations.every15min")}</SelectItem>
+                              <SelectItem value="30">{t("dialerIntegrations.every30min")}</SelectItem>
+                              <SelectItem value="60">{t("dialerIntegrations.everyHour")}</SelectItem>
+                              <SelectItem value="120">{t("dialerIntegrations.every2hours")}</SelectItem>
+                              <SelectItem value="360">{t("dialerIntegrations.every6hours")}</SelectItem>
+                              <SelectItem value="720">{t("dialerIntegrations.every12hours")}</SelectItem>
+                              <SelectItem value="1440">{t("dialerIntegrations.daily")}</SelectItem>
                             </SelectContent>
                           </Select>
                           <Badge variant={integration.is_active && integration.sync_frequency_minutes ? "default" : "secondary"} className="text-xs">
-                            {integration.is_active && integration.sync_frequency_minutes ? "Aktiv" : "Manuel"}
+                            {integration.is_active && integration.sync_frequency_minutes ? t("dialerIntegrations.active") : t("dialerIntegrations.manual")}
                           </Badge>
                         </div>
                       </TableCell>
@@ -924,7 +926,7 @@ export function DialerIntegrations() {
                         {integration.last_sync_at ? (
                           <span className="text-sm">{new Date(integration.last_sync_at).toLocaleString("da-DK")}</span>
                         ) : (
-                          <span className="text-muted-foreground text-sm">Aldrig</span>
+                          <span className="text-muted-foreground text-sm">{t("dialerIntegrations.never")}</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
