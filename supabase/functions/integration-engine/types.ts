@@ -6,13 +6,25 @@ export interface StandardProduct {
   metadata?: Record<string, unknown>;
 }
 
+// Conditional extraction rule - checks condition then extracts products
+export interface ConditionalExtractionRule {
+  conditionKey: string;           // Key to check in data object (e.g., "Antal abonnementer", "5GI salg")
+  conditionValue?: string;        // Optional: specific value to match (e.g., "1"). If empty, just checks key exists
+  extractionType: 'specific_fields' | 'regex' | 'static_value';
+  targetKeys?: string[];          // For specific_fields: ["Abonnement1", "Abonnement2"]
+  regexPattern?: string;          // For regex extraction
+  staticProductName?: string;     // For static_value: directly use this product name
+  staticProductPrice?: number;    // For static_value: directly use this price
+}
+
 // Product extraction configuration - stored in dialer_integrations.config
 export interface ProductExtractionConfig {
-  strategy: 'standard_closure' | 'data_keys_regex' | 'specific_fields';
+  strategy: 'standard_closure' | 'data_keys_regex' | 'specific_fields' | 'conditional';
   regexPattern?: string;     // For extracting (Name) and (Price) from a string key
   targetKeys?: string[];     // Array of keys to search in the 'data' object
   defaultName?: string;      // Fallback product name if nothing found
-  validationKey?: string;    // If set, products are only extracted if this key exists and has a value
+  validationKey?: string;    // DEPRECATED: Use conditional rules instead
+  conditionalRules?: ConditionalExtractionRule[];  // For 'conditional' strategy
 }
 
 // Full dialer integration config stored in JSONB

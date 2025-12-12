@@ -17,12 +17,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useTranslation } from "react-i18next";
 
+// Conditional extraction rule
+interface ConditionalExtractionRule {
+  conditionKey: string;           // Key to check in data object
+  conditionValue?: string;        // Optional: specific value to match
+  extractionType: 'specific_fields' | 'regex' | 'static_value';
+  targetKeys?: string[];          // For specific_fields
+  regexPattern?: string;          // For regex extraction
+  staticProductName?: string;     // For static_value
+  staticProductPrice?: number;    // For static_value
+}
+
 interface ProductExtractionConfig {
-  strategy: 'standard_closure' | 'data_keys_regex' | 'specific_fields';
+  strategy: 'standard_closure' | 'data_keys_regex' | 'specific_fields' | 'conditional';
   regexPattern?: string;
   targetKeys?: string[];
   defaultName?: string;
   validationKey?: string;
+  conditionalRules?: ConditionalExtractionRule[];
 }
 
 interface DialerIntegrationConfig {
@@ -48,11 +60,12 @@ interface FormData {
   api_url: string;
   org_code: string;
   // Product extraction config
-  productExtractionStrategy: 'standard_closure' | 'data_keys_regex' | 'specific_fields';
+  productExtractionStrategy: 'standard_closure' | 'data_keys_regex' | 'specific_fields' | 'conditional';
   productRegexPattern: string;
   productTargetKeys: string;
   productDefaultName: string;
   productValidationKey: string;
+  conditionalRules: ConditionalExtractionRule[];
 }
 
 const ADVERSUS_WEBHOOK_EVENTS = [
@@ -97,6 +110,7 @@ export function DialerIntegrations() {
     productTargetKeys: "",
     productDefaultName: "",
     productValidationKey: "",
+    conditionalRules: [],
   });
 
   // Per-integration sync days state
@@ -226,6 +240,9 @@ export function DialerIntegrations() {
       }
       if (data.productExtractionStrategy === 'specific_fields' && data.productTargetKeys) {
         productExtraction.targetKeys = data.productTargetKeys.split(',').map(k => k.trim()).filter(Boolean);
+      }
+      if (data.productExtractionStrategy === 'conditional' && data.conditionalRules.length > 0) {
+        productExtraction.conditionalRules = data.conditionalRules;
       }
       if (data.productDefaultName) {
         productExtraction.defaultName = data.productDefaultName;
@@ -360,6 +377,7 @@ export function DialerIntegrations() {
       productTargetKeys: "",
       productDefaultName: "",
       productValidationKey: "",
+      conditionalRules: [],
     });
     setEditingId(null);
     setIsDialogOpen(false);
@@ -765,7 +783,7 @@ export function DialerIntegrations() {
                           <Label htmlFor="productExtractionStrategy">{t("dialerIntegrations.strategy")}</Label>
                           <Select
                             value={formData.productExtractionStrategy}
-                            onValueChange={(value: 'standard_closure' | 'data_keys_regex' | 'specific_fields') => 
+                            onValueChange={(value: 'standard_closure' | 'data_keys_regex' | 'specific_fields' | 'conditional') => 
                               setFormData({ ...formData, productExtractionStrategy: value })
                             }
                           >
@@ -776,6 +794,7 @@ export function DialerIntegrations() {
                               <SelectItem value="standard_closure">{t("dialerIntegrations.strategyStandard")}</SelectItem>
                               <SelectItem value="data_keys_regex">{t("dialerIntegrations.strategyRegex")}</SelectItem>
                               <SelectItem value="specific_fields">{t("dialerIntegrations.strategyFields")}</SelectItem>
+                              <SelectItem value="conditional">Conditional Rules</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -807,18 +826,179 @@ export function DialerIntegrations() {
                           </div>
                         )}
                         
-                        <div className="grid gap-2">
-                          <Label htmlFor="productValidationKey">Validation Key (Optional)</Label>
-                          <Input
-                            id="productValidationKey"
-                            placeholder="e.g., Antal abonnementer"
-                            value={formData.productValidationKey}
-                            onChange={(e) => setFormData({ ...formData, productValidationKey: e.target.value })}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            If set, products will ONLY be extracted if this key exists and has a value in the data object.
-                          </p>
-                        </div>
+                        {/* Conditional Rules UI */}
+                        {formData.productExtractionStrategy === 'conditional' && (
+                          <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-sm font-medium">Extraction Rules</Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setFormData({
+                                    ...formData,
+                                    conditionalRules: [
+                                      ...formData.conditionalRules,
+                                      {
+                                        conditionKey: "",
+                                        conditionValue: "",
+                                        extractionType: "specific_fields",
+                                        targetKeys: [],
+                                      }
+                                    ]
+                                  });
+                                }}
+                              >
+                                <Plus className="h-4 w-4 mr-1" /> Add Rule
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Rules are evaluated in order. First matching rule extracts products.
+                            </p>
+                            
+                            {formData.conditionalRules.map((rule, index) => (
+                              <div key={index} className="border rounded-md p-3 space-y-2 bg-background">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium">Rule {index + 1}</span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setFormData({
+                                        ...formData,
+                                        conditionalRules: formData.conditionalRules.filter((_, i) => i !== index)
+                                      });
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                                
+                                {/* Condition */}
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <Label className="text-xs">Condition Key</Label>
+                                    <Input
+                                      placeholder="e.g., Antal abonnementer"
+                                      value={rule.conditionKey}
+                                      onChange={(e) => {
+                                        const updated = [...formData.conditionalRules];
+                                        updated[index] = { ...rule, conditionKey: e.target.value };
+                                        setFormData({ ...formData, conditionalRules: updated });
+                                      }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">Condition Value (optional)</Label>
+                                    <Input
+                                      placeholder="e.g., 1 (leave empty for any)"
+                                      value={rule.conditionValue || ""}
+                                      onChange={(e) => {
+                                        const updated = [...formData.conditionalRules];
+                                        updated[index] = { ...rule, conditionValue: e.target.value || undefined };
+                                        setFormData({ ...formData, conditionalRules: updated });
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                                
+                                {/* Extraction Type */}
+                                <div>
+                                  <Label className="text-xs">Extraction Type</Label>
+                                  <Select
+                                    value={rule.extractionType}
+                                    onValueChange={(value: 'specific_fields' | 'regex' | 'static_value') => {
+                                      const updated = [...formData.conditionalRules];
+                                      updated[index] = { ...rule, extractionType: value };
+                                      setFormData({ ...formData, conditionalRules: updated });
+                                    }}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="specific_fields">Extract from Fields</SelectItem>
+                                      <SelectItem value="regex">Regex Pattern</SelectItem>
+                                      <SelectItem value="static_value">Static Product Name</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                
+                                {/* Type-specific config */}
+                                {rule.extractionType === 'specific_fields' && (
+                                  <div>
+                                    <Label className="text-xs">Target Keys (comma-separated)</Label>
+                                    <Input
+                                      placeholder="e.g., Abonnement1, Abonnement2, Abonnement3"
+                                      value={rule.targetKeys?.join(", ") || ""}
+                                      onChange={(e) => {
+                                        const updated = [...formData.conditionalRules];
+                                        updated[index] = { 
+                                          ...rule, 
+                                          targetKeys: e.target.value.split(",").map(k => k.trim()).filter(Boolean) 
+                                        };
+                                        setFormData({ ...formData, conditionalRules: updated });
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                                
+                                {rule.extractionType === 'regex' && (
+                                  <div>
+                                    <Label className="text-xs">Regex Pattern</Label>
+                                    <Input
+                                      placeholder="e.g., ^(.*?)\s*-\s*(\d+)"
+                                      value={rule.regexPattern || ""}
+                                      onChange={(e) => {
+                                        const updated = [...formData.conditionalRules];
+                                        updated[index] = { ...rule, regexPattern: e.target.value };
+                                        setFormData({ ...formData, conditionalRules: updated });
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                                
+                                {rule.extractionType === 'static_value' && (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <Label className="text-xs">Product Name</Label>
+                                      <Input
+                                        placeholder="e.g., 5GI Subscription"
+                                        value={rule.staticProductName || ""}
+                                        onChange={(e) => {
+                                          const updated = [...formData.conditionalRules];
+                                          updated[index] = { ...rule, staticProductName: e.target.value };
+                                          setFormData({ ...formData, conditionalRules: updated });
+                                        }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs">Price (optional)</Label>
+                                      <Input
+                                        type="number"
+                                        placeholder="0"
+                                        value={rule.staticProductPrice || ""}
+                                        onChange={(e) => {
+                                          const updated = [...formData.conditionalRules];
+                                          updated[index] = { ...rule, staticProductPrice: parseFloat(e.target.value) || undefined };
+                                          setFormData({ ...formData, conditionalRules: updated });
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            
+                            {formData.conditionalRules.length === 0 && (
+                              <p className="text-sm text-muted-foreground text-center py-4">
+                                No rules defined. Click "Add Rule" to create extraction rules.
+                              </p>
+                            )}
+                          </div>
+                        )}
                         
                         <div className="grid gap-2">
                           <Label htmlFor="productDefaultName">{t("dialerIntegrations.defaultName")}</Label>
@@ -828,6 +1008,9 @@ export function DialerIntegrations() {
                             value={formData.productDefaultName}
                             onChange={(e) => setFormData({ ...formData, productDefaultName: e.target.value })}
                           />
+                          <p className="text-xs text-muted-foreground">
+                            Fallback product name if no rules match or extraction fails.
+                          </p>
                         </div>
                       </div>
                     </>
@@ -1055,6 +1238,7 @@ export function DialerIntegrations() {
                                 productTargetKeys: extractionConfig?.targetKeys?.join(", ") || "",
                                 productDefaultName: extractionConfig?.defaultName || "",
                                 productValidationKey: extractionConfig?.validationKey || "",
+                                conditionalRules: extractionConfig?.conditionalRules || [],
                               });
                               setIsDialogOpen(true);
                             }}
