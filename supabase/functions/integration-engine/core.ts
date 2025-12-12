@@ -207,16 +207,17 @@ export class IngestionEngine {
     const externalIds = sales.map(s => s.externalId);
     const { data: existingSales } = await this.supabase
       .from("sales")
-      .select("id, adversus_external_id, adversus_opp_number")
+      .select("id, adversus_external_id, adversus_opp_number, customer_phone")
       .in("adversus_external_id", externalIds);
     
     const existingSalesMap = new Map(existingSales?.map(s => [s.adversus_external_id, s]) || []);
 
     // DEDUPLICATION: Find webhook-created records that used leadId as externalId
     // Webhook stores leadId as adversus_external_id, but API uses sale.id
-    // We need to preserve the OPP (external_reference) from webhook before deleting duplicates
+    // We need to preserve OPP and phone from webhook before deleting duplicates
     const leadIds = sales.map(s => s.leadId).filter(Boolean) as string[];
     const webhookOppMap = new Map<string, string>(); // leadId -> external_reference (OPP)
+    const webhookPhoneMap = new Map<string, string>(); // leadId -> customer_phone
     
     if (leadIds.length > 0) {
       // Find sales with webhook-created leadId external_ids that don't match our externalIds (sale.id)
@@ -224,18 +225,23 @@ export class IngestionEngine {
       if (webhookDuplicateIds.length > 0) {
         const { data: webhookSales } = await this.supabase
           .from("sales")
-          .select("id, adversus_external_id, external_reference")
+          .select("id, adversus_external_id, external_reference, customer_phone")
           .in("adversus_external_id", webhookDuplicateIds)
           .eq("integration_type", "adversus");
         
         if (webhookSales && webhookSales.length > 0) {
-          // Preserve OPP values from webhook records before deletion
+          // Preserve OPP and phone values from webhook records before deletion
           for (const ws of webhookSales) {
-            if (ws.external_reference && ws.adversus_external_id) {
-              webhookOppMap.set(ws.adversus_external_id, ws.external_reference);
+            if (ws.adversus_external_id) {
+              if (ws.external_reference) {
+                webhookOppMap.set(ws.adversus_external_id, ws.external_reference);
+              }
+              if (ws.customer_phone) {
+                webhookPhoneMap.set(ws.adversus_external_id, ws.customer_phone);
+              }
             }
           }
-          this.log("INFO", `Eliminando ${webhookSales.length} registros duplicados del webhook (preservando ${webhookOppMap.size} OPPs)...`);
+          this.log("INFO", `Eliminando ${webhookSales.length} registros duplicados del webhook (preservando ${webhookOppMap.size} OPPs, ${webhookPhoneMap.size} teléfonos)...`);
           const webhookSaleIds = webhookSales.map(s => s.id);
           await this.supabase.from("sale_items").delete().in("sale_id", webhookSaleIds);
           await this.supabase.from("sales").delete().in("id", webhookSaleIds);
@@ -252,15 +258,23 @@ export class IngestionEngine {
       try {
         const existingSale = existingSalesMap.get(sale.externalId);
         
-        // NON-DESTRUCTIVE: Keep existing OPP if new one is empty
+        // NON-DESTRUCTIVE: Keep existing OPP and phone if new ones are empty
         // Priority: 1) New value from API, 2) Existing value in DB, 3) Value from webhook (via leadId)
         let oppNumber = sale.externalReference || null;
         if (!oppNumber && existingSale?.adversus_opp_number) {
           oppNumber = existingSale.adversus_opp_number;
         }
-        // If still no OPP, check if we preserved one from a webhook record with matching leadId
         if (!oppNumber && sale.leadId && webhookOppMap.has(sale.leadId)) {
           oppNumber = webhookOppMap.get(sale.leadId)!;
+        }
+
+        // Same preservation logic for phone number
+        let customerPhone = sale.customerPhone || null;
+        if (!customerPhone && existingSale?.customer_phone) {
+          customerPhone = existingSale.customer_phone;
+        }
+        if (!customerPhone && sale.leadId && webhookPhoneMap.has(sale.leadId)) {
+          customerPhone = webhookPhoneMap.get(sale.leadId)!;
         }
 
         const saleData = {
@@ -269,7 +283,7 @@ export class IngestionEngine {
           agent_name: sale.agentName || sale.agentEmail,
           agent_email: sale.agentEmail || null,
           customer_company: sale.customerName,
-          customer_phone: sale.customerPhone,
+          customer_phone: customerPhone,
           adversus_opp_number: oppNumber,
           client_campaign_id: sale.clientCampaignId || null,
           dialer_campaign_id: sale.campaignId || null,
