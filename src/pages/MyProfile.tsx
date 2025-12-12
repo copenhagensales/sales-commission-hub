@@ -339,7 +339,11 @@ export default function MyProfile() {
     const current = new Date(monthStart);
     while (current <= monthEnd && current <= now) {
       const dayOfWeek = current.getDay();
-      const dateStr = current.toISOString().split('T')[0];
+      // Use local date format to avoid timezone issues
+      const year = current.getFullYear();
+      const month = String(current.getMonth() + 1).padStart(2, '0');
+      const day = String(current.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
       
       // Check for actual time stamp on this date
