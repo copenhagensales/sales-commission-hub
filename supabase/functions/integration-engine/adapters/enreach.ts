@@ -242,6 +242,16 @@ export class EnreachAdapter implements DialerAdapter {
     const extractionConfig = this.config?.productExtraction;
     const strategy = extractionConfig?.strategy || 'standard_closure';
 
+    // VALIDATION KEY CHECK: If configured, verify the key exists and has a value
+    const validationKey = extractionConfig?.validationKey;
+    if (validationKey && dataObj) {
+      const validationValue = this.getValue(dataObj, [validationKey]);
+      if (!validationValue) {
+        console.log(`[EnreachAdapter] Validation key '${validationKey}' missing or empty. Skipping product extraction.`);
+        return [];
+      }
+    }
+
     // A. Estrategia: Regex en las llaves del objeto data
     if (strategy === 'data_keys_regex' && dataObj && extractionConfig?.regexPattern) {
         try {

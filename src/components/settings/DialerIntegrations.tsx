@@ -22,6 +22,7 @@ interface ProductExtractionConfig {
   regexPattern?: string;
   targetKeys?: string[];
   defaultName?: string;
+  validationKey?: string;
 }
 
 interface DialerIntegrationConfig {
@@ -51,6 +52,7 @@ interface FormData {
   productRegexPattern: string;
   productTargetKeys: string;
   productDefaultName: string;
+  productValidationKey: string;
 }
 
 const ADVERSUS_WEBHOOK_EVENTS = [
@@ -94,6 +96,7 @@ export function DialerIntegrations() {
     productRegexPattern: "",
     productTargetKeys: "",
     productDefaultName: "",
+    productValidationKey: "",
   });
 
   // Per-integration sync days state
@@ -227,6 +230,9 @@ export function DialerIntegrations() {
       if (data.productDefaultName) {
         productExtraction.defaultName = data.productDefaultName;
       }
+      if (data.productValidationKey) {
+        productExtraction.validationKey = data.productValidationKey;
+      }
       
       const config: DialerIntegrationConfig = {
         productExtraction,
@@ -353,6 +359,7 @@ export function DialerIntegrations() {
       productRegexPattern: "",
       productTargetKeys: "",
       productDefaultName: "",
+      productValidationKey: "",
     });
     setEditingId(null);
     setIsDialogOpen(false);
@@ -801,6 +808,19 @@ export function DialerIntegrations() {
                         )}
                         
                         <div className="grid gap-2">
+                          <Label htmlFor="productValidationKey">Validation Key (Optional)</Label>
+                          <Input
+                            id="productValidationKey"
+                            placeholder="e.g., Antal abonnementer"
+                            value={formData.productValidationKey}
+                            onChange={(e) => setFormData({ ...formData, productValidationKey: e.target.value })}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            If set, products will ONLY be extracted if this key exists and has a value in the data object.
+                          </p>
+                        </div>
+                        
+                        <div className="grid gap-2">
                           <Label htmlFor="productDefaultName">{t("dialerIntegrations.defaultName")}</Label>
                           <Input
                             id="productDefaultName"
@@ -1034,6 +1054,7 @@ export function DialerIntegrations() {
                                 productRegexPattern: extractionConfig?.regexPattern || "",
                                 productTargetKeys: extractionConfig?.targetKeys?.join(", ") || "",
                                 productDefaultName: extractionConfig?.defaultName || "",
+                                productValidationKey: extractionConfig?.validationKey || "",
                               });
                               setIsDialogOpen(true);
                             }}

@@ -12,6 +12,7 @@ export interface ProductExtractionConfig {
   regexPattern?: string;     // For extracting (Name) and (Price) from a string key
   targetKeys?: string[];     // Array of keys to search in the 'data' object
   defaultName?: string;      // Fallback product name if nothing found
+  validationKey?: string;    // If set, products are only extracted if this key exists and has a value
 }
 
 // Full dialer integration config stored in JSONB
