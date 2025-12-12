@@ -1455,7 +1455,7 @@ export function DialerIntegrations() {
                                 onClick={() => openDeleteSalesDialog(integration)}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
-                                Slet alle salg
+                                {t('dialerIntegrations.deleteAllSales')}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -2036,17 +2036,17 @@ export function DialerIntegrations() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-5 w-5" />
-              {deleteSalesStep === 3 ? "Sletning gennemført" : "Slet alle salg"}
+              {deleteSalesStep === 3 ? t('dialerIntegrations.deleteSalesComplete') : t('dialerIntegrations.deleteSalesTitle')}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-4">
                 {deleteSalesStep === 1 && (
                   <>
                     <p className="text-destructive font-medium">
-                      ADVARSEL: Du er ved at slette ALLE salg fra integrationen "{deleteSalesIntegration?.name}".
+                      {t('dialerIntegrations.deleteSalesWarning', { name: deleteSalesIntegration?.name })}
                     </p>
                     <p>
-                      Denne handling kan IKKE fortrydes. Alle salgsdata, provisioner og relaterede oplysninger vil blive permanent slettet.
+                      {t('dialerIntegrations.deleteSalesCannotUndo')}
                     </p>
                     <div className="space-y-3 pt-2">
                       <div className="flex items-start gap-2">
@@ -2056,7 +2056,7 @@ export function DialerIntegrations() {
                           onCheckedChange={(checked) => setDeleteSalesConfirmCheck1(checked === true)}
                         />
                         <label htmlFor="confirm1" className="text-sm leading-tight cursor-pointer">
-                          Jeg forstår at denne handling er permanent og ikke kan fortrydes
+                          {t('dialerIntegrations.deleteSalesConfirm1')}
                         </label>
                       </div>
                       <div className="flex items-start gap-2">
@@ -2066,7 +2066,7 @@ export function DialerIntegrations() {
                           onCheckedChange={(checked) => setDeleteSalesConfirmCheck2(checked === true)}
                         />
                         <label htmlFor="confirm2" className="text-sm leading-tight cursor-pointer">
-                          Jeg har sikret mig at der er taget backup af dataen hvis nødvendigt
+                          {t('dialerIntegrations.deleteSalesConfirm2')}
                         </label>
                       </div>
                       <div className="flex items-start gap-2">
@@ -2076,7 +2076,7 @@ export function DialerIntegrations() {
                           onCheckedChange={(checked) => setDeleteSalesConfirmCheck3(checked === true)}
                         />
                         <label htmlFor="confirm3" className="text-sm leading-tight cursor-pointer">
-                          Jeg bekræfter at jeg har tilladelse til at slette disse data
+                          {t('dialerIntegrations.deleteSalesConfirm3')}
                         </label>
                       </div>
                     </div>
@@ -2086,10 +2086,10 @@ export function DialerIntegrations() {
                 {deleteSalesStep === 2 && (
                   <>
                     <p className="text-destructive font-medium">
-                      Sidste bekræftelse påkrævet
+                      {t('dialerIntegrations.deleteSalesStep2Title')}
                     </p>
                     <p>
-                      For at fortsætte, skriv "{deleteSalesIntegration?.name}" i feltet nedenfor:
+                      {t('dialerIntegrations.deleteSalesStep2Desc', { name: deleteSalesIntegration?.name })}
                     </p>
                     <Input
                       value={deleteSalesConfirmText}
@@ -2099,7 +2099,7 @@ export function DialerIntegrations() {
                     />
                     {deleteSalesConfirmText && deleteSalesConfirmText !== deleteSalesIntegration?.name && (
                       <p className="text-destructive text-xs">
-                        Teksten matcher ikke. Skriv præcis "{deleteSalesIntegration?.name}"
+                        {t('dialerIntegrations.deleteSalesTextMismatch', { name: deleteSalesIntegration?.name })}
                       </p>
                     )}
                   </>
@@ -2108,10 +2108,10 @@ export function DialerIntegrations() {
                 {deleteSalesStep === 3 && (
                   <>
                     <p className="text-green-600 font-medium">
-                      Sletning gennemført!
+                      {t('dialerIntegrations.deleteSalesComplete')}!
                     </p>
                     <p>
-                      {deletedSalesCount} salg blev slettet fra "{deleteSalesIntegration?.name}".
+                      {t('dialerIntegrations.deleteSalesSuccess', { count: deletedSalesCount, name: deleteSalesIntegration?.name })}
                     </p>
                   </>
                 )}
@@ -2121,13 +2121,13 @@ export function DialerIntegrations() {
           <AlertDialogFooter>
             {deleteSalesStep === 1 && (
               <>
-                <AlertDialogCancel disabled={isDeletingSales}>Annuller</AlertDialogCancel>
+                <AlertDialogCancel disabled={isDeletingSales}>{t('dialerIntegrations.cancel')}</AlertDialogCancel>
                 <Button
                   variant="destructive"
                   disabled={!deleteSalesConfirmCheck1 || !deleteSalesConfirmCheck2 || !deleteSalesConfirmCheck3}
                   onClick={() => setDeleteSalesStep(2)}
                 >
-                  Fortsæt
+                  {t('dialerIntegrations.continue')}
                 </Button>
               </>
             )}
@@ -2135,7 +2135,7 @@ export function DialerIntegrations() {
             {deleteSalesStep === 2 && (
               <>
                 <Button variant="outline" onClick={() => setDeleteSalesStep(1)} disabled={isDeletingSales}>
-                  Tilbage
+                  {t('dialerIntegrations.back')}
                 </Button>
                 <Button
                   variant="destructive"
@@ -2145,10 +2145,10 @@ export function DialerIntegrations() {
                   {isDeletingSales ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Sletter...
+                      {t('dialerIntegrations.deleteSalesDeleting')}
                     </>
                   ) : (
-                    "Slet alle salg permanent"
+                    t('dialerIntegrations.deleteSalesButton')
                   )}
                 </Button>
               </>
@@ -2156,7 +2156,7 @@ export function DialerIntegrations() {
 
             {deleteSalesStep === 3 && (
               <AlertDialogAction onClick={() => setDeleteSalesDialogOpen(false)}>
-                Luk
+                {t('dialerIntegrations.close')}
               </AlertDialogAction>
             )}
           </AlertDialogFooter>
