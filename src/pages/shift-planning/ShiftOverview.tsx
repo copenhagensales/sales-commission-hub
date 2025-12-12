@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,6 +51,7 @@ export default function ShiftOverview() {
   const [selectedTimeStamp, setSelectedTimeStamp] = useState<{ id: string; employee_id: string; clock_in: string; clock_out: string | null; effective_clock_in: string | null; effective_clock_out: string | null; effective_hours: number | null; break_minutes: number | null; note: string | null } | null>(null);
   const [selectedTimeStampEmployee, setSelectedTimeStampEmployee] = useState<{ id: string; name: string; date: Date } | null>(null);
   const [openPopoverKey, setOpenPopoverKey] = useState<string | null>(null);
+  const [showWeekendStamps, setShowWeekendStamps] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -59,6 +60,10 @@ export default function ShiftOverview() {
   // Only show weekdays (Monday-Friday), exclude weekend
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd }).filter(
     day => day.getDay() !== 0 && day.getDay() !== 6
+  );
+  // Weekend days for fold-out
+  const weekendDays = eachDayOfInterval({ start: weekStart, end: weekEnd }).filter(
+    day => day.getDay() === 0 || day.getDay() === 6
   );
 
   const { data: shifts } = useShifts(
@@ -313,6 +318,32 @@ export default function ShiftOverview() {
       todaySick: employeeCount > 0 ? Math.round((todaySick / employeeCount) * 100) : 0,
     };
   }, [employees, absences, weekDays]);
+
+  // Weekend time stamps - group by employee
+  const weekendTimeStamps = useMemo(() => {
+    if (!timeStamps || !employees) return [];
+    
+    const weekendStamps: Array<{
+      employee: typeof employees[0];
+      date: Date;
+      timeStamp: NonNullable<ReturnType<typeof getTimeStampForDate>>;
+    }> = [];
+    
+    weekendDays.forEach(day => {
+      const dateStr = format(day, "yyyy-MM-dd");
+      employees.forEach(emp => {
+        const stamp = timeStamps.find(ts => {
+          const tsDate = ts.clock_in.split("T")[0];
+          return ts.employee_id === emp.id && tsDate === dateStr;
+        });
+        if (stamp) {
+          weekendStamps.push({ employee: emp, date: day, timeStamp: stamp });
+        }
+      });
+    });
+    
+    return weekendStamps.sort((a, b) => new Date(b.timeStamp.clock_in).getTime() - new Date(a.timeStamp.clock_in).getTime());
+  }, [timeStamps, employees, weekendDays]);
 
   // Handle popover actions
   const handleSetVacation = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null) => {
@@ -741,6 +772,65 @@ export default function ShiftOverview() {
             </div>
           </div>
         </div>
+
+        {/* Weekend Time Stamps - Collapsible */}
+        {weekendTimeStamps.length > 0 && (
+          <div className="bg-card rounded-xl border border-orange-200 dark:border-orange-800 overflow-hidden shadow-sm">
+            <button
+              onClick={() => setShowWeekendStamps(!showWeekendStamps)}
+              className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900/40">
+                  <CalendarDays className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-sm font-semibold text-foreground">Weekend-indstemplinger</h3>
+                  <p className="text-xs text-muted-foreground">{weekendTimeStamps.length} registrering{weekendTimeStamps.length !== 1 ? 'er' : ''} i weekenden</p>
+                </div>
+              </div>
+              <ChevronDown className={cn("h-5 w-5 text-muted-foreground transition-transform", showWeekendStamps && "rotate-180")} />
+            </button>
+            
+            {showWeekendStamps && (
+              <div className="border-t border-orange-200 dark:border-orange-800 divide-y divide-border/30">
+                {weekendTimeStamps.map((item) => {
+                  const clockIn = new Date(item.timeStamp.clock_in);
+                  const clockOut = item.timeStamp.clock_out ? new Date(item.timeStamp.clock_out) : null;
+                  const startTime = clockIn.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+                  const endTime = clockOut ? clockOut.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }) : null;
+                  const hours = clockOut ? (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60) : null;
+                  
+                  return (
+                    <div key={`${item.employee.id}-${item.date.toISOString()}`} className="flex items-center justify-between p-4 hover:bg-muted/20">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-xs font-semibold text-orange-700 dark:text-orange-300">
+                          {item.employee.first_name?.charAt(0)}{item.employee.last_name?.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{item.employee.first_name} {item.employee.last_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(item.date, "EEEE d. MMM", { locale: da })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {startTime}{endTime ? ` - ${endTime}` : ' (ikke udstemplet)'}
+                        </span>
+                        {hours !== null && (
+                          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800">
+                            {hours.toFixed(1)} timer
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Create Shift Dialog */}
         <CreateShiftDialog
