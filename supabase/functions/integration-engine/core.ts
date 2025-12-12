@@ -212,6 +212,29 @@ export class IngestionEngine {
     
     const existingSalesMap = new Map(existingSales?.map(s => [s.adversus_external_id, s]) || []);
 
+    // DEDUPLICATION: Find and delete webhook-created records that used leadId as externalId
+    // Webhook stores leadId as adversus_external_id, but API uses sale.id
+    // We need to delete these duplicates before inserting new ones
+    const leadIds = sales.map(s => s.leadId).filter(Boolean) as string[];
+    if (leadIds.length > 0) {
+      // Find sales with webhook-created leadId external_ids that don't match our externalIds (sale.id)
+      const webhookDuplicateIds = leadIds.filter(lid => !externalIds.includes(lid));
+      if (webhookDuplicateIds.length > 0) {
+        const { data: webhookSales } = await this.supabase
+          .from("sales")
+          .select("id, adversus_external_id")
+          .in("adversus_external_id", webhookDuplicateIds)
+          .eq("integration_type", "adversus");
+        
+        if (webhookSales && webhookSales.length > 0) {
+          this.log("INFO", `Eliminando ${webhookSales.length} registros duplicados del webhook...`);
+          const webhookSaleIds = webhookSales.map(s => s.id);
+          await this.supabase.from("sale_items").delete().in("sale_id", webhookSaleIds);
+          await this.supabase.from("sales").delete().in("id", webhookSaleIds);
+        }
+      }
+    }
+
     // Prepare ALL sales for UPSERT
     const allSalesData: any[] = [];
     const saleItemsToInsert: any[] = [];
@@ -296,7 +319,8 @@ export class IngestionEngine {
 
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
-      this.log("ERROR", `Error en operaciones bulk`, errMsg);
+      const errDetails = e instanceof Error && 'details' in e ? (e as any).details : undefined;
+      this.log("ERROR", `Error en operaciones bulk: ${errMsg}`, { details: errDetails, hint: (e as any)?.hint });
       errors += sales.length;
       processed = 0;
     }
