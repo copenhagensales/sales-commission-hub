@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History } from "lucide-react";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown } from "lucide-react";
 import { GdprSettingsCard } from "@/components/gdpr/GdprSettingsCard";
 import { GdprConsentDialog } from "@/components/gdpr/GdprConsentDialog";
 import { useHasDataProcessingConsent } from "@/hooks/useGdpr";
@@ -308,7 +308,7 @@ export default function MyProfile() {
   }, [timeStamps]);
 
   // Generate expected work schedule for current month - using actual time stamps when available
-  const expectedSchedule = useMemo(() => {
+  const { expectedSchedule, weekendSchedule } = useMemo(() => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -322,32 +322,59 @@ export default function MyProfile() {
       timeStampsByDate.set(dateKey, stamp);
     });
     
-    const schedule: Array<{
+    type ScheduleEntry = {
       date: string;
       status: "work" | "vacation" | "sick";
       hours: number;
       startTime: string;
       endTime: string;
       hasActualStamp: boolean;
-    }> = [];
+      isWeekend?: boolean;
+    };
     
-    // Generate all weekdays in the month
+    const schedule: ScheduleEntry[] = [];
+    const weekends: ScheduleEntry[] = [];
+    
+    // Generate all days in the month
     const current = new Date(monthStart);
     while (current <= monthEnd && current <= now) {
       const dayOfWeek = current.getDay();
-      // Only include weekdays (Mon-Fri = 1-5)
-      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-        const dateStr = current.toISOString().split('T')[0];
-        
-        // Check if there's an absence on this day
+      const dateStr = current.toISOString().split('T')[0];
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      
+      // Check for actual time stamp on this date
+      const actualStamp = timeStampsByDate.get(dateStr);
+      
+      if (isWeekend) {
+        // Only add weekend days if there's an actual stamp
+        if (actualStamp) {
+          const clockIn = new Date(actualStamp.clock_in);
+          const clockOut = actualStamp.clock_out ? new Date(actualStamp.clock_out) : null;
+          const actualStartTime = clockIn.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+          const actualEndTime = clockOut ? clockOut.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }) : null;
+          
+          let actualHours = 0;
+          if (clockOut) {
+            actualHours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+          }
+          
+          weekends.push({
+            date: dateStr,
+            status: "work",
+            hours: actualHours,
+            startTime: actualStartTime,
+            endTime: actualEndTime || "",
+            hasActualStamp: true,
+            isWeekend: true,
+          });
+        }
+      } else {
+        // Weekday logic
         const absence = absences.find(a => {
           const start = new Date(a.start_date);
           const end = new Date(a.end_date);
           return current >= start && current <= end;
         });
-        
-        // Check for actual time stamp on this date
-        const actualStamp = timeStampsByDate.get(dateStr);
         
         if (absence) {
           schedule.push({
@@ -359,13 +386,11 @@ export default function MyProfile() {
             hasActualStamp: false,
           });
         } else if (actualStamp) {
-          // Use actual clock_in/clock_out times
           const clockIn = new Date(actualStamp.clock_in);
           const clockOut = actualStamp.clock_out ? new Date(actualStamp.clock_out) : null;
           const actualStartTime = clockIn.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
           const actualEndTime = clockOut ? clockOut.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }) : null;
           
-          // Calculate actual hours worked
           let actualHours = dailyHours;
           if (clockOut) {
             actualHours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
@@ -380,7 +405,6 @@ export default function MyProfile() {
             hasActualStamp: true,
           });
         } else {
-          // Use default schedule (no actual stamp yet)
           schedule.push({
             date: dateStr,
             status: "work",
@@ -394,8 +418,13 @@ export default function MyProfile() {
       current.setDate(current.getDate() + 1);
     }
     
-    return schedule.reverse(); // Most recent first
+    return {
+      expectedSchedule: schedule.reverse(),
+      weekendSchedule: weekends.reverse(),
+    };
   }, [employee?.weekly_hours, employee?.standard_start_time, absences, deduplicatedTimeStamps]);
+  
+  const [showWeekends, setShowWeekends] = useState(false);
 
   // Calculate shift statistics using expected schedule
   const shiftStats = useMemo(() => {
@@ -1137,10 +1166,56 @@ export default function MyProfile() {
                         </div>
                       );
                     })}
-                    {expectedSchedule.length === 0 && (
+                    {expectedSchedule.length === 0 && weekendSchedule.length === 0 && (
                       <p className="text-sm text-muted-foreground text-center py-4">
                         Ingen arbejdsdage endnu denne måned
                       </p>
+                    )}
+                    
+                    {/* Weekend section - collapsible */}
+                    {weekendSchedule.length > 0 && (
+                      <div className="mt-4 pt-4 border-t">
+                        <button
+                          onClick={() => setShowWeekends(!showWeekends)}
+                          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
+                        >
+                          <ChevronDown className={`h-4 w-4 transition-transform ${showWeekends ? 'rotate-180' : ''}`} />
+                          <span>Weekend-vagter ({weekendSchedule.length})</span>
+                        </button>
+                        
+                        {showWeekends && (
+                          <div className="mt-3 space-y-2 pl-2 border-l-2 border-orange-300 dark:border-orange-700">
+                            {weekendSchedule.map((day) => {
+                              const date = new Date(day.date);
+                              const dailySalary = day.hours * shiftStats.hourlyRate;
+                              
+                              return (
+                                <div key={day.date} className="flex items-center justify-between py-2">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-3 h-3 rounded-full bg-orange-500" />
+                                    <span className="text-sm font-medium">
+                                      {format(date, "EEEE d. MMM", { locale: da })}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {day.startTime}{day.endTime ? ` - ${day.endTime}` : ' (ikke udstemplet)'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800">
+                                      {day.hours.toFixed(1)} timer
+                                    </Badge>
+                                    {shiftStats.hourlyRate > 0 && (
+                                      <Badge variant="secondary" className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                        {dailySalary.toLocaleString('da-DK')} kr
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </CardContent>
