@@ -117,7 +117,16 @@ export class EnreachAdapter implements DialerAdapter {
         return [];
       }
 
-      console.log(`[EnreachAdapter] Fetched ${allLeads.length} sales`);
+      console.log(`[EnreachAdapter] Fetched ${allLeads.length} raw leads from API`);
+
+      // FILTRO INTERNO: Solo procesamos leads con status=UserProcessed Y closure=Success
+      const filteredLeads = allLeads.filter((lead) => {
+        const status = this.getStr(lead, ['status', 'Status']);
+        const closure = this.getStr(lead, ['closure', 'Closure']);
+        return status === 'UserProcessed' && closure === 'Success';
+      });
+
+      console.log(`[EnreachAdapter] After internal filter (UserProcessed + Success): ${filteredLeads.length} sales`);
 
       const mappingLookup = new Map<string, CampaignMappingConfig>();
       if (campaignMappings) {
@@ -126,7 +135,7 @@ export class EnreachAdapter implements DialerAdapter {
         }
       }
 
-      return allLeads.map((lead: HeroBaseLead) => {
+      return filteredLeads.map((lead: HeroBaseLead) => {
         // --- 1. Identificadores Básicos ---
         const externalId = this.getStr(lead, ['uniqueId', 'UniqueId']);
         const campaignObj = (lead.campaign || lead.Campaign) as Record<string, unknown> | undefined;
