@@ -1,5 +1,5 @@
 import { DialerAdapter } from "./interface.ts";
-import { StandardSale, StandardUser, StandardCampaign, StandardProduct, StandardCall, CampaignMappingConfig, ReferenceExtractionConfig, DialerIntegrationConfig } from "../types.ts";
+import { StandardSale, StandardUser, StandardCampaign, StandardProduct, StandardCall, CampaignMappingConfig, ReferenceExtractionConfig, DialerIntegrationConfig, ConditionalExtractionRule } from "../types.ts";
 
 interface EnreachCredentials {
   username?: string;
@@ -242,7 +242,7 @@ export class EnreachAdapter implements DialerAdapter {
     const extractionConfig = this.config?.productExtraction;
     const strategy = extractionConfig?.strategy || 'standard_closure';
 
-    // VALIDATION KEY CHECK: If configured, verify the key exists and has a value
+    // VALIDATION KEY CHECK (legacy support): If configured, verify the key exists and has a value
     const validationKey = extractionConfig?.validationKey;
     if (validationKey && dataObj) {
       const validationValue = this.getValue(dataObj, [validationKey]);
@@ -250,6 +250,44 @@ export class EnreachAdapter implements DialerAdapter {
         console.log(`[EnreachAdapter] Validation key '${validationKey}' missing or empty. Skipping product extraction.`);
         return [];
       }
+    }
+
+    // NEW: Conditional Rules Strategy
+    if (strategy === 'conditional' && extractionConfig?.conditionalRules && dataObj) {
+      console.log(`[EnreachAdapter] Using conditional extraction with ${extractionConfig.conditionalRules.length} rules`);
+      
+      for (const rule of extractionConfig.conditionalRules) {
+        // Check if condition matches
+        const conditionValue = this.getValue(dataObj, [rule.conditionKey]);
+        
+        if (!conditionValue) {
+          console.log(`[EnreachAdapter] Rule condition key '${rule.conditionKey}' not found, skipping rule`);
+          continue;
+        }
+        
+        // If conditionValue is specified, check if it matches
+        if (rule.conditionValue && String(conditionValue) !== rule.conditionValue) {
+          console.log(`[EnreachAdapter] Rule condition value '${conditionValue}' !== '${rule.conditionValue}', skipping rule`);
+          continue;
+        }
+        
+        console.log(`[EnreachAdapter] Rule matched! Condition: ${rule.conditionKey}=${conditionValue}`);
+        
+        // Extract products based on extraction type
+        const extractedProducts = this.extractFromRule(rule, dataObj, lead);
+        
+        if (extractedProducts.length > 0) {
+          console.log(`[EnreachAdapter] Rule extracted ${extractedProducts.length} products`);
+          products.push(...extractedProducts);
+          break; // First matching rule wins
+        }
+      }
+      
+      // If conditional rules produced products, return them
+      if (products.length > 0) {
+        return products;
+      }
+      console.log(`[EnreachAdapter] No conditional rules matched, falling back to default`);
     }
 
     // A. Estrategia: Regex en las llaves del objeto data
@@ -316,6 +354,84 @@ export class EnreachAdapter implements DialerAdapter {
         });
     }
 
+    return products;
+  }
+
+  // Extract products based on a conditional rule
+  private extractFromRule(
+    rule: ConditionalExtractionRule,
+    dataObj: Record<string, unknown>,
+    lead: HeroBaseLead
+  ): StandardProduct[] {
+    const products: StandardProduct[] = [];
+    
+    switch (rule.extractionType) {
+      case 'specific_fields':
+        if (rule.targetKeys) {
+          for (const key of rule.targetKeys) {
+            const val = this.getValue(dataObj, [key]);
+            if (val && String(val).trim().length > 0) {
+              products.push({
+                name: String(val),
+                externalId: key,
+                quantity: 1,
+                unitPrice: 0
+              });
+            }
+          }
+        }
+        break;
+        
+      case 'regex':
+        if (rule.regexPattern) {
+          try {
+            const regex = new RegExp(rule.regexPattern, 'i');
+            for (const [key, value] of Object.entries(dataObj)) {
+              if (value && String(value).length > 0) {
+                // Try matching on the key
+                const keyMatch = key.match(regex);
+                if (keyMatch) {
+                  const name = keyMatch[1]?.trim() || key;
+                  const priceStr = keyMatch[2]?.replace(',', '.') || '0';
+                  products.push({
+                    name: name,
+                    externalId: key,
+                    quantity: 1,
+                    unitPrice: parseFloat(priceStr)
+                  });
+                }
+                // Also try matching on the value
+                const valMatch = String(value).match(regex);
+                if (valMatch) {
+                  const name = valMatch[1]?.trim() || String(value);
+                  const priceStr = valMatch[2]?.replace(',', '.') || '0';
+                  products.push({
+                    name: name,
+                    externalId: key,
+                    quantity: 1,
+                    unitPrice: parseFloat(priceStr)
+                  });
+                }
+              }
+            }
+          } catch (e) {
+            console.error("[EnreachAdapter] Invalid regex in rule:", e);
+          }
+        }
+        break;
+        
+      case 'static_value':
+        if (rule.staticProductName) {
+          products.push({
+            name: rule.staticProductName,
+            externalId: rule.conditionKey,
+            quantity: 1,
+            unitPrice: rule.staticProductPrice || 0
+          });
+        }
+        break;
+    }
+    
     return products;
   }
 
