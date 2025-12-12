@@ -10,7 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check, List, ExternalLink, MoreVertical, PhoneCall, Eye } from "lucide-react";
+import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check, List, ExternalLink, MoreVertical, PhoneCall, Eye, AlertTriangle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -176,6 +178,17 @@ export function DialerIntegrations() {
   // Fetch calls state
   const [fetchingCallsId, setFetchingCallsId] = useState<string | null>(null);
   const [callsDays, setCallsDays] = useState<Record<string, string>>({});
+
+  // Delete sales state
+  const [deleteSalesDialogOpen, setDeleteSalesDialogOpen] = useState(false);
+  const [deleteSalesIntegration, setDeleteSalesIntegration] = useState<DialerIntegration | null>(null);
+  const [deleteSalesStep, setDeleteSalesStep] = useState<1 | 2 | 3>(1);
+  const [deleteSalesConfirmCheck1, setDeleteSalesConfirmCheck1] = useState(false);
+  const [deleteSalesConfirmCheck2, setDeleteSalesConfirmCheck2] = useState(false);
+  const [deleteSalesConfirmCheck3, setDeleteSalesConfirmCheck3] = useState(false);
+  const [deleteSalesConfirmText, setDeleteSalesConfirmText] = useState("");
+  const [isDeletingSales, setIsDeletingSales] = useState(false);
+  const [deletedSalesCount, setDeletedSalesCount] = useState<number | null>(null);
 
   // Fetch Dialer Integrations from new table
   const { data: integrations, isLoading } = useQuery({
@@ -395,6 +408,47 @@ export function DialerIntegrations() {
     });
     setEditingId(null);
     setIsDialogOpen(false);
+  };
+
+  // Open delete sales dialog
+  const openDeleteSalesDialog = (integration: DialerIntegration) => {
+    setDeleteSalesIntegration(integration);
+    setDeleteSalesStep(1);
+    setDeleteSalesConfirmCheck1(false);
+    setDeleteSalesConfirmCheck2(false);
+    setDeleteSalesConfirmCheck3(false);
+    setDeleteSalesConfirmText("");
+    setDeletedSalesCount(null);
+    setDeleteSalesDialogOpen(true);
+  };
+
+  // Execute delete sales
+  const executeDeleteSales = async () => {
+    if (!deleteSalesIntegration) return;
+    
+    setIsDeletingSales(true);
+    try {
+      // Delete sales from this integration
+      const { data, error } = await supabase
+        .from("sales")
+        .delete()
+        .eq("source", deleteSalesIntegration.name)
+        .select("id");
+      
+      if (error) throw error;
+      
+      const count = data?.length || 0;
+      setDeletedSalesCount(count);
+      setDeleteSalesStep(3);
+      
+      toast.success(`${count} salg slettet fra ${deleteSalesIntegration.name}`);
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Ukendt fejl";
+      toast.error(`Fejl ved sletning: ${errorMessage}`);
+    } finally {
+      setIsDeletingSales(false);
+    }
   };
 
   // Execute manual function
@@ -1396,6 +1450,13 @@ export function DialerIntegrations() {
                                 )}
                                 Hent Calls
                               </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => openDeleteSalesDialog(integration)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Slet alle salg
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -1964,6 +2025,143 @@ export function DialerIntegrations() {
           </div>
         </div>
       </CardContent>
+
+      {/* Delete Sales Confirmation Dialog */}
+      <AlertDialog open={deleteSalesDialogOpen} onOpenChange={(open) => {
+        if (!open && !isDeletingSales) {
+          setDeleteSalesDialogOpen(false);
+        }
+      }}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              {deleteSalesStep === 3 ? "Sletning gennemført" : "Slet alle salg"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                {deleteSalesStep === 1 && (
+                  <>
+                    <p className="text-destructive font-medium">
+                      ADVARSEL: Du er ved at slette ALLE salg fra integrationen "{deleteSalesIntegration?.name}".
+                    </p>
+                    <p>
+                      Denne handling kan IKKE fortrydes. Alle salgsdata, provisioner og relaterede oplysninger vil blive permanent slettet.
+                    </p>
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          id="confirm1"
+                          checked={deleteSalesConfirmCheck1}
+                          onCheckedChange={(checked) => setDeleteSalesConfirmCheck1(checked === true)}
+                        />
+                        <label htmlFor="confirm1" className="text-sm leading-tight cursor-pointer">
+                          Jeg forstår at denne handling er permanent og ikke kan fortrydes
+                        </label>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          id="confirm2"
+                          checked={deleteSalesConfirmCheck2}
+                          onCheckedChange={(checked) => setDeleteSalesConfirmCheck2(checked === true)}
+                        />
+                        <label htmlFor="confirm2" className="text-sm leading-tight cursor-pointer">
+                          Jeg har sikret mig at der er taget backup af dataen hvis nødvendigt
+                        </label>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          id="confirm3"
+                          checked={deleteSalesConfirmCheck3}
+                          onCheckedChange={(checked) => setDeleteSalesConfirmCheck3(checked === true)}
+                        />
+                        <label htmlFor="confirm3" className="text-sm leading-tight cursor-pointer">
+                          Jeg bekræfter at jeg har tilladelse til at slette disse data
+                        </label>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {deleteSalesStep === 2 && (
+                  <>
+                    <p className="text-destructive font-medium">
+                      Sidste bekræftelse påkrævet
+                    </p>
+                    <p>
+                      For at fortsætte, skriv "{deleteSalesIntegration?.name}" i feltet nedenfor:
+                    </p>
+                    <Input
+                      value={deleteSalesConfirmText}
+                      onChange={(e) => setDeleteSalesConfirmText(e.target.value)}
+                      placeholder={deleteSalesIntegration?.name || ""}
+                      className="font-mono"
+                    />
+                    {deleteSalesConfirmText && deleteSalesConfirmText !== deleteSalesIntegration?.name && (
+                      <p className="text-destructive text-xs">
+                        Teksten matcher ikke. Skriv præcis "{deleteSalesIntegration?.name}"
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {deleteSalesStep === 3 && (
+                  <>
+                    <p className="text-green-600 font-medium">
+                      Sletning gennemført!
+                    </p>
+                    <p>
+                      {deletedSalesCount} salg blev slettet fra "{deleteSalesIntegration?.name}".
+                    </p>
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {deleteSalesStep === 1 && (
+              <>
+                <AlertDialogCancel disabled={isDeletingSales}>Annuller</AlertDialogCancel>
+                <Button
+                  variant="destructive"
+                  disabled={!deleteSalesConfirmCheck1 || !deleteSalesConfirmCheck2 || !deleteSalesConfirmCheck3}
+                  onClick={() => setDeleteSalesStep(2)}
+                >
+                  Fortsæt
+                </Button>
+              </>
+            )}
+
+            {deleteSalesStep === 2 && (
+              <>
+                <Button variant="outline" onClick={() => setDeleteSalesStep(1)} disabled={isDeletingSales}>
+                  Tilbage
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={deleteSalesConfirmText !== deleteSalesIntegration?.name || isDeletingSales}
+                  onClick={executeDeleteSales}
+                >
+                  {isDeletingSales ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Sletter...
+                    </>
+                  ) : (
+                    "Slet alle salg permanent"
+                  )}
+                </Button>
+              </>
+            )}
+
+            {deleteSalesStep === 3 && (
+              <AlertDialogAction onClick={() => setDeleteSalesDialogOpen(false)}>
+                Luk
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
