@@ -1,29 +1,17 @@
 import { DialerAdapter } from "./interface.ts";
-import { StandardSale, StandardUser, StandardCampaign, StandardProduct, StandardCall, CampaignMappingConfig, ReferenceExtractionConfig, ProductExtractionConfig, DialerIntegrationConfig } from "../types.ts";
+import { StandardSale, StandardUser, StandardCampaign, StandardProduct, StandardCall, CampaignMappingConfig, ReferenceExtractionConfig, DialerIntegrationConfig } from "../types.ts";
 
 interface EnreachCredentials {
   username?: string;
   password?: string;
   api_token?: string;
-  api_url?: string; // Full base URL like https://wshero01.herobase.com/api
-  org_code?: string; // Optional OrgCode for calls endpoint
+  api_url?: string;
+  org_code?: string;
 }
 
-// HeroBase API response types (flexible for different casing)
-interface HeroBaseCampaign {
-  uniqueId?: string;
-  UniqueId?: string;
-  Id?: string;
-  name?: string;
-  Name?: string;
-  active?: boolean;
-  Active?: boolean;
-  status?: string;
-  Status?: string;
-}
-
+// HeroBase API response types
 interface HeroBaseLead {
-  [key: string]: unknown; // Allow any key for flexible lookup
+  [key: string]: unknown;
 }
 
 export class EnreachAdapter implements DialerAdapter {
@@ -31,37 +19,29 @@ export class EnreachAdapter implements DialerAdapter {
   private headers: Record<string, string>;
   private dialerName: string;
   private orgCode: string | null;
-  private username: string | null;
   private config: DialerIntegrationConfig | null;
 
   constructor(credentials: EnreachCredentials, dialerName?: string, config?: DialerIntegrationConfig | null) {
-    // Default to wshero01.herobase.com/api if not provided
     const providedUrl = credentials.api_url || "https://wshero01.herobase.com/api";
-    // Ensure no trailing slash
     this.baseUrl = providedUrl.endsWith('/') ? providedUrl.slice(0, -1) : providedUrl;
-    // Ensure /api suffix
     if (!this.baseUrl.endsWith('/api')) {
       this.baseUrl = this.baseUrl + '/api';
     }
     
     this.dialerName = dialerName || "Enreach";
     this.orgCode = credentials.org_code || null;
-    this.username = credentials.username || null;
     this.config = config || null;
-    console.log(`[EnreachAdapter] Base URL: ${this.baseUrl}, Dialer: ${this.dialerName}, OrgCode from config: ${this.orgCode || 'not set'}`);
-    console.log(`[EnreachAdapter] Product extraction config:`, JSON.stringify(this.config?.productExtraction || 'not set'));
     
-    // Determine auth method: Basic (username/password) or Bearer (api_token)
+    console.log(`[EnreachAdapter] Config loaded: ${JSON.stringify(this.config?.productExtraction || 'None')}`);
+    
     let authHeader: string;
     if (credentials.username && credentials.password) {
       const basicAuth = btoa(`${credentials.username}:${credentials.password}`);
       authHeader = `Basic ${basicAuth}`;
-      console.log(`[EnreachAdapter] Using Basic Authentication for user: ${credentials.username}`);
     } else if (credentials.api_token) {
       authHeader = `Bearer ${credentials.api_token}`;
-      console.log("[EnreachAdapter] Using Bearer Token Authentication");
     } else {
-      throw new Error("[EnreachAdapter] No valid credentials provided. Require username/password or api_token.");
+      throw new Error("[EnreachAdapter] No valid credentials provided.");
     }
 
     this.headers = {
@@ -75,18 +55,10 @@ export class EnreachAdapter implements DialerAdapter {
     this.dialerName = name;
   }
 
-  /**
-   * Case-insensitive value lookup - tries multiple key variations
-   */
   private getValue(obj: Record<string, unknown> | null | undefined, keys: string[]): unknown {
     if (!obj || typeof obj !== 'object') return null;
-    
     for (const key of keys) {
-      // Direct match
-      if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') {
-        return obj[key];
-      }
-      // Try lowercase
+      if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
       const lowerKey = key.toLowerCase();
       for (const objKey of Object.keys(obj)) {
         if (objKey.toLowerCase() === lowerKey && obj[objKey] !== undefined && obj[objKey] !== null && obj[objKey] !== '') {
@@ -97,9 +69,6 @@ export class EnreachAdapter implements DialerAdapter {
     return null;
   }
 
-  /**
-   * Get string value with fallback
-   */
   private getStr(obj: Record<string, unknown> | null | undefined, keys: string[], fallback = ""): string {
     const val = this.getValue(obj, keys);
     if (val === null || val === undefined) return fallback;
@@ -108,73 +77,20 @@ export class EnreachAdapter implements DialerAdapter {
 
   private async get(endpoint: string): Promise<unknown> {
     const url = `${this.baseUrl}${endpoint}`;
-    console.log(`[EnreachAdapter] GET ${url}`);
-    
-    const response = await fetch(url, {
-      method: "GET",
-      headers: this.headers,
-    });
+    const response = await fetch(url, { method: "GET", headers: this.headers });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[EnreachAdapter] API Error ${response.status}: ${errorText.substring(0, 500)}`);
-      throw new Error(`Enreach API error: ${response.status} - ${errorText.substring(0, 300)}`);
+      console.error(`[EnreachAdapter] API Error ${response.status}: ${errorText.substring(0, 200)}`);
+      throw new Error(`Enreach API error: ${response.status}`);
     }
 
     return response.json();
   }
 
-  async fetchUsers(): Promise<StandardUser[]> {
-    try {
-      const data = await this.get("/users") as unknown[];
-
-      const users = Array.isArray(data) ? data : ((data as Record<string, unknown>).users as unknown[] || []);
-      
-      return users.map((user) => {
-        const u = user as Record<string, unknown>;
-        return {
-          externalId: this.getStr(u, ['uniqueId', 'UniqueId', 'Id', 'id']),
-          name: this.getStr(u, ['name', 'Name', 'FullName', 'fullName'], "Unknown"),
-          email: this.getStr(u, ['email', 'Email', 'EmailAddress', 'emailAddress']),
-          isActive: Boolean(this.getValue(u, ['active', 'Active', 'IsActive', 'isActive']) ?? true),
-          metadata: { source: "enreach" },
-        };
-      });
-    } catch (error) {
-      console.error("[EnreachAdapter] Error fetching users:", error);
-      return [];
-    }
-  }
-
-  async fetchCampaigns(): Promise<StandardCampaign[]> {
-    try {
-      const data = await this.get("/campaigns") as unknown;
-
-      const campaigns = Array.isArray(data) ? data : ((data as Record<string, unknown>).campaigns as unknown[] || []);
-      console.log(`[EnreachAdapter] Fetched ${campaigns.length} campaigns`);
-      
-      return campaigns.map((campaign) => {
-        const c = campaign as HeroBaseCampaign;
-        const id = this.getStr(c as Record<string, unknown>, ['uniqueId', 'UniqueId', 'Id', 'id']);
-        const name = this.getStr(c as Record<string, unknown>, ['name', 'Name'], "Unknown Campaign");
-        const active = this.getValue(c as Record<string, unknown>, ['active', 'Active', 'isActive', 'IsActive']);
-        const status = this.getStr(c as Record<string, unknown>, ['status', 'Status']);
-        
-        return {
-          externalId: id,
-          name,
-          isActive: active !== null ? Boolean(active) : (status?.toLowerCase() === "active"),
-        };
-      });
-    } catch (error) {
-      console.error("[EnreachAdapter] Error fetching campaigns:", error);
-      return [];
-    }
-  }
-
   async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
     try {
-      console.log(`[EnreachAdapter] Fetching sales for last ${days} days`);
+      console.log(`[EnreachAdapter] Fetching ONLY SUCCESS sales for last ${days} days`);
 
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -182,184 +98,98 @@ export class EnreachAdapter implements DialerAdapter {
       
       let allLeads: HeroBaseLead[] = [];
       
+      // FILTRADO ESTRICTO: Solo traemos ventas exitosas (LeadClosures=Success)
+      // AllClosedStatuses=true es necesario para ver leads ya procesados
+      const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true&LeadClosures=Success`;
+      
       try {
-        const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&Statuses=UserProcessed&LeadClosures=Success`;
-        console.log(`[EnreachAdapter] Fetching from: ${endpoint}`);
+        console.log(`[EnreachAdapter] GET ${endpoint}`);
         const data = await this.get(endpoint) as unknown;
         
         if (Array.isArray(data)) {
           allLeads = data as HeroBaseLead[];
         } else if (data && typeof data === 'object') {
           const wrapper = data as Record<string, unknown>;
-          allLeads = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || wrapper.Data || wrapper.data || []) as HeroBaseLead[];
+          allLeads = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as HeroBaseLead[];
         }
-      } catch (primaryError) {
-        console.warn("[EnreachAdapter] Primary fetch failed, trying alternative endpoint:", primaryError);
-        try {
-          const fallbackEndpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}`;
-          console.log(`[EnreachAdapter] Fallback fetch from: ${fallbackEndpoint}`);
-          const data = await this.get(fallbackEndpoint) as unknown;
-          
-          if (Array.isArray(data)) {
-            allLeads = data as HeroBaseLead[];
-          } else if (data && typeof data === 'object') {
-            const wrapper = data as Record<string, unknown>;
-            allLeads = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || wrapper.Data || wrapper.data || []) as HeroBaseLead[];
-          }
-        } catch (fallbackError) {
-          console.error("[EnreachAdapter] Fallback also failed:", fallbackError);
-          return [];
-        }
+      } catch (error) {
+        console.error("[EnreachAdapter] Error fetching leads:", error);
+        return [];
       }
 
-      console.log(`[EnreachAdapter] Fetched ${allLeads.length} total leads`);
-      
-      if (allLeads.length > 0) {
-        console.log(`[EnreachAdapter] Sample lead keys: ${Object.keys(allLeads[0]).slice(0, 15).join(', ')}`);
-      }
+      console.log(`[EnreachAdapter] Fetched ${allLeads.length} sales`);
 
       const mappingLookup = new Map<string, CampaignMappingConfig>();
       if (campaignMappings) {
         for (const mapping of campaignMappings) {
           mappingLookup.set(mapping.adversusCampaignId, mapping);
         }
-        console.log(`[EnreachAdapter] Loaded ${campaignMappings.length} campaign mappings`);
       }
 
-      const sales = allLeads.map((lead: HeroBaseLead) => {
-        // ===== HEROBASE SPECIFIC FIELD EXTRACTION =====
-        // The structure is: uniqueId, campaign: {uniqueId, code}, data: {Navn1, Navn2, Telefon1...}, firstProcessedByUser: {orgCode}
-        
-        // External ID - top level uniqueId
+      return allLeads.map((lead: HeroBaseLead) => {
+        // --- 1. Identificadores Básicos ---
         const externalId = this.getStr(lead, ['uniqueId', 'UniqueId']);
-
-        // Campaign info - nested in campaign object
         const campaignObj = (lead.campaign || lead.Campaign) as Record<string, unknown> | undefined;
         const campaignId = campaignObj ? this.getStr(campaignObj, ['uniqueId', 'UniqueId', 'code']) : "";
         const campaignCode = campaignObj ? this.getStr(campaignObj, ['code', 'Code']) : "";
         
-        // Agent info - from firstProcessedByUser object
+        // --- 2. Agente ---
         const firstProcessedByUser = (lead.firstProcessedByUser || lead.FirstProcessedByUser) as Record<string, unknown> | undefined;
         const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
+        const agentOrgCode = (firstProcessedByUser?.orgCode as string) || (lastModifiedByUser?.orgCode as string) || "";
         
-        // Try to get full name from user object first
-        let agentName = "";
-        if (firstProcessedByUser) {
-          agentName = this.getStr(firstProcessedByUser, ['name', 'Name', 'fullName', 'FullName', 'displayName', 'DisplayName']);
-        }
-        if (!agentName && lastModifiedByUser) {
-          agentName = this.getStr(lastModifiedByUser, ['name', 'Name', 'fullName', 'FullName', 'displayName', 'DisplayName']);
-        }
-        
-        // Get orgCode as a fallback identifier and email
-        const agentOrgCode = (firstProcessedByUser?.orgCode as string) || 
-                           (lastModifiedByUser?.orgCode as string) || "";
-        
-        const agentEmail = this.getStr(firstProcessedByUser || {}, ['email', 'Email', 'emailAddress', 'EmailAddress']) ||
-                          this.getStr(lastModifiedByUser || {}, ['email', 'Email', 'emailAddress', 'EmailAddress']) ||
-                          this.getStr(lead, ['agentEmail', 'AgentEmail', 'userEmail', 'UserEmail']) ||
-                          agentOrgCode; // Use orgCode as fallback
-        
-        // If we still don't have a name, use orgCode as the name
-        if (!agentName) {
-          agentName = agentOrgCode;
-        }
-        
-        // Log for debugging first few leads
-        if (allLeads.indexOf(lead) < 3) {
-          console.log(`[EnreachAdapter] Agent extraction - orgCode: ${agentOrgCode}, name: ${agentName}, email: ${agentEmail}, firstProcessedByUser keys: ${firstProcessedByUser ? Object.keys(firstProcessedByUser).join(', ') : 'null'}`);
-        }
+        // Nombre del agente: intenta buscar nombre real, sino usa el código
+        let agentName = this.getStr(firstProcessedByUser, ['name', 'Name', 'fullName']);
+        if (!agentName) agentName = agentOrgCode;
 
-        // Customer data - nested in 'data' object (HeroBase specific)
+        // --- 3. Cliente ---
         const dataObj = (lead.data || lead.Data) as Record<string, unknown> | undefined;
-        
         let customerName = "";
         let customerPhone = "";
-        let customerAddress = "";
         
         if (dataObj) {
-          // Name: Navn1 (first name) + Navn2 (last name)
-          const firstName = this.getStr(dataObj, ['Navn1', 'navn1', 'FirstName', 'firstName']);
-          const lastName = this.getStr(dataObj, ['Navn2', 'navn2', 'LastName', 'lastName']);
+          const firstName = this.getStr(dataObj, ['Navn1', 'FirstName', 'Fornavn']);
+          const lastName = this.getStr(dataObj, ['Navn2', 'LastName', 'Efternavn']);
           customerName = [firstName, lastName].filter(Boolean).join(' ').trim();
           
-          // Phone: Telefon1, Telefon2, Telefon3 (try in order)
-          customerPhone = this.getStr(dataObj, ['Telefon1', 'telefon1', 'Phone1', 'phone1']) ||
-                         this.getStr(dataObj, ['Telefon2', 'telefon2', 'Phone2', 'phone2']) ||
-                         this.getStr(dataObj, ['Telefon3', 'telefon3', 'Phone3', 'phone3']) ||
-                         this.getStr(dataObj, ['Telefon', 'telefon', 'Phone', 'phone', 'Mobile', 'mobile']);
-          
-          // Address (for context)
-          const address = this.getStr(dataObj, ['Adresse', 'adresse', 'Address', 'address']);
-          const city = this.getStr(dataObj, ['By', 'by', 'City', 'city']);
-          const postalCode = this.getStr(dataObj, ['Postnummer', 'postnummer', 'PostalCode', 'postalCode', 'Zip', 'zip']);
-          customerAddress = [address, postalCode, city].filter(Boolean).join(', ');
-        }
-        
-        // Fallback to top-level fields if data object extraction failed
-        if (!customerName) {
-          customerName = this.getStr(lead, ['company', 'Company', 'name', 'Name', 'customerName', 'CustomerName']);
-        }
-        if (!customerPhone) {
-          customerPhone = this.getStr(lead, ['phone', 'Phone', 'phoneNumber', 'PhoneNumber', 'mobile', 'Mobile']);
-        }
-
-        // Sale date - firstProcessedTime (when the sale was made)
-        const saleDate = this.getStr(lead, [
-          'firstProcessedTime', 'FirstProcessedTime',
-          'lastModifiedTime', 'LastModifiedTime', 
-          'soldTime', 'SoldTime', 'soldDate', 'SoldDate',
-          'closedTime', 'ClosedTime', 'createdTime', 'CreatedTime'
-        ]) || new Date().toISOString();
-
-        const mapping = mappingLookup.get(campaignId);
-        
-        // External reference - check data object for SerioID, KVHXR, or OPP patterns
-        let externalReference: string | null = null;
-        
-        // First try config-based extraction
-        if (mapping?.referenceConfig) {
-          const allVariables = { ...dataObj, ...lead };
-          externalReference = this.extractReference(allVariables as Record<string, unknown>, mapping.referenceConfig);
-          if (externalReference) {
-            console.log(`[EnreachAdapter] Extracted reference via config: ${externalReference}`);
+          if (!customerName) {
+            customerName = this.getStr(dataObj, ['Navn', 'Name', 'Company', 'Firma']);
           }
+          
+          customerPhone = this.getStr(dataObj, ['Telefon1', 'Telefon', 'Phone', 'Mobile']);
+        }
+
+        // --- 4. Extracción de Productos (Dinámica) ---
+        const products = this.extractProducts(lead, dataObj, campaignId, campaignCode);
+
+        // --- 5. Referencia Externa (Order ID) ---
+        let externalReference: string | null = null;
+        const mapping = mappingLookup.get(campaignId);
+
+        // Intento 1: Configuración específica de la campaña
+        if (mapping?.referenceConfig && dataObj) {
+            externalReference = this.extractReference({...dataObj, ...lead}, mapping.referenceConfig);
         }
         
-        // Then try HeroBase specific fields
+        // Intento 2: Campos comunes
         if (!externalReference && dataObj) {
-          externalReference = this.getStr(dataObj, ['SerioID', 'serioID', 'SERIO_ID']) ||
-                             this.getStr(dataObj, ['KVHXR', 'kvhxr']) ||
-                             this.getStr(dataObj, ['OrderId', 'orderId', 'order_id', 'OrdreId']) ||
-                             this.getStr(dataObj, ['Reference', 'reference', 'Ref', 'ref']) ||
-                             null;
-        }
-        
-        // Finally search for OPP patterns
-        if (!externalReference) {
-          const allVariables = { ...dataObj, ...lead };
-          externalReference = this.searchForOppInVariables(allVariables as Record<string, unknown>);
+            externalReference = this.getStr(dataObj, ['SerioID', 'KVHXR', 'OrderId', 'Reference', 'OrderNumber']) || null;
         }
 
-        // Products - extract based on configured strategy
-        let products: StandardProduct[] = this.extractProducts(lead, dataObj, campaignId, campaignCode);
+        const saleDate = this.getStr(lead, ['firstProcessedTime', 'lastModifiedTime']) || new Date().toISOString();
 
-        // Owner org unit - for metadata
-        const ownerOrgUnit = (lead.ownerOrgUnit || lead.OwnerOrgUnit) as Record<string, unknown> | undefined;
-        const organization = ownerOrgUnit?.orgCode as string || "";
-
-        const sale: StandardSale = {
+        return {
           externalId,
-          integrationType: "enreach" as const,
+          integrationType: "enreach",
           dialerName: this.dialerName,
           saleDate,
-          agentEmail,
-          agentExternalId: agentEmail || undefined, // Use email as ID for HeroBase
-          agentName: agentName || undefined,
-          customerName: customerName || undefined,
-          customerPhone: customerPhone || undefined,
+          agentEmail: agentOrgCode, 
+          agentExternalId: agentOrgCode,
+          agentName,
+          customerName,
+          customerPhone,
           campaignId,
-          campaignName: campaignCode || campaignId || undefined,
+          campaignName: campaignCode,
           externalReference,
           clientCampaignId: mapping?.clientCampaignId || null,
           products,
@@ -367,105 +197,17 @@ export class EnreachAdapter implements DialerAdapter {
             source: "enreach",
             campaignName: campaignCode,
             campaignId,
-            organization,
-            customerAddress,
             rawData: dataObj,
           },
         };
-
-        return sale;
       });
-
-      // Log extraction stats
-      const withExternalId = sales.filter(s => s.externalId).length;
-      const withAgent = sales.filter(s => s.agentName || s.agentEmail).length;
-      const withCustomer = sales.filter(s => s.customerName || s.customerPhone).length;
-      const withReference = sales.filter(s => s.externalReference).length;
-      console.log(`[EnreachAdapter] Extraction results: ${withExternalId}/${sales.length} with ID, ${withAgent} with agent, ${withCustomer} with customer, ${withReference} with reference`);
-
-      return sales;
     } catch (error) {
-      console.error("[EnreachAdapter] Error fetching sales:", error);
+      console.error("[EnreachAdapter] Critical error in fetchSales:", error);
       return [];
     }
   }
 
-  private extractReference(
-    variables: Record<string, unknown>,
-    config: ReferenceExtractionConfig
-  ): string | null {
-    try {
-      switch (config.type) {
-        case "field_id": {
-          const value = this.getValue(variables, [config.value, config.value.toLowerCase(), config.value.toUpperCase()]);
-          return value ? String(value) : null;
-        }
-        case "json_path": {
-          const parts = config.value.split(".");
-          let current: unknown = variables;
-          for (const part of parts) {
-            if (current && typeof current === "object") {
-              current = this.getValue(current as Record<string, unknown>, [part]);
-            } else {
-              return null;
-            }
-          }
-          return current ? String(current) : null;
-        }
-        case "regex": {
-          const regex = new RegExp(config.value);
-          for (const value of Object.values(variables)) {
-            if (typeof value === "string") {
-              const match = value.match(regex);
-              if (match) return match[0];
-            }
-          }
-          return null;
-        }
-        case "static":
-          return config.value;
-        default:
-          return null;
-      }
-    } catch (error) {
-      console.error("[EnreachAdapter] Error extracting reference:", error);
-      return null;
-    }
-  }
-
-  private searchForOppInVariables(variables: Record<string, unknown>): string | null {
-    const commonFields = [
-      "opp", "OPP", "Opp", "opp_number", "OppNumber", "oppNumber",
-      "order_id", "OrderId", "orderId", "order_number", "OrderNumber", "orderNumber",
-      "reference", "Reference", "ref", "Ref", "external_ref", "ExternalRef", "externalRef",
-      "ordreId", "OrdreId", "ordrenummer", "Ordrenummer", "OrdrNr",
-      "OpportunityId", "opportunityId", "opportunity_id"
-    ];
-
-    for (const field of commonFields) {
-      const val = variables[field];
-      if (val !== null && val !== undefined && val !== '') {
-        return String(val);
-      }
-    }
-
-    const oppPattern = /OPP-?\d{5,}/i;
-    for (const [key, value] of Object.entries(variables)) {
-      if (typeof value === "string") {
-        const match = value.match(oppPattern);
-        if (match) {
-          console.log(`[EnreachAdapter] Found OPP in field ${key}: ${match[0]}`);
-          return match[0];
-        }
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Extract products based on configured strategy
-   */
+  // --- LÓGICA DE EXTRACCIÓN DE PRODUCTOS CONFIGURABLE ---
   private extractProducts(
     lead: HeroBaseLead,
     dataObj: Record<string, unknown> | undefined,
@@ -473,382 +215,96 @@ export class EnreachAdapter implements DialerAdapter {
     campaignCode: string
   ): StandardProduct[] {
     const products: StandardProduct[] = [];
-    const extractionConfig = this.config?.productExtraction;
     
-    // First check if lead has explicit products array
-    const productsArray = (lead.Products || lead.products || lead.Items || lead.items || []) as unknown[];
-    if (Array.isArray(productsArray) && productsArray.length > 0) {
-      for (const p of productsArray) {
-        const prod = p as Record<string, unknown>;
-        products.push({
-          name: this.getStr(prod, ['name', 'Name', 'ProductName', 'productName', 'Title', 'title'], "Unknown Product"),
-          externalId: this.getStr(prod, ['uniqueId', 'UniqueId', 'Id', 'id', 'ProductId', 'productId'], "unknown"),
-          quantity: Number(this.getValue(prod, ['quantity', 'Quantity', 'Qty', 'qty']) || 1),
-          unitPrice: Number(this.getValue(prod, ['price', 'Price', 'UnitPrice', 'unitPrice', 'Amount', 'amount']) || 0),
-        });
-      }
-      return products;
+    const extractionConfig = this.config?.productExtraction;
+    const strategy = extractionConfig?.strategy || 'standard_closure';
+
+    // A. Estrategia: Regex en las llaves del objeto data
+    if (strategy === 'data_keys_regex' && dataObj && extractionConfig?.regexPattern) {
+        try {
+            const regex = new RegExp(extractionConfig.regexPattern, 'i');
+            for (const [key, value] of Object.entries(dataObj)) {
+                if (value && String(value).length > 0) {
+                    const match = key.match(regex);
+                    if (match) {
+                        const name = match[1]?.trim() || key;
+                        const priceStr = match[2]?.replace(',', '.') || '0';
+                        
+                        products.push({
+                            name: name,
+                            externalId: key, 
+                            quantity: 1,
+                            unitPrice: parseFloat(priceStr)
+                        });
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("[EnreachAdapter] Invalid regex:", e);
+        }
     }
 
-    // Apply extraction strategy based on config
-    const strategy = extractionConfig?.strategy || 'standard_closure';
-    
-    switch (strategy) {
-      case 'data_keys_regex': {
-        // Regex pattern to extract product name and price from data object keys
-        // Example: "Fri tale - 20 GB (5G) + 20 GB EU - 99 kr. (binding i 6 mdr.)" -> name="Fri tale - 20 GB", price=99
-        if (dataObj && extractionConfig?.regexPattern) {
-          try {
-            const regex = new RegExp(extractionConfig.regexPattern);
-            for (const [key, value] of Object.entries(dataObj)) {
-              const match = key.match(regex);
-              if (match) {
-                // match[1] = product name, match[2] = price (optional)
-                const productName = match[1]?.trim() || key;
-                const priceStr = match[2]?.replace(',', '.') || '0';
-                const price = parseFloat(priceStr) || 0;
-                
+    // B. Estrategia: Campos específicos
+    if (strategy === 'specific_fields' && dataObj && extractionConfig?.targetKeys) {
+        for (const key of extractionConfig.targetKeys) {
+            const val = this.getValue(dataObj, [key]);
+            if (val && String(val).trim().length > 0) {
                 products.push({
-                  name: productName,
-                  externalId: key,
-                  quantity: 1,
-                  unitPrice: price,
-                  metadata: { url: typeof value === 'string' ? value : undefined },
+                    name: String(val),
+                    externalId: String(val), 
+                    quantity: 1,
+                    unitPrice: 0 
                 });
-                
-                // Log first few matches
-                if (products.length <= 3) {
-                  console.log(`[EnreachAdapter] Regex extracted product: "${productName}" at ${price} kr from key: "${key.substring(0, 50)}..."`);
-                }
-              }
             }
-          } catch (regexError) {
-            console.error(`[EnreachAdapter] Invalid regex pattern: ${extractionConfig.regexPattern}`, regexError);
-          }
         }
-        break;
-      }
-      
-      case 'specific_fields': {
-        // Look for specific field names in the data object
-        if (dataObj && extractionConfig?.targetKeys?.length) {
-          for (const targetKey of extractionConfig.targetKeys) {
-            const value = this.getValue(dataObj, [targetKey, targetKey.toLowerCase(), targetKey.toUpperCase()]);
-            if (value !== null && value !== undefined && value !== '') {
-              products.push({
-                name: String(value),
-                externalId: targetKey,
-                quantity: 1,
-                unitPrice: 0,
-              });
-              console.log(`[EnreachAdapter] Extracted product from field ${targetKey}: "${String(value).substring(0, 50)}"`);
-            }
-          }
-        }
-        break;
-      }
-      
-      case 'standard_closure':
-      default: {
-        // Check closureData if available (standard Enreach/HeroBase pattern)
-        const closureData = (lead.closureData || lead.ClosureData) as unknown[];
-        if (Array.isArray(closureData) && closureData.length > 0) {
-          for (const item of closureData) {
-            const closure = item as Record<string, unknown>;
-            const productName = this.getStr(closure, ['name', 'Name', 'product', 'Product', 'value', 'Value']);
-            if (productName) {
-              products.push({
-                name: productName,
-                externalId: this.getStr(closure, ['id', 'Id', 'key', 'Key']) || productName,
-                quantity: Number(this.getValue(closure, ['quantity', 'Quantity', 'count', 'Count']) || 1),
-                unitPrice: Number(this.getValue(closure, ['price', 'Price', 'amount', 'Amount']) || 0),
-              });
-            }
-          }
-        }
-        break;
-      }
     }
-    
-    // Fallback: create product from campaign info if nothing found
+
+    // C. Estrategia: Standard Closure
+    const closureData = (lead.closureData || lead.ClosureData) as any[];
+    if (products.length === 0 && Array.isArray(closureData) && closureData.length > 0) {
+        for (const item of closureData) {
+            products.push({
+                name: item.text || item.productName || "Unknown",
+                externalId: item.sku || item.id || "unknown",
+                quantity: Number(item.amount || item.quantity || 1),
+                unitPrice: Number(item.price || item.amount || 0)
+            });
+        }
+    }
+
+    // D. Fallback final
     if (products.length === 0) {
-      const defaultName = extractionConfig?.defaultName || campaignCode || campaignId || "Unknown Product";
-      products.push({
-        name: defaultName,
-        externalId: campaignId || "unknown",
-        quantity: 1,
-        unitPrice: 0,
-      });
+        const fallbackName = extractionConfig?.defaultName || campaignCode || "Venta General";
+        products.push({
+            name: fallbackName,
+            externalId: campaignId || "unknown",
+            quantity: 1,
+            unitPrice: 0
+        });
     }
-    
+
     return products;
   }
 
-  async fetchResultData(resultId: string): Promise<Record<string, unknown>> {
+  private extractReference(variables: Record<string, unknown>, config: ReferenceExtractionConfig): string | null {
     try {
-      const data = await this.get(`/leads/${resultId}`) as Record<string, unknown>;
-
-      const dataObj = (data.data || data.Data || {}) as Record<string, unknown>;
-      const customFields = (data.customFields || data.CustomFields || {}) as Record<string, unknown>;
-      
-      return {
-        ...dataObj,
-        ...customFields,
-      };
-    } catch (error) {
-      console.error(`[EnreachAdapter] Error fetching lead data for ${resultId}:`, error);
-      return {};
-    }
+      if (config.type === 'field_id') {
+        return this.getStr(variables, [config.value]);
+      }
+      return null; 
+    } catch (e) { return null; }
   }
 
-  /**
-   * GDPR-Compliant CDR fetch - only IDs and metadata, NO personal Lead data
-   * Uses HeroBase /organizationalunits/{OrgCode}/calls endpoint for Call Detail Records
-   * REQUIRES: org_code to be configured in the integration
-   */
-  async fetchCalls(days: number): Promise<StandardCall[]> {
-    try {
-      // OrgCode is required for HeroBase calls API
-      const orgCode = this.orgCode;
-      
-      if (!orgCode) {
-        console.error("[EnreachAdapter] OrgCode is REQUIRED for fetching calls. Please configure org_code in the integration settings.");
-        return [];
-      }
-
-      // Calculate TimeSpan format: "d.hh:mm:ss" (e.g., "7.00:00:00" for 7 days)
-      const timeSpan = `${days}.00:00:00`;
-      
-      // StartTime in ISO format
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-      const startDateIso = startDate.toISOString();
-
-      console.log(`[EnreachAdapter] Fetching calls for OrgCode: ${orgCode}, TimeSpan: ${timeSpan}`);
-
-      let allCalls: Record<string, unknown>[] = [];
-      
-      // HeroBase API: /organizationalunits/{OrgCode}/calls?StartTime=YYYY-MM-DDTHH:mm:ss&TimeSpan=d.HH:mm:ss
-      const endpoint = `/organizationalunits/${encodeURIComponent(orgCode)}/calls?StartTime=${encodeURIComponent(startDateIso)}&TimeSpan=${encodeURIComponent(timeSpan)}&Limit=1000`;
-      
-      try {
-        console.log(`[EnreachAdapter] GET ${this.baseUrl}${endpoint}`);
-        const data = await this.get(endpoint) as unknown;
-        
-        if (Array.isArray(data)) {
-          allCalls = data as Record<string, unknown>[];
-        } else if (data && typeof data === 'object') {
-          const wrapper = data as Record<string, unknown>;
-          console.log(`[EnreachAdapter] Response keys: ${Object.keys(wrapper).slice(0, 10).join(', ')}`);
-          
-          allCalls = (
-            wrapper.Results || wrapper.results || 
-            wrapper.Calls || wrapper.calls || 
-            wrapper.Data || wrapper.data || 
-            []
-          ) as Record<string, unknown>[];
+  private searchForOppInVariables(variables: Record<string, unknown>): string | null {
+    for (const [key, value] of Object.entries(variables)) {
+        if (typeof value === 'string' && (key.toLowerCase().includes('opp') || key.toLowerCase().includes('order'))) {
+             return value;
         }
-        
-        console.log(`[EnreachAdapter] Fetched ${allCalls.length} calls`);
-      } catch (error) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        console.error(`[EnreachAdapter] Failed to fetch calls: ${errMsg}`);
-        return [];
-      }
-
-      if (allCalls.length === 0) {
-        console.log("[EnreachAdapter] No call records found");
-        return [];
-      }
-
-      // Log sample record structure for debugging
-      if (allCalls.length > 0) {
-        console.log(`[EnreachAdapter] Sample call keys: ${Object.keys(allCalls[0]).slice(0, 20).join(', ')}`);
-      }
-
-      // Map to StandardCall (GDPR-compliant - only IDs)
-      return allCalls.map((call) => {
-        // Determine status from endCause and connected flag
-        // endCause: 'NotApplicable', 'NormalDisconnect', 'NoResponse', 'Busy', 'VoiceMail', 'DroppedCall', 'DialingCancelled'
-        const connected = Boolean(this.getValue(call, ['connected', 'Connected']));
-        const endCause = this.getStr(call, ['endCause', 'EndCause']);
-        const status = this.mapEnreachEndCause(endCause, connected);
-        
-        // Times - API provides startTime, connectTime (optional), endTime (optional)
-        const callStartTime = this.getStr(call, ['startTime', 'StartTime']) || new Date().toISOString();
-        const connectTime = this.getStr(call, ['connectTime', 'ConnectTime']);
-        const callEndTime = this.getStr(call, ['endTime', 'EndTime']) || callStartTime;
-
-        // Duration extraction - HeroBase uses TimeSpan format like "00:01:30" or seconds
-        // conversationDuration: talk time (only if connected)
-        // dialingDuration: time spent dialing
-        // wrapUpDuration: wrap up time
-        const conversationDuration = this.parseTimeSpan(
-          this.getValue(call, ['conversationDuration', 'ConversationDuration'])
-        );
-        const dialingDuration = this.parseTimeSpan(
-          this.getValue(call, ['dialingDuration', 'DialingDuration'])
-        );
-        const wrapUpDuration = this.parseTimeSpan(
-          this.getValue(call, ['wrapUpDuration', 'WrapUpDuration'])
-        );
-        
-        // durationSeconds = conversation time (talk time)
-        // totalDurationSeconds = dialing + conversation + wrapup
-        const durationSeconds = conversationDuration;
-        const totalDurationSeconds = dialingDuration + conversationDuration + wrapUpDuration;
-
-        // Extract user/agent info from nested user object
-        // user: { uniqueId, username, name, orgCode, email }
-        const userObj = (call.user || call.User) as Record<string, unknown> | undefined;
-        let agentExternalId = "";
-        let agentEmail = "";
-        let agentName = "";
-        
-        if (userObj) {
-          agentExternalId = this.getStr(userObj, ['uniqueId', 'UniqueId', 'orgCode', 'OrgCode']);
-          agentEmail = this.getStr(userObj, ['email', 'Email']);
-          agentName = this.getStr(userObj, ['name', 'Name', 'username', 'Username']);
-        }
-
-        // Campaign info from nested campaign object
-        // campaign: { uniqueId, name, code, project }
-        const campaignObj = (call.campaign || call.Campaign) as Record<string, unknown> | undefined;
-        let campaignExternalId = "";
-        let campaignName = "";
-        
-        if (campaignObj) {
-          campaignExternalId = this.getStr(campaignObj, ['uniqueId', 'UniqueId', 'code', 'Code']);
-          campaignName = this.getStr(campaignObj, ['name', 'Name', 'code', 'Code']);
-        }
-
-        // Lead ID - uniqueLeadId from API (ONLY the ID, never personal data - GDPR)
-        const leadExternalId = this.getStr(call, ['uniqueLeadId', 'UniqueLeadId', 'leadId', 'LeadId']);
-
-        // Recording URL - needs separate /calls/{UniqueId}/recordings endpoint
-        // For now, construct potential URL pattern
-        const callUniqueId = this.getStr(call, ['uniqueId', 'UniqueId']);
-        const recordingUrl = callUniqueId ? `${this.baseUrl}/calls/${callUniqueId}/recordings` : undefined;
-
-        return {
-          externalId: callUniqueId,
-          integrationType: "enreach" as const,
-          dialerName: this.dialerName,
-          
-          startTime: callStartTime,
-          endTime: callEndTime,
-          
-          durationSeconds,
-          totalDurationSeconds,
-          
-          status,
-          
-          // ONLY IDs - No personal data (GDPR compliant)
-          agentExternalId,
-          campaignExternalId,
-          leadExternalId,
-          
-          recordingUrl,
-          
-          metadata: {
-            endCause,
-            connected,
-            connectTime,
-            incoming: Boolean(this.getValue(call, ['incoming', 'Incoming'])),
-            leadStatus: this.getStr(call, ['leadStatus', 'LeadStatus']),
-            leadClosure: this.getStr(call, ['leadClosure', 'LeadClosure']),
-            campaignType: this.getStr(call, ['campaignType', 'CampaignType']),
-            agentEmail,
-            agentName,
-            campaignName,
-          },
-        };
-      });
-    } catch (error) {
-      console.error("[EnreachAdapter] Error fetching calls:", error);
-      return [];
     }
+    return null;
   }
 
-  /**
-   * Parse TimeSpan format (d.hh:mm:ss or hh:mm:ss or seconds) to total seconds
-   */
-  private parseTimeSpan(value: unknown): number {
-    if (!value) return 0;
-    
-    // If already a number, return it
-    if (typeof value === 'number') return value;
-    
-    const str = String(value);
-    
-    // Try parsing as "d.hh:mm:ss" or "hh:mm:ss" or "mm:ss"
-    const parts = str.split(':');
-    
-    if (parts.length === 3) {
-      // hh:mm:ss or d.hh:mm:ss
-      let hours = 0;
-      let days = 0;
-      
-      // Check for days prefix like "1.02:30:00"
-      if (parts[0].includes('.')) {
-        const dayHour = parts[0].split('.');
-        days = parseInt(dayHour[0], 10) || 0;
-        hours = parseInt(dayHour[1], 10) || 0;
-      } else {
-        hours = parseInt(parts[0], 10) || 0;
-      }
-      
-      const minutes = parseInt(parts[1], 10) || 0;
-      const seconds = parseInt(parts[2], 10) || 0;
-      
-      return (days * 24 * 3600) + (hours * 3600) + (minutes * 60) + seconds;
-    } else if (parts.length === 2) {
-      // mm:ss
-      const minutes = parseInt(parts[0], 10) || 0;
-      const seconds = parseInt(parts[1], 10) || 0;
-      return (minutes * 60) + seconds;
-    }
-    
-    // Try parsing as plain number
-    return parseInt(str, 10) || 0;
-  }
-
-  /**
-   * Map Enreach/HeroBase endCause to unified status enum
-   * endCause values: 'NotApplicable', 'NormalDisconnect', 'NoResponse', 'Busy', 'VoiceMail', 'DroppedCall', 'DialingCancelled'
-   */
-  private mapEnreachEndCause(cause: string | undefined, connected?: boolean): StandardCall['status'] {
-    // If connected is true and normal disconnect, it was answered
-    if (connected) {
-      return 'ANSWERED';
-    }
-    
-    if (!cause) return 'OTHER';
-    
-    const c = cause.toLowerCase();
-    
-    switch (c) {
-      case 'normaldisconnect':
-        return connected ? 'ANSWERED' : 'NO_ANSWER';
-      case 'noresponse':
-        return 'NO_ANSWER';
-      case 'busy':
-        return 'BUSY';
-      case 'voicemail':
-        return 'NO_ANSWER'; // Voicemail = didn't reach person
-      case 'droppedcall':
-        return 'FAILED';
-      case 'dialingcancelled':
-        return 'FAILED';
-      case 'notapplicable':
-        return 'OTHER';
-      default:
-        // Fallback pattern matching
-        if (c.includes('answer')) return 'ANSWERED';
-        if (c.includes('busy')) return 'BUSY';
-        if (c.includes('no_answer') || c.includes('noanswer')) return 'NO_ANSWER';
-        if (c.includes('fail') || c.includes('error')) return 'FAILED';
-        return 'OTHER';
-    }
-  }
+  async fetchUsers(): Promise<StandardUser[]> { return []; }
+  async fetchCampaigns(): Promise<StandardCampaign[]> { return []; }
+  async fetchCalls(): Promise<StandardCall[]> { return []; }
 }
