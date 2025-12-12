@@ -2960,6 +2960,7 @@ export type Database = {
           dialer_campaign_id: string | null
           id: string
           integration_type: string | null
+          raw_payload: Json | null
           sale_datetime: string
           source: string | null
           status: string | null
@@ -2980,6 +2981,7 @@ export type Database = {
           dialer_campaign_id?: string | null
           id?: string
           integration_type?: string | null
+          raw_payload?: Json | null
           sale_datetime?: string
           source?: string | null
           status?: string | null
@@ -3000,6 +3002,7 @@ export type Database = {
           dialer_campaign_id?: string | null
           id?: string
           integration_type?: string | null
+          raw_payload?: Json | null
           sale_datetime?: string
           source?: string | null
           status?: string | null

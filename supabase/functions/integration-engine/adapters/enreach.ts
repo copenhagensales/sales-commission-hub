@@ -203,11 +203,12 @@ export class EnreachAdapter implements DialerAdapter {
           externalReference,
           clientCampaignId: mapping?.clientCampaignId || null,
           products,
+          // Store complete raw JSON from dialer
+          rawPayload: lead,
           metadata: {
             source: "enreach",
             campaignName: campaignCode,
             campaignId,
-            rawData: dataObj,
           },
         };
       });

@@ -51,6 +51,8 @@ export interface StandardSale {
   // Client campaign ID - resolved by adapter
   clientCampaignId?: string | null;
   products: StandardProduct[];
+  // Complete raw JSON payload from dialer for debugging/auditing
+  rawPayload?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
 }
 

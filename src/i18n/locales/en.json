@@ -180,6 +180,8 @@
     "unknownProduct": "Unknown product",
     "needsMapping": "Needs mapping",
     "mapped": "Mapped",
-    "noProducts": "No products registered"
+    "noProducts": "No products registered",
+    "rawJson": "Raw JSON Payload",
+    "noRawData": "No raw data available"
   }
 }
