@@ -181,9 +181,21 @@ export class EnreachAdapter implements DialerAdapter {
             externalReference = this.extractReference({...dataObj, ...lead}, mapping.referenceConfig);
         }
         
-        // Intento 2: Campos comunes
+        // Intento 2: Campos comunes (ESTRICTO - Solo OPP u OrderId reales)
+        // Eliminados: SerioID, KVHXR, Reference, Ref (para evitar IDs internos)
         if (!externalReference && dataObj) {
-            externalReference = this.getStr(dataObj, ['SerioID', 'KVHXR', 'OrderId', 'Reference', 'OrderNumber']) || null;
+            externalReference = this.getStr(dataObj, [
+                'OPP', 'opp', 'Opp', 
+                'OPP_number', 'opp_number', 'OppNumber',
+                'OrderId', 'orderId', 'order_id', 'OrdreId', 
+                'OrderNumber', 'orderNumber'
+            ]) || null;
+        }
+        
+        // Finalmente busca patrones OPP por regex (OPP-1234 o 123456)
+        if (!externalReference) {
+             const allVariables = { ...dataObj, ...lead };
+             externalReference = this.searchForOppInVariables(allVariables as Record<string, unknown>);
         }
 
         const saleDate = this.getStr(lead, ['firstProcessedTime', 'lastModifiedTime']) || new Date().toISOString();
