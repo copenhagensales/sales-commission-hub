@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle, AlertTriangle, Database, RefreshCw, ChevronLeft, ChevronRight, CalendarIcon, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { CheckCircle, AlertTriangle, Database, RefreshCw, ChevronLeft, ChevronRight, CalendarIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Code } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { da, enUS } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ interface Sale {
   integration_type: string | null;
   campaign_name: string | null;
   dialer_campaign_id: string | null;
+  raw_payload: Record<string, unknown> | null;
 }
 
 const PAGE_SIZE = 50;
@@ -44,6 +45,7 @@ export default function DialerData() {
   const [activeTab, setActiveTab] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [showRawJson, setShowRawJson] = useState<Sale | null>(null);
   const [page, setPage] = useState(0);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(subDays(new Date(), 7));
   const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
@@ -118,7 +120,7 @@ export default function DialerData() {
         .from("sales")
         .select(`
           id, adversus_external_id, agent_name, agent_email, sale_datetime, adversus_opp_number, 
-          customer_company, customer_phone, source, integration_type, dialer_campaign_id,
+          customer_company, customer_phone, source, integration_type, dialer_campaign_id, raw_payload,
           client_campaigns(name)
         `, { count: "exact" })
         .order(sortColumn === "campaign_name" ? "sale_datetime" : sortColumn, { ascending: sortDirection === "asc", nullsFirst: false })
@@ -411,6 +413,9 @@ export default function DialerData() {
                             <TableHead className="cursor-pointer select-none hover:bg-muted/50" onClick={() => handleSort("adversus_opp_number")}>
                               <div className="flex items-center">{t("dialerData.oppStatus")}<SortIcon column="adversus_opp_number" /></div>
                             </TableHead>
+                            <TableHead>
+                              <div className="flex items-center">JSON</div>
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -449,11 +454,25 @@ export default function DialerData() {
                                   </div>
                                 )}
                               </TableCell>
+                              <TableCell onClick={(e) => e.stopPropagation()}>
+                                {sale.raw_payload ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setShowRawJson(sale)}
+                                    className="h-7 px-2"
+                                  >
+                                    <Code className="h-4 w-4" />
+                                  </Button>
+                                ) : (
+                                  <span className="text-muted-foreground text-xs">-</span>
+                                )}
+                              </TableCell>
                             </TableRow>
                           ))}
                           {sales.length === 0 && (
                             <TableRow>
-                              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                              <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                                 {t("dialerData.noSalesFound")}
                               </TableCell>
                             </TableRow>
@@ -589,6 +608,27 @@ export default function DialerData() {
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Raw JSON Dialog */}
+        <Dialog open={!!showRawJson} onOpenChange={() => setShowRawJson(null)}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <Code className="h-5 w-5" />
+                {t("dialerData.rawJson")}
+                {showRawJson && getIntegrationBadge(showRawJson.integration_type)}
+              </DialogTitle>
+              <DialogDescription>
+                {showRawJson?.adversus_external_id || ""}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto">
+              <pre className="bg-muted p-4 rounded-lg text-xs font-mono overflow-auto max-h-[60vh]">
+                {showRawJson?.raw_payload ? JSON.stringify(showRawJson.raw_payload, null, 2) : t("dialerData.noRawData")}
+              </pre>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

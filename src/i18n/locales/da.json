@@ -180,6 +180,8 @@
     "unknownProduct": "Ukendt produkt",
     "needsMapping": "Mangler mapping",
     "mapped": "Mappet",
-    "noProducts": "Ingen produkter registreret"
+    "noProducts": "Ingen produkter registreret",
+    "rawJson": "Rå JSON Payload",
+    "noRawData": "Ingen rå data tilgængelig"
   }
 }

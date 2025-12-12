@@ -239,6 +239,7 @@ export class IngestionEngine {
           dialer_campaign_id: sale.campaignId || null,
           source: sale.dialerName,
           integration_type: sale.integrationType,
+          raw_payload: sale.rawPayload || null,
           updated_at: new Date().toISOString(),
         };
 

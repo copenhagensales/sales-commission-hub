@@ -150,6 +150,9 @@ export class AdversusAdapter implements DialerAdapter {
           metadata: { rawLineId: l.id },
         })),
 
+        // Store complete raw JSON from dialer
+        rawPayload: s,
+
         metadata: {
           campaignId: s.campaignId,
           leadId: s.leadId,
