@@ -227,12 +227,23 @@ export default function TimeStamp() {
             </h2>
             <div className="space-y-2">
               {todayStamps.map((stamp) => {
+                // Always show actual clock times
+                const actualIn = format(new Date(stamp.clock_in), "HH:mm");
+                const actualOut = stamp.clock_out 
+                  ? format(new Date(stamp.clock_out), "HH:mm")
+                  : null;
+                
+                // Show effective times only if they differ from actual times
                 const effectiveIn = stamp.effective_clock_in 
                   ? format(new Date(stamp.effective_clock_in), "HH:mm")
                   : null;
                 const effectiveOut = stamp.effective_clock_out 
                   ? format(new Date(stamp.effective_clock_out), "HH:mm")
                   : null;
+                
+                const hasEffectiveDifference = 
+                  (effectiveIn && effectiveIn !== actualIn) || 
+                  (effectiveOut && actualOut && effectiveOut !== actualOut);
                 
                 return (
                   <Card key={stamp.id} className="border-0 shadow-sm bg-card/50">
@@ -248,12 +259,9 @@ export default function TimeStamp() {
                           </div>
                           <div>
                             <div className="font-medium">
-                              {format(new Date(stamp.clock_in), "HH:mm")}
+                              {actualIn}
                               <span className="text-muted-foreground mx-1.5">→</span>
-                              {stamp.clock_out 
-                                ? format(new Date(stamp.clock_out), "HH:mm")
-                                : "..."
-                              }
+                              {actualOut || "..."}
                             </div>
                             {stamp.note && (
                               <p className="text-xs text-muted-foreground mt-0.5">
@@ -266,7 +274,7 @@ export default function TimeStamp() {
                           <div className="font-medium">
                             {formatDuration(stamp.clock_in, stamp.clock_out, stamp.effective_hours)}
                           </div>
-                          {effectiveIn && stamp.clock_out && effectiveOut && (
+                          {hasEffectiveDifference && effectiveIn && stamp.clock_out && effectiveOut && (
                             <p className="text-xs text-muted-foreground">
                               Effektiv: {effectiveIn}–{effectiveOut}
                             </p>
