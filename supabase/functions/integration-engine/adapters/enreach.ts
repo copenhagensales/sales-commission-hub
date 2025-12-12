@@ -90,75 +90,138 @@ export class EnreachAdapter implements DialerAdapter {
 
   async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
     try {
-      console.log(`[EnreachAdapter] Fetching ONLY SUCCESS sales for last ${days} days`);
-
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - days);
-      const modifiedFrom = cutoffDate.toISOString().split('T')[0];
+      // MEMORY OPTIMIZATION: For large date ranges, chunk into smaller periods
+      // Each week = ~600 leads, which is manageable
+      const MAX_DAYS_PER_CHUNK = 30; // Process 30 days at a time max
       
-      // FILTRADO ESTRICTO: Solo traemos ventas exitosas (LeadClosures=Success)
-      const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true&LeadClosures=Success`;
+      if (days > MAX_DAYS_PER_CHUNK) {
+        console.log(`[EnreachAdapter] Large date range (${days} days). Chunking into ${MAX_DAYS_PER_CHUNK}-day segments...`);
+        return this.fetchSalesChunked(days, MAX_DAYS_PER_CHUNK, campaignMappings);
+      }
       
-      let rawData: unknown;
-      try {
-        console.log(`[EnreachAdapter] GET ${endpoint}`);
-        rawData = await this.get(endpoint);
-      } catch (error) {
-        console.error("[EnreachAdapter] Error fetching leads:", error);
-        return [];
-      }
-
-      // Extract array from response
-      let allLeads: HeroBaseLead[];
-      if (Array.isArray(rawData)) {
-        allLeads = rawData as HeroBaseLead[];
-      } else if (rawData && typeof rawData === 'object') {
-        const wrapper = rawData as Record<string, unknown>;
-        allLeads = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as HeroBaseLead[];
-      } else {
-        allLeads = [];
-      }
-
-      console.log(`[EnreachAdapter] Fetched ${allLeads.length} raw leads from API`);
-
-      // Build mapping lookup once
-      const mappingLookup = new Map<string, CampaignMappingConfig>();
-      if (campaignMappings) {
-        for (const mapping of campaignMappings) {
-          mappingLookup.set(mapping.adversusCampaignId, mapping);
-        }
-      }
-
-      // MEMORY OPTIMIZATION: Process leads in-place, filter and transform in one pass
-      // Don't keep both raw and transformed in memory
-      const sales: StandardSale[] = [];
-      
-      for (let i = 0; i < allLeads.length; i++) {
-        const lead = allLeads[i];
-        
-        // Filter: only process Success leads
-        const closure = this.getStr(lead, ['closure', 'Closure']);
-        if (!closure || closure.toLowerCase() !== 'success') {
-          continue;
-        }
-        
-        // Transform lead to StandardSale
-        const sale = this.transformLeadToSale(lead, mappingLookup);
-        if (sale) {
-          sales.push(sale);
-        }
-        
-        // Clear reference to help GC (important for large datasets)
-        allLeads[i] = null as unknown as HeroBaseLead;
-      }
-
-      console.log(`[EnreachAdapter] Filtered ${allLeads.length} raw leads down to ${sales.length} valid sales`);
-
-      return sales;
+      return this.fetchSalesForPeriod(days, campaignMappings);
     } catch (error) {
       console.error("[EnreachAdapter] Critical error in fetchSales:", error);
       return [];
     }
+  }
+
+  // Fetch sales in chunks to avoid memory issues with large date ranges
+  private async fetchSalesChunked(
+    totalDays: number, 
+    chunkSize: number, 
+    campaignMappings?: CampaignMappingConfig[]
+  ): Promise<StandardSale[]> {
+    const allSales: StandardSale[] = [];
+    const now = new Date();
+    
+    // Calculate number of chunks needed
+    const chunks = Math.ceil(totalDays / chunkSize);
+    console.log(`[EnreachAdapter] Will fetch ${chunks} chunks of ${chunkSize} days each`);
+    
+    for (let i = 0; i < chunks; i++) {
+      const chunkEnd = new Date(now);
+      chunkEnd.setDate(chunkEnd.getDate() - (i * chunkSize));
+      
+      const chunkStart = new Date(chunkEnd);
+      chunkStart.setDate(chunkStart.getDate() - chunkSize);
+      
+      // Don't go beyond the total days requested
+      const daysFromNow = i * chunkSize;
+      if (daysFromNow >= totalDays) break;
+      
+      const daysToFetch = Math.min(chunkSize, totalDays - daysFromNow);
+      
+      console.log(`[EnreachAdapter] Fetching chunk ${i + 1}/${chunks}: ${daysToFetch} days (starting ${daysFromNow} days ago)`);
+      
+      try {
+        const chunkSales = await this.fetchSalesForPeriod(daysToFetch, campaignMappings, daysFromNow);
+        console.log(`[EnreachAdapter] Chunk ${i + 1} returned ${chunkSales.length} sales`);
+        allSales.push(...chunkSales);
+      } catch (e) {
+        console.error(`[EnreachAdapter] Error in chunk ${i + 1}:`, e);
+        // Continue with other chunks even if one fails
+      }
+    }
+    
+    console.log(`[EnreachAdapter] Total sales from all chunks: ${allSales.length}`);
+    return allSales;
+  }
+
+  // Fetch sales for a specific period (max 30 days to avoid memory issues)
+  private async fetchSalesForPeriod(
+    days: number, 
+    campaignMappings?: CampaignMappingConfig[],
+    offsetDays: number = 0
+  ): Promise<StandardSale[]> {
+    console.log(`[EnreachAdapter] Fetching SUCCESS sales for ${days} days (offset: ${offsetDays})`);
+
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() - offsetDays);
+    
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - days);
+    
+    const modifiedFrom = startDate.toISOString().split('T')[0];
+    const modifiedTo = endDate.toISOString().split('T')[0];
+    
+    // Include date range in query to limit results
+    const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&ModifiedTo=${modifiedTo}&AllClosedStatuses=true&LeadClosures=Success`;
+    
+    let rawData: unknown;
+    try {
+      console.log(`[EnreachAdapter] GET ${endpoint}`);
+      rawData = await this.get(endpoint);
+    } catch (error) {
+      console.error("[EnreachAdapter] Error fetching leads:", error);
+      return [];
+    }
+
+    // Extract array from response
+    let allLeads: HeroBaseLead[];
+    if (Array.isArray(rawData)) {
+      allLeads = rawData as HeroBaseLead[];
+    } else if (rawData && typeof rawData === 'object') {
+      const wrapper = rawData as Record<string, unknown>;
+      allLeads = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as HeroBaseLead[];
+    } else {
+      allLeads = [];
+    }
+
+    console.log(`[EnreachAdapter] Fetched ${allLeads.length} raw leads from API`);
+
+    // Build mapping lookup once
+    const mappingLookup = new Map<string, CampaignMappingConfig>();
+    if (campaignMappings) {
+      for (const mapping of campaignMappings) {
+        mappingLookup.set(mapping.adversusCampaignId, mapping);
+      }
+    }
+
+    // MEMORY OPTIMIZATION: Process leads in-place, filter and transform in one pass
+    const sales: StandardSale[] = [];
+    
+    for (let i = 0; i < allLeads.length; i++) {
+      const lead = allLeads[i];
+      
+      // Filter: only process Success leads
+      const closure = this.getStr(lead, ['closure', 'Closure']);
+      if (!closure || closure.toLowerCase() !== 'success') {
+        continue;
+      }
+      
+      // Transform lead to StandardSale
+      const sale = this.transformLeadToSale(lead, mappingLookup);
+      if (sale) {
+        sales.push(sale);
+      }
+      
+      // Clear reference to help GC
+      allLeads[i] = null as unknown as HeroBaseLead;
+    }
+
+    console.log(`[EnreachAdapter] Filtered to ${sales.length} valid sales`);
+    return sales;
   }
 
   // Transform a single lead to StandardSale (extracted for memory efficiency)
