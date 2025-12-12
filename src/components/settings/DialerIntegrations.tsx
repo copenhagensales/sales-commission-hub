@@ -696,7 +696,7 @@ export function DialerIntegrations() {
                 {t("dialerIntegrations.add")}
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
               <form onSubmit={handleSubmit}>
                 <DialogHeader>
                   <DialogTitle>{editingId ? t("dialerIntegrations.editIntegration") : t("dialerIntegrations.addIntegration")}</DialogTitle>
