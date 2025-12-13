@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, Plus, UserPlus, RefreshCcw, CalendarClock, UserCog, Video, Monitor, Phone, DollarSign } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, Plus, UserPlus, RefreshCcw, CalendarClock, UserCog, Video, Monitor, Phone, DollarSign, FlaskConical } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,8 +28,13 @@ const getOwnerNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.sales"), href: "/sales", icon: ShoppingCart },
   { name: t("sidebar.commissionCpo"), href: "/commission-cpo", icon: Percent },
   { name: t("sidebar.logics"), href: "/logikker", icon: ListChecks },
+];
+
+// Test submenu navigation (Bil Quiz Admin, Code of Conduct Admin, Pulse Survey Results)
+const getTestNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.carQuizAdmin"), href: "/car-quiz-admin", icon: Car },
   { name: t("sidebar.codeOfConductAdmin"), href: "/code-of-conduct-admin", icon: Shield },
+  { name: t("sidebar.pulseSurveyResults"), href: "/pulse-survey-results", icon: BarChart3 },
 ];
 
 // MG submenu navigation
@@ -93,15 +98,11 @@ const getSomeEmployeeNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.myContracts"), href: "/my-contracts", icon: FileText },
 ];
 
-// Teamleder extra navigation (pulse survey results, code of conduct for their team)
-const getTeamlederExtraNavigation = (t: (key: string) => string) => [
-  { name: t("sidebar.pulseSurveyResults"), href: "/pulse-survey-results", icon: BarChart3 },
-];
+// Teamleder extra navigation - empty now since test items moved to Test submenu
+const getTeamlederExtraNavigation = (_t: (key: string) => string) => [];
 
-// Code of conduct admin - only for teamleders (owners already have it in ownerNavigation)
-const getTeamlederCodeOfConductNav = (t: (key: string) => string) => [
-  { name: t("sidebar.codeOfConductAdmin"), href: "/code-of-conduct-admin", icon: Shield },
-];
+// Code of conduct admin - empty now since moved to Test submenu
+const getTeamlederCodeOfConductNav = (_t: (key: string) => string) => [];
 
 const getShiftPlanningNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.shiftPlanLeader"), href: "/shift-planning", icon: Calendar },
@@ -163,6 +164,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     location.pathname === "/extra-work-admin"
   );
   const [boardsOpen, setBoardsOpen] = useState(location.pathname.startsWith("/boards"));
+  const [testOpen, setTestOpen] = useState(
+    ["/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results"].includes(location.pathname)
+  );
 
   // Fetch denied menu items for this user
   const { data: deniedMenuItems = [] } = useQuery({
@@ -399,6 +403,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const mgNav = getMgNavigation(t);
   const boardsNav = getBoardsNavigation(t);
   const recruitmentNav = getRecruitmentNavigation(t);
+  const testNav = getTestNavigation(t);
 
   const handleNavClick = () => {
     if (isMobile && onNavigate) {
@@ -644,6 +649,41 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
                 {boardsNav.map((item) => {
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      onClick={handleNavClick}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                        isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.name}
+                    </NavLink>
+                  );
+                })}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Test menu - for teamleder or above (Bil Quiz Admin, Code of Conduct Admin, Pulse Survey Results) */}
+          {isTeamlederOrAbove && (
+            <Collapsible open={testOpen} onOpenChange={setTestOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                ["/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results"].includes(location.pathname) ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <FlaskConical className="h-5 w-5" />
+                  {t("sidebar.testMenu")}
+                </div>
+                {testOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {testNav.map((item) => {
                   const isActive = location.pathname === item.href;
                   return (
                     <NavLink
