@@ -166,15 +166,7 @@ export default function PublicPulseSurvey() {
     mutationFn: async (response: PulseSurveyResponse & { teamId: string; surveyId: string }) => {
       const teamName = teams?.find(t => t.id === response.teamId)?.name || 'Ukendt';
       
-      console.log('Submitting survey with data:', {
-        survey_id: response.surveyId,
-        nps_score: response.nps_score,
-        tenure: response.tenure,
-        teamId: response.teamId,
-        teamName
-      });
-      
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('pulse_survey_responses')
         .insert({
           survey_id: response.surveyId,
@@ -192,27 +184,17 @@ export default function PublicPulseSurvey() {
           improvement_suggestions: response.improvement_suggestions || null,
           submitted_team_id: response.teamId,
           department: teamName,
-        })
-        .select();
+        });
       
-      console.log('Insert result:', { data, error });
-      
-      if (error) {
-        console.error('Supabase error details:', JSON.stringify(error, null, 2));
-        throw error;
-      }
-      
-      return data;
+      if (error) throw error;
     },
-    onSuccess: (data) => {
-      console.log('Survey submitted successfully:', data);
+    onSuccess: () => {
       setSubmitted(true);
       toast.success('Tak for din besvarelse!');
     },
     onError: (error: any) => {
       console.error('Error submitting survey:', error);
-      const errorMessage = error?.message || error?.details || error?.code || JSON.stringify(error);
-      toast.error(`Fejl: ${errorMessage}`);
+      toast.error('Der opstod en fejl ved indsendelse');
     }
   });
 
