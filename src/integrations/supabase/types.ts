@@ -2760,6 +2760,36 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz_templates: {
+        Row: {
+          created_at: string
+          id: string
+          questions: Json
+          quiz_type: string
+          summary_points: Json | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          questions?: Json
+          quiz_type: string
+          summary_points?: Json | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          questions?: Json
+          quiz_type?: string
+          summary_points?: Json | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       recruitment_employees: {
         Row: {
           candidate_id: string
