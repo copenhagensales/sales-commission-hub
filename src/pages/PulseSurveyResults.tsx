@@ -162,19 +162,27 @@ export default function PulseSurveyResults() {
 
   const selectedSurvey = surveys?.find(s => s.id === selectedSurveyId);
 
-  // Get teams that have responses
+  // Get teams that have responses (check both team_id and submitted_team_id)
   const teamsWithResponses = useMemo(() => {
     if (!responses || !teams) return [];
-    const teamIds = new Set(responses.map(r => r.team_id).filter(Boolean));
+    const teamIds = new Set(responses.map(r => r.team_id || r.submitted_team_id).filter(Boolean));
     return teams.filter(t => teamIds.has(t.id));
   }, [responses, teams]);
 
-  // Filter responses by team
+  // Filter responses by team (check both team_id and submitted_team_id)
   const filteredResponses = useMemo(() => {
     if (!responses) return [];
     if (selectedTeamId === 'all') return responses;
-    return responses.filter(r => r.team_id === selectedTeamId);
+    return responses.filter(r => (r.team_id || r.submitted_team_id) === selectedTeamId);
   }, [responses, selectedTeamId]);
+
+  // Normalize responses to always have team_id populated for charts
+  const normalizedResponses = useMemo(() => {
+    return responses?.map(r => ({
+      ...r,
+      team_id: r.team_id || r.submitted_team_id
+    })) || [];
+  }, [responses]);
 
   // Calculate averages
   const averages = useMemo(() => calculateAverages(filteredResponses), [filteredResponses]);
@@ -430,18 +438,18 @@ export default function PulseSurveyResults() {
                 ) : (
                   <>
                     <TeamHeatmap 
-                      responses={responses || []} 
+                      responses={normalizedResponses} 
                       teams={teams || []} 
                       questionData={QUESTION_DATA} 
                     />
                     <div className="grid gap-4 lg:grid-cols-2">
                       <TeamComparisonBarChart 
-                        responses={responses || []} 
+                        responses={normalizedResponses} 
                         teams={teams || []} 
                         questionData={QUESTION_DATA} 
                       />
                       <TeamRadarChart 
-                        responses={responses || []} 
+                        responses={normalizedResponses} 
                         teams={teams || []} 
                         questionData={QUESTION_DATA} 
                       />
@@ -500,9 +508,9 @@ export default function PulseSurveyResults() {
                         <div key={i} className="p-3 bg-muted rounded-lg">
                           <div className="flex items-center gap-2 mb-1">
                             <Badge variant="outline">NPS: {r.nps_score}</Badge>
-                            {r.team_id && teams && (
+                            {(r.team_id || r.submitted_team_id) && teams && (
                               <Badge variant="secondary">
-                                {teams.find(t => t.id === r.team_id)?.name}
+                                {teams.find(t => t.id === (r.team_id || r.submitted_team_id))?.name}
                               </Badge>
                             )}
                           </div>
@@ -526,9 +534,9 @@ export default function PulseSurveyResults() {
                       .filter(r => r.improvement_suggestions)
                       .map((r, i) => (
                         <div key={i} className="p-3 bg-muted rounded-lg">
-                          {r.team_id && teams && (
+                          {(r.team_id || r.submitted_team_id) && teams && (
                             <Badge variant="secondary" className="mb-2">
-                              {teams.find(t => t.id === r.team_id)?.name}
+                              {teams.find(t => t.id === (r.team_id || r.submitted_team_id))?.name}
                             </Badge>
                           )}
                           <p className="text-sm">{r.improvement_suggestions}</p>
