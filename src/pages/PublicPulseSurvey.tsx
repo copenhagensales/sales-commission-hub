@@ -194,7 +194,8 @@ export default function PublicPulseSurvey() {
     },
     onError: (error: any) => {
       console.error('Error submitting survey:', error);
-      toast.error('Der opstod en fejl ved indsendelse');
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      toast.error(`Fejl: ${error?.message || error?.code || 'Ukendt fejl'}`);
     }
   });
 
