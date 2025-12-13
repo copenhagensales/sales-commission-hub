@@ -10,7 +10,7 @@ import { useCanAccess } from "@/hooks/useSystemRoles";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
-import { useShouldShowPulseSurvey } from "@/hooks/usePulseSurvey";
+
 import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
 import { useIsSomeEmployee } from "@/hooks/useSomeEmployee";
 import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
@@ -87,7 +87,6 @@ const getEmployeeNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.myProfile"), href: "/my-profile", icon: Users },
   { name: t("sidebar.myContract"), href: "/my-contracts", icon: FileText },
   { name: t("sidebar.teamWishesCareer"), href: "/career-wishes", icon: Sparkles },
-  { name: t("sidebar.pulseSurvey"), href: "/pulse-survey", icon: HeartHandshake },
 ];
 
 // Navigation items for SOME employees (dedicated)
@@ -146,7 +145,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const queryClient = useQueryClient();
   const { isTeamlederOrAbove, isOwner, isRekruttering, isRekrutteringOrAbove, isTeamleder, isSome, isLoading, role } = useCanAccess();
   const { user } = useAuth();
-  const { showMenuItem: showPulseSurvey, showBadge: showPulseBadge } = useShouldShowPulseSurvey();
+  
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
   const { data: isSomeEmployee, isLoading: isSomeLoading } = useIsSomeEmployee();
   const { data: carQuizCompletion } = useCarQuizCompletion();
@@ -343,7 +342,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
       }
       // If user has no special roles, give employee navigation
       if (!isTeamleder && !isRekruttering && !(isSomeEmployee || isSome)) {
-        addItems(getEmployeeNavigation(t).filter(item => item.href !== '/pulse-survey' || showPulseSurvey));
+        addItems(getEmployeeNavigation(t));
       }
     }
 
@@ -455,7 +454,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             const isActive = location.pathname === item.href;
             const hasPendingAbsenceBadge = 'badgeKey' in item && item.badgeKey === 'pendingAbsence' && pendingAbsenceCount > 0;
             const showBadge = (item.href === "/my-contracts" && pendingContractsCount > 0) || 
-                              (item.href === "/pulse-survey" && showPulseBadge) ||
                               hasPendingAbsenceBadge;
             const badgeCount = hasPendingAbsenceBadge 
               ? pendingAbsenceCount 
