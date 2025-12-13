@@ -13,6 +13,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Re
 import { TrendingUp, Users, Building, Plus, Info, Link, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import { TeamComparisonBarChart } from "@/components/pulse-survey/TeamComparisonBarChart";
+import { TeamRadarChart } from "@/components/pulse-survey/TeamRadarChart";
+import { TeamHeatmap } from "@/components/pulse-survey/TeamHeatmap";
 
 const QUESTION_DATA: Record<string, { label: string; fullQuestion: string }> = {
   nps_score: { 
@@ -380,6 +383,7 @@ export default function PulseSurveyResults() {
             <Tabs defaultValue="overview" className="space-y-4">
               <TabsList>
                 <TabsTrigger value="overview">Oversigt</TabsTrigger>
+                <TabsTrigger value="team-comparison">Team sammenligning</TabsTrigger>
                 <TabsTrigger value="details">Detaljer</TabsTrigger>
                 <TabsTrigger value="comments">Kommentarer</TabsTrigger>
               </TabsList>
@@ -412,6 +416,38 @@ export default function PulseSurveyResults() {
                     </div>
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="team-comparison" className="space-y-4">
+                {teamsWithResponses.length < 2 ? (
+                  <Card>
+                    <CardContent className="py-8 text-center">
+                      <p className="text-muted-foreground">
+                        Der kræves mindst 2 teams med besvarelser for at sammenligne.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <>
+                    <TeamHeatmap 
+                      responses={responses || []} 
+                      teams={teams || []} 
+                      questionData={QUESTION_DATA} 
+                    />
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <TeamComparisonBarChart 
+                        responses={responses || []} 
+                        teams={teams || []} 
+                        questionData={QUESTION_DATA} 
+                      />
+                      <TeamRadarChart 
+                        responses={responses || []} 
+                        teams={teams || []} 
+                        questionData={QUESTION_DATA} 
+                      />
+                    </div>
+                  </>
+                )}
               </TabsContent>
 
               <TabsContent value="details" className="space-y-4">
