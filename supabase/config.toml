@@ -107,3 +107,6 @@ verify_jwt = false
 
 [functions.enreach-diagnostics]
 verify_jwt = false
+
+[functions.submit-pulse-survey]
+verify_jwt = false
