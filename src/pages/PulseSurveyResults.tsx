@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { TeamComparisonBarChart } from "@/components/pulse-survey/TeamComparisonBarChart";
 import { TeamRadarChart } from "@/components/pulse-survey/TeamRadarChart";
 import { TeamHeatmap } from "@/components/pulse-survey/TeamHeatmap";
+import { TeamComparisonLineChart } from "@/components/pulse-survey/TeamComparisonLineChart";
 
 const QUESTION_DATA: Record<string, { label: string; fullQuestion: string }> = {
   nps_score: { 
@@ -437,6 +438,11 @@ export default function PulseSurveyResults() {
                   </Card>
                 ) : (
                   <>
+                    <TeamComparisonLineChart 
+                      responses={normalizedResponses} 
+                      teams={teams || []} 
+                      questionData={QUESTION_DATA} 
+                    />
                     <TeamHeatmap 
                       responses={normalizedResponses} 
                       teams={teams || []} 
