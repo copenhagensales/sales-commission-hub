@@ -748,7 +748,7 @@ export default function ShiftOverview() {
                                     variant="ghost"
                                     size="sm"
                                     className="justify-start gap-2 h-8 text-destructive hover:text-destructive"
-                                    onClick={() => handleClearStatus(absence, lateness)}
+                                    onClick={() => handleClearStatus(absenceDisplay, lateness)}
                                   >
                                     <X className="h-4 w-4" />
                                     Fjern status
