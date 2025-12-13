@@ -142,7 +142,7 @@ export default function PulseSurveyResults() {
   const activateSurvey = useActivatePulseSurvey();
   const [linkCopied, setLinkCopied] = useState(false);
 
-  const publicSurveyLink = `${window.location.origin}/survey`;
+  const publicSurveyLink = 'https://sales-sync-pay.lovable.app/survey';
 
   // Fetch all teams
   const { data: teams } = useQuery({
