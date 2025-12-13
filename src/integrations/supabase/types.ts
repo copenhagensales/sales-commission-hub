@@ -2673,6 +2673,7 @@ export type Database = {
           psychological_safety_score: number
           recognition_score: number
           seriousness_score: number
+          submitted_team_id: string | null
           survey_id: string
           team_id: string | null
           tenure: string
@@ -2692,6 +2693,7 @@ export type Database = {
           psychological_safety_score: number
           recognition_score: number
           seriousness_score: number
+          submitted_team_id?: string | null
           survey_id: string
           team_id?: string | null
           tenure: string
@@ -2711,12 +2713,20 @@ export type Database = {
           psychological_safety_score?: number
           recognition_score?: number
           seriousness_score?: number
+          submitted_team_id?: string | null
           survey_id?: string
           team_id?: string | null
           tenure?: string
           wellbeing_score?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "pulse_survey_responses_submitted_team_id_fkey"
+            columns: ["submitted_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pulse_survey_responses_survey_id_fkey"
             columns: ["survey_id"]

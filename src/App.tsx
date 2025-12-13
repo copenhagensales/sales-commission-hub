@@ -53,6 +53,7 @@ const MyContracts = lazyWithRetry(() => import("./pages/MyContracts"));
 const ContractSign = lazyWithRetry(() => import("./pages/ContractSign"));
 const PulseSurvey = lazyWithRetry(() => import("./pages/PulseSurvey"));
 const PulseSurveyResults = lazyWithRetry(() => import("./pages/PulseSurveyResults"));
+const PublicPulseSurvey = lazyWithRetry(() => import("./pages/PublicPulseSurvey"));
 const Admin = lazyWithRetry(() => import("./pages/Admin"));
 const MyProfile = lazyWithRetry(() => import("./pages/MyProfile"));
 const CareerWishes = lazyWithRetry(() => import("./pages/CareerWishes"));
@@ -282,6 +283,8 @@ const App = () => (
               {/* Boards routes - public for TV display */}
               <Route path="/boards/test" element={<TestBoard />} />
               <Route path="/boards/economic" element={<EconomicBoard />} />
+              {/* Public pulse survey - no auth required */}
+              <Route path="/survey" element={<PublicPulseSurvey />} />
               {/* Admin route - owner only */}
               <Route path="/admin" element={<RoleProtectedRoute requiredRole="ejer"><Admin /></RoleProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
