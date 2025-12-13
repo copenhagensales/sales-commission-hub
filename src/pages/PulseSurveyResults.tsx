@@ -10,13 +10,15 @@ import { useAllPulseSurveys, usePulseSurveyResults, useActivatePulseSurvey } fro
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
-import { TrendingUp, Users, Building, Plus, Info, Link, Copy, Check } from "lucide-react";
+import { TrendingUp, Users, Building, Plus, Info, Link, Copy, Check, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { TeamComparisonBarChart } from "@/components/pulse-survey/TeamComparisonBarChart";
 import { TeamRadarChart } from "@/components/pulse-survey/TeamRadarChart";
 import { TeamHeatmap } from "@/components/pulse-survey/TeamHeatmap";
 import { TeamComparisonLineChart } from "@/components/pulse-survey/TeamComparisonLineChart";
+import { PulseSurveyEditor } from "@/components/quiz-admin/PulseSurveyEditor";
+import { useQuizTemplate, useUpdateQuizTemplate, PulseSurveyQuestion } from "@/hooks/useQuizTemplates";
 
 const QUESTION_DATA: Record<string, { label: string; fullQuestion: string }> = {
   nps_score: { 
@@ -138,6 +140,19 @@ function AveragesChart({ averages }: { averages: Record<string, number> | null }
   );
 }
 
+// Default pulse survey questions
+const DEFAULT_PULSE_QUESTIONS: PulseSurveyQuestion[] = [
+  { id: 'nps_score', label: 'NPS', question: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?', type: 'rating', min: 0, max: 10 },
+  { id: 'development_score', label: 'Udvikling', question: 'I hvor høj grad oplever du, at du bliver uddannet, trænet og udviklet som sælger i dit team?', type: 'rating', min: 1, max: 10 },
+  { id: 'leadership_score', label: 'Ledelse', question: 'Hvor tilfreds er du med den måde, din teamleder leder teamet på?', type: 'rating', min: 1, max: 10 },
+  { id: 'recognition_score', label: 'Anerkendelse', question: 'I hvor høj grad oplever du, at dine præstationer bliver anerkendt og belønnet på en fair måde?', type: 'rating', min: 1, max: 10 },
+  { id: 'energy_score', label: 'Energi', question: 'Hvordan vil du vurdere energien og stemningen i dit team lige nu?', type: 'rating', min: 1, max: 10 },
+  { id: 'seriousness_score', label: 'Seriøsitet', question: 'I hvor høj grad oplever du, at der arbejdes seriøst og målrettet i dit team?', type: 'rating', min: 1, max: 10 },
+  { id: 'leader_availability_score', label: 'Leder tid', question: 'I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?', type: 'rating', min: 1, max: 10 },
+  { id: 'wellbeing_score', label: 'Trivsel', question: 'Hvor godt trives du samlet set i Copenhagen Sales lige nu?', type: 'rating', min: 1, max: 10 },
+  { id: 'psychological_safety_score', label: 'Tryghed', question: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?', type: 'rating', min: 1, max: 10 },
+];
+
 export default function PulseSurveyResults() {
   const { data: surveys, isLoading: surveysLoading } = useAllPulseSurveys();
   const [selectedSurveyId, setSelectedSurveyId] = useState<string>();
@@ -145,6 +160,31 @@ export default function PulseSurveyResults() {
   const { data: responses, isLoading: responsesLoading } = usePulseSurveyResults(selectedSurveyId);
   const activateSurvey = useActivatePulseSurvey();
   const [linkCopied, setLinkCopied] = useState(false);
+
+  // Template editing
+  const { data: template, isLoading: templateLoading } = useQuizTemplate('pulse_survey');
+  const updateTemplate = useUpdateQuizTemplate();
+  const [templateQuestions, setTemplateQuestions] = useState<PulseSurveyQuestion[]>([]);
+  const [templateInitialized, setTemplateInitialized] = useState(false);
+
+  // Initialize template questions from DB or defaults
+  useMemo(() => {
+    if (!templateInitialized && !templateLoading) {
+      if (template?.questions && Array.isArray(template.questions) && template.questions.length > 0) {
+        setTemplateQuestions(template.questions as PulseSurveyQuestion[]);
+      } else {
+        setTemplateQuestions(DEFAULT_PULSE_QUESTIONS);
+      }
+      setTemplateInitialized(true);
+    }
+  }, [template, templateLoading, templateInitialized]);
+
+  const handleSaveTemplate = () => {
+    updateTemplate.mutate({
+      quizType: 'pulse_survey',
+      questions: templateQuestions,
+    });
+  };
 
   const publicSurveyLink = 'https://sales-sync-pay.lovable.app/survey';
 
@@ -395,6 +435,10 @@ export default function PulseSurveyResults() {
                 <TabsTrigger value="team-comparison">Team sammenligning</TabsTrigger>
                 <TabsTrigger value="details">Detaljer</TabsTrigger>
                 <TabsTrigger value="comments">Kommentarer</TabsTrigger>
+                <TabsTrigger value="template" className="flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5" />
+                  Skabelon
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="space-y-4">
@@ -550,6 +594,27 @@ export default function PulseSurveyResults() {
                       ))}
                     {filteredResponses.filter(r => r.improvement_suggestions).length === 0 && (
                       <p className="text-muted-foreground text-sm">Ingen forslag</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="template" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Spørgsmålsskabelon</CardTitle>
+                    <CardDescription>Rediger spørgsmålene der bruges i pulsmålingen</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {templateLoading ? (
+                      <p className="text-muted-foreground">Indlæser skabelon...</p>
+                    ) : (
+                      <PulseSurveyEditor
+                        questions={templateQuestions}
+                        onChange={setTemplateQuestions}
+                        onSave={handleSaveTemplate}
+                        isSaving={updateTemplate.isPending}
+                      />
                     )}
                   </CardContent>
                 </Card>
