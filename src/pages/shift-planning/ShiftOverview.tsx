@@ -393,9 +393,15 @@ export default function ShiftOverview() {
     setOpenPopoverKey(null);
   };
 
-  const handleClearStatus = (currentAbsence: AbsenceRequest | null, currentLateness: LatenessRecord | null) => {
-    if (currentAbsence) {
-      deleteAbsence.mutate(currentAbsence.id);
+  const handleClearStatus = (
+    singleDayAbsence: AbsenceRequest | null, 
+    currentLateness: LatenessRecord | null,
+    multiDayAbsence?: AbsenceRequest | null
+  ) => {
+    // Use single-day absence if available, otherwise fall back to multi-day
+    const absenceToDelete = singleDayAbsence || multiDayAbsence;
+    if (absenceToDelete) {
+      deleteAbsence.mutate(absenceToDelete.id);
     }
     if (currentLateness) {
       deleteLateness.mutate(currentLateness.id);
@@ -748,7 +754,7 @@ export default function ShiftOverview() {
                                     variant="ghost"
                                     size="sm"
                                     className="justify-start gap-2 h-8 text-destructive hover:text-destructive"
-                                    onClick={() => handleClearStatus(absenceDisplay, lateness)}
+                                    onClick={() => handleClearStatus(absence, lateness, absenceDisplay)}
                                   >
                                     <X className="h-4 w-4" />
                                     Fjern status
