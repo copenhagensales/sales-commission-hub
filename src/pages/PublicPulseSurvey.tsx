@@ -166,7 +166,15 @@ export default function PublicPulseSurvey() {
     mutationFn: async (response: PulseSurveyResponse & { teamId: string; surveyId: string }) => {
       const teamName = teams?.find(t => t.id === response.teamId)?.name || 'Ukendt';
       
-      const { error } = await supabase
+      console.log('Submitting survey with data:', {
+        survey_id: response.surveyId,
+        nps_score: response.nps_score,
+        tenure: response.tenure,
+        teamId: response.teamId,
+        teamName
+      });
+      
+      const { data, error } = await supabase
         .from('pulse_survey_responses')
         .insert({
           survey_id: response.surveyId,
@@ -180,21 +188,30 @@ export default function PublicPulseSurvey() {
           leader_availability_score: response.leader_availability_score,
           wellbeing_score: response.wellbeing_score,
           psychological_safety_score: response.psychological_safety_score,
-          nps_comment: response.nps_comment,
-          improvement_suggestions: response.improvement_suggestions,
+          nps_comment: response.nps_comment || null,
+          improvement_suggestions: response.improvement_suggestions || null,
           submitted_team_id: response.teamId,
           department: teamName,
-        });
+        })
+        .select();
       
-      if (error) throw error;
+      console.log('Insert result:', { data, error });
+      
+      if (error) {
+        console.error('Supabase error details:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+      
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Survey submitted successfully:', data);
       setSubmitted(true);
       toast.success('Tak for din besvarelse!');
     },
     onError: (error: any) => {
       console.error('Error submitting survey:', error);
-      const errorMessage = error?.message || error?.details || 'Ukendt fejl';
+      const errorMessage = error?.message || error?.details || error?.code || JSON.stringify(error);
       toast.error(`Fejl: ${errorMessage}`);
     }
   });
