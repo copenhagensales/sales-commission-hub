@@ -10,8 +10,9 @@ import { useAllPulseSurveys, usePulseSurveyResults, useActivatePulseSurvey } fro
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from "recharts";
-import { TrendingUp, Users, Building, Plus, Info } from "lucide-react";
+import { TrendingUp, Users, Building, Plus, Info, Link, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 const QUESTION_DATA: Record<string, { label: string; fullQuestion: string }> = {
   nps_score: { 
@@ -139,6 +140,9 @@ export default function PulseSurveyResults() {
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const { data: responses, isLoading: responsesLoading } = usePulseSurveyResults(selectedSurveyId);
   const activateSurvey = useActivatePulseSurvey();
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const publicSurveyLink = `${window.location.origin}/survey`;
 
   // Fetch all teams
   const { data: teams } = useQuery({
@@ -232,11 +236,47 @@ export default function PulseSurveyResults() {
             <h1 className="text-3xl font-bold">Pulsmåling resultater</h1>
             <p className="text-muted-foreground">Anonymiseret oversigt over medarbejdertrivsel</p>
           </div>
-          <Button onClick={handleActivateSurvey} disabled={activateSurvey.isPending}>
-            <Plus className="h-4 w-4 mr-2" />
-            Aktiver ny pulsmåling
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleActivateSurvey} disabled={activateSurvey.isPending}>
+              <Plus className="h-4 w-4 mr-2" />
+              Aktiver ny pulsmåling
+            </Button>
+          </div>
         </div>
+
+        {/* Shareable Link */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Link className="h-4 w-4" />
+              Delebart link til pulsmåling
+            </CardTitle>
+            <CardDescription>
+              Del dette link med medarbejdere, så de kan udfylde pulsmålingen uden at logge ind
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <Input 
+                readOnly 
+                value={publicSurveyLink} 
+                className="font-mono text-sm"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  navigator.clipboard.writeText(publicSurveyLink);
+                  setLinkCopied(true);
+                  toast.success('Link kopieret!');
+                  setTimeout(() => setLinkCopied(false), 2000);
+                }}
+              >
+                {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Filters */}
         <div className="flex flex-wrap gap-4">
