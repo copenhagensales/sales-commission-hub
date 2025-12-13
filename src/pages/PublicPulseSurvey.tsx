@@ -164,6 +164,8 @@ export default function PublicPulseSurvey() {
   // Submit mutation
   const submitMutation = useMutation({
     mutationFn: async (response: PulseSurveyResponse & { teamId: string; surveyId: string }) => {
+      const teamName = teams?.find(t => t.id === response.teamId)?.name || 'Ukendt';
+      
       const { error } = await supabase
         .from('pulse_survey_responses')
         .insert({
@@ -181,7 +183,7 @@ export default function PublicPulseSurvey() {
           nps_comment: response.nps_comment,
           improvement_suggestions: response.improvement_suggestions,
           submitted_team_id: response.teamId,
-          team_name: teams?.find(t => t.id === response.teamId)?.name || 'Ukendt',
+          department: teamName,
         });
       
       if (error) throw error;
