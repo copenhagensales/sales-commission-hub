@@ -2662,62 +2662,62 @@ export type Database = {
         Row: {
           created_at: string
           department: string | null
-          development_score: number
-          energy_score: number
+          development_score: number | null
+          energy_score: number | null
           id: string
           improvement_suggestions: string | null
-          leader_availability_score: number
-          leadership_score: number
+          leader_availability_score: number | null
+          leadership_score: number | null
           nps_comment: string | null
           nps_score: number
-          psychological_safety_score: number
-          recognition_score: number
-          seriousness_score: number
+          psychological_safety_score: number | null
+          recognition_score: number | null
+          seriousness_score: number | null
           submitted_team_id: string | null
           survey_id: string
           team_id: string | null
           tenure: string
-          wellbeing_score: number
+          wellbeing_score: number | null
         }
         Insert: {
           created_at?: string
           department?: string | null
-          development_score: number
-          energy_score: number
+          development_score?: number | null
+          energy_score?: number | null
           id?: string
           improvement_suggestions?: string | null
-          leader_availability_score: number
-          leadership_score: number
+          leader_availability_score?: number | null
+          leadership_score?: number | null
           nps_comment?: string | null
           nps_score: number
-          psychological_safety_score: number
-          recognition_score: number
-          seriousness_score: number
+          psychological_safety_score?: number | null
+          recognition_score?: number | null
+          seriousness_score?: number | null
           submitted_team_id?: string | null
           survey_id: string
           team_id?: string | null
           tenure: string
-          wellbeing_score: number
+          wellbeing_score?: number | null
         }
         Update: {
           created_at?: string
           department?: string | null
-          development_score?: number
-          energy_score?: number
+          development_score?: number | null
+          energy_score?: number | null
           id?: string
           improvement_suggestions?: string | null
-          leader_availability_score?: number
-          leadership_score?: number
+          leader_availability_score?: number | null
+          leadership_score?: number | null
           nps_comment?: string | null
           nps_score?: number
-          psychological_safety_score?: number
-          recognition_score?: number
-          seriousness_score?: number
+          psychological_safety_score?: number | null
+          recognition_score?: number | null
+          seriousness_score?: number | null
           submitted_team_id?: string | null
           survey_id?: string
           team_id?: string | null
           tenure?: string
-          wellbeing_score?: number
+          wellbeing_score?: number | null
         }
         Relationships: [
           {
