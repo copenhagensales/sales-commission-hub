@@ -161,14 +161,13 @@ export default function PublicPulseSurvey() {
     }
   });
 
-  // Submit mutation
+  // Submit mutation via edge function
   const submitMutation = useMutation({
     mutationFn: async (response: PulseSurveyResponse & { teamId: string; surveyId: string }) => {
       const teamName = teams?.find(t => t.id === response.teamId)?.name || 'Ukendt';
       
-      const { error } = await supabase
-        .from('pulse_survey_responses')
-        .insert({
+      const res = await supabase.functions.invoke('submit-pulse-survey', {
+        body: {
           survey_id: response.surveyId,
           nps_score: response.nps_score,
           tenure: response.tenure,
@@ -184,9 +183,13 @@ export default function PublicPulseSurvey() {
           improvement_suggestions: response.improvement_suggestions || null,
           submitted_team_id: response.teamId,
           department: teamName,
-        });
+        }
+      });
       
-      if (error) throw error;
+      if (res.error) throw res.error;
+      if (res.data?.error) throw new Error(res.data.error);
+      
+      return res.data;
     },
     onSuccess: () => {
       setSubmitted(true);
@@ -194,8 +197,7 @@ export default function PublicPulseSurvey() {
     },
     onError: (error: any) => {
       console.error('Error submitting survey:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-      toast.error(`Fejl: ${error?.message || error?.code || 'Ukendt fejl'}`);
+      toast.error('Fejl ved indsendelse - prøv igen');
     }
   });
 
