@@ -29,7 +29,8 @@ export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps
       return { heatmapData: {}, teamsWithResponses: [], scoreKeys: [], overallAverages: {} };
     }
 
-    const scoreKeys = Object.keys(questionData).filter(k => k !== 'nps_score');
+    // Include NPS in the heatmap (put it first)
+    const scoreKeys = ['nps_score', ...Object.keys(questionData).filter(k => k !== 'nps_score')];
     
     // Get teams with responses
     const teamsWithResponses = teams.filter(team => 
