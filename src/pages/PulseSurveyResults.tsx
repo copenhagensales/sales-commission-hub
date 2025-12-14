@@ -117,16 +117,16 @@ function AveragesChart({ averages, questionData }: { averages: Record<string, nu
 
 // Initial default questions used when no template exists - will be saved to DB on first load
 const INITIAL_DEFAULT_QUESTIONS: PulseSurveyQuestion[] = [
-  { id: 'nps_score', label: '1. NPS / anbefaling', question: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?', type: 'rating', min: 0, max: 10 },
-  { id: 'development_score', label: '4. Udvikling og træning', question: 'I hvor høj grad oplever du, at du bliver uddannet, trænet og udviklet som sælger i dit team?', type: 'rating', min: 1, max: 10 },
-  { id: 'leadership_score', label: '5. Teamlederens ledelse', question: 'Hvor tilfreds er du med den måde, din teamleder leder teamet på?', type: 'rating', min: 1, max: 10 },
-  { id: 'recognition_score', label: '6. Anerkendelse og belønning', question: 'I hvor høj grad oplever du, at dine præstationer bliver anerkendt og belønnet på en fair måde?', type: 'rating', min: 1, max: 10 },
-  { id: 'energy_score', label: '7. Energi og stemning', question: 'Hvordan vil du vurdere energien og stemningen i dit team lige nu?', type: 'rating', min: 1, max: 10 },
-  { id: 'seriousness_score', label: '8. Seriøsitet i arbejdet', question: 'I hvor høj grad oplever du, at der arbejdes seriøst og målrettet i dit team?', type: 'rating', min: 1, max: 10 },
-  { id: 'leader_availability_score', label: '9. Lederens tid og overskud', question: 'I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?', type: 'rating', min: 1, max: 10 },
-  { id: 'wellbeing_score', label: '10. Samlet trivsel', question: 'Hvor godt trives du samlet set i Copenhagen Sales lige nu?', type: 'rating', min: 1, max: 10 },
-  { id: 'psychological_safety_score', label: '11. Psykologisk tryghed', question: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?', type: 'rating', min: 1, max: 10 },
-  { id: 'attrition_risk_score', label: '12. Risiko for frafald', question: 'Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 3 måneder?', type: 'rating', min: 1, max: 10 },
+  { id: 'nps_score', label: 'NPS / anbefaling', question: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?', type: 'rating', min: 0, max: 10 },
+  { id: 'development_score', label: 'Udvikling og træning', question: 'I hvor høj grad oplever du, at du bliver uddannet, trænet og udviklet som sælger i dit team?', type: 'rating', min: 1, max: 10 },
+  { id: 'leadership_score', label: 'Teamlederens ledelse', question: 'Hvor tilfreds er du med den måde, din teamleder leder teamet på?', type: 'rating', min: 1, max: 10 },
+  { id: 'recognition_score', label: 'Anerkendelse og belønning', question: 'I hvor høj grad oplever du, at dine præstationer bliver anerkendt og belønnet på en fair måde?', type: 'rating', min: 1, max: 10 },
+  { id: 'energy_score', label: 'Energi og stemning', question: 'Hvordan vil du vurdere energien og stemningen i dit team lige nu?', type: 'rating', min: 1, max: 10 },
+  { id: 'seriousness_score', label: 'Seriøsitet i arbejdet', question: 'I hvor høj grad oplever du, at der arbejdes seriøst og målrettet i dit team?', type: 'rating', min: 1, max: 10 },
+  { id: 'leader_availability_score', label: 'Lederens tid og overskud', question: 'I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?', type: 'rating', min: 1, max: 10 },
+  { id: 'wellbeing_score', label: 'Samlet trivsel', question: 'Hvor godt trives du samlet set i Copenhagen Sales lige nu?', type: 'rating', min: 1, max: 10 },
+  { id: 'psychological_safety_score', label: 'Psykologisk tryghed', question: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?', type: 'rating', min: 1, max: 10 },
+  { id: 'attrition_risk_score', label: 'Risiko for frafald', question: 'Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 3 måneder?', type: 'rating', min: 1, max: 10 },
 ];
 
 export default function PulseSurveyResults() {
