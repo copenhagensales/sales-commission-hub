@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,20 +9,12 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { CheckCircle, HeartHandshake } from "lucide-react";
+import { useQuizTemplate, PulseSurveyQuestion } from "@/hooks/useQuizTemplates";
 
 interface PulseSurveyResponse {
   nps_score: number;
   tenure: 'under_1_month' | '1_3_months' | '3_6_months' | 'over_6_months';
-  development_score: number;
-  leadership_score: number;
-  recognition_score: number;
-  energy_score: number;
-  seriousness_score: number;
-  leader_availability_score: number;
-  wellbeing_score: number;
-  psychological_safety_score: number;
-  nps_comment?: string;
-  improvement_suggestions?: string;
+  [key: string]: number | string | undefined;
 }
 
 const TENURE_OPTIONS = [
@@ -32,62 +24,16 @@ const TENURE_OPTIONS = [
   { value: 'over_6_months', label: 'Over 6 måneder' },
 ];
 
-const SCALE_QUESTIONS = [
-  {
-    key: 'nps_score',
-    title: '1. NPS / anbefaling',
-    question: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?',
-    helpText: '0 = Slet ikke sandsynligt, 10 = Meget sandsynligt',
-    isNps: true
-  },
-  {
-    key: 'development_score',
-    title: '4. Udvikling og træning',
-    question: 'I hvor høj grad oplever du, at du bliver uddannet, trænet og udviklet som sælger i dit team?',
-    helpText: '1 = Slet ikke, 10 = I meget høj grad'
-  },
-  {
-    key: 'leadership_score',
-    title: '5. Teamlederens ledelse',
-    question: 'Hvor tilfreds er du med den måde, din teamleder leder teamet på?',
-    helpText: '1 = Slet ikke tilfreds, 10 = Meget tilfreds'
-  },
-  {
-    key: 'recognition_score',
-    title: '6. Anerkendelse og belønning',
-    question: 'I hvor høj grad oplever du, at dine præstationer bliver anerkendt og belønnet på en fair måde?',
-    helpText: '1 = Slet ikke, 10 = I meget høj grad'
-  },
-  {
-    key: 'energy_score',
-    title: '7. Energi og stemning',
-    question: 'Hvordan vil du vurdere energien og stemningen i dit team lige nu?',
-    helpText: '1 = Meget dårlig, 10 = Meget god'
-  },
-  {
-    key: 'seriousness_score',
-    title: '8. Seriøsitet i arbejdet',
-    question: 'I hvor høj grad oplever du, at der arbejdes seriøst og målrettet i dit team?',
-    helpText: '1 = Slet ikke, 10 = I meget høj grad'
-  },
-  {
-    key: 'leader_availability_score',
-    title: '9. Lederens tid og overskud',
-    question: 'I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?',
-    helpText: '1 = Slet ikke, 10 = I meget høj grad'
-  },
-  {
-    key: 'wellbeing_score',
-    title: '10. Samlet trivsel',
-    question: 'Hvor godt trives du samlet set i Copenhagen Sales lige nu?',
-    helpText: '1 = Slet ikke, 10 = Rigtig godt'
-  },
-  {
-    key: 'psychological_safety_score',
-    title: '11. Psykologisk tryghed',
-    question: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?',
-    helpText: '1 = Slet ikke, 10 = I meget høj grad'
-  },
+const DEFAULT_QUESTIONS: PulseSurveyQuestion[] = [
+  { id: "nps_score", label: "1. NPS / anbefaling", question: "Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?", type: "rating", min: 0, max: 10 },
+  { id: "development_score", label: "4. Udvikling og træning", question: "I hvor høj grad oplever du, at du bliver uddannet, trænet og udviklet som sælger i dit team?", type: "rating", min: 1, max: 10 },
+  { id: "leadership_score", label: "5. Teamlederens ledelse", question: "Hvor tilfreds er du med den måde, din teamleder leder teamet på?", type: "rating", min: 1, max: 10 },
+  { id: "recognition_score", label: "6. Anerkendelse og belønning", question: "I hvor høj grad oplever du, at dine præstationer bliver anerkendt og belønnet på en fair måde?", type: "rating", min: 1, max: 10 },
+  { id: "energy_score", label: "7. Energi og stemning", question: "Hvordan vil du vurdere energien og stemningen i dit team lige nu?", type: "rating", min: 1, max: 10 },
+  { id: "seriousness_score", label: "8. Seriøsitet i arbejdet", question: "I hvor høj grad oplever du, at der arbejdes seriøst og målrettet i dit team?", type: "rating", min: 1, max: 10 },
+  { id: "leader_availability_score", label: "9. Lederens tid og overskud", question: "I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?", type: "rating", min: 1, max: 10 },
+  { id: "wellbeing_score", label: "10. Samlet trivsel", question: "Hvor godt trives du samlet set i Copenhagen Sales lige nu?", type: "rating", min: 1, max: 10 },
+  { id: "psychological_safety_score", label: "11. Psykologisk tryghed", question: "I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?", type: "rating", min: 1, max: 10 },
 ];
 
 function ScaleSelector({ value, onChange, isNps = false }: { value: number | undefined; onChange: (v: number) => void; isNps?: boolean }) {
@@ -125,6 +71,19 @@ export default function PublicPulseSurvey() {
   const [formData, setFormData] = useState<Partial<PulseSurveyResponse>>({});
   const [npsComment, setNpsComment] = useState('');
   const [improvementSuggestions, setImprovementSuggestions] = useState('');
+
+  // Fetch template questions from database
+  const { data: template } = useQuizTemplate("pulse_survey");
+  
+  const questions = useMemo(() => {
+    if (template?.questions && Array.isArray(template.questions) && template.questions.length > 0) {
+      return template.questions as PulseSurveyQuestion[];
+    }
+    return DEFAULT_QUESTIONS;
+  }, [template]);
+
+  const npsQuestion = useMemo(() => questions.find(q => q.id === 'nps_score') || questions[0], [questions]);
+  const otherQuestions = useMemo(() => questions.filter(q => q.id !== 'nps_score'), [questions]);
 
   // Fetch active survey
   const { data: activeSurvey, isLoading: surveyLoading } = useQuery({
@@ -339,9 +298,11 @@ export default function PublicPulseSurvey() {
         {/* NPS Question */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">{SCALE_QUESTIONS[0].title}</CardTitle>
-            <CardDescription>{SCALE_QUESTIONS[0].question}</CardDescription>
-            <p className="text-sm text-muted-foreground">{SCALE_QUESTIONS[0].helpText}</p>
+            <CardTitle className="text-lg">{npsQuestion.label}</CardTitle>
+            <CardDescription>{npsQuestion.question}</CardDescription>
+            <p className="text-sm text-muted-foreground">
+              {npsQuestion.min} = Slet ikke sandsynligt, {npsQuestion.max} = Meget sandsynligt
+            </p>
             <div className="flex gap-4 text-xs mt-2">
               <span className="text-red-500">0-6: Kritiker</span>
               <span className="text-amber-500">7-8: Passiv</span>
@@ -350,7 +311,7 @@ export default function PublicPulseSurvey() {
           </CardHeader>
           <CardContent className="space-y-4">
             <ScaleSelector 
-              value={formData.nps_score}
+              value={formData.nps_score as number}
               isNps={true}
               onChange={(v) => handleScaleChange('nps_score', v)} 
             />
@@ -399,17 +360,19 @@ export default function PublicPulseSurvey() {
         </Card>
 
         {/* Scale Questions */}
-        {SCALE_QUESTIONS.slice(1).map((q) => (
-          <Card key={q.key}>
+        {otherQuestions.map((q) => (
+          <Card key={q.id}>
             <CardHeader>
-              <CardTitle className="text-lg">{q.title}</CardTitle>
+              <CardTitle className="text-lg">{q.label}</CardTitle>
               <CardDescription>{q.question}</CardDescription>
-              <p className="text-sm text-muted-foreground">{q.helpText}</p>
+              <p className="text-sm text-muted-foreground">
+                {q.min} = Slet ikke, {q.max} = I meget høj grad
+              </p>
             </CardHeader>
             <CardContent>
               <ScaleSelector 
-                value={formData[q.key as keyof PulseSurveyResponse] as number} 
-                onChange={(v) => handleScaleChange(q.key, v)} 
+                value={formData[q.id] as number} 
+                onChange={(v) => handleScaleChange(q.id, v)} 
               />
             </CardContent>
           </Card>
