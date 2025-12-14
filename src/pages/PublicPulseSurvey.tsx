@@ -24,18 +24,7 @@ const TENURE_OPTIONS = [
   { value: 'over_6_months', label: 'Over 6 måneder' },
 ];
 
-const DEFAULT_QUESTIONS: PulseSurveyQuestion[] = [
-  { id: "nps_score", label: "1. NPS / anbefaling", question: "Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?", type: "rating", min: 0, max: 10 },
-  { id: "development_score", label: "4. Udvikling og træning", question: "I hvor høj grad oplever du, at du bliver uddannet, trænet og udviklet som sælger i dit team?", type: "rating", min: 1, max: 10 },
-  { id: "leadership_score", label: "5. Teamlederens ledelse", question: "Hvor tilfreds er du med den måde, din teamleder leder teamet på?", type: "rating", min: 1, max: 10 },
-  { id: "recognition_score", label: "6. Anerkendelse og belønning", question: "I hvor høj grad oplever du, at dine præstationer bliver anerkendt og belønnet på en fair måde?", type: "rating", min: 1, max: 10 },
-  { id: "energy_score", label: "7. Energi og stemning", question: "Hvordan vil du vurdere energien og stemningen i dit team lige nu?", type: "rating", min: 1, max: 10 },
-  { id: "seriousness_score", label: "8. Seriøsitet i arbejdet", question: "I hvor høj grad oplever du, at der arbejdes seriøst og målrettet i dit team?", type: "rating", min: 1, max: 10 },
-  { id: "leader_availability_score", label: "9. Lederens tid og overskud", question: "I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?", type: "rating", min: 1, max: 10 },
-  { id: "wellbeing_score", label: "10. Samlet trivsel", question: "Hvor godt trives du samlet set i Copenhagen Sales lige nu?", type: "rating", min: 1, max: 10 },
-  { id: "psychological_safety_score", label: "11. Psykologisk tryghed", question: "I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?", type: "rating", min: 1, max: 10 },
-  { id: "attrition_risk_score", label: "12. Risiko for frafald", question: "Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 3 måneder?", type: "rating", min: 1, max: 10 },
-];
+// No hardcoded fallback - questions come from database template only
 
 function ScaleSelector({ value, onChange, isNps = false }: { value: number | undefined; onChange: (v: number) => void; isNps?: boolean }) {
   const scale = isNps ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -74,13 +63,13 @@ export default function PublicPulseSurvey() {
   const [improvementSuggestions, setImprovementSuggestions] = useState('');
 
   // Fetch template questions from database
-  const { data: template } = useQuizTemplate("pulse_survey");
+  const { data: template, isLoading: templateLoading } = useQuizTemplate("pulse_survey");
   
   const questions = useMemo(() => {
     if (template?.questions && Array.isArray(template.questions) && template.questions.length > 0) {
       return template.questions as PulseSurveyQuestion[];
     }
-    return DEFAULT_QUESTIONS;
+    return [];
   }, [template]);
 
   const npsQuestion = useMemo(() => questions.find(q => q.id === 'nps_score') || questions[0], [questions]);
@@ -172,9 +161,8 @@ export default function PublicPulseSurvey() {
       return;
     }
 
-    // Validate required fields
-    const requiredScales = ['nps_score', 'development_score', 'leadership_score', 'recognition_score', 
-      'energy_score', 'seriousness_score', 'leader_availability_score', 'wellbeing_score', 'psychological_safety_score'];
+    // Validate required fields based on template questions
+    const requiredScales = questions.map(q => q.id);
     
     for (const key of requiredScales) {
       if (formData[key as keyof PulseSurveyResponse] === undefined) {
@@ -202,10 +190,28 @@ export default function PublicPulseSurvey() {
     });
   };
 
-  if (surveyLoading) {
+  if (surveyLoading || templateLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Indlæser...</div>
+      </div>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-background p-4">
+        <div className="max-w-2xl mx-auto py-12">
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <HeartHandshake className="h-16 w-16 text-muted-foreground mb-4" />
+              <p className="text-lg text-muted-foreground text-center">
+                Pulsmålingen er ikke konfigureret endnu.<br />
+                Kontakt venligst en administrator.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }

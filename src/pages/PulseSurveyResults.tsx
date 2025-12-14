@@ -20,48 +20,19 @@ import { TeamComparisonLineChart } from "@/components/pulse-survey/TeamCompariso
 import { PulseSurveyEditor } from "@/components/quiz-admin/PulseSurveyEditor";
 import { useQuizTemplate, useUpdateQuizTemplate, PulseSurveyQuestion } from "@/hooks/useQuizTemplates";
 
-const QUESTION_DATA: Record<string, { label: string; fullQuestion: string }> = {
-  nps_score: { 
-    label: 'NPS', 
-    fullQuestion: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?' 
-  },
-  development_score: { 
-    label: 'Udvikling', 
-    fullQuestion: 'I hvor høj grad oplever du, at du bliver uddannet, trænet og udviklet som sælger i dit team?' 
-  },
-  leadership_score: { 
-    label: 'Ledelse', 
-    fullQuestion: 'Hvor tilfreds er du med den måde, din teamleder leder teamet på?' 
-  },
-  recognition_score: { 
-    label: 'Anerkendelse', 
-    fullQuestion: 'I hvor høj grad oplever du, at dine præstationer bliver anerkendt og belønnet på en fair måde?' 
-  },
-  energy_score: { 
-    label: 'Energi', 
-    fullQuestion: 'Hvordan vil du vurdere energien og stemningen i dit team lige nu?' 
-  },
-  seriousness_score: { 
-    label: 'Seriøsitet', 
-    fullQuestion: 'I hvor høj grad oplever du, at der arbejdes seriøst og målrettet i dit team?' 
-  },
-  leader_availability_score: { 
-    label: 'Leder tid', 
-    fullQuestion: 'I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?' 
-  },
-  wellbeing_score: { 
-    label: 'Trivsel', 
-    fullQuestion: 'Hvor godt trives du samlet set i Copenhagen Sales lige nu?' 
-  },
-  psychological_safety_score: { 
-    label: 'Tryghed', 
-    fullQuestion: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?' 
-  },
-  attrition_risk_score: { 
-    label: 'Frafald', 
-    fullQuestion: 'Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 3 måneder?' 
-  },
-};
+// Build QUESTION_DATA dynamically from template
+function buildQuestionData(questions: PulseSurveyQuestion[]): Record<string, { label: string; fullQuestion: string }> {
+  const data: Record<string, { label: string; fullQuestion: string }> = {};
+  questions.forEach(q => {
+    // Extract short label from the full label (remove number prefix if present)
+    const shortLabel = q.label.replace(/^\d+\.\s*/, '');
+    data[q.id] = {
+      label: shortLabel,
+      fullQuestion: q.question,
+    };
+  });
+  return data;
+}
 
 const TENURE_LABELS: Record<string, string> = {
   'under_1_month': 'Under 1 måned',
@@ -91,10 +62,10 @@ function calculateNpsScore(responses: any[]) {
   };
 }
 
-function calculateAverages(responses: any[]) {
+function calculateAverages(responses: any[], questionData: Record<string, { label: string; fullQuestion: string }>) {
   if (!responses || responses.length === 0) return null;
 
-  const scoreKeys = Object.keys(QUESTION_DATA).filter(k => k !== 'nps_score');
+  const scoreKeys = Object.keys(questionData).filter(k => k !== 'nps_score');
   const averages: Record<string, number> = {};
 
   scoreKeys.forEach(key => {
@@ -107,12 +78,12 @@ function calculateAverages(responses: any[]) {
   return averages;
 }
 
-function AveragesChart({ averages }: { averages: Record<string, number> | null }) {
+function AveragesChart({ averages, questionData }: { averages: Record<string, number> | null; questionData: Record<string, { label: string; fullQuestion: string }> }) {
   if (!averages) return <p className="text-muted-foreground">Ingen data</p>;
 
   const data = Object.entries(averages).map(([key, value]) => ({
-    name: QUESTION_DATA[key]?.label || key,
-    fullQuestion: QUESTION_DATA[key]?.fullQuestion || '',
+    name: questionData[key]?.label || key,
+    fullQuestion: questionData[key]?.fullQuestion || '',
     score: value,
   }));
 
@@ -144,18 +115,18 @@ function AveragesChart({ averages }: { averages: Record<string, number> | null }
   );
 }
 
-// Default pulse survey questions
-const DEFAULT_PULSE_QUESTIONS: PulseSurveyQuestion[] = [
-  { id: 'nps_score', label: 'NPS', question: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?', type: 'rating', min: 0, max: 10 },
-  { id: 'development_score', label: 'Udvikling', question: 'I hvor høj grad oplever du, at du bliver uddannet, trænet og udviklet som sælger i dit team?', type: 'rating', min: 1, max: 10 },
-  { id: 'leadership_score', label: 'Ledelse', question: 'Hvor tilfreds er du med den måde, din teamleder leder teamet på?', type: 'rating', min: 1, max: 10 },
-  { id: 'recognition_score', label: 'Anerkendelse', question: 'I hvor høj grad oplever du, at dine præstationer bliver anerkendt og belønnet på en fair måde?', type: 'rating', min: 1, max: 10 },
-  { id: 'energy_score', label: 'Energi', question: 'Hvordan vil du vurdere energien og stemningen i dit team lige nu?', type: 'rating', min: 1, max: 10 },
-  { id: 'seriousness_score', label: 'Seriøsitet', question: 'I hvor høj grad oplever du, at der arbejdes seriøst og målrettet i dit team?', type: 'rating', min: 1, max: 10 },
-  { id: 'leader_availability_score', label: 'Leder tid', question: 'I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?', type: 'rating', min: 1, max: 10 },
-  { id: 'wellbeing_score', label: 'Trivsel', question: 'Hvor godt trives du samlet set i Copenhagen Sales lige nu?', type: 'rating', min: 1, max: 10 },
-  { id: 'psychological_safety_score', label: 'Tryghed', question: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?', type: 'rating', min: 1, max: 10 },
-  { id: 'attrition_risk_score', label: 'Risiko for frafald', question: 'Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 3 måneder?', type: 'rating', min: 1, max: 10 },
+// Initial default questions used when no template exists - will be saved to DB on first load
+const INITIAL_DEFAULT_QUESTIONS: PulseSurveyQuestion[] = [
+  { id: 'nps_score', label: '1. NPS / anbefaling', question: 'Hvor sandsynligt er det, at du vil anbefale Copenhagen Sales som arbejdsplads til en ven eller bekendt?', type: 'rating', min: 0, max: 10 },
+  { id: 'development_score', label: '4. Udvikling og træning', question: 'I hvor høj grad oplever du, at du bliver uddannet, trænet og udviklet som sælger i dit team?', type: 'rating', min: 1, max: 10 },
+  { id: 'leadership_score', label: '5. Teamlederens ledelse', question: 'Hvor tilfreds er du med den måde, din teamleder leder teamet på?', type: 'rating', min: 1, max: 10 },
+  { id: 'recognition_score', label: '6. Anerkendelse og belønning', question: 'I hvor høj grad oplever du, at dine præstationer bliver anerkendt og belønnet på en fair måde?', type: 'rating', min: 1, max: 10 },
+  { id: 'energy_score', label: '7. Energi og stemning', question: 'Hvordan vil du vurdere energien og stemningen i dit team lige nu?', type: 'rating', min: 1, max: 10 },
+  { id: 'seriousness_score', label: '8. Seriøsitet i arbejdet', question: 'I hvor høj grad oplever du, at der arbejdes seriøst og målrettet i dit team?', type: 'rating', min: 1, max: 10 },
+  { id: 'leader_availability_score', label: '9. Lederens tid og overskud', question: 'I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?', type: 'rating', min: 1, max: 10 },
+  { id: 'wellbeing_score', label: '10. Samlet trivsel', question: 'Hvor godt trives du samlet set i Copenhagen Sales lige nu?', type: 'rating', min: 1, max: 10 },
+  { id: 'psychological_safety_score', label: '11. Psykologisk tryghed', question: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?', type: 'rating', min: 1, max: 10 },
+  { id: 'attrition_risk_score', label: '12. Risiko for frafald', question: 'Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 3 måneder?', type: 'rating', min: 1, max: 10 },
 ];
 
 export default function PulseSurveyResults() {
@@ -178,11 +149,17 @@ export default function PulseSurveyResults() {
       if (template?.questions && Array.isArray(template.questions) && template.questions.length > 0) {
         setTemplateQuestions(template.questions as PulseSurveyQuestion[]);
       } else {
-        setTemplateQuestions(DEFAULT_PULSE_QUESTIONS);
+        setTemplateQuestions(INITIAL_DEFAULT_QUESTIONS);
       }
       setTemplateInitialized(true);
     }
   }, [template, templateLoading, templateInitialized]);
+
+  // Build questionData dynamically from template
+  const questionData = useMemo(() => {
+    const qs = templateQuestions.length > 0 ? templateQuestions : INITIAL_DEFAULT_QUESTIONS;
+    return buildQuestionData(qs);
+  }, [templateQuestions]);
 
   const handleSaveTemplate = () => {
     updateTemplate.mutate({
@@ -231,7 +208,7 @@ export default function PulseSurveyResults() {
   }, [responses]);
 
   // Calculate averages
-  const averages = useMemo(() => calculateAverages(filteredResponses), [filteredResponses]);
+  const averages = useMemo(() => calculateAverages(filteredResponses, questionData), [filteredResponses, questionData]);
   const npsData = useMemo(() => calculateNpsScore(filteredResponses), [filteredResponses]);
 
   // Calculate tenure distribution
@@ -455,7 +432,7 @@ export default function PulseSurveyResults() {
                   </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <AveragesChart averages={averages} />
+                    <AveragesChart averages={averages} questionData={questionData} />
                   </CardContent>
                 </Card>
 
@@ -490,23 +467,23 @@ export default function PulseSurveyResults() {
                     <TeamComparisonLineChart 
                       responses={normalizedResponses} 
                       teams={teams || []} 
-                      questionData={QUESTION_DATA} 
+                      questionData={questionData} 
                     />
                     <TeamHeatmap 
                       responses={normalizedResponses} 
                       teams={teams || []} 
-                      questionData={QUESTION_DATA} 
+                      questionData={questionData} 
                     />
                     <div className="grid gap-4 lg:grid-cols-2">
                       <TeamComparisonBarChart 
                         responses={normalizedResponses} 
                         teams={teams || []} 
-                        questionData={QUESTION_DATA} 
+                        questionData={questionData} 
                       />
                       <TeamRadarChart 
                         responses={normalizedResponses} 
                         teams={teams || []} 
-                        questionData={QUESTION_DATA} 
+                        questionData={questionData} 
                       />
                     </div>
                   </>
@@ -522,12 +499,12 @@ export default function PulseSurveyResults() {
                           <UITooltip>
                             <TooltipTrigger asChild>
                               <CardTitle className="text-sm font-medium flex items-center gap-1 cursor-help">
-                                {QUESTION_DATA[key]?.label || key}
+                                {questionData[key]?.label || key}
                                 <Info className="h-3 w-3 text-muted-foreground" />
                               </CardTitle>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
-                              <p className="text-sm">{QUESTION_DATA[key]?.fullQuestion}</p>
+                              <p className="text-sm">{questionData[key]?.fullQuestion}</p>
                             </TooltipContent>
                           </UITooltip>
                         </CardHeader>
