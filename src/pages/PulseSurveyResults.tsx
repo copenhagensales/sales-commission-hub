@@ -57,6 +57,10 @@ const QUESTION_DATA: Record<string, { label: string; fullQuestion: string }> = {
     label: 'Tryghed', 
     fullQuestion: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?' 
   },
+  attrition_risk_score: { 
+    label: 'Frafald', 
+    fullQuestion: 'Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 3 måneder?' 
+  },
 };
 
 const TENURE_LABELS: Record<string, string> = {
@@ -151,6 +155,7 @@ const DEFAULT_PULSE_QUESTIONS: PulseSurveyQuestion[] = [
   { id: 'leader_availability_score', label: 'Leder tid', question: 'I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?', type: 'rating', min: 1, max: 10 },
   { id: 'wellbeing_score', label: 'Trivsel', question: 'Hvor godt trives du samlet set i Copenhagen Sales lige nu?', type: 'rating', min: 1, max: 10 },
   { id: 'psychological_safety_score', label: 'Tryghed', question: 'I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?', type: 'rating', min: 1, max: 10 },
+  { id: 'attrition_risk_score', label: 'Risiko for frafald', question: 'Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 3 måneder?', type: 'rating', min: 1, max: 10 },
 ];
 
 export default function PulseSurveyResults() {

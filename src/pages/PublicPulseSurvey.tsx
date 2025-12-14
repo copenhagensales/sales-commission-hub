@@ -34,6 +34,7 @@ const DEFAULT_QUESTIONS: PulseSurveyQuestion[] = [
   { id: "leader_availability_score", label: "9. Lederens tid og overskud", question: "I hvor høj grad oplever du, at din leder har tid og overskud til dig, når du har brug for det?", type: "rating", min: 1, max: 10 },
   { id: "wellbeing_score", label: "10. Samlet trivsel", question: "Hvor godt trives du samlet set i Copenhagen Sales lige nu?", type: "rating", min: 1, max: 10 },
   { id: "psychological_safety_score", label: "11. Psykologisk tryghed", question: "I hvor høj grad føler du dig tryg ved at sige din ærlige mening i teamet – også når du er uenig eller har kritik?", type: "rating", min: 1, max: 10 },
+  { id: "attrition_risk_score", label: "12. Risiko for frafald", question: "Hvor sandsynligt er det, at du stadig arbejder i Copenhagen Sales om 3 måneder?", type: "rating", min: 1, max: 10 },
 ];
 
 function ScaleSelector({ value, onChange, isNps = false }: { value: number | undefined; onChange: (v: number) => void; isNps?: boolean }) {
