@@ -303,11 +303,6 @@ export default function PublicPulseSurvey() {
             <p className="text-sm text-muted-foreground">
               {npsQuestion.min} = Slet ikke sandsynligt, {npsQuestion.max} = Meget sandsynligt
             </p>
-            <div className="flex gap-4 text-xs mt-2">
-              <span className="text-red-500">0-6: Kritiker</span>
-              <span className="text-amber-500">7-8: Passiv</span>
-              <span className="text-green-500">9-10: Promoter</span>
-            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <ScaleSelector 
