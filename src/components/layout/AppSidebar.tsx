@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, Plus, UserPlus, RefreshCcw, CalendarClock, UserCog, Video, Monitor, Phone, DollarSign, FlaskConical } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, Plus, UserPlus, RefreshCcw, CalendarClock, UserCog, Video, Monitor, Phone, DollarSign, FlaskConical, Lock } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +28,7 @@ const getOwnerNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.sales"), href: "/sales", icon: ShoppingCart },
   { name: t("sidebar.commissionCpo"), href: "/commission-cpo", icon: Percent },
   { name: t("sidebar.logics"), href: "/logikker", icon: ListChecks },
+  { name: t("sidebar.closingShifts"), href: "/closing-shifts", icon: Lock },
 ];
 
 // Test submenu navigation (Bil Quiz Admin, Code of Conduct Admin, Pulse Survey Results)

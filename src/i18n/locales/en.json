@@ -1,5 +1,6 @@
 {
   "sidebar": {
+    "closingShifts": "Closing Shifts",
     "loading": "Loading...",
     "logout": "Log out",
     "employees": "Employees",
