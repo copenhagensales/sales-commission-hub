@@ -44,9 +44,9 @@ function calculateNps(scores: number[]): number {
 }
 
 export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps) {
-  const { heatmapData, teamsWithResponses, scoreKeys, overallAverages } = useMemo(() => {
+  const { heatmapData, teamsWithResponses, scoreKeys, overallAverages, responseCountByTeam, totalResponses } = useMemo(() => {
     if (!responses || responses.length === 0 || !teams || teams.length === 0) {
-      return { heatmapData: {}, teamsWithResponses: [], scoreKeys: [], overallAverages: {} };
+      return { heatmapData: {}, teamsWithResponses: [], scoreKeys: [], overallAverages: {}, responseCountByTeam: {}, totalResponses: 0 };
     }
 
     // Include NPS in the heatmap (put it first)
@@ -56,6 +56,12 @@ export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps
     const teamsWithResponses = teams.filter(team => 
       responses.some(r => r.team_id === team.id)
     );
+
+    // Calculate response count per team
+    const responseCountByTeam: Record<string, number> = {};
+    teamsWithResponses.forEach(team => {
+      responseCountByTeam[team.id] = responses.filter(r => r.team_id === team.id).length;
+    });
 
     // Calculate averages per team per question
     const heatmapData: Record<string, Record<string, number>> = {};
@@ -91,7 +97,7 @@ export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps
       }
     });
 
-    return { heatmapData, teamsWithResponses, scoreKeys, overallAverages };
+    return { heatmapData, teamsWithResponses, scoreKeys, overallAverages, responseCountByTeam, totalResponses: responses.length };
   }, [responses, teams, questionData]);
 
   if (teamsWithResponses.length === 0) {
@@ -117,6 +123,7 @@ export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps
               <thead>
                 <tr>
                   <th className="text-left p-2 text-sm font-medium border-b">Team</th>
+                  <th className="text-center p-2 text-xs font-medium border-b min-w-[50px]">n</th>
                   {scoreKeys.map(key => {
                     const isNps = key === 'nps_score';
                     const label = isNps ? 'NPS' : (questionData[key]?.label || key);
@@ -147,9 +154,10 @@ export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps
                     ? Math.round((teamValues.reduce((a, b) => a + b, 0) / teamValues.length) * 10) / 10 
                     : 0;
                   
-                  return (
-                    <tr key={team.id}>
-                      <td className="p-2 text-sm font-medium border-b">{team.name}</td>
+                    return (
+                      <tr key={team.id}>
+                        <td className="p-2 text-sm font-medium border-b">{team.name}</td>
+                        <td className="text-center p-2 text-sm border-b text-muted-foreground">{responseCountByTeam[team.id]}</td>
                       {scoreKeys.map(key => {
                         const value = heatmapData[team.id]?.[key];
                         const isNps = key === 'nps_score';
@@ -191,6 +199,7 @@ export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps
                 {/* Overall average row */}
                 <tr className="bg-muted/50">
                   <td className="p-2 text-sm font-bold border-t-2">Gennemsnit</td>
+                  <td className="text-center p-2 text-sm border-t-2 font-bold">{totalResponses}</td>
                   {scoreKeys.map(key => {
                     const value = overallAverages[key];
                     const isNps = key === 'nps_score';
