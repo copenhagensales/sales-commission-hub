@@ -72,6 +72,7 @@ export const TimeStamp = lazyPage(() => import("@/pages/TimeStamp"));
 
 export const TestBoard = lazyPage(() => import("@/pages/boards/TestBoard"));
 export const EconomicBoard = lazyPage(() => import("@/pages/boards/EconomicBoard"));
+export const SalesDashboard = lazyPage(() => import("@/pages/boards/SalesDashboard"));
 
 export const ClosingShifts = lazyPage(() => import("@/pages/ClosingShifts"));
 
