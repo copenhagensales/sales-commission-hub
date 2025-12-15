@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Mail, Phone, CheckCircle2 } from "lucide-react";
+import { Mail, Phone, CheckCircle2, Send } from "lucide-react";
 
 const WEEKDAYS = [
   { day: 1, name: "Mandag" },
@@ -82,6 +82,39 @@ export default function ClosingShifts() {
       toast.error("Kunne ikke opdatere tjekliste");
     },
   });
+
+  const sendReminderMutation = useMutation({
+    mutationFn: async (shift: ClosingShift) => {
+      const tasksArray = currentTasks.split("\n").filter(t => t.trim());
+      const { error } = await supabase.functions.invoke("send-closing-reminder", {
+        body: {
+          employeeName: shift.employee_name,
+          email: shift.email,
+          phone: shift.phone,
+          tasks: tasksArray,
+        },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Påmindelse sendt!");
+    },
+    onError: (err: any) => {
+      toast.error("Kunne ikke sende påmindelse: " + (err.message || "Ukendt fejl"));
+    },
+  });
+
+  const handleSendReminder = (shift: ClosingShift) => {
+    if (!shift.email && !shift.phone) {
+      toast.error("Ingen email eller telefon angivet");
+      return;
+    }
+    if (!shift.employee_name) {
+      toast.error("Intet navn angivet");
+      return;
+    }
+    sendReminderMutation.mutate(shift);
+  };
 
   const handleInputChange = (weekday: number, field: keyof ClosingShift, value: string) => {
     setEditingShifts((prev) => ({
@@ -217,6 +250,15 @@ export default function ClosingShifts() {
                           Gem
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSendReminder(shift)}
+                        disabled={sendReminderMutation.isPending || (!shift.email && !shift.phone)}
+                        title="Send påmindelse"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
