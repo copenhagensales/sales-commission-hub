@@ -20,6 +20,7 @@ const Wallboard = lazyWithRetry(() => import("./pages/Wallboard"));
 const Settings = lazyWithRetry(() => import("./pages/Settings"));
 const Commission = lazyWithRetry(() => import("./pages/Commission"));
 const MgTest = lazyWithRetry(() => import("./pages/MgTest"));
+const MgTestDashboard = lazyWithRetry(() => import("./pages/MgTestDashboard"));
 const KmTest = lazyWithRetry(() => import("./pages/KmTest"));
 const Codan = lazyWithRetry(() => import("./pages/Codan"));
 const TdcErhverv = lazyWithRetry(() => import("./pages/TdcErhverv"));
@@ -232,6 +233,7 @@ const App = () => (
               <Route path="/payroll" element={<RoleProtectedRoute requireTeamlederOrAbove><Payroll /></RoleProtectedRoute>} />
               <Route path="/wallboard" element={<Wallboard />} />
               <Route path="/mg-test" element={<RoleProtectedRoute requireTeamlederOrAbove><MgTest /></RoleProtectedRoute>} />
+              <Route path="/mg-test-dashboard" element={<RoleProtectedRoute requireTeamlederOrAbove><MgTestDashboard /></RoleProtectedRoute>} />
               <Route path="/km-test" element={<RoleProtectedRoute requireTeamlederOrAbove><KmTest /></RoleProtectedRoute>} />
               <Route path="/adversus-data" element={<RoleProtectedRoute requireTeamlederOrAbove><AdversusData /></RoleProtectedRoute>} />
               <Route path="/dialer-data" element={<RoleProtectedRoute requireTeamlederOrAbove><DialerData /></RoleProtectedRoute>} />
