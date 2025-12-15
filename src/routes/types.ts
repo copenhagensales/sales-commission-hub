@@ -6,7 +6,7 @@ export interface RouteConfig {
   path: string;
   component: React.ComponentType<any> | React.LazyExoticComponent<React.ComponentType<any>>;
   access: Access;
-  requiredRole?: string;
+  requiredRole?: "ejer" | "rekruttering" | "teamleder";
   requireTeamlederOrAbove?: boolean;
   children?: RouteConfig[];
 }
