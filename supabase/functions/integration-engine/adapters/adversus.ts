@@ -168,7 +168,15 @@ export class AdversusAdapter implements DialerAdapter {
     });
   }
   async fetchSalesRange(range: { from: string; to: string }, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
-    const filterStr = encodeURIComponent(JSON.stringify({ created: { $gt: range.from, $lt: range.to } }));
+    const hasTimeFrom = range.from.includes("T")
+    const hasTimeTo = range.to.includes("T")
+    const fromDate = new Date(range.from)
+    const toDate = new Date(range.to)
+    if (!hasTimeFrom) fromDate.setHours(0, 0, 0, 0)
+    if (!hasTimeTo) toDate.setHours(23, 59, 59, 999)
+    const fromISO = fromDate.toISOString()
+    const toISO = toDate.toISOString()
+    const filterStr = encodeURIComponent(JSON.stringify({ created: { $gte: fromISO, $lte: toISO } }));
     const campaignConfigMap = new Map<string, CampaignMappingConfig>();
     campaignMappings?.forEach(m => campaignConfigMap.set(m.adversusCampaignId, m));
     const users = await this.fetchUsers();
@@ -474,7 +482,7 @@ export class AdversusAdapter implements DialerAdapter {
         if (Array.isArray(records) && records.length > 0) {
           return this.mapCdrsToStandardCalls(records);
         }
-      } catch (_e) {}
+      } catch (_e) { void 0; }
     }
     return [];
   }

@@ -188,13 +188,15 @@ export function EmployeeExcelImport() {
             employee[field] = Number(value);
             break;
           case "salary_type":
-            const val = strValue.toLowerCase();
-            if (val === "provision" || val === "fixed" || val === "hourly") {
-              employee.salary_type = val;
-            } else if (val === "fast") {
-              employee.salary_type = "fixed";
-            } else if (val === "time" || val === "timeløn") {
-              employee.salary_type = "hourly";
+            {
+              const val = strValue.toLowerCase();
+              if (val === "provision" || val === "fixed" || val === "hourly") {
+                employee.salary_type = val;
+              } else if (val === "fast") {
+                employee.salary_type = "fixed";
+              } else if (val === "time" || val === "timeløn") {
+                employee.salary_type = "hourly";
+              }
             }
             break;
           case "employment_start_date":
