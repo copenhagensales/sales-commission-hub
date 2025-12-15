@@ -1536,6 +1536,16 @@ export default function MgTest() {
                                                 clientId: newClientId,
                                               });
                                             }
+                                            
+                                            // Auto-confirm new products with 0/0 when client is selected
+                                            if (!productId && newClientId && newClientId !== "unmapped") {
+                                              upsertProductValues.mutate({
+                                                row,
+                                                provision: 0,
+                                                cpo: 0,
+                                                clientId: newClientId,
+                                              });
+                                            }
                                           }}
                                         >
                                           <SelectTrigger className="w-full">
@@ -1552,31 +1562,6 @@ export default function MgTest() {
                                             ))}
                                           </SelectContent>
                                         </Select>
-                                        {!row.product && productClientDrafts[row.key] && (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="w-fit"
-                                            disabled={upsertProductValues.isPending}
-                                            onClick={() => {
-                                              const provisionRaw = editValues[row.key]?.provision ?? "0";
-                                              const cpoRaw = editValues[row.key]?.cpo ?? "0";
-                                              const provision = parseFloat(provisionRaw.replace(",", ".")) || 0;
-                                              const cpo = parseFloat(cpoRaw.replace(",", ".")) || 0;
-                                              upsertProductValues.mutate({
-                                                row,
-                                                provision,
-                                                cpo,
-                                                clientId: productClientDrafts[row.key],
-                                              });
-                                            }}
-                                          >
-                                            {upsertProductValues.isPending ? (
-                                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                            ) : null}
-                                            {t("mgTest.confirm")}
-                                          </Button>
-                                        )}
                                       </div>
                                     </TableCell>
                                     <TableCell>
