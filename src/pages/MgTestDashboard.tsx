@@ -140,10 +140,10 @@ export default function MgTestDashboard() {
     }).format(value);
   };
 
-  // Filter to only show clients with sales
-  const activeClients = clientStats?.filter(c => c.salesThisMonth > 0) || [];
-  const totalSalesToday = activeClients.reduce((sum, c) => sum + c.salesToday, 0);
-  const totalSalesMonth = activeClients.reduce((sum, c) => sum + c.salesThisMonth, 0);
+  // Show all clients (sorted by sales this month)
+  const allClients = clientStats || [];
+  const totalSalesToday = allClients.reduce((sum, c) => sum + c.salesToday, 0);
+  const totalSalesMonth = allClients.reduce((sum, c) => sum + c.salesThisMonth, 0);
 
   return (
     <MainLayout>
@@ -188,7 +188,7 @@ export default function MgTestDashboard() {
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {activeClients.map((client, index) => {
+            {allClients.map((client, index) => {
               const colors = clientColors[client.name] || defaultColors;
               const medals = ["🥇", "🥈", "🥉"];
               
@@ -269,7 +269,7 @@ export default function MgTestDashboard() {
         )}
 
         {/* Empty state */}
-        {!isLoading && activeClients.length === 0 && (
+        {!isLoading && allClients.length === 0 && (
           <div className="text-center py-12">
             <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium">Ingen salgsdata fundet</h3>
