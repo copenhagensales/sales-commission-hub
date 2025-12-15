@@ -2,7 +2,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Trophy, TrendingUp, Users, Building2 } from "lucide-react";
+import { Trophy, Users, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 // Client brand colors for visual distinction
@@ -24,130 +24,44 @@ const clientColors: Record<string, { bg: string; accent: string; text: string }>
 
 const defaultColors = { bg: "from-slate-600/20 to-slate-900/40", accent: "bg-slate-500", text: "text-slate-300" };
 
+interface TopSeller {
+  agent_name: string;
+  count: number;
+}
+
 interface ClientStats {
-  id: string;
-  name: string;
-  salesToday: number;
-  salesThisMonth: number;
-  totalCommission: number;
-  totalRevenue: number;
-  topSellers: { name: string; sales: number }[];
+  client_id: string;
+  client_name: string;
+  sales_today: number;
+  sales_month: number;
+  revenue_today: number;
+  revenue_month: number;
+  commission_today: number;
+  commission_month: number;
+  top_sellers: TopSeller[];
 }
 
 export default function MgTestDashboard() {
   const { data: clientStats, isLoading } = useQuery({
     queryKey: ["mg-test-dashboard-clients"],
     queryFn: async () => {
-      // Fetch all clients
-      const { data: clients, error: clientsError } = await supabase
-        .from("clients")
-        .select("id, name")
-        .order("name");
-
-      if (clientsError) throw clientsError;
-
-      // Fetch aggregated product types from MG Test (matches by adversus_product_title)
-      const { data: aggregatedProducts, error: aggError } = await supabase
-        .rpc("get_aggregated_product_types");
-
-      if (aggError) throw aggError;
-
-      // Build a map of adversus_product_title -> product info (client_id, counts_as_sale, commission, revenue)
-      const productTitleMap = new Map<string, { 
-        client_id: string | null; 
-        counts_as_sale: boolean; 
-        commission: number; 
-        revenue: number 
-      }>();
+      const { data, error } = await supabase.rpc("get_client_sales_stats");
+      if (error) throw error;
       
-      aggregatedProducts?.forEach((p: any) => {
-        if (p.adversus_product_title) {
-          productTitleMap.set(p.adversus_product_title, {
-            client_id: p.client_id,
-            counts_as_sale: p.counts_as_sale ?? true,
-            commission: p.commission_dkk || 0,
-            revenue: p.revenue_dkk || 0,
-          });
-        }
-      });
-
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-      // Fetch sale items for this month only (to avoid 1000 row limit)
-      const { data: saleItems, error: saleItemsError } = await supabase
-        .from("sale_items")
-        .select(`
-          id,
-          quantity,
-          adversus_product_title,
-          mapped_commission,
-          mapped_revenue,
-          sales!inner(
-            id,
-            sale_datetime,
-            agent_name
-          )
-        `)
-        if (saleItemsError) throw saleItemsError;
-
-      // Process stats for each client using adversus_product_title matching
-      const stats: ClientStats[] = clients?.map(client => {
-        // Filter sale_items where the product title maps to this client
-        const clientSaleItems = saleItems?.filter((item: any) => {
-          const productInfo = productTitleMap.get(item.adversus_product_title);
-          if (!productInfo) return false; // No mapping in MG Test = exclude
-          if (!productInfo.counts_as_sale) return false; // counts_as_sale = false = exclude
-          return productInfo.client_id === client.id;
-        }) || [];
-
-        let salesToday = 0;
-        let salesThisMonth = 0;
-        let totalCommission = 0;
-        let totalRevenue = 0;
-        const sellerMap = new Map<string, number>();
-
-        clientSaleItems.forEach((item: any) => {
-          const productInfo = productTitleMap.get(item.adversus_product_title);
-          const qty = item.quantity || 1;
-          const commission = (productInfo?.commission || item.mapped_commission || 0) * qty;
-          const revenue = (productInfo?.revenue || item.mapped_revenue || 0) * qty;
-          const saleDate = new Date(item.sales.sale_datetime);
-          const agentName = item.sales.agent_name || "Ukendt";
-
-          totalCommission += commission;
-          totalRevenue += revenue;
-
-          if (saleDate >= startOfToday) {
-            salesToday += qty;
-          }
-          if (saleDate >= startOfMonth) {
-            salesThisMonth += qty;
-            sellerMap.set(agentName, (sellerMap.get(agentName) || 0) + qty);
-          }
-        });
-
-        // Get top 3 sellers
-        const topSellers = Array.from(sellerMap.entries())
-          .map(([name, sales]) => ({ name, sales }))
-          .sort((a, b) => b.sales - a.sales)
-          .slice(0, 3);
-
-        return {
-          id: client.id,
-          name: client.name,
-          salesToday,
-          salesThisMonth,
-          totalCommission,
-          totalRevenue,
-          topSellers,
-        };
-      }) || [];
-
-      // Sort by sales this month, descending
-      return stats.sort((a, b) => b.salesThisMonth - a.salesThisMonth);
+      // Map the response to properly type top_sellers
+      return (data || []).map((item: any) => ({
+        client_id: item.client_id,
+        client_name: item.client_name,
+        sales_today: item.sales_today,
+        sales_month: item.sales_month,
+        revenue_today: item.revenue_today,
+        revenue_month: item.revenue_month,
+        commission_today: item.commission_today,
+        commission_month: item.commission_month,
+        top_sellers: (item.top_sellers || []) as TopSeller[],
+      })) as ClientStats[];
     },
+    refetchInterval: 30000,
   });
 
   const formatCurrency = (value: number) => {
@@ -159,10 +73,10 @@ export default function MgTestDashboard() {
     }).format(value);
   };
 
-  // Show all clients (sorted by sales this month)
-  const allClients = clientStats || [];
-  const totalSalesToday = allClients.reduce((sum, c) => sum + c.salesToday, 0);
-  const totalSalesMonth = allClients.reduce((sum, c) => sum + c.salesThisMonth, 0);
+  // Sort by sales this month descending
+  const allClients = [...(clientStats || [])].sort((a, b) => b.sales_month - a.sales_month);
+  const totalSalesToday = allClients.reduce((sum, c) => sum + c.sales_today, 0);
+  const totalSalesMonth = allClients.reduce((sum, c) => sum + c.sales_month, 0);
 
   return (
     <MainLayout>
@@ -208,12 +122,12 @@ export default function MgTestDashboard() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {allClients.map((client, index) => {
-              const colors = clientColors[client.name] || defaultColors;
+              const colors = clientColors[client.client_name] || defaultColors;
               const medals = ["🥇", "🥈", "🥉"];
               
               return (
                 <Card 
-                  key={client.id} 
+                  key={client.client_id} 
                   className={`relative overflow-hidden border-0 bg-gradient-to-br ${colors.bg} backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-xl`}
                 >
                   {/* Decorative accent bar */}
@@ -234,9 +148,9 @@ export default function MgTestDashboard() {
                         <Building2 className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-xl">{client.name}</CardTitle>
+                        <CardTitle className="text-xl">{client.client_name}</CardTitle>
                         <p className={`text-sm ${colors.text}`}>
-                          {formatCurrency(client.totalRevenue)} omsætning
+                          {formatCurrency(client.revenue_month)} omsætning
                         </p>
                       </div>
                     </div>
@@ -247,33 +161,33 @@ export default function MgTestDashboard() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-background/30 backdrop-blur rounded-lg p-3 text-center">
                         <p className="text-xs text-muted-foreground uppercase tracking-wide">I dag</p>
-                        <p className="text-2xl font-bold">{client.salesToday}</p>
+                        <p className="text-2xl font-bold">{client.sales_today}</p>
                       </div>
                       <div className="bg-background/30 backdrop-blur rounded-lg p-3 text-center">
                         <p className="text-xs text-muted-foreground uppercase tracking-wide">Denne måned</p>
-                        <p className="text-2xl font-bold">{client.salesThisMonth}</p>
+                        <p className="text-2xl font-bold">{client.sales_month}</p>
                       </div>
                     </div>
                     
                     {/* Top 3 sellers */}
-                    {client.topSellers.length > 0 && (
+                    {client.top_sellers && client.top_sellers.length > 0 && (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Trophy className="w-4 h-4" />
                           <span>Top sælgere denne måned</span>
                         </div>
                         <div className="space-y-1.5">
-                          {client.topSellers.map((seller, i) => (
+                          {client.top_sellers.slice(0, 3).map((seller, i) => (
                             <div 
-                              key={seller.name} 
+                              key={seller.agent_name} 
                               className="flex items-center justify-between bg-background/20 backdrop-blur rounded-lg px-3 py-2"
                             >
                               <div className="flex items-center gap-2">
                                 <span className="text-lg">{medals[i]}</span>
-                                <span className="font-medium truncate max-w-[140px]">{seller.name}</span>
+                                <span className="font-medium truncate max-w-[140px]">{seller.agent_name}</span>
                               </div>
                               <Badge variant="secondary" className="font-bold">
-                                {seller.sales} salg
+                                {seller.count} salg
                               </Badge>
                             </div>
                           ))}
