@@ -44,23 +44,40 @@ async function processWebhookPayload(
   const dialerId = dialerInfo?.id || null;
   const dialerName = dialerInfo?.name || 'Unknown Dialer';
   
-  // Handle same-day corrections
+  // Handle same-day corrections and deduplication by leadId
   const newEventDate = payload.eventTime ? getDateOnly(payload.eventTime) : getDateOnly(new Date().toISOString());
 
+  // Check for existing events by external_id OR leadId (webhooks use leadId, API sync uses resultId)
+  const externalIdsToCheck = [payload.externalId];
+  if (payload.leadId && payload.leadId !== payload.externalId) {
+    externalIdsToCheck.push(payload.leadId);
+  }
+  
   const { data: existingEvents } = await supabase
     .from('adversus_events')
-    .select('id')
-    .eq('external_id', payload.externalId);
+    .select('id, external_id')
+    .in('external_id', externalIdsToCheck);
 
-  let existingSales: { id: string; sale_datetime: string }[] = [];
+  let existingSales: { id: string; sale_datetime: string; adversus_external_id: string }[] = [];
 
   if (existingEvents && existingEvents.length > 0) {
     const existingEventIds = existingEvents.map((e: { id: string }) => e.id);
     const { data: salesForResult } = await supabase
       .from('sales')
-      .select('id, sale_datetime')
+      .select('id, sale_datetime, adversus_external_id')
       .in('adversus_event_id', existingEventIds);
     existingSales = salesForResult || [];
+  }
+
+  // Also check sales directly by leadId in case webhook came after API sync
+  if (payload.leadId) {
+    const { data: salesByLeadId } = await supabase
+      .from('sales')
+      .select('id, sale_datetime, adversus_external_id')
+      .eq('adversus_external_id', payload.leadId);
+    if (salesByLeadId && salesByLeadId.length > 0) {
+      existingSales = [...existingSales, ...salesByLeadId];
+    }
   }
 
   let isSameDayCorrection = false;
@@ -79,7 +96,7 @@ async function processWebhookPayload(
     }
   }
 
-  // Store raw event with dialer reference
+  // Store raw event with dialer reference and leadId
   const { data: eventData, error: eventError } = await supabase
     .from('adversus_events')
     .insert({
@@ -87,6 +104,19 @@ async function processWebhookPayload(
       event_type: payload.eventType,
       payload: {
         ...payload.rawPayload,
+        _parsed_webhook_data: {
+          externalId: payload.externalId,
+          leadId: payload.leadId,
+          agentId: payload.agentId,
+          agentName: payload.agentName,
+          agentEmail: payload.agentEmail,
+          campaignId: payload.campaignId,
+          campaignName: payload.campaignName,
+          customerPhone: payload.customerPhone,
+          customerCompany: payload.customerCompany,
+          externalReference: payload.externalReference,
+          products: payload.products,
+        },
         _dialer_webhook_info: {
           dialer_id: dialerId,
           dialer_name: dialerName,
@@ -104,15 +134,17 @@ async function processWebhookPayload(
   console.log('Stored event:', eventData.id);
 
   if (ignoreNewEvent) {
-    await logIntegration(supabase, 'warning', `Event stored but ignored (day change)`, {
+    await logIntegration(supabase, 'warning', `Event stored but ignored (day change or duplicate)`, {
       event_id: eventData.id,
       external_id: payload.externalId,
+      lead_id: payload.leadId,
       dialer_id: dialerId,
       dialer_name: dialerName,
+      existing_sales_count: existingSales.length,
     });
     return {
       success: true,
-      message: 'Event stored but ignored due to day change',
+      message: 'Event stored but ignored due to day change or existing sale',
       event_id: eventData.id,
     };
   }
@@ -139,7 +171,7 @@ async function processWebhookPayload(
     });
   }
 
-  // Create sale record with dialer source
+  // Create sale record with dialer source and full raw payload
   const { data: saleData, error: saleError } = await supabase
     .from('sales')
     .insert({
@@ -156,6 +188,17 @@ async function processWebhookPayload(
       validation_status: 'pending',
       source: dialerName,
       integration_type: provider,
+      raw_payload: {
+        ...payload.rawPayload,
+        _webhook_parsed: {
+          leadId: payload.leadId,
+          externalId: payload.externalId,
+          agentId: payload.agentId,
+          agentName: payload.agentName,
+          campaignId: payload.campaignId,
+          campaignName: payload.campaignName,
+        }
+      },
     })
     .select()
     .single();
