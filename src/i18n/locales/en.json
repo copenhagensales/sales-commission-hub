@@ -309,6 +309,8 @@
     "retroactiveDesc2": "Do you want to update existing sales with this new rule? This will resync sales from the last 30 days.",
     "updatingSales": "Updating sales...",
     "yesUpdateLast30Days": "Yes, update last 30 days",
-    "noOnlyFuture": "No, only future"
+    "noOnlyFuture": "No, only future",
+    "showMore": "Show {{count}} more",
+    "showLess": "Show less"
   }
 }

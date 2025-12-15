@@ -309,6 +309,8 @@
     "retroactiveDesc2": "Vil du opdatere eksisterende salg med denne nye regel? Dette vil gensynkronisere salg fra de sidste 30 dage.",
     "updatingSales": "Opdaterer salg...",
     "yesUpdateLast30Days": "Ja, opdater sidste 30 dage",
-    "noOnlyFuture": "Nej, kun fremtidige"
+    "noOnlyFuture": "Nej, kun fremtidige",
+    "showMore": "Vis {{count}} flere",
+    "showLess": "Vis færre"
   }
 }
