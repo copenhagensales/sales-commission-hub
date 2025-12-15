@@ -1571,7 +1571,7 @@ export default function MgTest() {
                                           (row.product?.commission_dkk !== null &&
                                           row.product?.commission_dkk !== undefined
                                             ? String(row.product.commission_dkk)
-                                            : "")
+                                            : "0")
                                         }
                                         onChange={(e) => handleChange(row.key, "provision", e.target.value, row)}
                                         placeholder="0,00"
@@ -1587,7 +1587,7 @@ export default function MgTest() {
                                           (row.product?.revenue_dkk !== null &&
                                           row.product?.revenue_dkk !== undefined
                                             ? String(row.product.revenue_dkk)
-                                            : "")
+                                            : "0")
                                         }
                                         onChange={(e) => handleChange(row.key, "cpo", e.target.value, row)}
                                         placeholder="0,00"
