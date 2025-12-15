@@ -863,6 +863,7 @@ export type Database = {
           employee_name: string | null
           id: string
           phone: string | null
+          tasks: string | null
           updated_at: string
           weekday: number
         }
@@ -872,6 +873,7 @@ export type Database = {
           employee_name?: string | null
           id?: string
           phone?: string | null
+          tasks?: string | null
           updated_at?: string
           weekday: number
         }
@@ -881,6 +883,7 @@ export type Database = {
           employee_name?: string | null
           id?: string
           phone?: string | null
+          tasks?: string | null
           updated_at?: string
           weekday?: number
         }

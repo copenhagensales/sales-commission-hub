@@ -5,6 +5,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Mail, Phone, CheckCircle2 } from "lucide-react";
 
@@ -16,24 +17,20 @@ const WEEKDAYS = [
   { day: 5, name: "Fredag" },
 ];
 
-const CLOSING_TASKS = [
-  "Lukke alle vinduer (inkl. mødelokaler)",
-  "Fylde opvaskeren og starte den",
-  "Ryd kopper af alle borde",
-  "Lukke begge døre",
-];
-
 interface ClosingShift {
   id: string;
   weekday: number;
   employee_name: string | null;
   email: string | null;
   phone: string | null;
+  tasks: string | null;
 }
 
 export default function ClosingShifts() {
   const queryClient = useQueryClient();
   const [editingShifts, setEditingShifts] = useState<Record<number, Partial<ClosingShift>>>({});
+  const [editingTasks, setEditingTasks] = useState<string | null>(null);
+  const [tasksChanged, setTasksChanged] = useState(false);
 
   const { data: shifts, isLoading } = useQuery({
     queryKey: ["closing-shifts"],
@@ -46,6 +43,9 @@ export default function ClosingShifts() {
       return data as ClosingShift[];
     },
   });
+
+  // Get tasks from weekday 1
+  const currentTasks = editingTasks ?? shifts?.find(s => s.weekday === 1)?.tasks ?? "";
 
   const updateShiftMutation = useMutation({
     mutationFn: async ({ weekday, updates }: { weekday: number; updates: Partial<ClosingShift> }) => {
@@ -61,6 +61,25 @@ export default function ClosingShifts() {
     },
     onError: () => {
       toast.error("Kunne ikke opdatere lukkevagt");
+    },
+  });
+
+  const updateTasksMutation = useMutation({
+    mutationFn: async (tasks: string) => {
+      const { error } = await supabase
+        .from("closing_shifts")
+        .update({ tasks })
+        .eq("weekday", 1);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["closing-shifts"] });
+      toast.success("Tjekliste opdateret");
+      setEditingTasks(null);
+      setTasksChanged(false);
+    },
+    onError: () => {
+      toast.error("Kunne ikke opdatere tjekliste");
     },
   });
 
@@ -123,15 +142,29 @@ export default function ClosingShifts() {
               Tjekliste ved lukning
             </CardTitle>
             <CardDescription>
-              Denne liste sendes med påmindelsen kl. 16:00
+              Denne liste sendes med påmindelsen kl. 16:00 (én opgave per linje)
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-              {CLOSING_TASKS.map((task, i) => (
-                <li key={i}>{task}</li>
-              ))}
-            </ul>
+          <CardContent className="space-y-3">
+            <Textarea
+              value={currentTasks}
+              onChange={(e) => {
+                setEditingTasks(e.target.value);
+                setTasksChanged(true);
+              }}
+              placeholder="Skriv opgaver her (én per linje)"
+              rows={5}
+              className="resize-none"
+            />
+            {tasksChanged && (
+              <Button
+                size="sm"
+                onClick={() => updateTasksMutation.mutate(currentTasks)}
+                disabled={updateTasksMutation.isPending}
+              >
+                Gem tjekliste
+              </Button>
+            )}
           </CardContent>
         </Card>
 
