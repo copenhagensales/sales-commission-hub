@@ -14,6 +14,76 @@ interface ClosingReminderRequest {
   auto?: boolean; // Flag for automatic/scheduled execution
 }
 
+async function getM365AccessToken(): Promise<string> {
+  const tenantId = Deno.env.get('M365_TENANT_ID');
+  const clientId = Deno.env.get('M365_CLIENT_ID');
+  const clientSecret = Deno.env.get('M365_CLIENT_SECRET');
+
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error('M365 credentials not configured');
+  }
+
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  const tokenBody = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope: 'https://graph.microsoft.com/.default',
+    grant_type: 'client_credentials',
+  });
+
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: tokenBody.toString(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('M365 token error:', errorText);
+    throw new Error('Failed to get M365 access token');
+  }
+
+  const data = await response.json();
+  return data.access_token;
+}
+
+async function sendEmail(accessToken: string, to: string, subject: string, htmlBody: string): Promise<void> {
+  const senderEmail = Deno.env.get('M365_SENDER_EMAIL');
+  
+  if (!senderEmail) {
+    throw new Error('M365_SENDER_EMAIL not configured');
+  }
+
+  const sendMailUrl = `https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`;
+  
+  const emailPayload = {
+    message: {
+      subject: subject,
+      body: {
+        contentType: 'HTML',
+        content: htmlBody,
+      },
+      toRecipients: [{ emailAddress: { address: to } }],
+    },
+    saveToSentItems: true,
+  };
+
+  const response = await fetch(sendMailUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(emailPayload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('M365 email error:', errorText);
+    throw new Error('Failed to send email via M365');
+  }
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -108,45 +178,37 @@ const handler = async (req: Request): Promise<Response> => {
 
     const results: { email?: boolean; sms?: boolean } = {};
 
-    // Send email if provided
+    // Send email via M365 if email provided
     if (email) {
-      const resendApiKey = Deno.env.get("RESEND_API_KEY");
-      if (resendApiKey) {
-        console.log(`Sending email to ${email}`);
-        const emailResponse = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${resendApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: "Copenhagen Sales <onboarding@resend.dev>",
-            to: [email],
-            subject: "Påmindelse: Du har lukkevagt i dag",
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h1 style="color: #333;">Hej ${employeeName}!</h1>
-                <p>Dette er en påmindelse om, at du har lukkevagt i dag.</p>
-                <h2 style="color: #555;">Husk at:</h2>
-                <ul style="line-height: 1.8;">
-                  ${taskListHtml}
-                </ul>
-                <p style="margin-top: 20px; color: #666;">God aften!</p>
-                <hr style="margin-top: 30px; border: none; border-top: 1px solid #eee;" />
-                <p style="color: #999; font-size: 12px;">Copenhagen Sales</p>
-              </div>
-            `,
-          }),
-        });
-        if (emailResponse.ok) {
-          console.log("Email sent successfully");
-          results.email = true;
-        } else {
-          const errorText = await emailResponse.text();
-          console.error("Email error:", errorText);
-        }
-      } else {
-        console.error("RESEND_API_KEY not configured");
+      try {
+        console.log(`Sending email to ${email} via M365`);
+        const accessToken = await getM365AccessToken();
+        
+        const htmlBody = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="padding: 20px 0; border-bottom: 1px solid #eee;">
+              <h2 style="margin: 0; color: #333;">COPENHAGEN SALES</h2>
+            </div>
+            <div style="padding: 20px 0;">
+              <h1 style="color: #333;">Hej ${employeeName}!</h1>
+              <p>Dette er en påmindelse om, at du har lukkevagt i dag.</p>
+              <h2 style="color: #555;">Husk at:</h2>
+              <ul style="line-height: 1.8;">
+                ${taskListHtml}
+              </ul>
+              <p style="margin-top: 20px; color: #666;">God aften!</p>
+            </div>
+            <div style="padding: 20px 0; border-top: 1px solid #eee; font-size: 12px; color: #666;">
+              <p>Med venlig hilsen,<br>Copenhagen Sales</p>
+            </div>
+          </div>
+        `;
+        
+        await sendEmail(accessToken, email, "Påmindelse: Du har lukkevagt i dag", htmlBody);
+        console.log("Email sent successfully via M365");
+        results.email = true;
+      } catch (error) {
+        console.error("M365 email error:", error);
       }
     }
 
