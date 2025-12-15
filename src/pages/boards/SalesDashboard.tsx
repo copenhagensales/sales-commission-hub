@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Trophy, Building2, Maximize, Minimize } from "lucide-react";
+import { Trophy, Building2, Maximize, Minimize, Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+
+const PIN_CODE = "1234"; // Change this to your desired PIN
 
 const clientColors: Record<string, { bg: string; accent: string; text: string }> = {
   "TDC Erhverv": { bg: "from-violet-600/20 to-violet-900/40", accent: "bg-violet-500", text: "text-violet-300" },
@@ -41,8 +44,30 @@ interface ClientStats {
 }
 
 export default function SalesDashboard() {
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Check sessionStorage for existing unlock
+  useEffect(() => {
+    const unlocked = sessionStorage.getItem("sales-dashboard-unlocked");
+    if (unlocked === "true") {
+      setIsUnlocked(true);
+    }
+  }, []);
+
+  const handlePinComplete = (value: string) => {
+    if (value === PIN_CODE) {
+      setIsUnlocked(true);
+      sessionStorage.setItem("sales-dashboard-unlocked", "true");
+      setError(false);
+    } else {
+      setError(true);
+      setPin("");
+    }
+  };
 
   const { data: clientStats, isLoading } = useQuery({
     queryKey: ["sales-dashboard-tv"],
@@ -62,6 +87,7 @@ export default function SalesDashboard() {
       })) as ClientStats[];
     },
     refetchInterval: 30000,
+    enabled: isUnlocked,
   });
 
   useEffect(() => {
@@ -98,6 +124,48 @@ export default function SalesDashboard() {
   const totalSalesToday = allClients.reduce((sum, c) => sum + c.sales_today, 0);
   const totalSalesMonth = allClients.reduce((sum, c) => sum + c.sales_month, 0);
   const totalRevenueMonth = allClients.reduce((sum, c) => sum + c.revenue_month, 0);
+
+  // PIN Screen
+  if (!isUnlocked) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+        <div className="text-center space-y-8">
+          <div className="flex justify-center">
+            <div className="w-20 h-20 rounded-2xl bg-slate-800 flex items-center justify-center border border-slate-700">
+              <Lock className="w-10 h-10 text-slate-400" />
+            </div>
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white mb-2">Sales Dashboard</h1>
+            <p className="text-slate-400">Indtast PIN-kode for at fortsætte</p>
+          </div>
+          <div className="flex justify-center">
+            <InputOTP
+              maxLength={4}
+              value={pin}
+              onChange={(value) => {
+                setPin(value);
+                setError(false);
+                if (value.length === 4) {
+                  handlePinComplete(value);
+                }
+              }}
+            >
+              <InputOTPGroup>
+                <InputOTPSlot index={0} className="w-14 h-14 text-2xl bg-slate-800 border-slate-700 text-white" />
+                <InputOTPSlot index={1} className="w-14 h-14 text-2xl bg-slate-800 border-slate-700 text-white" />
+                <InputOTPSlot index={2} className="w-14 h-14 text-2xl bg-slate-800 border-slate-700 text-white" />
+                <InputOTPSlot index={3} className="w-14 h-14 text-2xl bg-slate-800 border-slate-700 text-white" />
+              </InputOTPGroup>
+            </InputOTP>
+          </div>
+          {error && (
+            <p className="text-red-400 text-sm">Forkert PIN-kode. Prøv igen.</p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-6 lg:p-8">
