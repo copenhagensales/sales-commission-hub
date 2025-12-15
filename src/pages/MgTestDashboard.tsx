@@ -46,7 +46,8 @@ export default function MgTestDashboard() {
 
       if (clientsError) throw clientsError;
 
-      // Fetch all sale items with sales, campaign info, and product (only counts_as_sale = true)
+      // Fetch all sale items with sales and campaign info
+      // Use left join for products since some items may not have mapped products yet
       const { data: saleItems, error: saleItemsError } = await supabase
         .from("sale_items")
         .select(`
@@ -55,7 +56,7 @@ export default function MgTestDashboard() {
           mapped_commission,
           mapped_revenue,
           product_id,
-          products!inner(
+          products(
             id,
             counts_as_sale
           ),
@@ -65,10 +66,15 @@ export default function MgTestDashboard() {
             agent_name,
             client_campaign_id
           )
-        `)
-        .eq("products.counts_as_sale", true);
+        `);
 
       if (saleItemsError) throw saleItemsError;
+
+      // Filter: only include items where counts_as_sale is true OR product is null (default to counting)
+      const filteredSaleItems = saleItems?.filter((item: any) => {
+        if (!item.products) return true; // No product mapped = count as sale by default
+        return item.products.counts_as_sale === true;
+      }) || [];
 
       // Fetch campaign to client mapping
       const { data: campaigns, error: campaignsError } = await supabase
@@ -85,10 +91,10 @@ export default function MgTestDashboard() {
 
       // Process stats for each client
       const stats: ClientStats[] = clients?.map(client => {
-        const clientSaleItems = saleItems?.filter((item: any) => {
+        const clientSaleItems = filteredSaleItems.filter((item: any) => {
           const campaignId = item.sales?.client_campaign_id;
           return campaignToClient.get(campaignId) === client.id;
-        }) || [];
+        });
 
         let salesToday = 0;
         let salesThisMonth = 0;
