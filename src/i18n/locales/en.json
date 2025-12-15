@@ -311,6 +311,7 @@
     "yesUpdateLast30Days": "Yes, update last 30 days",
     "noOnlyFuture": "No, only future",
     "showMore": "Show {{count}} more",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "confirm": "Confirm"
   }
 }
