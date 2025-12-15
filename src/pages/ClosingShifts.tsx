@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Mail, Phone, Send, CheckCircle2 } from "lucide-react";
+import { Mail, Phone, CheckCircle2 } from "lucide-react";
 
 const WEEKDAYS = [
   { day: 1, name: "Mandag" },
@@ -34,7 +34,6 @@ interface ClosingShift {
 export default function ClosingShifts() {
   const queryClient = useQueryClient();
   const [editingShifts, setEditingShifts] = useState<Record<number, Partial<ClosingShift>>>({});
-  const [sendingReminder, setSendingReminder] = useState<number | null>(null);
 
   const { data: shifts, isLoading } = useQuery({
     queryKey: ["closing-shifts"],
@@ -62,28 +61,6 @@ export default function ClosingShifts() {
     },
     onError: () => {
       toast.error("Kunne ikke opdatere lukkevagt");
-    },
-  });
-
-  const sendReminderMutation = useMutation({
-    mutationFn: async (shift: ClosingShift) => {
-      const { error } = await supabase.functions.invoke("send-closing-reminder", {
-        body: {
-          employeeName: shift.employee_name,
-          email: shift.email,
-          phone: shift.phone,
-          tasks: CLOSING_TASKS,
-        },
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Påmindelse sendt!");
-      setSendingReminder(null);
-    },
-    onError: () => {
-      toast.error("Kunne ikke sende påmindelse");
-      setSendingReminder(null);
     },
   });
 
@@ -119,15 +96,6 @@ export default function ClosingShifts() {
 
   const hasChanges = (weekday: number) => {
     return !!editingShifts[weekday] && Object.keys(editingShifts[weekday]).length > 0;
-  };
-
-  const handleSendReminder = (shift: ClosingShift) => {
-    if (!shift.email && !shift.phone) {
-      toast.error("Ingen email eller telefon angivet");
-      return;
-    }
-    setSendingReminder(shift.weekday);
-    sendReminderMutation.mutate(shift);
   };
 
   if (isLoading) {
@@ -216,15 +184,6 @@ export default function ClosingShifts() {
                           Gem
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleSendReminder(shift)}
-                        disabled={sendingReminder === weekday.day || (!shift.email && !shift.phone)}
-                        title="Send påmindelse nu"
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
                 </CardContent>
