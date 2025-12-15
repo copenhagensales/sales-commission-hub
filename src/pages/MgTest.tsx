@@ -635,18 +635,68 @@ export default function MgTest() {
     },
   });
 
-  // Mutation to toggle counts_as_sale
+  // Mutation to toggle counts_as_sale (creates product if needed)
   const toggleCountsAsSale = useMutation({
-    mutationFn: async ({ productId, countsAsSale }: { productId: string; countsAsSale: boolean }) => {
-      const { error } = await supabase
-        .from("products")
-        .update({ counts_as_sale: countsAsSale })
-        .eq("id", productId);
-      if (error) throw error;
+    mutationFn: async ({ 
+      productId, 
+      countsAsSale, 
+      row 
+    }: { 
+      productId: string | null; 
+      countsAsSale: boolean; 
+      row: AggregatedProduct;
+    }) => {
+      if (productId) {
+        // Update existing product
+        const { error } = await supabase
+          .from("products")
+          .update({ counts_as_sale: countsAsSale })
+          .eq("id", productId);
+        if (error) throw error;
+      } else {
+        // Create new product with counts_as_sale setting
+        const productName = row.adversus_product_title || "Ukendt produkt";
+        const { data: newProduct, error: createError } = await supabase
+          .from("products")
+          .insert({
+            name: productName,
+            commission_dkk: 0,
+            revenue_dkk: 0,
+            counts_as_sale: countsAsSale,
+          })
+          .select("id")
+          .single();
+        
+        if (createError) throw createError;
+        
+        // Create mapping if we have external_id
+        if (row.adversus_external_id && newProduct) {
+          await supabase
+            .from("adversus_product_mappings")
+            .upsert(
+              {
+                adversus_external_id: row.adversus_external_id,
+                adversus_product_title: row.adversus_product_title,
+                product_id: newProduct.id,
+              },
+              { onConflict: "adversus_external_id" }
+            );
+        }
+        
+        // Link sale_items to this product
+        if (newProduct && row.adversus_product_title) {
+          await supabase
+            .from("sale_items")
+            .update({ product_id: newProduct.id })
+            .eq("adversus_product_title", row.adversus_product_title);
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Opdateret");
       queryClient.invalidateQueries({ queryKey: ["mg-webhook-products"] });
+      queryClient.invalidateQueries({ queryKey: ["adversus-product-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke opdatere");
@@ -1514,21 +1564,16 @@ export default function MgTest() {
                                       />
                                     </TableCell>
                                     <TableCell className="text-center">
-                                      {row.product ? (
-                                        <Checkbox
-                                          checked={row.product.counts_as_sale}
-                                          onCheckedChange={(checked) => {
-                                            if (row.product?.id) {
-                                              toggleCountsAsSale.mutate({
-                                                productId: row.product.id,
-                                                countsAsSale: checked === true,
-                                              });
-                                            }
-                                          }}
-                                        />
-                                      ) : (
-                                        <span className="text-xs text-muted-foreground">-</span>
-                                      )}
+                                      <Checkbox
+                                        checked={row.product?.counts_as_sale ?? true}
+                                        onCheckedChange={(checked) => {
+                                          toggleCountsAsSale.mutate({
+                                            productId: row.product?.id ?? null,
+                                            countsAsSale: checked === true,
+                                            row,
+                                          });
+                                        }}
+                                      />
                                     </TableCell>
                                   </TableRow>
                                 );
