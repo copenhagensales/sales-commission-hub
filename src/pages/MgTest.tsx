@@ -187,6 +187,11 @@ export default function MgTest() {
   const [openProductGroups, setOpenProductGroups] = useState<Record<string, boolean>>({});
   const [openCampaignGroups, setOpenCampaignGroups] = useState<Record<string, boolean>>({});
   const [campaignFieldIdDrafts, setCampaignFieldIdDrafts] = useState<Record<string, string>>({});
+  
+  // Performance: limit visible items per section
+  const ITEMS_PER_SECTION = 3;
+  const [expandedProductSections, setExpandedProductSections] = useState<Record<string, boolean>>({});
+  const [expandedCampaignSections, setExpandedCampaignSections] = useState<Record<string, boolean>>({});
 
   // Field Inspector state
   const [inspectingCampaign, setInspectingCampaign] = useState<CampaignMapping | null>(null);
@@ -1464,7 +1469,7 @@ export default function MgTest() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {group.rows.map((row) => {
+                              {(expandedProductSections[groupKey] ? group.rows : group.rows.slice(0, ITEMS_PER_SECTION)).map((row) => {
                                 const current = editValues[row.key];
                                 const productId = row.product?.id ?? null;
                                 const existingClientCampaignId = row.product?.client_campaign_id ?? null;
@@ -1604,6 +1609,26 @@ export default function MgTest() {
                             </TableBody>
                           </Table>
                         </div>
+                        {group.rows.length > ITEMS_PER_SECTION && !expandedProductSections[groupKey] && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full mt-2"
+                            onClick={() => setExpandedProductSections(prev => ({ ...prev, [groupKey]: true }))}
+                          >
+                            {t("mgTest.showMore", { count: group.rows.length - ITEMS_PER_SECTION })}
+                          </Button>
+                        )}
+                        {expandedProductSections[groupKey] && group.rows.length > ITEMS_PER_SECTION && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full mt-2"
+                            onClick={() => setExpandedProductSections(prev => ({ ...prev, [groupKey]: false }))}
+                          >
+                            {t("mgTest.showLess")}
+                          </Button>
+                        )}
                       </CardContent>
                     )}
                   </Card>
@@ -1703,6 +1728,7 @@ export default function MgTest() {
                         </div>
 
                         {isOpen && (
+                          <>
                           <div className="rounded-md border overflow-x-auto mt-4">
                             <Table>
                               <TableHeader>
@@ -1716,7 +1742,7 @@ export default function MgTest() {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {group.rows.map((mapping) => {
+                                {(expandedCampaignSections[groupKey] ? group.rows : group.rows.slice(0, ITEMS_PER_SECTION)).map((mapping) => {
                                   const existingClientId =
                                     clientCampaigns?.find((c) => c.id === mapping.client_campaign_id)?.client_id ??
                                     null;
@@ -1826,7 +1852,28 @@ export default function MgTest() {
                               </TableBody>
                             </Table>
                           </div>
-                        )}
+                          {group.rows.length > ITEMS_PER_SECTION && !expandedCampaignSections[groupKey] && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full mt-2"
+                              onClick={() => setExpandedCampaignSections(prev => ({ ...prev, [groupKey]: true }))}
+                            >
+                              {t("mgTest.showMore", { count: group.rows.length - ITEMS_PER_SECTION })}
+                            </Button>
+                          )}
+                          {expandedCampaignSections[groupKey] && group.rows.length > ITEMS_PER_SECTION && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full mt-2"
+                              onClick={() => setExpandedCampaignSections(prev => ({ ...prev, [groupKey]: false }))}
+                            >
+                              {t("mgTest.showLess")}
+                            </Button>
+                          )}
+                        </>
+                      )}
                       </div>
                     );
                   })
