@@ -856,6 +856,36 @@ export type Database = {
         }
         Relationships: []
       }
+      closing_shifts: {
+        Row: {
+          created_at: string
+          email: string | null
+          employee_name: string | null
+          id: string
+          phone: string | null
+          updated_at: string
+          weekday: number
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          employee_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          weekday: number
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          employee_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          weekday?: number
+        }
+        Relationships: []
+      }
       code_of_conduct_attempts: {
         Row: {
           answers: Json
