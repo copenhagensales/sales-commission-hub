@@ -167,6 +167,77 @@ export class AdversusAdapter implements DialerAdapter {
       };
     });
   }
+  async fetchSalesRange(range: { from: string; to: string }, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
+    const filterStr = encodeURIComponent(JSON.stringify({ created: { $gt: range.from, $lt: range.to } }));
+    const campaignConfigMap = new Map<string, CampaignMappingConfig>();
+    campaignMappings?.forEach(m => campaignConfigMap.set(m.adversusCampaignId, m));
+    const users = await this.fetchUsers();
+    const userMap = new Map<string, StandardUser>();
+    users.forEach(u => userMap.set(u.externalId, u));
+    console.log(`[Adversus] Loaded ${users.length} users for agent lookup`);
+    const rawSales = await this.fetchSalesSequential(filterStr);
+    console.log(`[Adversus] Fetched ${rawSales.length} sales (range)`);
+    const leadIdToOpp = await this.buildLeadOppMap(rawSales, campaignConfigMap);
+    console.log(`[Adversus] Built OPP map with ${leadIdToOpp.size} entries`);
+    return rawSales.map((s: any) => {
+      const agentObj = s.ownedBy || s.createdBy;
+      const agentId = typeof agentObj === "object" ? String(agentObj.id) : String(agentObj);
+      let agentEmail: string;
+      let agentName: string;
+      if (typeof agentObj === "object" && agentObj.email) {
+        agentEmail = agentObj.email;
+        agentName = agentObj.name || agentObj.displayName || "Desconocido";
+      } else if (userMap.has(agentId)) {
+        const user = userMap.get(agentId)!;
+        agentEmail = user.email;
+        agentName = user.name;
+      } else {
+        agentEmail = `agent-${agentId}@adversus.local`;
+        agentName = "Desconocido";
+      }
+      const campaignId = s.campaignId ? String(s.campaignId) : undefined;
+      const leadId = s.leadId ? String(s.leadId) : undefined;
+      let externalReference: string | null = null;
+      let clientCampaignId: string | null = null;
+      if (campaignId && campaignConfigMap.has(campaignId)) {
+        clientCampaignId = campaignConfigMap.get(campaignId)!.clientCampaignId;
+      }
+      if (leadId && leadIdToOpp.has(leadId)) {
+        externalReference = leadIdToOpp.get(leadId)!;
+      }
+      const saleId = String(s.id);
+      const leadIdValue = s.leadId ? String(s.leadId) : null;
+      return {
+        externalId: saleId,
+        leadId: leadIdValue,
+        integrationType: "adversus" as const,
+        dialerName: this.dialerName,
+        saleDate: s.closedTime || s.createdTime,
+        agentExternalId: String(agentId),
+        agentEmail,
+        agentName,
+        customerName: s.lead?.company || s.lead?.name || "",
+        customerPhone: s.lead?.phone || "",
+        campaignId,
+        campaignName: s.campaign?.name || undefined,
+        externalReference,
+        clientCampaignId,
+        products: (s.lines || []).map((l: any) => ({
+          name: l.title || "Producto desconocido",
+          externalId: String(l.productId),
+          quantity: l.quantity || 1,
+          unitPrice: l.unitPrice || 0,
+          metadata: { rawLineId: l.id },
+        })),
+        rawPayload: s,
+        metadata: {
+          campaignId: s.campaignId,
+          leadId: s.leadId,
+          lead: s.lead,
+        },
+      };
+    });
+  }
 
   // Construir mapa leadId -> OPP desde /leads con filtros por campaña (SECUENCIAL para evitar rate limit)
   private async buildLeadOppMap(
@@ -379,6 +450,32 @@ export class AdversusAdapter implements DialerAdapter {
     }
     
     console.log(`[Adversus] No call data found from any endpoint`);
+    return [];
+  }
+  async fetchCallsRange(range: { from: string; to: string }): Promise<StandardCall[]> {
+    const startDateStr = range.from.split('T')[0];
+    const endDateStr = range.to.split('T')[0];
+    console.log(`[Adversus] Fetching calls range ${startDateStr} -> ${endDateStr}`);
+    const endpoints = [
+      `/calls?from=${startDateStr}&to=${endDateStr}&pageSize=1000`,
+      `/cdr?from=${startDateStr}&to=${endDateStr}&pageSize=1000`,
+      `/activity?from=${startDateStr}&to=${endDateStr}&type=call&pageSize=1000`,
+      `/calls?from=${startDateStr}&pageSize=1000`,
+      `/cdr?from=${startDateStr}&pageSize=1000`,
+      `/activity?from=${startDateStr}&type=call&pageSize=1000`,
+    ];
+    for (const endpoint of endpoints) {
+      try {
+        const url = `${this.baseUrl}${endpoint}`;
+        const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
+        if (!res.ok) continue;
+        const data = await res.json();
+        const records = data.calls || data.cdr || data.cdrs || data.activities || data.data || [];
+        if (Array.isArray(records) && records.length > 0) {
+          return this.mapCdrsToStandardCalls(records);
+        }
+      } catch (_e) {}
+    }
     return [];
   }
 

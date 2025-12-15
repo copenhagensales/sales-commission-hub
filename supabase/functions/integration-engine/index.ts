@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { IngestionEngine } from "./core.ts";
-import { AdversusAdapter } from "./adapters/adversus.ts";
-import { EnreachAdapter } from "./adapters/enreach.ts";
 import { DialerAdapter } from "./adapters/interface.ts";
+import { getAdapter } from "./adapters/registry.ts";
+import { fetchSampleFields } from "./actions/fetch-sample-fields.ts";
+import { repairHistory } from "./actions/repair-history.ts";
 
 // Declare EdgeRuntime for background tasks
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
@@ -25,213 +26,42 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { source, action, actions, days = 1, campaignId, integration_id, background = false } = body;
+    const { source, action, actions, days = 1, campaignId, integration_id, background = false, from, to } = body;
 
     const supabase = getSupabase();
 
     // Handle fetch-sample-fields action - returns raw field data for UI inspection
     if (action === "fetch-sample-fields") {
-      console.log(`[Integration Engine] Fetching sample fields for campaign: ${campaignId}`);
-      
-      const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY");
-      
-      // Get active Adversus integration
-      const { data: integrations, error: intError } = await supabase
-        .from("dialer_integrations")
-        .select("*")
-        .eq("provider", source || "adversus")
-        .eq("is_active", true)
-        .limit(1);
-
-      if (intError) throw intError;
-      if (!integrations || integrations.length === 0) {
-        return new Response(
-          JSON.stringify({ success: false, error: "No active integration found" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      const integration = integrations[0];
-      const { data: credentials } = await supabase.rpc("get_dialer_credentials", {
-        p_integration_id: integration.id,
-        p_encryption_key: encryptionKey,
-      });
-
-      // Create adapter and fetch leads for the campaign
-      const adapter = new AdversusAdapter(credentials, integration.name);
-      const leads = await adapter.fetchLeadsForCampaign(campaignId, 100);
-
-      if (leads.length === 0) {
-        console.log(`[Integration Engine] No leads found for campaign ${campaignId}`);
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            fields: [], 
-            message: `No leads found for campaign ${campaignId}` 
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Extract resultData fields from first lead with data
-      const fields: { fieldId: string; label: string; sampleValue: string }[] = [];
-      const sampleLead = leads.find((l: any) => l.resultData && l.resultData.length > 0) || leads[0];
-      const resultData = sampleLead?.resultData || [];
-
-      if (Array.isArray(resultData)) {
-        for (const field of resultData) {
-          if (field.id !== undefined) {
-            fields.push({
-              fieldId: `result_${field.id}`,
-              label: `Field ${field.id}`,
-              sampleValue: field.value !== null && field.value !== undefined ? String(field.value) : "(empty)",
-            });
-          }
-        }
-      }
-
-      // Sort fields alphabetically by fieldId
-      fields.sort((a, b) => a.fieldId.localeCompare(b.fieldId));
-
-      console.log(`[Integration Engine] Found ${fields.length} fields from ${leads.length} leads`);
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          fields,
-          leadCount: leads.length,
-          sampleLeadId: sampleLead?.id,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      const result = await fetchSampleFields(supabase, source, campaignId);
+      return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Handle repair-history action - bulk fetch and update historical sales
     if (action === "repair-history") {
-      console.log(`[Integration Engine] Starting historical repair (${days} days)${integration_id ? ` for integration: ${integration_id}` : ''}${background ? ' [BACKGROUND]' : ''}`);
-      const encryptionKey = Deno.env.get("DB_ENCRYPTION_KEY");
-      
-      // Build query - support specific integration or all active Adversus integrations
-      let query = supabase
-        .from("dialer_integrations")
-        .select("*")
-        .eq("is_active", true);
-      
-      if (integration_id) {
-        query = query.eq("id", integration_id);
-      } else {
-        query = query.eq("provider", "adversus");
-      }
-      
-      const { data: integrations, error: intError } = await query;
-
-      if (intError) throw intError;
-      if (!integrations || integrations.length === 0) {
-        return new Response(
-          JSON.stringify({ success: false, error: integration_id ? "Integration not found or inactive" : "No active Adversus integrations found" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Background processing function
-      async function runRepairHistory() {
-        const engine = new IngestionEngine();
-        const campaignMappings = await engine.getCampaignMappings();
-        
-        let totalProcessed = 0;
-        let totalErrors = 0;
-        const results: { name: string; status: string; processed?: number; errors?: number; error?: string }[] = [];
-
-        for (const integration of integrations!) {
-          try {
-            console.log(`[Integration Engine] Processing integration: ${integration.name}`);
-            
-            const { data: credentials } = await supabase.rpc("get_dialer_credentials", {
-              p_integration_id: integration.id,
-              p_encryption_key: encryptionKey,
-            });
-
-            const adapter = new AdversusAdapter(credentials, integration.name);
-            
-            // Fetch all sales for the specified period (default 90 days for repair)
-            const sales = await adapter.fetchSales(days || 90, campaignMappings);
-            console.log(`[Integration Engine] Fetched ${sales.length} sales for ${integration.name}`);
-            
-            // Process sales - core.ts handles non-destructive OPP updates
-            const result = await engine.processSales(sales);
-            
-            totalProcessed += result.processed;
-            totalErrors += result.errors;
-            
-            results.push({ 
-              name: integration.name, 
-              status: "success", 
-              processed: result.processed,
-              errors: result.errors 
-            });
-
-            // Log success
-            await supabase.from("integration_logs").insert({
-              integration_type: "dialer",
-              integration_id: integration.id,
-              integration_name: integration.name,
-              status: "success",
-              message: `Historical repair: ${result.processed} sales processed`,
-              details: { action: "repair-history", days, processed: result.processed, errors: result.errors },
-            });
-
-          } catch (e) {
-            const errMsg = e instanceof Error ? e.message : String(e);
-            console.error(`[Integration Engine] Error in ${integration.name}:`, e);
-            totalErrors++;
-            results.push({ name: integration.name, status: "error", error: errMsg });
-            
-            // Log error
-            await supabase.from("integration_logs").insert({
-              integration_type: "dialer",
-              integration_id: integration.id,
-              integration_name: integration.name,
-              status: "error",
-              message: `Historical repair failed: ${errMsg}`,
-              details: { action: "repair-history", days, error: errMsg },
-            });
-          }
-        }
-        
-        console.log(`[Integration Engine] Repair complete: ${totalProcessed} processed, ${totalErrors} errors`);
-        return { totalProcessed, totalErrors, results };
-      }
-
-      // If background mode, use waitUntil and return immediately
       if (background) {
-        EdgeRuntime.waitUntil(runRepairHistory());
-        
+        EdgeRuntime.waitUntil(repairHistory(supabase, days || 90, integration_id));
         return new Response(
-          JSON.stringify({ 
-            success: true, 
+          JSON.stringify({
+            success: true,
             action: "repair-history",
             background: true,
-            message: `Started background repair for ${integrations.length} integration(s). Check logs for progress.`,
-            integrations: integrations.map(i => i.name),
+            message: `Started background repair. Check logs for progress.`,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        )
       }
-
-      // Synchronous mode - wait for completion
-      const { totalProcessed, totalErrors, results } = await runRepairHistory();
-
+      const { totalProcessed, totalErrors, results } = await repairHistory(supabase, days || 90, integration_id)
       return new Response(
-        JSON.stringify({ 
-          success: true, 
+        JSON.stringify({
+          success: true,
           action: "repair-history",
           days,
           totalProcessed,
           totalErrors,
-          results 
+          results,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      )
     }
 
     // integration_id already parsed from body above
@@ -288,23 +118,13 @@ serve(async (req) => {
           p_encryption_key: encryptionKey,
         });
 
-        let dialerAdapter: DialerAdapter;
-        if (integration.provider === "adversus" || source === "adversus") {
-          // Pass the integration name as the dialer name
-          dialerAdapter = new AdversusAdapter(credentials, integration.name);
-        } else if (integration.provider === "enreach" || source === "enreach") {
-          // Pass the integration name as the dialer name, api_url from the integration record, and config
-          const enreachCredentials = {
-            ...credentials,
-            api_url: integration.api_url, // Include the api_url from the integration record
-          };
-          console.log(`[Integration Engine] Enreach api_url from DB: ${integration.api_url}`);
-          console.log(`[Integration Engine] Enreach config from DB:`, JSON.stringify(integration.config || 'not set'));
-          dialerAdapter = new EnreachAdapter(enreachCredentials, integration.name, integration.config);
-        } else {
-          throw new Error(`Fuente no soportada: ${source || integration.provider}`);
-        }
-        adapter = dialerAdapter;
+        adapter = getAdapter(
+          source || integration.provider,
+          credentials,
+          integration.name,
+          integration.api_url,
+          integration.config
+        );
 
         const runResults: Record<string, unknown> = {};
 
@@ -322,23 +142,31 @@ serve(async (req) => {
         }
 
         if (actionList.includes("sales") || action === "sync") {
-          // Pass campaignMappings to adapter for reference extraction
-          let sales = await adapter.fetchSales(days, campaignMappings);
-          
-          // Filter by campaignId if provided (for retroactive sync)
+          const useRange = from && to;
+          let sales: any[] = [];
+          if (useRange && (adapter as any).fetchSalesRange) {
+            console.log(`[Integration Engine] Fetching sales by range ${from} -> ${to}`);
+            sales = await (adapter as any).fetchSalesRange({ from, to }, campaignMappings);
+          } else {
+            sales = await adapter.fetchSales(days, campaignMappings);
+          }
           if (campaignId) {
             console.log(`[Integration Engine] Filtering sales for campaign: ${campaignId}`);
             const beforeCount = sales.length;
             sales = sales.filter(s => s.campaignId === String(campaignId));
             console.log(`[Integration Engine] Filtered ${beforeCount} -> ${sales.length} sales for campaign ${campaignId}`);
           }
-          
           runResults["sales"] = await engine.processSales(sales);
         }
 
         // --- CALLS (CDR - GDPR Compliant) ---
         if (actionList.includes("calls")) {
-          if (adapter.fetchCalls) {
+          if ((adapter as any).fetchCallsRange && from && to) {
+            console.log(`[Integration Engine] Fetching calls by range ${from} -> ${to}`);
+            const calls = await (adapter as any).fetchCallsRange({ from, to });
+            console.log(`[Integration Engine] Fetched ${calls.length} calls`);
+            runResults["calls"] = await engine.processCalls(calls);
+          } else if (adapter.fetchCalls) {
             console.log(`[Integration Engine] Fetching calls for ${integration.name}...`);
             const calls = await adapter.fetchCalls(days);
             console.log(`[Integration Engine] Fetched ${calls.length} calls`);

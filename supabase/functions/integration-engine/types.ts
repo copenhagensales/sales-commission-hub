@@ -130,3 +130,14 @@ export interface StandardCall {
   // Metadatos (Campos específicos brutos, si se necesitan para debugging)
   metadata?: Record<string, unknown>;
 }
+
+export interface DateRange {
+  from: string;
+  to: string;
+}
+
+export interface FetchParams {
+  days?: number;
+  range?: DateRange;
+  campaignId?: string;
+}

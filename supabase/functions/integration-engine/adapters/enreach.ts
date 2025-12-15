@@ -237,6 +237,111 @@ export class EnreachAdapter implements DialerAdapter {
       return [];
     }
   }
+  async fetchSalesRange(range: { from: string; to: string }, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
+    try {
+      const fromStr = range.from.split('T')[0]
+      const toStr = range.to.split('T')[0]
+      console.log(`[EnreachAdapter] Fetching ONLY SUCCESS sales for range ${fromStr} -> ${toStr}`)
+      let allLeads: HeroBaseLead[] = []
+      const endpointCandidates = [
+        `/simpleleads?Projects=*&ModifiedFrom=${fromStr}&ModifiedTo=${toStr}&AllClosedStatuses=true&LeadClosures=Success`,
+        `/simpleleads?Projects=*&ModifiedFrom=${fromStr}&AllClosedStatuses=true&LeadClosures=Success`,
+      ]
+      let data: unknown = []
+      for (const endpoint of endpointCandidates) {
+        try {
+          console.log(`[EnreachAdapter] GET ${endpoint}`)
+          data = await this.get(endpoint)
+          break
+        } catch (_e) {
+          continue
+        }
+      }
+      if (Array.isArray(data)) {
+        allLeads = data as HeroBaseLead[]
+      } else if (data && typeof data === 'object') {
+        const wrapper = data as Record<string, unknown>
+        allLeads = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as HeroBaseLead[]
+      }
+      console.log(`[EnreachAdapter] Fetched ${allLeads.length} raw leads from API (range)`)
+      let filteredLeads = allLeads.filter((lead) => {
+        const closure = this.getStr(lead, ['closure', 'Closure'])
+        return closure && closure.toLowerCase() === 'success'
+      })
+      const dataFilters = this.config?.productExtraction?.dataFilters
+      if (dataFilters && dataFilters.length > 0) {
+        const beforeCount = filteredLeads.length
+        filteredLeads = filteredLeads.filter((lead) => this.passesDataFilters(lead, dataFilters))
+        console.log(`[EnreachAdapter] Data filters applied: ${beforeCount} -> ${filteredLeads.length} leads`)
+      }
+      const mappingLookup = new Map<string, CampaignMappingConfig>()
+      if (campaignMappings) {
+        for (const mapping of campaignMappings) {
+          mappingLookup.set(mapping.adversusCampaignId, mapping)
+        }
+      }
+      return filteredLeads.map((lead: HeroBaseLead) => {
+        const externalId = this.getStr(lead, ['uniqueId', 'UniqueId'])
+        const campaignObj = (lead.campaign || lead.Campaign) as Record<string, unknown> | undefined
+        const campaignId = campaignObj ? this.getStr(campaignObj, ['uniqueId', 'UniqueId', 'code']) : ""
+        const campaignCode = campaignObj ? this.getStr(campaignObj, ['code', 'Code']) : ""
+        const firstProcessedByUser = (lead.firstProcessedByUser || lead.FirstProcessedByUser) as Record<string, unknown> | undefined
+        const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined
+        const agentOrgCode = (firstProcessedByUser?.orgCode as string) || (lastModifiedByUser?.orgCode as string) || ""
+        let agentName = this.getStr(firstProcessedByUser, ['name', 'Name', 'fullName'])
+        if (!agentName) agentName = agentOrgCode
+        const dataObj = (lead.data || lead.Data) as Record<string, unknown> | undefined
+        let customerName = ""
+        let customerPhone = ""
+        if (dataObj) {
+          const firstName = this.getStr(dataObj, ['Navn1', 'FirstName', 'Fornavn'])
+          const lastName = this.getStr(dataObj, ['Navn2', 'LastName', 'Efternavn'])
+          customerName = [firstName, lastName].filter(Boolean).join(' ').trim()
+          if (!customerName) {
+            customerName = this.getStr(dataObj, ['Navn', 'Name', 'Company', 'Firma'])
+          }
+          customerPhone = this.getStr(dataObj, ['Telefon1', 'Telefon', 'Phone', 'Mobile'])
+        }
+        const products = this.extractProducts(lead, dataObj, campaignId, campaignCode)
+        let externalReference: string | null = null
+        const mapping = mappingLookup.get(campaignId)
+        if (mapping?.referenceConfig && dataObj) {
+          externalReference = this.extractReference({ ...dataObj, ...lead }, mapping.referenceConfig)
+        }
+        if (!externalReference) {
+          const allVariables = { ...dataObj, ...lead }
+          externalReference = this.searchForOppInVariables(allVariables as Record<string, unknown>)
+        }
+        const saleDate = this.getStr(lead, ['firstProcessedTime', 'lastModifiedTime']) || new Date().toISOString()
+        return {
+          externalId,
+          integrationType: "enreach",
+          dialerName: this.dialerName,
+          saleDate,
+          agentEmail: agentOrgCode,
+          agentExternalId: agentOrgCode,
+          agentName,
+          customerName,
+          customerPhone,
+          campaignId,
+          campaignName: campaignCode,
+          externalReference,
+          clientCampaignId: mapping?.clientCampaignId || null,
+          products,
+          rawPayload: lead,
+          metadata: {
+            source: "enreach",
+            campaignName: campaignCode,
+            campaignId,
+          },
+        }
+      })
+    } catch (error) {
+      console.error("[EnreachAdapter] Critical error in fetchSalesRange:", error)
+      return []
+    }
+  }
+  async fetchCallsRange(): Promise<StandardCall[]> { return [] }
 
   // --- LÓGICA DE EXTRACCIÓN DE PRODUCTOS CONFIGURABLE ---
   private extractProducts(
