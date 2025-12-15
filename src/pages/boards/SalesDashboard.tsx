@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Trophy, Building2, Maximize, Minimize, Lock } from "lucide-react";
+import { Trophy, Building2, Maximize, Minimize, Lock, Link, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { toast } from "sonner";
 
 const PIN_CODE = "1234"; // Change this to your desired PIN
 
@@ -182,7 +183,19 @@ export default function SalesDashboard() {
             <p className="text-slate-400 text-sm lg:text-base">Live kundeoversigt</p>
           </div>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href);
+              toast.success("Link kopieret til udklipsholder");
+            }}
+            className="gap-2 border-slate-700 bg-slate-800/50 hover:bg-slate-700 text-slate-300"
+          >
+            <Link className="h-4 w-4" />
+            Kopier link
+          </Button>
           <div className="text-right">
             <p className="text-3xl lg:text-5xl font-bold tabular-nums">
               {currentTime.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}
