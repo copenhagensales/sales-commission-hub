@@ -3903,6 +3903,22 @@ export type Database = {
         Returns: string
       }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
+      get_aggregated_product_types: {
+        Args: never
+        Returns: {
+          adversus_external_id: string
+          adversus_product_title: string
+          client_id: string
+          client_name: string
+          commission_dkk: number
+          counts_as_sale: boolean
+          product_client_campaign_id: string
+          product_id: string
+          product_name: string
+          revenue_dkk: number
+          sale_source: string
+        }[]
+      }
       get_auth_email_by_work_email: {
         Args: { _work_email: string }
         Returns: string
