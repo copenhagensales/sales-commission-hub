@@ -1472,11 +1472,8 @@ export default function MgTest() {
                               {(expandedProductSections[groupKey] ? group.rows : group.rows.slice(0, ITEMS_PER_SECTION)).map((row) => {
                                 const current = editValues[row.key];
                                 const productId = row.product?.id ?? null;
-                                const existingClientCampaignId = row.product?.client_campaign_id ?? null;
-                                const existingClientId =
-                                  existingClientCampaignId
-                                    ? clientCampaigns?.find((c) => c.id === existingClientCampaignId)?.client_id ?? null
-                                    : null;
+                                // Use campaignId which contains client_id from aggregated data
+                                const existingClientId = row.campaignId === "unmapped" ? null : row.campaignId;
                                 const selectionFromProduct =
                                   productId && productClientSelections[productId] !== undefined
                                     ? productClientSelections[productId]
