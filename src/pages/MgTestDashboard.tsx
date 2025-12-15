@@ -1,10 +1,10 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Trophy, Users, Building2 } from "lucide-react";
+import { Trophy, Users, Building2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-
+import { Button } from "@/components/ui/button";
 // Client brand colors for visual distinction
 const clientColors: Record<string, { bg: string; accent: string; text: string }> = {
   "TDC Erhverv": { bg: "from-violet-600/20 to-violet-900/40", accent: "bg-violet-500", text: "text-violet-300" },
@@ -42,7 +42,8 @@ interface ClientStats {
 }
 
 export default function MgTestDashboard() {
-  const { data: clientStats, isLoading } = useQuery({
+  const queryClient = useQueryClient();
+  const { data: clientStats, isLoading, isFetching } = useQuery({
     queryKey: ["mg-test-dashboard-clients"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_client_sales_stats");
@@ -89,7 +90,17 @@ export default function MgTestDashboard() {
               <h1 className="text-3xl font-bold tracking-tight">Test Dashboard</h1>
               <p className="text-muted-foreground mt-1">Kundeoversigt med salgsperformance</p>
             </div>
-            <div className="flex gap-6">
+            <div className="flex items-center gap-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => queryClient.invalidateQueries({ queryKey: ["mg-test-dashboard-clients"] })}
+                disabled={isFetching}
+                className="gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+                Opdater
+              </Button>
               <div className="text-right">
                 <p className="text-sm text-muted-foreground">Salg i dag</p>
                 <p className="text-3xl font-bold text-primary">{isLoading ? "..." : totalSalesToday}</p>
