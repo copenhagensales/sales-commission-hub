@@ -311,6 +311,7 @@
     "yesUpdateLast30Days": "Ja, opdater sidste 30 dage",
     "noOnlyFuture": "Nej, kun fremtidige",
     "showMore": "Vis {{count}} flere",
-    "showLess": "Vis færre"
+    "showLess": "Vis færre",
+    "confirm": "Bekræft"
   }
 }
