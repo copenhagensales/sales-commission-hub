@@ -57,7 +57,7 @@ export function SmartRedirect() {
 }
 
 export function wrapWithGuard(
-  Component: React.LazyExoticComponent<React.ComponentType<any>>,
+  Component: React.ComponentType<any> | React.LazyExoticComponent<React.ComponentType<any>>,
   meta: RouteConfig
 ) {
   const element = React.createElement(Component);
