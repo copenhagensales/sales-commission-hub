@@ -27,23 +27,19 @@ interface InspectorField {
   sampleValue: string;
 }
 
-interface WebhookSaleItem {
-  id: string;
+// Type for data returned from the RPC function
+interface AggregatedProductRpc {
   adversus_external_id: string | null;
   adversus_product_title: string | null;
   product_id: string | null;
-  products: {
-    id: string;
-    name: string;
-    commission_dkk: number | null;
-    revenue_dkk: number | null;
-    client_campaign_id: string | null;
-    counts_as_sale: boolean;
-  } | null;
-  sales: {
-    client_campaign_id: string | null;
-    source: string | null;
-  } | null;
+  product_name: string | null;
+  commission_dkk: number | null;
+  revenue_dkk: number | null;
+  product_client_campaign_id: string | null;
+  counts_as_sale: boolean;
+  client_id: string | null;
+  client_name: string | null;
+  sale_source: string | null;
 }
 
 interface AggregatedProduct {
@@ -283,23 +279,17 @@ export default function MgTest() {
     },
   });
 
-  // Hent alle produkter direkte fra webhook-data (sale_items) inkl. kampagne-id
+  // Hent aggregerede produkter via RPC (server-side aggregation)
   const {
-    data: saleItems,
-    isLoading: loadingSaleItems,
-    isError: isSaleItemsError,
-  } = useQuery<WebhookSaleItem[]>({
-    queryKey: ["mg-webhook-products"],
+    data: aggregatedProductsRpc,
+    isLoading: loadingAggregatedProducts,
+    isError: isAggregatedProductsError,
+  } = useQuery<AggregatedProductRpc[]>({
+    queryKey: ["mg-aggregated-products"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sale_items")
-        .select(
-          "id, adversus_external_id, adversus_product_title, product_id, products(id, name, commission_dkk, revenue_dkk, client_campaign_id, counts_as_sale), sales(client_campaign_id, source)"
-        )
-        .not("adversus_product_title", "is", null);
-
+      const { data, error } = await supabase.rpc("get_aggregated_product_types");
       if (error) throw error;
-      return data as WebhookSaleItem[];
+      return (data ?? []) as AggregatedProductRpc[];
     },
   });
 
@@ -343,22 +333,16 @@ export default function MgTest() {
     isLoading: loadingVagtEmployees,
   } = useVagtEmployees();
 
+  // Transform RPC data to AggregatedProduct format (server already did the aggregation)
   const aggregatedProducts: AggregatedProduct[] = useMemo(() => {
-    const map = new Map<string, AggregatedProduct>();
-
-    saleItems?.forEach((item) => {
-      const productCampaignId = item.products?.client_campaign_id ?? null;
-      const saleCampaignId = item.sales?.client_campaign_id ?? null;
-      const campaignId = productCampaignId ?? saleCampaignId ?? null;
-
-      const campaign = campaignId ? clientCampaigns?.find((c) => c.id === campaignId) || null : null;
-      let clientId = campaign?.client_id ?? null;
-      let clientName = clientId
-        ? clients?.find((client) => client.id === clientId)?.name ?? "Ukendt kunde"
-        : null;
-
-      // Midlertidig hjælp: hvis der ikke er fundet kunde, forsøg at udlede kundenavn fra produktnavnet eller source
-      if (!clientId) {
+    if (!aggregatedProductsRpc) return [];
+    
+    return aggregatedProductsRpc.map((item) => {
+      // Try to parse client from product title if no client_id from RPC
+      let clientId = item.client_id;
+      let clientName = item.client_name;
+      
+      if (!clientId && item.adversus_product_title) {
         const parsedClient = parseClientFromTitle(item.adversus_product_title, clients);
         if (parsedClient) {
           clientId = parsedClient.id;
@@ -366,40 +350,36 @@ export default function MgTest() {
         }
       }
       
-      // Fallback: forsøg at matche kunde fra sales.source (f.eks. "Eesy")
-      if (!clientId && item.sales?.source) {
-        const parsedClient = parseClientFromSource(item.sales.source, clients);
+      // Fallback: try to match client from source (e.g., "Eesy")
+      if (!clientId && item.sale_source) {
+        const parsedClient = parseClientFromSource(item.sale_source, clients);
         if (parsedClient) {
           clientId = parsedClient.id;
           clientName = parsedClient.name ?? "Ukendt kunde";
         }
       }
 
-      const productKey = item.adversus_external_id || item.adversus_product_title || item.id;
+      const productKey = item.adversus_external_id || item.adversus_product_title || "";
       const fullKey = `${clientId ?? "no-client"}::${productKey}`;
 
-      if (!map.has(fullKey)) {
-        map.set(fullKey, {
-          key: fullKey,
-          adversus_external_id: item.adversus_external_id,
-          adversus_product_title: item.adversus_product_title,
-          product: item.products
-            ? {
-                id: item.products.id,
-                name: item.products.name,
-                commission_dkk: item.products.commission_dkk,
-                revenue_dkk: item.products.revenue_dkk,
-                client_campaign_id: item.products.client_campaign_id,
-                counts_as_sale: item.products.counts_as_sale ?? true,
-              }
-            : null,
-          campaignId: clientId,
-          campaignLabel: clientName ?? "Ingen kunde valgt",
-        });
-      }
-    });
-
-    return Array.from(map.values()).sort((a, b) => {
+      return {
+        key: fullKey,
+        adversus_external_id: item.adversus_external_id,
+        adversus_product_title: item.adversus_product_title,
+        product: item.product_id
+          ? {
+              id: item.product_id,
+              name: item.product_name ?? "",
+              commission_dkk: item.commission_dkk,
+              revenue_dkk: item.revenue_dkk,
+              client_campaign_id: item.product_client_campaign_id,
+              counts_as_sale: item.counts_as_sale ?? true,
+            }
+          : null,
+        campaignId: clientId,
+        campaignLabel: clientName ?? "Ingen kunde valgt",
+      };
+    }).sort((a, b) => {
       const campA = a.campaignLabel;
       const campB = b.campaignLabel;
       if (campA !== campB) return campA.localeCompare(campB, "da");
@@ -407,7 +387,7 @@ export default function MgTest() {
       const titleB = b.adversus_product_title || "";
       return titleA.localeCompare(titleB, "da");
     });
-  }, [saleItems, clientCampaigns, clients]);
+  }, [aggregatedProductsRpc, clients]);
 
   const productsByCampaign = useMemo(() => {
     const groups = new Map<
@@ -660,7 +640,7 @@ export default function MgTest() {
         }
         return next;
       });
-      queryClient.invalidateQueries({ queryKey: ["mg-webhook-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
       queryClient.invalidateQueries({ queryKey: ["adversus-product-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
@@ -729,7 +709,7 @@ export default function MgTest() {
     },
     onSuccess: () => {
       toast.success("Opdateret");
-      queryClient.invalidateQueries({ queryKey: ["mg-webhook-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
       queryClient.invalidateQueries({ queryKey: ["adversus-product-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
@@ -982,7 +962,7 @@ export default function MgTest() {
     onSuccess: (data) => {
       toast.success(`Retroaktiv opdatering gennemført: ${data.created || 0} oprettet, ${data.updated || 0} opdateret`);
       setRetroactiveDialog(null);
-      queryClient.invalidateQueries({ queryKey: ["mg-webhook-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
     },
     onError: (error: Error) => {
       toast.error(`Fejl under retroaktiv opdatering: ${error.message}`);
@@ -1134,7 +1114,7 @@ export default function MgTest() {
       queryClient.invalidateQueries({ queryKey: ["sales-list"] });
       queryClient.invalidateQueries({ queryKey: ["codan-dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["tdc-erhverv-dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["mg-webhook-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke backfille salg til kampagner");
@@ -1181,7 +1161,7 @@ export default function MgTest() {
         delete next[variables.productId];
         return next;
       });
-      queryClient.invalidateQueries({ queryKey: ["mg-webhook-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
     },
@@ -1369,7 +1349,7 @@ export default function MgTest() {
     },
   });
 
-  const isLoadingProductsTab = loadingSaleItems || loadingClientCampaigns || loadingClients;
+  const isLoadingProductsTab = loadingAggregatedProducts || loadingClientCampaigns || loadingClients;
   const isLoadingCampaignTab = loadingCampaignMappings || loadingClientCampaigns;
   const isLoadingCustomersTab = loadingClients;
   const isLoadingEmployeeTab =
@@ -1403,7 +1383,15 @@ export default function MgTest() {
                   <span>Henter produkter…</span>
                 </CardContent>
               </Card>
-            ) : isSaleItemsError ? (
+            ) : isAggregatedProductsError ? (
+              <Card>
+                <CardContent className="py-6">
+                  <p className="text-sm text-destructive">
+                    Der opstod en fejl ved hentning af produkter. Prøv at genindlæse siden.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : productsByCampaign.length === 0 ? (
               <Card>
                 <CardContent className="py-6">
                   <p className="text-sm text-destructive">
