@@ -3,6 +3,7 @@
  */
 export interface StandardWebhookPayload {
   externalId: string;
+  leadId?: string; // Lead ID for deduplication with API sync
   eventType: string;
   eventTime: string;
   
