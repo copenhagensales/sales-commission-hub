@@ -1,5 +1,6 @@
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { useVagtEmployees, type VagtEmployee } from "@/hooks/useVagtEmployee";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -174,6 +175,7 @@ const parseClientFromSource = (source: string | null, clientList?: ClientRow[]):
 };
 
 export default function MgTest() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [editValues, setEditValues] = useState<EditValues>({});
   const [newClientName, setNewClientName] = useState("");
@@ -1359,19 +1361,18 @@ export default function MgTest() {
     <MainLayout>
       <div className="space-y-6">
         <header className="space-y-2">
-          <h1 className="text-3xl font-bold">MG test – Adversus mapping</h1>
+          <h1 className="text-3xl font-bold">{t("mgTest.title")}</h1>
           <p className="text-muted-foreground text-sm max-w-2xl">
-            Her kan du mappe både produkter og kampagner fra Adversus til dine interne produkter og
-            kundekampagner, samt vedligeholde listen over kundenavne.
+            {t("mgTest.description")}
           </p>
         </header>
 
         <Tabs defaultValue="product" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="product">Mapping produkt</TabsTrigger>
-            <TabsTrigger value="customer">Mapping kunde / kampagne</TabsTrigger>
-            <TabsTrigger value="employee-mapping">Medarbejder mapping</TabsTrigger>
-            <TabsTrigger value="customers">Kundenavne</TabsTrigger>
+            <TabsTrigger value="product">{t("mgTest.tabProduct")}</TabsTrigger>
+            <TabsTrigger value="customer">{t("mgTest.tabCampaign")}</TabsTrigger>
+            <TabsTrigger value="employee-mapping">{t("mgTest.tabEmployee")}</TabsTrigger>
+            <TabsTrigger value="customers">{t("mgTest.tabCustomers")}</TabsTrigger>
           </TabsList>
 
           {/* Mapping produkt */}
@@ -1380,14 +1381,14 @@ export default function MgTest() {
               <Card>
                 <CardContent className="flex items-center justify-center py-12 text-muted-foreground gap-2">
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>Henter produkter…</span>
+                  <span>{t("mgTest.loadingProducts")}</span>
                 </CardContent>
               </Card>
             ) : isAggregatedProductsError ? (
               <Card>
                 <CardContent className="py-6">
                   <p className="text-sm text-destructive">
-                    Der opstod en fejl ved hentning af produkter. Prøv at genindlæse siden.
+                    {t("mgTest.productFetchError")}
                   </p>
                 </CardContent>
               </Card>
@@ -1395,7 +1396,7 @@ export default function MgTest() {
               <Card>
                 <CardContent className="py-6">
                   <p className="text-sm text-destructive">
-                    Der opstod en fejl ved hentning af produkter. Prøv at genindlæse siden.
+                    {t("mgTest.productFetchError")}
                   </p>
                 </CardContent>
               </Card>
@@ -1403,8 +1404,7 @@ export default function MgTest() {
               <Card>
                 <CardContent className="py-6">
                   <p className="text-sm text-muted-foreground">
-                    Der er endnu ikke modtaget nogen produkter via webhook. Når de første leads kommer ind, vil
-                    de dukke op her.
+                    {t("mgTest.noProducts")}
                   </p>
                 </CardContent>
               </Card>
@@ -1419,14 +1419,14 @@ export default function MgTest() {
                       <div>
                         <CardTitle className="text-base font-semibold">{group.campaignLabel}</CardTitle>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {group.campaignLabel === "Manglende mapping"
-                            ? "Produkter uden valgt kunde. Vælg kunde og gem for at flytte produktet til den rette kundegruppe."
-                            : `${group.rows.length} unikke produkter til denne kunde.`}
+                          {group.campaignLabel === t("mgTest.missingMapping")
+                            ? t("mgTest.missingMappingDesc")
+                            : t("mgTest.productsForCustomer", { count: group.rows.length })}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">
-                          {group.rows.length} {group.rows.length === 1 ? "produkt" : "produkter"}
+                          {group.rows.length} {group.rows.length === 1 ? t("mgTest.product") : t("mgTest.products")}
                         </Badge>
                         <Button
                           type="button"
@@ -1439,7 +1439,7 @@ export default function MgTest() {
                               [groupKey]: !isOpen,
                             }))
                           }
-                          aria-label={isOpen ? "Fold gruppe sammen" : "Fold gruppe ud"}
+                          aria-label={isOpen ? t("mgTest.collapseGroup") : t("mgTest.expandGroup")}
                         >
                           <ChevronDown
                             className={`h-4 w-4 transition-transform ${
@@ -1455,12 +1455,12 @@ export default function MgTest() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="w-[26%]">Adversus produktnavn</TableHead>
-                                <TableHead className="w-[14%]">External ID</TableHead>
-                                <TableHead className="w-[20%]">Kunde</TableHead>
-                                <TableHead className="w-[12%]">Provision (DKK)</TableHead>
-                                <TableHead className="w-[12%]">CPO / omsætning (DKK)</TableHead>
-                                <TableHead className="w-[16%] text-center">Tæl som salg</TableHead>
+                                <TableHead className="w-[26%]">{t("mgTest.adversusProductName")}</TableHead>
+                                <TableHead className="w-[14%]">{t("mgTest.externalId")}</TableHead>
+                                <TableHead className="w-[20%]">{t("mgTest.customer")}</TableHead>
+                                <TableHead className="w-[12%]">{t("mgTest.commission")}</TableHead>
+                                <TableHead className="w-[12%]">{t("mgTest.cpoRevenue")}</TableHead>
+                                <TableHead className="w-[16%] text-center">{t("mgTest.countAsSale")}</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1492,18 +1492,18 @@ export default function MgTest() {
                                     <TableCell>
                                       <div className="flex flex-col">
                                         <span className="font-medium">
-                                          {row.adversus_product_title || "(ingen titel)"}
+                                          {row.adversus_product_title || t("mgTest.noTitle")}
                                         </span>
                                         {row.product && (
                                           <span className="text-xs text-muted-foreground">
-                                            Internt produkt: {row.product.name}
+                                            {t("mgTest.internalProduct")}: {row.product.name}
                                           </span>
                                         )}
                                       </div>
                                     </TableCell>
                                     <TableCell>
                                       <span className="text-xs font-mono text-muted-foreground">
-                                        {row.adversus_external_id || "(mangler)"}
+                                        {row.adversus_external_id || t("mgTest.missing")}
                                       </span>
                                     </TableCell>
                                     <TableCell>
@@ -1534,11 +1534,11 @@ export default function MgTest() {
                                           }}
                                         >
                                           <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Vælg kunde" />
+                                            <SelectValue placeholder={t("mgTest.selectCustomer")} />
                                           </SelectTrigger>
                                           <SelectContent className="bg-background border z-50 max-h-72">
                                             <SelectItem value="unmapped" className="text-sm text-muted-foreground">
-                                              Manglende mapping
+                                              {t("mgTest.missingMapping")}
                                             </SelectItem>
                                             {clients?.map((client) => (
                                               <SelectItem key={client.id} value={client.id} className="text-sm">
@@ -1549,7 +1549,7 @@ export default function MgTest() {
                                         </Select>
                                         {!row.product && (
                                           <span className="text-xs text-muted-foreground">
-                                            Gem provision / CPO først for at oprette produktet
+                                            {t("mgTest.saveCommissionFirst")}
                                           </span>
                                         )}
                                       </div>
@@ -1617,9 +1617,9 @@ export default function MgTest() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-4">
                 <div>
-                  <CardTitle>Mapping kunde / kampagne</CardTitle>
+                  <CardTitle>{t("mgTest.campaignMappingTitle")}</CardTitle>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Her mapper du Adversus campaignId til dine interne kundekampagner.
+                    {t("mgTest.campaignMappingDesc")}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
@@ -1633,7 +1633,7 @@ export default function MgTest() {
                     {autoAssignCampaigns.isPending && (
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     )}
-                    Auto-fordel kampagner
+                    {t("mgTest.autoAssignCampaigns")}
                   </Button>
                   <Button
                     size="sm"
@@ -1645,21 +1645,20 @@ export default function MgTest() {
                     {backfillSalesCampaigns.isPending && (
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     )}
-                    Backfill salg til kampagner
+                    {t("mgTest.backfillSales")}
                   </Button>
-                  <Badge variant="outline">{campaignMappings?.length ?? 0} kampagner</Badge>
+                  <Badge variant="outline">{campaignMappings?.length ?? 0} {t("mgTest.campaigns")}</Badge>
                 </div>
               </CardHeader>
               <CardContent>
                 {isLoadingCampaignTab ? (
                   <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>Henter kampagner…</span>
+                    <span>{t("mgTest.loadingCampaigns")}</span>
                   </div>
                 ) : !campaignMappings || campaignMappings.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    Der er endnu ikke registreret nogen Adversus-kampagner. Når de første webhooks kommer ind,
-                    oprettes de automatisk her.
+                    {t("mgTest.noCampaigns")}
                   </p>
                 ) : (
                   campaignsByClient.map((group) => {
@@ -1672,14 +1671,14 @@ export default function MgTest() {
                           <div>
                             <h3 className="text-sm font-semibold">{group.clientLabel}</h3>
                             <p className="text-xs text-muted-foreground mt-1">
-                              {group.clientLabel === "Manglende mapping"
-                                ? "Kampagner uden valgt kunde. Vælg kunde og gem for at flytte kampagnen til den rette kundegruppe."
-                                : `${group.rows.length} kampagner til denne kunde.`}
+                              {group.clientLabel === t("mgTest.missingMapping")
+                                ? t("mgTest.campaignMissingDesc")
+                                : t("mgTest.campaignsForCustomer", { count: group.rows.length })}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline">
-                              {group.rows.length} {group.rows.length === 1 ? "kampagne" : "kampagner"}
+                              {group.rows.length} {group.rows.length === 1 ? t("mgTest.campaign") : t("mgTest.campaigns")}
                             </Badge>
                             <Button
                               type="button"
@@ -1692,7 +1691,7 @@ export default function MgTest() {
                                   [groupKey]: !isOpen,
                                 }))
                               }
-                              aria-label={isOpen ? "Fold gruppe sammen" : "Fold gruppe ud"}
+                              aria-label={isOpen ? t("mgTest.collapseGroup") : t("mgTest.expandGroup")}
                             >
                               <ChevronDown
                                 className={`h-4 w-4 transition-transform ${
@@ -1708,12 +1707,12 @@ export default function MgTest() {
                             <Table>
                               <TableHeader>
                               <TableRow>
-                                  <TableHead className="w-[22%]">Adversus kampagnenavn</TableHead>
-                                  <TableHead className="w-[12%]">Campaign ID</TableHead>
-                                  <TableHead className="w-[8%]">Inspect</TableHead>
-                                  <TableHead className="w-[25%]">Intern kunde / kampagne</TableHead>
-                                  <TableHead className="w-[18%]">OPP/Reference Field ID</TableHead>
-                                  <TableHead className="w-[15%]">Gem</TableHead>
+                                  <TableHead className="w-[22%]">{t("mgTest.adversusCampaignName")}</TableHead>
+                                  <TableHead className="w-[12%]">{t("mgTest.campaignId")}</TableHead>
+                                  <TableHead className="w-[8%]">{t("mgTest.inspect")}</TableHead>
+                                  <TableHead className="w-[25%]">{t("mgTest.internalCampaign")}</TableHead>
+                                  <TableHead className="w-[18%]">{t("mgTest.oppFieldId")}</TableHead>
+                                  <TableHead className="w-[15%]">{t("mgTest.save")}</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -1746,7 +1745,7 @@ export default function MgTest() {
                                     <TableRow key={mapping.id}>
                                       <TableCell>
                                         <span className="font-medium">
-                                          {mapping.adversus_campaign_name || "(ingen navn)"}
+                                          {mapping.adversus_campaign_name || t("mgTest.noName")}
                                         </span>
                                       </TableCell>
                                       <TableCell>
@@ -1779,7 +1778,7 @@ export default function MgTest() {
                                           }
                                         >
                                           <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Vælg kunde" />
+                                            <SelectValue placeholder={t("mgTest.selectCustomer")} />
                                           </SelectTrigger>
                                           <SelectContent className="bg-background border z-50 max-h-72">
                                             {clients?.map((client) => (
@@ -1794,7 +1793,7 @@ export default function MgTest() {
                                         <Input
                                           type="text"
                                           className="h-9 font-mono text-xs"
-                                          placeholder="f.eks. 80862"
+                                          placeholder={t("mgTest.fieldIdPlaceholder")}
                                           value={currentFieldId}
                                           onChange={(e) =>
                                             setCampaignFieldIdDrafts((prev) => ({
@@ -1818,7 +1817,7 @@ export default function MgTest() {
                                           }
                                           disabled={updateCampaignMapping.isPending || !hasChanges}
                                         >
-                                          Gem
+                                          {t("mgTest.save")}
                                         </Button>
                                       </TableCell>
                                     </TableRow>
@@ -1840,23 +1839,23 @@ export default function MgTest() {
           <TabsContent value="employee-mapping" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Medarbejder mapping</CardTitle>
+                <CardTitle>{t("mgTest.employeeMappingTitle")}</CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Merge medarbejdere fra Agenter og Vagt-flow til én fælles master-medarbejder, baseret på e-mail.
+                  {t("mgTest.employeeMappingDesc")}
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
                 {isLoadingEmployeeTab ? (
                   <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>Henter medarbejderdata…</span>
+                    <span>{t("mgTest.loadingEmployees")}</span>
                   </div>
                 ) : (
                   <>
                     <div className="grid gap-4 md:grid-cols-3">
                       <Card className="border-dashed">
                         <CardHeader className="py-3">
-                          <p className="text-xs font-medium text-muted-foreground">Agenter uden mapping</p>
+                          <p className="text-xs font-medium text-muted-foreground">{t("mgTest.agentsWithoutMapping")}</p>
                           <p className="text-2xl font-semibold">
                             {unmappedAgentsCount}
                           </p>
@@ -1864,7 +1863,7 @@ export default function MgTest() {
                       </Card>
                       <Card className="border-dashed">
                         <CardHeader className="py-3">
-                          <p className="text-xs font-medium text-muted-foreground">Vagt-medarbejdere uden mapping</p>
+                          <p className="text-xs font-medium text-muted-foreground">{t("mgTest.vagtEmployeesWithoutMapping")}</p>
                           <p className="text-2xl font-semibold">
                             {unmappedEmployeesCount}
                           </p>
@@ -1873,29 +1872,28 @@ export default function MgTest() {
                       <Card className="border-dashed">
                         <CardHeader className="py-3 flex flex-row items-center justify-between gap-2">
                           <div>
-                            <p className="text-xs font-medium text-muted-foreground">E-mail-baserede forslag</p>
+                            <p className="text-xs font-medium text-muted-foreground">{t("mgTest.emailSuggestions")}</p>
                             <p className="text-2xl font-semibold">{emailSuggestions.length}</p>
                           </div>
-                          <Badge variant="outline">Auto-match</Badge>
+                          <Badge variant="outline">{t("mgTest.autoMatch")}</Badge>
                         </CardHeader>
                       </Card>
                     </div>
 
                     {emailSuggestions.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
-                        Der er ingen e-mail-baserede forslag lige nu. Enten er alle allerede matchet, eller også
-                        mangler der e-mails på nogle profiler.
+                        {t("mgTest.noSuggestions")}
                       </p>
                     ) : (
                       <div className="rounded-md border overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="w-[24%]">E-mail</TableHead>
-                              <TableHead className="w-[26%]">Agent (provisionssystem)</TableHead>
-                              <TableHead className="w-[26%]">Vagt-medarbejder</TableHead>
-                              <TableHead className="w-[14%]">Status</TableHead>
-                              <TableHead className="w-[10%] text-right">Handling</TableHead>
+                              <TableHead className="w-[24%]">{t("mgTest.email")}</TableHead>
+                              <TableHead className="w-[26%]">{t("mgTest.agentCommission")}</TableHead>
+                              <TableHead className="w-[26%]">{t("mgTest.vagtEmployee")}</TableHead>
+                              <TableHead className="w-[14%]">{t("mgTest.status")}</TableHead>
+                              <TableHead className="w-[10%] text-right">{t("mgTest.action")}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1907,20 +1905,20 @@ export default function MgTest() {
                                 <TableCell>
                                   <div className="flex flex-col">
                                     <span className="font-medium">{s.agent.name}</span>
-                                    <span className="text-xs text-muted-foreground">Agent-ID: {s.agent.id}</span>
+                                    <span className="text-xs text-muted-foreground">{t("mgTest.agentId")}: {s.agent.id}</span>
                                   </div>
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex flex-col">
                                     <span className="font-medium">{s.vagtEmployee.full_name}</span>
                                     <span className="text-xs text-muted-foreground">
-                                      Medarbejder-ID: {s.vagtEmployee.id}
+                                      {t("mgTest.employeeId")}: {s.vagtEmployee.id}
                                     </span>
                                   </div>
                                 </TableCell>
                                 <TableCell>
                                   <Badge variant="outline" className="text-xs">
-                                    Klar til merge
+                                    {t("mgTest.readyToMerge")}
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -1937,7 +1935,7 @@ export default function MgTest() {
                                     {mergeEmployeeSuggestion.isPending && (
                                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     )}
-                                    Merge
+                                    {t("mgTest.merge")}
                                   </Button>
                                 </TableCell>
                               </TableRow>
@@ -1949,17 +1947,17 @@ export default function MgTest() {
 
                     {mergedProfiles.length > 0 && (
                       <div className="space-y-3">
-                        <h3 className="text-sm font-medium">Eksisterende mappings</h3>
+                        <h3 className="text-sm font-medium">{t("mgTest.existingMappings")}</h3>
                         <div className="rounded-md border overflow-x-auto">
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="w-[26%]">Master-medarbejder</TableHead>
-                                <TableHead className="w-[18%]">Master e-mail</TableHead>
-                                <TableHead className="w-[14%]">Kilde</TableHead>
-                                <TableHead className="w-[26%]">Kilde-navn</TableHead>
-                                <TableHead className="w-[16%]">Kilde-e-mail</TableHead>
-                                <TableHead className="w-[10%] text-right">Handling</TableHead>
+                                <TableHead className="w-[26%]">{t("mgTest.masterEmployee")}</TableHead>
+                                <TableHead className="w-[18%]">{t("mgTest.masterEmail")}</TableHead>
+                                <TableHead className="w-[14%]">{t("mgTest.source")}</TableHead>
+                                <TableHead className="w-[26%]">{t("mgTest.sourceName")}</TableHead>
+                                <TableHead className="w-[16%]">{t("mgTest.sourceEmail")}</TableHead>
+                                <TableHead className="w-[10%] text-right">{t("mgTest.action")}</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1967,13 +1965,13 @@ export default function MgTest() {
                                 <TableRow key={identity.id}>
                                   <TableCell>
                                     <div className="flex flex-col">
-                                      <span className="font-medium">{master?.full_name ?? "(ukendt)"}</span>
+                                      <span className="font-medium">{master?.full_name ?? t("mgTest.unknown")}</span>
                                       <span className="text-xs text-muted-foreground">ID: {identity.master_employee_id}</span>
                                     </div>
                                   </TableCell>
                                   <TableCell>
                                     <span className="text-xs font-mono text-muted-foreground">
-                                      {master?.primary_email ?? "(ingen)"}
+                                      {master?.primary_email ?? t("mgTest.none")}
                                     </span>
                                   </TableCell>
                                   <TableCell>
@@ -1983,15 +1981,15 @@ export default function MgTest() {
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex flex-col">
-                                      <span className="font-medium">{identity.source_name ?? "(ingen navn)"}</span>
+                                      <span className="font-medium">{identity.source_name ?? t("mgTest.noSourceName")}</span>
                                       <span className="text-xs text-muted-foreground">
-                                        Kilde-ID: {identity.source_employee_id}
+                                        {t("mgTest.sourceId")}: {identity.source_employee_id}
                                       </span>
                                     </div>
                                   </TableCell>
                                   <TableCell>
                                     <span className="text-xs font-mono text-muted-foreground">
-                                      {identity.source_email ?? "(ingen)"}
+                                      {identity.source_email ?? t("mgTest.none")}
                                     </span>
                                   </TableCell>
                                   <TableCell className="text-right">
@@ -2006,7 +2004,7 @@ export default function MgTest() {
                                       }
                                       disabled={deleteIdentityMapping.isPending}
                                     >
-                                      Fjern mapping
+                                      {t("mgTest.removeMapping")}
                                     </Button>
                                   </TableCell>
                                 </TableRow>
@@ -2026,10 +2024,9 @@ export default function MgTest() {
           <TabsContent value="customers">
             <Card>
               <CardHeader>
-                <CardTitle>Kundenavne</CardTitle>
+                <CardTitle>{t("mgTest.customerNamesTitle")}</CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Vedligehold listen over jeres kundenavne. Disse navne bruges bl.a. i dropdownen "Intern kunde /
-                  kampagne".
+                  {t("mgTest.customerNamesDesc")}
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
