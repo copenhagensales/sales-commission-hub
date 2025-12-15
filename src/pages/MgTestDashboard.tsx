@@ -71,7 +71,11 @@ export default function MgTestDashboard() {
         }
       });
 
-      // Fetch all sale items with sales info
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      // Fetch sale items for this month only (to avoid 1000 row limit)
       const { data: saleItems, error: saleItemsError } = await supabase
         .from("sale_items")
         .select(`
@@ -85,13 +89,8 @@ export default function MgTestDashboard() {
             sale_datetime,
             agent_name
           )
-        `);
-
-      if (saleItemsError) throw saleItemsError;
-
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        `)
+        if (saleItemsError) throw saleItemsError;
 
       // Process stats for each client using adversus_product_title matching
       const stats: ClientStats[] = clients?.map(client => {
