@@ -46,7 +46,7 @@ export default function MgTestDashboard() {
 
       if (clientsError) throw clientsError;
 
-      // Fetch all sale items with sales and campaign info
+      // Fetch all sale items with sales, campaign info, and product (only counts_as_sale = true)
       const { data: saleItems, error: saleItemsError } = await supabase
         .from("sale_items")
         .select(`
@@ -54,13 +54,19 @@ export default function MgTestDashboard() {
           quantity,
           mapped_commission,
           mapped_revenue,
+          product_id,
+          products!inner(
+            id,
+            counts_as_sale
+          ),
           sales!inner(
             id,
             sale_datetime,
             agent_name,
             client_campaign_id
           )
-        `);
+        `)
+        .eq("products.counts_as_sale", true);
 
       if (saleItemsError) throw saleItemsError;
 
