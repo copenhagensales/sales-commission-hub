@@ -1,5 +1,8 @@
 {
   "sidebar": {
+    "closingShifts": "Lukkevagter"
+  },
+  "sidebar": {
     "loading": "Indlæser...",
     "logout": "Log ud",
     "employees": "Medarbejdere",
