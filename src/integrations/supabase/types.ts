@@ -3924,6 +3924,20 @@ export type Database = {
         Returns: string
       }
       get_auth_user_id_by_email: { Args: { _email: string }; Returns: string }
+      get_client_sales_stats: {
+        Args: { p_end_date?: string; p_start_date?: string }
+        Returns: {
+          client_id: string
+          client_name: string
+          commission_month: number
+          commission_today: number
+          revenue_month: number
+          revenue_today: number
+          sales_month: number
+          sales_today: number
+          top_sellers: Json
+        }[]
+      }
       get_current_employee_id: { Args: never; Returns: string }
       get_customer_credentials: {
         Args: { p_client_id: string; p_encryption_key: string }
