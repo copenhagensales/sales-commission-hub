@@ -64,6 +64,7 @@ import {
   TimeStamp,
   TestBoard,
   EconomicBoard,
+  ClosingShifts,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -161,6 +162,8 @@ export const routes: RouteConfig[] = [
   { path: "/boards/test", component: TestBoard, access: "public" },
   { path: "/boards/economic", component: EconomicBoard, access: "public" },
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
+
+  { path: "/closing-shifts", component: ClosingShifts, access: "role", requireTeamlederOrAbove: true },
 
   { path: "/admin", component: Admin, access: "role", requiredRole: "ejer" },
   { path: "*", component: NotFound, access: "public" },
