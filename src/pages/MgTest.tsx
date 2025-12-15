@@ -42,6 +42,7 @@ interface WebhookSaleItem {
   } | null;
   sales: {
     client_campaign_id: string | null;
+    source: string | null;
   } | null;
 }
 
@@ -148,6 +149,19 @@ const parseClientFromTitle = (title: string | null, clientList?: ClientRow[]): C
 
   return (
     clientList.find((client) => client.name && client.name.trim().toLowerCase() === lowerCandidate) || null
+  );
+};
+
+// Parse client from source (e.g., "Eesy" -> "Eesy TM" or "eesy FM Gaden")
+const parseClientFromSource = (source: string | null, clientList?: ClientRow[]): ClientRow | null => {
+  if (!source || !clientList || clientList.length === 0) return null;
+  const lowerSource = source.toLowerCase().trim();
+  
+  // Find client where name contains the source (case insensitive)
+  return (
+    clientList.find((client) => 
+      client.name && client.name.toLowerCase().includes(lowerSource)
+    ) || null
   );
 };
 
@@ -268,7 +282,7 @@ export default function MgTest() {
       const { data, error } = await supabase
         .from("sale_items")
         .select(
-          "id, adversus_external_id, adversus_product_title, product_id, products(id, name, commission_dkk, revenue_dkk, client_campaign_id, counts_as_sale), sales(client_campaign_id)"
+          "id, adversus_external_id, adversus_product_title, product_id, products(id, name, commission_dkk, revenue_dkk, client_campaign_id, counts_as_sale), sales(client_campaign_id, source)"
         )
         .not("adversus_product_title", "is", null);
 
@@ -331,9 +345,18 @@ export default function MgTest() {
         ? clients?.find((client) => client.id === clientId)?.name ?? "Ukendt kunde"
         : null;
 
-      // Midlertidig hjælp: hvis der ikke er fundet kunde, forsøg at udlede kundenavn fra produktnavnet
+      // Midlertidig hjælp: hvis der ikke er fundet kunde, forsøg at udlede kundenavn fra produktnavnet eller source
       if (!clientId) {
         const parsedClient = parseClientFromTitle(item.adversus_product_title, clients);
+        if (parsedClient) {
+          clientId = parsedClient.id;
+          clientName = parsedClient.name ?? "Ukendt kunde";
+        }
+      }
+      
+      // Fallback: forsøg at matche kunde fra sales.source (f.eks. "Eesy")
+      if (!clientId && item.sales?.source) {
+        const parsedClient = parseClientFromSource(item.sales.source, clients);
         if (parsedClient) {
           clientId = parsedClient.id;
           clientName = parsedClient.name ?? "Ukendt kunde";
