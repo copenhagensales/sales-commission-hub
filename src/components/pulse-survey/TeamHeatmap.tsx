@@ -126,7 +126,7 @@ export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps
                   <th className="text-center p-2 text-xs font-medium border-b min-w-[50px]">n</th>
                   {scoreKeys.map(key => {
                     const isNps = key === 'nps_score';
-                    const label = isNps ? 'NPS' : (questionData[key]?.label || key);
+                    const label = isNps ? 'eNPS' : (questionData[key]?.label || key);
                     const tooltip = isNps 
                       ? 'Net Promoter Score: % Promoters (9-10) minus % Detractors (0-6). Skala: -100 til +100'
                       : questionData[key]?.fullQuestion;
