@@ -70,9 +70,9 @@ export default function MgTestDashboard() {
 
       if (saleItemsError) throw saleItemsError;
 
-      // Filter: only include items where counts_as_sale is true OR product is null (default to counting)
+      // Filter: only include items where product is mapped AND counts_as_sale is true
       const filteredSaleItems = saleItems?.filter((item: any) => {
-        if (!item.products) return true; // No product mapped = count as sale by default
+        if (!item.products) return false; // No product mapped = exclude
         return item.products.counts_as_sale === true;
       }) || [];
 
