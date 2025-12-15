@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Trophy, Users, Building2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TvPreviewOverlay } from "@/components/tv-preview/TvPreviewOverlay";
+
 // Client brand colors for visual distinction
 const clientColors: Record<string, { bg: string; accent: string; text: string }> = {
   "TDC Erhverv": { bg: "from-violet-600/20 to-violet-900/40", accent: "bg-violet-500", text: "text-violet-300" },
@@ -80,6 +82,7 @@ export default function MgTestDashboard() {
 
   return (
     <MainLayout>
+      <TvPreviewOverlay>
       <div className="space-y-8">
         {/* Header with totals */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 p-6">
@@ -220,6 +223,7 @@ export default function MgTestDashboard() {
           </div>
         )}
       </div>
+      </TvPreviewOverlay>
     </MainLayout>
   );
 }
