@@ -152,12 +152,24 @@ const parseClientFromTitle = (title: string | null, clientList?: ClientRow[]): C
   );
 };
 
-// Parse client from source (e.g., "Eesy" -> "Eesy TM" or "eesy FM Gaden")
+// Parse client from source (e.g., "Eesy" -> "Eesy TM")
 const parseClientFromSource = (source: string | null, clientList?: ClientRow[]): ClientRow | null => {
   if (!source || !clientList || clientList.length === 0) return null;
   const lowerSource = source.toLowerCase().trim();
   
-  // Find client where name contains the source (case insensitive)
+  // Specifik mapping for kendte sources til kunder
+  const sourceToClientMap: Record<string, string> = {
+    'eesy': 'Eesy TM',
+  };
+  
+  const targetClientName = sourceToClientMap[lowerSource];
+  if (targetClientName) {
+    return clientList.find((client) => 
+      client.name && client.name.toLowerCase() === targetClientName.toLowerCase()
+    ) || null;
+  }
+  
+  // Fallback: find client where name contains the source
   return (
     clientList.find((client) => 
       client.name && client.name.toLowerCase().includes(lowerSource)
