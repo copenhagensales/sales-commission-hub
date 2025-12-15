@@ -1,6 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Trophy, Users, Building2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -42,8 +42,7 @@ interface ClientStats {
 }
 
 export default function MgTestDashboard() {
-  const queryClient = useQueryClient();
-  const { data: clientStats, isLoading, isFetching } = useQuery({
+  const { data: clientStats, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["mg-test-dashboard-clients"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_client_sales_stats");
@@ -94,7 +93,7 @@ export default function MgTestDashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => queryClient.invalidateQueries({ queryKey: ["mg-test-dashboard-clients"] })}
+                onClick={() => refetch()}
                 disabled={isFetching}
                 className="gap-2"
               >
