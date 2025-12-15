@@ -43,6 +43,7 @@ const getMgNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.tdcErhverv"), href: "/tdc-erhverv", icon: Building2 },
   { name: t("sidebar.codan"), href: "/codan", icon: Shield },
   { name: t("sidebar.mgTest"), href: "/mg-test", icon: Percent },
+  { name: t("sidebar.testDashboard"), href: "/mg-test-dashboard", icon: FlaskConical },
   { name: t("sidebar.dialerData"), href: "/dialer-data", icon: Database },
   { name: t("sidebar.callsData"), href: "/calls-data", icon: Phone },
   { name: t("sidebar.dataSourcesInfo"), href: "/adversus-data", icon: Database },
@@ -155,7 +156,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const [mgOpen, setMgOpen] = useState(
-    ["/payroll", "/tdc-erhverv", "/codan", "/mg-test", "/dialer-data", "/adversus-data"].includes(location.pathname)
+    ["/payroll", "/tdc-erhverv", "/codan", "/mg-test", "/mg-test-dashboard", "/dialer-data", "/adversus-data", "/calls-data"].includes(location.pathname)
   );
   const [timeTrackingOpen, setTimeTrackingOpen] = useState(
     location.pathname === "/shift-planning/time-tracking" || 
