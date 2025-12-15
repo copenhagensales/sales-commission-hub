@@ -2592,6 +2592,7 @@ export type Database = {
         Row: {
           client_campaign_id: string | null
           commission_dkk: number | null
+          counts_as_sale: boolean
           created_at: string | null
           external_product_code: string | null
           id: string
@@ -2602,6 +2603,7 @@ export type Database = {
         Insert: {
           client_campaign_id?: string | null
           commission_dkk?: number | null
+          counts_as_sale?: boolean
           created_at?: string | null
           external_product_code?: string | null
           id?: string
@@ -2612,6 +2614,7 @@ export type Database = {
         Update: {
           client_campaign_id?: string | null
           commission_dkk?: number | null
+          counts_as_sale?: boolean
           created_at?: string | null
           external_product_code?: string | null
           id?: string

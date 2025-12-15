@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, ChevronDown, Search } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -37,6 +38,7 @@ interface WebhookSaleItem {
     commission_dkk: number | null;
     revenue_dkk: number | null;
     client_campaign_id: string | null;
+    counts_as_sale: boolean;
   } | null;
   sales: {
     client_campaign_id: string | null;
@@ -53,6 +55,7 @@ interface AggregatedProduct {
     commission_dkk: number | null;
     revenue_dkk: number | null;
     client_campaign_id: string | null;
+    counts_as_sale: boolean;
   } | null;
   campaignId: string | null;
   campaignLabel: string;
@@ -265,7 +268,7 @@ export default function MgTest() {
       const { data, error } = await supabase
         .from("sale_items")
         .select(
-          "id, adversus_external_id, adversus_product_title, product_id, products(id, name, commission_dkk, revenue_dkk, client_campaign_id), sales(client_campaign_id)"
+          "id, adversus_external_id, adversus_product_title, product_id, products(id, name, commission_dkk, revenue_dkk, client_campaign_id, counts_as_sale), sales(client_campaign_id)"
         )
         .not("adversus_product_title", "is", null);
 
@@ -352,6 +355,7 @@ export default function MgTest() {
                 commission_dkk: item.products.commission_dkk,
                 revenue_dkk: item.products.revenue_dkk,
                 client_campaign_id: item.products.client_campaign_id,
+                counts_as_sale: item.products.counts_as_sale ?? true,
               }
             : null,
           campaignId: clientId,
@@ -628,6 +632,24 @@ export default function MgTest() {
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke gemme værdier");
+    },
+  });
+
+  // Mutation to toggle counts_as_sale
+  const toggleCountsAsSale = useMutation({
+    mutationFn: async ({ productId, countsAsSale }: { productId: string; countsAsSale: boolean }) => {
+      const { error } = await supabase
+        .from("products")
+        .update({ counts_as_sale: countsAsSale })
+        .eq("id", productId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Opdateret");
+      queryClient.invalidateQueries({ queryKey: ["mg-webhook-products"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke opdatere");
     },
   });
 
@@ -1360,11 +1382,12 @@ export default function MgTest() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="w-[30%]">Adversus produktnavn</TableHead>
-                                <TableHead className="w-[18%]">External ID</TableHead>
-                                <TableHead className="w-[24%]">Kunde</TableHead>
-                                <TableHead className="w-[14%]">Provision (DKK)</TableHead>
-                                <TableHead className="w-[14%]">CPO / omsætning (DKK)</TableHead>
+                                <TableHead className="w-[26%]">Adversus produktnavn</TableHead>
+                                <TableHead className="w-[14%]">External ID</TableHead>
+                                <TableHead className="w-[20%]">Kunde</TableHead>
+                                <TableHead className="w-[12%]">Provision (DKK)</TableHead>
+                                <TableHead className="w-[12%]">CPO / omsætning (DKK)</TableHead>
+                                <TableHead className="w-[16%] text-center">Tæl som salg</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1489,6 +1512,23 @@ export default function MgTest() {
                                         onChange={(e) => handleChange(row.key, "cpo", e.target.value, row)}
                                         placeholder="0,00"
                                       />
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      {row.product ? (
+                                        <Checkbox
+                                          checked={row.product.counts_as_sale}
+                                          onCheckedChange={(checked) => {
+                                            if (row.product?.id) {
+                                              toggleCountsAsSale.mutate({
+                                                productId: row.product.id,
+                                                countsAsSale: checked === true,
+                                              });
+                                            }
+                                          }}
+                                        />
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">-</span>
+                                      )}
                                     </TableCell>
                                   </TableRow>
                                 );
