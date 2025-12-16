@@ -75,4 +75,5 @@ export const EconomicBoard = lazyPage(() => import("@/pages/boards/EconomicBoard
 export const SalesDashboard = lazyPage(() => import("@/pages/boards/SalesDashboard"));
 
 export const ClosingShifts = lazyPage(() => import("@/pages/ClosingShifts"));
+export const Permissions = lazyPage(() => import("@/pages/Permissions"));
 

@@ -66,6 +66,7 @@ import {
   EconomicBoard,
   SalesDashboard,
   ClosingShifts,
+  Permissions,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -168,6 +169,7 @@ export const routes: RouteConfig[] = [
   { path: "/closing-shifts", component: ClosingShifts, access: "role", requireTeamlederOrAbove: true },
 
   { path: "/admin", component: Admin, access: "role", requiredRole: "ejer" },
+  { path: "/permissions", component: Permissions, access: "role", requiredRole: "ejer" },
   { path: "*", component: NotFound, access: "public" },
 ];
 
