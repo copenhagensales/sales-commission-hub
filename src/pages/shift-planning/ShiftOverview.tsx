@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,6 +13,7 @@ import { useShifts, useDepartments, useEmployeesForShifts, useDanishHolidays, us
 import { CreateShiftDialog } from "@/components/shift-planning/CreateShiftDialog";
 import { ShiftCard } from "@/components/shift-planning/ShiftCard";
 import { EditTimeStampDialog } from "@/components/shift-planning/EditTimeStampDialog";
+import { ShiftDetailDialog } from "@/components/shift-planning/ShiftDetailDialog";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
@@ -52,6 +53,10 @@ export default function ShiftOverview() {
   const [selectedTimeStampEmployee, setSelectedTimeStampEmployee] = useState<{ id: string; name: string; date: Date } | null>(null);
   const [openPopoverKey, setOpenPopoverKey] = useState<string | null>(null);
   const [showWeekendStamps, setShowWeekendStamps] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [selectedDetailEmployee, setSelectedDetailEmployee] = useState<{ id: string; first_name: string; last_name: string; department: string | null; salary_type: string | null; salary_amount: number | null; standard_start_time: string | null } | null>(null);
+  const [selectedDetailDate, setSelectedDetailDate] = useState<Date | null>(null);
+  const [selectedDetailTimeStamp, setSelectedDetailTimeStamp] = useState<TimeStampData | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -409,6 +414,18 @@ export default function ShiftOverview() {
     setOpenPopoverKey(null);
   };
 
+  const handleViewDetails = (
+    employee: { id: string; first_name: string; last_name: string; department: string | null; salary_type: string | null; salary_amount: number | null; standard_start_time: string | null },
+    date: Date,
+    timeStamp: TimeStampData | null
+  ) => {
+    setSelectedDetailEmployee(employee);
+    setSelectedDetailDate(date);
+    setSelectedDetailTimeStamp(timeStamp);
+    setDetailDialogOpen(true);
+    setOpenPopoverKey(null);
+  };
+
   // Handle delay dialog submit
   const handleDelaySubmit = () => {
     if (!pendingDelayCell || !delayMinutes) return;
@@ -747,6 +764,15 @@ export default function ShiftOverview() {
                                 <Pencil className="h-4 w-4" />
                                 Ændre indstempling
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="justify-start gap-2 h-8"
+                                onClick={() => handleViewDetails(employee as any, day, timeStamp)}
+                              >
+                                <Info className="h-4 w-4" />
+                                Se info
+                              </Button>
                               {hasStatus && (
                                 <>
                                   <div className="border-t my-1" />
@@ -906,6 +932,15 @@ export default function ShiftOverview() {
             date={selectedTimeStampEmployee.date}
           />
         )}
+
+        {/* Shift Detail Dialog */}
+        <ShiftDetailDialog
+          open={detailDialogOpen}
+          onOpenChange={setDetailDialogOpen}
+          employee={selectedDetailEmployee}
+          date={selectedDetailDate}
+          timeStamp={selectedDetailTimeStamp}
+        />
       </div>
     </MainLayout>
   );
