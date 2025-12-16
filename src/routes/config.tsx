@@ -64,6 +64,7 @@ import {
   TimeStamp,
   TestBoard,
   EconomicBoard,
+  ClientSalesOverview,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -160,9 +161,9 @@ export const routes: RouteConfig[] = [
 
   { path: "/boards/test", component: TestBoard, access: "public" },
   { path: "/boards/economic", component: EconomicBoard, access: "public" },
+  { path: "/client-sales-overview", component: ClientSalesOverview, access: "role", requireTeamlederOrAbove: true },
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
 
   { path: "/admin", component: Admin, access: "role", requiredRole: "ejer" },
   { path: "*", component: NotFound, access: "public" },
 ];
-
