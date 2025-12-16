@@ -457,15 +457,17 @@ export function PositionsTab() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => navigate(`/role-preview/${position.id}`)}
-                          title="Test"
-                          className="text-primary hover:text-primary"
-                        >
-                          <Play className="h-4 w-4" />
-                        </Button>
+                        {!isOwner && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate(`/role-preview/${position.id}`)}
+                            title="Test"
+                            className="text-primary hover:text-primary"
+                          >
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        )}
                         {isOwner ? (
                           <Button
                             variant="ghost"
