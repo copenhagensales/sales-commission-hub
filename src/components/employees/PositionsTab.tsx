@@ -461,7 +461,7 @@ export function PositionsTab() {
                           variant="ghost"
                           size="icon"
                           onClick={() => navigate(`/role-preview/${position.id}`)}
-                          title="Test rolle"
+                          title="Test stilling"
                           className="text-primary hover:text-primary"
                         >
                           <Play className="h-4 w-4" />
