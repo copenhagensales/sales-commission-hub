@@ -83,7 +83,7 @@ export default function MgTestDashboard() {
   return (
     <MainLayout>
       <TvPreviewOverlay>
-      <div className="h-[calc(100vh-4rem)] flex flex-col p-3 overflow-hidden">
+      <div className="h-[calc(100vh-4rem)] flex flex-col p-[5%] overflow-hidden">
         {/* Compact Header */}
         <div className="flex-shrink-0 rounded-xl bg-gradient-to-r from-primary/10 to-background border border-primary/20 px-4 py-3 mb-3">
           <div className="flex items-center justify-between">
