@@ -68,6 +68,7 @@ import {
   ClosingShifts,
   Permissions,
   Teams,
+  RolePreview,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -172,5 +173,6 @@ export const routes: RouteConfig[] = [
 
   { path: "/admin", component: Admin, access: "role", requiredRole: "ejer" },
   { path: "/permissions", component: Permissions, access: "role", requiredRole: "ejer" },
+  { path: "/role-preview/:id", component: RolePreview, access: "role", requireTeamlederOrAbove: true },
   { path: "*", component: NotFound, access: "public" },
 ];
