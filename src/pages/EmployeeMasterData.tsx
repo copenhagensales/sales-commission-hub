@@ -21,6 +21,7 @@ import { useCanAccess } from "@/hooks/useSystemRoles";
 import { EmployeeExcelImport } from "@/components/employees/EmployeeExcelImport";
 import { DialerMappingTab } from "@/components/employees/DialerMappingTab";
 import { TeamsTab } from "@/components/employees/TeamsTab";
+import { PositionsTab } from "@/components/employees/PositionsTab";
 
 
 interface EmployeeMasterDataRecord {
@@ -807,6 +808,7 @@ export default function EmployeeMasterData() {
           <TabsList>
             <TabsTrigger value="all-employees">Alle medarbejdere</TabsTrigger>
             <TabsTrigger value="teams">Teams</TabsTrigger>
+            <TabsTrigger value="positions">Stillinger</TabsTrigger>
             <TabsTrigger value="dialer-mapping">Dialer mapping</TabsTrigger>
           </TabsList>
 
@@ -1007,6 +1009,10 @@ export default function EmployeeMasterData() {
 
           <TabsContent value="teams" className="space-y-6">
             <TeamsTab />
+          </TabsContent>
+
+          <TabsContent value="positions" className="space-y-6">
+            <PositionsTab />
           </TabsContent>
 
           <TabsContent value="dialer-mapping" className="space-y-6">

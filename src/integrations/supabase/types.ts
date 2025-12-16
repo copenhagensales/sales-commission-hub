@@ -2312,6 +2312,36 @@ export type Database = {
         }
         Relationships: []
       }
+      job_positions: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          permissions: Json
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          permissions?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          permissions?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       lateness_record: {
         Row: {
           created_at: string
