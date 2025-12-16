@@ -298,28 +298,66 @@ export default function ContractSign() {
             </div>
           </div>
 
-          {/* Contract Content */}
-          <div className="p-8 md:p-12 bg-card">
+          {/* Contract Content - Professional Legal Document Layout */}
+          <div className="p-8 md:p-14 lg:p-16 bg-card">
             <div
-              className="prose prose-invert max-w-none
-                prose-headings:font-bold prose-headings:text-foreground prose-headings:tracking-tight
-                prose-h1:text-2xl prose-h1:text-center prose-h1:mb-10 prose-h1:pb-6 prose-h1:border-b-2 prose-h1:border-primary/30
-                prose-h2:text-xl prose-h2:mt-12 prose-h2:mb-5 prose-h2:text-primary
-                prose-h3:text-lg prose-h3:mt-8 prose-h3:mb-3
-                prose-h4:text-base prose-h4:font-bold prose-h4:mt-6 prose-h4:mb-2
-                prose-p:text-muted-foreground prose-p:leading-relaxed prose-p:my-3
-                prose-strong:text-foreground prose-strong:font-bold
-                prose-ul:my-4 prose-li:text-muted-foreground prose-li:my-1
-                prose-ol:my-4 prose-ol:pl-6
-                [&_br]:block [&_br]:content-[''] [&_br]:my-1
-                [&_hr]:my-10 [&_hr]:border-border/50
-                [&_table]:w-full [&_table]:border-collapse [&_table]:my-8 [&_table]:text-sm [&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:border [&_table]:border-border
-                [&_th]:bg-muted [&_th]:text-left [&_th]:px-4 [&_th]:py-3 [&_th]:font-bold [&_th]:text-foreground [&_th]:border-b [&_th]:border-border
-                [&_td]:px-4 [&_td]:py-2.5 [&_td]:border-b [&_td]:border-border/50 [&_td]:text-muted-foreground [&_td]:align-top
+              className="max-w-3xl mx-auto prose prose-invert
+                /* Main title - centered, prominent */
+                prose-h1:text-2xl prose-h1:font-bold prose-h1:text-center prose-h1:text-foreground 
+                prose-h1:tracking-wide prose-h1:uppercase prose-h1:mb-12 prose-h1:mt-0
+                prose-h1:pb-4 prose-h1:border-b-2 prose-h1:border-primary/40
+                
+                /* Section headings - bold, clear separation */
+                prose-h2:text-lg prose-h2:font-bold prose-h2:text-foreground prose-h2:uppercase
+                prose-h2:tracking-wider prose-h2:mt-12 prose-h2:mb-6 prose-h2:pt-8
+                prose-h2:border-t prose-h2:border-border/30
+                
+                /* Subsection headings */
+                prose-h3:text-base prose-h3:font-bold prose-h3:text-foreground
+                prose-h3:mt-8 prose-h3:mb-4
+                
+                prose-h4:text-sm prose-h4:font-bold prose-h4:text-foreground prose-h4:uppercase
+                prose-h4:tracking-wide prose-h4:mt-6 prose-h4:mb-3
+                
+                /* Body text - readable with proper spacing */
+                prose-p:text-muted-foreground prose-p:leading-7 prose-p:my-4
+                prose-p:text-[15px]
+                
+                /* Strong text stands out */
+                prose-strong:text-foreground prose-strong:font-semibold
+                
+                /* Lists with proper indentation */
+                prose-ul:my-6 prose-ul:pl-6 prose-ul:space-y-2
+                prose-ol:my-6 prose-ol:pl-8 prose-ol:space-y-3
+                prose-li:text-muted-foreground prose-li:text-[15px] prose-li:leading-7
+                prose-li:pl-2
+                
+                /* Line breaks - minimal spacing for address blocks */
+                [&_br]:block [&_br]:content-[''] [&_br]:h-1
+                
+                /* Horizontal rules for section breaks */
+                [&_hr]:my-12 [&_hr]:border-border/40
+                
+                /* Tables - professional grid layout */
+                [&_table]:w-full [&_table]:my-8 [&_table]:text-sm
+                [&_table]:border [&_table]:border-border/50 [&_table]:rounded-lg [&_table]:overflow-hidden
+                [&_th]:bg-muted/50 [&_th]:px-5 [&_th]:py-3 [&_th]:text-left 
+                [&_th]:font-bold [&_th]:text-foreground [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider
+                [&_th]:border-b [&_th]:border-border
+                [&_td]:px-5 [&_td]:py-3 [&_td]:border-b [&_td]:border-border/30 [&_td]:text-muted-foreground
+                [&_td]:align-top
                 [&_tr:last-child_td]:border-b-0
-                [&_td:first-child]:font-medium [&_td:first-child]:text-foreground [&_td:first-child]:whitespace-nowrap
-                [&_td:last-child]:text-right [&_td:last-child]:font-medium
-                [&_pre]:whitespace-pre-wrap [&_pre]:font-sans [&_pre]:text-sm [&_pre]:bg-muted/30 [&_pre]:p-4 [&_pre]:rounded-lg [&_pre]:my-4"
+                [&_tr:nth-child(even)]:bg-muted/20
+                [&_td:first-child]:font-medium [&_td:first-child]:text-foreground
+                
+                /* Indented quote-style blocks for party info */
+                [&_blockquote]:border-l-4 [&_blockquote]:border-primary/40 [&_blockquote]:pl-6
+                [&_blockquote]:my-6 [&_blockquote]:py-2 [&_blockquote]:bg-muted/20 [&_blockquote]:rounded-r-lg
+                [&_blockquote_p]:my-1 [&_blockquote_p]:text-foreground
+                
+                /* Preformatted text for structured data */
+                [&_pre]:whitespace-pre-wrap [&_pre]:font-mono [&_pre]:text-sm 
+                [&_pre]:bg-muted/30 [&_pre]:p-5 [&_pre]:rounded-lg [&_pre]:my-6 [&_pre]:border [&_pre]:border-border/30"
               dangerouslySetInnerHTML={{ __html: contract.content }}
             />
           </div>
