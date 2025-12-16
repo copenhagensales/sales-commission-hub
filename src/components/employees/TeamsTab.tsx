@@ -18,6 +18,7 @@ interface Team {
   name: string;
   description: string | null;
   team_leader_id: string | null;
+  assistant_team_leader_id: string | null;
 }
 
 interface Employee {
@@ -41,6 +42,7 @@ export function TeamsTab() {
     name: "",
     description: "",
     team_leader_id: "",
+    assistant_team_leader_id: "",
     client_ids: [] as string[],
     employee_ids: [] as string[],
   });
@@ -150,6 +152,7 @@ export function TeamsTab() {
           name: data.name,
           description: data.description || null,
           team_leader_id: data.team_leader_id || null,
+          assistant_team_leader_id: data.assistant_team_leader_id || null,
         })
         .select()
         .single();
@@ -194,6 +197,7 @@ export function TeamsTab() {
           name: data.name,
           description: data.description || null,
           team_leader_id: data.team_leader_id || null,
+          assistant_team_leader_id: data.assistant_team_leader_id || null,
         })
         .eq("id", data.id);
       if (teamError) throw teamError;
@@ -252,6 +256,7 @@ export function TeamsTab() {
       name: "",
       description: "",
       team_leader_id: "",
+      assistant_team_leader_id: "",
       client_ids: [],
       employee_ids: [],
     });
@@ -269,6 +274,7 @@ export function TeamsTab() {
       name: team.name,
       description: team.description || "",
       team_leader_id: team.team_leader_id || "",
+      assistant_team_leader_id: team.assistant_team_leader_id || "",
       client_ids: getTeamClients(team.id),
       employee_ids: getTeamMembers(team.id),
     });
@@ -330,6 +336,7 @@ export function TeamsTab() {
                 <TableHead className="text-xs font-medium text-muted-foreground">Navn</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground">Beskrivelse</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground">Teamleder</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">Ass. Teamleder</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground">Kunder</TableHead>
                 <TableHead className="text-xs font-medium text-muted-foreground">Medarbejdere</TableHead>
                 <TableHead></TableHead>
@@ -348,6 +355,11 @@ export function TeamsTab() {
                     <TableCell className="py-3">
                       {team.team_leader_id && employeeMap[team.team_leader_id]
                         ? employeeMap[team.team_leader_id]
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      {team.assistant_team_leader_id && employeeMap[team.assistant_team_leader_id]
+                        ? employeeMap[team.assistant_team_leader_id]
                         : "-"}
                     </TableCell>
                     <TableCell className="py-3">
@@ -446,6 +458,25 @@ export function TeamsTab() {
                 <p className="text-xs text-muted-foreground">
                   Kun medarbejdere med stillingen "Teamleder" eller "Assisterende Teamleder" vises her.
                 </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Assisterende Teamleder</Label>
+                <Select
+                  value={formData.assistant_team_leader_id || "__none__"}
+                  onValueChange={(value) => setFormData({ ...formData, assistant_team_leader_id: value === "__none__" ? "" : value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg assisterende teamleder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Ingen</SelectItem>
+                    {teamLeaders.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.first_name} {emp.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

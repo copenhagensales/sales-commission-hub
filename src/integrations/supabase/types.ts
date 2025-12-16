@@ -3555,6 +3555,7 @@ export type Database = {
       }
       teams: {
         Row: {
+          assistant_team_leader_id: string | null
           created_at: string | null
           description: string | null
           id: string
@@ -3563,6 +3564,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          assistant_team_leader_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -3571,6 +3573,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          assistant_team_leader_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -3579,6 +3582,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "teams_assistant_team_leader_id_fkey"
+            columns: ["assistant_team_leader_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "teams_team_leader_id_fkey"
             columns: ["team_leader_id"]
