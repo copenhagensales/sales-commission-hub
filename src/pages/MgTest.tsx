@@ -21,6 +21,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import ClientSalesOverviewContent from "@/pages/ClientSalesOverview";
 
 interface InspectorField {
   fieldId: string;
@@ -1378,6 +1379,7 @@ export default function MgTest() {
             <TabsTrigger value="customer">{t("mgTest.tabCampaign")}</TabsTrigger>
             <TabsTrigger value="employee-mapping">{t("mgTest.tabEmployee")}</TabsTrigger>
             <TabsTrigger value="customers">{t("mgTest.tabCustomers")}</TabsTrigger>
+            <TabsTrigger value="client-sales">Client Sales</TabsTrigger>
           </TabsList>
 
           {/* Mapping produkt */}
@@ -2198,6 +2200,11 @@ export default function MgTest() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Client Sales Overview Tab */}
+          <TabsContent value="client-sales">
+            <ClientSalesOverviewContent />
           </TabsContent>
         </Tabs>
       </div>
