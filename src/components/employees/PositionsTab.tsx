@@ -262,20 +262,6 @@ export function PositionsTab() {
     },
   });
 
-  const getAllPermissionsEnabled = (): Record<string, boolean | { view: boolean; edit: boolean }> => {
-    const allPermissions: Record<string, boolean | { view: boolean; edit: boolean }> = {};
-    PERMISSION_CATEGORIES.forEach(category => {
-      category.permissions.forEach(permission => {
-        if (permission.hasEditOption) {
-          allPermissions[permission.key] = { view: true, edit: true };
-        } else {
-          allPermissions[permission.key] = true;
-        }
-      });
-    });
-    return allPermissions;
-  };
-
   const handleOpenCreate = () => {
     setEditingPosition(null);
     setFormData({
@@ -284,17 +270,6 @@ export function PositionsTab() {
       permissions: {},
     });
     setExpandedCategories([]);
-    setIsDialogOpen(true);
-  };
-
-  const handleCreateOwnerPosition = () => {
-    setEditingPosition(null);
-    setFormData({
-      name: "Ejer",
-      description: "Fuld adgang til alle systemfunktioner",
-      permissions: getAllPermissionsEnabled(),
-    });
-    setExpandedCategories(PERMISSION_CATEGORIES.map(c => c.key));
     setIsDialogOpen(true);
   };
 
@@ -404,16 +379,10 @@ export function PositionsTab() {
             Definer stillinger og deres tilhørende rettigheder
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleCreateOwnerPosition}>
-            <Shield className="h-4 w-4 mr-2" />
-            Opret Ejer-stilling
-          </Button>
-          <Button onClick={handleOpenCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            Opret stilling
-          </Button>
-        </div>
+        <Button onClick={handleOpenCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          Opret stilling
+        </Button>
       </div>
 
       <Table>
