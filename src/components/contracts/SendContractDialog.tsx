@@ -173,52 +173,97 @@ export function SendContractDialog({
 
   // Merge placeholders with employee data
   const mergeContent = (content: string): string => {
-    const address = [
+    const fullAddress = [
       employee.address_street,
-      employee.address_postal_code,
-      employee.address_city,
+      `${employee.address_postal_code || ""} ${employee.address_city || ""}`.trim(),
     ]
       .filter(Boolean)
       .join(", ");
 
     const replacements: Record<string, string> = {
-      // English keys
-      employee_name: `${employee.first_name} ${employee.last_name}`,
-      cpr_number: employee.cpr_number || "[CPR ikke angivet]",
-      address: address || "[Adresse ikke angivet]",
-      job_title: employee.job_title || "[Stilling ikke angivet]",
-      work_location: employee.work_location || "[Arbejdssted ikke angivet]",
-      weekly_hours: employee.weekly_hours?.toString() || "[Timer ikke angivet]",
-      salary_type: employee.salary_type ? salaryTypeLabels[employee.salary_type] || employee.salary_type : "[Løntype ikke angivet]",
-      salary_amount: employee.salary_amount?.toLocaleString("da-DK") || "[Beløb ikke angivet]",
-      vacation_type: employee.vacation_type ? vacationTypeLabels[employee.vacation_type] || employee.vacation_type : "[Ferietype ikke angivet]",
-      employment_start_date: employee.employment_start_date
-        ? format(new Date(employee.employment_start_date), "d. MMMM yyyy", { locale: da })
-        : "[Startdato ikke angivet]",
-      standard_start_time: employee.standard_start_time || "[Mødetid ikke angivet]",
-      current_date: format(new Date(), "d. MMMM yyyy", { locale: da }),
-      effective_date: "[Angiv dato]",
-      new_salary_details: "[Angiv nye lønoplysninger]",
-      vehicle_details: "[Angiv køretøjsoplysninger]",
-      // Danish keys (used in templates)
+      // === MEDARBEJDER INFO ===
+      // Navn
+      medarbejder_navn: `${employee.first_name} ${employee.last_name}`,
+      medarbejder_fornavn: employee.first_name,
+      medarbejder_efternavn: employee.last_name,
       fornavn: employee.first_name,
       efternavn: employee.last_name,
+      employee_name: `${employee.first_name} ${employee.last_name}`,
+      
+      // CPR
+      medarbejder_cpr: employee.cpr_number || "[CPR ikke angivet]",
       cpr: employee.cpr_number || "[CPR ikke angivet]",
+      cpr_number: employee.cpr_number || "[CPR ikke angivet]",
+      
+      // === ADRESSE ===
+      medarbejder_adresse: fullAddress || "[Adresse ikke angivet]",
+      medarbejder_vej: employee.address_street || "[Vej ikke angivet]",
+      medarbejder_postnummer: employee.address_postal_code || "[Postnummer ikke angivet]",
+      medarbejder_by: employee.address_city || "[By ikke angivet]",
       adresse: employee.address_street || "[Adresse ikke angivet]",
       postnummer: employee.address_postal_code || "[Postnummer ikke angivet]",
       by: employee.address_city || "[By ikke angivet]",
+      address: fullAddress || "[Adresse ikke angivet]",
+      
+      // === KONTAKT ===
+      medarbejder_email: employee.private_email || "[Email ikke angivet]",
       privat_email: employee.private_email || "[Email ikke angivet]",
+      
+      // === ANSÆTTELSE ===
+      medarbejder_stilling: employee.job_title || "[Stilling ikke angivet]",
       stilling: employee.job_title || "[Stilling ikke angivet]",
+      job_title: employee.job_title || "[Stilling ikke angivet]",
+      
+      medarbejder_arbejdssted: employee.work_location || "[Arbejdssted ikke angivet]",
+      arbejdssted: employee.work_location || "[Arbejdssted ikke angivet]",
+      work_location: employee.work_location || "[Arbejdssted ikke angivet]",
+      
+      medarbejder_timer: employee.weekly_hours?.toString() || "[Timer ikke angivet]",
       timer_pr_uge: employee.weekly_hours?.toString() || "[Timer ikke angivet]",
-      arbejdstid: employee.standard_start_time || "[Arbejdstid ikke angivet]",
+      weekly_hours: employee.weekly_hours?.toString() || "[Timer ikke angivet]",
+      
+      medarbejder_mødetid: employee.standard_start_time || "[Mødetid ikke angivet]",
+      mødetid: employee.standard_start_time || "[Mødetid ikke angivet]",
+      arbejdstid: employee.standard_start_time || "[Mødetid ikke angivet]",
+      standard_start_time: employee.standard_start_time || "[Mødetid ikke angivet]",
+      
+      medarbejder_startdato: employee.employment_start_date
+        ? format(new Date(employee.employment_start_date), "d. MMMM yyyy", { locale: da })
+        : "[Startdato ikke angivet]",
       ansættelsesdato: employee.employment_start_date
         ? format(new Date(employee.employment_start_date), "d. MMMM yyyy", { locale: da })
         : "[Startdato ikke angivet]",
+      employment_start_date: employee.employment_start_date
+        ? format(new Date(employee.employment_start_date), "d. MMMM yyyy", { locale: da })
+        : "[Startdato ikke angivet]",
+      
+      // === LØN ===
+      medarbejder_løntype: employee.salary_type ? salaryTypeLabels[employee.salary_type] || employee.salary_type : "[Løntype ikke angivet]",
+      løntype: employee.salary_type ? salaryTypeLabels[employee.salary_type] || employee.salary_type : "[Løntype ikke angivet]",
+      salary_type: employee.salary_type ? salaryTypeLabels[employee.salary_type] || employee.salary_type : "[Løntype ikke angivet]",
+      
+      medarbejder_løn: employee.salary_amount?.toLocaleString("da-DK") || "[Beløb ikke angivet]",
+      løn: employee.salary_amount?.toLocaleString("da-DK") || "[Beløb ikke angivet]",
+      salary_amount: employee.salary_amount?.toLocaleString("da-DK") || "[Beløb ikke angivet]",
+      
+      // === FERIE ===
+      medarbejder_ferietype: employee.vacation_type ? vacationTypeLabels[employee.vacation_type] || employee.vacation_type : "[Ferietype ikke angivet]",
+      ferietype: employee.vacation_type ? vacationTypeLabels[employee.vacation_type] || employee.vacation_type : "[Ferietype ikke angivet]",
+      vacation_type: employee.vacation_type ? vacationTypeLabels[employee.vacation_type] || employee.vacation_type : "[Ferietype ikke angivet]",
+      
+      // === DATOER ===
+      dags_dato: format(new Date(), "d. MMMM yyyy", { locale: da }),
+      current_date: format(new Date(), "d. MMMM yyyy", { locale: da }),
+      effective_date: "[Angiv dato]",
+      
+      // === DIVERSE ===
+      new_salary_details: "[Angiv nye lønoplysninger]",
+      vehicle_details: "[Angiv køretøjsoplysninger]",
     };
 
     let merged = content;
     Object.entries(replacements).forEach(([key, value]) => {
-      merged = merged.replace(new RegExp(`{{${key}}}`, "g"), value);
+      merged = merged.replace(new RegExp(`{{${key}}}`, "gi"), value);
     });
     return merged;
   };
@@ -400,24 +445,92 @@ export function SendContractDialog({
                   />
                 </div>
 
-                <div className="bg-muted/50 rounded-lg p-4">
-                  <h4 className="font-medium mb-2">Medarbejderdata der flettes ind:</h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Navn:</span>{" "}
-                      {employee.first_name} {employee.last_name}
+                <div className="bg-muted/50 rounded-lg p-4 space-y-4">
+                  <h4 className="font-medium text-sm">Medarbejderdata der flettes ind:</h4>
+                  
+                  {/* Personal Info */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Personlig info</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Navn:</span>
+                        <span className="font-medium">{employee.first_name} {employee.last_name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">CPR:</span>
+                        <span className="font-medium">{employee.cpr_number || <span className="text-destructive">Mangler</span>}</span>
+                      </div>
+                      <div className="flex justify-between col-span-2">
+                        <span className="text-muted-foreground">Adresse:</span>
+                        <span className="font-medium text-right">
+                          {employee.address_street ? (
+                            `${employee.address_street}, ${employee.address_postal_code || ""} ${employee.address_city || ""}`.trim()
+                          ) : (
+                            <span className="text-destructive">Mangler</span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Email:</span>
+                        <span className="font-medium">{employee.private_email || <span className="text-destructive">Mangler</span>}</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">Stilling:</span>{" "}
-                      {employee.job_title || "-"}
+                  </div>
+
+                  {/* Employment Info */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Ansættelse</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Stilling:</span>
+                        <span className="font-medium">{employee.job_title || <span className="text-destructive">Mangler</span>}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Arbejdssted:</span>
+                        <span className="font-medium">{employee.work_location || <span className="text-destructive">Mangler</span>}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Mødetid:</span>
+                        <span className="font-medium">{employee.standard_start_time || <span className="text-destructive">Mangler</span>}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Timer/uge:</span>
+                        <span className="font-medium">{employee.weekly_hours || <span className="text-destructive">Mangler</span>}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Startdato:</span>
+                        <span className="font-medium">
+                          {employee.employment_start_date 
+                            ? format(new Date(employee.employment_start_date), "d. MMM yyyy", { locale: da })
+                            : <span className="text-destructive">Mangler</span>
+                          }
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">Arbejdssted:</span>{" "}
-                      {employee.work_location || "-"}
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Løn:</span>{" "}
-                      {employee.salary_amount?.toLocaleString("da-DK")} DKK ({employee.salary_type || "-"})
+                  </div>
+
+                  {/* Salary Info */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Løn & Ferie</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Løntype:</span>
+                        <span className="font-medium">
+                          {employee.salary_type ? salaryTypeLabels[employee.salary_type] || employee.salary_type : <span className="text-destructive">Mangler</span>}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Løn:</span>
+                        <span className="font-medium">
+                          {employee.salary_amount ? `${employee.salary_amount.toLocaleString("da-DK")} DKK` : <span className="text-destructive">Mangler</span>}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Ferietype:</span>
+                        <span className="font-medium">
+                          {employee.vacation_type ? vacationTypeLabels[employee.vacation_type] || employee.vacation_type : <span className="text-destructive">Mangler</span>}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>

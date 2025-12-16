@@ -250,23 +250,38 @@ export default function ContractSign() {
   const needsLogin = !user && contract.status === "pending_employee";
 
   return (
-    <div className="min-h-screen bg-white light">
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
-        <div className="flex items-center justify-between">
-          {user ? (
-            <Button variant="ghost" className="text-gray-700 hover:bg-gray-100" onClick={() => navigate("/my-contracts")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Tilbage
-            </Button>
-          ) : (
-            <div />
-          )}
+    <div className="min-h-screen bg-gray-50 light">
+      <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            {user ? (
+              <Button variant="ghost" size="sm" className="text-gray-600 hover:bg-gray-200" onClick={() => navigate("/my-contracts")}>
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Tilbage
+              </Button>
+            ) : null}
+            <Badge
+              variant="outline"
+              className={
+                contract.status === "signed"
+                  ? "bg-green-50 text-green-700 border-green-200"
+                  : contract.status === "pending_employee"
+                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                  : contract.status === "rejected"
+                  ? "bg-red-50 text-red-700 border-red-200"
+                  : "bg-gray-50 text-gray-700 border-gray-200"
+              }
+            >
+              {statusLabels[contract.status as ContractStatus]}
+            </Badge>
+          </div>
           <div className="flex items-center gap-2">
             {canSign && (
               <Button
                 size="sm"
                 onClick={scrollToSignSection}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="bg-green-600 hover:bg-green-700 text-white shadow-sm"
               >
                 <PenLine className="h-4 w-4 mr-2" />
                 Underskriv nu
@@ -275,7 +290,7 @@ export default function ContractSign() {
             <Button
               variant="outline"
               size="sm"
-              className="border-gray-300 text-gray-700 hover:bg-gray-100"
+              className="border-gray-300 text-gray-700 hover:bg-white"
               onClick={handleDownloadPdf}
               disabled={downloadingPdf}
             >
@@ -286,94 +301,112 @@ export default function ContractSign() {
               )}
               Download PDF
             </Button>
-            <Badge
-              className={
-                contract.status === "signed"
-                  ? "bg-green-100 text-green-800"
-                  : contract.status === "pending_employee"
-                  ? "bg-amber-100 text-amber-800"
-                  : "bg-muted text-muted-foreground"
-              }
-            >
-              {statusLabels[contract.status as ContractStatus]}
-            </Badge>
-            </div>
+          </div>
         </div>
 
-        <Card className="bg-white border-gray-200 relative overflow-hidden">
+        {/* Contract Document */}
+        <Card className="bg-white border-gray-200 shadow-lg relative overflow-hidden">
           {/* Official stamp overlay when signed */}
           {contract.status === "signed" && (
-            <div className="absolute top-8 right-8 z-10 pointer-events-none">
-              <div className="relative">
-                {/* Outer ring */}
-                <div className="w-32 h-32 rounded-full border-4 border-green-600 flex items-center justify-center transform rotate-[-15deg] opacity-80">
-                  {/* Inner content */}
-                  <div className="w-28 h-28 rounded-full border-2 border-green-600 flex flex-col items-center justify-center bg-white/90">
-                    <span className="text-green-600 font-bold text-xs tracking-wider">COPENHAGEN</span>
-                    <span className="text-green-600 font-bold text-xs tracking-wider">SALES</span>
-                    <div className="w-16 h-0.5 bg-green-600 my-1" />
-                    <span className="text-green-700 font-extrabold text-sm">GODKENDT</span>
-                    <div className="w-16 h-0.5 bg-green-600 my-1" />
-                    <span className="text-green-600 text-[10px] font-medium">
+            <div className="absolute top-6 right-6 z-10 pointer-events-none">
+              <div className="relative transform rotate-[-12deg]">
+                <div className="w-28 h-28 rounded-full border-[3px] border-green-600/80 flex items-center justify-center">
+                  <div className="w-24 h-24 rounded-full border-[2px] border-green-600/60 flex flex-col items-center justify-center bg-white/95">
+                    <span className="text-green-600 font-bold text-[9px] tracking-widest">COPENHAGEN</span>
+                    <span className="text-green-600 font-bold text-[9px] tracking-widest">SALES</span>
+                    <div className="w-12 h-0.5 bg-green-600/60 my-0.5" />
+                    <span className="text-green-700 font-black text-xs">GODKENDT</span>
+                    <div className="w-12 h-0.5 bg-green-600/60 my-0.5" />
+                    <span className="text-green-600 text-[8px] font-medium">
                       {format(new Date(), "dd.MM.yyyy")}
                     </span>
                   </div>
                 </div>
-                {/* Signature line effect */}
-                <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-20 h-1 bg-green-600/30 blur-sm" />
               </div>
             </div>
           )}
-          <CardHeader>
-            <CardTitle className="text-gray-900">{contract.title}</CardTitle>
+          
+          {/* Document Header */}
+          <div className="border-b border-gray-100 px-6 md:px-10 py-6 bg-gray-50/50">
+            <h1 className="text-xl md:text-2xl font-semibold text-gray-900">{contract.title}</h1>
             {contract.sent_at && (
-              <p className="text-sm text-gray-500">
-                Sendt {format(new Date(contract.sent_at), "d. MMMM yyyy", { locale: da })}
+              <p className="text-sm text-gray-500 mt-1">
+                Udsendt {format(new Date(contract.sent_at), "d. MMMM yyyy", { locale: da })}
               </p>
             )}
-          </CardHeader>
-          <CardContent>
-            <div className="bg-white rounded-lg border border-gray-200 p-8 md:p-12 shadow-sm">
-              <div
-                className="prose prose-lg max-w-none text-black prose-headings:text-center prose-headings:font-serif prose-headings:font-bold prose-headings:tracking-wide prose-h1:text-2xl prose-h1:mb-8 prose-p:text-sm prose-p:leading-relaxed [&_table]:w-full [&_table]:border-collapse [&_td]:py-2 [&_td]:pr-4 [&_td:first-child]:font-semibold [&_td:first-child]:w-24"
-                dangerouslySetInnerHTML={{ __html: contract.content }}
-              />
-            </div>
+          </div>
+          
+          {/* Document Content */}
+          <CardContent className="p-6 md:p-10">
+            <div
+              className="prose prose-sm md:prose-base max-w-none text-gray-800 
+                prose-headings:text-gray-900 prose-headings:font-semibold prose-headings:mt-8 prose-headings:mb-4
+                prose-h1:text-xl prose-h1:text-center prose-h1:mb-6 prose-h1:mt-0
+                prose-h2:text-lg prose-h2:border-b prose-h2:border-gray-200 prose-h2:pb-2
+                prose-h3:text-base
+                prose-p:leading-relaxed prose-p:text-gray-700
+                prose-strong:text-gray-900 prose-strong:font-semibold
+                prose-ul:my-4 prose-li:my-1
+                [&_table]:w-full [&_table]:border-collapse [&_table]:my-4 [&_table]:text-sm
+                [&_th]:bg-gray-50 [&_th]:text-left [&_th]:p-3 [&_th]:font-semibold [&_th]:border [&_th]:border-gray-200
+                [&_td]:p-3 [&_td]:border [&_td]:border-gray-200 [&_td]:align-top
+                [&_td:first-child]:font-medium [&_td:first-child]:text-gray-900 [&_td:first-child]:w-48
+                [&_.placeholder]:text-amber-600 [&_.placeholder]:bg-amber-50 [&_.placeholder]:px-1 [&_.placeholder]:rounded"
+              dangerouslySetInnerHTML={{ __html: contract.content }}
+            />
           </CardContent>
         </Card>
 
         {/* Signatures section */}
-        <Card className="bg-white border-gray-200">
-          <CardHeader>
-            <CardTitle className="text-lg text-gray-900">Underskrifter</CardTitle>
+        <Card className="bg-white border-gray-200 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-gray-500" />
+              Underskrifter
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {contract.signatures?.map((sig: any) => (
-              <div
-                key={sig.id}
-                className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
-              >
-                <div>
-                  <p className="font-medium text-gray-900">{sig.signer_name}</p>
-                  <p className="text-sm text-gray-500">
-                    {sig.signer_type === "employee" ? "Medarbejder" : "Leder"}
-                  </p>
+          <CardContent>
+            <div className="divide-y divide-gray-100">
+              {contract.signatures?.map((sig: any) => (
+                <div
+                  key={sig.id}
+                  className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-medium ${
+                      sig.signed_at 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {sig.signer_name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">{sig.signer_name}</p>
+                      <p className="text-xs text-gray-500">
+                        {sig.signer_type === "employee" ? "Medarbejder" : "Leder"}
+                      </p>
+                    </div>
+                  </div>
+                  {sig.signed_at ? (
+                    <div className="flex items-center gap-2 text-green-600">
+                      <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center">
+                        <Check className="h-3.5 w-3.5" />
+                      </div>
+                      <span className="text-xs text-gray-500">
+                        {format(new Date(sig.signed_at), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center">
+                        <Clock className="h-3.5 w-3.5 text-amber-600" />
+                      </div>
+                      <span className="text-xs text-amber-600 font-medium">Afventer</span>
+                    </div>
+                  )}
                 </div>
-                {sig.signed_at ? (
-                  <div className="flex items-center gap-2 text-green-600">
-                    <Check className="h-5 w-5" />
-                    <span className="text-sm">
-                      {format(new Date(sig.signed_at), "d. MMM yyyy HH:mm", { locale: da })}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-amber-600">
-                    <Clock className="h-5 w-5" />
-                    <span className="text-sm">Afventer</span>
-                  </div>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </CardContent>
         </Card>
 
