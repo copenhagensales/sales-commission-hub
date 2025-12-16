@@ -26,9 +26,14 @@ const getOwnerNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.closingShifts"), href: "/closing-shifts", icon: Lock },
 ];
 
+// Personale (Personnel) submenu navigation
+const getPersonnelNavigation = (t: (key: string) => string) => [
+  { name: t("sidebar.employees"), href: "/employees", icon: Users },
+  { name: t("sidebar.teams"), href: "/teams", icon: Users },
+];
+
 // Ledelse (Management) submenu navigation
 const getLedelseNavigation = (t: (key: string) => string) => [
-  { name: t("sidebar.employees"), href: "/employees", icon: Users },
   { name: t("sidebar.contracts"), href: "/contracts", icon: FileText },
   { name: t("sidebar.permissions"), href: "/permissions", icon: Shield },
   { name: t("sidebar.careerWishesOverview"), href: "/career-wishes-overview", icon: Sparkles },
@@ -160,7 +165,10 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const [ledelseOpen, setLedelseOpen] = useState(
-    ["/employees", "/contracts", "/permissions", "/career-wishes-overview"].some(p => location.pathname.startsWith(p))
+    ["/contracts", "/permissions", "/career-wishes-overview"].some(p => location.pathname.startsWith(p))
+  );
+  const [personnelOpen, setPersonnelOpen] = useState(
+    ["/employees", "/teams"].some(p => location.pathname.startsWith(p))
   );
   const [mgOpen, setMgOpen] = useState(
     ["/payroll", "/tdc-erhverv", "/codan", "/mg-test", "/mg-test-dashboard", "/dialer-data", "/adversus-data", "/calls-data"].includes(location.pathname)
@@ -412,6 +420,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const recruitmentNav = getRecruitmentNavigation(t);
   const testNav = getTestNavigation(t);
   const ledelseNav = getLedelseNavigation(t);
+  const personnelNav = getPersonnelNavigation(t);
 
   const handleNavClick = () => {
     if (isMobile && onNavigate) {
@@ -492,12 +501,49 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             );
           })}
 
+          {/* Personale (Personnel) menu - owner only */}
+          {isOwner && (
+            <Collapsible open={personnelOpen} onOpenChange={setPersonnelOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                ["/employees", "/teams"].some(p => location.pathname.startsWith(p)) 
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <Users className="h-5 w-5" />
+                  {t("sidebar.personnel")}
+                </div>
+                {personnelOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {personnelNav.map((item) => {
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      onClick={handleNavClick}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                        isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.name}
+                    </NavLink>
+                  );
+                })}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
           {/* Ledelse (Management) menu - owner only */}
           {isOwner && (
             <Collapsible open={ledelseOpen} onOpenChange={setLedelseOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                ["/employees", "/contracts", "/permissions", "/career-wishes-overview"].some(p => location.pathname.startsWith(p)) 
+                ["/contracts", "/permissions", "/career-wishes-overview"].some(p => location.pathname.startsWith(p)) 
                   ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>

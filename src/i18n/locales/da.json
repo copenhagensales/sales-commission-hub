@@ -65,7 +65,8 @@
     "new": "Ny",
     "bookings": "Bookinger",
     "permissions": "Rettigheder",
-    "management": "Ledelse"
+    "management": "Ledelse",
+    "personnel": "Personale"
   },
   "dialerIntegrations": {
     "title": "Dialer Integrationer",
