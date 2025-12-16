@@ -5,17 +5,32 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, RefreshCw, Calendar } from "lucide-react"
+import { Loader2, RefreshCw, Calendar, Eye } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client"
 import { toast } from "sonner"
+import { format } from "date-fns"
+
+type LeadDetail = {
+  id: string
+  vendor: string
+  customerName: string
+  customerPhone: string
+  saleTime: string
+  internetUnits: number
+  subscriptionUnits: number
+  closure: string
+  agent: string
+}
 
 type VendorStats = { 
   vendor: string
   successLeads: number
   internetUnits: number
   subscriptionUnits: number
-  missingSubscriptionKeys: number 
+  missingSubscriptionKeys: number
+  sales: LeadDetail[]
 }
 
 interface DialerIntegration {
@@ -39,6 +54,7 @@ export default function ClientSalesOverview() {
   const [date, setDate] = useState<string>(ymdLocal(Date.now()))
   const [loading, setLoading] = useState<boolean>(false)
   const [rows, setRows] = useState<VendorStats[]>([])
+  const [selectedVendor, setSelectedVendor] = useState<VendorStats | null>(null)
 
   // Fetch available Enreach integrations
   const { data: integrations, isLoading: loadingIntegrations } = useQuery({
@@ -99,147 +115,220 @@ export default function ClientSalesOverview() {
     }
   }
 
-  const selectedIntegration = integrations?.find(i => i.id === selectedIntegrationId)
   const totalSuccessLeads = rows.reduce((sum, r) => sum + r.successLeads, 0)
   const totalInternetUnits = rows.reduce((sum, r) => sum + r.internetUnits, 0)
   const totalSubscriptionUnits = rows.reduce((sum, r) => sum + r.subscriptionUnits, 0)
 
+  const formatDateTime = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr.includes(" ") ? dateStr.replace(" ", "T") : dateStr)
+      return format(d, "HH:mm")
+    } catch {
+      return dateStr
+    }
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calendar className="h-5 w-5" />
-          Client Sales Overview
-        </CardTitle>
-        <CardDescription>
-          Hent salgsdata fra Enreach for en specifik dato og se statistik pr. leverandør
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Configuration */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Integration</label>
-            <Select 
-              value={selectedIntegrationId} 
-              onValueChange={setSelectedIntegrationId}
-              disabled={loadingIntegrations}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={loadingIntegrations ? "Henter..." : "Vælg integration"} />
-              </SelectTrigger>
-              <SelectContent>
-                {integrations?.map((integration) => (
-                  <SelectItem key={integration.id} value={integration.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{integration.name}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {integration.provider}
-                      </Badge>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Dato</label>
-            <Input 
-              type="date"
-              value={date} 
-              onChange={(e) => setDate(e.target.value)} 
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label className="text-sm font-medium">&nbsp;</label>
-            <Button 
-              onClick={fetchData} 
-              disabled={loading || !selectedIntegrationId}
-              className="w-full"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Henter...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Hent data
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Summary Cards */}
-        {rows.length > 0 && (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Client Sales Overview
+          </CardTitle>
+          <CardDescription>
+            Hent salgsdata fra Enreach for en specifik dato og se statistik pr. leverandør
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Configuration */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-2xl font-bold">{totalSuccessLeads}</div>
-                <p className="text-sm text-muted-foreground">Success Leads</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-2xl font-bold">{totalInternetUnits}</div>
-                <p className="text-sm text-muted-foreground">Internet Units</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-2xl font-bold">{totalSubscriptionUnits}</div>
-                <p className="text-sm text-muted-foreground">Subscription Units</p>
-              </CardContent>
-            </Card>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Integration</label>
+              <Select 
+                value={selectedIntegrationId} 
+                onValueChange={setSelectedIntegrationId}
+                disabled={loadingIntegrations}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingIntegrations ? "Henter..." : "Vælg integration"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {integrations?.map((integration) => (
+                    <SelectItem key={integration.id} value={integration.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{integration.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {integration.provider}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Dato</label>
+              <Input 
+                type="date"
+                value={date} 
+                onChange={(e) => setDate(e.target.value)} 
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">&nbsp;</label>
+              <Button 
+                onClick={fetchData} 
+                disabled={loading || !selectedIntegrationId}
+                className="w-full"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Henter...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Hent data
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-        )}
 
-        {/* Results Table */}
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Leverandør</TableHead>
-                <TableHead className="text-right">Success Leads</TableHead>
-                <TableHead className="text-right">Internet Units</TableHead>
-                <TableHead className="text-right">Subscription Units</TableHead>
-                <TableHead className="text-right">Missing Keys</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
+          {/* Summary Cards */}
+          {rows.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="text-2xl font-bold">{totalSuccessLeads}</div>
+                  <p className="text-sm text-muted-foreground">Success Leads</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="text-2xl font-bold">{totalInternetUnits}</div>
+                  <p className="text-sm text-muted-foreground">Internet Units</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="text-2xl font-bold">{totalSubscriptionUnits}</div>
+                  <p className="text-sm text-muted-foreground">Subscription Units</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Results Table */}
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    {loading ? "Henter data..." : "Ingen data - vælg integration og dato, og klik 'Hent data'"}
-                  </TableCell>
+                  <TableHead>Leverandør</TableHead>
+                  <TableHead className="text-right">Success Leads</TableHead>
+                  <TableHead className="text-right">Internet Units</TableHead>
+                  <TableHead className="text-right">Subscription Units</TableHead>
+                  <TableHead className="text-right">Missing Keys</TableHead>
+                  <TableHead className="text-center">Detaljer</TableHead>
                 </TableRow>
-              ) : (
-                rows.map((r) => (
-                  <TableRow key={r.vendor || "unknown"}>
-                    <TableCell className="font-medium">
-                      {r.vendor || <span className="text-muted-foreground">-</span>}
-                    </TableCell>
-                    <TableCell className="text-right">{r.successLeads}</TableCell>
-                    <TableCell className="text-right">{r.internetUnits}</TableCell>
-                    <TableCell className="text-right">{r.subscriptionUnits}</TableCell>
-                    <TableCell className="text-right">
-                      {r.missingSubscriptionKeys > 0 ? (
-                        <Badge variant="destructive">{r.missingSubscriptionKeys}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">0</span>
-                      )}
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      {loading ? "Henter data..." : "Ingen data - vælg integration og dato, og klik 'Hent data'"}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+                ) : (
+                  rows.map((r) => (
+                    <TableRow key={r.vendor || "unknown"} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedVendor(r)}>
+                      <TableCell className="font-medium">
+                        {r.vendor || <span className="text-muted-foreground">-</span>}
+                      </TableCell>
+                      <TableCell className="text-right">{r.successLeads}</TableCell>
+                      <TableCell className="text-right">{r.internetUnits}</TableCell>
+                      <TableCell className="text-right">{r.subscriptionUnits}</TableCell>
+                      <TableCell className="text-right">
+                        {r.missingSubscriptionKeys > 0 ? (
+                          <Badge variant="destructive">{r.missingSubscriptionKeys}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">0</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedVendor(r); }}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sales Detail Dialog */}
+      <Dialog open={!!selectedVendor} onOpenChange={(open) => !open && setSelectedVendor(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Salg for: {selectedVendor?.vendor || "Ukendt leverandør"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedVendor?.successLeads || 0} salg fundet
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tidspunkt</TableHead>
+                  <TableHead>Kunde</TableHead>
+                  <TableHead>Telefon</TableHead>
+                  <TableHead>Sælger</TableHead>
+                  <TableHead className="text-right">Internet</TableHead>
+                  <TableHead className="text-right">Abonnementer</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedVendor?.sales.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      Ingen salg at vise
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  selectedVendor?.sales.map((sale, idx) => (
+                    <TableRow key={sale.id || idx}>
+                      <TableCell className="font-mono text-sm">
+                        {formatDateTime(sale.saleTime)}
+                      </TableCell>
+                      <TableCell>{sale.customerName || <span className="text-muted-foreground">-</span>}</TableCell>
+                      <TableCell className="font-mono text-sm">{sale.customerPhone || "-"}</TableCell>
+                      <TableCell>{sale.agent || <span className="text-muted-foreground">-</span>}</TableCell>
+                      <TableCell className="text-right">{sale.internetUnits}</TableCell>
+                      <TableCell className="text-right">{sale.subscriptionUnits}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {sale.closure || "success"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
