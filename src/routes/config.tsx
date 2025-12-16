@@ -63,6 +63,7 @@ import {
   TimeStamp,
   TestBoard,
   EconomicBoard,
+  ClientSalesOverview,
   SalesDashboard,
   ClosingShifts,
   Permissions,
@@ -161,6 +162,7 @@ export const routes: RouteConfig[] = [
 
   { path: "/boards/test", component: TestBoard, access: "public" },
   { path: "/boards/economic", component: EconomicBoard, access: "public" },
+  { path: "/client-sales-overview", component: ClientSalesOverview, access: "role", requireTeamlederOrAbove: true },
   { path: "/boards/sales", component: SalesDashboard, access: "public" },
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
 
@@ -170,4 +172,3 @@ export const routes: RouteConfig[] = [
   { path: "/permissions", component: Permissions, access: "role", requiredRole: "ejer" },
   { path: "*", component: NotFound, access: "public" },
 ];
-
