@@ -26,9 +26,9 @@ const getOwnerNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.careerWishesOverview"), href: "/career-wishes-overview", icon: Sparkles },
   { name: t("sidebar.some"), href: "/some", icon: Video },
   { name: t("sidebar.sales"), href: "/sales", icon: ShoppingCart },
-  
   { name: t("sidebar.logics"), href: "/logikker", icon: ListChecks },
   { name: t("sidebar.closingShifts"), href: "/closing-shifts", icon: Lock },
+  { name: t("sidebar.permissions"), href: "/permissions", icon: Shield },
 ];
 
 // Test submenu navigation (Bil Quiz Admin, Code of Conduct Admin, Pulse Survey Results)

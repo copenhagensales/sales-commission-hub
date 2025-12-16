@@ -63,7 +63,8 @@
     "codeOfConduct": "Code of Conduct",
     "timeClock": "Time Clock",
     "new": "New",
-    "bookings": "Bookings"
+    "bookings": "Bookings",
+    "permissions": "Permissions"
   },
   "dialerIntegrations": {
     "title": "Dialer Integrations",

@@ -63,7 +63,8 @@
     "codeOfConduct": "Code of Conduct",
     "timeClock": "Stempelur",
     "new": "Ny",
-    "bookings": "Bookinger"
+    "bookings": "Bookinger",
+    "permissions": "Rettigheder"
   },
   "dialerIntegrations": {
     "title": "Dialer Integrationer",
