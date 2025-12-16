@@ -1,5 +1,6 @@
 {
   "sidebar": {
+    "closingShifts": "Lukkevagter",
     "loading": "Indlæser...",
     "logout": "Log ud",
     "employees": "Medarbejdere",
@@ -62,7 +63,9 @@
     "codeOfConduct": "Code of Conduct",
     "timeClock": "Stempelur",
     "new": "Ny",
-    "bookings": "Bookinger"
+    "bookings": "Bookinger",
+    "permissions": "Rettigheder",
+    "management": "Ledelse"
   },
   "dialerIntegrations": {
     "title": "Dialer Integrationer",

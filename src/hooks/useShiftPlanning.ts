@@ -446,7 +446,7 @@ export function useEmployeesForShifts(department?: string) {
       
       let query = supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id")
+        .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount")
         .eq("is_active", true)
         .order("first_name");
 

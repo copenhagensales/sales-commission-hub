@@ -19,14 +19,34 @@ function getHeatmapColor(value: number): string {
   }
 }
 
+// Color scale for NPS (-100 to +100)
+function getNpsColor(nps: number): string {
+  if (nps < 0) {
+    return `hsl(0 70% ${45 + Math.min(nps + 50, 50) * 0.2}%)`;
+  } else if (nps < 30) {
+    return `hsl(${nps * 2} 70% 50%)`;
+  } else {
+    return `hsl(${60 + Math.min(nps - 30, 70) * 0.85} 70% ${42 - Math.min(nps - 30, 70) * 0.1}%)`;
+  }
+}
+
 function getTextColor(value: number): string {
   return value >= 4 && value <= 7 ? 'hsl(0 0% 10%)' : 'hsl(0 0% 100%)';
 }
 
+// Calculate NPS from individual scores (% promoters - % detractors)
+function calculateNps(scores: number[]): number {
+  if (scores.length === 0) return 0;
+  const promoters = scores.filter(s => s >= 9).length;
+  const detractors = scores.filter(s => s <= 6).length;
+  const nps = ((promoters - detractors) / scores.length) * 100;
+  return Math.round(nps);
+}
+
 export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps) {
-  const { heatmapData, teamsWithResponses, scoreKeys, overallAverages } = useMemo(() => {
+  const { heatmapData, teamsWithResponses, scoreKeys, overallAverages, responseCountByTeam, totalResponses } = useMemo(() => {
     if (!responses || responses.length === 0 || !teams || teams.length === 0) {
-      return { heatmapData: {}, teamsWithResponses: [], scoreKeys: [], overallAverages: {} };
+      return { heatmapData: {}, teamsWithResponses: [], scoreKeys: [], overallAverages: {}, responseCountByTeam: {}, totalResponses: 0 };
     }
 
     // Include NPS in the heatmap (put it first)
@@ -36,6 +56,12 @@ export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps
     const teamsWithResponses = teams.filter(team => 
       responses.some(r => r.team_id === team.id)
     );
+
+    // Calculate response count per team
+    const responseCountByTeam: Record<string, number> = {};
+    teamsWithResponses.forEach(team => {
+      responseCountByTeam[team.id] = responses.filter(r => r.team_id === team.id).length;
+    });
 
     // Calculate averages per team per question
     const heatmapData: Record<string, Record<string, number>> = {};
@@ -48,7 +74,12 @@ export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps
       scoreKeys.forEach(key => {
         const values = teamResponses.map(r => r[key]).filter(v => typeof v === 'number');
         if (values.length > 0) {
-          heatmapData[team.id][key] = Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10;
+          // For nps_score, calculate actual NPS instead of average
+          if (key === 'nps_score') {
+            heatmapData[team.id][key] = calculateNps(values);
+          } else {
+            heatmapData[team.id][key] = Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10;
+          }
         }
       });
     });
@@ -57,11 +88,16 @@ export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps
     scoreKeys.forEach(key => {
       const values = responses.map(r => r[key]).filter(v => typeof v === 'number');
       if (values.length > 0) {
-        overallAverages[key] = Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10;
+        // For nps_score, calculate actual NPS instead of average
+        if (key === 'nps_score') {
+          overallAverages[key] = calculateNps(values);
+        } else {
+          overallAverages[key] = Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10;
+        }
       }
     });
 
-    return { heatmapData, teamsWithResponses, scoreKeys, overallAverages };
+    return { heatmapData, teamsWithResponses, scoreKeys, overallAverages, responseCountByTeam, totalResponses: responses.length };
   }, [responses, teams, questionData]);
 
   if (teamsWithResponses.length === 0) {
@@ -87,18 +123,27 @@ export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps
               <thead>
                 <tr>
                   <th className="text-left p-2 text-sm font-medium border-b">Team</th>
-                  {scoreKeys.map(key => (
-                    <Tooltip key={key}>
-                      <TooltipTrigger asChild>
-                        <th className="text-center p-2 text-xs font-medium border-b cursor-help min-w-[60px]">
-                          {questionData[key]?.label || key}
-                        </th>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="text-sm">{questionData[key]?.fullQuestion}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
+                  <th className="text-center p-2 text-xs font-medium border-b min-w-[50px]">n</th>
+                  {scoreKeys.map(key => {
+                    const isNps = key === 'nps_score';
+                    const label = isNps ? 'eNPS' : (questionData[key]?.label || key);
+                    const tooltip = isNps 
+                      ? 'Net Promoter Score: % Promoters (9-10) minus % Detractors (0-6). Skala: -100 til +100'
+                      : questionData[key]?.fullQuestion;
+                    
+                    return (
+                      <Tooltip key={key}>
+                        <TooltipTrigger asChild>
+                          <th className="text-center p-2 text-xs font-medium border-b cursor-help min-w-[60px]">
+                            {label}
+                          </th>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-sm">{tooltip}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
                   <th className="text-center p-2 text-xs font-medium border-b min-w-[60px]">Snit</th>
                 </tr>
               </thead>
@@ -109,20 +154,30 @@ export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps
                     ? Math.round((teamValues.reduce((a, b) => a + b, 0) / teamValues.length) * 10) / 10 
                     : 0;
                   
-                  return (
-                    <tr key={team.id}>
-                      <td className="p-2 text-sm font-medium border-b">{team.name}</td>
+                    return (
+                      <tr key={team.id}>
+                        <td className="p-2 text-sm font-medium border-b">{team.name}</td>
+                        <td className="text-center p-2 text-sm border-b text-muted-foreground">{responseCountByTeam[team.id]}</td>
                       {scoreKeys.map(key => {
                         const value = heatmapData[team.id]?.[key];
+                        const isNps = key === 'nps_score';
                         const displayValue = value !== undefined ? value : '-';
+                        
+                        // Use different color scale for NPS
+                        const bgColor = value !== undefined 
+                          ? (isNps ? getNpsColor(value) : getHeatmapColor(value))
+                          : 'transparent';
+                        const textColor = value !== undefined 
+                          ? 'hsl(0 0% 100%)'
+                          : 'inherit';
                         
                         return (
                           <td 
                             key={key} 
                             className="text-center p-2 border-b transition-all"
                             style={{ 
-                              backgroundColor: value !== undefined ? getHeatmapColor(value) : 'transparent',
-                              color: value !== undefined ? getTextColor(value) : 'inherit'
+                              backgroundColor: bgColor,
+                              color: textColor
                             }}
                           >
                             <span className="font-semibold text-sm">{displayValue}</span>
@@ -144,15 +199,23 @@ export function TeamHeatmap({ responses, teams, questionData }: TeamHeatmapProps
                 {/* Overall average row */}
                 <tr className="bg-muted/50">
                   <td className="p-2 text-sm font-bold border-t-2">Gennemsnit</td>
+                  <td className="text-center p-2 text-sm border-t-2 font-bold">{totalResponses}</td>
                   {scoreKeys.map(key => {
                     const value = overallAverages[key];
+                    const isNps = key === 'nps_score';
+                    
+                    // Use different color scale for NPS
+                    const bgColor = value !== undefined 
+                      ? (isNps ? getNpsColor(value) : getHeatmapColor(value))
+                      : 'transparent';
+                    
                     return (
                       <td 
                         key={key} 
                         className="text-center p-2 border-t-2"
                         style={{ 
-                          backgroundColor: value !== undefined ? getHeatmapColor(value) : 'transparent',
-                          color: value !== undefined ? getTextColor(value) : 'inherit'
+                          backgroundColor: bgColor,
+                          color: value !== undefined ? 'hsl(0 0% 100%)' : 'inherit'
                         }}
                       >
                         <span className="font-bold text-sm">{value ?? '-'}</span>

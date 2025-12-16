@@ -856,6 +856,39 @@ export type Database = {
         }
         Relationships: []
       }
+      closing_shifts: {
+        Row: {
+          created_at: string
+          email: string | null
+          employee_name: string | null
+          id: string
+          phone: string | null
+          tasks: string | null
+          updated_at: string
+          weekday: number
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          employee_name?: string | null
+          id?: string
+          phone?: string | null
+          tasks?: string | null
+          updated_at?: string
+          weekday: number
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          employee_name?: string | null
+          id?: string
+          phone?: string | null
+          tasks?: string | null
+          updated_at?: string
+          weekday?: number
+        }
+        Relationships: []
+      }
       code_of_conduct_attempts: {
         Row: {
           answers: Json
@@ -4019,6 +4052,7 @@ export type Database = {
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_owner_only: { Args: { _user_id: string }; Returns: boolean }
       is_rekruttering: { Args: { _user_id: string }; Returns: boolean }
+      is_some: { Args: { _user_id: string }; Returns: boolean }
       is_teamleder_or_above: { Args: { _user_id: string }; Returns: boolean }
       is_vagt_admin_or_planner: { Args: { _user_id: string }; Returns: boolean }
       remove_role_by_email: { Args: { _email: string }; Returns: undefined }
@@ -4035,9 +4069,9 @@ export type Database = {
       schedule_integration_sync: {
         Args: {
           p_anon_key: string
-          p_client_id: string
           p_function_url: string
           p_job_name: string
+          p_payload?: Json
           p_schedule: string
         }
         Returns: number

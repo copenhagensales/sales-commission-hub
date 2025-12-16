@@ -1,5 +1,6 @@
 {
   "sidebar": {
+    "closingShifts": "Closing Shifts",
     "loading": "Loading...",
     "logout": "Log out",
     "employees": "Employees",
@@ -62,7 +63,9 @@
     "codeOfConduct": "Code of Conduct",
     "timeClock": "Time Clock",
     "new": "New",
-    "bookings": "Bookings"
+    "bookings": "Bookings",
+    "permissions": "Permissions",
+    "management": "Management"
   },
   "dialerIntegrations": {
     "title": "Dialer Integrations",

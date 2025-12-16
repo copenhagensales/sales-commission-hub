@@ -81,26 +81,48 @@ export class AdversusWebhookParser implements WebhookParser {
     const leadId = formData['leadid'] || formData['lead_id'] || '0';
     const externalReference = formData['OPP nr'] || formData['ordre_id'] || formData['orderId'] || null;
     
+    // Extract all phone number fields that might exist
+    const customerPhone = formData['Live Nummer'] || 
+                         formData['Kontakt nummer'] || 
+                         formData['Telefonnummer1'] ||
+                         formData['phone'] || 
+                         formData['telefon'] ||
+                         '';
+    
+    // Extract agent info from form data - more thorough search
+    const agentId = formData['userid'] || formData['user_id'] || formData['agentid'] || '';
+    const agentName = formData['username'] || formData['user_name'] || formData['agentname'] || '';
+    const agentEmail = formData['useremail'] || formData['user_email'] || formData['agentemail'] || '';
+    
+    // Extract campaign info
+    const campaignId = formData['campaign_id'] || formData['campaignid'] || formData['campaign'] || '';
+    const campaignName = formData['campaign_name'] || formData['campaignname'] || '';
+    
+    // Extract customer info
+    const customerCompany = formData['company'] || formData['CVR'] || formData['Efternavn'] || '';
+    const customerName = formData['NAVN FF Forsikring'] || formData['customer_name'] || formData['navn'] || '';
+    
     return {
       externalId: leadId,
+      leadId: leadId, // Store leadId explicitly for deduplication
       eventType: formData['status'] || 'leadClosedSuccess',
       eventTime: new Date().toISOString(),
       
-      agentId: formData['userid'] || formData['user_id'] || '',
-      agentName: formData['username'] || formData['user_name'] || '',
-      agentEmail: formData['useremail'] || formData['user_email'] || '',
+      agentId,
+      agentName,
+      agentEmail,
       
-      campaignId: formData['campaign_id'] || formData['campaignid'] || '',
-      campaignName: formData['campaign_name'] || formData['campaignname'] || '',
+      campaignId,
+      campaignName,
       
-      customerPhone: formData['Live Nummer'] || formData['Kontakt nummer'] || formData['phone'] || '',
-      customerCompany: formData['company'] || formData['CVR'] || '',
+      customerPhone,
+      customerCompany: customerCompany || customerName,
       
       externalReference,
       
       products: [], // Form data doesn't typically include products
       
-      rawPayload: formData,
+      rawPayload: formData, // Store ALL form data for debugging
     };
   }
 
@@ -119,6 +141,9 @@ export class AdversusWebhookParser implements WebhookParser {
       ) || null;
     }
     
+    const leadId = payload.lead?.id ? String(payload.lead.id) : undefined;
+    
+    // Prefer result_id as it's unique per sale, fall back to leadId
     const externalId = String(
       payload.result_id || 
       payload.lead?.id || 
@@ -134,6 +159,7 @@ export class AdversusWebhookParser implements WebhookParser {
 
     return {
       externalId,
+      leadId, // Store leadId for deduplication with API sync
       eventType: body.type || 'result',
       eventTime: body.event_time || new Date().toISOString(),
       

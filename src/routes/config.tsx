@@ -7,7 +7,7 @@ import {
   Payroll,
   Wallboard,
   Settings,
-  Commission,
+  
   MgTest,
   MgTestDashboard,
   KmTest,
@@ -21,7 +21,6 @@ import {
   EmployeeMasterData,
   EmployeeDetail,
   EmployeeOnboarding,
-  Teams,
   VagtFlowIndex,
   VagtBookWeek,
   VagtLocations,
@@ -65,6 +64,9 @@ import {
   TestBoard,
   EconomicBoard,
   ClientSalesOverview,
+  SalesDashboard,
+  ClosingShifts,
+  Permissions,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -92,7 +94,7 @@ export const routes: RouteConfig[] = [
   { path: "/sales", component: Sales, access: "role", requireTeamlederOrAbove: true },
   { path: "/codan", component: Codan, access: "role", requireTeamlederOrAbove: true },
   { path: "/tdc-erhverv", component: TdcErhverv, access: "role", requireTeamlederOrAbove: true },
-  { path: "/commission-cpo", component: Commission, access: "role", requireTeamlederOrAbove: true },
+  
   { path: "/payroll", component: Payroll, access: "role", requireTeamlederOrAbove: true },
   { path: "/mg-test", component: MgTest, access: "role", requireTeamlederOrAbove: true },
   { path: "/mg-test-dashboard", component: MgTestDashboard, access: "role", requireTeamlederOrAbove: true },
@@ -103,7 +105,6 @@ export const routes: RouteConfig[] = [
   { path: "/logikker", component: Logikker, access: "role", requireTeamlederOrAbove: true },
   { path: "/employees", component: EmployeeMasterData, access: "role", requireTeamlederOrAbove: true },
   { path: "/employees/:id", component: EmployeeDetail, access: "role", requireTeamlederOrAbove: true },
-  { path: "/teams", component: Teams, access: "role", requireTeamlederOrAbove: true },
   { path: "/settings", component: Settings, access: "role", requireTeamlederOrAbove: true },
 
   {
@@ -162,8 +163,12 @@ export const routes: RouteConfig[] = [
   { path: "/boards/test", component: TestBoard, access: "public" },
   { path: "/boards/economic", component: EconomicBoard, access: "public" },
   { path: "/client-sales-overview", component: ClientSalesOverview, access: "role", requireTeamlederOrAbove: true },
+  { path: "/boards/sales", component: SalesDashboard, access: "public" },
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
 
+  { path: "/closing-shifts", component: ClosingShifts, access: "role", requireTeamlederOrAbove: true },
+
   { path: "/admin", component: Admin, access: "role", requiredRole: "ejer" },
+  { path: "/permissions", component: Permissions, access: "role", requiredRole: "ejer" },
   { path: "*", component: NotFound, access: "public" },
 ];
