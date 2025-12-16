@@ -187,6 +187,24 @@ serve(async (req) => {
       return `${y}-${m}-${dy}`; 
     }
 
+    // Helper to get value from object with multiple key variations
+    // deno-lint-ignore no-explicit-any
+    function getStr(obj: Record<string, any> | null | undefined, keys: string[], fallback = ""): string {
+      if (!obj || typeof obj !== "object") return fallback;
+      for (const key of keys) {
+        if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") {
+          return String(obj[key]);
+        }
+        const lowerKey = key.toLowerCase();
+        for (const objKey of Object.keys(obj)) {
+          if (objKey.toLowerCase() === lowerKey && obj[objKey] !== undefined && obj[objKey] !== null && obj[objKey] !== "") {
+            return String(obj[objKey]);
+          }
+        }
+      }
+      return fallback;
+    }
+
     // deno-lint-ignore no-explicit-any
     function chooseSaleTime(l: any): string | undefined {
       const lm = l.lastModifiedTime as string | undefined;
@@ -233,11 +251,36 @@ serve(async (req) => {
         vstats.internetUnits += internetQty;
         vstats.subscriptionUnits += subsQty;
         
-        // Add sale detail
-        const leadId = String(l.leadId ?? l.id ?? "");
-        const customerName = String(dataObj?.["Navn"] ?? dataObj?.["navn"] ?? dataObj?.["Kundenavn"] ?? "").trim();
-        const customerPhone = String(l.phone ?? l.Phone ?? dataObj?.["Telefon"] ?? "").trim();
-        const agent = String(l.lastModifiedByUser?.name ?? l.lastModifiedBy ?? dataObj?.["Sælger"] ?? "").trim();
+        // Extract customer name - same pattern as EnreachAdapter
+        const firstName = getStr(dataObj, ["Navn1", "FirstName", "Fornavn"]);
+        const lastName = getStr(dataObj, ["Navn2", "LastName", "Efternavn"]);
+        let customerName = [firstName, lastName].filter(Boolean).join(" ").trim();
+        if (!customerName) {
+          customerName = getStr(dataObj, ["Navn", "Name", "Company", "Firma", "Kundenavn"]);
+        }
+        
+        // Extract customer phone
+        const customerPhone = getStr(dataObj, ["Telefon1", "Telefon", "Phone", "Mobile", "Mobil"]) ||
+                              getStr(l, ["phone", "Phone"]);
+        
+        // Extract agent info - check firstProcessedByUser and lastModifiedByUser objects
+        // deno-lint-ignore no-explicit-any
+        const firstProcessedByUser = (l.firstProcessedByUser || l.FirstProcessedByUser) as Record<string, any> | undefined;
+        // deno-lint-ignore no-explicit-any
+        const lastModifiedByUser = (l.lastModifiedByUser || l.LastModifiedByUser) as Record<string, any> | undefined;
+        
+        let agent = getStr(firstProcessedByUser, ["name", "Name", "fullName"]);
+        if (!agent) {
+          agent = getStr(lastModifiedByUser, ["name", "Name", "fullName"]);
+        }
+        if (!agent) {
+          agent = getStr(firstProcessedByUser, ["orgCode"]) || getStr(lastModifiedByUser, ["orgCode"]);
+        }
+        if (!agent) {
+          agent = getStr(dataObj, ["Sælger", "saelger", "Agent", "agent"]);
+        }
+        
+        const leadId = String(l.leadId ?? l.uniqueId ?? l.UniqueId ?? l.id ?? "");
         const closure = String(l.closure ?? l.Closure ?? "").trim();
         
         vstats.sales.push({
