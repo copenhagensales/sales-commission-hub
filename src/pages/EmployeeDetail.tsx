@@ -674,15 +674,6 @@ export default function EmployeeDetail() {
                     displayValue={employee.job_title}
                   />
                   <SelectRow 
-                    label="Afdeling" 
-                    value={employee.department} 
-                    field="department" 
-                    options={clients.map(c => ({ value: c.name, label: c.name }))}
-                    onSave={handleSave}
-                    displayValue={employee.department}
-                    allowClear
-                  />
-                  <SelectRow 
                     label="Arbejdssted" 
                     value={employee.work_location} 
                     field="work_location" 
