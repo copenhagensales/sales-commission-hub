@@ -64,7 +64,8 @@
     "timeClock": "Stempelur",
     "new": "Ny",
     "bookings": "Bookinger",
-    "permissions": "Rettigheder"
+    "permissions": "Rettigheder",
+    "management": "Ledelse"
   },
   "dialerIntegrations": {
     "title": "Dialer Integrationer",

@@ -19,15 +19,19 @@ import { useTranslation } from "react-i18next";
 
 // Navigation items - using translation keys instead of hardcoded names
 const getOwnerNavigation = (t: (key: string) => string) => [
-  { name: t("sidebar.employees"), href: "/employees", icon: Users },
-  { name: t("sidebar.contracts"), href: "/contracts", icon: FileText },
   { name: t("sidebar.myContracts"), href: "/my-contracts", icon: FileText },
-  { name: t("sidebar.careerWishesOverview"), href: "/career-wishes-overview", icon: Sparkles },
   { name: t("sidebar.some"), href: "/some", icon: Video },
   { name: t("sidebar.sales"), href: "/sales", icon: ShoppingCart },
   { name: t("sidebar.logics"), href: "/logikker", icon: ListChecks },
   { name: t("sidebar.closingShifts"), href: "/closing-shifts", icon: Lock },
+];
+
+// Ledelse (Management) submenu navigation
+const getLedelseNavigation = (t: (key: string) => string) => [
+  { name: t("sidebar.employees"), href: "/employees", icon: Users },
+  { name: t("sidebar.contracts"), href: "/contracts", icon: FileText },
   { name: t("sidebar.permissions"), href: "/permissions", icon: Shield },
+  { name: t("sidebar.careerWishesOverview"), href: "/career-wishes-overview", icon: Sparkles },
 ];
 
 // Test submenu navigation (Bil Quiz Admin, Code of Conduct Admin, Pulse Survey Results)
@@ -155,6 +159,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
+  const [ledelseOpen, setLedelseOpen] = useState(
+    ["/employees", "/contracts", "/permissions", "/career-wishes-overview"].some(p => location.pathname.startsWith(p))
+  );
   const [mgOpen, setMgOpen] = useState(
     ["/payroll", "/tdc-erhverv", "/codan", "/mg-test", "/mg-test-dashboard", "/dialer-data", "/adversus-data", "/calls-data"].includes(location.pathname)
   );
@@ -404,6 +411,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const boardsNav = getBoardsNavigation(t);
   const recruitmentNav = getRecruitmentNavigation(t);
   const testNav = getTestNavigation(t);
+  const ledelseNav = getLedelseNavigation(t);
 
   const handleNavClick = () => {
     if (isMobile && onNavigate) {
@@ -483,6 +491,43 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               </NavLink>
             );
           })}
+
+          {/* Ledelse (Management) menu - owner only */}
+          {isOwner && (
+            <Collapsible open={ledelseOpen} onOpenChange={setLedelseOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                ["/employees", "/contracts", "/permissions", "/career-wishes-overview"].some(p => location.pathname.startsWith(p)) 
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <Crown className="h-5 w-5" />
+                  {t("sidebar.management")}
+                </div>
+                {ledelseOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {ledelseNav.map((item) => {
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      onClick={handleNavClick}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                        isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.name}
+                    </NavLink>
+                  );
+                })}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           {/* Firmabil menu item for Fieldmarketing employees */}
           {isFieldmarketing && !isTeamlederOrAbove && (
