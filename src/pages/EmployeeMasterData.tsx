@@ -19,6 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useCanAccess } from "@/hooks/useSystemRoles";
 import { EmployeeExcelImport } from "@/components/employees/EmployeeExcelImport";
+import { DialerMappingTab } from "@/components/employees/DialerMappingTab";
 
 
 interface EmployeeMasterDataRecord {
@@ -804,6 +805,7 @@ export default function EmployeeMasterData() {
         <Tabs defaultValue="all-employees" className="space-y-6">
           <TabsList>
             <TabsTrigger value="all-employees">Alle medarbejdere</TabsTrigger>
+            <TabsTrigger value="dialer-mapping">Dialer mapping</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all-employees" className="space-y-6">
@@ -999,6 +1001,10 @@ export default function EmployeeMasterData() {
             )}
           </div>
         </div>
+          </TabsContent>
+
+          <TabsContent value="dialer-mapping" className="space-y-6">
+            <DialerMappingTab />
           </TabsContent>
         </Tabs>
 

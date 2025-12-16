@@ -1816,6 +1816,42 @@ export type Database = {
           },
         ]
       }
+      employee_agent_mapping: {
+        Row: {
+          agent_id: string
+          created_at: string
+          employee_id: string
+          id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          employee_id: string
+          id?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_agent_mapping_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_agent_mapping_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_identity: {
         Row: {
           created_at: string | null
