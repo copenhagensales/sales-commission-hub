@@ -302,24 +302,24 @@ export default function ContractSign() {
           <div className="p-8 md:p-12 bg-card">
             <div
               className="prose prose-invert max-w-none
-                prose-headings:font-semibold prose-headings:text-foreground
-                prose-h1:text-2xl prose-h1:text-center prose-h1:mb-12 prose-h1:pb-6 prose-h1:border-b prose-h1:border-border
-                prose-h2:text-xl prose-h2:mt-14 prose-h2:mb-6 prose-h2:pt-8 prose-h2:border-t prose-h2:border-border/50
-                prose-h3:text-lg prose-h3:mt-10 prose-h3:mb-4
-                prose-p:text-muted-foreground prose-p:leading-relaxed prose-p:mb-6
-                prose-strong:text-foreground prose-strong:font-semibold
-                prose-ul:my-6 prose-li:text-muted-foreground prose-li:my-2
-                prose-ol:my-6 prose-ol:pl-6
-                [&_br]:block [&_br]:my-4
-                [&_hr]:my-12 [&_hr]:border-border/50
-                [&_table]:w-full [&_table]:border-collapse [&_table]:my-10 [&_table]:text-sm [&_table]:rounded-lg [&_table]:overflow-hidden
-                [&_th]:bg-muted [&_th]:text-left [&_th]:px-4 [&_th]:py-3 [&_th]:font-semibold [&_th]:text-foreground [&_th]:border-b [&_th]:border-border
-                [&_td]:px-4 [&_td]:py-3 [&_td]:border-b [&_td]:border-border [&_td]:text-muted-foreground
+                prose-headings:font-bold prose-headings:text-foreground prose-headings:tracking-tight
+                prose-h1:text-2xl prose-h1:text-center prose-h1:mb-10 prose-h1:pb-6 prose-h1:border-b-2 prose-h1:border-primary/30
+                prose-h2:text-xl prose-h2:mt-12 prose-h2:mb-5 prose-h2:text-primary
+                prose-h3:text-lg prose-h3:mt-8 prose-h3:mb-3
+                prose-h4:text-base prose-h4:font-bold prose-h4:mt-6 prose-h4:mb-2
+                prose-p:text-muted-foreground prose-p:leading-relaxed prose-p:my-3
+                prose-strong:text-foreground prose-strong:font-bold
+                prose-ul:my-4 prose-li:text-muted-foreground prose-li:my-1
+                prose-ol:my-4 prose-ol:pl-6
+                [&_br]:block [&_br]:content-[''] [&_br]:my-1
+                [&_hr]:my-10 [&_hr]:border-border/50
+                [&_table]:w-full [&_table]:border-collapse [&_table]:my-8 [&_table]:text-sm [&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:border [&_table]:border-border
+                [&_th]:bg-muted [&_th]:text-left [&_th]:px-4 [&_th]:py-3 [&_th]:font-bold [&_th]:text-foreground [&_th]:border-b [&_th]:border-border
+                [&_td]:px-4 [&_td]:py-2.5 [&_td]:border-b [&_td]:border-border/50 [&_td]:text-muted-foreground [&_td]:align-top
                 [&_tr:last-child_td]:border-b-0
-                [&_td:first-child]:font-medium [&_td:first-child]:text-foreground [&_td:first-child]:w-48
-                [&>p:first-of-type]:mt-8
-                [&_p+p]:mt-6
-                space-y-6"
+                [&_td:first-child]:font-medium [&_td:first-child]:text-foreground [&_td:first-child]:whitespace-nowrap
+                [&_td:last-child]:text-right [&_td:last-child]:font-medium
+                [&_pre]:whitespace-pre-wrap [&_pre]:font-sans [&_pre]:text-sm [&_pre]:bg-muted/30 [&_pre]:p-4 [&_pre]:rounded-lg [&_pre]:my-4"
               dangerouslySetInnerHTML={{ __html: contract.content }}
             />
           </div>
@@ -389,10 +389,10 @@ export default function ContractSign() {
         {canSign && (
           <div 
             ref={signSectionRef}
-            className="relative overflow-hidden rounded-2xl shadow-2xl border-2 border-warning/30"
+            className="relative overflow-hidden rounded-2xl shadow-2xl border-2 border-emerald-500/30"
           >
-            {/* Gradient background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500" />
+            {/* Green gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600" />
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wOCI+PHBhdGggZD0iTTM2IDM0aDR2MWgtNHpNMzYgMjRoNHYxaC00ek0yNiAzNGg0djFoLTR6TTI2IDI0aDR2MWgtNHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-50" />
             
             <div className="relative p-8 md:p-10">
@@ -417,7 +417,7 @@ export default function ContractSign() {
                 <div className="flex items-start gap-4">
                   <div className={`mt-0.5 h-7 w-7 rounded-lg border-2 flex items-center justify-center transition-all flex-shrink-0 ${
                     accepted 
-                      ? 'border-orange-500 bg-orange-500' 
+                      ? 'border-emerald-500 bg-emerald-500' 
                       : 'border-white/60 bg-transparent'
                   }`}>
                     {accepted && <Check className="h-4 w-4 text-white" />}
@@ -438,7 +438,7 @@ export default function ContractSign() {
                   size="lg"
                   className={`flex-1 h-14 text-base font-bold transition-all duration-300 ${
                     accepted 
-                      ? 'bg-white text-orange-600 hover:bg-white/95 shadow-2xl hover:scale-[1.02]' 
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 shadow-2xl shadow-orange-500/30 hover:scale-[1.02]' 
                       : 'bg-white/20 text-white/50 cursor-not-allowed border border-white/20'
                   }`}
                   disabled={!accepted || signMutation.isPending}
@@ -454,7 +454,7 @@ export default function ContractSign() {
                 <Button
                   size="lg"
                   variant="ghost"
-                  className="h-14 px-6 text-white/80 hover:text-white hover:bg-white/10 border border-white/20"
+                  className="h-14 px-6 text-white/80 hover:text-white hover:bg-red-500/20 border border-white/20 hover:border-red-300/50"
                   onClick={() => setRejectDialogOpen(true)}
                   disabled={rejectMutation.isPending}
                 >
