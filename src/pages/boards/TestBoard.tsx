@@ -66,11 +66,15 @@ export default function TestBoard() {
         const campaignName = (sale.client_campaigns as any)?.name || 'Ukendt kampagne';
         const existing = campaignMap.get(campaignName) || { name: campaignName, count: 0 };
         
-        // Count sale items quantity
-        const saleCount = sale.sale_items?.reduce(
-          (sum: number, item: any) => sum + (Number(item.quantity) || 1),
-          0
-        ) || 1;
+        // Count sale items quantity - ensure we parse quantity as number
+        const items = sale.sale_items || [];
+        let saleCount = 0;
+        for (const item of items) {
+          const qty = parseInt(String(item.quantity), 10);
+          saleCount += isNaN(qty) || qty < 1 ? 1 : qty;
+        }
+        // If no items, count as 1 sale
+        if (saleCount === 0) saleCount = 1;
         
         existing.count += saleCount;
         campaignMap.set(campaignName, existing);
