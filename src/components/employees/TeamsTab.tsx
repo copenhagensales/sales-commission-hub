@@ -428,14 +428,14 @@ export function TeamsTab() {
               <div className="space-y-2">
                 <Label>Teamleder</Label>
                 <Select
-                  value={formData.team_leader_id}
-                  onValueChange={(value) => setFormData({ ...formData, team_leader_id: value })}
+                  value={formData.team_leader_id || "__none__"}
+                  onValueChange={(value) => setFormData({ ...formData, team_leader_id: value === "__none__" ? "" : value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Vælg teamleder" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Ingen</SelectItem>
+                    <SelectItem value="__none__">Ingen</SelectItem>
                     {teamLeaders.map((emp) => (
                       <SelectItem key={emp.id} value={emp.id}>
                         {emp.first_name} {emp.last_name}
