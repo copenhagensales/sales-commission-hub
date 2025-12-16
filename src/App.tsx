@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AppRouter } from "@/routes/AppRouter";
+import { RolePreviewProvider } from "@/contexts/RolePreviewContext";
 
 const queryClient = new QueryClient();
 
@@ -57,11 +58,13 @@ const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AppRouter />
-        </BrowserRouter>
+        <RolePreviewProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AppRouter />
+          </BrowserRouter>
+        </RolePreviewProvider>
       </TooltipProvider>
     </QueryClientProvider>
   </ErrorBoundary>
