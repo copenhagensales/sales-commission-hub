@@ -171,7 +171,7 @@ export function SendContractDialog({
   const missingFields = getMissingFields(employee, selectedContractType);
   const hasMissingFields = missingFields.length > 0;
 
-  // Merge placeholders with employee data
+  // Merge placeholders with employee data - supports both {{key}} and ${key} syntax
   const mergeContent = (content: string): string => {
     const fullAddress = [
       employee.address_street,
@@ -180,36 +180,53 @@ export function SendContractDialog({
       .filter(Boolean)
       .join(", ");
 
+    const fullName = `${employee.first_name} ${employee.last_name}`;
+    const startDateFormatted = employee.employment_start_date
+      ? format(new Date(employee.employment_start_date), "d. MMMM yyyy", { locale: da })
+      : "[Startdato ikke angivet]";
+
+    // Define all replacement mappings
     const replacements: Record<string, string> = {
-      // === MEDARBEJDER INFO ===
-      // Navn
-      medarbejder_navn: `${employee.first_name} ${employee.last_name}`,
+      // === ${} STYLE PLACEHOLDERS (from template) ===
+      // These are the exact keys from the user's template
+      UserFullname: fullName,
+      Address: employee.address_street || "[Adresse ikke angivet]",
+      Zipcode: employee.address_postal_code || "[Postnummer]",
+      City: employee.address_city || "[By]",
+      SocialSecurityNumber: employee.cpr_number || "[CPR ikke angivet]",
+      UserUserEmail: employee.private_email || "[Email ikke angivet]",
+      
+      // === {{}} STYLE PLACEHOLDERS ===
+      // Medarbejder info
+      medarbejder_navn: fullName,
       medarbejder_fornavn: employee.first_name,
       medarbejder_efternavn: employee.last_name,
       fornavn: employee.first_name,
       efternavn: employee.last_name,
-      employee_name: `${employee.first_name} ${employee.last_name}`,
+      employee_name: fullName,
+      navn: fullName,
       
       // CPR
       medarbejder_cpr: employee.cpr_number || "[CPR ikke angivet]",
       cpr: employee.cpr_number || "[CPR ikke angivet]",
       cpr_number: employee.cpr_number || "[CPR ikke angivet]",
       
-      // === ADRESSE ===
+      // Adresse
       medarbejder_adresse: fullAddress || "[Adresse ikke angivet]",
       medarbejder_vej: employee.address_street || "[Vej ikke angivet]",
-      medarbejder_postnummer: employee.address_postal_code || "[Postnummer ikke angivet]",
-      medarbejder_by: employee.address_city || "[By ikke angivet]",
+      medarbejder_postnummer: employee.address_postal_code || "[Postnummer]",
+      medarbejder_by: employee.address_city || "[By]",
       adresse: employee.address_street || "[Adresse ikke angivet]",
-      postnummer: employee.address_postal_code || "[Postnummer ikke angivet]",
-      by: employee.address_city || "[By ikke angivet]",
+      postnummer: employee.address_postal_code || "[Postnummer]",
+      by: employee.address_city || "[By]",
       address: fullAddress || "[Adresse ikke angivet]",
       
-      // === KONTAKT ===
+      // Kontakt
       medarbejder_email: employee.private_email || "[Email ikke angivet]",
       privat_email: employee.private_email || "[Email ikke angivet]",
+      email: employee.private_email || "[Email ikke angivet]",
       
-      // === ANSÆTTELSE ===
+      // Ansættelse
       medarbejder_stilling: employee.job_title || "[Stilling ikke angivet]",
       stilling: employee.job_title || "[Stilling ikke angivet]",
       job_title: employee.job_title || "[Stilling ikke angivet]",
@@ -221,23 +238,21 @@ export function SendContractDialog({
       medarbejder_timer: employee.weekly_hours?.toString() || "[Timer ikke angivet]",
       timer_pr_uge: employee.weekly_hours?.toString() || "[Timer ikke angivet]",
       weekly_hours: employee.weekly_hours?.toString() || "[Timer ikke angivet]",
+      timer: employee.weekly_hours?.toString() || "[Timer ikke angivet]",
       
       medarbejder_mødetid: employee.standard_start_time || "[Mødetid ikke angivet]",
       mødetid: employee.standard_start_time || "[Mødetid ikke angivet]",
       arbejdstid: employee.standard_start_time || "[Mødetid ikke angivet]",
       standard_start_time: employee.standard_start_time || "[Mødetid ikke angivet]",
       
-      medarbejder_startdato: employee.employment_start_date
-        ? format(new Date(employee.employment_start_date), "d. MMMM yyyy", { locale: da })
-        : "[Startdato ikke angivet]",
-      ansættelsesdato: employee.employment_start_date
-        ? format(new Date(employee.employment_start_date), "d. MMMM yyyy", { locale: da })
-        : "[Startdato ikke angivet]",
-      employment_start_date: employee.employment_start_date
-        ? format(new Date(employee.employment_start_date), "d. MMMM yyyy", { locale: da })
-        : "[Startdato ikke angivet]",
+      // Startdato - multiple variants
+      medarbejder_startdato: startDateFormatted,
+      startdato: startDateFormatted,
+      ansættelsesdato: startDateFormatted,
+      employment_start_date: startDateFormatted,
+      tiltrædelsesdato: startDateFormatted,
       
-      // === LØN ===
+      // Løn
       medarbejder_løntype: employee.salary_type ? salaryTypeLabels[employee.salary_type] || employee.salary_type : "[Løntype ikke angivet]",
       løntype: employee.salary_type ? salaryTypeLabels[employee.salary_type] || employee.salary_type : "[Løntype ikke angivet]",
       salary_type: employee.salary_type ? salaryTypeLabels[employee.salary_type] || employee.salary_type : "[Løntype ikke angivet]",
@@ -246,25 +261,34 @@ export function SendContractDialog({
       løn: employee.salary_amount?.toLocaleString("da-DK") || "[Beløb ikke angivet]",
       salary_amount: employee.salary_amount?.toLocaleString("da-DK") || "[Beløb ikke angivet]",
       
-      // === FERIE ===
+      // Ferie
       medarbejder_ferietype: employee.vacation_type ? vacationTypeLabels[employee.vacation_type] || employee.vacation_type : "[Ferietype ikke angivet]",
       ferietype: employee.vacation_type ? vacationTypeLabels[employee.vacation_type] || employee.vacation_type : "[Ferietype ikke angivet]",
       vacation_type: employee.vacation_type ? vacationTypeLabels[employee.vacation_type] || employee.vacation_type : "[Ferietype ikke angivet]",
       
-      // === DATOER ===
+      // Datoer
       dags_dato: format(new Date(), "d. MMMM yyyy", { locale: da }),
       current_date: format(new Date(), "d. MMMM yyyy", { locale: da }),
-      effective_date: "[Angiv dato]",
+      dato: format(new Date(), "d. MMMM yyyy", { locale: da }),
       
-      // === DIVERSE ===
+      // Diverse
+      effective_date: "[Angiv dato]",
       new_salary_details: "[Angiv nye lønoplysninger]",
       vehicle_details: "[Angiv køretøjsoplysninger]",
     };
 
     let merged = content;
+    
+    // Replace {{key}} style placeholders (case-insensitive)
     Object.entries(replacements).forEach(([key, value]) => {
-      merged = merged.replace(new RegExp(`{{${key}}}`, "gi"), value);
+      merged = merged.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "gi"), value);
     });
+    
+    // Replace ${key} style placeholders (case-insensitive)
+    Object.entries(replacements).forEach(([key, value]) => {
+      merged = merged.replace(new RegExp(`\\$\\{\\s*${key}\\s*\\}`, "gi"), value);
+    });
+    
     return merged;
   };
 
