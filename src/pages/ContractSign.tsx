@@ -356,11 +356,6 @@ export default function ContractSign() {
                   /* Line breaks - minimal for addresses */
                   [&_br]:block [&_br]:content-[''] [&_br]:h-0.5
                   
-                  /* Extra spacing between major sections */
-                  [&_p]:my-5
-                  [&>p:nth-child(7)]:mt-14 [&>p:nth-child(7)]:pt-6 [&>p:nth-child(7)]:border-t [&>p:nth-child(7)]:border-foreground/10
-                  [&>p:nth-child(8)]:mt-14 [&>p:nth-child(8)]:pt-6 [&>p:nth-child(8)]:border-t [&>p:nth-child(8)]:border-foreground/10
-                  
                   /* Horizontal rules */
                   [&_hr]:my-14 [&_hr]:border-foreground/10
                   
