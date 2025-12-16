@@ -27,9 +27,15 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Shield, ChevronDown, ChevronRight, Eye, Edit } from "lucide-react";
+import { Plus, Pencil, Trash2, Shield, ChevronDown, ChevronRight, Eye, Edit, Lock } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+
+// Owner position name - this position is locked and cannot be edited
+const OWNER_POSITION_NAME = "Ejer";
+
+const isOwnerPosition = (name: string) => name.toLowerCase() === OWNER_POSITION_NAME.toLowerCase();
 
 interface Permission {
   key: string;
@@ -155,6 +161,21 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
   },
 ];
 
+// Generate all permissions with full access (must be after PERMISSION_CATEGORIES)
+const generateAllPermissions = (): Record<string, boolean | { view: boolean; edit: boolean }> => {
+  const allPermissions: Record<string, boolean | { view: boolean; edit: boolean }> = {};
+  PERMISSION_CATEGORIES.forEach(category => {
+    category.permissions.forEach(permission => {
+      if (permission.hasEditOption) {
+        allPermissions[permission.key] = { view: true, edit: true };
+      } else {
+        allPermissions[permission.key] = true;
+      }
+    });
+  });
+  return allPermissions;
+};
+
 interface JobPosition {
   id: string;
   name: string;
@@ -274,11 +295,13 @@ export function PositionsTab() {
   };
 
   const handleOpenEdit = (position: JobPosition) => {
+    const isOwner = isOwnerPosition(position.name);
     setEditingPosition(position);
     setFormData({
       name: position.name,
       description: position.description || "",
-      permissions: position.permissions,
+      // For Ejer, always show all permissions as enabled
+      permissions: isOwner ? generateAllPermissions() : position.permissions,
     });
     setExpandedCategories(PERMISSION_CATEGORIES.map(c => c.key));
     setIsDialogOpen(true);
@@ -402,44 +425,70 @@ export function PositionsTab() {
               </TableCell>
             </TableRow>
           ) : (
-            positions.map((position) => (
-              <TableRow key={position.id}>
-                <TableCell className="font-medium">{position.name}</TableCell>
-                <TableCell className="text-muted-foreground max-w-[200px] truncate">
-                  {position.description || "-"}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">
-                      {countActivePermissions(position.permissions)} af {getTotalPermissions()}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleOpenEdit(position)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        if (confirm("Er du sikker på at du vil slette denne stilling?")) {
-                          deleteMutation.mutate(position.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))
+              positions.map((position) => {
+                const isOwner = isOwnerPosition(position.name);
+                const displayPermissions = isOwner ? generateAllPermissions() : position.permissions;
+                
+                return (
+                  <TableRow key={position.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {position.name}
+                        {isOwner && (
+                          <Badge variant="secondary" className="gap-1 text-xs">
+                            <Lock className="h-3 w-3" />
+                            Låst
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                      {position.description || "-"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          {isOwner ? getTotalPermissions() : countActivePermissions(displayPermissions)} af {getTotalPermissions()}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {isOwner ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenEdit(position)}
+                          title="Se rettigheder (kan ikke redigeres)"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenEdit(position)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              if (confirm("Er du sikker på at du vil slette denne stilling?")) {
+                                deleteMutation.mutate(position.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
           )}
         </TableBody>
       </Table>
@@ -447,9 +496,21 @@ export function PositionsTab() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {editingPosition ? "Rediger stilling" : "Opret stilling"}
+            <DialogTitle className="flex items-center gap-2">
+              {editingPosition && isOwnerPosition(editingPosition.name) ? (
+                <>
+                  <Lock className="h-5 w-5 text-muted-foreground" />
+                  Se rettigheder for Ejer
+                </>
+              ) : (
+                editingPosition ? "Rediger stilling" : "Opret stilling"
+              )}
             </DialogTitle>
+            {editingPosition && isOwnerPosition(editingPosition.name) && (
+              <p className="text-sm text-muted-foreground">
+                Ejer-stillingen har alle rettigheder og kan ikke ændres.
+              </p>
+            )}
           </DialogHeader>
 
           <div className="space-y-6">
@@ -460,6 +521,7 @@ export function PositionsTab() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="F.eks. Teamleder"
+                  disabled={editingPosition && isOwnerPosition(editingPosition.name)}
                 />
               </div>
               <div className="space-y-2">
@@ -468,6 +530,7 @@ export function PositionsTab() {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Kort beskrivelse"
+                  disabled={editingPosition && isOwnerPosition(editingPosition.name)}
                 />
               </div>
             </div>
@@ -476,103 +539,130 @@ export function PositionsTab() {
               <Label className="text-base font-semibold flex items-center gap-2">
                 <Shield className="h-4 w-4" />
                 Rettigheder
+                {editingPosition && isOwnerPosition(editingPosition.name) && (
+                  <Badge variant="secondary" className="gap-1 ml-2">
+                    <Lock className="h-3 w-3" />
+                    Alle rettigheder
+                  </Badge>
+                )}
               </Label>
-              <p className="text-sm text-muted-foreground">
-                Klik på en kategori for at udvide og konfigurere rettigheder
-              </p>
+              {!(editingPosition && isOwnerPosition(editingPosition.name)) && (
+                <p className="text-sm text-muted-foreground">
+                  Klik på en kategori for at udvide og konfigurere rettigheder
+                </p>
+              )}
               
               <div className="space-y-2 mt-4">
-                {PERMISSION_CATEGORIES.map((category) => (
-                  <Collapsible
-                    key={category.key}
-                    open={expandedCategories.includes(category.key)}
-                    onOpenChange={() => toggleCategory(category.key)}
-                  >
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-between px-4 py-3 h-auto hover:bg-muted/50"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg">{category.icon}</span>
-                          <span className="font-medium">{category.label}</span>
-                          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                            {category.permissions.filter(p => getPermissionValue(p.key)).length} / {category.permissions.length}
-                          </span>
-                        </div>
-                        {expandedCategories.includes(category.key) ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="border rounded-lg mt-2 divide-y">
-                        {category.permissions.map((permission) => (
-                          <div
-                            key={permission.key}
-                            className="flex items-center justify-between gap-4 px-4 py-3"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm">{permission.label}</div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {permission.description}
-                              </div>
-                            </div>
-                            
-                            {permission.hasEditOption ? (
-                              <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                  <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-                                  <span className="text-xs text-muted-foreground">Se</span>
-                                  <Switch
-                                    checked={getPermissionValue(permission.key, "view")}
-                                    onCheckedChange={(checked) =>
-                                      handlePermissionChange(permission.key, checked, "view")
-                                    }
-                                  />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Edit className="h-3.5 w-3.5 text-muted-foreground" />
-                                  <span className="text-xs text-muted-foreground">Ret</span>
-                                  <Switch
-                                    checked={getPermissionValue(permission.key, "edit")}
-                                    onCheckedChange={(checked) =>
-                                      handlePermissionChange(permission.key, checked, "edit")
-                                    }
-                                    disabled={!getPermissionValue(permission.key, "view")}
-                                  />
-                                </div>
-                              </div>
-                            ) : (
-                              <Switch
-                                checked={getPermissionValue(permission.key)}
-                                onCheckedChange={(checked) =>
-                                  handlePermissionChange(permission.key, checked)
-                                }
-                              />
-                            )}
+                {PERMISSION_CATEGORIES.map((category) => {
+                  const isOwnerLocked = editingPosition && isOwnerPosition(editingPosition.name);
+                  
+                  return (
+                    <Collapsible
+                      key={category.key}
+                      open={expandedCategories.includes(category.key)}
+                      onOpenChange={() => toggleCategory(category.key)}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-between px-4 py-3 h-auto hover:bg-muted/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">{category.icon}</span>
+                            <span className="font-medium">{category.label}</span>
+                            <span className={cn(
+                              "text-xs px-2 py-0.5 rounded-full",
+                              isOwnerLocked
+                                ? "bg-green-500/20 text-green-600"
+                                : "text-muted-foreground bg-muted"
+                            )}>
+                              {isOwnerLocked 
+                                ? `${category.permissions.length} / ${category.permissions.length}`
+                                : `${category.permissions.filter(p => getPermissionValue(p.key)).length} / ${category.permissions.length}`
+                              }
+                            </span>
                           </div>
-                        ))}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                ))}
+                          {expandedCategories.includes(category.key) ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="border rounded-lg mt-2 divide-y">
+                          {category.permissions.map((permission) => (
+                            <div
+                              key={permission.key}
+                              className={cn(
+                                "flex items-center justify-between gap-4 px-4 py-3",
+                                isOwnerLocked && "bg-green-500/5"
+                              )}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm">{permission.label}</div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {permission.description}
+                                </div>
+                              </div>
+                              
+                              {permission.hasEditOption ? (
+                                <div className="flex items-center gap-4">
+                                  <div className="flex items-center gap-2">
+                                    <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <span className="text-xs text-muted-foreground">Se</span>
+                                    <Switch
+                                      checked={isOwnerLocked ? true : getPermissionValue(permission.key, "view")}
+                                      onCheckedChange={(checked) =>
+                                        handlePermissionChange(permission.key, checked, "view")
+                                      }
+                                      disabled={!!isOwnerLocked}
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Edit className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <span className="text-xs text-muted-foreground">Ret</span>
+                                    <Switch
+                                      checked={isOwnerLocked ? true : getPermissionValue(permission.key, "edit")}
+                                      onCheckedChange={(checked) =>
+                                        handlePermissionChange(permission.key, checked, "edit")
+                                      }
+                                      disabled={!!isOwnerLocked || !getPermissionValue(permission.key, "view")}
+                                    />
+                                  </div>
+                                </div>
+                              ) : (
+                                <Switch
+                                  checked={isOwnerLocked ? true : getPermissionValue(permission.key)}
+                                  onCheckedChange={(checked) =>
+                                    handlePermissionChange(permission.key, checked)
+                                  }
+                                  disabled={!!isOwnerLocked}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  );
+                })}
               </div>
             </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={handleCloseDialog}>
-              Annuller
+              {editingPosition && isOwnerPosition(editingPosition.name) ? "Luk" : "Annuller"}
             </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
-              {editingPosition ? "Gem ændringer" : "Opret"}
-            </Button>
+            {!(editingPosition && isOwnerPosition(editingPosition.name)) && (
+              <Button
+                onClick={handleSubmit}
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                {editingPosition ? "Gem ændringer" : "Opret"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
