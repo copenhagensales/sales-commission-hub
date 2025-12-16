@@ -83,57 +83,49 @@ export default function MgTestDashboard() {
   return (
     <MainLayout>
       <TvPreviewOverlay>
-      <div className="space-y-6 p-[5%]">
-        {/* Header with totals */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20 p-6">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHoiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9nPjwvc3ZnPg==')] opacity-50" />
-          <div className="relative flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Test Dashboard</h1>
-              <p className="text-muted-foreground mt-1">Kundeoversigt med salgsperformance</p>
-            </div>
-            <div className="flex items-center gap-6">
+      <div className="h-[calc(100vh-4rem)] flex flex-col p-3 overflow-hidden">
+        {/* Compact Header */}
+        <div className="flex-shrink-0 rounded-xl bg-gradient-to-r from-primary/10 to-background border border-primary/20 px-4 py-3 mb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <h1 className="text-xl font-bold">Test Dashboard</h1>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => refetch()}
                 disabled={isFetching}
-                className="gap-2"
+                className="h-7 px-2"
               >
-                <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-                Opdater
+                <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
               </Button>
+            </div>
+            <div className="flex items-center gap-6">
               <div className="text-right">
-                <p className="text-sm text-muted-foreground">Salg i dag</p>
-                <p className="text-3xl font-bold text-primary">{isLoading ? "..." : totalSalesToday}</p>
+                <p className="text-xs text-muted-foreground">I dag</p>
+                <p className="text-2xl font-bold text-primary">{isLoading ? "..." : totalSalesToday}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-muted-foreground">Salg denne måned</p>
-                <p className="text-3xl font-bold">{isLoading ? "..." : totalSalesMonth}</p>
+                <p className="text-xs text-muted-foreground">Denne måned</p>
+                <p className="text-2xl font-bold">{isLoading ? "..." : totalSalesMonth}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Client cards grid */}
+        {/* Client cards grid - fills remaining space */}
         {isLoading ? (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {[...Array(4)].map((_, i) => (
+          <div className="grid gap-2 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 flex-1 auto-rows-fr">
+            {[...Array(10)].map((_, i) => (
               <Card key={i} className="animate-pulse">
-                <CardHeader className="pb-3">
-                  <div className="h-8 bg-muted rounded w-1/2" />
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="h-6 bg-muted rounded w-3/4" />
-                    <div className="h-6 bg-muted rounded w-1/2" />
-                  </div>
+                <CardContent className="p-3">
+                  <div className="h-4 bg-muted rounded w-1/2 mb-2" />
+                  <div className="h-6 bg-muted rounded w-3/4" />
                 </CardContent>
               </Card>
             ))}
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-2 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 flex-1 auto-rows-fr overflow-auto">
             {allClients.map((client, index) => {
               const colors = clientColors[client.client_name] || defaultColors;
               const medals = ["🥇", "🥈", "🥉"];
@@ -141,67 +133,60 @@ export default function MgTestDashboard() {
               return (
                 <Card 
                   key={client.client_id} 
-                  className={`relative overflow-hidden border-0 bg-gradient-to-br ${colors.bg} backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-xl`}
+                  className={`relative overflow-hidden border-0 bg-gradient-to-br ${colors.bg} backdrop-blur-sm`}
                 >
-                  {/* Decorative accent bar */}
-                  <div className={`absolute top-0 left-0 right-0 h-1 ${colors.accent}`} />
+                  {/* Accent bar */}
+                  <div className={`absolute top-0 left-0 right-0 h-0.5 ${colors.accent}`} />
                   
-                  {/* Rank badge for top 3 */}
+                  {/* Rank badge */}
                   {index < 3 && (
-                    <div className="absolute top-3 right-3">
-                      <Badge variant="secondary" className="text-lg px-3 py-1 font-bold bg-background/80 backdrop-blur">
-                        #{index + 1}
-                      </Badge>
-                    </div>
+                    <Badge variant="secondary" className="absolute top-1.5 right-1.5 text-xs px-1.5 py-0 font-bold bg-background/80">
+                      #{index + 1}
+                    </Badge>
                   )}
                   
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-xl ${colors.accent} flex items-center justify-center shadow-lg`}>
-                        <Building2 className="w-6 h-6 text-white" />
+                  <CardContent className="p-3 space-y-2">
+                    {/* Client name and revenue */}
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-lg ${colors.accent} flex items-center justify-center flex-shrink-0`}>
+                        <Building2 className="w-4 h-4 text-white" />
                       </div>
-                      <div>
-                        <CardTitle className="text-xl">{client.client_name}</CardTitle>
-                        <p className={`text-sm ${colors.text}`}>
-                          {formatCurrency(client.revenue_month)} omsætning
-                        </p>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-4">
-                    {/* Sales stats */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-background/30 backdrop-blur rounded-lg p-3 text-center">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">I dag</p>
-                        <p className="text-2xl font-bold">{client.sales_today}</p>
-                      </div>
-                      <div className="bg-background/30 backdrop-blur rounded-lg p-3 text-center">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Denne måned</p>
-                        <p className="text-2xl font-bold">{client.sales_month}</p>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{client.client_name}</p>
+                        <p className={`text-xs ${colors.text}`}>{formatCurrency(client.revenue_month)}</p>
                       </div>
                     </div>
                     
-                    {/* Top 3 sellers */}
+                    {/* Sales stats - compact */}
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <div className="bg-background/30 rounded px-2 py-1.5 text-center">
+                        <p className="text-[10px] text-muted-foreground uppercase">I dag</p>
+                        <p className="text-lg font-bold leading-tight">{client.sales_today}</p>
+                      </div>
+                      <div className="bg-background/30 rounded px-2 py-1.5 text-center">
+                        <p className="text-[10px] text-muted-foreground uppercase">Måned</p>
+                        <p className="text-lg font-bold leading-tight">{client.sales_month}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Top sellers - compact list */}
                     {client.top_sellers && client.top_sellers.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Trophy className="w-4 h-4" />
-                          <span>Top sælgere denne måned</span>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <Trophy className="w-3 h-3" />
+                          <span>Top sælgere</span>
                         </div>
-                        <div className="space-y-1.5">
+                        <div className="space-y-0.5">
                           {client.top_sellers.slice(0, 3).map((seller, i) => (
                             <div 
                               key={seller.agent_name} 
-                              className="flex items-center justify-between bg-background/20 backdrop-blur rounded-lg px-3 py-2"
+                              className="flex items-center justify-between bg-background/20 rounded px-1.5 py-0.5 text-xs"
                             >
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">{medals[i]}</span>
-                                <span className="font-medium truncate max-w-[140px]">{seller.agent_name}</span>
+                              <div className="flex items-center gap-1 min-w-0">
+                                <span>{medals[i]}</span>
+                                <span className="truncate">{seller.agent_name}</span>
                               </div>
-                              <Badge variant="secondary" className="font-bold">
-                                {seller.count} salg
-                              </Badge>
+                              <span className="font-semibold text-[10px] flex-shrink-0 ml-1">{seller.count}</span>
                             </div>
                           ))}
                         </div>
@@ -216,10 +201,9 @@ export default function MgTestDashboard() {
 
         {/* Empty state */}
         {!isLoading && allClients.length === 0 && (
-          <div className="text-center py-12">
-            <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">Ingen salgsdata fundet</h3>
-            <p className="text-muted-foreground">Der er ingen kunder med salg denne måned.</p>
+          <div className="text-center py-8">
+            <Users className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+            <h3 className="text-sm font-medium">Ingen salgsdata fundet</h3>
           </div>
         )}
       </div>
