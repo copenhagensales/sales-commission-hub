@@ -7,7 +7,7 @@ import {
   Payroll,
   Wallboard,
   Settings,
-  Commission,
+  
   MgTest,
   MgTestDashboard,
   KmTest,
@@ -93,7 +93,7 @@ export const routes: RouteConfig[] = [
   { path: "/sales", component: Sales, access: "role", requireTeamlederOrAbove: true },
   { path: "/codan", component: Codan, access: "role", requireTeamlederOrAbove: true },
   { path: "/tdc-erhverv", component: TdcErhverv, access: "role", requireTeamlederOrAbove: true },
-  { path: "/commission-cpo", component: Commission, access: "role", requireTeamlederOrAbove: true },
+  
   { path: "/payroll", component: Payroll, access: "role", requireTeamlederOrAbove: true },
   { path: "/mg-test", component: MgTest, access: "role", requireTeamlederOrAbove: true },
   { path: "/mg-test-dashboard", component: MgTestDashboard, access: "role", requireTeamlederOrAbove: true },

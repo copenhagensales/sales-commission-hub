@@ -26,7 +26,7 @@ const getOwnerNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.careerWishesOverview"), href: "/career-wishes-overview", icon: Sparkles },
   { name: t("sidebar.some"), href: "/some", icon: Video },
   { name: t("sidebar.sales"), href: "/sales", icon: ShoppingCart },
-  { name: t("sidebar.commissionCpo"), href: "/commission-cpo", icon: Percent },
+  
   { name: t("sidebar.logics"), href: "/logikker", icon: ListChecks },
   { name: t("sidebar.closingShifts"), href: "/closing-shifts", icon: Lock },
 ];
