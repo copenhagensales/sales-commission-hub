@@ -65,7 +65,8 @@
     "new": "New",
     "bookings": "Bookings",
     "permissions": "Permissions",
-    "management": "Management"
+    "management": "Management",
+    "personnel": "Personnel"
   },
   "dialerIntegrations": {
     "title": "Dialer Integrations",
