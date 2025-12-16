@@ -303,17 +303,23 @@ export default function ContractSign() {
             <div
               className="prose prose-invert max-w-none
                 prose-headings:font-semibold prose-headings:text-foreground
-                prose-h1:text-2xl prose-h1:text-center prose-h1:mb-8 prose-h1:pb-4 prose-h1:border-b prose-h1:border-border
-                prose-h2:text-xl prose-h2:mt-10 prose-h2:mb-4
-                prose-h3:text-lg prose-h3:mt-8
-                prose-p:text-muted-foreground prose-p:leading-relaxed
+                prose-h1:text-2xl prose-h1:text-center prose-h1:mb-12 prose-h1:pb-6 prose-h1:border-b prose-h1:border-border
+                prose-h2:text-xl prose-h2:mt-14 prose-h2:mb-6 prose-h2:pt-8 prose-h2:border-t prose-h2:border-border/50
+                prose-h3:text-lg prose-h3:mt-10 prose-h3:mb-4
+                prose-p:text-muted-foreground prose-p:leading-relaxed prose-p:mb-6
                 prose-strong:text-foreground prose-strong:font-semibold
-                prose-ul:my-4 prose-li:text-muted-foreground prose-li:my-1
-                [&_table]:w-full [&_table]:border-collapse [&_table]:my-6 [&_table]:text-sm [&_table]:rounded-lg [&_table]:overflow-hidden
+                prose-ul:my-6 prose-li:text-muted-foreground prose-li:my-2
+                prose-ol:my-6 prose-ol:pl-6
+                [&_br]:block [&_br]:my-4
+                [&_hr]:my-12 [&_hr]:border-border/50
+                [&_table]:w-full [&_table]:border-collapse [&_table]:my-10 [&_table]:text-sm [&_table]:rounded-lg [&_table]:overflow-hidden
                 [&_th]:bg-muted [&_th]:text-left [&_th]:px-4 [&_th]:py-3 [&_th]:font-semibold [&_th]:text-foreground [&_th]:border-b [&_th]:border-border
                 [&_td]:px-4 [&_td]:py-3 [&_td]:border-b [&_td]:border-border [&_td]:text-muted-foreground
                 [&_tr:last-child_td]:border-b-0
-                [&_td:first-child]:font-medium [&_td:first-child]:text-foreground [&_td:first-child]:w-48"
+                [&_td:first-child]:font-medium [&_td:first-child]:text-foreground [&_td:first-child]:w-48
+                [&>p:first-of-type]:mt-8
+                [&_p+p]:mt-6
+                space-y-6"
               dangerouslySetInnerHTML={{ __html: contract.content }}
             />
           </div>
@@ -383,40 +389,44 @@ export default function ContractSign() {
         {canSign && (
           <div 
             ref={signSectionRef}
-            className="bg-primary rounded-2xl shadow-2xl overflow-hidden"
+            className="relative overflow-hidden rounded-2xl shadow-2xl border-2 border-warning/30"
           >
-            <div className="p-8 md:p-10">
+            {/* Gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500" />
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wOCI+PHBhdGggZD0iTTM2IDM0aDR2MWgtNHpNMzYgMjRoNHYxaC00ek0yNiAzNGg0djFoLTR6TTI2IDI0aDR2MWgtNHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-50" />
+            
+            <div className="relative p-8 md:p-10">
               <div className="flex items-start gap-5 mb-8">
-                <div className="h-14 w-14 rounded-2xl bg-primary-foreground/20 backdrop-blur flex items-center justify-center flex-shrink-0">
-                  <PenLine className="h-7 w-7 text-primary-foreground" />
+                <div className="h-14 w-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-lg">
+                  <PenLine className="h-7 w-7 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-primary-foreground">Underskriv kontrakt</h2>
-                  <p className="text-primary-foreground/80 mt-1">Bekræft din accept af kontraktens vilkår og betingelser</p>
+                  <h2 className="text-2xl font-bold text-white drop-shadow-sm">Underskriv kontrakt</h2>
+                  <p className="text-white/90 mt-1">Bekræft din accept af kontraktens vilkår og betingelser</p>
                 </div>
               </div>
 
               <div 
-                className={`p-5 rounded-xl cursor-pointer transition-all ${
+                className={`p-5 rounded-xl cursor-pointer transition-all duration-300 ${
                   accepted 
-                    ? 'bg-card shadow-xl' 
-                    : 'bg-primary-foreground/10 backdrop-blur hover:bg-primary-foreground/20'
+                    ? 'bg-white shadow-2xl scale-[1.02]' 
+                    : 'bg-white/15 backdrop-blur-sm hover:bg-white/25 border border-white/20'
                 }`}
                 onClick={() => setAccepted(!accepted)}
               >
                 <div className="flex items-start gap-4">
                   <div className={`mt-0.5 h-7 w-7 rounded-lg border-2 flex items-center justify-center transition-all flex-shrink-0 ${
                     accepted 
-                      ? 'border-primary bg-primary' 
-                      : 'border-primary-foreground/50 bg-transparent'
+                      ? 'border-orange-500 bg-orange-500' 
+                      : 'border-white/60 bg-transparent'
                   }`}>
-                    {accepted && <Check className="h-4 w-4 text-primary-foreground" />}
+                    {accepted && <Check className="h-4 w-4 text-white" />}
                   </div>
                   <div>
-                    <p className={`font-semibold ${accepted ? 'text-foreground' : 'text-primary-foreground'}`}>
+                    <p className={`font-semibold ${accepted ? 'text-gray-900' : 'text-white'}`}>
                       Jeg accepterer kontraktens betingelser
                     </p>
-                    <p className={`text-sm mt-1 ${accepted ? 'text-muted-foreground' : 'text-primary-foreground/70'}`}>
+                    <p className={`text-sm mt-1 ${accepted ? 'text-gray-600' : 'text-white/80'}`}>
                       Ved at markere denne boks bekræfter jeg, at jeg har læst og forstået indholdet af denne kontrakt.
                     </p>
                   </div>
@@ -426,11 +436,10 @@ export default function ContractSign() {
               <div className="flex gap-3 mt-6">
                 <Button
                   size="lg"
-                  variant={accepted ? "secondary" : "ghost"}
-                  className={`flex-1 h-14 text-base font-semibold transition-all ${
+                  className={`flex-1 h-14 text-base font-bold transition-all duration-300 ${
                     accepted 
-                      ? 'bg-card text-foreground hover:bg-card/90 shadow-xl' 
-                      : 'bg-primary-foreground/20 text-primary-foreground/60 cursor-not-allowed'
+                      ? 'bg-white text-orange-600 hover:bg-white/95 shadow-2xl hover:scale-[1.02]' 
+                      : 'bg-white/20 text-white/50 cursor-not-allowed border border-white/20'
                   }`}
                   disabled={!accepted || signMutation.isPending}
                   onClick={() => signMutation.mutate()}
@@ -445,7 +454,7 @@ export default function ContractSign() {
                 <Button
                   size="lg"
                   variant="ghost"
-                  className="h-14 px-6 text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                  className="h-14 px-6 text-white/80 hover:text-white hover:bg-white/10 border border-white/20"
                   onClick={() => setRejectDialogOpen(true)}
                   disabled={rejectMutation.isPending}
                 >
@@ -453,7 +462,7 @@ export default function ContractSign() {
                 </Button>
               </div>
 
-              <p className="text-xs text-center text-primary-foreground/60 mt-6">
+              <p className="text-xs text-center text-white/70 mt-6">
                 <Shield className="h-3 w-3 inline mr-1" />
                 Din underskrift registreres sikkert med tidsstempel og IP-adresse
               </p>
