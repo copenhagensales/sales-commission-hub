@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff } from "lucide-react";
@@ -800,7 +801,13 @@ export default function EmployeeMasterData() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <Tabs defaultValue="all-employees" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="all-employees">Alle medarbejdere</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="all-employees" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-xl bg-card/50 p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-muted-foreground">Aktive medarbejdere</span>
@@ -992,6 +999,8 @@ export default function EmployeeMasterData() {
             )}
           </div>
         </div>
+          </TabsContent>
+        </Tabs>
 
         {/* Delete confirmation dialog */}
         <AlertDialog open={!!deleteEmployeeId} onOpenChange={(open) => !open && setDeleteEmployeeId(null)}>
