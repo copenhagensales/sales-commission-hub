@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Shield, ChevronDown, ChevronRight, Eye, Edit, Lock } from "lucide-react";
+import { Plus, Pencil, Trash2, Shield, ChevronDown, ChevronRight, Eye, Edit, Lock, Play } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -192,6 +193,7 @@ interface FormData {
 }
 
 export function PositionsTab() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState<JobPosition | null>(null);
@@ -454,37 +456,48 @@ export function PositionsTab() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {isOwner ? (
+                      <div className="flex gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleOpenEdit(position)}
-                          title="Se rettigheder (kan ikke redigeres)"
+                          onClick={() => navigate(`/role-preview/${position.id}`)}
+                          title="Test rolle"
+                          className="text-primary hover:text-primary"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Play className="h-4 w-4" />
                         </Button>
-                      ) : (
-                        <div className="flex gap-2">
+                        {isOwner ? (
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleOpenEdit(position)}
+                            title="Se rettigheder (kan ikke redigeres)"
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              if (confirm("Er du sikker på at du vil slette denne stilling?")) {
-                                deleteMutation.mutate(position.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenEdit(position)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                if (confirm("Er du sikker på at du vil slette denne stilling?")) {
+                                  deleteMutation.mutate(position.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
