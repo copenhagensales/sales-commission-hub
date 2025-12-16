@@ -82,6 +82,17 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
   {
+    key: "tabs_employees",
+    label: "Medarbejdere faner",
+    icon: "📑",
+    permissions: [
+      { key: "tab_employees_all", label: "Alle medarbejdere", description: "Adgang til alle medarbejdere fane", hasEditOption: true },
+      { key: "tab_employees_dialer_mapping", label: "Dialer mapping", description: "Adgang til dialer mapping fane", hasEditOption: true },
+      { key: "tab_employees_teams", label: "Teams fane", description: "Adgang til teams fane", hasEditOption: true },
+      { key: "tab_employees_positions", label: "Stillinger", description: "Adgang til stillinger fane", hasEditOption: true },
+    ],
+  },
+  {
     key: "menu_management",
     label: "Ledelse menu",
     icon: "👑",
@@ -92,6 +103,15 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
   {
+    key: "tabs_contracts",
+    label: "Kontrakter faner",
+    icon: "📑",
+    permissions: [
+      { key: "tab_contracts_all", label: "Alle kontrakter", description: "Adgang til alle kontrakter fane", hasEditOption: true },
+      { key: "tab_contracts_templates", label: "Skabeloner", description: "Adgang til kontraktskabeloner fane", hasEditOption: true },
+    ],
+  },
+  {
     key: "menu_test",
     label: "Test menu",
     icon: "🧪",
@@ -99,6 +119,34 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: "menu_car_quiz_admin", label: "Bil Quiz Admin", description: "Adgang til bil quiz administration", hasEditOption: true },
       { key: "menu_coc_admin", label: "Code of Conduct Admin", description: "Adgang til Code of Conduct administration", hasEditOption: true },
       { key: "menu_pulse_survey", label: "Pulsmåling resultater", description: "Adgang til pulsmåling resultater", hasEditOption: true },
+    ],
+  },
+  {
+    key: "tabs_car_quiz",
+    label: "Bil Quiz faner",
+    icon: "📑",
+    permissions: [
+      { key: "tab_car_quiz_questions", label: "Spørgsmål", description: "Adgang til quiz spørgsmål fane", hasEditOption: true },
+      { key: "tab_car_quiz_submissions", label: "Besvarelser", description: "Adgang til besvarelser fane", hasEditOption: true },
+    ],
+  },
+  {
+    key: "tabs_coc",
+    label: "Code of Conduct faner",
+    icon: "📑",
+    permissions: [
+      { key: "tab_coc_questions", label: "Spørgsmål", description: "Adgang til CoC spørgsmål fane", hasEditOption: true },
+      { key: "tab_coc_submissions", label: "Besvarelser", description: "Adgang til CoC besvarelser fane", hasEditOption: true },
+    ],
+  },
+  {
+    key: "tabs_pulse_survey",
+    label: "Pulsmåling faner",
+    icon: "📑",
+    permissions: [
+      { key: "tab_pulse_results", label: "Resultater", description: "Adgang til pulsmåling resultater fane", hasEditOption: true },
+      { key: "tab_pulse_template", label: "Skabelon", description: "Adgang til pulsmåling skabelon fane", hasEditOption: true },
+      { key: "tab_pulse_teams", label: "Team sammenligning", description: "Adgang til team sammenligning fane", hasEditOption: true },
     ],
   },
   {
@@ -114,6 +162,16 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: "menu_dialer_data", label: "Dialer Data", description: "Adgang til dialer data", hasEditOption: true },
       { key: "menu_calls_data", label: "Calls Data", description: "Adgang til opkaldsdata", hasEditOption: true },
       { key: "menu_adversus_data", label: "Adversus Data", description: "Adgang til Adversus data", hasEditOption: true },
+    ],
+  },
+  {
+    key: "tabs_mg_test",
+    label: "MG Test faner",
+    icon: "📑",
+    permissions: [
+      { key: "tab_mg_products", label: "Produkter", description: "Adgang til produkter fane", hasEditOption: true },
+      { key: "tab_mg_campaigns", label: "Kampagner", description: "Adgang til kampagner fane", hasEditOption: true },
+      { key: "tab_mg_customers", label: "Kunder", description: "Adgang til kunder fane", hasEditOption: true },
     ],
   },
   {
@@ -186,6 +244,19 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     icon: "⚙️",
     permissions: [
       { key: "menu_settings", label: "Indstillinger", description: "Adgang til systemindstillinger", hasEditOption: true },
+    ],
+  },
+  {
+    key: "tabs_settings",
+    label: "Indstillinger faner",
+    icon: "📑",
+    permissions: [
+      { key: "tab_settings_api", label: "API Integrationer", description: "Adgang til API integrationer fane", hasEditOption: true },
+      { key: "tab_settings_dialer", label: "Dialer Integrationer", description: "Adgang til dialer integrationer fane", hasEditOption: true },
+      { key: "tab_settings_customer", label: "Kunde Integrationer", description: "Adgang til kunde integrationer fane", hasEditOption: true },
+      { key: "tab_settings_webhooks", label: "Webhooks", description: "Adgang til webhooks fane", hasEditOption: true },
+      { key: "tab_settings_logs", label: "Logs", description: "Adgang til integrationslog fane", hasEditOption: true },
+      { key: "tab_settings_excel_crm", label: "Excel CRM Import", description: "Adgang til Excel CRM import fane", hasEditOption: true },
     ],
   },
 ];

@@ -12,7 +12,7 @@ interface PositionPermissions {
   [key: string]: boolean | { view: boolean; edit: boolean };
 }
 
-// Generate all permissions for owner - only visible menu items
+// Generate all permissions for owner - visible menu items and tabs
 const generateAllPermissions = (): PositionPermissions => ({
   // Main menu
   menu_dashboard: true,
@@ -24,14 +24,32 @@ const generateAllPermissions = (): PositionPermissions => ({
   // Personnel menu
   menu_employees: { view: true, edit: true },
   menu_teams: { view: true, edit: true },
+  // Employees tabs
+  tab_employees_all: { view: true, edit: true },
+  tab_employees_dialer_mapping: { view: true, edit: true },
+  tab_employees_teams: { view: true, edit: true },
+  tab_employees_positions: { view: true, edit: true },
   // Management menu
   menu_contracts: { view: true, edit: true },
   menu_permissions: { view: true, edit: true },
   menu_career_wishes_overview: { view: true, edit: true },
+  // Contracts tabs
+  tab_contracts_all: { view: true, edit: true },
+  tab_contracts_templates: { view: true, edit: true },
   // Test menu
   menu_car_quiz_admin: { view: true, edit: true },
   menu_coc_admin: { view: true, edit: true },
   menu_pulse_survey: { view: true, edit: true },
+  // Car Quiz tabs
+  tab_car_quiz_questions: { view: true, edit: true },
+  tab_car_quiz_submissions: { view: true, edit: true },
+  // CoC tabs
+  tab_coc_questions: { view: true, edit: true },
+  tab_coc_submissions: { view: true, edit: true },
+  // Pulse Survey tabs
+  tab_pulse_results: { view: true, edit: true },
+  tab_pulse_template: { view: true, edit: true },
+  tab_pulse_teams: { view: true, edit: true },
   // MG menu
   menu_payroll: { view: true, edit: true },
   menu_tdc_erhverv: { view: true, edit: true },
@@ -41,6 +59,10 @@ const generateAllPermissions = (): PositionPermissions => ({
   menu_dialer_data: { view: true, edit: true },
   menu_calls_data: { view: true, edit: true },
   menu_adversus_data: { view: true, edit: true },
+  // MG Test tabs
+  tab_mg_products: { view: true, edit: true },
+  tab_mg_campaigns: { view: true, edit: true },
+  tab_mg_customers: { view: true, edit: true },
   // Shift planning menu
   menu_shift_overview: { view: true, edit: true },
   menu_my_schedule: true,
@@ -77,6 +99,13 @@ const generateAllPermissions = (): PositionPermissions => ({
   menu_time_stamp: true,
   // System menu
   menu_settings: { view: true, edit: true },
+  // Settings tabs
+  tab_settings_api: { view: true, edit: true },
+  tab_settings_dialer: { view: true, edit: true },
+  tab_settings_customer: { view: true, edit: true },
+  tab_settings_webhooks: { view: true, edit: true },
+  tab_settings_logs: { view: true, edit: true },
+  tab_settings_excel_crm: { view: true, edit: true },
 });
 
 export default function RolePreview() {
