@@ -28,10 +28,16 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Shield, ChevronDown, ChevronRight, Eye, Edit, Lock, Play } from "lucide-react";
+import { Plus, Pencil, Trash2, Shield, ChevronDown, ChevronRight, Eye, Edit, Lock, Play, Info, LayoutGrid, Layers } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Owner position name - this position is locked and cannot be edited
 const OWNER_POSITION_NAME = "Ejer";
@@ -767,102 +773,184 @@ export function PositionsTab() {
                 </p>
               )}
               
-              <div className="space-y-2 mt-4">
-                {PERMISSION_CATEGORIES.map((category) => {
-                  const isOwnerLocked = editingPosition && isOwnerPosition(editingPosition.name);
-                  
-                  return (
-                    <Collapsible
-                      key={category.key}
-                      open={expandedCategories.includes(category.key)}
-                      onOpenChange={() => toggleCategory(category.key)}
-                    >
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-between px-4 py-3 h-auto hover:bg-muted/50"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="text-lg">{category.icon}</span>
-                            <span className="font-medium">{category.label}</span>
-                            <span className={cn(
-                              "text-xs px-2 py-0.5 rounded-full",
-                              isOwnerLocked
-                                ? "bg-green-500/20 text-green-600"
-                                : "text-muted-foreground bg-muted"
-                            )}>
-                              {isOwnerLocked 
-                                ? `${category.permissions.length} / ${category.permissions.length}`
-                                : `${category.permissions.filter(p => getPermissionValue(p.key)).length} / ${category.permissions.length}`
-                              }
-                            </span>
-                          </div>
-                          {expandedCategories.includes(category.key) ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="border rounded-lg mt-2 divide-y">
-                          {category.permissions.map((permission) => (
-                            <div
-                              key={permission.key}
-                              className={cn(
-                                "flex items-center justify-between gap-4 px-4 py-3",
-                                isOwnerLocked && "bg-green-500/5"
-                              )}
-                            >
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium text-sm">{permission.label}</div>
-                                <div className="text-xs text-muted-foreground truncate">
-                                  {permission.description}
-                                </div>
-                              </div>
-                              
-                              {permission.hasEditOption ? (
-                                <div className="flex items-center gap-4">
-                                  <div className="flex items-center gap-2">
-                                    <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-                                    <span className="text-xs text-muted-foreground">Se</span>
-                                    <Switch
-                                      checked={isOwnerLocked ? true : getPermissionValue(permission.key, "view")}
-                                      onCheckedChange={(checked) =>
-                                        handlePermissionChange(permission.key, checked, "view")
-                                      }
-                                      disabled={!!isOwnerLocked}
-                                    />
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Edit className="h-3.5 w-3.5 text-muted-foreground" />
-                                    <span className="text-xs text-muted-foreground">Ret</span>
-                                    <Switch
-                                      checked={isOwnerLocked ? true : getPermissionValue(permission.key, "edit")}
-                                      onCheckedChange={(checked) =>
-                                        handlePermissionChange(permission.key, checked, "edit")
-                                      }
-                                      disabled={!!isOwnerLocked || !getPermissionValue(permission.key, "view")}
-                                    />
-                                  </div>
-                                </div>
+              <TooltipProvider delayDuration={200}>
+                <div className="space-y-3 mt-4">
+                  {PERMISSION_CATEGORIES.map((category) => {
+                    const isOwnerLocked = editingPosition && isOwnerPosition(editingPosition.name);
+                    const isTabCategory = category.key.startsWith("tabs_");
+                    const activeCount = isOwnerLocked 
+                      ? category.permissions.length
+                      : category.permissions.filter(p => getPermissionValue(p.key)).length;
+                    
+                    return (
+                      <Collapsible
+                        key={category.key}
+                        open={expandedCategories.includes(category.key)}
+                        onOpenChange={() => toggleCategory(category.key)}
+                      >
+                        <CollapsibleTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className={cn(
+                              "w-full justify-between px-4 py-3 h-auto hover:bg-muted/50 border rounded-lg",
+                              isTabCategory && "ml-6 w-[calc(100%-1.5rem)] bg-muted/30 border-dashed",
+                              expandedCategories.includes(category.key) && "border-primary/30"
+                            )}
+                          >
+                            <div className="flex items-center gap-3">
+                              {isTabCategory ? (
+                                <Layers className="h-4 w-4 text-muted-foreground" />
                               ) : (
-                                <Switch
-                                  checked={isOwnerLocked ? true : getPermissionValue(permission.key)}
-                                  onCheckedChange={(checked) =>
-                                    handlePermissionChange(permission.key, checked)
-                                  }
-                                  disabled={!!isOwnerLocked}
-                                />
+                                <span className="text-lg">{category.icon}</span>
                               )}
+                              <div className="text-left">
+                                <span className="font-medium block">{category.label}</span>
+                                {isTabCategory && (
+                                  <span className="text-xs text-muted-foreground">Under-faner</span>
+                                )}
+                              </div>
+                              <Badge 
+                                variant={activeCount === category.permissions.length ? "default" : "secondary"}
+                                className={cn(
+                                  "ml-2",
+                                  activeCount === category.permissions.length && "bg-green-600"
+                                )}
+                              >
+                                {activeCount} / {category.permissions.length}
+                              </Badge>
                             </div>
-                          ))}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  );
-                })}
-              </div>
+                            {expandedCategories.includes(category.key) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className={cn(
+                            "border rounded-lg mt-2 overflow-hidden",
+                            isTabCategory && "ml-6"
+                          )}>
+                            {category.permissions.map((permission, idx) => (
+                              <div
+                                key={permission.key}
+                                className={cn(
+                                  "flex items-center justify-between gap-4 px-4 py-3 transition-colors",
+                                  isOwnerLocked && "bg-green-500/5",
+                                  idx !== category.permissions.length - 1 && "border-b",
+                                  !isOwnerLocked && "hover:bg-muted/30"
+                                )}
+                              >
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="cursor-help">
+                                        <Info className="h-4 w-4 text-muted-foreground/60 hover:text-primary transition-colors" />
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" className="max-w-xs">
+                                      <p className="font-medium mb-1">{permission.label}</p>
+                                      <p className="text-muted-foreground text-xs">{permission.description}</p>
+                                      {permission.hasEditOption && (
+                                        <div className="mt-2 pt-2 border-t text-xs space-y-1">
+                                          <p className="flex items-center gap-1.5">
+                                            <Eye className="h-3 w-3" /> <strong>Se:</strong> Kan se indholdet
+                                          </p>
+                                          <p className="flex items-center gap-1.5">
+                                            <Edit className="h-3 w-3" /> <strong>Ret:</strong> Kan ændre indholdet
+                                          </p>
+                                        </div>
+                                      )}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-sm">{permission.label}</div>
+                                  </div>
+                                </div>
+                                
+                                {permission.hasEditOption ? (
+                                  <div className="flex items-center gap-6">
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="flex items-center gap-2">
+                                          <div className={cn(
+                                            "flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors",
+                                            (isOwnerLocked || getPermissionValue(permission.key, "view")) && "bg-primary/10"
+                                          )}>
+                                            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                                            <span className="text-xs font-medium">Se</span>
+                                          </div>
+                                          <Switch
+                                            checked={isOwnerLocked ? true : getPermissionValue(permission.key, "view")}
+                                            onCheckedChange={(checked) =>
+                                              handlePermissionChange(permission.key, checked, "view")
+                                            }
+                                            disabled={!!isOwnerLocked}
+                                          />
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Kan se dette indhold</TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="flex items-center gap-2">
+                                          <div className={cn(
+                                            "flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors",
+                                            (isOwnerLocked || getPermissionValue(permission.key, "edit")) && "bg-orange-500/10"
+                                          )}>
+                                            <Edit className="h-3.5 w-3.5 text-muted-foreground" />
+                                            <span className="text-xs font-medium">Ret</span>
+                                          </div>
+                                          <Switch
+                                            checked={isOwnerLocked ? true : getPermissionValue(permission.key, "edit")}
+                                            onCheckedChange={(checked) =>
+                                              handlePermissionChange(permission.key, checked, "edit")
+                                            }
+                                            disabled={!!isOwnerLocked || !getPermissionValue(permission.key, "view")}
+                                          />
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        {!getPermissionValue(permission.key, "view") 
+                                          ? "Aktiver 'Se' først for at kunne redigere"
+                                          : "Kan redigere dette indhold"
+                                        }
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                ) : (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="flex items-center gap-2">
+                                        <span className={cn(
+                                          "text-xs font-medium px-2 py-1 rounded-md transition-colors",
+                                          (isOwnerLocked || getPermissionValue(permission.key)) 
+                                            ? "bg-green-500/10 text-green-700" 
+                                            : "text-muted-foreground"
+                                        )}>
+                                          {(isOwnerLocked || getPermissionValue(permission.key)) ? "Aktiveret" : "Deaktiveret"}
+                                        </span>
+                                        <Switch
+                                          checked={isOwnerLocked ? true : getPermissionValue(permission.key)}
+                                          onCheckedChange={(checked) =>
+                                            handlePermissionChange(permission.key, checked)
+                                          }
+                                          disabled={!!isOwnerLocked}
+                                        />
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{permission.description}</TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    );
+                  })}
+                </div>
+              </TooltipProvider>
             </div>
           </div>
 
