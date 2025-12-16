@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
         source: provider || "adversus", 
         integration_id, 
         action: "sync", 
-        days: 1 
+        days: 2 
       };
     } else {
       // Legacy support for other integration types
@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
       jobName = `${integration_type}-sync-scheduled`;
       functionName = typeToFunction[integration_type];
       payload = integration_type === "adversus" 
-        ? { source: "adversus", action: "sync", days: 1 }
+        ? { source: "adversus", action: "sync", days: 2 }
         : {};
     }
 
@@ -97,13 +97,13 @@ Deno.serve(async (req) => {
       console.log(`[update-cron-schedule] Scheduling: ${cronExpression} -> ${functionUrl}`);
       console.log(`[update-cron-schedule] Payload: ${JSON.stringify(payload)}`);
 
-      // Schedule the new cron job using the RPC function
+      // Schedule the new cron job using the RPC function with full payload
       const { data: scheduleData, error: scheduleError } = await supabase.rpc("schedule_integration_sync", {
         p_job_name: jobName,
         p_schedule: cronExpression,
         p_function_url: functionUrl,
         p_anon_key: anonKey,
-        p_client_id: integration_id || "00000000-0000-0000-0000-000000000000",
+        p_payload: payload,
       });
 
       if (scheduleError) {

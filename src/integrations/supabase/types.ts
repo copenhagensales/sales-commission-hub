@@ -4069,9 +4069,9 @@ export type Database = {
       schedule_integration_sync: {
         Args: {
           p_anon_key: string
-          p_client_id: string
           p_function_url: string
           p_job_name: string
+          p_payload?: Json
           p_schedule: string
         }
         Returns: number
