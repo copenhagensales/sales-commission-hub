@@ -82,17 +82,6 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
   {
-    key: "tabs_employees",
-    label: "Medarbejdere faner",
-    icon: "📑",
-    permissions: [
-      { key: "tab_employees_all", label: "Alle medarbejdere", description: "Adgang til alle medarbejdere fane", hasEditOption: true },
-      { key: "tab_employees_dialer_mapping", label: "Dialer mapping", description: "Adgang til dialer mapping fane", hasEditOption: true },
-      { key: "tab_employees_teams", label: "Teams fane", description: "Adgang til teams fane", hasEditOption: true },
-      { key: "tab_employees_positions", label: "Stillinger", description: "Adgang til stillinger fane", hasEditOption: true },
-    ],
-  },
-  {
     key: "menu_management",
     label: "Ledelse menu",
     icon: "👑",
@@ -103,15 +92,6 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
   {
-    key: "tabs_contracts",
-    label: "Kontrakter faner",
-    icon: "📑",
-    permissions: [
-      { key: "tab_contracts_all", label: "Alle kontrakter", description: "Adgang til alle kontrakter fane", hasEditOption: true },
-      { key: "tab_contracts_templates", label: "Skabeloner", description: "Adgang til kontraktskabeloner fane", hasEditOption: true },
-    ],
-  },
-  {
     key: "menu_test",
     label: "Test menu",
     icon: "🧪",
@@ -119,34 +99,6 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: "menu_car_quiz_admin", label: "Bil Quiz Admin", description: "Adgang til bil quiz administration", hasEditOption: true },
       { key: "menu_coc_admin", label: "Code of Conduct Admin", description: "Adgang til Code of Conduct administration", hasEditOption: true },
       { key: "menu_pulse_survey", label: "Pulsmåling resultater", description: "Adgang til pulsmåling resultater", hasEditOption: true },
-    ],
-  },
-  {
-    key: "tabs_car_quiz",
-    label: "Bil Quiz faner",
-    icon: "📑",
-    permissions: [
-      { key: "tab_car_quiz_questions", label: "Spørgsmål", description: "Adgang til quiz spørgsmål fane", hasEditOption: true },
-      { key: "tab_car_quiz_submissions", label: "Besvarelser", description: "Adgang til besvarelser fane", hasEditOption: true },
-    ],
-  },
-  {
-    key: "tabs_coc",
-    label: "Code of Conduct faner",
-    icon: "📑",
-    permissions: [
-      { key: "tab_coc_questions", label: "Spørgsmål", description: "Adgang til CoC spørgsmål fane", hasEditOption: true },
-      { key: "tab_coc_submissions", label: "Besvarelser", description: "Adgang til CoC besvarelser fane", hasEditOption: true },
-    ],
-  },
-  {
-    key: "tabs_pulse_survey",
-    label: "Pulsmåling faner",
-    icon: "📑",
-    permissions: [
-      { key: "tab_pulse_results", label: "Resultater", description: "Adgang til pulsmåling resultater fane", hasEditOption: true },
-      { key: "tab_pulse_template", label: "Skabelon", description: "Adgang til pulsmåling skabelon fane", hasEditOption: true },
-      { key: "tab_pulse_teams", label: "Team sammenligning", description: "Adgang til team sammenligning fane", hasEditOption: true },
     ],
   },
   {
@@ -162,25 +114,6 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: "menu_dialer_data", label: "Dialer Data", description: "Adgang til dialer data", hasEditOption: true },
       { key: "menu_calls_data", label: "Calls Data", description: "Adgang til opkaldsdata", hasEditOption: true },
       { key: "menu_adversus_data", label: "Adversus Data", description: "Adgang til Adversus data", hasEditOption: true },
-    ],
-  },
-  {
-    key: "tabs_mg_test",
-    label: "MG Test faner",
-    icon: "📑",
-    permissions: [
-      { key: "tab_mg_products", label: "Produkter", description: "Adgang til produkter fane", hasEditOption: true },
-      { key: "tab_mg_campaigns", label: "Kampagner", description: "Adgang til kampagner fane", hasEditOption: true },
-      { key: "tab_mg_customers", label: "Kunder", description: "Adgang til kunder fane", hasEditOption: true },
-    ],
-  },
-  {
-    key: "tabs_payroll",
-    label: "Lønkørsel faner",
-    icon: "📑",
-    permissions: [
-      { key: "tab_payroll_overview", label: "Overblik", description: "Adgang til lønkørsel overblik fane", hasEditOption: true },
-      { key: "tab_payroll_details", label: "Detaljer", description: "Adgang til lønkørsel detaljer fane", hasEditOption: true },
     ],
   },
   {
@@ -227,15 +160,6 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
   {
-    key: "tabs_candidates",
-    label: "Kandidater faner",
-    icon: "📑",
-    permissions: [
-      { key: "tab_candidates_all", label: "Alle kandidater", description: "Adgang til alle kandidater fane", hasEditOption: true },
-      { key: "tab_candidates_pipeline", label: "Pipeline", description: "Adgang til kandidat pipeline fane", hasEditOption: true },
-    ],
-  },
-  {
     key: "menu_boards",
     label: "Boards menu",
     icon: "📺",
@@ -262,108 +186,6 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     icon: "⚙️",
     permissions: [
       { key: "menu_settings", label: "Indstillinger", description: "Adgang til systemindstillinger", hasEditOption: true },
-    ],
-  },
-  {
-    key: "tabs_settings",
-    label: "Indstillinger faner",
-    icon: "📑",
-    permissions: [
-      { key: "tab_settings_api", label: "API Integrationer", description: "Adgang til API integrationer fane", hasEditOption: true },
-      { key: "tab_settings_dialer", label: "Dialer Integrationer", description: "Adgang til dialer integrationer fane", hasEditOption: true },
-      { key: "tab_settings_customer", label: "Kunde Integrationer", description: "Adgang til kunde integrationer fane", hasEditOption: true },
-      { key: "tab_settings_webhooks", label: "Webhooks", description: "Adgang til webhooks fane", hasEditOption: true },
-      { key: "tab_settings_logs", label: "Logs", description: "Adgang til integrationslog fane", hasEditOption: true },
-      { key: "tab_settings_excel_crm", label: "Excel CRM Import", description: "Adgang til Excel CRM import fane", hasEditOption: true },
-    ],
-  },
-  {
-    key: "data_visibility",
-    label: "Data synlighed",
-    icon: "👁️",
-    permissions: [
-      { key: "view_own_revenue", label: "Se egen omsætning", description: "Kan se egne omsætningstal" },
-      { key: "view_team_revenue", label: "Se team omsætning", description: "Kan se omsætning for eget team" },
-      { key: "view_all_revenue", label: "Se al omsætning", description: "Kan se omsætning for hele virksomheden" },
-      { key: "view_own_commission", label: "Se egen provision", description: "Kan se egne provisionstal" },
-      { key: "view_team_commission", label: "Se team provision", description: "Kan se provision for eget team" },
-      { key: "view_all_commission", label: "Se al provision", description: "Kan se provision for alle" },
-      { key: "view_salary_data", label: "Se løndata", description: "Kan se lønoplysninger" },
-      { key: "view_sensitive_data", label: "Se følsomme data", description: "Kan se CPR, bank info mv." },
-    ],
-  },
-  {
-    key: "employee_management",
-    label: "Medarbejderstyring",
-    icon: "👥",
-    permissions: [
-      { key: "create_employees", label: "Oprette medarbejdere", description: "Kan oprette nye medarbejdere" },
-      { key: "edit_employees", label: "Redigere medarbejdere", description: "Kan redigere medarbejderdata" },
-      { key: "delete_employees", label: "Slette medarbejdere", description: "Kan slette medarbejdere" },
-      { key: "manage_teams", label: "Administrere teams", description: "Kan oprette og redigere teams" },
-      { key: "assign_team_members", label: "Tildele teammedlemmer", description: "Kan tilføje/fjerne fra teams" },
-      { key: "manage_positions", label: "Administrere stillinger", description: "Kan oprette og redigere stillinger" },
-      { key: "assign_roles", label: "Tildele roller", description: "Kan tildele systemroller til brugere" },
-    ],
-  },
-  {
-    key: "contract_management",
-    label: "Kontraktstyring",
-    icon: "📄",
-    permissions: [
-      { key: "view_contracts", label: "Se kontrakter", description: "Kan se kontraktliste" },
-      { key: "create_contracts", label: "Oprette kontrakter", description: "Kan oprette nye kontrakter" },
-      { key: "send_contracts", label: "Sende kontrakter", description: "Kan sende kontrakter til underskrift" },
-      { key: "edit_contract_templates", label: "Redigere skabeloner", description: "Kan ændre kontraktskabeloner" },
-      { key: "delete_contracts", label: "Slette kontrakter", description: "Kan slette kontrakter" },
-    ],
-  },
-  {
-    key: "shift_management",
-    label: "Vagtstyring",
-    icon: "📅",
-    permissions: [
-      { key: "view_all_shifts", label: "Se alle vagter", description: "Kan se alle medarbejderes vagter" },
-      { key: "create_shifts", label: "Oprette vagter", description: "Kan oprette nye vagter" },
-      { key: "edit_shifts", label: "Redigere vagter", description: "Kan ændre eksisterende vagter" },
-      { key: "approve_absence", label: "Godkende fravær", description: "Kan godkende fraværsanmodninger" },
-      { key: "mark_sick", label: "Registrere sygdom", description: "Kan registrere medarbejdere som syge" },
-      { key: "edit_time_stamps", label: "Redigere tidsstempler", description: "Kan ændre ind/ud-stemplinger" },
-    ],
-  },
-  {
-    key: "sales_data",
-    label: "Salgsdata",
-    icon: "💰",
-    permissions: [
-      { key: "view_sales", label: "Se salg", description: "Kan se salgsdata" },
-      { key: "edit_sales", label: "Redigere salg", description: "Kan ændre salgsdata" },
-      { key: "delete_sales", label: "Slette salg", description: "Kan slette salgsdata" },
-      { key: "manage_products", label: "Administrere produkter", description: "Kan oprette/ændre produkter" },
-      { key: "manage_campaigns", label: "Administrere kampagner", description: "Kan ændre kampagnemappings" },
-      { key: "run_payroll", label: "Køre lønberegning", description: "Kan udføre lønkørsler" },
-    ],
-  },
-  {
-    key: "integrations",
-    label: "Integrationer",
-    icon: "🔌",
-    permissions: [
-      { key: "view_integrations", label: "Se integrationer", description: "Kan se integrationsopsætning" },
-      { key: "manage_integrations", label: "Administrere integrationer", description: "Kan ændre API-integrationer" },
-      { key: "view_logs", label: "Se logs", description: "Kan se integrationslogfiler" },
-      { key: "trigger_sync", label: "Udføre synkronisering", description: "Kan manuelt starte datasynd" },
-    ],
-  },
-  {
-    key: "system",
-    label: "System",
-    icon: "⚙️",
-    permissions: [
-      { key: "manage_system_settings", label: "Systemindstillinger", description: "Kan ændre systemkonfiguration" },
-      { key: "view_audit_logs", label: "Se aktivitetslog", description: "Kan se systemaktivitetslog" },
-      { key: "manage_webhooks", label: "Administrere webhooks", description: "Kan ændre webhook-endpoints" },
-      { key: "full_admin_access", label: "Fuld administratoradgang", description: "Har alle rettigheder i systemet" },
     ],
   },
 ];
