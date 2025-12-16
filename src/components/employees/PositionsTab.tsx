@@ -21,30 +21,145 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Shield } from "lucide-react";
+import { Plus, Pencil, Trash2, Shield, ChevronDown, ChevronRight, Eye, Edit } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
+import { cn } from "@/lib/utils";
 
 interface Permission {
   key: string;
   label: string;
   description: string;
+  hasEditOption?: boolean; // If true, show separate view/edit toggles
 }
 
-const AVAILABLE_PERMISSIONS: Permission[] = [
-  { key: "can_see_own_revenue", label: "Se egen omsætning", description: "Kan se omsætningstal for eget team" },
-  { key: "can_see_other_teams_revenue", label: "Se andre teams omsætning", description: "Kan se omsætningstal for andre teams" },
-  { key: "can_manage_employees", label: "Administrere medarbejdere", description: "Kan oprette og redigere medarbejdere" },
-  { key: "can_manage_teams", label: "Administrere teams", description: "Kan oprette og redigere teams" },
-  { key: "can_manage_contracts", label: "Administrere kontrakter", description: "Kan sende og administrere kontrakter" },
-  { key: "can_view_all_data", label: "Se alle data", description: "Har adgang til alle data i systemet" },
+interface PermissionCategory {
+  key: string;
+  label: string;
+  icon: string;
+  permissions: Permission[];
+}
+
+const PERMISSION_CATEGORIES: PermissionCategory[] = [
+  {
+    key: "menu_access",
+    label: "Menu adgang",
+    icon: "📱",
+    permissions: [
+      { key: "menu_dashboard", label: "Dashboard", description: "Adgang til dashboard oversigt", hasEditOption: false },
+      { key: "menu_wallboard", label: "Wallboard", description: "Adgang til wallboard visning", hasEditOption: false },
+      { key: "menu_mg_test", label: "MG Test", description: "Adgang til MG Test sektion", hasEditOption: true },
+      { key: "menu_sales", label: "Salg", description: "Adgang til salgsdata", hasEditOption: true },
+      { key: "menu_agents", label: "Agenter", description: "Adgang til agentdata", hasEditOption: true },
+      { key: "menu_payroll", label: "Lønkørsel", description: "Adgang til lønkørsel", hasEditOption: true },
+      { key: "menu_shift_planning", label: "Vagtplan", description: "Adgang til vagtplanlægning", hasEditOption: true },
+      { key: "menu_recruitment", label: "Rekruttering", description: "Adgang til rekrutteringsmodul", hasEditOption: true },
+      { key: "menu_contracts", label: "Kontrakter", description: "Adgang til kontraktmodul", hasEditOption: true },
+      { key: "menu_some", label: "SOME", description: "Adgang til social media modul", hasEditOption: true },
+      { key: "menu_settings", label: "Indstillinger", description: "Adgang til systemindstillinger", hasEditOption: true },
+    ],
+  },
+  {
+    key: "data_visibility",
+    label: "Data synlighed",
+    icon: "👁️",
+    permissions: [
+      { key: "view_own_revenue", label: "Se egen omsætning", description: "Kan se egne omsætningstal" },
+      { key: "view_team_revenue", label: "Se team omsætning", description: "Kan se omsætning for eget team" },
+      { key: "view_all_revenue", label: "Se al omsætning", description: "Kan se omsætning for hele virksomheden" },
+      { key: "view_own_commission", label: "Se egen provision", description: "Kan se egne provisionstal" },
+      { key: "view_team_commission", label: "Se team provision", description: "Kan se provision for eget team" },
+      { key: "view_all_commission", label: "Se al provision", description: "Kan se provision for alle" },
+      { key: "view_salary_data", label: "Se løndata", description: "Kan se lønoplysninger" },
+      { key: "view_sensitive_data", label: "Se følsomme data", description: "Kan se CPR, bank info mv." },
+    ],
+  },
+  {
+    key: "employee_management",
+    label: "Medarbejderstyring",
+    icon: "👥",
+    permissions: [
+      { key: "create_employees", label: "Oprette medarbejdere", description: "Kan oprette nye medarbejdere" },
+      { key: "edit_employees", label: "Redigere medarbejdere", description: "Kan redigere medarbejderdata" },
+      { key: "delete_employees", label: "Slette medarbejdere", description: "Kan slette medarbejdere" },
+      { key: "manage_teams", label: "Administrere teams", description: "Kan oprette og redigere teams" },
+      { key: "assign_team_members", label: "Tildele teammedlemmer", description: "Kan tilføje/fjerne fra teams" },
+      { key: "manage_positions", label: "Administrere stillinger", description: "Kan oprette og redigere stillinger" },
+      { key: "assign_roles", label: "Tildele roller", description: "Kan tildele systemroller til brugere" },
+    ],
+  },
+  {
+    key: "contract_management",
+    label: "Kontraktstyring",
+    icon: "📄",
+    permissions: [
+      { key: "view_contracts", label: "Se kontrakter", description: "Kan se kontraktliste" },
+      { key: "create_contracts", label: "Oprette kontrakter", description: "Kan oprette nye kontrakter" },
+      { key: "send_contracts", label: "Sende kontrakter", description: "Kan sende kontrakter til underskrift" },
+      { key: "edit_contract_templates", label: "Redigere skabeloner", description: "Kan ændre kontraktskabeloner" },
+      { key: "delete_contracts", label: "Slette kontrakter", description: "Kan slette kontrakter" },
+    ],
+  },
+  {
+    key: "shift_management",
+    label: "Vagtstyring",
+    icon: "📅",
+    permissions: [
+      { key: "view_all_shifts", label: "Se alle vagter", description: "Kan se alle medarbejderes vagter" },
+      { key: "create_shifts", label: "Oprette vagter", description: "Kan oprette nye vagter" },
+      { key: "edit_shifts", label: "Redigere vagter", description: "Kan ændre eksisterende vagter" },
+      { key: "approve_absence", label: "Godkende fravær", description: "Kan godkende fraværsanmodninger" },
+      { key: "mark_sick", label: "Registrere sygdom", description: "Kan registrere medarbejdere som syge" },
+      { key: "edit_time_stamps", label: "Redigere tidsstempler", description: "Kan ændre ind/ud-stemplinger" },
+    ],
+  },
+  {
+    key: "sales_data",
+    label: "Salgsdata",
+    icon: "💰",
+    permissions: [
+      { key: "view_sales", label: "Se salg", description: "Kan se salgsdata" },
+      { key: "edit_sales", label: "Redigere salg", description: "Kan ændre salgsdata" },
+      { key: "delete_sales", label: "Slette salg", description: "Kan slette salgsdata" },
+      { key: "manage_products", label: "Administrere produkter", description: "Kan oprette/ændre produkter" },
+      { key: "manage_campaigns", label: "Administrere kampagner", description: "Kan ændre kampagnemappings" },
+      { key: "run_payroll", label: "Køre lønberegning", description: "Kan udføre lønkørsler" },
+    ],
+  },
+  {
+    key: "integrations",
+    label: "Integrationer",
+    icon: "🔌",
+    permissions: [
+      { key: "view_integrations", label: "Se integrationer", description: "Kan se integrationsopsætning" },
+      { key: "manage_integrations", label: "Administrere integrationer", description: "Kan ændre API-integrationer" },
+      { key: "view_logs", label: "Se logs", description: "Kan se integrationslogfiler" },
+      { key: "trigger_sync", label: "Udføre synkronisering", description: "Kan manuelt starte datasynd" },
+    ],
+  },
+  {
+    key: "system",
+    label: "System",
+    icon: "⚙️",
+    permissions: [
+      { key: "manage_system_settings", label: "Systemindstillinger", description: "Kan ændre systemkonfiguration" },
+      { key: "view_audit_logs", label: "Se aktivitetslog", description: "Kan se systemaktivitetslog" },
+      { key: "manage_webhooks", label: "Administrere webhooks", description: "Kan ændre webhook-endpoints" },
+      { key: "full_admin_access", label: "Fuld administratoradgang", description: "Har alle rettigheder i systemet" },
+    ],
+  },
 ];
 
 interface JobPosition {
   id: string;
   name: string;
   description: string | null;
-  permissions: Record<string, boolean>;
+  permissions: Record<string, boolean | { view: boolean; edit: boolean }>;
   is_active: boolean;
   created_at: string;
 }
@@ -52,7 +167,7 @@ interface JobPosition {
 interface FormData {
   name: string;
   description: string;
-  permissions: Record<string, boolean>;
+  permissions: Record<string, boolean | { view: boolean; edit: boolean }>;
 }
 
 export function PositionsTab() {
@@ -64,6 +179,7 @@ export function PositionsTab() {
     description: "",
     permissions: {},
   });
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
 
   // Fetch positions
   const { data: positions = [], isLoading } = useQuery({
@@ -77,7 +193,7 @@ export function PositionsTab() {
       if (error) throw error;
       return data.map(p => ({
         ...p,
-        permissions: (p.permissions as Record<string, boolean>) || {}
+        permissions: (p.permissions as Record<string, boolean | { view: boolean; edit: boolean }>) || {}
       })) as JobPosition[];
     },
   });
@@ -151,8 +267,9 @@ export function PositionsTab() {
     setFormData({
       name: "",
       description: "",
-      permissions: AVAILABLE_PERMISSIONS.reduce((acc, p) => ({ ...acc, [p.key]: false }), {}),
+      permissions: {},
     });
+    setExpandedCategories([]);
     setIsDialogOpen(true);
   };
 
@@ -163,6 +280,7 @@ export function PositionsTab() {
       description: position.description || "",
       permissions: position.permissions,
     });
+    setExpandedCategories(PERMISSION_CATEGORIES.map(c => c.key));
     setIsDialogOpen(true);
   };
 
@@ -170,6 +288,7 @@ export function PositionsTab() {
     setIsDialogOpen(false);
     setEditingPosition(null);
     setFormData({ name: "", description: "", permissions: {} });
+    setExpandedCategories([]);
   };
 
   const handleSubmit = () => {
@@ -185,15 +304,66 @@ export function PositionsTab() {
     }
   };
 
-  const handlePermissionChange = (key: string, value: boolean) => {
-    setFormData({
-      ...formData,
-      permissions: { ...formData.permissions, [key]: value },
+  const toggleCategory = (categoryKey: string) => {
+    setExpandedCategories(prev =>
+      prev.includes(categoryKey)
+        ? prev.filter(k => k !== categoryKey)
+        : [...prev, categoryKey]
+    );
+  };
+
+  const getPermissionValue = (key: string, type?: "view" | "edit"): boolean => {
+    const value = formData.permissions[key];
+    if (type) {
+      if (typeof value === "object" && value !== null) {
+        return value[type] || false;
+      }
+      return false;
+    }
+    if (typeof value === "boolean") return value;
+    if (typeof value === "object" && value !== null) {
+      return value.view || value.edit || false;
+    }
+    return false;
+  };
+
+  const handlePermissionChange = (key: string, checked: boolean, type?: "view" | "edit") => {
+    setFormData(prev => {
+      const newPermissions = { ...prev.permissions };
+      
+      if (type) {
+        const currentValue = typeof newPermissions[key] === "object" 
+          ? newPermissions[key] as { view: boolean; edit: boolean }
+          : { view: false, edit: false };
+        
+        if (type === "edit" && checked) {
+          // If enabling edit, also enable view
+          newPermissions[key] = { view: true, edit: true };
+        } else if (type === "view" && !checked) {
+          // If disabling view, also disable edit
+          newPermissions[key] = { view: false, edit: false };
+        } else {
+          newPermissions[key] = { ...currentValue, [type]: checked };
+        }
+      } else {
+        newPermissions[key] = checked;
+      }
+      
+      return { ...prev, permissions: newPermissions };
     });
   };
 
-  const countActivePermissions = (permissions: Record<string, boolean>) => {
-    return Object.values(permissions).filter(Boolean).length;
+  const countActivePermissions = (permissions: Record<string, boolean | { view: boolean; edit: boolean }>) => {
+    let count = 0;
+    Object.values(permissions).forEach(value => {
+      if (typeof value === "boolean" && value) count++;
+      if (typeof value === "object" && value !== null && (value.view || value.edit)) count++;
+    });
+    return count;
+  };
+
+  const getTotalPermissions = () => {
+    return PERMISSION_CATEGORIES.reduce((acc, cat) => acc + cat.permissions.length, 0);
   };
 
   if (isLoading) {
@@ -203,7 +373,12 @@ export function PositionsTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Stillinger</h2>
+        <div>
+          <h2 className="text-lg font-semibold">Stillinger</h2>
+          <p className="text-sm text-muted-foreground">
+            Definer stillinger og deres tilhørende rettigheder
+          </p>
+        </div>
         <Button onClick={handleOpenCreate}>
           <Plus className="h-4 w-4 mr-2" />
           Opret stilling
@@ -230,14 +405,14 @@ export function PositionsTab() {
             positions.map((position) => (
               <TableRow key={position.id}>
                 <TableCell className="font-medium">{position.name}</TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell className="text-muted-foreground max-w-[200px] truncate">
                   {position.description || "-"}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
                     <Shield className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">
-                      {countActivePermissions(position.permissions)} af {AVAILABLE_PERMISSIONS.length}
+                      {countActivePermissions(position.permissions)} af {getTotalPermissions()}
                     </span>
                   </div>
                 </TableCell>
@@ -270,54 +445,119 @@ export function PositionsTab() {
       </Table>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingPosition ? "Rediger stilling" : "Opret stilling"}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Navn *</Label>
-              <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="F.eks. Teamleder"
-              />
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Navn *</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="F.eks. Teamleder"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Beskrivelse</Label>
+                <Input
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Kort beskrivelse"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Beskrivelse</Label>
-              <Textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Kort beskrivelse af stillingen"
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-3">
-              <Label className="text-base font-medium">Rettigheder</Label>
-              <div className="space-y-3 border rounded-lg p-4">
-                {AVAILABLE_PERMISSIONS.map((permission) => (
-                  <div
-                    key={permission.key}
-                    className="flex items-center justify-between gap-4"
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Rettigheder
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Klik på en kategori for at udvide og konfigurere rettigheder
+              </p>
+              
+              <div className="space-y-2 mt-4">
+                {PERMISSION_CATEGORIES.map((category) => (
+                  <Collapsible
+                    key={category.key}
+                    open={expandedCategories.includes(category.key)}
+                    onOpenChange={() => toggleCategory(category.key)}
                   >
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">{permission.label}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {permission.description}
+                    <CollapsibleTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-between px-4 py-3 h-auto hover:bg-muted/50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">{category.icon}</span>
+                          <span className="font-medium">{category.label}</span>
+                          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                            {category.permissions.filter(p => getPermissionValue(p.key)).length} / {category.permissions.length}
+                          </span>
+                        </div>
+                        {expandedCategories.includes(category.key) ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="border rounded-lg mt-2 divide-y">
+                        {category.permissions.map((permission) => (
+                          <div
+                            key={permission.key}
+                            className="flex items-center justify-between gap-4 px-4 py-3"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">{permission.label}</div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {permission.description}
+                              </div>
+                            </div>
+                            
+                            {permission.hasEditOption ? (
+                              <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                  <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <span className="text-xs text-muted-foreground">Se</span>
+                                  <Switch
+                                    checked={getPermissionValue(permission.key, "view")}
+                                    onCheckedChange={(checked) =>
+                                      handlePermissionChange(permission.key, checked, "view")
+                                    }
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Edit className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <span className="text-xs text-muted-foreground">Ret</span>
+                                  <Switch
+                                    checked={getPermissionValue(permission.key, "edit")}
+                                    onCheckedChange={(checked) =>
+                                      handlePermissionChange(permission.key, checked, "edit")
+                                    }
+                                    disabled={!getPermissionValue(permission.key, "view")}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <Switch
+                                checked={getPermissionValue(permission.key)}
+                                onCheckedChange={(checked) =>
+                                  handlePermissionChange(permission.key, checked)
+                                }
+                              />
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                    <Switch
-                      checked={formData.permissions[permission.key] || false}
-                      onCheckedChange={(checked) =>
-                        handlePermissionChange(permission.key, checked)
-                      }
-                    />
-                  </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 ))}
               </div>
             </div>
