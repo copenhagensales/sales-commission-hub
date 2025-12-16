@@ -298,68 +298,104 @@ export default function ContractSign() {
             </div>
           </div>
 
-          {/* Contract Content - Professional Legal Document Layout */}
-          <div className="p-8 md:p-14 lg:p-16 bg-card">
-            <div
-              className="max-w-3xl mx-auto prose prose-invert
-                /* Main title - centered, prominent */
-                prose-h1:text-2xl prose-h1:font-bold prose-h1:text-center prose-h1:text-foreground 
-                prose-h1:tracking-wide prose-h1:uppercase prose-h1:mb-12 prose-h1:mt-0
-                prose-h1:pb-4 prose-h1:border-b-2 prose-h1:border-primary/40
-                
-                /* Section headings - bold, clear separation */
-                prose-h2:text-lg prose-h2:font-bold prose-h2:text-foreground prose-h2:uppercase
-                prose-h2:tracking-wider prose-h2:mt-12 prose-h2:mb-6 prose-h2:pt-8
-                prose-h2:border-t prose-h2:border-border/30
-                
-                /* Subsection headings */
-                prose-h3:text-base prose-h3:font-bold prose-h3:text-foreground
-                prose-h3:mt-8 prose-h3:mb-4
-                
-                prose-h4:text-sm prose-h4:font-bold prose-h4:text-foreground prose-h4:uppercase
-                prose-h4:tracking-wide prose-h4:mt-6 prose-h4:mb-3
-                
-                /* Body text - readable with proper spacing */
-                prose-p:text-muted-foreground prose-p:leading-7 prose-p:my-4
-                prose-p:text-[15px]
-                
-                /* Strong text stands out */
-                prose-strong:text-foreground prose-strong:font-semibold
-                
-                /* Lists with proper indentation */
-                prose-ul:my-6 prose-ul:pl-6 prose-ul:space-y-2
-                prose-ol:my-6 prose-ol:pl-8 prose-ol:space-y-3
-                prose-li:text-muted-foreground prose-li:text-[15px] prose-li:leading-7
-                prose-li:pl-2
-                
-                /* Line breaks - minimal spacing for address blocks */
-                [&_br]:block [&_br]:content-[''] [&_br]:h-1
-                
-                /* Horizontal rules for section breaks */
-                [&_hr]:my-12 [&_hr]:border-border/40
-                
-                /* Tables - professional grid layout */
-                [&_table]:w-full [&_table]:my-8 [&_table]:text-sm
-                [&_table]:border [&_table]:border-border/50 [&_table]:rounded-lg [&_table]:overflow-hidden
-                [&_th]:bg-muted/50 [&_th]:px-5 [&_th]:py-3 [&_th]:text-left 
-                [&_th]:font-bold [&_th]:text-foreground [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider
-                [&_th]:border-b [&_th]:border-border
-                [&_td]:px-5 [&_td]:py-3 [&_td]:border-b [&_td]:border-border/30 [&_td]:text-muted-foreground
-                [&_td]:align-top
-                [&_tr:last-child_td]:border-b-0
-                [&_tr:nth-child(even)]:bg-muted/20
-                [&_td:first-child]:font-medium [&_td:first-child]:text-foreground
-                
-                /* Indented quote-style blocks for party info */
-                [&_blockquote]:border-l-4 [&_blockquote]:border-primary/40 [&_blockquote]:pl-6
-                [&_blockquote]:my-6 [&_blockquote]:py-2 [&_blockquote]:bg-muted/20 [&_blockquote]:rounded-r-lg
-                [&_blockquote_p]:my-1 [&_blockquote_p]:text-foreground
-                
-                /* Preformatted text for structured data */
-                [&_pre]:whitespace-pre-wrap [&_pre]:font-mono [&_pre]:text-sm 
-                [&_pre]:bg-muted/30 [&_pre]:p-5 [&_pre]:rounded-lg [&_pre]:my-6 [&_pre]:border [&_pre]:border-border/30"
-              dangerouslySetInnerHTML={{ __html: contract.content }}
-            />
+          {/* Contract Content - Professional Danish Employment Contract Layout */}
+          <div className="py-12 px-6 md:px-12 lg:px-20 bg-card">
+            {/* Narrow column container - max 65 characters per line */}
+            <div className="max-w-[42rem] mx-auto">
+              <div
+                className="prose prose-invert
+                  /* Base typography - optimized for legal documents */
+                  prose-base
+                  text-[15px] leading-[1.8]
+                  
+                  /* ═══════════════════════════════════════════════════════════
+                     DOCUMENT TITLE - Very prominent, centered
+                     ═══════════════════════════════════════════════════════════ */
+                  prose-h1:text-xl prose-h1:font-bold prose-h1:text-center prose-h1:text-foreground 
+                  prose-h1:tracking-[0.15em] prose-h1:uppercase prose-h1:mb-16 prose-h1:mt-4
+                  prose-h1:pb-6 prose-h1:border-b prose-h1:border-foreground/20
+                  
+                  /* ═══════════════════════════════════════════════════════════
+                     SECTION TITLES (§1, §2 etc.) - Clear separation
+                     ═══════════════════════════════════════════════════════════ */
+                  prose-h2:text-base prose-h2:font-bold prose-h2:text-foreground 
+                  prose-h2:tracking-wide prose-h2:uppercase
+                  prose-h2:mt-14 prose-h2:mb-5 prose-h2:pt-6
+                  prose-h2:border-t prose-h2:border-foreground/10
+                  
+                  /* ═══════════════════════════════════════════════════════════
+                     SUBSECTION TITLES - Slightly smaller
+                     ═══════════════════════════════════════════════════════════ */
+                  prose-h3:text-[15px] prose-h3:font-semibold prose-h3:text-foreground
+                  prose-h3:mt-8 prose-h3:mb-3
+                  
+                  prose-h4:text-sm prose-h4:font-semibold prose-h4:text-muted-foreground
+                  prose-h4:uppercase prose-h4:tracking-wider
+                  prose-h4:mt-6 prose-h4:mb-2
+                  
+                  /* ═══════════════════════════════════════════════════════════
+                     PARAGRAPHS - Generous spacing, readable line length
+                     ═══════════════════════════════════════════════════════════ */
+                  prose-p:text-muted-foreground prose-p:leading-[1.9] prose-p:my-5
+                  prose-p:text-[15px] prose-p:text-justify prose-p:hyphens-auto
+                  
+                  prose-strong:text-foreground prose-strong:font-semibold
+                  
+                  /* ═══════════════════════════════════════════════════════════
+                     LISTS - Proper indentation for numbered items
+                     ═══════════════════════════════════════════════════════════ */
+                  prose-ul:my-6 prose-ul:pl-5 prose-ul:space-y-3
+                  prose-ol:my-6 prose-ol:pl-0 prose-ol:space-y-4 prose-ol:list-none
+                  prose-li:text-muted-foreground prose-li:text-[15px] prose-li:leading-[1.8]
+                  prose-li:my-0
+                  
+                  /* Nested list indentation */
+                  [&_ol_ol]:pl-8 [&_ol_ol]:mt-3 [&_ol_ol]:mb-0
+                  [&_ul_ul]:pl-6 [&_ul_ul]:mt-2
+                  
+                  /* Line breaks - minimal for addresses */
+                  [&_br]:block [&_br]:content-[''] [&_br]:h-0.5
+                  
+                  /* Horizontal rules */
+                  [&_hr]:my-14 [&_hr]:border-foreground/10
+                  
+                  /* ═══════════════════════════════════════════════════════════
+                     TABLES - Clean grid for structured data (notice periods etc.)
+                     ═══════════════════════════════════════════════════════════ */
+                  [&_table]:w-full [&_table]:my-8 [&_table]:text-sm
+                  [&_table]:border [&_table]:border-border/40 [&_table]:rounded
+                  [&_th]:bg-muted/30 [&_th]:px-4 [&_th]:py-2.5 [&_th]:text-left 
+                  [&_th]:font-semibold [&_th]:text-foreground [&_th]:text-xs 
+                  [&_th]:uppercase [&_th]:tracking-wider [&_th]:border-b [&_th]:border-border/40
+                  [&_td]:px-4 [&_td]:py-2.5 [&_td]:border-b [&_td]:border-border/20 
+                  [&_td]:text-muted-foreground [&_td]:align-top
+                  [&_tr:last-child_td]:border-b-0
+                  [&_td:first-child]:font-medium [&_td:first-child]:text-foreground
+                  [&_td:last-child]:text-right
+                  
+                  /* ═══════════════════════════════════════════════════════════
+                     PARTY BLOCKS - Clear visual separation for Medarbejder/Arbejdsgiver
+                     ═══════════════════════════════════════════════════════════ */
+                  [&_blockquote]:border-l-2 [&_blockquote]:border-primary/50 
+                  [&_blockquote]:pl-6 [&_blockquote]:ml-0 [&_blockquote]:mr-0
+                  [&_blockquote]:my-8 [&_blockquote]:py-4
+                  [&_blockquote]:bg-muted/10 [&_blockquote]:rounded-r
+                  [&_blockquote_p]:my-1.5 [&_blockquote_p]:text-foreground/90
+                  [&_blockquote_p]:text-[14px] [&_blockquote_p]:leading-relaxed
+                  [&_blockquote_strong]:text-foreground
+                  
+                  /* Definition lists for structured info */
+                  [&_dl]:my-6 [&_dl]:grid [&_dl]:grid-cols-[auto_1fr] [&_dl]:gap-x-6 [&_dl]:gap-y-2
+                  [&_dt]:font-medium [&_dt]:text-foreground [&_dt]:text-sm
+                  [&_dd]:text-muted-foreground [&_dd]:text-sm [&_dd]:m-0
+                  
+                  /* Pre blocks for special formatting */
+                  [&_pre]:whitespace-pre-wrap [&_pre]:font-sans [&_pre]:text-sm 
+                  [&_pre]:bg-muted/20 [&_pre]:p-5 [&_pre]:rounded [&_pre]:my-6 
+                  [&_pre]:border [&_pre]:border-border/20 [&_pre]:leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: contract.content }}
+              />
+            </div>
           </div>
         </div>
 
