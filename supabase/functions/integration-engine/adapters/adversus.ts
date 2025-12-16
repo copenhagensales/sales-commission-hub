@@ -1,28 +1,35 @@
 import { DialerAdapter } from "./interface.ts";
 import { StandardSale, StandardUser, StandardCampaign, StandardCall, CampaignMappingConfig, ReferenceExtractionConfig } from "../types.ts";
 
+interface AdversusCredentials {
+  username?: string;
+  password?: string;
+  ADVERSUS_API_USERNAME?: string;
+  ADVERSUS_API_PASSWORD?: string;
+}
+
 export class AdversusAdapter implements DialerAdapter {
   private authHeader: string;
   private baseUrl = "https://api.adversus.io/v1";
   private dialerName: string;
 
-  constructor(secrets?: Record<string, string> | string[] | null, dialerName?: string) {
-    // Support both object secrets and env vars
+  constructor(credentials?: AdversusCredentials | Record<string, string> | null, dialerName?: string) {
+    // Extract credentials - support multiple key formats
     let user: string | undefined;
     let pass: string | undefined;
 
-    if (secrets && typeof secrets === "object" && !Array.isArray(secrets)) {
-      user = secrets.ADVERSUS_API_USERNAME;
-      pass = secrets.ADVERSUS_API_PASSWORD;
+    if (credentials && typeof credentials === "object") {
+      // Support both formats: {username, password} or {ADVERSUS_API_USERNAME, ADVERSUS_API_PASSWORD}
+      user = credentials.username || credentials.ADVERSUS_API_USERNAME;
+      pass = credentials.password || credentials.ADVERSUS_API_PASSWORD;
     }
 
-    // Fallback to env vars
-    user = user || Deno.env.get("ADVERSUS_API_USERNAME");
-    pass = pass || Deno.env.get("ADVERSUS_API_PASSWORD");
+    if (!user || !pass) {
+      throw new Error("[AdversusAdapter] No valid credentials provided. Required: username/password or ADVERSUS_API_USERNAME/ADVERSUS_API_PASSWORD");
+    }
 
-    if (!user || !pass) throw new Error("Credenciales Adversus faltantes");
     this.authHeader = btoa(`${user}:${pass}`);
-    this.dialerName = dialerName || "Lovablecph";
+    this.dialerName = dialerName || "Adversus";
   }
 
   setDialerName(name: string) {
