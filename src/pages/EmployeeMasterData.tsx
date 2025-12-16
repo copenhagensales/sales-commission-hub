@@ -883,7 +883,7 @@ export default function EmployeeMasterData() {
                     <TableHead className="text-xs font-medium text-muted-foreground">Navn</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">E-mail</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Telefon</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Afdeling</TableHead>
+                    
                     <TableHead className="text-xs font-medium text-muted-foreground">Stilling</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Løntype</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
@@ -926,7 +926,7 @@ export default function EmployeeMasterData() {
                         ) : <span className="text-muted-foreground/50">-</span>}
                       </TableCell>
                       <TableCell className="py-3 text-sm">{employee.private_phone || <span className="text-muted-foreground/50">-</span>}</TableCell>
-                      <TableCell className="py-3 text-sm">{employee.department || <span className="text-muted-foreground/50">-</span>}</TableCell>
+                      
                       <TableCell className="py-3">
                         {employee.job_title ? (
                           <Badge variant="secondary" className="text-xs font-normal">{employee.job_title}</Badge>
