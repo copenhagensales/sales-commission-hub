@@ -64,7 +64,8 @@
     "timeClock": "Time Clock",
     "new": "New",
     "bookings": "Bookings",
-    "permissions": "Permissions"
+    "permissions": "Permissions",
+    "management": "Management"
   },
   "dialerIntegrations": {
     "title": "Dialer Integrations",
