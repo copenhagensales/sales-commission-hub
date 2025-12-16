@@ -20,7 +20,6 @@ import { useTranslation } from "react-i18next";
 // Navigation items - using translation keys instead of hardcoded names
 const getOwnerNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.employees"), href: "/employees", icon: Users },
-  { name: t("sidebar.teams"), href: "/teams", icon: Users },
   { name: t("sidebar.contracts"), href: "/contracts", icon: FileText },
   { name: t("sidebar.myContracts"), href: "/my-contracts", icon: FileText },
   { name: t("sidebar.careerWishesOverview"), href: "/career-wishes-overview", icon: Sparkles },
