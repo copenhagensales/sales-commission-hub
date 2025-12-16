@@ -6,12 +6,25 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface LeadDetail {
+  id: string;
+  vendor: string;
+  customerName: string;
+  customerPhone: string;
+  saleTime: string;
+  internetUnits: number;
+  subscriptionUnits: number;
+  closure: string;
+  agent: string;
+}
+
 interface VendorStats {
   vendor: string;
   successLeads: number;
   internetUnits: number;
   subscriptionUnits: number;
   missingSubscriptionKeys: number;
+  sales: LeadDetail[];
 }
 
 serve(async (req) => {
@@ -204,7 +217,8 @@ serve(async (req) => {
           successLeads: 0, 
           internetUnits: 0, 
           subscriptionUnits: 0, 
-          missingSubscriptionKeys: 0 
+          missingSubscriptionKeys: 0,
+          sales: []
         });
       }
       
@@ -218,6 +232,25 @@ serve(async (req) => {
         vstats.successLeads += 1;
         vstats.internetUnits += internetQty;
         vstats.subscriptionUnits += subsQty;
+        
+        // Add sale detail
+        const leadId = String(l.leadId ?? l.id ?? "");
+        const customerName = String(dataObj?.["Navn"] ?? dataObj?.["navn"] ?? dataObj?.["Kundenavn"] ?? "").trim();
+        const customerPhone = String(l.phone ?? l.Phone ?? dataObj?.["Telefon"] ?? "").trim();
+        const agent = String(l.lastModifiedByUser?.name ?? l.lastModifiedBy ?? dataObj?.["Sælger"] ?? "").trim();
+        const closure = String(l.closure ?? l.Closure ?? "").trim();
+        
+        vstats.sales.push({
+          id: leadId,
+          vendor: vKey,
+          customerName,
+          customerPhone,
+          saleTime: st,
+          internetUnits: internetQty,
+          subscriptionUnits: subsQty,
+          closure,
+          agent
+        });
         
         if (subsQty > 0) {
           let found = 0;
