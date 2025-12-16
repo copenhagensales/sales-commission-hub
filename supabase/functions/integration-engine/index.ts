@@ -129,7 +129,8 @@ serve(async (req) => {
         const runResults: Record<string, unknown> = {};
 
         // Soportar tanto 'action' (legacy) como 'actions' (nuevo array)
-        const actionList = actions || (action === "sync" ? ["sales"] : [action]);
+        // Default sync now includes campaigns + sales to ensure campaign names are always up to date
+        const actionList = actions || (action === "sync" ? ["campaigns", "sales"] : [action]);
 
         if (actionList.includes("campaigns")) {
           const campaigns = await adapter.fetchCampaigns();
