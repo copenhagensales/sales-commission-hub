@@ -9,7 +9,7 @@ export const Sales = lazyPage(() => import("@/pages/Sales"));
 export const Payroll = lazyPage(() => import("@/pages/Payroll"));
 export const Wallboard = lazyPage(() => import("@/pages/Wallboard"));
 export const Settings = lazyPage(() => import("@/pages/Settings"));
-export const Commission = lazyPage(() => import("@/pages/Commission"));
+
 export const MgTest = lazyPage(() => import("@/pages/MgTest"));
 export const MgTestDashboard = lazyPage(() => import("@/pages/MgTestDashboard"));
 export const KmTest = lazyPage(() => import("@/pages/KmTest"));
