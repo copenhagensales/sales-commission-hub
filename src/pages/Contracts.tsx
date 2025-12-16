@@ -16,6 +16,7 @@ import { da } from "date-fns/locale";
 import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search, Upload, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RichTextEditor } from "@/components/contracts/RichTextEditor";
+import { useCanAccess } from "@/hooks/useSystemRoles";
 
 type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "other";
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
@@ -84,10 +85,12 @@ const statusColors: Record<ContractStatus, string> = {
 
 export default function Contracts() {
   const queryClient = useQueryClient();
+  const { isOwner } = useCanAccess();
   const [searchTerm, setSearchTerm] = useState("");
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ContractTemplate | null>(null);
   const [previewContract, setPreviewContract] = useState<Contract | null>(null);
+  const [deleteContractId, setDeleteContractId] = useState<string | null>(null);
   const [templateForm, setTemplateForm] = useState({
     name: "",
     type: "employment" as ContractType,
@@ -174,6 +177,30 @@ export default function Contracts() {
       queryClient.invalidateQueries({ queryKey: ["contract-templates"] });
       toast.success("Skabelon deaktiveret");
     },
+  });
+
+  // Delete contract mutation (only for unsigned contracts)
+  const deleteContractMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // First delete signatures
+      await supabase
+        .from("contract_signatures")
+        .delete()
+        .eq("contract_id", id);
+      
+      // Then delete contract
+      const { error } = await supabase
+        .from("contracts")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      setDeleteContractId(null);
+      toast.success("Kontrakt slettet");
+    },
+    onError: () => toast.error("Kunne ikke slette kontrakt"),
   });
 
   // Sync contracts to SharePoint mutation
@@ -379,13 +406,25 @@ export default function Contracts() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setPreviewContract(contract)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setPreviewContract(contract)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {isOwner && contract.status !== "signed" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeleteContractId(contract.id)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -563,6 +602,30 @@ export default function Contracts() {
                 </div>
               )}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Contract Confirmation Dialog */}
+        <Dialog open={!!deleteContractId} onOpenChange={(open) => !open && setDeleteContractId(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Slet kontrakt?</DialogTitle>
+            </DialogHeader>
+            <p className="text-muted-foreground">
+              Er du sikker på, at du vil slette denne kontrakt? Handlingen kan ikke fortrydes.
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteContractId(null)}>
+                Annuller
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => deleteContractId && deleteContractMutation.mutate(deleteContractId)}
+                disabled={deleteContractMutation.isPending}
+              >
+                {deleteContractMutation.isPending ? "Sletter..." : "Slet"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
