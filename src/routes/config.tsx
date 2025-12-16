@@ -21,7 +21,6 @@ import {
   EmployeeMasterData,
   EmployeeDetail,
   EmployeeOnboarding,
-  Teams,
   VagtFlowIndex,
   VagtBookWeek,
   VagtLocations,
@@ -105,7 +104,6 @@ export const routes: RouteConfig[] = [
   { path: "/logikker", component: Logikker, access: "role", requireTeamlederOrAbove: true },
   { path: "/employees", component: EmployeeMasterData, access: "role", requireTeamlederOrAbove: true },
   { path: "/employees/:id", component: EmployeeDetail, access: "role", requireTeamlederOrAbove: true },
-  { path: "/teams", component: Teams, access: "role", requireTeamlederOrAbove: true },
   { path: "/settings", component: Settings, access: "role", requireTeamlederOrAbove: true },
 
   {
