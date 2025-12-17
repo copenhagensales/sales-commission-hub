@@ -38,6 +38,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
   const [period, setPeriod] = useState<PeriodType>("week");
   const [showInviteOptions, setShowInviteOptions] = useState(true); // Start with period selection visible
   const [matchStarted, setMatchStarted] = useState(false); // Track if match has actually started
+  const [showPeriodSelection, setShowPeriodSelection] = useState(false); // Show period selection after invite
   const [momentum, setMomentum] = useState(50); // 0-100, 50 = neutral
   const [animateScore, setAnimateScore] = useState<'left' | 'right' | null>(null);
   const [matchComment, setMatchComment] = useState(""); // Free text comment/stake
@@ -1016,8 +1017,31 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         {/* Action buttons when opponent is selected */}
         {hasOpponents && (
           <div className="flex flex-col gap-3 pt-2">
-            {/* Show period selection only if match not yet started */}
-            {!matchStarted ? (
+            {/* Step 1: Show invite button */}
+            {!showPeriodSelection && !matchStarted && (
+              <div className="space-y-3 animate-fade-in">
+                <Button 
+                  onClick={() => setShowPeriodSelection(true)}
+                  className="w-full h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all"
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Inviter til match
+                </Button>
+                <button 
+                  onClick={() => {
+                    setOpponentTeam([]);
+                    setMyTeam([]);
+                    setMatchComment("");
+                  }}
+                  className="w-full text-xs text-slate-500 hover:text-white transition-colors py-1"
+                >
+                  Annuller
+                </button>
+              </div>
+            )}
+
+            {/* Step 2: Show period selection after invite */}
+            {showPeriodSelection && !matchStarted && (
               <div className="space-y-3 animate-fade-in">
                 <p className="text-center text-sm text-slate-300 font-medium">Vælg kampperiode</p>
                 <div className="grid grid-cols-2 gap-3">
@@ -1025,6 +1049,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                     onClick={() => {
                       setPeriod("today");
                       setMatchStarted(true);
+                      setShowPeriodSelection(false);
                       const teamLabel = battleMode === "team" ? ` (${myTeamNames.length}v${opponentTeamNames.length})` : "";
                       toast.success(`⚔️ Duel startet!${teamLabel}`, {
                         description: "Kampen gælder for i dag."
@@ -1040,6 +1065,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                     onClick={() => {
                       setPeriod("week");
                       setMatchStarted(true);
+                      setShowPeriodSelection(false);
                       const teamLabel = battleMode === "team" ? ` (${myTeamNames.length}v${opponentTeamNames.length})` : "";
                       toast.success(`⚔️ Duel startet!${teamLabel}`, {
                         description: "Kampen gælder for denne uge."
@@ -1054,17 +1080,21 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                 </div>
                 <button 
                   onClick={() => {
+                    setShowPeriodSelection(false);
                     setOpponentTeam([]);
                     setMyTeam([]);
+                    setMatchComment("");
                   }}
                   className="w-full text-xs text-slate-500 hover:text-white transition-colors py-1"
                 >
                   Annuller
                 </button>
               </div>
-            ) : (
+            )}
+
+            {/* Step 3: Match in progress */}
+            {matchStarted && (
               <div className="flex items-center justify-center gap-2">
-                {/* Match status indicator */}
                 <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   <span className="text-xs text-slate-300 font-medium">Kamp i gang • {dateRange.label}</span>
