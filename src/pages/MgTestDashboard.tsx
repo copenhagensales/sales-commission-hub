@@ -44,7 +44,7 @@ interface ClientStats {
 }
 
 export default function MgTestDashboard() {
-  const { data: clientStats, isLoading, isFetching, refetch } = useQuery({
+  const { data: clientStats, isLoading, isFetching, refetch, dataUpdatedAt } = useQuery({
     queryKey: ["mg-test-dashboard-clients"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_client_sales_stats");
@@ -64,7 +64,10 @@ export default function MgTestDashboard() {
       })) as ClientStats[];
     },
     refetchInterval: 30000,
+    staleTime: 0, // Always consider data stale to ensure fresh fetches
   });
+
+  const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString("da-DK") : "";
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("da-DK", {
@@ -98,6 +101,9 @@ export default function MgTestDashboard() {
               >
                 <RefreshCw className={`h-3 w-3 ${isFetching ? "animate-spin" : ""}`} />
               </Button>
+              {lastUpdated && (
+                <span className="text-[10px] text-muted-foreground">Opdateret: {lastUpdated}</span>
+              )}
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
@@ -179,7 +185,7 @@ export default function MgTestDashboard() {
                         <div className="space-y-0.5">
                           {client.top_sellers.slice(0, 3).map((seller, i) => (
                             <div 
-                              key={seller.agent_name} 
+                              key={`${client.client_id}-${seller.agent_name}-${i}`} 
                               className="flex items-center justify-between bg-background/20 rounded px-1 py-0.5 text-[10px]"
                             >
                               <div className="flex items-center gap-0.5 min-w-0">
