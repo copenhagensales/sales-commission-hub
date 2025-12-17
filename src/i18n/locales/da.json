@@ -218,7 +218,12 @@
     "originalCampaignName": "Original kampagnenavn (Dialer)",
     "internalCampaignName": "Internt kampagnenavn",
     "customerInfo": "Kundeinformation",
-    "references": "Referencer"
+    "references": "Referencer",
+    "unknownProducts": "Unknown Produkter",
+    "unknownProductsDescription": "Salg med produkter markeret som 'Unknown' der kræver gennemgang af rå JSON",
+    "noUnknownProducts": "Ingen unknown produkter - Alt er korrekt mappet!",
+    "unknownProductJson": "Unknown Produkt - Rå JSON",
+    "rawPayload": "Rå Payload"
   },
   "mgTest": {
     "title": "MG test – Adversus mapping",
