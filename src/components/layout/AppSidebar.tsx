@@ -51,6 +51,7 @@ const getMgNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.payroll"), href: "/payroll", icon: Wallet },
   { name: t("sidebar.tdcErhverv"), href: "/tdc-erhverv", icon: Building2 },
   { name: "TDC Dagsoverblik", href: "/tdc-erhverv-dashboard", icon: BarChart3 },
+  { name: "Relatel Dagsoverblik", href: "/relatel-dashboard", icon: BarChart3 },
   { name: t("sidebar.codan"), href: "/codan", icon: Shield },
   { name: t("sidebar.mgTest"), href: "/mg-test", icon: Percent },
   { name: t("sidebar.testDashboard"), href: "/mg-test-dashboard", icon: FlaskConical },
@@ -173,7 +174,7 @@ const [personnelOpen, setPersonnelOpen] = useState(
     location.pathname.startsWith("/employees")
   );
   const [mgOpen, setMgOpen] = useState(
-    ["/payroll", "/tdc-erhverv", "/tdc-erhverv-dashboard", "/codan", "/mg-test", "/mg-test-dashboard", "/dialer-data", "/adversus-data", "/calls-data"].includes(location.pathname)
+    ["/payroll", "/tdc-erhverv", "/tdc-erhverv-dashboard", "/relatel-dashboard", "/codan", "/mg-test", "/mg-test-dashboard", "/dialer-data", "/adversus-data", "/calls-data"].includes(location.pathname)
   );
   const [timeTrackingOpen, setTimeTrackingOpen] = useState(
     location.pathname === "/shift-planning/time-tracking" || 
@@ -747,7 +748,7 @@ const [personnelOpen, setPersonnelOpen] = useState(
             <Collapsible open={mgOpen} onOpenChange={setMgOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                ["/payroll", "/tdc-erhverv", "/tdc-erhverv-dashboard", "/codan", "/mg-test", "/adversus-data"].includes(location.pathname) ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                ["/payroll", "/tdc-erhverv", "/tdc-erhverv-dashboard", "/relatel-dashboard", "/codan", "/mg-test", "/adversus-data"].includes(location.pathname) ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
                 <div className="flex items-center gap-3">
                   <Percent className="h-5 w-5" />
@@ -763,6 +764,7 @@ const [personnelOpen, setPersonnelOpen] = useState(
                   if (item.href === "/payroll") return positionPermissions.canViewPayroll;
                   if (item.href === "/tdc-erhverv") return positionPermissions.canViewTdcErhverv;
                   if (item.href === "/tdc-erhverv-dashboard") return positionPermissions.canViewTdcErhverv;
+                  if (item.href === "/relatel-dashboard") return positionPermissions.canViewMgTest;
                   if (item.href === "/codan") return positionPermissions.canViewCodan;
                   if (item.href === "/mg-test-dashboard") return positionPermissions.canViewTestDashboard;
                   if (item.href === "/dialer-data") return positionPermissions.canViewDialerData;
