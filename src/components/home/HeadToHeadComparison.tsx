@@ -1,12 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, CalendarRange, Plus, X, UserPlus } from "lucide-react";
-import { startOfWeek, startOfDay, endOfDay } from "date-fns";
+import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, CalendarRange, Plus, X, Sparkles, Timer, Activity } from "lucide-react";
+import { startOfWeek, startOfDay, endOfDay, differenceInHours, differenceInDays, formatDistanceToNow } from "date-fns";
+import { da } from "date-fns/locale";
 import { toast } from "sonner";
 
 interface AgentStats {
@@ -27,12 +27,17 @@ interface HeadToHeadComparisonProps {
 type PeriodType = "today" | "week";
 type BattleMode = "1v1" | "team";
 
+// Player role types based on performance
+type PlayerRole = "closer" | "grinder" | "consistent" | "comeback" | "hot_streak" | null;
+
 export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }: HeadToHeadComparisonProps) => {
   const [battleMode, setBattleMode] = useState<BattleMode>("1v1");
-  const [myTeam, setMyTeam] = useState<string[]>([]); // Additional teammates (not including self)
+  const [myTeam, setMyTeam] = useState<string[]>([]);
   const [opponentTeam, setOpponentTeam] = useState<string[]>([]);
   const [period, setPeriod] = useState<PeriodType>("week");
   const [showInviteOptions, setShowInviteOptions] = useState(false);
+  const [momentum, setMomentum] = useState(50); // 0-100, 50 = neutral
+  const [animateScore, setAnimateScore] = useState<'left' | 'right' | null>(null);
 
   // Calculate date range based on period
   const dateRange = useMemo(() => {
@@ -46,6 +51,29 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfDay(now), label: "Denne uge" };
     }
   }, [period]);
+
+  // Calculate time remaining
+  const timeInfo = useMemo(() => {
+    const now = new Date();
+    const endTime = dateRange.end;
+    const totalDuration = period === "today" ? 24 : 7 * 24; // hours
+    const elapsed = period === "today" 
+      ? differenceInHours(now, dateRange.start)
+      : differenceInHours(now, dateRange.start);
+    const percentComplete = Math.min(100, Math.round((elapsed / totalDuration) * 100));
+    
+    const hoursRemaining = differenceInHours(endTime, now);
+    const daysRemaining = differenceInDays(endTime, now);
+    
+    let timeRemainingText = "";
+    if (daysRemaining > 0) {
+      timeRemainingText = `${daysRemaining}d ${hoursRemaining % 24}t`;
+    } else {
+      timeRemainingText = `${hoursRemaining}t`;
+    }
+    
+    return { percentComplete, timeRemainingText };
+  }, [dateRange, period]);
 
   // Fetch all agents for selection
   const { data: agents = [] } = useQuery({
@@ -73,7 +101,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
   const opponentTeamNames = useMemo(() => getTeamNames(opponentTeam), [opponentTeam, agents]);
 
   // Fetch stats for teams
-  const { data: stats } = useQuery({
+  const { data: stats, dataUpdatedAt } = useQuery({
     queryKey: ["h2h-stats", myTeamNames.join(","), opponentTeamNames.join(","), dateRange.start.toISOString(), dateRange.end.toISOString()],
     queryFn: async () => {
       const monthStart = dateRange.start.toISOString();
@@ -85,6 +113,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         .select(`
           id,
           agent_name,
+          sale_datetime,
           sale_items (
             id,
             mapped_commission,
@@ -102,7 +131,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
       // Fetch call stats
       const { data: calls } = await supabase
         .from("dialer_calls")
-        .select("agent_external_id, duration_seconds, total_duration_seconds")
+        .select("agent_external_id, duration_seconds, total_duration_seconds, start_time")
         .gte("start_time", monthStart)
         .lte("start_time", monthEnd);
 
@@ -112,6 +141,17 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         .from("agents")
         .select("id, name, external_adversus_id")
         .in("name", allNames.filter(Boolean));
+
+      // Calculate recent activity for momentum
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const recentSales = sales?.filter(s => s.sale_datetime && s.sale_datetime >= oneHourAgo) || [];
+      
+      let myRecentActivity = 0;
+      let opponentRecentActivity = 0;
+      recentSales.forEach(s => {
+        if (myTeamNames.includes(s.agent_name || "")) myRecentActivity++;
+        if (opponentTeamNames.includes(s.agent_name || "")) opponentRecentActivity++;
+      });
 
       // Helper function to calculate team stats
       const calculateTeamStats = (teamNames: string[]): AgentStats => {
@@ -161,10 +201,26 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
       return {
         myTeam: calculateTeamStats(myTeamNames),
         opponentTeam: opponentTeamNames.length > 0 ? calculateTeamStats(opponentTeamNames) : null,
+        recentActivity: { my: myRecentActivity, opponent: opponentRecentActivity },
       };
     },
     enabled: myTeamNames.length > 0,
+    refetchInterval: 30000, // Refresh every 30 seconds for live feel
   });
+
+  // Update momentum based on recent activity
+  useEffect(() => {
+    if (stats?.recentActivity) {
+      const { my, opponent } = stats.recentActivity;
+      const total = my + opponent;
+      if (total > 0) {
+        const newMomentum = Math.round((my / total) * 100);
+        setMomentum(newMomentum);
+      } else {
+        setMomentum(50);
+      }
+    }
+  }, [stats?.recentActivity]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -181,117 +237,36 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(num);
   };
 
-  const StatBar = ({ 
-    label, 
-    icon: Icon, 
-    leftValue, 
-    rightValue, 
-    formatFn = formatNumber,
-    delay = 0
-  }: { 
-    label: string; 
-    icon: React.ComponentType<{ className?: string }>; 
-    leftValue: number; 
-    rightValue: number; 
-    formatFn?: (n: number) => string;
-    delay?: number;
-  }) => {
-    const total = leftValue + rightValue || 1;
-    const leftPercent = (leftValue / total) * 100;
-    const rightPercent = (rightValue / total) * 100;
+  // Calculate wins per KPI
+  const calculateKpiWins = () => {
+    if (!stats?.opponentTeam) return { sales: 'none', revenue: 'none', commission: 'none', calls: 'none', talkTime: 'none' };
     
-    const leftWins = leftValue > rightValue;
-    const rightWins = rightValue > leftValue;
-    const tie = leftValue === rightValue;
-
-    return (
-      <div className="group relative" style={{ animationDelay: `${delay}ms` }}>
-        <div className="flex items-center justify-between mb-2">
-          <div className={`flex items-center gap-2 transition-all duration-300 ${leftWins ? "scale-105" : ""}`}>
-            {leftWins && <Zap className="w-3 h-3 text-amber-400 animate-pulse" />}
-            <span className={`font-bold text-sm tabular-nums ${leftWins ? "text-emerald-400" : tie ? "text-amber-300" : "text-slate-400"}`}>
-              {formatFn(leftValue)}
-            </span>
-          </div>
-          
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-700/50 backdrop-blur-sm">
-            <Icon className="w-3.5 h-3.5 text-slate-300" />
-            <span className="text-xs font-medium text-slate-300">{label}</span>
-          </div>
-          
-          <div className={`flex items-center gap-2 transition-all duration-300 ${rightWins ? "scale-105" : ""}`}>
-            <span className={`font-bold text-sm tabular-nums ${rightWins ? "text-emerald-400" : tie ? "text-amber-300" : "text-slate-400"}`}>
-              {formatFn(rightValue)}
-            </span>
-            {rightWins && <Zap className="w-3 h-3 text-amber-400 animate-pulse" />}
-          </div>
-        </div>
-        
-        <div className="relative h-3 rounded-full overflow-hidden bg-slate-800/80 border border-slate-700/50">
-          <div className="absolute inset-0 opacity-30">
-            <div 
-              className={`absolute left-0 top-0 h-full ${leftWins ? "bg-emerald-500" : tie ? "bg-amber-500" : "bg-rose-500"} blur-md`}
-              style={{ width: `${leftPercent}%` }}
-            />
-            <div 
-              className={`absolute right-0 top-0 h-full ${rightWins ? "bg-emerald-500" : tie ? "bg-amber-500" : "bg-rose-500"} blur-md`}
-              style={{ width: `${rightPercent}%` }}
-            />
-          </div>
-          
-          <div className="relative flex h-full">
-            <div 
-              className={`transition-all duration-700 ease-out ${
-                leftWins 
-                  ? "bg-gradient-to-r from-emerald-600 to-emerald-400" 
-                  : tie 
-                    ? "bg-gradient-to-r from-amber-600 to-amber-400" 
-                    : "bg-gradient-to-r from-rose-600 to-rose-500"
-              }`}
-              style={{ 
-                width: `${leftPercent}%`,
-                boxShadow: leftWins ? '0 0 20px rgba(52, 211, 153, 0.5)' : 'none'
-              }}
-            />
-            <div className="w-0.5 bg-slate-900 z-10" />
-            <div 
-              className={`transition-all duration-700 ease-out ${
-                rightWins 
-                  ? "bg-gradient-to-l from-emerald-600 to-emerald-400" 
-                  : tie 
-                    ? "bg-gradient-to-l from-amber-600 to-amber-400" 
-                    : "bg-gradient-to-l from-rose-600 to-rose-500"
-              }`}
-              style={{ 
-                width: `${rightPercent}%`,
-                boxShadow: rightWins ? '0 0 20px rgba(52, 211, 153, 0.5)' : 'none'
-              }}
-            />
-          </div>
-        </div>
-      </div>
-    );
+    const getWinner = (left: number, right: number): 'left' | 'right' | 'tie' => {
+      if (left > right) return 'left';
+      if (right > left) return 'right';
+      return 'tie';
+    };
+    
+    return {
+      sales: getWinner(stats.myTeam.salesCount, stats.opponentTeam.salesCount),
+      revenue: getWinner(stats.myTeam.revenue, stats.opponentTeam.revenue),
+      commission: getWinner(stats.myTeam.commission, stats.opponentTeam.commission),
+      calls: getWinner(stats.myTeam.callCount, stats.opponentTeam.callCount),
+      talkTime: getWinner(stats.myTeam.talkTimeSeconds, stats.opponentTeam.talkTimeSeconds),
+    };
   };
 
-  // Calculate wins
+  const kpiWins = calculateKpiWins();
+
+  // Calculate total wins
   const calculateWins = () => {
     if (!stats?.opponentTeam) return { left: 0, right: 0 };
     let left = 0, right = 0;
     
-    if (stats.myTeam.salesCount > stats.opponentTeam.salesCount) left++;
-    else if (stats.myTeam.salesCount < stats.opponentTeam.salesCount) right++;
-    
-    if (stats.myTeam.revenue > stats.opponentTeam.revenue) left++;
-    else if (stats.myTeam.revenue < stats.opponentTeam.revenue) right++;
-    
-    if (stats.myTeam.commission > stats.opponentTeam.commission) left++;
-    else if (stats.myTeam.commission < stats.opponentTeam.commission) right++;
-    
-    if (stats.myTeam.callCount > stats.opponentTeam.callCount) left++;
-    else if (stats.myTeam.callCount < stats.opponentTeam.callCount) right++;
-    
-    if (stats.myTeam.talkTimeSeconds > stats.opponentTeam.talkTimeSeconds) left++;
-    else if (stats.myTeam.talkTimeSeconds < stats.opponentTeam.talkTimeSeconds) right++;
+    Object.values(kpiWins).forEach(winner => {
+      if (winner === 'left') left++;
+      else if (winner === 'right') right++;
+    });
     
     return { left, right };
   };
@@ -299,7 +274,75 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
   const wins = calculateWins();
   const isWinning = wins.left > wins.right;
   const isLosing = wins.left < wins.right;
+  const isTied = wins.left === wins.right && wins.left > 0;
   const hasOpponents = opponentTeam.length > 0;
+
+  // Generate dynamic match narrative
+  const getMatchNarrative = () => {
+    if (!stats?.opponentTeam) return null;
+    
+    const leftName = myTeamNames.length === 1 ? myTeamNames[0].split(" ")[0] : "Dit hold";
+    const rightName = opponentTeamNames.length === 1 ? opponentTeamNames[0].split(" ")[0] : "Modstanderen";
+    
+    // Check for close battles
+    const salesDiff = Math.abs(stats.myTeam.salesCount - stats.opponentTeam.salesCount);
+    const revenueDiff = Math.abs(stats.myTeam.revenue - stats.opponentTeam.revenue);
+    
+    if (isTied) {
+      if (salesDiff <= 1) return { text: "Tæt løb – kun 1 salg kan afgøre det!", type: "intense" };
+      return { text: "Jævnbyrdig kamp – hvem tager føringen?", type: "neutral" };
+    }
+    
+    if (isWinning) {
+      if (wins.left - wins.right >= 3) return { text: `${leftName} dominerer kampen`, type: "winning" };
+      if (salesDiff === 1) return { text: `${rightName} mangler kun 1 salg for at indhente`, type: "intense" };
+      return { text: `${leftName} fører – hold momentum!`, type: "winning" };
+    }
+    
+    if (isLosing) {
+      if (wins.right - wins.left >= 3) return { text: `${rightName} har overtaget – kæmp tilbage!`, type: "losing" };
+      if (salesDiff === 1) return { text: `Kun 1 salg fra at vende kampen!`, type: "comeback" };
+      return { text: `${rightName} fører – du kan stadig vinde!`, type: "losing" };
+    }
+    
+    return { text: "Kampen er i gang", type: "neutral" };
+  };
+
+  const narrative = hasOpponents ? getMatchNarrative() : null;
+
+  // Determine player role based on stats
+  const getPlayerRole = (name: string, isMyTeam: boolean): PlayerRole => {
+    if (!stats?.opponentTeam) return null;
+    const teamStats = isMyTeam ? stats.myTeam : stats.opponentTeam;
+    const otherStats = isMyTeam ? stats.opponentTeam : stats.myTeam;
+    
+    // Hot streak: winning in 3+ categories
+    const myWins = isMyTeam ? wins.left : wins.right;
+    if (myWins >= 3) return "hot_streak";
+    
+    // Closer: high commission per sale
+    if (teamStats.salesCount > 0 && teamStats.commission / teamStats.salesCount > (otherStats.commission / (otherStats.salesCount || 1))) {
+      return "closer";
+    }
+    
+    // Grinder: high call volume
+    if (teamStats.callCount > otherStats.callCount * 1.2) return "grinder";
+    
+    // Comeback: losing but with recent activity
+    if (!isMyTeam && isWinning && momentum < 50) return "comeback";
+    if (isMyTeam && isLosing && momentum > 50) return "comeback";
+    
+    // Consistent: similar performance across metrics
+    return "consistent";
+  };
+
+  const roleLabels: Record<NonNullable<PlayerRole>, { label: string; icon: typeof Flame }> = {
+    hot_streak: { label: "Hot Streak", icon: Flame },
+    closer: { label: "Closer", icon: Target },
+    grinder: { label: "Grinder", icon: Activity },
+    comeback: { label: "Comeback", icon: Sparkles },
+    consistent: { label: "Konsistent", icon: Trophy },
+  };
 
   const getInitials = (name: string) => {
     return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
@@ -337,6 +380,122 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     !opponentTeam.includes(a.id)
   );
 
+  // KPI Battle Row Component
+  const KpiBattleRow = ({ 
+    label, 
+    icon: Icon, 
+    leftValue, 
+    rightValue, 
+    winner,
+    formatFn = formatNumber,
+  }: { 
+    label: string; 
+    icon: React.ComponentType<{ className?: string }>; 
+    leftValue: number; 
+    rightValue: number; 
+    winner: 'left' | 'right' | 'tie' | string;
+    formatFn?: (n: number) => string;
+  }) => {
+    const total = leftValue + rightValue || 1;
+    const leftPercent = (leftValue / total) * 100;
+    
+    return (
+      <div className="group relative">
+        <div className="flex items-center gap-3">
+          {/* Left value */}
+          <div className={`flex-1 flex items-center justify-end gap-2 transition-all duration-500 ${
+            winner === 'left' ? 'scale-105' : ''
+          }`}>
+            {winner === 'left' && (
+              <div className="relative">
+                <Trophy className="w-4 h-4 text-amber-400" />
+                <div className="absolute inset-0 animate-ping">
+                  <Trophy className="w-4 h-4 text-amber-400/50" />
+                </div>
+              </div>
+            )}
+            <span className={`font-bold text-sm tabular-nums transition-colors duration-300 ${
+              winner === 'left' ? 'text-emerald-400' : 
+              winner === 'tie' ? 'text-amber-300' : 
+              'text-slate-400'
+            }`}>
+              {formatFn(leftValue)}
+            </span>
+          </div>
+          
+          {/* Center label with icon */}
+          <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl min-w-[120px] transition-all duration-300 ${
+            winner === 'left' ? 'bg-emerald-500/10 border border-emerald-500/30' :
+            winner === 'right' ? 'bg-rose-500/10 border border-rose-500/30' :
+            winner === 'tie' ? 'bg-amber-500/10 border border-amber-500/30' :
+            'bg-slate-800/50 border border-slate-700/50'
+          }`}>
+            <Icon className={`w-4 h-4 ${
+              winner === 'left' ? 'text-emerald-400' :
+              winner === 'right' ? 'text-rose-400' :
+              winner === 'tie' ? 'text-amber-400' :
+              'text-slate-400'
+            }`} />
+            <span className="text-xs font-medium text-slate-300">{label}</span>
+          </div>
+          
+          {/* Right value */}
+          <div className={`flex-1 flex items-center gap-2 transition-all duration-500 ${
+            winner === 'right' ? 'scale-105' : ''
+          }`}>
+            <span className={`font-bold text-sm tabular-nums transition-colors duration-300 ${
+              winner === 'right' ? 'text-emerald-400' : 
+              winner === 'tie' ? 'text-amber-300' : 
+              'text-slate-400'
+            }`}>
+              {formatFn(rightValue)}
+            </span>
+            {winner === 'right' && (
+              <div className="relative">
+                <Trophy className="w-4 h-4 text-amber-400" />
+                <div className="absolute inset-0 animate-ping">
+                  <Trophy className="w-4 h-4 text-amber-400/50" />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Progress bar */}
+        <div className="relative h-2 mt-2 rounded-full overflow-hidden bg-slate-800/80">
+          <div className="relative flex h-full">
+            <div 
+              className={`transition-all duration-700 ease-out ${
+                winner === 'left' 
+                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-400' 
+                  : winner === 'tie' 
+                    ? 'bg-gradient-to-r from-amber-600 to-amber-400' 
+                    : 'bg-gradient-to-r from-slate-600 to-slate-500'
+              }`}
+              style={{ 
+                width: `${leftPercent}%`,
+                boxShadow: winner === 'left' ? '0 0 15px rgba(52, 211, 153, 0.4)' : 'none'
+              }}
+            />
+            <div className="w-px bg-slate-900" />
+            <div 
+              className={`flex-1 transition-all duration-700 ease-out ${
+                winner === 'right' 
+                  ? 'bg-gradient-to-l from-emerald-600 to-emerald-400' 
+                  : winner === 'tie' 
+                    ? 'bg-gradient-to-l from-amber-600 to-amber-400' 
+                    : 'bg-gradient-to-l from-slate-600 to-slate-500'
+              }`}
+              style={{ 
+                boxShadow: winner === 'right' ? '0 0 15px rgba(52, 211, 153, 0.4)' : 'none'
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Team member badge component
   const TeamMemberBadge = ({ name, onRemove }: { name: string; onRemove?: () => void }) => (
     <div className="relative group">
@@ -359,15 +518,15 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     name, 
     isWinner, 
     isLoser, 
-    score, 
     showCrown,
+    role,
     colorScheme
   }: { 
     name: string; 
     isWinner: boolean; 
     isLoser: boolean; 
-    score?: number;
     showCrown?: boolean;
+    role?: PlayerRole;
     colorScheme: 'blue' | 'rose' | 'emerald';
   }) => {
     const gradients = {
@@ -376,15 +535,15 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
       emerald: 'from-emerald-500/20 to-emerald-600/10 border-emerald-400/30'
     };
     
-    const glowColor = isWinner ? 'bg-emerald-500' : isLoser ? 'bg-rose-500' : `bg-${colorScheme}-500`;
     const actualGradient = isWinner ? gradients.emerald : isLoser ? gradients.rose : gradients[colorScheme];
+    const roleInfo = role ? roleLabels[role] : null;
     
     return (
       <div className="relative">
         {showCrown && (
-          <Crown className="absolute -top-5 left-1/2 -translate-x-1/2 w-6 h-6 text-amber-400 animate-bounce z-20" style={{ animationDuration: '2s' }} />
+          <Crown className="absolute -top-5 left-1/2 -translate-x-1/2 w-6 h-6 text-amber-400 z-20" style={{ animation: 'bounce 2s ease-in-out infinite' }} />
         )}
-        <div className={`absolute inset-0 ${glowColor} blur-xl opacity-20 scale-110 rounded-xl`} />
+        <div className={`absolute inset-0 ${isWinner ? 'bg-emerald-500' : isLoser ? 'bg-rose-500' : 'bg-blue-500'} blur-xl opacity-20 scale-110 rounded-xl`} />
         <div className={`relative px-4 py-3 rounded-xl bg-gradient-to-br ${actualGradient} border backdrop-blur-sm`}>
           <div className="flex flex-col items-center gap-1">
             <Zap className={`w-5 h-5 ${isWinner ? 'text-emerald-400' : isLoser ? 'text-rose-400' : 'text-blue-400'}`} />
@@ -394,6 +553,60 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
             <p className="text-[10px] text-slate-400 truncate max-w-full">
               {name.split(" ").slice(1).join(" ")}
             </p>
+            {roleInfo && (
+              <div className="flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-700/50">
+                <roleInfo.icon className="w-3 h-3 text-amber-400" />
+                <span className="text-[9px] font-medium text-slate-300">{roleInfo.label}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Momentum Bar Component
+  const MomentumBar = () => {
+    const leftName = myTeamNames.length === 1 ? myTeamNames[0].split(" ")[0] : "Dig";
+    const rightName = opponentTeamNames.length === 1 ? opponentTeamNames[0].split(" ")[0] : "Modstander";
+    
+    return (
+      <div className="relative">
+        <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+          <span className={momentum > 60 ? 'text-emerald-400 font-medium' : ''}>{leftName}</span>
+          <span className="flex items-center gap-1">
+            <Activity className="w-3 h-3" />
+            Momentum
+          </span>
+          <span className={momentum < 40 ? 'text-emerald-400 font-medium' : ''}>{rightName}</span>
+        </div>
+        <div className="relative h-2 rounded-full bg-slate-800/80 overflow-hidden">
+          {/* Center marker */}
+          <div className="absolute left-1/2 top-0 w-0.5 h-full bg-slate-600 z-10" />
+          
+          {/* Momentum indicator */}
+          <div 
+            className="absolute top-0 h-full transition-all duration-1000 ease-out"
+            style={{ 
+              left: `${Math.min(momentum, 50)}%`,
+              right: `${Math.min(100 - momentum, 50)}%`,
+              background: momentum > 50 
+                ? 'linear-gradient(to right, transparent, rgba(52, 211, 153, 0.6))' 
+                : 'linear-gradient(to left, transparent, rgba(52, 211, 153, 0.6))'
+            }}
+          />
+          
+          {/* Energy ball */}
+          <div 
+            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full transition-all duration-500 ease-out"
+            style={{ 
+              left: `${momentum}%`,
+              transform: 'translate(-50%, -50%)',
+              background: momentum > 55 ? '#34d399' : momentum < 45 ? '#f87171' : '#fbbf24',
+              boxShadow: `0 0 10px ${momentum > 55 ? 'rgba(52, 211, 153, 0.8)' : momentum < 45 ? 'rgba(248, 113, 113, 0.8)' : 'rgba(251, 191, 36, 0.8)'}`
+            }}
+          >
+            <Zap className="w-2 h-2 text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
           </div>
         </div>
       </div>
@@ -452,7 +665,54 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="relative space-y-6 z-10 text-white">
+      <CardContent className="relative space-y-5 z-10 text-white">
+        {/* Time & Progress Bar */}
+        {hasOpponents && (
+          <div className="flex items-center justify-between gap-4 px-2 py-2 rounded-xl bg-slate-800/40 border border-slate-700/30">
+            <div className="flex items-center gap-2">
+              <Timer className="w-4 h-4 text-slate-400" />
+              <span className="text-xs text-slate-400">{dateRange.label}</span>
+            </div>
+            <div className="flex-1 mx-4">
+              <div className="h-1.5 rounded-full bg-slate-700/50 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-1000"
+                  style={{ width: `${timeInfo.percentComplete}%` }}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-slate-400">{timeInfo.percentComplete}%</span>
+              <span className="text-slate-600">|</span>
+              <span className="text-amber-400 font-medium">{timeInfo.timeRemainingText} tilbage</span>
+            </div>
+          </div>
+        )}
+
+        {/* Match Narrative */}
+        {narrative && (
+          <div className={`text-center py-3 px-4 rounded-xl border transition-all duration-500 ${
+            narrative.type === 'winning' ? 'bg-emerald-500/10 border-emerald-500/30' :
+            narrative.type === 'losing' ? 'bg-rose-500/10 border-rose-500/30' :
+            narrative.type === 'intense' ? 'bg-amber-500/10 border-amber-500/30 animate-pulse' :
+            narrative.type === 'comeback' ? 'bg-blue-500/10 border-blue-500/30' :
+            'bg-slate-800/40 border-slate-700/30'
+          }`}>
+            <p className={`text-sm font-medium ${
+              narrative.type === 'winning' ? 'text-emerald-400' :
+              narrative.type === 'losing' ? 'text-rose-400' :
+              narrative.type === 'intense' ? 'text-amber-400' :
+              narrative.type === 'comeback' ? 'text-blue-400' :
+              'text-slate-300'
+            }`}>
+              {narrative.text}
+            </p>
+          </div>
+        )}
+
+        {/* Momentum Bar */}
+        {hasOpponents && <MomentumBar />}
+
         {/* Team Display */}
         <div className="grid grid-cols-3 gap-3 items-start">
           {/* Left Team (My Team) */}
@@ -462,6 +722,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
               isWinner={hasOpponents && isWinning}
               isLoser={hasOpponents && isLosing}
               showCrown={hasOpponents && isWinning}
+              role={hasOpponents ? getPlayerRole(currentEmployeeName || "", true) : null}
               colorScheme="blue"
             />
             
@@ -538,6 +799,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                   isWinner={isLosing}
                   isLoser={isWinning}
                   showCrown={isLosing}
+                  role={getPlayerRole(opponentTeamNames[0] || "", false)}
                   colorScheme="rose"
                 />
                 
@@ -609,7 +871,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
           </div>
         </div>
 
-        {/* Stats Comparison Bars */}
+        {/* KPI Battles */}
         {stats?.opponentTeam && (
           <div className="space-y-4 pt-4 border-t border-slate-700/50">
             <div className="flex items-center justify-center gap-6 pb-2">
@@ -620,7 +882,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                 </span>
               </div>
               <div className="px-4 py-1 rounded-full bg-slate-800/50 border border-slate-700/50">
-                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-medium">Kategorier</span>
+                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-medium">KPI Kampe</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className={`text-lg font-black tabular-nums ${isLosing ? "text-amber-400" : "text-slate-500"}`}>
@@ -630,11 +892,11 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
               </div>
             </div>
 
-            <StatBar label="Salg" icon={Target} leftValue={stats.myTeam.salesCount} rightValue={stats.opponentTeam.salesCount} delay={0} />
-            <StatBar label="Omsætning" icon={TrendingUp} leftValue={stats.myTeam.revenue} rightValue={stats.opponentTeam.revenue} formatFn={formatCurrency} delay={100} />
-            <StatBar label="Provision" icon={DollarSign} leftValue={stats.myTeam.commission} rightValue={stats.opponentTeam.commission} formatFn={formatCurrency} delay={200} />
-            <StatBar label="Opkald" icon={Phone} leftValue={stats.myTeam.callCount} rightValue={stats.opponentTeam.callCount} delay={300} />
-            <StatBar label="Taletid" icon={Clock} leftValue={stats.myTeam.talkTimeSeconds} rightValue={stats.opponentTeam.talkTimeSeconds} formatFn={formatTime} delay={400} />
+            <KpiBattleRow label="Salg" icon={Target} leftValue={stats.myTeam.salesCount} rightValue={stats.opponentTeam.salesCount} winner={kpiWins.sales} />
+            <KpiBattleRow label="Omsætning" icon={TrendingUp} leftValue={stats.myTeam.revenue} rightValue={stats.opponentTeam.revenue} winner={kpiWins.revenue} formatFn={formatCurrency} />
+            <KpiBattleRow label="Provision" icon={DollarSign} leftValue={stats.myTeam.commission} rightValue={stats.opponentTeam.commission} winner={kpiWins.commission} formatFn={formatCurrency} />
+            <KpiBattleRow label="Opkald" icon={Phone} leftValue={stats.myTeam.callCount} rightValue={stats.opponentTeam.callCount} winner={kpiWins.calls} />
+            <KpiBattleRow label="Taletid" icon={Clock} leftValue={stats.myTeam.talkTimeSeconds} rightValue={stats.opponentTeam.talkTimeSeconds} winner={kpiWins.talkTime} formatFn={formatTime} />
           </div>
         )}
 
@@ -657,22 +919,24 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
             {!showInviteOptions ? (
               <Button 
                 onClick={() => setShowInviteOptions(true)}
-                className="relative w-full h-11 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-600 hover:via-orange-600 hover:to-amber-600 text-white font-bold text-sm shadow-lg shadow-orange-500/25 border-0 overflow-hidden group"
+                className="relative w-full h-12 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-600 hover:via-orange-600 hover:to-amber-600 text-white font-bold text-sm shadow-lg shadow-orange-500/25 border-0 overflow-hidden group"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-                <Send className="h-4 w-4 mr-2 group-hover:translate-x-1 transition-transform" />
-                {battleMode === "team" ? `Inviter alle (${myTeamNames.length + opponentTeamNames.length} spillere)` : "Inviter til duel"}
+                <Swords className="h-5 w-5 mr-2 group-hover:rotate-12 transition-transform" />
+                <span className="relative">
+                  {isWinning ? "🔥 Fortsæt kampen" : isLosing ? "⚔️ Vend kampen" : "⚡ Start duellen"}
+                </span>
               </Button>
             ) : (
               <div className="space-y-3 animate-fade-in">
-                <p className="text-center text-sm text-slate-300 font-medium">Vælg duel-periode</p>
+                <p className="text-center text-sm text-slate-300 font-medium">Vælg kampperiode</p>
                 <div className="grid grid-cols-2 gap-3">
                   <Button 
                     onClick={() => {
                       setPeriod("today");
                       const teamLabel = battleMode === "team" ? ` (${myTeamNames.length}v${opponentTeamNames.length})` : "";
-                      toast.success(`Invitation sendt!${teamLabel}`, {
-                        description: "Duellen gælder for i dag."
+                      toast.success(`⚔️ Duel startet!${teamLabel}`, {
+                        description: "Kampen gælder for i dag."
                       });
                       setShowInviteOptions(false);
                     }}
@@ -686,8 +950,8 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                     onClick={() => {
                       setPeriod("week");
                       const teamLabel = battleMode === "team" ? ` (${myTeamNames.length}v${opponentTeamNames.length})` : "";
-                      toast.success(`Invitation sendt!${teamLabel}`, {
-                        description: "Duellen gælder for denne uge."
+                      toast.success(`⚔️ Duel startet!${teamLabel}`, {
+                        description: "Kampen gælder for denne uge."
                       });
                       setShowInviteOptions(false);
                     }}
@@ -714,7 +978,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
               }}
               className="w-full text-xs text-slate-500 hover:text-white transition-colors py-2"
             >
-              Nulstil hold
+              Nulstil duel
             </button>
           </div>
         )}
