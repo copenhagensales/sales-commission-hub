@@ -4160,6 +4160,10 @@ export type Database = {
         Args: { _employee_id: string; _user_id: string }
         Returns: boolean
       }
+      is_in_my_teams: {
+        Args: { _target_employee_id: string }
+        Returns: boolean
+      }
       is_manager_or_above: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_owner_only: { Args: { _user_id: string }; Returns: boolean }
@@ -4187,6 +4191,10 @@ export type Database = {
           p_schedule: string
         }
         Returns: number
+      }
+      shares_team_with_user: {
+        Args: { _target_employee_id: string; _user_id: string }
+        Returns: boolean
       }
       unschedule_integration_sync: {
         Args: { p_job_name: string }
