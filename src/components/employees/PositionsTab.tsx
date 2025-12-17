@@ -76,6 +76,10 @@ const DATA_SCOPE_PERMISSIONS: DataScopePermission[] = [
   { key: "scope_contracts", label: "Kontrakter", description: "Hvem kan brugeren se kontrakter for" },
   { key: "scope_payroll", label: "Løndata", description: "Hvem kan brugeren se løndata for" },
   { key: "scope_career_wishes", label: "Karriereønsker", description: "Hvem kan brugeren se karriereønsker for" },
+  { key: "scope_sales", label: "Salgsdata", description: "Hvem kan brugeren se salgsdata og provision for" },
+  { key: "scope_quiz", label: "Quiz-svar", description: "Hvem kan brugeren se quiz-besvarelser for (bilquiz, code of conduct)" },
+  { key: "scope_extra_work", label: "Ekstraarbejde", description: "Hvem kan brugeren se ekstraarbejde for" },
+  { key: "scope_fieldmarketing", label: "Fieldmarketing", description: "Hvem kan brugeren se fieldmarketing bookings og salg for" },
 ];
 
 const PERMISSION_CATEGORIES: PermissionCategory[] = [
