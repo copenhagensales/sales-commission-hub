@@ -10,6 +10,7 @@ import { useCanAccess } from "@/hooks/useSystemRoles";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 
 import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
 import { useIsSomeEmployee } from "@/hooks/useSomeEmployee";
@@ -154,6 +155,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const queryClient = useQueryClient();
   const { isTeamlederOrAbove, isOwner, isRekruttering, isRekrutteringOrAbove, isTeamleder, isSome, isLoading, role } = useCanAccess();
   const { user } = useAuth();
+  const positionPermissions = usePermissions();
   
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
   const { data: isSomeEmployee, isLoading: isSomeLoading } = useIsSomeEmployee();
@@ -409,6 +411,50 @@ const [personnelOpen, setPersonnelOpen] = useState(
   // Add pulse survey results if granted
   if (isMenuItemGranted("pulse-results") && !mainNavigation.some(item => item.href === "/pulse-survey-results")) {
     mainNavigation = [...mainNavigation, { name: t("sidebar.pulseSurveyResults"), href: "/pulse-survey-results", icon: BarChart3 }];
+  }
+
+  // === POSITION-BASED PERMISSIONS ===
+  // Add menu items based on job_title position permissions from job_positions table
+  if (!positionPermissions.isLoading && positionPermissions.position) {
+    // Time stamp
+    if (positionPermissions.canViewTimeStamp && !mainNavigation.some(item => item.href === "/time-stamp")) {
+      mainNavigation = [...mainNavigation, { name: t("sidebar.timeClock"), href: "/time-stamp", icon: Clock }];
+    }
+    
+    // My profile
+    if (positionPermissions.canViewMyProfile && !mainNavigation.some(item => item.href === "/my-profile")) {
+      mainNavigation = [...mainNavigation, { name: t("sidebar.myProfile"), href: "/my-profile", icon: User }];
+    }
+    
+    // My contracts
+    if (positionPermissions.canViewMyContracts && !mainNavigation.some(item => item.href === "/my-contracts")) {
+      mainNavigation = [...mainNavigation, { name: t("sidebar.myContracts"), href: "/my-contracts", icon: FileText }];
+    }
+    
+    // Career wishes
+    if (positionPermissions.canViewCareerWishes && !mainNavigation.some(item => item.href === "/career-wishes")) {
+      mainNavigation = [...mainNavigation, { name: t("sidebar.teamWishesCareer"), href: "/career-wishes", icon: Sparkles }];
+    }
+    
+    // My schedule
+    if (positionPermissions.canViewMySchedule && !mainNavigation.some(item => item.href === "/my-schedule")) {
+      mainNavigation = [...mainNavigation, { name: t("sidebar.myCalendar"), href: "/my-schedule", icon: UserCheck }];
+    }
+    
+    // SOME
+    if (positionPermissions.canViewSome && !mainNavigation.some(item => item.href === "/some")) {
+      mainNavigation = [...mainNavigation, { name: t("sidebar.some"), href: "/some", icon: Video }];
+    }
+    
+    // Dashboard
+    if (positionPermissions.canViewDashboard && !mainNavigation.some(item => item.href === "/dashboard")) {
+      mainNavigation = [...mainNavigation, { name: t("sidebar.dashboard"), href: "/dashboard", icon: LayoutDashboard }];
+    }
+    
+    // Wallboard
+    if (positionPermissions.canViewWallboard && !mainNavigation.some(item => item.href === "/wallboard")) {
+      mainNavigation = [...mainNavigation, { name: t("sidebar.wallboard"), href: "/wallboard", icon: Tv }];
+    }
   }
   
   const currentShiftPlanningNav = isOwner ? getShiftPlanningNavigation(t) : employeeShiftPlanningNavigation;
@@ -700,8 +746,8 @@ const [personnelOpen, setPersonnelOpen] = useState(
             </Collapsible>
           )}
 
-          {/* MG menu - only for owners */}
-          {isOwner && (
+          {/* MG menu - for owners or users with MG Test position permission */}
+          {(isOwner || positionPermissions.canViewMgTest) && (
             <Collapsible open={mgOpen} onOpenChange={setMgOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
@@ -714,7 +760,19 @@ const [personnelOpen, setPersonnelOpen] = useState(
                 {mgOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {mgNav.map((item) => {
+                {mgNav.filter(item => {
+                  // Filter MG items based on position permissions for non-owners
+                  if (isOwner) return true;
+                  if (item.href === "/mg-test") return positionPermissions.canViewMgTest;
+                  if (item.href === "/payroll") return positionPermissions.canViewPayroll;
+                  if (item.href === "/tdc-erhverv") return positionPermissions.canViewTdcErhverv;
+                  if (item.href === "/codan") return positionPermissions.canViewCodan;
+                  if (item.href === "/mg-test-dashboard") return positionPermissions.canViewTestDashboard;
+                  if (item.href === "/dialer-data") return positionPermissions.canViewDialerData;
+                  if (item.href === "/calls-data") return positionPermissions.canViewCallsData;
+                  if (item.href === "/adversus-data") return positionPermissions.canViewAdversusData;
+                  return false;
+                }).map((item) => {
                   const isActive = location.pathname === item.href;
                   return (
                     <NavLink
