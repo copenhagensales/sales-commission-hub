@@ -325,5 +325,28 @@
     "showMore": "Vis {{count}} flere",
     "showLess": "Vis færre",
     "confirm": "Bekræft"
+  },
+  "batchMigration": {
+    "title": "Batch Migration",
+    "description": "Synkroniser historiske data i batches for at undgå hukommelsesgrænser",
+    "batchSync": "Batch Sync",
+    "totalDays": "Antal dage",
+    "batchSize": "Batch størrelse (dage)",
+    "parallelCalls": "Parallelle kald",
+    "days": "dage",
+    "sequential": "sekventiel",
+    "parallel": "parallelle",
+    "previewInfo": "Dette vil oprette ca. <strong>{{batches}}</strong> batches og sende <strong>{{concurrency}}</strong> parallelle forespørgsler ad gangen",
+    "overallProgress": "Samlet fremskridt",
+    "batchesProgress": "{{completed}} / {{total}} batches",
+    "salesSynced": "Salg synkroniseret",
+    "successfulBatches": "Succesfulde batches",
+    "failedBatches": "Fejlede batches",
+    "sales": "salg",
+    "error": "Fejl",
+    "startBatchMigration": "Start Batch Migration",
+    "reset": "Nulstil",
+    "close": "Luk",
+    "syncing": "Synkroniserer..."
   }
 }
