@@ -627,20 +627,34 @@ export default function MgTest() {
         productId = newProduct.id as string;
       }
 
-      // 2) Opret/opdatér mapping baseret på adversus_external_id
+      // 2) Opret/opdatér mapping baseret på adversus_external_id + adversus_product_title (composite key)
       if (row.adversus_external_id) {
-        const { error: mappingError } = await supabase
+        // First check if mapping with this exact combination exists
+        const { data: existingMapping } = await supabase
           .from("adversus_product_mappings")
-          .upsert(
-            {
+          .select("id")
+          .eq("adversus_external_id", row.adversus_external_id)
+          .eq("adversus_product_title", row.adversus_product_title || "")
+          .maybeSingle();
+
+        if (existingMapping) {
+          // Update existing mapping
+          const { error: updateError } = await supabase
+            .from("adversus_product_mappings")
+            .update({ product_id: productId })
+            .eq("id", existingMapping.id);
+          if (updateError) throw updateError;
+        } else {
+          // Insert new mapping
+          const { error: insertError } = await supabase
+            .from("adversus_product_mappings")
+            .insert({
               adversus_external_id: row.adversus_external_id,
               adversus_product_title: row.adversus_product_title,
               product_id: productId,
-            },
-            { onConflict: "adversus_external_id" }
-          );
-
-        if (mappingError) throw mappingError;
+            });
+          if (insertError) throw insertError;
+        }
       }
 
       // 3) Opdater alle sale_items med samme adversus_product_title så de peger på dette produkt
@@ -713,18 +727,29 @@ export default function MgTest() {
         
         if (createError) throw createError;
         
-        // Create mapping if we have external_id
+        // Create mapping if we have external_id (use composite key lookup)
         if (row.adversus_external_id && newProduct) {
-          await supabase
+          const { data: existingMapping } = await supabase
             .from("adversus_product_mappings")
-            .upsert(
-              {
+            .select("id")
+            .eq("adversus_external_id", row.adversus_external_id)
+            .eq("adversus_product_title", row.adversus_product_title || "")
+            .maybeSingle();
+
+          if (existingMapping) {
+            await supabase
+              .from("adversus_product_mappings")
+              .update({ product_id: newProduct.id })
+              .eq("id", existingMapping.id);
+          } else {
+            await supabase
+              .from("adversus_product_mappings")
+              .insert({
                 adversus_external_id: row.adversus_external_id,
                 adversus_product_title: row.adversus_product_title,
                 product_id: newProduct.id,
-              },
-              { onConflict: "adversus_external_id" }
-            );
+              });
+          }
         }
         
         // Link sale_items to this product
