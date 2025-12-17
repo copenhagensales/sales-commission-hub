@@ -19,15 +19,30 @@ export interface DataFilterGroup {
   rules: DataFilterRule[];
 }
 
-// Conditional extraction rule - checks condition then extracts products
+// Condition for extraction rules - same operators as filter rules
+export interface ExtractionCondition {
+  field: string;  // Key to check in data object (e.g., "Leadtype", "Mødebook")
+  operator: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'regex' | 'notEquals' | 'notContains' | 'isEmpty' | 'isNotEmpty' | 'notExists';
+  value: string;  // Value to compare (ignored for isEmpty/isNotEmpty/notExists)
+}
+
+// Conditional extraction rule - checks condition(s) then extracts products
 export interface ConditionalExtractionRule {
-  conditionKey: string;           // Key to check in data object (e.g., "Antal abonnementer", "5GI salg")
+  // NEW: Multiple conditions with boolean logic
+  conditions?: ExtractionCondition[];  // Array of conditions to evaluate
+  conditionsLogic?: 'AND' | 'OR';      // How conditions are combined (default: AND)
+  
+  // LEGACY: Single condition (backward compatible)
+  conditionKey?: string;           // Key to check in data object (e.g., "Antal abonnementer", "5GI salg")
   conditionValue?: string;        // Optional: specific value to match (e.g., "1"). If empty, just checks key exists
+  
+  // Extraction configuration
   extractionType: 'specific_fields' | 'regex' | 'static_value' | 'composite';
   targetKeys?: string[];          // For specific_fields: ["Abonnement1", "Abonnement2"]
   regexPattern?: string;          // For regex extraction
   staticProductName?: string;     // For static_value: directly use this product name
   staticProductPrice?: number;    // For static_value: directly use this price
+  productNameTemplate?: string;   // For composite: template like "{{A-kasse type}}"
 }
 
 // Product extraction configuration - stored in dialer_integrations.config

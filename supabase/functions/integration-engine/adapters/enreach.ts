@@ -9,6 +9,7 @@ import {
   ReferenceExtractionConfig,
   DialerIntegrationConfig,
   ConditionalExtractionRule,
+  ExtractionCondition,
   DataFilterRule,
   DataFilterGroup,
 } from "../types.ts";
@@ -416,9 +417,10 @@ export class EnreachAdapter implements DialerAdapter {
 
     if (strategy === "conditional" && extractionConfig?.conditionalRules && dataObj) {
       for (const rule of extractionConfig.conditionalRules) {
-        const conditionValue = this.getValue(dataObj, [rule.conditionKey]);
-        if (!conditionValue) continue;
-        if (rule.conditionValue && String(conditionValue) !== rule.conditionValue) continue;
+        // Check if rule conditions pass
+        if (!this.checkExtractionRuleConditions(rule, dataObj, lead)) {
+          continue;
+        }
         const extractedProducts = this.extractFromRule(rule, dataObj, lead);
         if (extractedProducts.length > 0) {
           products.push(...extractedProducts);
@@ -701,6 +703,81 @@ export class EnreachAdapter implements DialerAdapter {
       }
     }
 
+    return true;
+  }
+
+  // Check if extraction rule conditions pass (supports both legacy single condition and new multiple conditions)
+  private checkExtractionRuleConditions(
+    rule: ConditionalExtractionRule,
+    dataObj: Record<string, unknown>,
+    lead: HeroBaseLead,
+  ): boolean {
+    // NEW: If rule has conditions array, use those with boolean logic
+    if (rule.conditions && rule.conditions.length > 0) {
+      const logic = rule.conditionsLogic || 'AND';
+      
+      const checkCondition = (condition: ExtractionCondition): boolean => {
+        // Try to get value from dataObj first, then from lead root
+        let fieldValue = this.getValue(dataObj, [condition.field]);
+        if (fieldValue === undefined || fieldValue === null || fieldValue === "") {
+          fieldValue = this.getNestedValue(lead, condition.field);
+        }
+        
+        const fieldExists = fieldValue !== undefined && fieldValue !== null;
+        
+        // Handle existence/empty checks
+        switch (condition.operator) {
+          case "notExists":
+            return !fieldExists;
+          case "isEmpty":
+            return !fieldExists || fieldValue === "";
+          case "isNotEmpty":
+            return fieldExists && fieldValue !== "";
+        }
+        
+        const strValue = fieldExists ? String(fieldValue) : "";
+        const condValue = condition.value || "";
+        
+        switch (condition.operator) {
+          case "equals":
+            return strValue.toLowerCase() === condValue.toLowerCase();
+          case "notEquals":
+            return strValue.toLowerCase() !== condValue.toLowerCase();
+          case "contains":
+            return strValue.toLowerCase().includes(condValue.toLowerCase());
+          case "notContains":
+            return !strValue.toLowerCase().includes(condValue.toLowerCase());
+          case "startsWith":
+            return strValue.toLowerCase().startsWith(condValue.toLowerCase());
+          case "endsWith":
+            return strValue.toLowerCase().endsWith(condValue.toLowerCase());
+          case "regex":
+            try {
+              return new RegExp(condValue, "i").test(strValue);
+            } catch {
+              return false;
+            }
+          default:
+            return true;
+        }
+      };
+      
+      if (logic === 'OR') {
+        return rule.conditions.some(checkCondition);
+      } else {
+        return rule.conditions.every(checkCondition);
+      }
+    }
+    
+    // LEGACY: Single conditionKey/conditionValue (backward compatible)
+    if (rule.conditionKey) {
+      const conditionValue = this.getValue(dataObj, [rule.conditionKey]);
+      if (!conditionValue) return false;
+      if (rule.conditionValue && String(conditionValue) !== rule.conditionValue) return false;
+      return true;
+    }
+    
+    // No conditions = always pass (useful for catch-all rules)
     return true;
   }
 
