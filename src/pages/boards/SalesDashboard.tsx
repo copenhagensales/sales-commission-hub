@@ -70,7 +70,7 @@ export default function SalesDashboard() {
     }
   };
 
-  const { data: clientStats, isLoading } = useQuery({
+  const { data: clientStats, isLoading, dataUpdatedAt } = useQuery({
     queryKey: ["sales-dashboard-tv"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_client_sales_stats");
@@ -88,8 +88,11 @@ export default function SalesDashboard() {
       })) as ClientStats[];
     },
     refetchInterval: 30000,
+    staleTime: 0,
     enabled: isUnlocked,
   });
+
+  const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString("da-DK") : "";
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -306,6 +309,8 @@ export default function SalesDashboard() {
         <div className="flex items-center justify-center gap-1.5">
           <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
           Live opdatering hvert 30. sekund
+          {lastUpdated && <span className="ml-2">• Opdateret: {lastUpdated}</span>}
+          <span className="ml-2">• v2.1</span>
         </div>
       </footer>
     </div>
