@@ -497,7 +497,10 @@ export class EnreachAdapter implements DialerAdapter {
           for (const key of rule.targetKeys) {
             const val = this.getValue(dataObj, [key]);
             if (val && String(val).trim().length > 0) {
-              products.push({ name: String(val), externalId: key, quantity: 1, unitPrice: 0 });
+              // FIX: Use product name as externalId instead of field key name
+              // This ensures unique products (e.g., different Abonnement values) get unique IDs
+              const productName = String(val).trim();
+              products.push({ name: productName, externalId: productName, quantity: 1, unitPrice: 0 });
             }
           }
         }
@@ -530,9 +533,10 @@ export class EnreachAdapter implements DialerAdapter {
         break;
       case "static_value":
         if (rule.staticProductName) {
+          // FIX: Use product name as externalId instead of conditionKey
           products.push({
             name: rule.staticProductName,
-            externalId: rule.conditionKey,
+            externalId: rule.staticProductName,
             quantity: 1,
             unitPrice: rule.staticProductPrice || 0,
           });
@@ -558,9 +562,10 @@ export class EnreachAdapter implements DialerAdapter {
           // Limpiar espacios extra resultantes de valores vacíos
           name = name.replace(/\s+-\s*$/g, "").replace(/^\s*-\s+/g, "").trim();
           if (name && name.length > 0) {
+            // FIX: Use product name as externalId instead of conditionKey
             products.push({
               name: name,
-              externalId: rule.conditionKey,
+              externalId: name,
               quantity: 1,
               unitPrice: 0,
             });
