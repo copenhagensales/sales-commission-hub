@@ -324,14 +324,10 @@ export default function TdcErhvervBoard() {
 
                 {/* Salg måned KPI */}
                 <div className="rounded-lg bg-muted/50 p-4 text-center">
-                  <div className="flex justify-between items-baseline mb-2">
-                    <span className="text-xs text-muted-foreground uppercase tracking-wider">Salg måned</span>
-                  </div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Salg måned</p>
                   <p className="text-4xl font-bold text-foreground">
                     {teamStats.totalSales} <span className="text-lg font-normal text-muted-foreground">/ {teamStats.targetSales}</span>
                   </p>
-                  <Progress value={salesProgress} className="h-2 mt-2" />
-                  <p className="text-xs text-muted-foreground mt-1">{Math.round(salesProgress)}% af mål</p>
                 </div>
               </div>
             </div>
