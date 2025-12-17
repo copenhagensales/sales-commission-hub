@@ -67,7 +67,7 @@ const SalesRegistration = () => {
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
-        .eq("name", "eesy FM Gaden Products")
+        .ilike("name", "eesy FM Gaden Products")
         .single();
       
       if (!campaigns) return [];
