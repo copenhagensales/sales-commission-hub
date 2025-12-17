@@ -337,22 +337,68 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     !opponentTeam.includes(a.id)
   );
 
-  // Team member avatar component
-  const TeamMemberAvatar = ({ name, onRemove, isSmall = false }: { name: string; onRemove?: () => void; isSmall?: boolean }) => (
-    <div className={`relative group ${isSmall ? 'w-10 h-10' : 'w-12 h-12'}`}>
-      <div className={`${isSmall ? 'w-10 h-10 text-xs' : 'w-12 h-12 text-sm'} rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center font-bold border-2 border-slate-500/50`}>
-        {getInitials(name)}
+  // Team member badge component
+  const TeamMemberBadge = ({ name, onRemove }: { name: string; onRemove?: () => void }) => (
+    <div className="relative group">
+      <div className="px-3 py-1.5 rounded-lg bg-slate-700/80 border border-slate-600/50 flex items-center gap-2">
+        <span className="text-xs font-medium text-slate-200 truncate max-w-[80px]">{name.split(" ")[0]}</span>
+        {onRemove && (
+          <button 
+            onClick={onRemove}
+            className="w-4 h-4 bg-rose-500/80 rounded-full flex items-center justify-center hover:bg-rose-500 transition-colors"
+          >
+            <X className="w-3 h-3 text-white" />
+          </button>
+        )}
       </div>
-      {onRemove && (
-        <button 
-          onClick={onRemove}
-          className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <X className="w-3 h-3 text-white" />
-        </button>
-      )}
     </div>
   );
+
+  // Player card component
+  const PlayerCard = ({ 
+    name, 
+    isWinner, 
+    isLoser, 
+    score, 
+    showCrown,
+    colorScheme
+  }: { 
+    name: string; 
+    isWinner: boolean; 
+    isLoser: boolean; 
+    score?: number;
+    showCrown?: boolean;
+    colorScheme: 'blue' | 'rose' | 'emerald';
+  }) => {
+    const gradients = {
+      blue: 'from-blue-500/20 to-blue-600/10 border-blue-400/30',
+      rose: 'from-rose-500/20 to-rose-600/10 border-rose-400/30',
+      emerald: 'from-emerald-500/20 to-emerald-600/10 border-emerald-400/30'
+    };
+    
+    const glowColor = isWinner ? 'bg-emerald-500' : isLoser ? 'bg-rose-500' : `bg-${colorScheme}-500`;
+    const actualGradient = isWinner ? gradients.emerald : isLoser ? gradients.rose : gradients[colorScheme];
+    
+    return (
+      <div className="relative">
+        {showCrown && (
+          <Crown className="absolute -top-5 left-1/2 -translate-x-1/2 w-6 h-6 text-amber-400 animate-bounce z-20" style={{ animationDuration: '2s' }} />
+        )}
+        <div className={`absolute inset-0 ${glowColor} blur-xl opacity-20 scale-110 rounded-xl`} />
+        <div className={`relative px-4 py-3 rounded-xl bg-gradient-to-br ${actualGradient} border backdrop-blur-sm`}>
+          <div className="flex flex-col items-center gap-1">
+            <Zap className={`w-5 h-5 ${isWinner ? 'text-emerald-400' : isLoser ? 'text-rose-400' : 'text-blue-400'}`} />
+            <p className="font-bold text-sm text-white text-center leading-tight">
+              {name.split(" ")[0]}
+            </p>
+            <p className="text-[10px] text-slate-400 truncate max-w-full">
+              {name.split(" ").slice(1).join(" ")}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Card className="relative border-0 shadow-2xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -411,19 +457,13 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         <div className="grid grid-cols-3 gap-3 items-start">
           {/* Left Team (My Team) */}
           <div className="text-center">
-            <div className="relative inline-block">
-              {hasOpponents && isWinning && (
-                <Crown className="absolute -top-4 left-1/2 -translate-x-1/2 w-6 h-6 text-amber-400 animate-bounce" style={{ animationDuration: '2s' }} />
-              )}
-              <div className={`absolute inset-0 rounded-full ${isWinning ? 'bg-emerald-500' : isLosing ? 'bg-rose-500' : 'bg-blue-500'} blur-xl opacity-30 scale-110`} />
-              <div className={`relative w-16 h-16 p-1 rounded-full bg-gradient-to-br ${isWinning ? 'from-emerald-400 to-emerald-600' : isLosing ? 'from-rose-400 to-rose-600' : 'from-blue-400 to-blue-600'}`}>
-                <div className="w-full h-full rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-xl font-bold shadow-inner">
-                  {currentEmployeeName ? getInitials(currentEmployeeName) : "?"}
-                </div>
-              </div>
-            </div>
-            
-            <p className="mt-2 font-bold text-sm truncate">{currentEmployeeName?.split(" ")[0] || "Dig"}</p>
+            <PlayerCard 
+              name={currentEmployeeName || "Dig"} 
+              isWinner={hasOpponents && isWinning}
+              isLoser={hasOpponents && isLosing}
+              showCrown={hasOpponents && isWinning}
+              colorScheme="blue"
+            />
             
             {/* Team members */}
             {battleMode === "team" && (
@@ -433,11 +473,10 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                     const agent = agents.find(a => a.id === id);
                     if (!agent) return null;
                     return (
-                      <TeamMemberAvatar 
+                      <TeamMemberBadge 
                         key={id} 
                         name={agent.name} 
                         onRemove={() => removeFromMyTeam(id)}
-                        isSmall
                       />
                     );
                   })}
@@ -494,26 +533,13 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
           <div className="text-center">
             {hasOpponents ? (
               <>
-                <div className="relative inline-block">
-                  {isLosing && (
-                    <Crown className="absolute -top-4 left-1/2 -translate-x-1/2 w-6 h-6 text-amber-400 animate-bounce" style={{ animationDuration: '2s' }} />
-                  )}
-                  <div className={`absolute inset-0 rounded-full ${isLosing ? 'bg-emerald-500' : isWinning ? 'bg-rose-500' : 'bg-rose-500'} blur-xl opacity-30 scale-110`} />
-                  <div className={`relative w-16 h-16 p-1 rounded-full bg-gradient-to-br ${isLosing ? 'from-emerald-400 to-emerald-600' : 'from-rose-400 to-rose-600'}`}>
-                    <div className="w-full h-full rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-xl font-bold shadow-inner">
-                      {opponentTeamNames.length === 1 
-                        ? getInitials(opponentTeamNames[0])
-                        : <Users className="w-6 h-6" />
-                      }
-                    </div>
-                  </div>
-                </div>
-                <p className="mt-2 font-bold text-sm truncate">
-                  {opponentTeamNames.length === 1 
-                    ? opponentTeamNames[0].split(" ")[0] 
-                    : `Hold (${opponentTeamNames.length})`
-                  }
-                </p>
+                <PlayerCard 
+                  name={opponentTeamNames.length === 1 ? opponentTeamNames[0] : `Hold (${opponentTeamNames.length})`} 
+                  isWinner={isLosing}
+                  isLoser={isWinning}
+                  showCrown={isLosing}
+                  colorScheme="rose"
+                />
                 
                 {/* Opponent team members */}
                 {battleMode === "team" && opponentTeam.length > 0 && (
@@ -523,11 +549,10 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                         const agent = agents.find(a => a.id === id);
                         if (!agent) return null;
                         return (
-                          <TeamMemberAvatar 
+                          <TeamMemberBadge 
                             key={id} 
                             name={agent.name} 
                             onRemove={() => removeFromOpponentTeam(id)}
-                            isSmall
                           />
                         );
                       })}
