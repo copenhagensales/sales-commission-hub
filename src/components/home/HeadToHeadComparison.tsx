@@ -3,10 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, CalendarRange, Plus, X, Sparkles, Timer, Activity, MessageSquare, Bell, Check, XCircle } from "lucide-react";
-import { startOfWeek, startOfDay, endOfDay, differenceInHours, differenceInDays, formatDistanceToNow } from "date-fns";
+import { startOfWeek, startOfDay, endOfDay, endOfWeek, differenceInHours, differenceInDays, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,18 @@ interface StoredBattleState {
   period: PeriodType;
   matchStarted: boolean;
   matchComment: string;
+  activeChallengeId?: string;
+  matchStartTime?: string;
+}
+
+interface ActiveChallenge {
+  id: string;
+  period: PeriodType;
+  battle_mode: BattleMode;
+  comment: string | null;
+  accepted_at: string;
+  challenger_employee_id: string;
+  opponent_employee_id: string;
 }
 
 export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }: HeadToHeadComparisonProps) => {
@@ -60,14 +73,18 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
   const [battleMode, setBattleMode] = useState<BattleMode>(initialState?.battleMode ?? "1v1");
   const [myTeam, setMyTeam] = useState<string[]>(initialState?.myTeam ?? []);
   const [opponentTeam, setOpponentTeam] = useState<string[]>(initialState?.opponentTeam ?? []);
-  const [period, setPeriod] = useState<PeriodType>(initialState?.period ?? "week");
-  const [showInviteOptions, setShowInviteOptions] = useState(true);
+  const [period, setPeriod] = useState<PeriodType>(initialState?.period ?? "today");
   const [matchStarted, setMatchStarted] = useState(initialState?.matchStarted ?? false);
-  const [showPeriodSelection, setShowPeriodSelection] = useState(false);
   const [momentum, setMomentum] = useState(50);
   const [animateScore, setAnimateScore] = useState<'left' | 'right' | null>(null);
   const [matchComment, setMatchComment] = useState(initialState?.matchComment ?? "");
   const [showPendingChallenges, setShowPendingChallenges] = useState(false);
+  const [showSetupDialog, setShowSetupDialog] = useState(false);
+  const [setupOpponent, setSetupOpponent] = useState<string>("");
+  const [setupPeriod, setSetupPeriod] = useState<PeriodType>("today");
+  const [setupComment, setSetupComment] = useState("");
+  const [activeChallengeId, setActiveChallengeId] = useState<string | null>(initialState?.activeChallengeId ?? null);
+  const [matchStartTime, setMatchStartTime] = useState<string | null>(initialState?.matchStartTime ?? null);
 
   const queryClient = useQueryClient();
 
@@ -109,20 +126,38 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     },
   });
 
-  // Respond to challenge mutation
+  // Respond to challenge mutation - sets accepted_at for fair start
   const respondChallengeMutation = useMutation({
-    mutationFn: async ({ challengeId, accept }: { challengeId: string; accept: boolean }) => {
+    mutationFn: async ({ challengeId, accept, challenge }: { challengeId: string; accept: boolean; challenge?: any }) => {
+      const acceptedAt = new Date().toISOString();
       const { error } = await supabase
         .from("h2h_challenges")
         .update({ 
           status: accept ? "accepted" : "declined",
-          responded_at: new Date().toISOString()
+          responded_at: acceptedAt,
+          accepted_at: accept ? acceptedAt : null
         })
         .eq("id", challengeId);
       if (error) throw error;
+      
+      // If accepted, start the match with the fair start time
+      if (accept && challenge) {
+        return { acceptedAt, challenge };
+      }
+      return null;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["h2h-pending-challenges"] });
+      if (data?.acceptedAt && data?.challenge) {
+        // Set up match state with fair start time
+        setMatchStartTime(data.acceptedAt);
+        setActiveChallengeId(data.challenge.id);
+        setPeriod(data.challenge.period as PeriodType);
+        setBattleMode(data.challenge.battle_mode as BattleMode);
+        setMatchComment(data.challenge.comment || "");
+        setMatchStarted(true);
+        // TODO: Set opponent from challenge
+      }
     },
   });
 
@@ -135,26 +170,43 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
       period,
       matchStarted,
       matchComment,
+      activeChallengeId: activeChallengeId ?? undefined,
+      matchStartTime: matchStartTime ?? undefined,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
       console.error("Failed to save battle state:", e);
     }
-  }, [battleMode, myTeam, opponentTeam, period, matchStarted, matchComment]);
+  }, [battleMode, myTeam, opponentTeam, period, matchStarted, matchComment, activeChallengeId, matchStartTime]);
 
-  // Calculate date range based on period
+  // Calculate date range based on period - uses matchStartTime for fair start
   const dateRange = useMemo(() => {
     const now = new Date();
+    
+    // If match is active and we have a start time, use that as the start
+    if (matchStarted && matchStartTime) {
+      const startTime = new Date(matchStartTime);
+      const endTime = period === "today" 
+        ? endOfDay(startTime) 
+        : endOfWeek(startTime, { weekStartsOn: 1 });
+      return { 
+        start: startTime, 
+        end: endTime, 
+        label: period === "today" ? "I dag" : "Denne uge" 
+      };
+    }
+    
+    // Default behavior for preview/no active match
     switch (period) {
       case "today":
         return { start: startOfDay(now), end: endOfDay(now), label: "I dag" };
       case "week":
-        return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfDay(now), label: "Denne uge" };
+        return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }), label: "Denne uge" };
       default:
-        return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfDay(now), label: "Denne uge" };
+        return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }), label: "Denne uge" };
     }
-  }, [period]);
+  }, [period, matchStarted, matchStartTime]);
 
   // Calculate time remaining
   const timeInfo = useMemo(() => {
@@ -883,8 +935,12 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                     variant="outline"
                     className="h-8 bg-emerald-500/20 border-emerald-500/30 hover:bg-emerald-500/40 text-emerald-400"
                     onClick={() => {
-                      respondChallengeMutation.mutate({ challengeId: challenge.id, accept: true });
-                      toast.success("Udfordring accepteret!");
+                      respondChallengeMutation.mutate({ 
+                        challengeId: challenge.id, 
+                        accept: true,
+                        challenge: challenge 
+                      });
+                      toast.success("⚔️ Duel startet! Begge starter på 0-0");
                       setShowPendingChallenges(false);
                     }}
                   >
@@ -1116,24 +1172,11 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                 </div>
               </>
             ) : (
-              <div className="space-y-3">
-                <div className="relative inline-block">
-                  <div className="w-16 h-16 mx-auto rounded-full bg-slate-700/50 border-2 border-dashed border-slate-600 flex items-center justify-center">
-                    <Users className="w-8 h-8 text-slate-500" />
-                  </div>
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-16 h-16 mx-auto rounded-full bg-slate-700/50 border-2 border-dashed border-slate-600 flex items-center justify-center">
+                  <Users className="w-8 h-8 text-slate-500" />
                 </div>
-                <Select onValueChange={(id) => setOpponentTeam([id])}>
-                  <SelectTrigger className="bg-slate-700/80 border-slate-600/50 text-white text-xs h-9 hover:bg-slate-600/80 transition-colors backdrop-blur-sm">
-                    <SelectValue placeholder="Vælg modstander" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-700 max-h-48">
-                    {availableForOpponentTeam.map(agent => (
-                      <SelectItem key={agent.id} value={agent.id}>
-                        {agent.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <span className="text-xs text-slate-500">Ingen modstander</span>
               </div>
             )}
           </div>
@@ -1167,143 +1210,172 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
           </div>
         )}
 
-        {/* No opponent selected state */}
-        {!hasOpponents && (
-          <div className="text-center py-8">
-            <div className="relative inline-block mb-4">
-              <Target className="h-12 w-12 text-slate-600" />
-              <div className="absolute inset-0 animate-ping">
-                <Target className="h-12 w-12 text-slate-700/50" />
-              </div>
-            </div>
-            <p className="text-slate-400 text-sm">Vælg en modstander for at starte duellen</p>
+        {/* No opponent selected - show Start Duel button */}
+        {!hasOpponents && !matchStarted && (
+          <div className="text-center py-6">
+            <Button 
+              onClick={() => setShowSetupDialog(true)}
+              className="h-14 px-8 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all text-base"
+            >
+              <Swords className="w-5 h-5 mr-2" />
+              Start ny duel
+            </Button>
+            <p className="text-slate-500 text-xs mt-3">Vælg modstander, periode og indsats i ét trin</p>
           </div>
         )}
 
-        {/* Action buttons when opponent is selected */}
-        {hasOpponents && (
-          <div className="flex flex-col gap-3 pt-2">
-            {/* Step 1: Show invite button */}
-            {!showPeriodSelection && !matchStarted && (
-              <div className="space-y-3 animate-fade-in">
-                <Button 
-                  onClick={() => setShowPeriodSelection(true)}
-                  className="w-full h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all"
-                >
-                  <Send className="w-4 h-4 mr-2" />
-                  Inviter til match
-                </Button>
-                <button 
-                  onClick={() => {
-                    setOpponentTeam([]);
-                    setMyTeam([]);
-                    setMatchComment("");
-                  }}
-                  className="w-full text-xs text-slate-500 hover:text-white transition-colors py-1"
-                >
-                  Annuller
-                </button>
-              </div>
-            )}
-
-            {/* Step 2: Show period selection after invite */}
-            {showPeriodSelection && !matchStarted && (
-              <div className="space-y-3 animate-fade-in">
-                <p className="text-center text-sm text-slate-300 font-medium">Vælg kampperiode</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button 
-                    onClick={async () => {
-                      // Get opponent employee ID from agent mapping
-                      const opponentAgent = agents.find(a => opponentTeam.includes(a.id));
-                      const opponentEmployeeId = opponentAgent?.employeeId;
-                      
-                      if (opponentEmployeeId && currentEmployeeId) {
-                        try {
-                          await createChallengeMutation.mutateAsync({
-                            opponentId: opponentEmployeeId,
-                            battleMode: battleMode,
-                            period: "today",
-                            comment: matchComment
-                          });
-                          toast.success(`⚔️ Invitation sendt!`, {
-                            description: `${opponentAgent?.name} vil modtage din udfordring.`
-                          });
-                        } catch (error) {
-                          console.error("Failed to send challenge:", error);
-                        }
-                      }
-                      
-                      setPeriod("today");
-                      setMatchStarted(true);
-                      setShowPeriodSelection(false);
-                    }}
-                    disabled={createChallengeMutation.isPending}
-                    variant="outline"
-                    className="h-16 flex flex-col gap-1 bg-slate-800/80 border-slate-600/50 hover:bg-blue-500/20 hover:border-blue-400/50 text-white transition-all group"
-                  >
-                    <CalendarDays className="h-5 w-5 text-blue-400 group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-bold">I dag</span>
-                  </Button>
-                  <Button 
-                    onClick={async () => {
-                      // Get opponent employee ID from agent mapping
-                      const opponentAgent = agents.find(a => opponentTeam.includes(a.id));
-                      const opponentEmployeeId = opponentAgent?.employeeId;
-                      
-                      if (opponentEmployeeId && currentEmployeeId) {
-                        try {
-                          await createChallengeMutation.mutateAsync({
-                            opponentId: opponentEmployeeId,
-                            battleMode: battleMode,
-                            period: "week",
-                            comment: matchComment
-                          });
-                          toast.success(`⚔️ Invitation sendt!`, {
-                            description: `${opponentAgent?.name} vil modtage din udfordring.`
-                          });
-                        } catch (error) {
-                          console.error("Failed to send challenge:", error);
-                        }
-                      }
-                      
-                      setPeriod("week");
-                      setMatchStarted(true);
-                      setShowPeriodSelection(false);
-                    }}
-                    disabled={createChallengeMutation.isPending}
-                    variant="outline"
-                    className="h-16 flex flex-col gap-1 bg-slate-800/80 border-slate-600/50 hover:bg-emerald-500/20 hover:border-emerald-400/50 text-white transition-all group"
-                  >
-                    <CalendarRange className="h-5 w-5 text-emerald-400 group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-bold">Denne uge</span>
-                  </Button>
-                </div>
-                <button 
-                  onClick={() => {
-                    setShowPeriodSelection(false);
-                    setOpponentTeam([]);
-                    setMyTeam([]);
-                    setMatchComment("");
-                  }}
-                  className="w-full text-xs text-slate-500 hover:text-white transition-colors py-1"
-                >
-                  Annuller
-                </button>
-              </div>
-            )}
-
-            {/* Step 3: Match in progress */}
-            {matchStarted && (
-              <div className="flex items-center justify-center gap-2">
-                <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs text-slate-300 font-medium">Kamp i gang • {dateRange.label}</span>
-                </div>
-              </div>
-            )}
+        {/* Match in progress */}
+        {matchStarted && (
+          <div className="flex flex-col items-center gap-3 pt-2">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs text-emerald-300 font-medium">Kamp i gang • {dateRange.label}</span>
+            </div>
+            <button 
+              onClick={() => {
+                setMatchStarted(false);
+                setOpponentTeam([]);
+                setMyTeam([]);
+                setMatchComment("");
+                setMatchStartTime(null);
+                setActiveChallengeId(null);
+              }}
+              className="text-xs text-slate-500 hover:text-rose-400 transition-colors py-1"
+            >
+              Afslut kamp
+            </button>
           </div>
         )}
       </CardContent>
+
+      {/* Setup Dialog - All options in one place */}
+      <Dialog open={showSetupDialog} onOpenChange={setShowSetupDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Swords className="w-5 h-5 text-amber-400" />
+              Start ny duel
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Vælg modstander, periode og evt. indsats
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-5 pt-4">
+            {/* Opponent Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300">Modstander</label>
+              <Select value={setupOpponent} onValueChange={setSetupOpponent}>
+                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                  <SelectValue placeholder="Vælg modstander" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-700">
+                  {agents.filter(a => a.name !== currentEmployeeName && a.employeeId).map(agent => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{agent.name}</span>
+                        {agent.teamName && (
+                          <span className="text-xs text-slate-500">({agent.teamName})</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Period Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300">Kampperiode</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setSetupPeriod("today")}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
+                    setupPeriod === "today" 
+                      ? "bg-blue-500/20 border-blue-400/50 text-blue-400" 
+                      : "bg-slate-800/50 border-slate-600/50 text-slate-400 hover:border-slate-500"
+                  }`}
+                >
+                  <CalendarDays className="w-6 h-6" />
+                  <span className="text-sm font-medium">I dag</span>
+                  <span className="text-[10px] text-slate-500">Fra nu til midnat</span>
+                </button>
+                <button
+                  onClick={() => setSetupPeriod("week")}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
+                    setupPeriod === "week" 
+                      ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-400" 
+                      : "bg-slate-800/50 border-slate-600/50 text-slate-400 hover:border-slate-500"
+                  }`}
+                >
+                  <CalendarRange className="w-6 h-6" />
+                  <span className="text-sm font-medium">Denne uge</span>
+                  <span className="text-[10px] text-slate-500">Fra nu til søndag</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Comment/Stake */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-300">Indsats (valgfrit)</label>
+              <Input
+                value={setupComment}
+                onChange={(e) => setSetupComment(e.target.value)}
+                placeholder="fx 'Taberen giver kaffe'"
+                className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+                maxLength={50}
+              />
+            </div>
+
+            {/* Send Button */}
+            <Button 
+              onClick={async () => {
+                if (!setupOpponent) {
+                  toast.error("Vælg en modstander først");
+                  return;
+                }
+                
+                const opponentAgent = agents.find(a => a.id === setupOpponent);
+                const opponentEmployeeId = opponentAgent?.employeeId;
+                
+                if (opponentEmployeeId && currentEmployeeId) {
+                  try {
+                    await createChallengeMutation.mutateAsync({
+                      opponentId: opponentEmployeeId,
+                      battleMode: battleMode,
+                      period: setupPeriod,
+                      comment: setupComment
+                    });
+                    toast.success(`⚔️ Invitation sendt!`, {
+                      description: `${opponentAgent?.name} vil modtage din udfordring.`
+                    });
+                    
+                    // Set up local state for preview
+                    setOpponentTeam([setupOpponent]);
+                    setPeriod(setupPeriod);
+                    setMatchComment(setupComment);
+                    setMatchStartTime(new Date().toISOString());
+                    setMatchStarted(true);
+                    setShowSetupDialog(false);
+                    
+                    // Reset setup state
+                    setSetupOpponent("");
+                    setSetupComment("");
+                  } catch (error) {
+                    console.error("Failed to send challenge:", error);
+                    toast.error("Kunne ikke sende invitation");
+                  }
+                }
+              }}
+              disabled={!setupOpponent || createChallengeMutation.isPending}
+              className="w-full h-12 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              Send invitation
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
