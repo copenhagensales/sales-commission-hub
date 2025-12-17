@@ -544,7 +544,15 @@ export class EnreachAdapter implements DialerAdapter {
           // Regex que captura todo el contenido entre {{ }} incluyendo guiones, espacios, etc.
           name = name.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
             const trimmedKey = key.trim();
-            const val = this.getValue(dataObj, [trimmedKey]);
+            // Usar getNestedValue para soportar notación de punto (e.g., campaign.code)
+            // Buscar primero en el lead completo, luego en dataObj
+            let val = this.getNestedValue(lead, trimmedKey);
+            if (val === undefined || val === null) {
+              val = this.getNestedValue(dataObj, trimmedKey);
+            }
+            if (val === undefined || val === null) {
+              val = this.getValue(dataObj, [trimmedKey]);
+            }
             return val ? String(val) : "";
           });
           // Limpiar espacios extra resultantes de valores vacíos
