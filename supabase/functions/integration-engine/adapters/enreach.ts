@@ -614,6 +614,7 @@ export class EnreachAdapter implements DialerAdapter {
   // Check if a single rule passes
   private checkRule(lead: HeroBaseLead, rule: DataFilterRule): boolean {
     let fieldValue = this.getNestedValue(lead, rule.field);
+    const fieldExists = fieldValue !== undefined;
 
     // Compat: "agentEmail" maps to orgCode fields
     if ((fieldValue === undefined || fieldValue === null || fieldValue === "") && rule.field === "agentEmail") {
@@ -624,8 +625,18 @@ export class EnreachAdapter implements DialerAdapter {
         this.getNestedValue(lead, "LastModifiedByUser.orgCode");
     }
 
+    // Handle existence/empty checks first
+    switch (rule.operator) {
+      case "notExists":
+        return !fieldExists;
+      case "isEmpty":
+        return !fieldExists || fieldValue === null || fieldValue === "";
+      case "isNotEmpty":
+        return fieldExists && fieldValue !== null && fieldValue !== "";
+    }
+
     const strValue = fieldValue !== undefined && fieldValue !== null ? String(fieldValue) : "";
-    const filterValue = rule.value;
+    const filterValue = rule.value || "";
 
     switch (rule.operator) {
       case "equals":
