@@ -37,28 +37,40 @@ export function RoleProtectedRoute({
     return <Navigate to="/auth" replace />;
   }
 
-  // Check if user has position-based permission for this route
+  // PRIORITY: Position-based permissions take precedence
+  // If positionPermission is specified and user has that permission, grant access immediately
   const hasPositionAccess = positionPermission ? canView(positionPermission) : false;
+  
+  if (hasPositionAccess) {
+    return <>{children}</>;
+  }
 
-  // Check role requirements
-  if (requiredRole === "ejer" && !isOwner) {
+  // Fallback to system role checks if no position permission granted
+  
+  // Owner has access to everything
+  if (isOwner) {
+    return <>{children}</>;
+  }
+
+  // Check specific role requirements
+  if (requiredRole === "ejer") {
     return <Navigate to="/my-schedule" replace />;
   }
 
-  if (requiredRole === "rekruttering" && !isRekruttering && !isOwner) {
+  if (requiredRole === "rekruttering" && !isRekruttering) {
     return <Navigate to="/my-schedule" replace />;
   }
 
-  // requireTeamlederOrAbove: allow if system role qualifies OR if position permission grants access
-  if (requireTeamlederOrAbove && !isTeamlederOrAbove && !isRekruttering && !hasPositionAccess) {
+  if (requiredRole === "teamleder" && role !== "teamleder") {
     return <Navigate to="/my-schedule" replace />;
   }
 
-  if (requireRekrutteringOrAbove && !isRekrutteringOrAbove && !hasPositionAccess) {
+  // Check teamleder or above requirement
+  if (requireTeamlederOrAbove && !isTeamlederOrAbove && !isRekruttering) {
     return <Navigate to="/my-schedule" replace />;
   }
 
-  if (requiredRole === "teamleder" && role !== "teamleder" && role !== "ejer" && !hasPositionAccess) {
+  if (requireRekrutteringOrAbove && !isRekrutteringOrAbove) {
     return <Navigate to="/my-schedule" replace />;
   }
   

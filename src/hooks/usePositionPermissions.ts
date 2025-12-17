@@ -130,11 +130,8 @@ export function usePositionPermissions() {
     queryKey: ["position-permissions", user?.email],
     queryFn: async (): Promise<{ position: JobPosition | null; permissions: PositionPermissions }> => {
       if (!user?.email) {
-        console.log("usePositionPermissions: No user email");
         return { position: null, permissions: {} };
       }
-
-      console.log("usePositionPermissions: Looking up employee for email:", user.email);
 
       // Get employee's job_title
       const { data: employee, error: empError } = await supabase
@@ -145,20 +142,16 @@ export function usePositionPermissions() {
         .maybeSingle();
 
       if (empError) {
-        console.error("usePositionPermissions: Error fetching employee:", empError);
+        console.error("Error fetching employee:", empError);
         return { position: null, permissions: {} };
       }
 
-      console.log("usePositionPermissions: Found employee with job_title:", employee?.job_title);
-
       if (!employee?.job_title) {
-        console.log("usePositionPermissions: No job_title found");
         return { position: null, permissions: {} };
       }
 
       // Check if owner position - always full permissions
       if (employee.job_title.toLowerCase() === OWNER_POSITION_NAME.toLowerCase()) {
-        console.log("usePositionPermissions: User is owner, granting all permissions");
         return {
           position: { id: "owner", name: OWNER_POSITION_NAME, permissions: generateAllPermissions() },
           permissions: generateAllPermissions(),
@@ -173,19 +166,15 @@ export function usePositionPermissions() {
         .maybeSingle();
 
       if (posError) {
-        console.error("usePositionPermissions: Error fetching position:", posError);
+        console.error("Error fetching position:", posError);
         return { position: null, permissions: {} };
       }
 
-      console.log("usePositionPermissions: Found position:", position?.name, "with permissions:", position?.permissions);
-
       if (!position) {
-        console.log("usePositionPermissions: No position found for job_title:", employee.job_title);
         return { position: null, permissions: {} };
       }
 
       const permissions = (position.permissions as PositionPermissions) || {};
-      console.log("usePositionPermissions: Returning permissions:", permissions);
 
       return {
         position: { ...position, permissions },
@@ -225,20 +214,12 @@ export function usePermissions() {
   const { data, isLoading } = usePositionPermissions();
   const permissions = data?.permissions || {};
   
-  // Debug logging
-  console.log("usePermissions - position:", data?.position?.name, "permissions:", permissions);
-  console.log("usePermissions - menu_mg_test value:", permissions["menu_mg_test"]);
-  
   const hasPermission = (key: string, type?: "view" | "edit"): boolean => {
     const value = permissions[key];
     
     if (type) {
       if (typeof value === "object" && value !== null && "view" in value) {
-        const result = value[type] || false;
-        if (key === "menu_mg_test") {
-          console.log(`usePermissions - hasPermission(${key}, ${type}):`, result, "value:", value);
-        }
-        return result;
+        return value[type] || false;
       }
       return false;
     }
@@ -251,13 +232,7 @@ export function usePermissions() {
     return false;
   };
 
-  const canView = (key: string): boolean => {
-    const result = hasPermission(key, "view") || hasPermission(key);
-    if (key === "menu_mg_test") {
-      console.log(`usePermissions - canView(${key}):`, result);
-    }
-    return result;
-  };
+  const canView = (key: string): boolean => hasPermission(key, "view") || hasPermission(key);
   const canEdit = (key: string): boolean => hasPermission(key, "edit");
 
   const getDataScope = (key: string): DataScope => {
