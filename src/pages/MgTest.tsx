@@ -80,6 +80,7 @@ interface CampaignMapping {
   client_campaign_id: string | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   reference_extraction_config: ReferenceExtractionConfig | any | null;
+  source?: string | null;
 }
 
 interface ClientCampaignRow {
@@ -924,13 +925,36 @@ export default function MgTest() {
   const { data: campaignMappings, isLoading: loadingCampaignMappings } = useQuery<CampaignMapping[]>({
     queryKey: ["mg-campaign-mappings"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get all campaign mappings
+      const { data: mappings, error } = await supabase
         .from("adversus_campaign_mappings")
         .select("id, adversus_campaign_id, adversus_campaign_name, client_campaign_id, reference_extraction_config")
         .order("adversus_campaign_name", { ascending: true });
 
       if (error) throw error;
-      return data as CampaignMapping[];
+
+      // Then get distinct source for each campaign from sales
+      const { data: sources, error: sourcesError } = await supabase
+        .from("sales")
+        .select("dialer_campaign_id, source")
+        .not("source", "is", null)
+        .not("dialer_campaign_id", "is", null);
+
+      if (sourcesError) throw sourcesError;
+
+      // Create a map of campaign_id -> source (use first found source for each campaign)
+      const sourceMap = new Map<string, string>();
+      sources?.forEach((s) => {
+        if (s.dialer_campaign_id && s.source && !sourceMap.has(s.dialer_campaign_id)) {
+          sourceMap.set(s.dialer_campaign_id, s.source);
+        }
+      });
+
+      // Merge source info into campaign mappings
+      return (mappings || []).map((m) => ({
+        ...m,
+        source: sourceMap.get(m.adversus_campaign_id) || null,
+      })) as CampaignMapping[];
     },
   });
 
@@ -1889,11 +1913,12 @@ export default function MgTest() {
                             <Table>
                               <TableHeader>
                               <TableRow>
-                                  <TableHead className="w-[22%]">{t("mgTest.adversusCampaignName")}</TableHead>
-                                  <TableHead className="w-[12%]">{t("mgTest.campaignId")}</TableHead>
-                                  <TableHead className="w-[8%]">{t("mgTest.inspect")}</TableHead>
-                                  <TableHead className="w-[25%]">{t("mgTest.internalCampaign")}</TableHead>
-                                  <TableHead className="w-[18%]">{t("mgTest.oppFieldId")}</TableHead>
+                                  <TableHead className="w-[20%]">{t("mgTest.adversusCampaignName")}</TableHead>
+                                  <TableHead className="w-[10%]">{t("mgTest.campaignId")}</TableHead>
+                                  <TableHead className="w-[10%]">API</TableHead>
+                                  <TableHead className="w-[6%]">{t("mgTest.inspect")}</TableHead>
+                                  <TableHead className="w-[22%]">{t("mgTest.internalCampaign")}</TableHead>
+                                  <TableHead className="w-[17%]">{t("mgTest.oppFieldId")}</TableHead>
                                   <TableHead className="w-[15%]">{t("mgTest.save")}</TableHead>
                                 </TableRow>
                               </TableHeader>
@@ -1934,6 +1959,15 @@ export default function MgTest() {
                                         <span className="text-xs font-mono text-muted-foreground">
                                           {mapping.adversus_campaign_id}
                                         </span>
+                                      </TableCell>
+                                      <TableCell>
+                                        {mapping.source ? (
+                                          <Badge variant="outline" className="text-xs">
+                                            {mapping.source}
+                                          </Badge>
+                                        ) : (
+                                          <span className="text-xs text-muted-foreground">-</span>
+                                        )}
                                       </TableCell>
                                       <TableCell>
                                         <Button
