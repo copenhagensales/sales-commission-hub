@@ -2315,6 +2315,57 @@ export type Database = {
           },
         ]
       }
+      h2h_challenges: {
+        Row: {
+          battle_mode: string
+          challenger_employee_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          opponent_employee_id: string
+          period: string
+          responded_at: string | null
+          status: string
+        }
+        Insert: {
+          battle_mode?: string
+          challenger_employee_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          opponent_employee_id: string
+          period?: string
+          responded_at?: string | null
+          status?: string
+        }
+        Update: {
+          battle_mode?: string
+          challenger_employee_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          opponent_employee_id?: string
+          period?: string
+          responded_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "h2h_challenges_challenger_employee_id_fkey"
+            columns: ["challenger_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "h2h_challenges_opponent_employee_id_fkey"
+            columns: ["opponent_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       head_to_head_battles: {
         Row: {
           challenger_employee_id: string

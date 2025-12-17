@@ -3,12 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, CalendarRange, Plus, X, Sparkles, Timer, Activity, MessageSquare } from "lucide-react";
+import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, CalendarRange, Plus, X, Sparkles, Timer, Activity, MessageSquare, Bell, Check, XCircle } from "lucide-react";
 import { startOfWeek, startOfDay, endOfDay, differenceInHours, differenceInDays, formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 interface AgentStats {
   id: string;
@@ -66,6 +67,64 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
   const [momentum, setMomentum] = useState(50);
   const [animateScore, setAnimateScore] = useState<'left' | 'right' | null>(null);
   const [matchComment, setMatchComment] = useState(initialState?.matchComment ?? "");
+  const [showPendingChallenges, setShowPendingChallenges] = useState(false);
+
+  const queryClient = useQueryClient();
+
+  // Fetch pending challenges received
+  const { data: pendingChallenges = [] } = useQuery({
+    queryKey: ["h2h-pending-challenges", currentEmployeeId],
+    queryFn: async () => {
+      if (!currentEmployeeId) return [];
+      const { data, error } = await supabase
+        .from("h2h_challenges")
+        .select(`
+          id, battle_mode, period, comment, created_at, status,
+          challenger:challenger_employee_id(id, first_name, last_name)
+        `)
+        .eq("opponent_employee_id", currentEmployeeId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentEmployeeId,
+    refetchInterval: 30000, // Check for new challenges every 30s
+  });
+
+  // Create challenge mutation
+  const createChallengeMutation = useMutation({
+    mutationFn: async ({ opponentId, battleMode, period, comment }: { opponentId: string; battleMode: string; period: string; comment: string }) => {
+      const { error } = await supabase.from("h2h_challenges").insert({
+        challenger_employee_id: currentEmployeeId,
+        opponent_employee_id: opponentId,
+        battle_mode: battleMode,
+        period: period,
+        comment: comment || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["h2h-pending-challenges"] });
+    },
+  });
+
+  // Respond to challenge mutation
+  const respondChallengeMutation = useMutation({
+    mutationFn: async ({ challengeId, accept }: { challengeId: string; accept: boolean }) => {
+      const { error } = await supabase
+        .from("h2h_challenges")
+        .update({ 
+          status: accept ? "accepted" : "declined",
+          responded_at: new Date().toISOString()
+        })
+        .eq("id", challengeId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["h2h-pending-challenges"] });
+    },
+  });
 
   // Persist state to localStorage
   useEffect(() => {
@@ -120,7 +179,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     return { percentComplete, timeRemainingText };
   }, [dateRange, period]);
 
-  // Fetch all agents for selection with team info
+  // Fetch all agents for selection with team info and employee mapping
   const { data: agents = [] } = useQuery({
     queryKey: ["h2h-agents"],
     queryFn: async () => {
@@ -142,9 +201,11 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         .select("id, team_id, teams:team_id(id, name)")
         .in("id", employeeIds.length > 0 ? employeeIds : ['none']);
       
-      // Build agent -> team mapping
+      // Build agent -> team mapping and agent -> employee mapping
       const agentTeamMap: Record<string, string> = {};
+      const agentEmployeeMap: Record<string, string> = {};
       mappings?.forEach(m => {
+        agentEmployeeMap[m.agent_id] = m.employee_id;
         const employee = employees?.find(e => e.id === m.employee_id);
         if (employee?.teams) {
           agentTeamMap[m.agent_id] = (employee.teams as any).name || '';
@@ -153,7 +214,8 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
       
       return (agentsData || []).map(agent => ({
         ...agent,
-        teamName: agentTeamMap[agent.id] || null
+        teamName: agentTeamMap[agent.id] || null,
+        employeeId: agentEmployeeMap[agent.id] || null
       }));
     },
   });
@@ -743,6 +805,19 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
           
           {/* Mode toggle - more prominent (disabled during match) */}
           <div className="ml-auto flex items-center gap-3">
+            {/* Pending challenges notification */}
+            {pendingChallenges.length > 0 && (
+              <button
+                onClick={() => setShowPendingChallenges(!showPendingChallenges)}
+                className="relative flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/20 border border-amber-500/30 hover:bg-amber-500/30 transition-colors"
+              >
+                <Bell className="w-4 h-4 text-amber-400" />
+                <Badge className="bg-amber-500 text-white text-[10px] px-1.5 py-0 h-5">
+                  {pendingChallenges.length}
+                </Badge>
+              </button>
+            )}
+            
             <div className={`flex bg-slate-800 rounded-xl p-1 border border-slate-600/50 shadow-lg ${isMatchOngoing ? 'opacity-50' : ''}`}>
               <button
                 onClick={() => {
@@ -782,6 +857,56 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
       </CardHeader>
       
       <CardContent className="relative space-y-5 z-10 text-white">
+        {/* Pending challenges dropdown */}
+        {showPendingChallenges && pendingChallenges.length > 0 && (
+          <div className="p-4 rounded-xl bg-slate-800/80 border border-amber-500/30 space-y-3 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-amber-400">Modtagne udfordringer</h4>
+              <button onClick={() => setShowPendingChallenges(false)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {pendingChallenges.map((challenge: any) => (
+              <div key={challenge.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50 border border-slate-600/30">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-white">
+                    {challenge.challenger?.first_name} {challenge.challenger?.last_name}
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    {challenge.period === 'today' ? 'I dag' : 'Denne uge'} • {challenge.battle_mode}
+                    {challenge.comment && ` • "${challenge.comment}"`}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 bg-emerald-500/20 border-emerald-500/30 hover:bg-emerald-500/40 text-emerald-400"
+                    onClick={() => {
+                      respondChallengeMutation.mutate({ challengeId: challenge.id, accept: true });
+                      toast.success("Udfordring accepteret!");
+                      setShowPendingChallenges(false);
+                    }}
+                  >
+                    <Check className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 bg-rose-500/20 border-rose-500/30 hover:bg-rose-500/40 text-rose-400"
+                    onClick={() => {
+                      respondChallengeMutation.mutate({ challengeId: challenge.id, accept: false });
+                      toast.info("Udfordring afvist");
+                      setShowPendingChallenges(false);
+                    }}
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {/* Time & Progress Bar */}
         {hasOpponents && (
           <div className="flex items-center justify-between gap-4 px-2 py-2 rounded-xl bg-slate-800/40 border border-slate-700/30">
@@ -1087,15 +1212,32 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                 <p className="text-center text-sm text-slate-300 font-medium">Vælg kampperiode</p>
                 <div className="grid grid-cols-2 gap-3">
                   <Button 
-                    onClick={() => {
+                    onClick={async () => {
+                      // Get opponent employee ID from agent mapping
+                      const opponentAgent = agents.find(a => opponentTeam.includes(a.id));
+                      const opponentEmployeeId = opponentAgent?.employeeId;
+                      
+                      if (opponentEmployeeId && currentEmployeeId) {
+                        try {
+                          await createChallengeMutation.mutateAsync({
+                            opponentId: opponentEmployeeId,
+                            battleMode: battleMode,
+                            period: "today",
+                            comment: matchComment
+                          });
+                          toast.success(`⚔️ Invitation sendt!`, {
+                            description: `${opponentAgent?.name} vil modtage din udfordring.`
+                          });
+                        } catch (error) {
+                          console.error("Failed to send challenge:", error);
+                        }
+                      }
+                      
                       setPeriod("today");
                       setMatchStarted(true);
                       setShowPeriodSelection(false);
-                      const teamLabel = battleMode === "team" ? ` (${myTeamNames.length}v${opponentTeamNames.length})` : "";
-                      toast.success(`⚔️ Duel startet!${teamLabel}`, {
-                        description: "Kampen gælder for i dag."
-                      });
                     }}
+                    disabled={createChallengeMutation.isPending}
                     variant="outline"
                     className="h-16 flex flex-col gap-1 bg-slate-800/80 border-slate-600/50 hover:bg-blue-500/20 hover:border-blue-400/50 text-white transition-all group"
                   >
@@ -1103,15 +1245,32 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                     <span className="text-xs font-bold">I dag</span>
                   </Button>
                   <Button 
-                    onClick={() => {
+                    onClick={async () => {
+                      // Get opponent employee ID from agent mapping
+                      const opponentAgent = agents.find(a => opponentTeam.includes(a.id));
+                      const opponentEmployeeId = opponentAgent?.employeeId;
+                      
+                      if (opponentEmployeeId && currentEmployeeId) {
+                        try {
+                          await createChallengeMutation.mutateAsync({
+                            opponentId: opponentEmployeeId,
+                            battleMode: battleMode,
+                            period: "week",
+                            comment: matchComment
+                          });
+                          toast.success(`⚔️ Invitation sendt!`, {
+                            description: `${opponentAgent?.name} vil modtage din udfordring.`
+                          });
+                        } catch (error) {
+                          console.error("Failed to send challenge:", error);
+                        }
+                      }
+                      
                       setPeriod("week");
                       setMatchStarted(true);
                       setShowPeriodSelection(false);
-                      const teamLabel = battleMode === "team" ? ` (${myTeamNames.length}v${opponentTeamNames.length})` : "";
-                      toast.success(`⚔️ Duel startet!${teamLabel}`, {
-                        description: "Kampen gælder for denne uge."
-                      });
                     }}
+                    disabled={createChallengeMutation.isPending}
                     variant="outline"
                     className="h-16 flex flex-col gap-1 bg-slate-800/80 border-slate-600/50 hover:bg-emerald-500/20 hover:border-emerald-400/50 text-white transition-all group"
                   >
