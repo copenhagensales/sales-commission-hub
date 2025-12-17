@@ -322,6 +322,33 @@ export default function MgTest() {
     },
   });
 
+  // Hent manuelt oprettede produkter direkte fra products tabellen
+  const { data: manualProducts } = useQuery({
+    queryKey: ["mg-manual-products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select(`
+          id,
+          name,
+          commission_dkk,
+          revenue_dkk,
+          external_product_code,
+          counts_as_sale,
+          client_campaign_id,
+          client_campaigns!inner(
+            id,
+            name,
+            client_id,
+            clients(id, name)
+          )
+        `)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Medarbejderkilder og master-profiler
   const { data: agents, isLoading: loadingAgents } = useQuery<AgentRow[]>({
     queryKey: ["mg-agents"],
@@ -364,51 +391,91 @@ export default function MgTest() {
 
   // Transform RPC data to AggregatedProduct format (server already did the aggregation)
   const aggregatedProducts: AggregatedProduct[] = useMemo(() => {
-    if (!aggregatedProductsRpc) return [];
-    
-    return aggregatedProductsRpc.map((item) => {
-      // Try to parse client from product title if no client_id from RPC
-      let clientId = item.client_id;
-      let clientName = item.client_name;
-      
-      if (!clientId && item.adversus_product_title) {
-        const parsedClient = parseClientFromTitle(item.adversus_product_title, clients);
-        if (parsedClient) {
-          clientId = parsedClient.id;
-          clientName = parsedClient.name ?? "Ukendt kunde";
-        }
-      }
-      
-      // Fallback: try to match client from source (e.g., "Eesy")
-      if (!clientId && item.sale_source) {
-        const parsedClient = parseClientFromSource(item.sale_source, clients);
-        if (parsedClient) {
-          clientId = parsedClient.id;
-          clientName = parsedClient.name ?? "Ukendt kunde";
-        }
-      }
+    const products: AggregatedProduct[] = [];
+    const seenKeys = new Set<string>();
 
-      const productKey = `${item.adversus_external_id ?? ""}::${item.adversus_product_title ?? ""}`;
-      const fullKey = `${clientId ?? "no-client"}::${productKey}`;
+    // 1. Add products from RPC (sale_items based)
+    if (aggregatedProductsRpc) {
+      aggregatedProductsRpc.forEach((item) => {
+        let clientId = item.client_id;
+        let clientName = item.client_name;
+        
+        if (!clientId && item.adversus_product_title) {
+          const parsedClient = parseClientFromTitle(item.adversus_product_title, clients);
+          if (parsedClient) {
+            clientId = parsedClient.id;
+            clientName = parsedClient.name ?? "Ukendt kunde";
+          }
+        }
+        
+        if (!clientId && item.sale_source) {
+          const parsedClient = parseClientFromSource(item.sale_source, clients);
+          if (parsedClient) {
+            clientId = parsedClient.id;
+            clientName = parsedClient.name ?? "Ukendt kunde";
+          }
+        }
 
-      return {
-        key: fullKey,
-        adversus_external_id: item.adversus_external_id,
-        adversus_product_title: item.adversus_product_title,
-        product: item.product_id
-          ? {
-              id: item.product_id,
-              name: item.product_name ?? "",
-              commission_dkk: item.commission_dkk,
-              revenue_dkk: item.revenue_dkk,
-              client_campaign_id: item.product_client_campaign_id,
-              counts_as_sale: item.counts_as_sale ?? true,
-            }
-          : null,
-        campaignId: clientId,
-        campaignLabel: clientName ?? "Ingen kunde valgt",
-      };
-    }).sort((a, b) => {
+        const productKey = `${item.adversus_external_id ?? ""}::${item.adversus_product_title ?? ""}`;
+        const fullKey = `${clientId ?? "no-client"}::${productKey}`;
+
+        if (!seenKeys.has(fullKey)) {
+          seenKeys.add(fullKey);
+          products.push({
+            key: fullKey,
+            adversus_external_id: item.adversus_external_id,
+            adversus_product_title: item.adversus_product_title,
+            product: item.product_id
+              ? {
+                  id: item.product_id,
+                  name: item.product_name ?? "",
+                  commission_dkk: item.commission_dkk,
+                  revenue_dkk: item.revenue_dkk,
+                  client_campaign_id: item.product_client_campaign_id,
+                  counts_as_sale: item.counts_as_sale ?? true,
+                }
+              : null,
+            campaignId: clientId,
+            campaignLabel: clientName ?? "Ingen kunde valgt",
+          });
+        }
+      });
+    }
+
+    // 2. Add manually created products from products table
+    if (manualProducts) {
+      manualProducts.forEach((p) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const campaign = p.client_campaigns as any;
+        const clientId = campaign?.client_id ?? null;
+        const clientName = campaign?.clients?.name ?? "Ingen kunde valgt";
+
+        // Use product name as the key identifier for manual products
+        const productKey = `manual::${p.id}`;
+        const fullKey = `${clientId ?? "no-client"}::${productKey}`;
+
+        if (!seenKeys.has(fullKey)) {
+          seenKeys.add(fullKey);
+          products.push({
+            key: fullKey,
+            adversus_external_id: p.external_product_code,
+            adversus_product_title: p.name,
+            product: {
+              id: p.id,
+              name: p.name,
+              commission_dkk: p.commission_dkk,
+              revenue_dkk: p.revenue_dkk,
+              client_campaign_id: p.client_campaign_id,
+              counts_as_sale: p.counts_as_sale ?? true,
+            },
+            campaignId: clientId,
+            campaignLabel: clientName,
+          });
+        }
+      });
+    }
+
+    return products.sort((a, b) => {
       const campA = a.campaignLabel;
       const campB = b.campaignLabel;
       if (campA !== campB) return campA.localeCompare(campB, "da");
@@ -416,7 +483,7 @@ export default function MgTest() {
       const titleB = b.adversus_product_title || "";
       return titleA.localeCompare(titleB, "da");
     });
-  }, [aggregatedProductsRpc, clients]);
+  }, [aggregatedProductsRpc, manualProducts, clients]);
 
   const productsByCampaign = useMemo(() => {
     const groups = new Map<
