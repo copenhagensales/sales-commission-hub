@@ -84,7 +84,10 @@ export default function SalesDashboard() {
         revenue_month: item.revenue_month,
         commission_today: item.commission_today,
         commission_month: item.commission_month,
-        top_sellers: (item.top_sellers || []) as TopSeller[],
+        top_sellers: (item.top_sellers || []).map((s: any) => ({
+          agent_name: s.name,
+          count: s.count,
+        })) as TopSeller[],
       })) as ClientStats[];
     },
     refetchInterval: 30000,

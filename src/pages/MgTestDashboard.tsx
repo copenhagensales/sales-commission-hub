@@ -50,7 +50,7 @@ export default function MgTestDashboard() {
       const { data, error } = await supabase.rpc("get_client_sales_stats");
       if (error) throw error;
       
-      // Map the response to properly type top_sellers
+      // Map the response to properly type top_sellers (RPC returns 'name', frontend expects 'agent_name')
       return (data || []).map((item: any) => ({
         client_id: item.client_id,
         client_name: item.client_name,
@@ -60,7 +60,10 @@ export default function MgTestDashboard() {
         revenue_month: item.revenue_month,
         commission_today: item.commission_today,
         commission_month: item.commission_month,
-        top_sellers: (item.top_sellers || []) as TopSeller[],
+        top_sellers: (item.top_sellers || []).map((s: any) => ({
+          agent_name: s.name,
+          count: s.count,
+        })) as TopSeller[],
       })) as ClientStats[];
     },
     refetchInterval: 30000,
