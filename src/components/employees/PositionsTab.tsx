@@ -500,7 +500,8 @@ export function PositionsTab() {
     return "egen"; // Default
   };
 
-  const countActivePermissions = (permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope>) => {
+  const countActivePermissions = (permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope> | null | undefined) => {
+    if (!permissions) return 0;
     let count = 0;
     Object.entries(permissions).forEach(([key, value]) => {
       // Don't count data scope permissions in this count
