@@ -52,12 +52,7 @@ interface Permission {
   label: string;
   description: string;
   hasEditOption?: boolean; // If true, show separate view/edit toggles
-}
-
-interface DataScopePermission {
-  key: string;
-  label: string;
-  description: string;
+  scopeKey?: string; // If set, show data scope selector (egen/team/alt)
 }
 
 interface PermissionCategory {
@@ -66,21 +61,6 @@ interface PermissionCategory {
   icon: string;
   permissions: Permission[];
 }
-
-// Data scope permissions - applies to areas where users can see data about others
-const DATA_SCOPE_PERMISSIONS: DataScopePermission[] = [
-  { key: "scope_employees", label: "Medarbejdere", description: "Hvem kan brugeren se i medarbejderlisten" },
-  { key: "scope_shifts", label: "Vagter", description: "Hvem kan brugeren se vagter for" },
-  { key: "scope_absence", label: "Fravær", description: "Hvem kan brugeren se fraværsdata for" },
-  { key: "scope_time_tracking", label: "Tidsregistrering", description: "Hvem kan brugeren se tidsregistreringer for" },
-  { key: "scope_contracts", label: "Kontrakter", description: "Hvem kan brugeren se kontrakter for" },
-  { key: "scope_payroll", label: "Løndata", description: "Hvem kan brugeren se løndata for" },
-  { key: "scope_career_wishes", label: "Karriereønsker", description: "Hvem kan brugeren se karriereønsker for" },
-  { key: "scope_sales", label: "Salgsdata", description: "Hvem kan brugeren se salgsdata og provision for" },
-  { key: "scope_quiz", label: "Quiz-svar", description: "Hvem kan brugeren se quiz-besvarelser for (bilquiz, code of conduct)" },
-  { key: "scope_extra_work", label: "Ekstraarbejde", description: "Hvem kan brugeren se ekstraarbejde for" },
-  { key: "scope_fieldmarketing", label: "Fieldmarketing", description: "Hvem kan brugeren se fieldmarketing bookings og salg for" },
-];
 
 const PERMISSION_CATEGORIES: PermissionCategory[] = [
   {
@@ -91,7 +71,7 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: "menu_dashboard", label: "Dashboard", description: "Adgang til dashboard oversigt", hasEditOption: false },
       { key: "menu_wallboard", label: "Wallboard", description: "Adgang til wallboard visning", hasEditOption: false },
       { key: "menu_some", label: "SOME", description: "Adgang til social media modul", hasEditOption: true },
-      { key: "menu_sales", label: "Salg", description: "Adgang til salgsdata", hasEditOption: true },
+      { key: "menu_sales", label: "Salg", description: "Adgang til salgsdata", hasEditOption: true, scopeKey: "scope_sales" },
       { key: "menu_logics", label: "Logikker", description: "Adgang til logikker", hasEditOption: true },
       { key: "menu_closing_shifts", label: "Lukkevagter", description: "Adgang til lukkevagter", hasEditOption: true },
     ],
@@ -101,7 +81,7 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Personale menu",
     icon: "👥",
     permissions: [
-      { key: "menu_employees", label: "Medarbejdere", description: "Adgang til medarbejdersiden", hasEditOption: true },
+      { key: "menu_employees", label: "Medarbejdere", description: "Adgang til medarbejdersiden", hasEditOption: true, scopeKey: "scope_employees" },
       { key: "menu_teams", label: "Teams", description: "Adgang til teams", hasEditOption: true },
     ],
   },
@@ -121,9 +101,9 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Ledelse menu",
     icon: "👑",
     permissions: [
-      { key: "menu_contracts", label: "Kontrakter", description: "Adgang til kontraktmodul", hasEditOption: true },
+      { key: "menu_contracts", label: "Kontrakter", description: "Adgang til kontraktmodul", hasEditOption: true, scopeKey: "scope_contracts" },
       { key: "menu_permissions", label: "Rettigheder", description: "Adgang til rettighedsstyring", hasEditOption: true },
-      { key: "menu_career_wishes_overview", label: "Karriereønsker overblik", description: "Adgang til karriereønsker overblik", hasEditOption: true },
+      { key: "menu_career_wishes_overview", label: "Karriereønsker overblik", description: "Adgang til karriereønsker overblik", hasEditOption: true, scopeKey: "scope_career_wishes" },
     ],
   },
   {
@@ -140,7 +120,7 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Test menu",
     icon: "🧪",
     permissions: [
-      { key: "menu_car_quiz_admin", label: "Bil Quiz Admin", description: "Adgang til bil quiz administration", hasEditOption: true },
+      { key: "menu_car_quiz_admin", label: "Bil Quiz Admin", description: "Adgang til bil quiz administration", hasEditOption: true, scopeKey: "scope_quiz" },
       { key: "menu_coc_admin", label: "Code of Conduct Admin", description: "Adgang til Code of Conduct administration", hasEditOption: true },
       { key: "menu_pulse_survey", label: "Pulsmåling resultater", description: "Adgang til pulsmåling resultater", hasEditOption: true },
     ],
@@ -178,7 +158,7 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "MG menu",
     icon: "📊",
     permissions: [
-      { key: "menu_payroll", label: "Lønkørsel", description: "Adgang til lønkørsel", hasEditOption: true },
+      { key: "menu_payroll", label: "Lønkørsel", description: "Adgang til lønkørsel", hasEditOption: true, scopeKey: "scope_payroll" },
       { key: "menu_tdc_erhverv", label: "TDC Erhverv", description: "Adgang til TDC Erhverv dashboard", hasEditOption: true },
       { key: "menu_codan", label: "Codan", description: "Adgang til Codan dashboard", hasEditOption: true },
       { key: "menu_mg_test", label: "MG Test", description: "Adgang til MG Test", hasEditOption: true },
@@ -203,11 +183,11 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Vagtplan menu",
     icon: "📅",
     permissions: [
-      { key: "menu_shift_overview", label: "Vagtplan oversigt", description: "Adgang til vagtplan oversigt", hasEditOption: true },
+      { key: "menu_shift_overview", label: "Vagtplan oversigt", description: "Adgang til vagtplan oversigt", hasEditOption: true, scopeKey: "scope_shifts" },
       { key: "menu_my_schedule", label: "Min kalender", description: "Adgang til egen kalender", hasEditOption: false },
-      { key: "menu_absence", label: "Fravær", description: "Adgang til fraværsmodul", hasEditOption: true },
-      { key: "menu_time_tracking", label: "Tidsregistrering", description: "Adgang til tidsregistrering", hasEditOption: true },
-      { key: "menu_extra_work", label: "Ekstra arbejde", description: "Adgang til ekstra arbejde", hasEditOption: true },
+      { key: "menu_absence", label: "Fravær", description: "Adgang til fraværsmodul", hasEditOption: true, scopeKey: "scope_absence" },
+      { key: "menu_time_tracking", label: "Tidsregistrering", description: "Adgang til tidsregistrering", hasEditOption: true, scopeKey: "scope_time_tracking" },
+      { key: "menu_extra_work", label: "Ekstra arbejde", description: "Adgang til ekstra arbejde", hasEditOption: true, scopeKey: "scope_extra_work" },
       { key: "menu_extra_work_admin", label: "Ekstra arbejde admin", description: "Adgang til ekstra arbejde administration", hasEditOption: true },
     ],
   },
@@ -216,7 +196,7 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Fieldmarketing menu",
     icon: "🚗",
     permissions: [
-      { key: "menu_fm_overview", label: "Oversigt", description: "Adgang til fieldmarketing oversigt", hasEditOption: true },
+      { key: "menu_fm_overview", label: "Oversigt", description: "Adgang til fieldmarketing oversigt", hasEditOption: true, scopeKey: "scope_fieldmarketing" },
       { key: "menu_fm_my_week", label: "Min uge", description: "Adgang til min uge", hasEditOption: false },
       { key: "menu_fm_book_week", label: "Book uge", description: "Adgang til book uge", hasEditOption: true },
       { key: "menu_fm_bookings", label: "Bookinger", description: "Adgang til bookinger", hasEditOption: true },
@@ -295,11 +275,11 @@ const generateAllPermissions = (): Record<string, boolean | { view: boolean; edi
       } else {
         allPermissions[permission.key] = true;
       }
+      // Add scope permission if defined - owner sees all
+      if (permission.scopeKey) {
+        allPermissions[permission.scopeKey] = "alt";
+      }
     });
-  });
-  // Add data scope permissions - owner sees all
-  DATA_SCOPE_PERMISSIONS.forEach(scope => {
-    allPermissions[scope.key] = "alt";
   });
   return allPermissions;
 };
@@ -807,7 +787,7 @@ export function PositionsTab() {
                                 </div>
                                 
                                 {permission.hasEditOption ? (
-                                  <div className="flex items-center gap-6">
+                                  <div className="flex items-center gap-4">
                                     <Tooltip>
                                       <TooltipTrigger asChild>
                                         <div className="flex items-center gap-2">
@@ -855,6 +835,62 @@ export function PositionsTab() {
                                         }
                                       </TooltipContent>
                                     </Tooltip>
+                                    {permission.scopeKey && (
+                                      <div className="flex items-center gap-2 pl-2 border-l">
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Database className="h-3.5 w-3.5 text-muted-foreground" />
+                                          </TooltipTrigger>
+                                          <TooltipContent>Data synlighed</TooltipContent>
+                                        </Tooltip>
+                                        <RadioGroup
+                                          value={isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)}
+                                          onValueChange={(value) => handleScopeChange(permission.scopeKey!, value as DataScope)}
+                                          className="flex items-center gap-2"
+                                          disabled={!!isOwnerLocked}
+                                        >
+                                          <div className="flex items-center gap-1">
+                                            <RadioGroupItem value="egen" id={`${permission.scopeKey}-egen`} className="h-3 w-3" />
+                                            <Label 
+                                              htmlFor={`${permission.scopeKey}-egen`} 
+                                              className={cn(
+                                                "text-xs cursor-pointer flex items-center gap-0.5",
+                                                (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)) === "egen" && "text-primary font-medium"
+                                              )}
+                                            >
+                                              <User className="h-3 w-3" />
+                                              Egen
+                                            </Label>
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            <RadioGroupItem value="team" id={`${permission.scopeKey}-team`} className="h-3 w-3" />
+                                            <Label 
+                                              htmlFor={`${permission.scopeKey}-team`} 
+                                              className={cn(
+                                                "text-xs cursor-pointer flex items-center gap-0.5",
+                                                (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)) === "team" && "text-primary font-medium"
+                                              )}
+                                            >
+                                              <Users className="h-3 w-3" />
+                                              Team
+                                            </Label>
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            <RadioGroupItem value="alt" id={`${permission.scopeKey}-alt`} className="h-3 w-3" />
+                                            <Label 
+                                              htmlFor={`${permission.scopeKey}-alt`} 
+                                              className={cn(
+                                                "text-xs cursor-pointer flex items-center gap-0.5",
+                                                (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)) === "alt" && "text-primary font-medium"
+                                              )}
+                                            >
+                                              <Globe className="h-3 w-3" />
+                                              Alt
+                                            </Label>
+                                          </div>
+                                        </RadioGroup>
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <Tooltip>
@@ -891,109 +927,6 @@ export function PositionsTab() {
               </TooltipProvider>
             </div>
 
-            {/* Data Scope Section */}
-            <div className="space-y-2">
-              <Label className="text-base font-semibold flex items-center gap-2">
-                <Database className="h-4 w-4" />
-                Data synlighed
-                {editingPosition && isOwnerPosition(editingPosition.name) && (
-                  <Badge variant="secondary" className="gap-1 ml-2">
-                    <Lock className="h-3 w-3" />
-                    Fuld adgang
-                  </Badge>
-                )}
-              </Label>
-              {!(editingPosition && isOwnerPosition(editingPosition.name)) && (
-                <p className="text-sm text-muted-foreground">
-                  Bestem hvilke data brugeren kan se: egen (kun sig selv), team (sit team), eller alt (alle)
-                </p>
-              )}
-
-              <div className="border rounded-lg mt-4 overflow-hidden">
-                {DATA_SCOPE_PERMISSIONS.map((scopePerm, idx) => {
-                  const isOwnerLocked = editingPosition && isOwnerPosition(editingPosition.name);
-                  const currentScope = isOwnerLocked ? "alt" : getScopeValue(scopePerm.key);
-
-                  return (
-                    <div
-                      key={scopePerm.key}
-                      className={cn(
-                        "flex items-center justify-between gap-4 px-4 py-3 transition-colors",
-                        isOwnerLocked && "bg-green-500/5",
-                        idx !== DATA_SCOPE_PERMISSIONS.length - 1 && "border-b",
-                        !isOwnerLocked && "hover:bg-muted/30"
-                      )}
-                    >
-                      <TooltipProvider delayDuration={200}>
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="cursor-help">
-                                <Info className="h-4 w-4 text-muted-foreground/60 hover:text-primary transition-colors" />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="max-w-xs">
-                              <p className="font-medium mb-1">{scopePerm.label}</p>
-                              <p className="text-muted-foreground text-xs">{scopePerm.description}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm">{scopePerm.label}</div>
-                          </div>
-                        </div>
-                      </TooltipProvider>
-
-                      <RadioGroup
-                        value={currentScope}
-                        onValueChange={(value) => handleScopeChange(scopePerm.key, value as DataScope)}
-                        className="flex items-center gap-4"
-                        disabled={!!isOwnerLocked}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <RadioGroupItem value="egen" id={`${scopePerm.key}-egen`} />
-                          <Label 
-                            htmlFor={`${scopePerm.key}-egen`} 
-                            className={cn(
-                              "text-xs font-medium cursor-pointer flex items-center gap-1",
-                              currentScope === "egen" && "text-primary"
-                            )}
-                          >
-                            <User className="h-3 w-3" />
-                            Egen
-                          </Label>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <RadioGroupItem value="team" id={`${scopePerm.key}-team`} />
-                          <Label 
-                            htmlFor={`${scopePerm.key}-team`} 
-                            className={cn(
-                              "text-xs font-medium cursor-pointer flex items-center gap-1",
-                              currentScope === "team" && "text-primary"
-                            )}
-                          >
-                            <Users className="h-3 w-3" />
-                            Team
-                          </Label>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <RadioGroupItem value="alt" id={`${scopePerm.key}-alt`} />
-                          <Label 
-                            htmlFor={`${scopePerm.key}-alt`} 
-                            className={cn(
-                              "text-xs font-medium cursor-pointer flex items-center gap-1",
-                              currentScope === "alt" && "text-primary"
-                            )}
-                          >
-                            <Globe className="h-3 w-3" />
-                            Alt
-                          </Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
           </div>
 
           <DialogFooter>
