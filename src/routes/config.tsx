@@ -13,6 +13,7 @@ import {
   KmTest,
   Codan,
   TdcErhverv,
+  TdcErhvervDashboard,
   NotFound,
   AdversusData,
   DialerData,
@@ -96,6 +97,7 @@ export const routes: RouteConfig[] = [
   { path: "/sales", component: Sales, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_sales" },
   { path: "/codan", component: Codan, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_codan" },
   { path: "/tdc-erhverv", component: TdcErhverv, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_tdc_erhverv" },
+  { path: "/tdc-erhverv-dashboard", component: TdcErhvervDashboard, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_tdc_erhverv" },
   
   { path: "/payroll", component: Payroll, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_payroll" },
   { path: "/mg-test", component: MgTest, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_mg_test" },
