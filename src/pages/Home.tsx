@@ -16,12 +16,13 @@ import {
   Sparkles,
   Gift,
   PartyPopper,
-  Target
+  Target,
+  CalendarDays
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, isToday, parseISO, differenceInYears, startOfMonth, endOfMonth } from "date-fns";
+import { format, parseISO, differenceInYears, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subWeeks } from "date-fns";
 import { da } from "date-fns/locale";
 
 const Home = () => {
@@ -119,6 +120,118 @@ const Home = () => {
     },
   });
 
+  // Fetch weekly recognition data (top seller by commission last week, best single day)
+  const { data: weeklyRecognition } = useQuery({
+    queryKey: ["home-weekly-recognition"],
+    queryFn: async () => {
+      const now = new Date();
+      const lastWeekStart = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 }).toISOString();
+      const lastWeekEnd = endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 }).toISOString();
+      
+      // Fetch all sales from last week with commission
+      const { data: sales } = await supabase
+        .from("sales")
+        .select(`
+          id,
+          agent_name,
+          sale_datetime,
+          sale_items (
+            id,
+            mapped_commission,
+            quantity
+          )
+        `)
+        .gte("sale_datetime", lastWeekStart)
+        .lte("sale_datetime", lastWeekEnd);
+      
+      if (!sales || sales.length === 0) {
+        return { topWeekly: null, bestDay: null };
+      }
+      
+      // Calculate total commission per agent
+      const agentTotals: Record<string, number> = {};
+      // Calculate best single day per agent
+      const agentDailyTotals: Record<string, Record<string, number>> = {};
+      
+      sales.forEach(sale => {
+        const agentName = sale.agent_name || "Unknown";
+        const saleDate = sale.sale_datetime ? sale.sale_datetime.split("T")[0] : "";
+        
+        const saleCommission = sale.sale_items?.reduce((sum, item) => {
+          return sum + ((item.mapped_commission || 0) * (item.quantity || 1));
+        }, 0) || 0;
+        
+        // Total for the week
+        agentTotals[agentName] = (agentTotals[agentName] || 0) + saleCommission;
+        
+        // Daily totals
+        if (!agentDailyTotals[agentName]) {
+          agentDailyTotals[agentName] = {};
+        }
+        agentDailyTotals[agentName][saleDate] = (agentDailyTotals[agentName][saleDate] || 0) + saleCommission;
+      });
+      
+      // Find top weekly performer
+      let topWeeklyAgent = "";
+      let topWeeklyCommission = 0;
+      Object.entries(agentTotals).forEach(([agent, total]) => {
+        if (total > topWeeklyCommission) {
+          topWeeklyCommission = total;
+          topWeeklyAgent = agent;
+        }
+      });
+      
+      // Find best single day
+      let bestDayAgent = "";
+      let bestDayDate = "";
+      let bestDayCommission = 0;
+      Object.entries(agentDailyTotals).forEach(([agent, days]) => {
+        Object.entries(days).forEach(([date, total]) => {
+          if (total > bestDayCommission) {
+            bestDayCommission = total;
+            bestDayAgent = agent;
+            bestDayDate = date;
+          }
+        });
+      });
+      
+      // Get team info for top performers
+      const agentNames = [topWeeklyAgent, bestDayAgent].filter(Boolean);
+      const { data: agents } = await supabase
+        .from("agents")
+        .select("name, email")
+        .in("name", agentNames);
+      
+      // Map agent emails to employees
+      const agentEmails = agents?.map(a => a.email).filter(Boolean) || [];
+      const { data: employees } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, work_email, private_email, team_id, teams:team_id(name)")
+        .or(agentEmails.map(e => `work_email.eq.${e},private_email.eq.${e}`).join(",") || "id.is.null");
+      
+      const getTeamForAgent = (agentName: string) => {
+        const agent = agents?.find(a => a.name === agentName);
+        if (!agent?.email) return null;
+        const emp = employees?.find(e => e.work_email === agent.email || e.private_email === agent.email);
+        return emp?.teams as { name: string } | null;
+      };
+      
+      return {
+        topWeekly: topWeeklyAgent ? {
+          name: topWeeklyAgent,
+          commission: topWeeklyCommission,
+          team: getTeamForAgent(topWeeklyAgent)?.name || null
+        } : null,
+        bestDay: bestDayAgent ? {
+          name: bestDayAgent,
+          date: bestDayDate,
+          commission: bestDayCommission,
+          team: getTeamForAgent(bestDayAgent)?.name || null
+        } : null
+      };
+    },
+  });
+
   // Get greeting based on time of day
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -128,6 +241,18 @@ const Home = () => {
   };
 
   const firstName = employee?.first_name || "kollega";
+
+  const formatCommission = (amount: number) => {
+    return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(amount);
+  };
+
+  const formatDate = (dateStr: string) => {
+    try {
+      return format(parseISO(dateStr), "EEEE d. MMMM", { locale: da });
+    } catch {
+      return dateStr;
+    }
+  };
 
   return (
     <MainLayout>
@@ -264,20 +389,59 @@ const Home = () => {
                 </div>
                 <div className="flex-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider">Ugens medarbejder</p>
-                  <p className="font-semibold">Sarah Jensen</p>
-                  <p className="text-sm text-muted-foreground">For fremragende kundeservice</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold">{weeklyRecognition?.topWeekly?.name || "Ingen data"}</p>
+                    {weeklyRecognition?.topWeekly?.team && (
+                      <Badge variant="secondary" className="text-xs">{weeklyRecognition.topWeekly.team}</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {weeklyRecognition?.topWeekly 
+                      ? `Højeste provision: ${formatCommission(weeklyRecognition.topWeekly.commission)}`
+                      : "Mest provision i sidste uge"}
+                  </p>
                 </div>
               </div>
 
-              {/* Deal of the Week */}
+              {/* Best Day of the Week */}
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+                <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/50">
+                  <CalendarDays className="w-6 h-6 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Ugens bedste dag</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold">{weeklyRecognition?.bestDay?.name || "Ingen data"}</p>
+                    {weeklyRecognition?.bestDay?.team && (
+                      <Badge variant="secondary" className="text-xs">{weeklyRecognition.bestDay.team}</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {weeklyRecognition?.bestDay 
+                      ? `${formatDate(weeklyRecognition.bestDay.date)} - ${formatCommission(weeklyRecognition.bestDay.commission)}`
+                      : "Bedste enkeltdag i sidste uge"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Deal of the Week (same person as best day) */}
               <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
                 <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/50">
                   <Sparkles className="w-6 h-6 text-green-600" />
                 </div>
                 <div className="flex-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider">Ugens handel</p>
-                  <p className="font-semibold">Marcus Andersen</p>
-                  <p className="text-sm text-muted-foreground">15 produkter i én ordre</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold">{weeklyRecognition?.bestDay?.name || "Ingen data"}</p>
+                    {weeklyRecognition?.bestDay?.team && (
+                      <Badge variant="secondary" className="text-xs">{weeklyRecognition.bestDay.team}</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {weeklyRecognition?.bestDay 
+                      ? `Bedste enkeltdag: ${formatCommission(weeklyRecognition.bestDay.commission)}`
+                      : "Bedste dag målt i provision"}
+                  </p>
                 </div>
               </div>
 
