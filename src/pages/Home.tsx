@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
   Cake, 
   Award, 
@@ -12,7 +11,6 @@ import {
   Users,
   Calendar,
   Star,
-  Heart,
   Sparkles,
   Gift,
   PartyPopper,
@@ -442,25 +440,6 @@ const Home = () => {
                       ? `Bedste enkeltdag: ${formatCommission(weeklyRecognition.bestDay.commission)}`
                       : "Bedste dag målt i provision"}
                   </p>
-                </div>
-              </div>
-
-              {/* Kudos */}
-              <div className="pt-4 border-t">
-                <p className="text-sm font-medium mb-3 flex items-center gap-2">
-                  <Heart className="w-4 h-4 text-pink-500" />
-                  Seneste kudos
-                </p>
-                <div className="space-y-2">
-                  <div className="flex items-start gap-3 text-sm p-3 rounded-lg bg-muted/50">
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback className="text-xs">MN</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p><span className="font-medium">Martin Nielsen</span> til <span className="font-medium">Anne Larsen</span></p>
-                      <p className="text-muted-foreground">"Tak for hjælpen med præsentationen! 🙏"</p>
-                    </div>
-                  </div>
                 </div>
               </div>
             </CardContent>
