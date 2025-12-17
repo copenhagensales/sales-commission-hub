@@ -218,7 +218,12 @@
     "originalCampaignName": "Original Campaign Name (Dialer)",
     "internalCampaignName": "Internal Campaign Name",
     "customerInfo": "Customer Information",
-    "references": "References"
+    "references": "References",
+    "unknownProducts": "Unknown Products",
+    "unknownProductsDescription": "Sales with products marked as 'Unknown' that need raw JSON review",
+    "noUnknownProducts": "No unknown products - Everything is mapped correctly!",
+    "unknownProductJson": "Unknown Product - Raw JSON",
+    "rawPayload": "Raw Payload"
   },
   "mgTest": {
     "title": "MG Test – Adversus Mapping",
