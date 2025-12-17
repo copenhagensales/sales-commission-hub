@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, CalendarRange } from "lucide-react";
+import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, CalendarRange, Plus, X, UserPlus } from "lucide-react";
 import { startOfWeek, startOfDay, endOfDay } from "date-fns";
 import { toast } from "sonner";
 
@@ -25,9 +25,12 @@ interface HeadToHeadComparisonProps {
 }
 
 type PeriodType = "today" | "week";
+type BattleMode = "1v1" | "team";
 
 export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }: HeadToHeadComparisonProps) => {
-  const [opponentId, setOpponentId] = useState<string>("");
+  const [battleMode, setBattleMode] = useState<BattleMode>("1v1");
+  const [myTeam, setMyTeam] = useState<string[]>([]); // Additional teammates (not including self)
+  const [opponentTeam, setOpponentTeam] = useState<string[]>([]);
   const [period, setPeriod] = useState<PeriodType>("week");
   const [showInviteOptions, setShowInviteOptions] = useState(false);
 
@@ -57,67 +60,26 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     },
   });
 
-  // Fetch head-to-head history between current user and selected opponent
-  const { data: battleHistory = [] } = useQuery({
-    queryKey: ["h2h-history", currentEmployeeId, opponentId],
-    queryFn: async () => {
-      if (!currentEmployeeId || !opponentId) return [];
-      
-      const { data, error } = await supabase
-        .from("head_to_head_battles")
-        .select("*")
-        .or(`and(challenger_employee_id.eq.${currentEmployeeId},opponent_employee_id.eq.${opponentId}),and(challenger_employee_id.eq.${opponentId},opponent_employee_id.eq.${currentEmployeeId})`)
-        .not("completed_at", "is", null)
-        .order("completed_at", { ascending: false })
-        .limit(10);
-      
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!currentEmployeeId && !!opponentId,
-  });
+  // Get team member names
+  const getTeamNames = (teamIds: string[]) => {
+    return teamIds.map(id => agents.find(a => a.id === id)?.name).filter(Boolean) as string[];
+  };
 
-  // Calculate W-L record
-  const record = useMemo(() => {
-    if (!battleHistory || battleHistory.length === 0) return { wins: 0, losses: 0, streak: 0 };
-    
-    let wins = 0;
-    let losses = 0;
-    let currentStreak = 0;
-    let streakType: "win" | "loss" | null = null;
+  const myTeamNames = useMemo(() => {
+    const names = [currentEmployeeName, ...getTeamNames(myTeam)].filter(Boolean) as string[];
+    return names;
+  }, [currentEmployeeName, myTeam, agents]);
 
-    battleHistory.forEach((battle, index) => {
-      const isWinner = battle.winner_employee_id === currentEmployeeId;
-      if (isWinner) {
-        wins++;
-        if (index === 0) streakType = "win";
-        if (streakType === "win") currentStreak++;
-      } else if (battle.winner_employee_id) {
-        losses++;
-        if (index === 0) streakType = "loss";
-        if (streakType === "loss") currentStreak++;
-      }
-    });
+  const opponentTeamNames = useMemo(() => getTeamNames(opponentTeam), [opponentTeam, agents]);
 
-    return { 
-      wins, 
-      losses, 
-      streak: streakType === "win" ? currentStreak : -currentStreak 
-    };
-  }, [battleHistory, currentEmployeeId]);
-
-  // Fetch stats for current user and opponent
+  // Fetch stats for teams
   const { data: stats } = useQuery({
-    queryKey: ["h2h-stats", currentEmployeeName, opponentId, dateRange.start.toISOString(), dateRange.end.toISOString()],
+    queryKey: ["h2h-stats", myTeamNames.join(","), opponentTeamNames.join(","), dateRange.start.toISOString(), dateRange.end.toISOString()],
     queryFn: async () => {
       const monthStart = dateRange.start.toISOString();
       const monthEnd = dateRange.end.toISOString();
 
-      // Get opponent name
-      const opponent = agents.find(a => a.id === opponentId);
-      const opponentName = opponent?.name || "";
-
-      // Fetch sales stats for both
+      // Fetch sales stats
       const { data: sales } = await supabase
         .from("sales")
         .select(`
@@ -144,89 +106,64 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         .gte("start_time", monthStart)
         .lte("start_time", monthEnd);
 
-      // Get agent external IDs for current user and opponent
+      // Get agent external IDs for all team members
+      const allNames = [...myTeamNames, ...opponentTeamNames];
       const { data: agentMappings } = await supabase
         .from("agents")
         .select("id, name, external_adversus_id")
-        .in("name", [currentEmployeeName, opponentName].filter(Boolean));
+        .in("name", allNames.filter(Boolean));
 
-      const currentAgentExternalId = agentMappings?.find(a => a.name === currentEmployeeName)?.external_adversus_id;
-      const opponentAgentExternalId = agentMappings?.find(a => a.name === opponentName)?.external_adversus_id;
+      // Helper function to calculate team stats
+      const calculateTeamStats = (teamNames: string[]): AgentStats => {
+        const teamExternalIds = teamNames.map(name => 
+          agentMappings?.find(a => a.name === name)?.external_adversus_id
+        ).filter(Boolean);
 
-      // Calculate stats for current user
-      const currentSales = sales?.filter(s => s.agent_name === currentEmployeeName) || [];
-      const currentSalesCount = currentSales.reduce((sum, s) => {
-        return sum + (s.sale_items?.reduce((itemSum, item) => {
-          const product = item.products as any;
-          if (product?.counts_as_sale === false) return itemSum;
-          return itemSum + (item.quantity || 1);
-        }, 0) || 0);
-      }, 0);
-      const currentRevenue = currentSales.reduce((sum, s) => {
-        return sum + (s.sale_items?.reduce((itemSum, item) => {
-          const rev = (item.products as any)?.revenue_dkk || 0;
-          return itemSum + (rev * (item.quantity || 1));
-        }, 0) || 0);
-      }, 0);
-      const currentCommission = currentSales.reduce((sum, s) => {
-        return sum + (s.sale_items?.reduce((itemSum, item) => {
-          const comm = (item.products as any)?.commission_dkk || item.mapped_commission || 0;
-          return itemSum + (comm * (item.quantity || 1));
-        }, 0) || 0);
-      }, 0);
+        const teamSales = sales?.filter(s => teamNames.includes(s.agent_name || "")) || [];
+        
+        const salesCount = teamSales.reduce((sum, s) => {
+          return sum + (s.sale_items?.reduce((itemSum, item) => {
+            const product = item.products as any;
+            if (product?.counts_as_sale === false) return itemSum;
+            return itemSum + (item.quantity || 1);
+          }, 0) || 0);
+        }, 0);
 
-      const currentCalls = calls?.filter(c => c.agent_external_id === currentAgentExternalId) || [];
-      const currentCallCount = currentCalls.length;
-      const currentTalkTime = currentCalls.reduce((sum, c) => sum + (c.duration_seconds || 0), 0);
+        const revenue = teamSales.reduce((sum, s) => {
+          return sum + (s.sale_items?.reduce((itemSum, item) => {
+            const rev = (item.products as any)?.revenue_dkk || 0;
+            return itemSum + (rev * (item.quantity || 1));
+          }, 0) || 0);
+        }, 0);
 
-      // Calculate stats for opponent
-      const opponentSales = sales?.filter(s => s.agent_name === opponentName) || [];
-      const opponentSalesCount = opponentSales.reduce((sum, s) => {
-        return sum + (s.sale_items?.reduce((itemSum, item) => {
-          const product = item.products as any;
-          if (product?.counts_as_sale === false) return itemSum;
-          return itemSum + (item.quantity || 1);
-        }, 0) || 0);
-      }, 0);
-      const opponentRevenue = opponentSales.reduce((sum, s) => {
-        return sum + (s.sale_items?.reduce((itemSum, item) => {
-          const rev = (item.products as any)?.revenue_dkk || 0;
-          return itemSum + (rev * (item.quantity || 1));
-        }, 0) || 0);
-      }, 0);
-      const opponentCommission = opponentSales.reduce((sum, s) => {
-        return sum + (s.sale_items?.reduce((itemSum, item) => {
-          const comm = (item.products as any)?.commission_dkk || item.mapped_commission || 0;
-          return itemSum + (comm * (item.quantity || 1));
-        }, 0) || 0);
-      }, 0);
+        const commission = teamSales.reduce((sum, s) => {
+          return sum + (s.sale_items?.reduce((itemSum, item) => {
+            const comm = (item.products as any)?.commission_dkk || item.mapped_commission || 0;
+            return itemSum + (comm * (item.quantity || 1));
+          }, 0) || 0);
+        }, 0);
 
-      const opponentCalls = calls?.filter(c => c.agent_external_id === opponentAgentExternalId) || [];
-      const opponentCallCount = opponentCalls.length;
-      const opponentTalkTime = opponentCalls.reduce((sum, c) => sum + (c.duration_seconds || 0), 0);
+        const teamCalls = calls?.filter(c => teamExternalIds.includes(c.agent_external_id)) || [];
+        const callCount = teamCalls.length;
+        const talkTimeSeconds = teamCalls.reduce((sum, c) => sum + (c.duration_seconds || 0), 0);
+
+        return {
+          id: teamNames.join(","),
+          name: teamNames.length === 1 ? teamNames[0] : `Hold (${teamNames.length})`,
+          salesCount,
+          revenue,
+          commission,
+          callCount,
+          talkTimeSeconds,
+        };
+      };
 
       return {
-        current: {
-          id: currentEmployeeId || "",
-          name: currentEmployeeName || "Dig",
-          salesCount: currentSalesCount,
-          revenue: currentRevenue,
-          commission: currentCommission,
-          callCount: currentCallCount,
-          talkTimeSeconds: currentTalkTime,
-        } as AgentStats,
-        opponent: opponentName ? {
-          id: opponentId,
-          name: opponentName,
-          salesCount: opponentSalesCount,
-          revenue: opponentRevenue,
-          commission: opponentCommission,
-          callCount: opponentCallCount,
-          talkTimeSeconds: opponentTalkTime,
-        } as AgentStats : null,
+        myTeam: calculateTeamStats(myTeamNames),
+        opponentTeam: opponentTeamNames.length > 0 ? calculateTeamStats(opponentTeamNames) : null,
       };
     },
-    enabled: !!currentEmployeeName,
+    enabled: myTeamNames.length > 0,
   });
 
   const formatTime = (seconds: number) => {
@@ -253,7 +190,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     delay = 0
   }: { 
     label: string; 
-    icon: any; 
+    icon: React.ComponentType<{ className?: string }>; 
     leftValue: number; 
     rightValue: number; 
     formatFn?: (n: number) => string;
@@ -291,7 +228,6 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         </div>
         
         <div className="relative h-3 rounded-full overflow-hidden bg-slate-800/80 border border-slate-700/50">
-          {/* Glow effect */}
           <div className="absolute inset-0 opacity-30">
             <div 
               className={`absolute left-0 top-0 h-full ${leftWins ? "bg-emerald-500" : tie ? "bg-amber-500" : "bg-rose-500"} blur-md`}
@@ -303,7 +239,6 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
             />
           </div>
           
-          {/* Actual bars */}
           <div className="relative flex h-full">
             <div 
               className={`transition-all duration-700 ease-out ${
@@ -340,23 +275,23 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
 
   // Calculate wins
   const calculateWins = () => {
-    if (!stats?.opponent) return { left: 0, right: 0 };
+    if (!stats?.opponentTeam) return { left: 0, right: 0 };
     let left = 0, right = 0;
     
-    if (stats.current.salesCount > stats.opponent.salesCount) left++;
-    else if (stats.current.salesCount < stats.opponent.salesCount) right++;
+    if (stats.myTeam.salesCount > stats.opponentTeam.salesCount) left++;
+    else if (stats.myTeam.salesCount < stats.opponentTeam.salesCount) right++;
     
-    if (stats.current.revenue > stats.opponent.revenue) left++;
-    else if (stats.current.revenue < stats.opponent.revenue) right++;
+    if (stats.myTeam.revenue > stats.opponentTeam.revenue) left++;
+    else if (stats.myTeam.revenue < stats.opponentTeam.revenue) right++;
     
-    if (stats.current.commission > stats.opponent.commission) left++;
-    else if (stats.current.commission < stats.opponent.commission) right++;
+    if (stats.myTeam.commission > stats.opponentTeam.commission) left++;
+    else if (stats.myTeam.commission < stats.opponentTeam.commission) right++;
     
-    if (stats.current.callCount > stats.opponent.callCount) left++;
-    else if (stats.current.callCount < stats.opponent.callCount) right++;
+    if (stats.myTeam.callCount > stats.opponentTeam.callCount) left++;
+    else if (stats.myTeam.callCount < stats.opponentTeam.callCount) right++;
     
-    if (stats.current.talkTimeSeconds > stats.opponent.talkTimeSeconds) left++;
-    else if (stats.current.talkTimeSeconds < stats.opponent.talkTimeSeconds) right++;
+    if (stats.myTeam.talkTimeSeconds > stats.opponentTeam.talkTimeSeconds) left++;
+    else if (stats.myTeam.talkTimeSeconds < stats.opponentTeam.talkTimeSeconds) right++;
     
     return { left, right };
   };
@@ -364,10 +299,60 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
   const wins = calculateWins();
   const isWinning = wins.left > wins.right;
   const isLosing = wins.left < wins.right;
+  const hasOpponents = opponentTeam.length > 0;
 
   const getInitials = (name: string) => {
     return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
   };
+
+  const addToMyTeam = (agentId: string) => {
+    if (!myTeam.includes(agentId)) {
+      setMyTeam([...myTeam, agentId]);
+    }
+  };
+
+  const removeFromMyTeam = (agentId: string) => {
+    setMyTeam(myTeam.filter(id => id !== agentId));
+  };
+
+  const addToOpponentTeam = (agentId: string) => {
+    if (!opponentTeam.includes(agentId)) {
+      setOpponentTeam([...opponentTeam, agentId]);
+    }
+  };
+
+  const removeFromOpponentTeam = (agentId: string) => {
+    setOpponentTeam(opponentTeam.filter(id => id !== agentId));
+  };
+
+  const availableForMyTeam = agents.filter(a => 
+    a.name !== currentEmployeeName && 
+    !myTeam.includes(a.id) && 
+    !opponentTeam.includes(a.id)
+  );
+
+  const availableForOpponentTeam = agents.filter(a => 
+    a.name !== currentEmployeeName && 
+    !myTeam.includes(a.id) && 
+    !opponentTeam.includes(a.id)
+  );
+
+  // Team member avatar component
+  const TeamMemberAvatar = ({ name, onRemove, isSmall = false }: { name: string; onRemove?: () => void; isSmall?: boolean }) => (
+    <div className={`relative group ${isSmall ? 'w-10 h-10' : 'w-12 h-12'}`}>
+      <div className={`${isSmall ? 'w-10 h-10 text-xs' : 'w-12 h-12 text-sm'} rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center font-bold border-2 border-slate-500/50`}>
+        {getInitials(name)}
+      </div>
+      {onRemove && (
+        <button 
+          onClick={onRemove}
+          className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <X className="w-3 h-3 text-white" />
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <Card className="relative border-0 shadow-2xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -388,126 +373,210 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
           <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
             Head to Head
           </span>
+          
+          {/* Mode toggle */}
+          <div className="ml-auto flex items-center gap-2">
+            <div className="flex bg-slate-800/80 rounded-full p-0.5 border border-slate-700/50">
+              <button
+                onClick={() => {
+                  setBattleMode("1v1");
+                  setMyTeam([]);
+                  setOpponentTeam(opponentTeam.slice(0, 1));
+                }}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                  battleMode === "1v1" 
+                    ? "bg-amber-500 text-white" 
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                1v1
+              </button>
+              <button
+                onClick={() => setBattleMode("team")}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                  battleMode === "team" 
+                    ? "bg-amber-500 text-white" 
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Hold
+              </button>
+            </div>
+          </div>
         </CardTitle>
       </CardHeader>
       
       <CardContent className="relative space-y-6 z-10 text-white">
-        {/* Player Cards */}
-        <div className="grid grid-cols-3 gap-3 items-center">
-          {/* Left Player (Current User) */}
-          <div className="text-center group">
+        {/* Team Display */}
+        <div className="grid grid-cols-3 gap-3 items-start">
+          {/* Left Team (My Team) */}
+          <div className="text-center">
             <div className="relative inline-block">
-              {/* Crown for winner */}
-              {opponentId && isWinning && (
+              {hasOpponents && isWinning && (
                 <Crown className="absolute -top-4 left-1/2 -translate-x-1/2 w-6 h-6 text-amber-400 animate-bounce" style={{ animationDuration: '2s' }} />
               )}
-              {/* Glow ring */}
-              <div className={`absolute inset-0 rounded-full ${isWinning ? 'bg-emerald-500' : isLosing ? 'bg-rose-500' : 'bg-blue-500'} blur-xl opacity-30 scale-110 group-hover:scale-125 transition-transform duration-500`} />
-              {/* Avatar ring */}
-              <div className={`relative w-18 h-18 p-1 rounded-full bg-gradient-to-br ${isWinning ? 'from-emerald-400 to-emerald-600' : isLosing ? 'from-rose-400 to-rose-600' : 'from-blue-400 to-blue-600'}`}>
+              <div className={`absolute inset-0 rounded-full ${isWinning ? 'bg-emerald-500' : isLosing ? 'bg-rose-500' : 'bg-blue-500'} blur-xl opacity-30 scale-110`} />
+              <div className={`relative w-16 h-16 p-1 rounded-full bg-gradient-to-br ${isWinning ? 'from-emerald-400 to-emerald-600' : isLosing ? 'from-rose-400 to-rose-600' : 'from-blue-400 to-blue-600'}`}>
                 <div className="w-full h-full rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-xl font-bold shadow-inner">
                   {currentEmployeeName ? getInitials(currentEmployeeName) : "?"}
                 </div>
               </div>
             </div>
-            <p className="mt-3 font-bold text-sm truncate">{currentEmployeeName?.split(" ")[0] || "Dig"}</p>
-            {opponentId && (
+            
+            <p className="mt-2 font-bold text-sm truncate">{currentEmployeeName?.split(" ")[0] || "Dig"}</p>
+            
+            {/* Team members */}
+            {battleMode === "team" && (
+              <div className="mt-3 space-y-2">
+                <div className="flex flex-wrap justify-center gap-1">
+                  {myTeam.map(id => {
+                    const agent = agents.find(a => a.id === id);
+                    if (!agent) return null;
+                    return (
+                      <TeamMemberAvatar 
+                        key={id} 
+                        name={agent.name} 
+                        onRemove={() => removeFromMyTeam(id)}
+                        isSmall
+                      />
+                    );
+                  })}
+                </div>
+                {availableForMyTeam.length > 0 && myTeam.length < 3 && (
+                  <Select onValueChange={addToMyTeam}>
+                    <SelectTrigger className="h-8 text-xs bg-slate-700/50 border-slate-600/50 hover:bg-slate-600/50">
+                      <Plus className="w-3 h-3 mr-1" />
+                      <span>Tilføj</span>
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-700">
+                      {availableForMyTeam.map(agent => (
+                        <SelectItem key={agent.id} value={agent.id}>
+                          {agent.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            )}
+            
+            {hasOpponents && (
               <div className="flex flex-col items-center gap-1.5 mt-2">
                 <div className={`px-3 py-1 rounded-full text-xs font-bold ${
                   isWinning ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 
                   isLosing ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 
                   'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                 }`}>
-                  {wins.left} / 5 kategorier
+                  {wins.left} / 5
                 </div>
-                {record.streak > 0 && (
-                  <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 gap-1 animate-pulse">
-                    <Flame className="h-3 w-3" />
-                    {record.streak} streak
-                  </Badge>
-                )}
               </div>
             )}
           </div>
 
-          {/* VS Badge + Record */}
-          <div className="text-center relative">
+          {/* VS Badge */}
+          <div className="text-center relative pt-2">
             <div className="relative inline-block">
-              {/* Animated ring around VS */}
               <div className="absolute inset-0 rounded-full border-2 border-amber-400/30 animate-ping" style={{ animationDuration: '3s' }} />
-              <div className="relative w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 border-2 border-amber-400/50 flex items-center justify-center backdrop-blur-sm">
-                <span className="text-2xl font-black bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
+              <div className="relative w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 border-2 border-amber-400/50 flex items-center justify-center backdrop-blur-sm">
+                <span className="text-xl font-black bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
                   VS
                 </span>
               </div>
             </div>
-            
-            {opponentId && record.wins + record.losses > 0 && (
-              <div className="mt-3 space-y-1">
-                <div className="flex items-center justify-center gap-1 text-lg font-black">
-                  <span className="text-emerald-400">{record.wins}</span>
-                  <span className="text-slate-600">-</span>
-                  <span className="text-rose-400">{record.losses}</span>
-                </div>
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest">Historik</p>
-              </div>
+            {battleMode === "team" && (
+              <p className="text-[10px] text-slate-500 mt-2 uppercase tracking-wider">
+                {myTeamNames.length}v{opponentTeamNames.length}
+              </p>
             )}
           </div>
 
-          {/* Right Player (Opponent) */}
-          <div className="text-center group">
-            {opponentId ? (
+          {/* Right Team (Opponent Team) */}
+          <div className="text-center">
+            {hasOpponents ? (
               <>
                 <div className="relative inline-block">
-                  {/* Crown for winner */}
                   {isLosing && (
                     <Crown className="absolute -top-4 left-1/2 -translate-x-1/2 w-6 h-6 text-amber-400 animate-bounce" style={{ animationDuration: '2s' }} />
                   )}
-                  {/* Glow ring */}
-                  <div className={`absolute inset-0 rounded-full ${isLosing ? 'bg-emerald-500' : isWinning ? 'bg-rose-500' : 'bg-rose-500'} blur-xl opacity-30 scale-110 group-hover:scale-125 transition-transform duration-500`} />
-                  {/* Avatar ring */}
-                  <div className={`relative w-18 h-18 p-1 rounded-full bg-gradient-to-br ${isLosing ? 'from-emerald-400 to-emerald-600' : isWinning ? 'from-rose-400 to-rose-600' : 'from-rose-400 to-rose-600'}`}>
+                  <div className={`absolute inset-0 rounded-full ${isLosing ? 'bg-emerald-500' : isWinning ? 'bg-rose-500' : 'bg-rose-500'} blur-xl opacity-30 scale-110`} />
+                  <div className={`relative w-16 h-16 p-1 rounded-full bg-gradient-to-br ${isLosing ? 'from-emerald-400 to-emerald-600' : 'from-rose-400 to-rose-600'}`}>
                     <div className="w-full h-full rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-xl font-bold shadow-inner">
-                      {stats?.opponent?.name ? getInitials(stats.opponent.name) : "?"}
+                      {opponentTeamNames.length === 1 
+                        ? getInitials(opponentTeamNames[0])
+                        : <Users className="w-6 h-6" />
+                      }
                     </div>
                   </div>
                 </div>
-                <p className="mt-3 font-bold text-sm truncate">{stats?.opponent?.name?.split(" ")[0] || "Modstander"}</p>
+                <p className="mt-2 font-bold text-sm truncate">
+                  {opponentTeamNames.length === 1 
+                    ? opponentTeamNames[0].split(" ")[0] 
+                    : `Hold (${opponentTeamNames.length})`
+                  }
+                </p>
+                
+                {/* Opponent team members */}
+                {battleMode === "team" && opponentTeam.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex flex-wrap justify-center gap-1">
+                      {opponentTeam.map(id => {
+                        const agent = agents.find(a => a.id === id);
+                        if (!agent) return null;
+                        return (
+                          <TeamMemberAvatar 
+                            key={id} 
+                            name={agent.name} 
+                            onRemove={() => removeFromOpponentTeam(id)}
+                            isSmall
+                          />
+                        );
+                      })}
+                    </div>
+                    {availableForOpponentTeam.length > 0 && opponentTeam.length < 4 && (
+                      <Select onValueChange={addToOpponentTeam}>
+                        <SelectTrigger className="h-8 text-xs bg-slate-700/50 border-slate-600/50 hover:bg-slate-600/50">
+                          <Plus className="w-3 h-3 mr-1" />
+                          <span>Tilføj</span>
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-800 border-slate-700">
+                          {availableForOpponentTeam.map(agent => (
+                            <SelectItem key={agent.id} value={agent.id}>
+                              {agent.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                )}
+                
                 <div className="flex flex-col items-center gap-1.5 mt-2">
                   <div className={`px-3 py-1 rounded-full text-xs font-bold ${
                     isLosing ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 
                     isWinning ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 
                     'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                   }`}>
-                    {wins.right} / 5 kategorier
+                    {wins.right} / 5
                   </div>
-                  {record.streak < 0 && (
-                    <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 gap-1 animate-pulse">
-                      <Flame className="h-3 w-3" />
-                      {Math.abs(record.streak)} streak
-                    </Badge>
-                  )}
                 </div>
               </>
             ) : (
               <div className="space-y-3">
                 <div className="relative inline-block">
-                  <div className="w-18 h-18 mx-auto rounded-full bg-slate-700/50 border-2 border-dashed border-slate-600 flex items-center justify-center">
+                  <div className="w-16 h-16 mx-auto rounded-full bg-slate-700/50 border-2 border-dashed border-slate-600 flex items-center justify-center">
                     <Users className="w-8 h-8 text-slate-500" />
                   </div>
                 </div>
-                <Select value={opponentId} onValueChange={setOpponentId}>
+                <Select onValueChange={(id) => setOpponentTeam([id])}>
                   <SelectTrigger className="bg-slate-700/80 border-slate-600/50 text-white text-xs h-9 hover:bg-slate-600/80 transition-colors backdrop-blur-sm">
                     <SelectValue placeholder="Vælg modstander" />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-800 border-slate-700 max-h-48">
-                    {agents
-                      .filter(a => a.name !== currentEmployeeName)
-                      .map(agent => (
-                        <SelectItem key={agent.id} value={agent.id}>
-                          {agent.name}
-                        </SelectItem>
-                      ))}
+                    {availableForOpponentTeam.map(agent => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -516,9 +585,8 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         </div>
 
         {/* Stats Comparison Bars */}
-        {stats?.opponent && (
+        {stats?.opponentTeam && (
           <div className="space-y-4 pt-4 border-t border-slate-700/50">
-            {/* Category wins summary */}
             <div className="flex items-center justify-center gap-6 pb-2">
               <div className="flex items-center gap-2">
                 <Trophy className={`h-5 w-5 ${isWinning ? "text-amber-400" : "text-slate-500"} transition-colors`} />
@@ -537,16 +605,16 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
               </div>
             </div>
 
-            <StatBar label="Salg" icon={Target} leftValue={stats.current.salesCount} rightValue={stats.opponent.salesCount} delay={0} />
-            <StatBar label="Omsætning" icon={TrendingUp} leftValue={stats.current.revenue} rightValue={stats.opponent.revenue} formatFn={formatCurrency} delay={100} />
-            <StatBar label="Provision" icon={DollarSign} leftValue={stats.current.commission} rightValue={stats.opponent.commission} formatFn={formatCurrency} delay={200} />
-            <StatBar label="Opkald" icon={Phone} leftValue={stats.current.callCount} rightValue={stats.opponent.callCount} delay={300} />
-            <StatBar label="Taletid" icon={Clock} leftValue={stats.current.talkTimeSeconds} rightValue={stats.opponent.talkTimeSeconds} formatFn={formatTime} delay={400} />
+            <StatBar label="Salg" icon={Target} leftValue={stats.myTeam.salesCount} rightValue={stats.opponentTeam.salesCount} delay={0} />
+            <StatBar label="Omsætning" icon={TrendingUp} leftValue={stats.myTeam.revenue} rightValue={stats.opponentTeam.revenue} formatFn={formatCurrency} delay={100} />
+            <StatBar label="Provision" icon={DollarSign} leftValue={stats.myTeam.commission} rightValue={stats.opponentTeam.commission} formatFn={formatCurrency} delay={200} />
+            <StatBar label="Opkald" icon={Phone} leftValue={stats.myTeam.callCount} rightValue={stats.opponentTeam.callCount} delay={300} />
+            <StatBar label="Taletid" icon={Clock} leftValue={stats.myTeam.talkTimeSeconds} rightValue={stats.opponentTeam.talkTimeSeconds} formatFn={formatTime} delay={400} />
           </div>
         )}
 
         {/* No opponent selected state */}
-        {!opponentId && (
+        {!hasOpponents && (
           <div className="text-center py-8">
             <div className="relative inline-block mb-4">
               <Target className="h-12 w-12 text-slate-600" />
@@ -559,7 +627,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         )}
 
         {/* Action buttons when opponent is selected */}
-        {opponentId && (
+        {hasOpponents && (
           <div className="flex flex-col gap-3 pt-2">
             {!showInviteOptions ? (
               <Button 
@@ -568,7 +636,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                 <Send className="h-4 w-4 mr-2 group-hover:translate-x-1 transition-transform" />
-                Inviter til duel
+                {battleMode === "team" ? `Inviter alle (${myTeamNames.length + opponentTeamNames.length} spillere)` : "Inviter til duel"}
               </Button>
             ) : (
               <div className="space-y-3 animate-fade-in">
@@ -577,7 +645,8 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                   <Button 
                     onClick={() => {
                       setPeriod("today");
-                      toast.success(`Invitation sendt til ${stats?.opponent?.name || "modstander"}!`, {
+                      const teamLabel = battleMode === "team" ? ` (${myTeamNames.length}v${opponentTeamNames.length})` : "";
+                      toast.success(`Invitation sendt!${teamLabel}`, {
                         description: "Duellen gælder for i dag."
                       });
                       setShowInviteOptions(false);
@@ -591,7 +660,8 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                   <Button 
                     onClick={() => {
                       setPeriod("week");
-                      toast.success(`Invitation sendt til ${stats?.opponent?.name || "modstander"}!`, {
+                      const teamLabel = battleMode === "team" ? ` (${myTeamNames.length}v${opponentTeamNames.length})` : "";
+                      toast.success(`Invitation sendt!${teamLabel}`, {
                         description: "Duellen gælder for denne uge."
                       });
                       setShowInviteOptions(false);
@@ -613,12 +683,13 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
             )}
             <button 
               onClick={() => {
-                setOpponentId("");
+                setOpponentTeam([]);
+                setMyTeam([]);
                 setShowInviteOptions(false);
               }}
               className="w-full text-xs text-slate-500 hover:text-white transition-colors py-2"
             >
-              Vælg en anden modstander
+              Nulstil hold
             </button>
           </div>
         )}
