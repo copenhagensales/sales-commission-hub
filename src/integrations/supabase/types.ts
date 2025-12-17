@@ -2315,6 +2315,73 @@ export type Database = {
           },
         ]
       }
+      head_to_head_battles: {
+        Row: {
+          challenger_employee_id: string
+          challenger_stats: Json
+          challenger_wins: number
+          completed_at: string | null
+          created_at: string
+          id: string
+          opponent_employee_id: string
+          opponent_stats: Json
+          opponent_wins: number
+          period_end: string
+          period_start: string
+          winner_employee_id: string | null
+        }
+        Insert: {
+          challenger_employee_id: string
+          challenger_stats?: Json
+          challenger_wins?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          opponent_employee_id: string
+          opponent_stats?: Json
+          opponent_wins?: number
+          period_end: string
+          period_start: string
+          winner_employee_id?: string | null
+        }
+        Update: {
+          challenger_employee_id?: string
+          challenger_stats?: Json
+          challenger_wins?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          opponent_employee_id?: string
+          opponent_stats?: Json
+          opponent_wins?: number
+          period_end?: string
+          period_start?: string
+          winner_employee_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "head_to_head_battles_challenger_employee_id_fkey"
+            columns: ["challenger_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "head_to_head_battles_opponent_employee_id_fkey"
+            columns: ["opponent_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "head_to_head_battles_winner_employee_id_fkey"
+            columns: ["winner_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_logs: {
         Row: {
           created_at: string
