@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { HeadToHeadComparison } from "@/components/home/HeadToHeadComparison";
 import { 
   Cake, 
   Award, 
@@ -716,6 +717,12 @@ const Home = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Head to Head Comparison */}
+        <HeadToHeadComparison 
+          currentEmployeeId={employee?.id}
+          currentEmployeeName={employee ? `${employee.first_name} ${employee.last_name}` : undefined}
+        />
 
         {/* Motivational Quote */}
         <Card className="border-0 shadow-lg bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5">
