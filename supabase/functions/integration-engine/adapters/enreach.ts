@@ -541,11 +541,15 @@ export class EnreachAdapter implements DialerAdapter {
       case "composite":
         if ((rule as any).productNameTemplate) {
           let name = String((rule as any).productNameTemplate);
-          name = name.replace(/\{{1,2}([\w\.]+)\}{1,2}/g, (_, key) => {
-            const val = this.getValue(dataObj, [key]);
+          // Regex que captura todo el contenido entre {{ }} incluyendo guiones, espacios, etc.
+          name = name.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+            const trimmedKey = key.trim();
+            const val = this.getValue(dataObj, [trimmedKey]);
             return val ? String(val) : "";
           });
-          if (name) {
+          // Limpiar espacios extra resultantes de valores vacíos
+          name = name.replace(/\s+-\s*$/g, "").replace(/^\s*-\s+/g, "").trim();
+          if (name && name.length > 0) {
             products.push({
               name: name,
               externalId: rule.conditionKey,
