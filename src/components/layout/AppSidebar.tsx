@@ -900,20 +900,6 @@ const [personnelOpen, setPersonnelOpen] = useState(
 
           {isOwner && (
             <NavLink
-              to="/admin"
-              onClick={handleNavClick}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname === "/admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}
-            >
-              <Crown className="h-5 w-5" />
-              {t("sidebar.administration")}
-            </NavLink>
-          )}
-
-          {isOwner && (
-            <NavLink
               to="/settings"
               onClick={handleNavClick}
               className={cn(

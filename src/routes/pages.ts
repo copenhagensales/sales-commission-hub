@@ -46,7 +46,6 @@ export const ContractSign = lazyPage(() => import("@/pages/ContractSign"));
 export const PulseSurvey = lazyPage(() => import("@/pages/PulseSurvey"));
 export const PulseSurveyResults = lazyPage(() => import("@/pages/PulseSurveyResults"));
 export const PublicPulseSurvey = lazyPage(() => import("@/pages/PublicPulseSurvey"));
-export const Admin = lazyPage(() => import("@/pages/Admin"));
 export const MyProfile = lazyPage(() => import("@/pages/MyProfile"));
 export const CareerWishes = lazyPage(() => import("@/pages/CareerWishes"));
 export const CareerWishesOverview = lazyPage(() => import("@/pages/CareerWishesOverview"));
