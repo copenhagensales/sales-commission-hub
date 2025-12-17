@@ -111,65 +111,77 @@ export class EnreachAdapter implements DialerAdapter {
     processor: (leads: HeroBaseLead[]) => StandardSale[],
     maxLeads = 50000
   ): Promise<StandardSale[]> {
-    const allSales: StandardSale[] = [];
-    const seenIds = new Set<string>(); // Deduplicación
-    let skip = 0;
-    const take = 500;
-    let hasMore = true;
-    let page = 1;
-    let totalProcessed = 0;
-    let duplicatesSkipped = 0;
+     const allSales: StandardSale[] = [];
+     const seenIds = new Set<string>(); // Deduplicación
+     let skip = 0;
+     const take = 500;
+     let hasMore = true;
+     let page = 1;
+     let totalProcessed = 0;
+     let duplicatesSkipped = 0;
+     let lastFirstId: string | null = null;
 
-    console.log(`[EnreachAdapter] Starting pagination on: ${baseEndpoint}`);
+     console.log(`[EnreachAdapter] Starting pagination on: ${baseEndpoint}`);
 
-    while (hasMore && totalProcessed < maxLeads) {
-      const separator = baseEndpoint.includes("?") ? "&" : "?";
-      const pagedEndpoint = `${baseEndpoint}${separator}skip=${skip}&take=${take}`;
+     while (hasMore && totalProcessed < maxLeads) {
+       const separator = baseEndpoint.includes("?") ? "&" : "?";
+       const pagedEndpoint = `${baseEndpoint}${separator}skip=${skip}&take=${take}`;
 
-      try {
-        const data = (await this.get(pagedEndpoint)) as unknown;
-        let pageResults: HeroBaseLead[] = [];
+       try {
+         const data = (await this.get(pagedEndpoint)) as unknown;
+         let pageResults: HeroBaseLead[] = [];
 
-        if (Array.isArray(data)) {
-          pageResults = data as HeroBaseLead[];
-        } else if (data && typeof data === "object") {
-          const wrapper = data as Record<string, unknown>;
-          pageResults = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as HeroBaseLead[];
-        }
+         if (Array.isArray(data)) {
+           pageResults = data as HeroBaseLead[];
+         } else if (data && typeof data === "object") {
+           const wrapper = data as Record<string, unknown>;
+           pageResults = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as HeroBaseLead[];
+         }
 
-        if (pageResults.length > 0) {
-          const pageSales = processor(pageResults);
-          
-          // Deduplicar: solo agregar ventas con externalId único
-          let addedThisPage = 0;
-          for (const sale of pageSales) {
-            if (sale.externalId && !seenIds.has(sale.externalId)) {
-              seenIds.add(sale.externalId);
-              allSales.push(sale);
-              addedThisPage++;
-            } else if (sale.externalId) {
-              duplicatesSkipped++;
-            }
-          }
-          
-          totalProcessed += pageResults.length;
-          console.log(`[EnreachAdapter] Page ${page}: ${pageResults.length} leads -> ${addedThisPage} sales (Total: ${allSales.length}, Dups: ${duplicatesSkipped})`);
+         if (pageResults.length > 0) {
+           // Guardrail: algunos endpoints ignoran skip/take y devuelven siempre la misma página
+           const firstAny = pageResults[0] as Record<string, unknown>;
+           const firstId = this.getStr(firstAny, ["uniqueId", "UniqueId", "id", "Id"]);
+           if (skip > 0 && lastFirstId && firstId && firstId === lastFirstId) {
+             console.warn(`[EnreachAdapter] Pagination appears stuck (same firstId: ${firstId}). Stopping to avoid infinite loop.`);
+             break;
+           }
+           if (firstId) lastFirstId = firstId;
 
-          if (pageResults.length < take || totalProcessed >= maxLeads) {
-            hasMore = false;
-          } else {
-            skip += take;
-            page++;
-            await new Promise((resolve) => setTimeout(resolve, 50));
-          }
-        } else {
-          hasMore = false;
-        }
-      } catch (e) {
-        console.error(`[EnreachAdapter] Error fetching page ${page}:`, e);
-        hasMore = false;
-      }
-    }
+           const pageSales = processor(pageResults);
+
+           // Deduplicar: solo agregar ventas con externalId único
+           let addedThisPage = 0;
+           for (const sale of pageSales) {
+             if (sale.externalId && !seenIds.has(sale.externalId)) {
+               seenIds.add(sale.externalId);
+               allSales.push(sale);
+               addedThisPage++;
+             } else if (sale.externalId) {
+               duplicatesSkipped++;
+             }
+           }
+
+           totalProcessed += pageResults.length;
+           console.log(
+             `[EnreachAdapter] Page ${page}: ${pageResults.length} leads -> ${addedThisPage} sales (Total: ${allSales.length}, Dups: ${duplicatesSkipped})`
+           );
+
+           if (pageResults.length < take || totalProcessed >= maxLeads) {
+             hasMore = false;
+           } else {
+             skip += take;
+             page++;
+             await new Promise((resolve) => setTimeout(resolve, 50));
+           }
+         } else {
+           hasMore = false;
+         }
+       } catch (e) {
+         console.error(`[EnreachAdapter] Error fetching page ${page}:`, e);
+         hasMore = false;
+       }
+     }
 
     if (duplicatesSkipped > 0) {
       console.log(`[EnreachAdapter] Total duplicates skipped: ${duplicatesSkipped}`);
@@ -204,23 +216,19 @@ export class EnreachAdapter implements DialerAdapter {
         }
       }
 
-      const dataFilters = this.config?.productExtraction?.dataFilters;
+       const dataFilters = this.config?.productExtraction?.dataFilters;
 
-      // Procesador que filtra y mapea cada página
-      const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
-        // Filtrar solo closure=Success
-        let filtered = leads.filter((lead) => {
-          const closure = this.getStr(lead, ["closure", "Closure"]);
-          return closure && closure.toLowerCase() === "success";
-        });
+       // Procesador por página: el endpoint ya viene filtrado por Success (LeadClosures=Success)
+       const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
+         let filtered = leads;
 
-        // Aplicar filtros de datos si existen
-        if (dataFilters && dataFilters.length > 0) {
-          filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters));
-        }
+         // Aplicar filtros de datos si existen
+         if (dataFilters && dataFilters.length > 0) {
+           filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters));
+         }
 
-        return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
-      };
+         return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
+       };
 
       return await this.processPageByPage(endpoint, pageProcessor);
     } catch (error) {
@@ -247,20 +255,17 @@ export class EnreachAdapter implements DialerAdapter {
         }
       }
 
-      const dataFilters = this.config?.productExtraction?.dataFilters;
+       const dataFilters = this.config?.productExtraction?.dataFilters;
 
-      const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
-        let filtered = leads.filter((lead) => {
-          const closure = this.getStr(lead, ["closure", "Closure"]);
-          return closure && closure.toLowerCase() === "success";
-        });
+       const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
+         let filtered = leads;
 
-        if (dataFilters && dataFilters.length > 0) {
-          filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters));
-        }
+         if (dataFilters && dataFilters.length > 0) {
+           filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters));
+         }
 
-        return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
-      };
+         return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
+       };
 
       return await this.processPageByPage(endpoint, pageProcessor);
     } catch (error) {
