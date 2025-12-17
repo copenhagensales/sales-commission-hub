@@ -304,7 +304,7 @@ export default function SalesDashboard() {
           <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
           Live opdatering hvert 30. sekund
           {lastUpdated && <span className="ml-2">• Opdateret: {lastUpdated}</span>}
-          <span className="ml-2">• v2.1</span>
+          <span className="ml-2">• v2.2</span>
         </div>
       </footer>
     </div>
