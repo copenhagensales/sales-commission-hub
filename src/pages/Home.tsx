@@ -383,19 +383,19 @@ const Home = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Employee of the Week */}
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
                 <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900/50">
                   <Award className="w-6 h-6 text-amber-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Ugens medarbejder</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 uppercase tracking-wider">Ugens medarbejder</p>
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold">{weeklyRecognition?.topWeekly?.name || "Ingen data"}</p>
+                    <p className="font-semibold text-amber-900 dark:text-amber-100">{weeklyRecognition?.topWeekly?.name || "Ingen data"}</p>
                     {weeklyRecognition?.topWeekly?.team && (
                       <Badge variant="secondary" className="text-xs">{weeklyRecognition.topWeekly.team}</Badge>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
                     {weeklyRecognition?.topWeekly 
                       ? `Højeste provision: ${formatCommission(weeklyRecognition.topWeekly.commission)}`
                       : "Mest provision i sidste uge"}
@@ -404,19 +404,19 @@ const Home = () => {
               </div>
 
               {/* Best Day of the Week */}
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
                 <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/50">
                   <CalendarDays className="w-6 h-6 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Ugens bedste dag</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-400 uppercase tracking-wider">Ugens bedste dag</p>
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold">{weeklyRecognition?.bestDay?.name || "Ingen data"}</p>
+                    <p className="font-semibold text-blue-900 dark:text-blue-100">{weeklyRecognition?.bestDay?.name || "Ingen data"}</p>
                     {weeklyRecognition?.bestDay?.team && (
                       <Badge variant="secondary" className="text-xs">{weeklyRecognition.bestDay.team}</Badge>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
                     {weeklyRecognition?.bestDay 
                       ? `${formatDate(weeklyRecognition.bestDay.date)} - ${formatCommission(weeklyRecognition.bestDay.commission)}`
                       : "Bedste enkeltdag i sidste uge"}
@@ -425,19 +425,19 @@ const Home = () => {
               </div>
 
               {/* Deal of the Week (same person as best day) */}
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
                 <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/50">
                   <Sparkles className="w-6 h-6 text-green-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Ugens handel</p>
+                  <p className="text-xs text-green-700 dark:text-green-400 uppercase tracking-wider">Ugens handel</p>
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold">{weeklyRecognition?.bestDay?.name || "Ingen data"}</p>
+                    <p className="font-semibold text-green-900 dark:text-green-100">{weeklyRecognition?.bestDay?.name || "Ingen data"}</p>
                     {weeklyRecognition?.bestDay?.team && (
                       <Badge variant="secondary" className="text-xs">{weeklyRecognition.bestDay.team}</Badge>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-green-700 dark:text-green-300">
                     {weeklyRecognition?.bestDay 
                       ? `Bedste enkeltdag: ${formatCommission(weeklyRecognition.bestDay.commission)}`
                       : "Bedste dag målt i provision"}
