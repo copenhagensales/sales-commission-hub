@@ -2,8 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
+export type DataScope = "egen" | "team" | "alt";
+
 export interface PositionPermissions {
-  [key: string]: boolean | { view: boolean; edit: boolean };
+  [key: string]: boolean | { view: boolean; edit: boolean } | DataScope;
 }
 
 interface JobPosition {
@@ -108,6 +110,14 @@ const generateAllPermissions = (): PositionPermissions => ({
   tab_settings_webhooks: { view: true, edit: true },
   tab_settings_logs: { view: true, edit: true },
   tab_settings_excel_crm: { view: true, edit: true },
+  // Data scope permissions - owner sees all
+  scope_employees: "alt" as DataScope,
+  scope_shifts: "alt" as DataScope,
+  scope_absence: "alt" as DataScope,
+  scope_time_tracking: "alt" as DataScope,
+  scope_contracts: "alt" as DataScope,
+  scope_payroll: "alt" as DataScope,
+  scope_career_wishes: "alt" as DataScope,
 });
 
 export function usePositionPermissions() {
@@ -205,14 +215,14 @@ export function usePermissions() {
     const value = permissions[key];
     
     if (type) {
-      if (typeof value === "object" && value !== null) {
+      if (typeof value === "object" && value !== null && "view" in value) {
         return value[type] || false;
       }
       return false;
     }
     
     if (typeof value === "boolean") return value;
-    if (typeof value === "object" && value !== null) {
+    if (typeof value === "object" && value !== null && "view" in value) {
       return value.view || value.edit || false;
     }
     
@@ -222,6 +232,14 @@ export function usePermissions() {
   const canView = (key: string): boolean => hasPermission(key, "view") || hasPermission(key);
   const canEdit = (key: string): boolean => hasPermission(key, "edit");
 
+  const getDataScope = (key: string): DataScope => {
+    const value = permissions[key];
+    if (value === "egen" || value === "team" || value === "alt") {
+      return value;
+    }
+    return "egen"; // Default to own data only
+  };
+
   return {
     isLoading,
     position: data?.position,
@@ -229,6 +247,15 @@ export function usePermissions() {
     hasPermission,
     canView,
     canEdit,
+    getDataScope,
+    // Data scope helpers
+    scopeEmployees: getDataScope("scope_employees"),
+    scopeShifts: getDataScope("scope_shifts"),
+    scopeAbsence: getDataScope("scope_absence"),
+    scopeTimeTracking: getDataScope("scope_time_tracking"),
+    scopeContracts: getDataScope("scope_contracts"),
+    scopePayroll: getDataScope("scope_payroll"),
+    scopeCareerWishes: getDataScope("scope_career_wishes"),
     // Main menu permissions
     canViewDashboard: hasPermission("menu_dashboard"),
     canViewWallboard: hasPermission("menu_wallboard"),

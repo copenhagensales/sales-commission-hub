@@ -1,7 +1,9 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 
-interface RolePreviewPermissions {
-  [key: string]: boolean | { view: boolean; edit: boolean };
+type DataScope = "egen" | "team" | "alt";
+
+export interface RolePreviewPermissions {
+  [key: string]: boolean | { view: boolean; edit: boolean } | DataScope;
 }
 
 interface RolePreviewContextType {
