@@ -1,6 +1,7 @@
 import type { RouteConfig } from "./types";
 import {
   Auth,
+  Home,
   Dashboard,
   Agents,
   Sales,
@@ -77,6 +78,7 @@ export const routes: RouteConfig[] = [
   { path: "/auth", component: Auth, access: "auth" },
   { path: "/onboarding", component: EmployeeOnboarding, access: "public" },
 
+  { path: "/home", component: Home, access: "protected" },
   { path: "/my-schedule", component: MySchedule, access: "protected" },
   { path: "/my-profile", component: MyProfile, access: "protected" },
   { path: "/my-contracts", component: MyContracts, access: "protected" },
