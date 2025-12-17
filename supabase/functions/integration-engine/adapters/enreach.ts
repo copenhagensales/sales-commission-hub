@@ -614,6 +614,13 @@ export class EnreachAdapter implements DialerAdapter {
   // Check if a single rule passes
   private checkRule(lead: HeroBaseLead, rule: DataFilterRule): boolean {
     let fieldValue = this.getNestedValue(lead, rule.field);
+
+    // Fallback: try to find field in lead.data.* if not found at root
+    const dataObj = (lead.data || lead.Data) as Record<string, unknown> | undefined;
+    if ((fieldValue === undefined || fieldValue === null || fieldValue === "") && dataObj && !rule.field.startsWith("data.")) {
+      fieldValue = this.getNestedValue(dataObj, rule.field);
+    }
+
     const fieldExists = fieldValue !== undefined;
 
     // Compat: "agentEmail" maps to orgCode fields
