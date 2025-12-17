@@ -9,6 +9,7 @@ export interface VagtEmployee {
   phone: string | null;
   is_active: boolean;
   team: string | null; // Maps to department field
+  job_title?: string | null;
 }
 
 export function useVagtEmployee() {
@@ -21,9 +22,8 @@ export function useVagtEmployee() {
 
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, private_email, private_phone, is_active, department")
+        .select("id, first_name, last_name, private_email, private_phone, is_active, department, job_title")
         .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
-        .eq("job_title", "Fieldmarketing")
         .eq("is_active", true)
         .maybeSingle();
 
@@ -37,6 +37,7 @@ export function useVagtEmployee() {
         phone: data.private_phone,
         is_active: data.is_active ?? true,
         team: data.department, // Use department as team
+        job_title: data.job_title,
       } as VagtEmployee;
     },
     enabled: !!user,

@@ -20,7 +20,6 @@ const OWNER_POSITION_NAME = "Ejer";
 const generateAllPermissions = (): PositionPermissions => ({
   // Main menu
   menu_dashboard: true,
-  menu_wallboard: true,
   menu_some: { view: true, edit: true },
   menu_sales: { view: true, edit: true },
   menu_logics: { view: true, edit: true },
@@ -266,7 +265,6 @@ export function usePermissions() {
     scopeFieldmarketing: getDataScope("scope_fieldmarketing"),
     // Main menu permissions
     canViewDashboard: hasPermission("menu_dashboard"),
-    canViewWallboard: hasPermission("menu_wallboard"),
     canViewSome: canView("menu_some"),
     canEditSome: canEdit("menu_some"),
     canViewSales: canView("menu_sales"),

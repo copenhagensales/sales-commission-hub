@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, ChevronDown, Search } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Loader2, ChevronDown, Search, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -207,6 +208,25 @@ export default function MgTest() {
     campaignName: string;
   } | null>(null);
   const [retroactiveSyncing, setRetroactiveSyncing] = useState(false);
+
+  // Create product dialog state
+  const [createProductDialog, setCreateProductDialog] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    name: "",
+    clientId: "",
+    commission: "0",
+    revenue: "0",
+    externalCode: "",
+    countsAsSale: true,
+  });
+
+  // Create campaign dialog state
+  const [createCampaignDialog, setCreateCampaignDialog] = useState(false);
+  const [newCampaign, setNewCampaign] = useState({
+    name: "",
+    clientId: "",
+    externalId: "",
+  });
 
   // Inspector mutation - fetch sample fields from Adversus
   const inspectCampaignMutation = useMutation({
@@ -723,6 +743,124 @@ export default function MgTest() {
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke opdatere");
+    },
+  });
+
+  // Mutation to create a manual product
+  const createManualProduct = useMutation({
+    mutationFn: async (productData: typeof newProduct) => {
+      const commission = parseFloat(productData.commission.replace(",", ".")) || 0;
+      const revenue = parseFloat(productData.revenue.replace(",", ".")) || 0;
+
+      // Find or create client_campaign for the selected client
+      let clientCampaignId: string | null = null;
+      if (productData.clientId) {
+        const { data: campaigns } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", productData.clientId);
+
+        if (campaigns && campaigns.length > 0) {
+          clientCampaignId = campaigns[0].id;
+        } else {
+          const { data: newCampaign, error: insertError } = await supabase
+            .from("client_campaigns")
+            .insert({ client_id: productData.clientId, name: "Standard" })
+            .select("id")
+            .single();
+
+          if (insertError) throw insertError;
+          clientCampaignId = newCampaign.id;
+        }
+      }
+
+      const { error } = await supabase.from("products").insert({
+        name: productData.name.trim(),
+        client_campaign_id: clientCampaignId,
+        commission_dkk: commission,
+        revenue_dkk: revenue,
+        external_product_code: productData.externalCode.trim() || null,
+        counts_as_sale: productData.countsAsSale,
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Produkt oprettet");
+      setCreateProductDialog(false);
+      setNewProduct({
+        name: "",
+        clientId: "",
+        commission: "0",
+        revenue: "0",
+        externalCode: "",
+        countsAsSale: true,
+      });
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke oprette produkt");
+    },
+  });
+
+  // Create campaign mutation
+  const createManualCampaign = useMutation({
+    mutationFn: async (campaignData: typeof newCampaign) => {
+      if (!campaignData.name.trim()) {
+        throw new Error("Kampagnenavn er påkrævet");
+      }
+
+      // First create or get client_campaign
+      let clientCampaignId: string | null = null;
+      
+      if (campaignData.clientId) {
+        // Check if client already has a campaign we can use or create new one
+        const { data: existingCampaigns } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", campaignData.clientId)
+          .eq("name", campaignData.name.trim());
+
+        if (existingCampaigns && existingCampaigns.length > 0) {
+          clientCampaignId = existingCampaigns[0].id;
+        } else {
+          const { data: newClientCampaign, error: insertError } = await supabase
+            .from("client_campaigns")
+            .insert({ 
+              client_id: campaignData.clientId, 
+              name: campaignData.name.trim() 
+            })
+            .select("id")
+            .single();
+
+          if (insertError) throw insertError;
+          clientCampaignId = newClientCampaign.id;
+        }
+      }
+
+      // Create adversus_campaign_mapping
+      const { error } = await supabase.from("adversus_campaign_mappings").insert({
+        adversus_campaign_id: campaignData.externalId.trim() || `manual-${Date.now()}`,
+        adversus_campaign_name: campaignData.name.trim(),
+        client_campaign_id: clientCampaignId,
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Kampagne oprettet");
+      setCreateCampaignDialog(false);
+      setNewCampaign({
+        name: "",
+        clientId: "",
+        externalId: "",
+      });
+      queryClient.invalidateQueries({ queryKey: ["mg-campaign-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke oprette kampagne");
     },
   });
 
@@ -1384,6 +1522,12 @@ export default function MgTest() {
 
           {/* Mapping produkt */}
           <TabsContent value="product" className="space-y-4">
+            <div className="flex justify-end">
+              <Button onClick={() => setCreateProductDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Opret produkt
+              </Button>
+            </div>
             {isLoadingProductsTab ? (
               <Card>
                 <CardContent className="flex items-center justify-center py-12 text-muted-foreground gap-2">
@@ -1675,6 +1819,14 @@ export default function MgTest() {
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     )}
                     {t("mgTest.backfillSales")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setCreateCampaignDialog(true)}
+                    className="hover-scale"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Opret kampagne
                   </Button>
                   <Badge variant="outline">{campaignMappings?.length ?? 0} {t("mgTest.campaigns")}</Badge>
                 </div>
@@ -2315,6 +2467,178 @@ export default function MgTest() {
               className="w-full"
             >
               Nej, kun fremtidige
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Product Dialog */}
+      <Dialog open={createProductDialog} onOpenChange={setCreateProductDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Opret nyt produkt</DialogTitle>
+            <DialogDescription>
+              Opret et produkt manuelt uden at det kommer fra en integration.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="product-name">Produktnavn *</Label>
+              <Input
+                id="product-name"
+                value={newProduct.name}
+                onChange={(e) => setNewProduct((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Indtast produktnavn"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="product-client">Kunde</Label>
+              <Select
+                value={newProduct.clientId || undefined}
+                onValueChange={(value) => setNewProduct((prev) => ({ ...prev, clientId: value }))}
+              >
+                <SelectTrigger id="product-client">
+                  <SelectValue placeholder="Vælg kunde" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients?.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="product-commission">Provision (DKK)</Label>
+                <Input
+                  id="product-commission"
+                  type="text"
+                  inputMode="decimal"
+                  value={newProduct.commission}
+                  onChange={(e) => setNewProduct((prev) => ({ ...prev, commission: e.target.value }))}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="product-revenue">Omsætning (DKK)</Label>
+                <Input
+                  id="product-revenue"
+                  type="text"
+                  inputMode="decimal"
+                  value={newProduct.revenue}
+                  onChange={(e) => setNewProduct((prev) => ({ ...prev, revenue: e.target.value }))}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="product-code">Ekstern produktkode</Label>
+              <Input
+                id="product-code"
+                value={newProduct.externalCode}
+                onChange={(e) => setNewProduct((prev) => ({ ...prev, externalCode: e.target.value }))}
+                placeholder="Valgfrit"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="product-counts"
+                checked={newProduct.countsAsSale}
+                onCheckedChange={(checked) =>
+                  setNewProduct((prev) => ({ ...prev, countsAsSale: checked === true }))
+                }
+              />
+              <Label htmlFor="product-counts" className="text-sm font-normal">
+                Tæl som salg
+              </Label>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setCreateProductDialog(false)}>
+              Annuller
+            </Button>
+            <Button
+              onClick={() => createManualProduct.mutate(newProduct)}
+              disabled={!newProduct.name.trim() || createManualProduct.isPending}
+            >
+              {createManualProduct.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Opretter...
+                </>
+              ) : (
+                "Opret produkt"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Campaign Dialog */}
+      <Dialog open={createCampaignDialog} onOpenChange={setCreateCampaignDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Opret kampagne manuelt</DialogTitle>
+            <DialogDescription>
+              Opret en ny kampagne der ikke kommer fra en integration.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="campaign-name">Kampagnenavn *</Label>
+              <Input
+                id="campaign-name"
+                value={newCampaign.name}
+                onChange={(e) => setNewCampaign((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="F.eks. TDC Erhverv Q1"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="campaign-client">Kunde</Label>
+              <Select
+                value={newCampaign.clientId || undefined}
+                onValueChange={(value) => setNewCampaign((prev) => ({ ...prev, clientId: value }))}
+              >
+                <SelectTrigger id="campaign-client">
+                  <SelectValue placeholder="Vælg kunde (valgfrit)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients?.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="campaign-external-id">Ekstern kampagne-ID</Label>
+              <Input
+                id="campaign-external-id"
+                value={newCampaign.externalId}
+                onChange={(e) => setNewCampaign((prev) => ({ ...prev, externalId: e.target.value }))}
+                placeholder="Valgfrit - genereres automatisk"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setCreateCampaignDialog(false)}>
+              Annuller
+            </Button>
+            <Button
+              onClick={() => createManualCampaign.mutate(newCampaign)}
+              disabled={!newCampaign.name.trim() || createManualCampaign.isPending}
+            >
+              {createManualCampaign.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Opretter...
+                </>
+              ) : (
+                "Opret kampagne"
+              )}
             </Button>
           </div>
         </DialogContent>

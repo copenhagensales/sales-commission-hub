@@ -69,7 +69,6 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     icon: "📱",
     permissions: [
       { key: "menu_dashboard", label: "Dashboard", description: "Adgang til dashboard oversigt", hasEditOption: false },
-      { key: "menu_wallboard", label: "Wallboard", description: "Adgang til wallboard visning", hasEditOption: false },
       { key: "menu_some", label: "SOME", description: "Adgang til social media modul", hasEditOption: true },
       { key: "menu_sales", label: "Salg", description: "Adgang til salgsdata", hasEditOption: true, scopeKey: "scope_sales" },
       { key: "menu_logics", label: "Logikker", description: "Adgang til logikker", hasEditOption: true },
@@ -500,7 +499,8 @@ export function PositionsTab() {
     return "egen"; // Default
   };
 
-  const countActivePermissions = (permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope>) => {
+  const countActivePermissions = (permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope> | null | undefined) => {
+    if (!permissions) return 0;
     let count = 0;
     Object.entries(permissions).forEach(([key, value]) => {
       // Don't count data scope permissions in this count

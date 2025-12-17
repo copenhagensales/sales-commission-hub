@@ -95,7 +95,10 @@ async function processSalesBatch(
   let processed = 0
   let errors = 0
 
-  const externalIds = sales.map((s) => s.externalId)
+  const externalIdsRaw = sales.map((s) => String(s.externalId || "").trim()).filter(Boolean)
+  const externalIds = Array.from(new Set(externalIdsRaw))
+  const externalIdSet = new Set(externalIds)
+
   const { data: existingSales } = await supabase
     .from("sales")
     .select("id, adversus_external_id, adversus_opp_number, customer_phone")
@@ -106,7 +109,7 @@ async function processSalesBatch(
   const webhookOppMap = new Map<string, string>()
   const webhookPhoneMap = new Map<string, string>()
   if (leadIds.length > 0) {
-    const webhookDuplicateIds = leadIds.filter((lid) => !externalIds.includes(lid))
+    const webhookDuplicateIds = leadIds.filter((lid) => !externalIdSet.has(lid))
     if (webhookDuplicateIds.length > 0) {
       const { data: webhookSales } = await supabase
         .from("sales")
@@ -216,19 +219,50 @@ export async function processSales(
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
 ) {
   if (sales.length === 0) return { processed: 0, errors: 0 }
-  const sampleSale = sales[0]
+
+  // Normalizar + deduplicar por adversus_external_id para evitar errores de bulk upsert
+  const byExternalId = new Map<string, StandardSale>()
+  let duplicates = 0
+  for (const s of sales) {
+    const externalId = String(s.externalId || "").trim()
+    if (!externalId) continue
+    const normalized = { ...s, externalId }
+
+    const prev = byExternalId.get(externalId)
+    if (!prev) {
+      byExternalId.set(externalId, normalized)
+      continue
+    }
+
+    duplicates++
+    // Preferir la venta con fecha más reciente (siempre que sea parseable)
+    const prevTs = Date.parse(prev.saleDate)
+    const nextTs = Date.parse(normalized.saleDate)
+    if (!Number.isNaN(nextTs) && (Number.isNaN(prevTs) || nextTs > prevTs)) {
+      byExternalId.set(externalId, normalized)
+    }
+  }
+
+  const dedupedSales = Array.from(byExternalId.values())
+  if (dedupedSales.length === 0) return { processed: 0, errors: 0 }
+
+  const sampleSale = dedupedSales[0]
   log(
     "INFO",
-    `Procesando ${sales.length} ventas de ${sampleSale.dialerName} (${sampleSale.integrationType}) en lotes de ${batchSize}...`
+    `Procesando ${dedupedSales.length} ventas de ${sampleSale.dialerName} (${sampleSale.integrationType}) en lotes de ${batchSize}...`
   )
-  await ensureCampaignMappings(supabase, sales, log)
+  if (duplicates > 0) {
+    log("WARN", `Detectados ${duplicates} external_id duplicados (deduplicados antes de upsert).`)
+  }
+
+  await ensureCampaignMappings(supabase, dedupedSales, log)
   const { data: dbProducts } = await supabase.from("products").select("id, name, commission_dkk, revenue_dkk")
   const { data: dbMappings } = await supabase.from("adversus_product_mappings").select("*")
   const productMapByName = new Map(dbProducts?.map((p) => [p.name.toLowerCase(), p]))
   const productMapByExtId = new Map(dbMappings?.map((m) => [m.adversus_external_id, m.product_id]))
   let totalProcessed = 0
   let totalErrors = 0
-  const batches = chunk(sales, batchSize)
+  const batches = chunk(dedupedSales, batchSize)
   const totalBatches = batches.length
   for (let batchNum = 0; batchNum < totalBatches; batchNum++) {
     const batch = batches[batchNum]
@@ -245,8 +279,9 @@ export async function processSales(
     totalErrors += errors
     log(
       "INFO",
-      `Lote ${batchNum + 1} completado: ${processed} procesadas, ${errors} errores. Total: ${totalProcessed}/${sales.length}`
+      `Lote ${batchNum + 1} completado: ${processed} procesadas, ${errors} errores. Total: ${totalProcessed}/${dedupedSales.length}`
     )
   }
+  return { processed: totalProcessed, errors: totalErrors }
   return { processed: totalProcessed, errors: totalErrors }
 }

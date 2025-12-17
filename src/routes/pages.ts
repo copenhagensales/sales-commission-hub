@@ -3,11 +3,11 @@ import { lazy } from "react";
 const lazyPage = (importFn: () => Promise<any>) => lazy(importFn);
 
 export const Auth = lazyPage(() => import("@/pages/Auth"));
+export const Home = lazyPage(() => import("@/pages/Home"));
 export const Dashboard = lazyPage(() => import("@/pages/Dashboard"));
 export const Agents = lazyPage(() => import("@/pages/Agents"));
 export const Sales = lazyPage(() => import("@/pages/Sales"));
 export const Payroll = lazyPage(() => import("@/pages/Payroll"));
-export const Wallboard = lazyPage(() => import("@/pages/Wallboard"));
 export const Settings = lazyPage(() => import("@/pages/Settings"));
 
 export const MgTest = lazyPage(() => import("@/pages/MgTest"));
@@ -46,7 +46,6 @@ export const ContractSign = lazyPage(() => import("@/pages/ContractSign"));
 export const PulseSurvey = lazyPage(() => import("@/pages/PulseSurvey"));
 export const PulseSurveyResults = lazyPage(() => import("@/pages/PulseSurveyResults"));
 export const PublicPulseSurvey = lazyPage(() => import("@/pages/PublicPulseSurvey"));
-export const Admin = lazyPage(() => import("@/pages/Admin"));
 export const MyProfile = lazyPage(() => import("@/pages/MyProfile"));
 export const CareerWishes = lazyPage(() => import("@/pages/CareerWishes"));
 export const CareerWishesOverview = lazyPage(() => import("@/pages/CareerWishesOverview"));
@@ -70,7 +69,7 @@ export const UpcomingHires = lazyPage(() => import("@/pages/recruitment/Upcoming
 export const Some = lazyPage(() => import("@/pages/Some"));
 export const TimeStamp = lazyPage(() => import("@/pages/TimeStamp"));
 
-export const TestBoard = lazyPage(() => import("@/pages/boards/TestBoard"));
+export const TestBoard = lazyPage(() => import("@/pages/boards/TdcErhvervBoard"));
 export const EconomicBoard = lazyPage(() => import("@/pages/boards/EconomicBoard"));
 export const ClientSalesOverview = lazyPage(() => import("@/pages/ClientSalesOverview"));
 export const SalesDashboard = lazyPage(() => import("@/pages/boards/SalesDashboard"));

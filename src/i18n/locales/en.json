@@ -1,5 +1,6 @@
 {
   "sidebar": {
+    "home": "Home",
     "closingShifts": "Closing Shifts",
     "loading": "Loading...",
     "logout": "Log out",
@@ -51,7 +52,7 @@
     "vehicles": "Vehicles",
     "billing": "Billing",
     "salesRegistration": "Sales Registration",
-    "test": "Test",
+    "test": "TDC Erhverv",
     "testMenu": "Test",
     "economic": "E-conomic",
     "fieldmarketing": "Field Marketing",

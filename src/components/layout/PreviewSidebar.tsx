@@ -19,7 +19,6 @@ interface PreviewSidebarProps {
 // Map permission keys to menu items (aligned with PositionsTab.tsx)
 const MAIN_MENU_ITEMS = {
   menu_dashboard: { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  menu_wallboard: { name: "Wallboard", href: "/wallboard", icon: Tv },
   menu_some: { name: "SOME", href: "/some", icon: Video },
   menu_sales: { name: "Salg", href: "/sales", icon: ShoppingCart },
   menu_logics: { name: "Logikker", href: "/logikker", icon: ListChecks },
@@ -93,7 +92,7 @@ const RECRUITMENT_ITEMS = {
 };
 
 const BOARDS_ITEMS = {
-  menu_boards_test: { name: "Test", href: "/boards/test", icon: Tv },
+  menu_boards_test: { name: "TDC Erhverv", href: "/boards/test", icon: Tv },
   menu_boards_economic: { name: "Økonomi", href: "/boards/economic", icon: Wallet },
   menu_boards_sales: { name: "Sales Dashboard", href: "/boards/sales", icon: ShoppingCart },
 };

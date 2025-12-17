@@ -66,12 +66,12 @@ export function wrapWithGuard(
   if (meta.access === "protected") return <ProtectedRoute>{element}</ProtectedRoute>;
   if (meta.access === "role") {
     if (meta.requiredRole) {
-      return <RoleProtectedRoute requiredRole={meta.requiredRole}>{element}</RoleProtectedRoute>;
+      return <RoleProtectedRoute requiredRole={meta.requiredRole} positionPermission={meta.positionPermission}>{element}</RoleProtectedRoute>;
     }
     if (meta.requireTeamlederOrAbove) {
-      return <RoleProtectedRoute requireTeamlederOrAbove>{element}</RoleProtectedRoute>;
+      return <RoleProtectedRoute requireTeamlederOrAbove positionPermission={meta.positionPermission}>{element}</RoleProtectedRoute>;
     }
-    return <RoleProtectedRoute>{element}</RoleProtectedRoute>;
+    return <RoleProtectedRoute positionPermission={meta.positionPermission}>{element}</RoleProtectedRoute>;
   }
   return element;
 }

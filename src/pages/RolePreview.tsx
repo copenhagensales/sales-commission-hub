@@ -14,7 +14,6 @@ type DataScope = "egen" | "team" | "alt";
 const generateAllPermissions = (): RolePreviewPermissions => ({
   // Main menu
   menu_dashboard: true,
-  menu_wallboard: true,
   menu_some: { view: true, edit: true },
   menu_sales: { view: true, edit: true },
   menu_logics: { view: true, edit: true },
