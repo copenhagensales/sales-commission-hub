@@ -220,6 +220,14 @@ export default function MgTest() {
     countsAsSale: true,
   });
 
+  // Create campaign dialog state
+  const [createCampaignDialog, setCreateCampaignDialog] = useState(false);
+  const [newCampaign, setNewCampaign] = useState({
+    name: "",
+    clientId: "",
+    externalId: "",
+  });
+
   // Inspector mutation - fetch sample fields from Adversus
   const inspectCampaignMutation = useMutation({
     mutationFn: async (campaign: CampaignMapping) => {
@@ -793,6 +801,66 @@ export default function MgTest() {
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke oprette produkt");
+    },
+  });
+
+  // Create campaign mutation
+  const createManualCampaign = useMutation({
+    mutationFn: async (campaignData: typeof newCampaign) => {
+      if (!campaignData.name.trim()) {
+        throw new Error("Kampagnenavn er påkrævet");
+      }
+
+      // First create or get client_campaign
+      let clientCampaignId: string | null = null;
+      
+      if (campaignData.clientId) {
+        // Check if client already has a campaign we can use or create new one
+        const { data: existingCampaigns } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", campaignData.clientId)
+          .eq("name", campaignData.name.trim());
+
+        if (existingCampaigns && existingCampaigns.length > 0) {
+          clientCampaignId = existingCampaigns[0].id;
+        } else {
+          const { data: newClientCampaign, error: insertError } = await supabase
+            .from("client_campaigns")
+            .insert({ 
+              client_id: campaignData.clientId, 
+              name: campaignData.name.trim() 
+            })
+            .select("id")
+            .single();
+
+          if (insertError) throw insertError;
+          clientCampaignId = newClientCampaign.id;
+        }
+      }
+
+      // Create adversus_campaign_mapping
+      const { error } = await supabase.from("adversus_campaign_mappings").insert({
+        adversus_campaign_id: campaignData.externalId.trim() || `manual-${Date.now()}`,
+        adversus_campaign_name: campaignData.name.trim(),
+        client_campaign_id: clientCampaignId,
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Kampagne oprettet");
+      setCreateCampaignDialog(false);
+      setNewCampaign({
+        name: "",
+        clientId: "",
+        externalId: "",
+      });
+      queryClient.invalidateQueries({ queryKey: ["mg-campaign-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke oprette kampagne");
     },
   });
 
@@ -1752,6 +1820,14 @@ export default function MgTest() {
                     )}
                     {t("mgTest.backfillSales")}
                   </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setCreateCampaignDialog(true)}
+                    className="hover-scale"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Opret kampagne
+                  </Button>
                   <Badge variant="outline">{campaignMappings?.length ?? 0} {t("mgTest.campaigns")}</Badge>
                 </div>
               </CardHeader>
@@ -2494,6 +2570,74 @@ export default function MgTest() {
                 </>
               ) : (
                 "Opret produkt"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Campaign Dialog */}
+      <Dialog open={createCampaignDialog} onOpenChange={setCreateCampaignDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Opret kampagne manuelt</DialogTitle>
+            <DialogDescription>
+              Opret en ny kampagne der ikke kommer fra en integration.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="campaign-name">Kampagnenavn *</Label>
+              <Input
+                id="campaign-name"
+                value={newCampaign.name}
+                onChange={(e) => setNewCampaign((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="F.eks. TDC Erhverv Q1"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="campaign-client">Kunde</Label>
+              <Select
+                value={newCampaign.clientId || undefined}
+                onValueChange={(value) => setNewCampaign((prev) => ({ ...prev, clientId: value }))}
+              >
+                <SelectTrigger id="campaign-client">
+                  <SelectValue placeholder="Vælg kunde (valgfrit)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients?.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="campaign-external-id">Ekstern kampagne-ID</Label>
+              <Input
+                id="campaign-external-id"
+                value={newCampaign.externalId}
+                onChange={(e) => setNewCampaign((prev) => ({ ...prev, externalId: e.target.value }))}
+                placeholder="Valgfrit - genereres automatisk"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setCreateCampaignDialog(false)}>
+              Annuller
+            </Button>
+            <Button
+              onClick={() => createManualCampaign.mutate(newCampaign)}
+              disabled={!newCampaign.name.trim() || createManualCampaign.isPending}
+            >
+              {createManualCampaign.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Opretter...
+                </>
+              ) : (
+                "Opret kampagne"
               )}
             </Button>
           </div>
