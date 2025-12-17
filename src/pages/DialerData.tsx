@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle, AlertTriangle, Database, RefreshCw, ChevronLeft, ChevronRight, CalendarIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Code } from "lucide-react";
+import { CheckCircle, AlertTriangle, Database, RefreshCw, ChevronLeft, ChevronRight, CalendarIcon, Search, ArrowUpDown, ArrowUp, ArrowDown, Code, HelpCircle } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { da, enUS } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,26 @@ interface Sale {
   raw_payload: Record<string, unknown> | null;
 }
 
+interface UnknownProductSale {
+  sale_id: string;
+  sale_external_id: string | null;
+  sale_datetime: string | null;
+  agent_name: string | null;
+  agent_email: string | null;
+  customer_company: string | null;
+  customer_phone: string | null;
+  source: string | null;
+  integration_type: string | null;
+  dialer_campaign_id: string | null;
+  campaign_name: string | null;
+  raw_payload: Record<string, unknown> | null;
+  sale_item_id: string;
+  product_title: string | null;
+  product_external_id: string | null;
+  quantity: number | null;
+  created_at: string | null;
+}
+
 const PAGE_SIZE = 50;
 
 type SortColumn = "integration_type" | "source" | "adversus_external_id" | "agent_name" | "customer_company" | "sale_datetime" | "adversus_opp_number" | "campaign_name";
@@ -53,6 +73,7 @@ export default function DialerData() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortColumn, setSortColumn] = useState<SortColumn>("sale_datetime");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [showUnknownJson, setShowUnknownJson] = useState<UnknownProductSale | null>(null);
 
   // Fetch real counts from database
   const { data: stats } = useQuery({
@@ -216,6 +237,16 @@ export default function DialerData() {
       ? <ArrowUp className="h-4 w-4 ml-1" /> 
       : <ArrowDown className="h-4 w-4 ml-1" />;
   };
+
+  // Fetch sales with unknown products via RPC
+  const { data: unknownProducts, isLoading: unknownLoading, refetch: refetchUnknown } = useQuery({
+    queryKey: ["unknown-products"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_sales_with_unknown_products");
+      if (error) throw error;
+      return (data || []) as UnknownProductSale[];
+    },
+  });
 
   // Get unique dialer names for filter
   const { data: dialerNames } = useQuery({
@@ -521,7 +552,96 @@ export default function DialerData() {
           </TabsContent>
         </Tabs>
 
-        {/* Sale Detail Dialog - Improved Design */}
+        {/* Unknown Products Section */}
+        <Card className="border-yellow-500/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-yellow-600">
+                <HelpCircle className="h-5 w-5" />
+                {t("dialerData.unknownProducts", "Productos Unknown")} ({unknownProducts?.length || 0})
+              </CardTitle>
+              <Button variant="outline" size="sm" onClick={() => refetchUnknown()} disabled={unknownLoading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${unknownLoading ? "animate-spin" : ""}`} />
+                {t("dialerData.refresh")}
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {t("dialerData.unknownProductsDescription", "Ventas con productos marcados como 'Unknown' que necesitan revisión del raw JSON")}
+            </p>
+          </CardHeader>
+          <CardContent>
+            {unknownLoading ? (
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                {t("dialerData.loading")}
+              </div>
+            ) : unknownProducts && unknownProducts.length > 0 ? (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("dialerData.integration")}</TableHead>
+                      <TableHead>{t("dialerData.dialer")}</TableHead>
+                      <TableHead>{t("dialerData.campaign")}</TableHead>
+                      <TableHead>{t("dialerData.dialerId")}</TableHead>
+                      <TableHead>{t("dialerData.agent")}</TableHead>
+                      <TableHead>{t("dialerData.customer")}</TableHead>
+                      <TableHead>{t("dialerData.timestamp")}</TableHead>
+                      <TableHead>JSON</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {unknownProducts.map((item) => (
+                      <TableRow key={item.sale_item_id}>
+                        <TableCell>{getIntegrationBadge(item.integration_type)}</TableCell>
+                        <TableCell className="text-sm">{item.source || "-"}</TableCell>
+                        <TableCell className="text-sm max-w-[120px] truncate">{item.campaign_name || item.dialer_campaign_id || "-"}</TableCell>
+                        <TableCell className="font-mono text-sm">{item.sale_external_id || "-"}</TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="text-sm">{item.agent_name || "-"}</p>
+                            <p className="text-xs text-muted-foreground">{item.agent_email || ""}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[150px]">
+                          <div>
+                            <p className="truncate">{item.customer_company || "-"}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{item.customer_phone || ""}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {item.sale_datetime
+                            ? format(new Date(item.sale_datetime), "dd. MMM yyyy HH:mm", { locale: dateLocale })
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {item.raw_payload ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowUnknownJson(item)}
+                              className="h-7 px-2"
+                            >
+                              <Code className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">-</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                <p>{t("dialerData.noUnknownProducts", "No hay productos unknown - ¡Todo está mapeado correctamente!")}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Dialog open={!!selectedSale} onOpenChange={() => setSelectedSale(null)}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader className="pb-4 border-b">
@@ -700,6 +820,64 @@ export default function DialerData() {
                 {showRawJson?.raw_payload ? JSON.stringify(showRawJson.raw_payload, null, 2) : t("dialerData.noRawData")}
               </pre>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Unknown Product JSON Dialog */}
+        <Dialog open={!!showUnknownJson} onOpenChange={() => setShowUnknownJson(null)}>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <HelpCircle className="h-5 w-5 text-yellow-600" />
+                {t("dialerData.unknownProductJson", "Unknown Product - Raw JSON")}
+                {showUnknownJson && getIntegrationBadge(showUnknownJson.integration_type)}
+              </DialogTitle>
+              <DialogDescription className="space-y-1">
+                <span className="block font-mono">{showUnknownJson?.sale_external_id || ""}</span>
+                <span className="block text-xs">
+                  {showUnknownJson?.agent_name} • {showUnknownJson?.source} • {showUnknownJson?.campaign_name || showUnknownJson?.dialer_campaign_id}
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+            
+            {showUnknownJson && (
+              <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+                {/* Quick Reference Info */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div className="bg-muted/50 p-2 rounded">
+                    <p className="text-xs text-muted-foreground">{t("dialerData.agent")}</p>
+                    <p className="font-medium truncate">{showUnknownJson.agent_name || "-"}</p>
+                    <p className="text-xs text-muted-foreground truncate">{showUnknownJson.agent_email || ""}</p>
+                  </div>
+                  <div className="bg-muted/50 p-2 rounded">
+                    <p className="text-xs text-muted-foreground">{t("dialerData.customer")}</p>
+                    <p className="font-medium truncate">{showUnknownJson.customer_company || "-"}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{showUnknownJson.customer_phone || ""}</p>
+                  </div>
+                  <div className="bg-muted/50 p-2 rounded">
+                    <p className="text-xs text-muted-foreground">{t("dialerData.timestamp")}</p>
+                    <p className="font-medium">
+                      {showUnknownJson.sale_datetime
+                        ? format(new Date(showUnknownJson.sale_datetime), "dd. MMM yyyy HH:mm", { locale: dateLocale })
+                        : "-"}
+                    </p>
+                  </div>
+                  <div className="bg-muted/50 p-2 rounded">
+                    <p className="text-xs text-muted-foreground">{t("dialerData.campaign")}</p>
+                    <p className="font-medium truncate">{showUnknownJson.campaign_name || "-"}</p>
+                    <p className="text-xs text-muted-foreground font-mono truncate">{showUnknownJson.dialer_campaign_id || ""}</p>
+                  </div>
+                </div>
+                
+                {/* Raw JSON */}
+                <div className="flex-1 overflow-auto">
+                  <p className="text-xs text-muted-foreground mb-2">{t("dialerData.rawPayload", "Raw Payload")}:</p>
+                  <pre className="bg-muted p-4 rounded-lg text-xs font-mono overflow-auto max-h-[50vh]">
+                    {showUnknownJson.raw_payload ? JSON.stringify(showUnknownJson.raw_payload, null, 2) : t("dialerData.noRawData")}
+                  </pre>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
