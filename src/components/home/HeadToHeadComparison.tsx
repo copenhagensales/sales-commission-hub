@@ -2,9 +2,10 @@ import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, CalendarRange, Plus, X, Sparkles, Timer, Activity } from "lucide-react";
+import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, CalendarRange, Plus, X, Sparkles, Timer, Activity, MessageSquare } from "lucide-react";
 import { startOfWeek, startOfDay, endOfDay, differenceInHours, differenceInDays, formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
@@ -39,6 +40,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
   const [matchStarted, setMatchStarted] = useState(false); // Track if match has actually started
   const [momentum, setMomentum] = useState(50); // 0-100, 50 = neutral
   const [animateScore, setAnimateScore] = useState<'left' | 'right' | null>(null);
+  const [matchComment, setMatchComment] = useState(""); // Free text comment/stake
 
   // Calculate date range based on period
   const dateRange = useMemo(() => {
@@ -847,8 +849,8 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
             )}
           </div>
 
-          {/* VS Badge */}
-          <div className="text-center relative pt-2">
+          {/* VS Badge & Comment */}
+          <div className="text-center relative pt-2 flex flex-col items-center">
             <div className="relative inline-block">
               <div className="absolute inset-0 rounded-full border-2 border-amber-400/30 animate-ping" style={{ animationDuration: '3s' }} />
               <div className="relative w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 border-2 border-amber-400/50 flex items-center justify-center backdrop-blur-sm">
@@ -862,6 +864,29 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                 {myTeamNames.length}v{opponentTeamNames.length}
               </p>
             )}
+            
+            {/* Match Comment/Stake */}
+            <div className="mt-3 w-full max-w-[180px]">
+              {isMatchOngoing && matchComment ? (
+                <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                  <div className="flex items-center gap-1.5 justify-center">
+                    <MessageSquare className="w-3 h-3 text-amber-400" />
+                    <span className="text-[10px] text-amber-300 font-medium">Indsats</span>
+                  </div>
+                  <p className="text-xs text-amber-200 mt-1 text-center">{matchComment}</p>
+                </div>
+              ) : !isMatchOngoing ? (
+                <div className="space-y-1">
+                  <Input
+                    value={matchComment}
+                    onChange={(e) => setMatchComment(e.target.value)}
+                    placeholder="fx 'Vi spiller om en sodavand'"
+                    className="h-8 text-[10px] bg-slate-700/50 border-slate-600/50 text-slate-200 placeholder:text-slate-500 text-center"
+                    maxLength={50}
+                  />
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {/* Right Team (Opponent Team) */}
