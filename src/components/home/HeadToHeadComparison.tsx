@@ -31,17 +31,58 @@ type BattleMode = "1v1" | "team";
 // Player role types based on performance
 type PlayerRole = "closer" | "grinder" | "consistent" | "comeback" | "hot_streak" | null;
 
+const STORAGE_KEY = "h2h-battle-state";
+
+interface StoredBattleState {
+  battleMode: BattleMode;
+  myTeam: string[];
+  opponentTeam: string[];
+  period: PeriodType;
+  matchStarted: boolean;
+  matchComment: string;
+}
+
 export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }: HeadToHeadComparisonProps) => {
-  const [battleMode, setBattleMode] = useState<BattleMode>("1v1");
-  const [myTeam, setMyTeam] = useState<string[]>([]);
-  const [opponentTeam, setOpponentTeam] = useState<string[]>([]);
-  const [period, setPeriod] = useState<PeriodType>("week");
-  const [showInviteOptions, setShowInviteOptions] = useState(true); // Start with period selection visible
-  const [matchStarted, setMatchStarted] = useState(false); // Track if match has actually started
-  const [showPeriodSelection, setShowPeriodSelection] = useState(false); // Show period selection after invite
-  const [momentum, setMomentum] = useState(50); // 0-100, 50 = neutral
+  // Load initial state from localStorage
+  const getInitialState = (): StoredBattleState | null => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) return JSON.parse(stored);
+    } catch (e) {
+      console.error("Failed to load battle state:", e);
+    }
+    return null;
+  };
+
+  const initialState = getInitialState();
+
+  const [battleMode, setBattleMode] = useState<BattleMode>(initialState?.battleMode ?? "1v1");
+  const [myTeam, setMyTeam] = useState<string[]>(initialState?.myTeam ?? []);
+  const [opponentTeam, setOpponentTeam] = useState<string[]>(initialState?.opponentTeam ?? []);
+  const [period, setPeriod] = useState<PeriodType>(initialState?.period ?? "week");
+  const [showInviteOptions, setShowInviteOptions] = useState(true);
+  const [matchStarted, setMatchStarted] = useState(initialState?.matchStarted ?? false);
+  const [showPeriodSelection, setShowPeriodSelection] = useState(false);
+  const [momentum, setMomentum] = useState(50);
   const [animateScore, setAnimateScore] = useState<'left' | 'right' | null>(null);
-  const [matchComment, setMatchComment] = useState(""); // Free text comment/stake
+  const [matchComment, setMatchComment] = useState(initialState?.matchComment ?? "");
+
+  // Persist state to localStorage
+  useEffect(() => {
+    const state: StoredBattleState = {
+      battleMode,
+      myTeam,
+      opponentTeam,
+      period,
+      matchStarted,
+      matchComment,
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      console.error("Failed to save battle state:", e);
+    }
+  }, [battleMode, myTeam, opponentTeam, period, matchStarted, matchComment]);
 
   // Calculate date range based on period
   const dateRange = useMemo(() => {
