@@ -19,7 +19,6 @@ interface PreviewSidebarProps {
 // Map permission keys to menu items (aligned with PositionsTab.tsx)
 const MAIN_MENU_ITEMS = {
   menu_dashboard: { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  menu_wallboard: { name: "Wallboard", href: "/wallboard", icon: Tv },
   menu_some: { name: "SOME", href: "/some", icon: Video },
   menu_sales: { name: "Salg", href: "/sales", icon: ShoppingCart },
   menu_logics: { name: "Logikker", href: "/logikker", icon: ListChecks },

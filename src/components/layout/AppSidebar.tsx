@@ -450,11 +450,6 @@ const [personnelOpen, setPersonnelOpen] = useState(
     if (positionPermissions.canViewDashboard && !mainNavigation.some(item => item.href === "/dashboard")) {
       mainNavigation = [...mainNavigation, { name: t("sidebar.dashboard"), href: "/dashboard", icon: LayoutDashboard }];
     }
-    
-    // Wallboard
-    if (positionPermissions.canViewWallboard && !mainNavigation.some(item => item.href === "/wallboard")) {
-      mainNavigation = [...mainNavigation, { name: t("sidebar.wallboard"), href: "/wallboard", icon: Tv }];
-    }
   }
   
   const currentShiftPlanningNav = isOwner ? getShiftPlanningNavigation(t) : employeeShiftPlanningNavigation;

@@ -69,7 +69,6 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     icon: "📱",
     permissions: [
       { key: "menu_dashboard", label: "Dashboard", description: "Adgang til dashboard oversigt", hasEditOption: false },
-      { key: "menu_wallboard", label: "Wallboard", description: "Adgang til wallboard visning", hasEditOption: false },
       { key: "menu_some", label: "SOME", description: "Adgang til social media modul", hasEditOption: true },
       { key: "menu_sales", label: "Salg", description: "Adgang til salgsdata", hasEditOption: true, scopeKey: "scope_sales" },
       { key: "menu_logics", label: "Logikker", description: "Adgang til logikker", hasEditOption: true },

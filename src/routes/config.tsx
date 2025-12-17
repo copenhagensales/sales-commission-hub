@@ -6,7 +6,6 @@ import {
   Agents,
   Sales,
   Payroll,
-  Wallboard,
   Settings,
   
   MgTest,
