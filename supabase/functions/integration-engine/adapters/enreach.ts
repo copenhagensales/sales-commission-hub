@@ -676,7 +676,13 @@ export class EnreachAdapter implements DialerAdapter {
   }
 
   private passesDataFilters(lead: HeroBaseLead, filters: DataFilterRule[], groups?: DataFilterGroup[], groupsLogic?: 'AND' | 'OR'): boolean {
-    // If we have new-style filter groups, use those
+    // FIRST: Check legacy filters (these are always AND, must ALL pass)
+    if (filters && filters.length > 0) {
+      const passesLegacy = filters.every((rule) => this.checkRule(lead, rule));
+      if (!passesLegacy) return false;
+    }
+
+    // THEN: If we have new-style filter groups, also check those
     if (groups && groups.length > 0) {
       const logic = groupsLogic || 'AND';
       if (logic === "OR") {
@@ -688,9 +694,7 @@ export class EnreachAdapter implements DialerAdapter {
       }
     }
 
-    // Legacy: single list of filters, all must pass (AND)
-    if (!filters || filters.length === 0) return true;
-    return filters.every((rule) => this.checkRule(lead, rule));
+    return true;
   }
 
   async fetchUsers(): Promise<StandardUser[]> {
