@@ -41,7 +41,6 @@ import {
   PulseSurvey,
   PulseSurveyResults,
   PublicPulseSurvey,
-  Admin,
   MyProfile,
   CareerWishes,
   CareerWishesOverview,
@@ -176,7 +175,6 @@ export const routes: RouteConfig[] = [
 
   { path: "/closing-shifts", component: ClosingShifts, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_closing_shifts" },
 
-  { path: "/admin", component: Admin, access: "role", requiredRole: "ejer" },
   { path: "/permissions", component: Permissions, access: "role", requiredRole: "ejer", positionPermission: "menu_permissions" },
   { path: "/role-preview/:id", component: RolePreview, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_permissions" },
   { path: "*", component: NotFound, access: "public" },
