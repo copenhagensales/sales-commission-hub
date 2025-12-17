@@ -106,7 +106,31 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
       return data || [];
     },
     enabled: !!currentEmployeeId,
-    refetchInterval: 30000, // Check for new challenges every 30s
+    refetchInterval: 30000,
+  });
+
+  // Fetch all active challenges for current employee (multi-battle support)
+  const { data: activeChallenges = [] } = useQuery({
+    queryKey: ["h2h-active-challenges", currentEmployeeId],
+    queryFn: async () => {
+      if (!currentEmployeeId) return [];
+      const { data, error } = await supabase
+        .from("h2h_challenges")
+        .select(`
+          id, battle_mode, period, comment, accepted_at, status,
+          challenger_employee_id, opponent_employee_id,
+          challenger:challenger_employee_id(id, first_name, last_name),
+          opponent:opponent_employee_id(id, first_name, last_name)
+        `)
+        .eq("status", "accepted")
+        .is("forfeited_at", null)
+        .or(`challenger_employee_id.eq.${currentEmployeeId},opponent_employee_id.eq.${currentEmployeeId}`)
+        .order("accepted_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentEmployeeId,
+    refetchInterval: 30000,
   });
 
   // Create challenge mutation
@@ -123,6 +147,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["h2h-pending-challenges"] });
+      queryClient.invalidateQueries({ queryKey: ["h2h-active-challenges"] });
     },
   });
 
@@ -140,7 +165,6 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         .eq("id", challengeId);
       if (error) throw error;
       
-      // If accepted, start the match with the fair start time
       if (accept && challenge) {
         return { acceptedAt, challenge };
       }
@@ -148,15 +172,39 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["h2h-pending-challenges"] });
+      queryClient.invalidateQueries({ queryKey: ["h2h-active-challenges"] });
       if (data?.acceptedAt && data?.challenge) {
-        // Set up match state with fair start time
         setMatchStartTime(data.acceptedAt);
         setActiveChallengeId(data.challenge.id);
         setPeriod(data.challenge.period as PeriodType);
         setBattleMode(data.challenge.battle_mode as BattleMode);
         setMatchComment(data.challenge.comment || "");
         setMatchStarted(true);
-        // TODO: Set opponent from challenge
+      }
+    },
+  });
+
+  // Forfeit/withdraw mutation
+  const forfeitMutation = useMutation({
+    mutationFn: async (challengeId: string) => {
+      const { error } = await supabase
+        .from("h2h_challenges")
+        .update({ 
+          forfeited_at: new Date().toISOString(),
+          forfeited_by: currentEmployeeId
+        })
+        .eq("id", challengeId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["h2h-active-challenges"] });
+      toast.info("Du har trukket dig fra duellen");
+      // Reset local state if this was the selected battle
+      if (activeChallengeId) {
+        setMatchStarted(false);
+        setActiveChallengeId(null);
+        setMatchStartTime(null);
+        setOpponentTeam([]);
       }
     },
   });
@@ -856,7 +904,14 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
           </span>
           
           {/* Mode toggle - more prominent (disabled during match) */}
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2">
+            {/* Active battles count */}
+            {activeChallenges.length > 0 && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
+                <span className="text-[10px] font-medium text-emerald-400">{activeChallenges.length} aktiv{activeChallenges.length > 1 ? 'e' : ''}</span>
+              </div>
+            )}
+            
             {/* Pending challenges notification */}
             {pendingChallenges.length > 0 && (
               <button
@@ -869,6 +924,33 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                 </Badge>
               </button>
             )}
+
+            {/* Forfeit button - only when match is ongoing */}
+            {isMatchOngoing && activeChallengeId && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (confirm("Er du sikker på at du vil trække dig? Det tæller som et tab.")) {
+                    forfeitMutation.mutate(activeChallengeId);
+                  }
+                }}
+                className="h-9 bg-rose-500/20 border-rose-500/30 hover:bg-rose-500/40 text-rose-400"
+              >
+                <XCircle className="w-4 h-4 mr-1" />
+                Træk dig
+              </Button>
+            )}
+
+            {/* New battle button - always show to allow multiple battles */}
+            <Button
+              size="sm"
+              onClick={() => setShowSetupDialog(true)}
+              className="h-9 bg-gradient-to-r from-amber-500/80 to-orange-500/80 hover:from-amber-500 hover:to-orange-500 text-white"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Ny duel
+            </Button>
             
             <div className={`flex bg-slate-800 rounded-xl p-1 border border-slate-600/50 shadow-lg ${isMatchOngoing ? 'opacity-50' : ''}`}>
               <button
@@ -963,6 +1045,47 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
             ))}
           </div>
         )}
+
+        {/* Active Battles List - when multiple battles exist */}
+        {activeChallenges.length > 1 && (
+          <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 space-y-2">
+            <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Dine aktive dueller</h4>
+            <div className="flex flex-wrap gap-2">
+              {activeChallenges.map((challenge: any) => {
+                const isChallenger = challenge.challenger_employee_id === currentEmployeeId;
+                const opponentData = isChallenger ? challenge.opponent : challenge.challenger;
+                const isSelected = challenge.id === activeChallengeId;
+                
+                return (
+                  <button
+                    key={challenge.id}
+                    onClick={() => {
+                      setActiveChallengeId(challenge.id);
+                      setMatchStartTime(challenge.accepted_at);
+                      setPeriod(challenge.period as PeriodType);
+                      setBattleMode(challenge.battle_mode as BattleMode);
+                      setMatchStarted(true);
+                    }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                      isSelected 
+                        ? "bg-amber-500/20 border-amber-500/50 text-amber-400" 
+                        : "bg-slate-700/50 border-slate-600/50 text-slate-300 hover:border-slate-500"
+                    }`}
+                  >
+                    <Swords className="w-3 h-3" />
+                    <span className="text-sm font-medium">
+                      vs {opponentData?.first_name}
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      {challenge.period === 'today' ? 'i dag' : 'uge'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Time & Progress Bar */}
         {hasOpponents && (
           <div className="flex items-center justify-between gap-4 px-2 py-2 rounded-xl bg-slate-800/40 border border-slate-700/30">
@@ -1324,15 +1447,18 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                       comment: setupComment
                     });
                     toast.success(`⚔️ Invitation sendt!`, {
-                      description: `${opponentAgent?.name} vil modtage din udfordring.`
+                      description: `${opponentAgent?.name} vil modtage din udfordring. Duellen starter når de accepterer.`
                     });
                     
-                    // Set up local state for preview
-                    setOpponentTeam([setupOpponent]);
-                    setPeriod(setupPeriod);
-                    setMatchComment(setupComment);
-                    setMatchStartTime(new Date().toISOString());
-                    setMatchStarted(true);
+                    // Only set up local state if no match is currently active
+                    // This allows multiple pending challenges
+                    if (!isMatchOngoing) {
+                      setOpponentTeam([setupOpponent]);
+                      setPeriod(setupPeriod);
+                      setMatchStartTime(new Date().toISOString());
+                      setMatchStarted(true);
+                    }
+                    
                     setShowSetupDialog(false);
                     
                     // Reset setup state
