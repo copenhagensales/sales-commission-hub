@@ -105,17 +105,20 @@ export class EnreachAdapter implements DialerAdapter {
   }
 
   // Helper para procesar páginas una por una SIN acumular todo en memoria
+  // Con deduplicación automática por externalId
   private async processPageByPage(
     baseEndpoint: string,
     processor: (leads: HeroBaseLead[]) => StandardSale[],
-    maxLeads = 50000 // Límite de seguridad para evitar OOM
+    maxLeads = 50000
   ): Promise<StandardSale[]> {
     const allSales: StandardSale[] = [];
+    const seenIds = new Set<string>(); // Deduplicación
     let skip = 0;
-    const take = 500; // Reducido de 1000 a 500 para menor uso de memoria por página
+    const take = 500;
     let hasMore = true;
     let page = 1;
     let totalProcessed = 0;
+    let duplicatesSkipped = 0;
 
     console.log(`[EnreachAdapter] Starting pagination on: ${baseEndpoint}`);
 
@@ -135,12 +138,22 @@ export class EnreachAdapter implements DialerAdapter {
         }
 
         if (pageResults.length > 0) {
-          // Procesar inmediatamente y liberar memoria de la página
           const pageSales = processor(pageResults);
-          allSales.push(...pageSales);
-          totalProcessed += pageResults.length;
           
-          console.log(`[EnreachAdapter] Page ${page}: ${pageResults.length} leads -> ${pageSales.length} sales (Total: ${allSales.length})`);
+          // Deduplicar: solo agregar ventas con externalId único
+          let addedThisPage = 0;
+          for (const sale of pageSales) {
+            if (sale.externalId && !seenIds.has(sale.externalId)) {
+              seenIds.add(sale.externalId);
+              allSales.push(sale);
+              addedThisPage++;
+            } else if (sale.externalId) {
+              duplicatesSkipped++;
+            }
+          }
+          
+          totalProcessed += pageResults.length;
+          console.log(`[EnreachAdapter] Page ${page}: ${pageResults.length} leads -> ${addedThisPage} sales (Total: ${allSales.length}, Dups: ${duplicatesSkipped})`);
 
           if (pageResults.length < take || totalProcessed >= maxLeads) {
             hasMore = false;
@@ -158,6 +171,9 @@ export class EnreachAdapter implements DialerAdapter {
       }
     }
 
+    if (duplicatesSkipped > 0) {
+      console.log(`[EnreachAdapter] Total duplicates skipped: ${duplicatesSkipped}`);
+    }
     if (totalProcessed >= maxLeads) {
       console.warn(`[EnreachAdapter] Reached max leads limit (${maxLeads}). Consider using smaller date ranges.`);
     }
