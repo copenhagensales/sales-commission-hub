@@ -1,12 +1,14 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useCanAccess } from "@/hooks/useSystemRoles";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: "teamleder" | "ejer" | "rekruttering";
   requireTeamlederOrAbove?: boolean;
   requireRekrutteringOrAbove?: boolean;
+  positionPermission?: string; // Position-based permission key to check
 }
 
 export function RoleProtectedRoute({ 
@@ -14,12 +16,14 @@ export function RoleProtectedRoute({
   requiredRole,
   requireTeamlederOrAbove = false,
   requireRekrutteringOrAbove = false,
+  positionPermission,
 }: RoleProtectedRouteProps) {
   const { user, loading: authLoading } = useAuth();
   const { isLoading: roleLoading, role, isTeamlederOrAbove, isOwner, isRekruttering, isRekrutteringOrAbove } = useCanAccess();
+  const { isLoading: permLoading, canView } = usePermissions();
   
-  // Wait for both auth and role to fully load
-  const isLoading = authLoading || roleLoading;
+  // Wait for auth, role, and permissions to fully load
+  const isLoading = authLoading || roleLoading || permLoading;
   
   if (isLoading) {
     return (
@@ -33,6 +37,9 @@ export function RoleProtectedRoute({
     return <Navigate to="/auth" replace />;
   }
 
+  // Check if user has position-based permission for this route
+  const hasPositionAccess = positionPermission ? canView(positionPermission) : false;
+
   // Check role requirements
   if (requiredRole === "ejer" && !isOwner) {
     return <Navigate to="/my-schedule" replace />;
@@ -42,16 +49,16 @@ export function RoleProtectedRoute({
     return <Navigate to="/my-schedule" replace />;
   }
 
-  // requireTeamlederOrAbove now also allows rekruttering for recruitment pages
-  if (requireTeamlederOrAbove && !isTeamlederOrAbove && !isRekruttering) {
+  // requireTeamlederOrAbove: allow if system role qualifies OR if position permission grants access
+  if (requireTeamlederOrAbove && !isTeamlederOrAbove && !isRekruttering && !hasPositionAccess) {
     return <Navigate to="/my-schedule" replace />;
   }
 
-  if (requireRekrutteringOrAbove && !isRekrutteringOrAbove) {
+  if (requireRekrutteringOrAbove && !isRekrutteringOrAbove && !hasPositionAccess) {
     return <Navigate to="/my-schedule" replace />;
   }
 
-  if (requiredRole === "teamleder" && role !== "teamleder" && role !== "ejer") {
+  if (requiredRole === "teamleder" && role !== "teamleder" && role !== "ejer" && !hasPositionAccess) {
     return <Navigate to="/my-schedule" replace />;
   }
   
