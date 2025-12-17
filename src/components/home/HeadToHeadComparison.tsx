@@ -553,20 +553,20 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     
     return (
       <div className="group relative">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-2">
           {/* Left value */}
-          <div className={`flex-1 flex items-center justify-end gap-2 transition-all duration-500 ${
-            winner === 'left' ? 'scale-105' : ''
+          <div className={`min-w-[100px] flex items-center justify-end gap-1.5 transition-all duration-500 ${
+            winner === 'left' ? 'scale-[1.02]' : ''
           }`}>
             {winner === 'left' && (
-              <div className="relative">
+              <div className="relative shrink-0">
                 <Trophy className="w-4 h-4 text-amber-400" />
                 <div className="absolute inset-0 animate-ping">
                   <Trophy className="w-4 h-4 text-amber-400/50" />
                 </div>
               </div>
             )}
-            <span className={`font-bold text-sm tabular-nums transition-colors duration-300 ${
+            <span className={`font-bold text-sm tabular-nums whitespace-nowrap transition-colors duration-300 ${
               winner === 'left' ? 'text-emerald-400' : 
               winner === 'tie' ? 'text-amber-300' : 
               'text-slate-400'
@@ -576,26 +576,26 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
           </div>
           
           {/* Center label with icon */}
-          <div className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl min-w-[120px] transition-all duration-300 ${
+          <div className={`shrink-0 flex items-center justify-center gap-2 px-3 py-2 rounded-xl min-w-[110px] transition-all duration-300 ${
             winner === 'left' ? 'bg-emerald-500/10 border border-emerald-500/30' :
             winner === 'right' ? 'bg-rose-500/10 border border-rose-500/30' :
             winner === 'tie' ? 'bg-amber-500/10 border border-amber-500/30' :
             'bg-slate-800/50 border border-slate-700/50'
           }`}>
-            <Icon className={`w-4 h-4 ${
+            <Icon className={`w-4 h-4 shrink-0 ${
               winner === 'left' ? 'text-emerald-400' :
               winner === 'right' ? 'text-rose-400' :
               winner === 'tie' ? 'text-amber-400' :
               'text-slate-400'
             }`} />
-            <span className="text-xs font-medium text-slate-300">{label}</span>
+            <span className="text-xs font-medium text-slate-300 whitespace-nowrap">{label}</span>
           </div>
           
           {/* Right value */}
-          <div className={`flex-1 flex items-center gap-2 transition-all duration-500 ${
-            winner === 'right' ? 'scale-105' : ''
+          <div className={`min-w-[100px] flex items-center gap-1.5 transition-all duration-500 ${
+            winner === 'right' ? 'scale-[1.02]' : ''
           }`}>
-            <span className={`font-bold text-sm tabular-nums transition-colors duration-300 ${
+            <span className={`font-bold text-sm tabular-nums whitespace-nowrap transition-colors duration-300 ${
               winner === 'right' ? 'text-emerald-400' : 
               winner === 'tie' ? 'text-amber-300' : 
               'text-slate-400'
@@ -603,7 +603,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
               {formatFn(rightValue)}
             </span>
             {winner === 'right' && (
-              <div className="relative">
+              <div className="relative shrink-0">
                 <Trophy className="w-4 h-4 text-amber-400" />
                 <div className="absolute inset-0 animate-ping">
                   <Trophy className="w-4 h-4 text-amber-400/50" />
