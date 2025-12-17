@@ -100,11 +100,15 @@ const Home = () => {
           }
         }
         
-        // Check anniversary (next 14 days)
+        // Check anniversary (yearly and 6-month, next 14 days)
         if (emp.employment_start_date) {
           const startDate = parseISO(emp.employment_start_date);
-          const years = differenceInYears(today, startDate);
+          const monthsSinceStart = differenceInYears(today, startDate) * 12 + 
+            (today.getMonth() - startDate.getMonth()) + 
+            (today.getDate() >= startDate.getDate() ? 0 : -1);
           
+          // Check yearly anniversaries
+          const years = differenceInYears(today, startDate);
           if (years > 0) {
             const anniversaryThisYear = new Date(today.getFullYear(), startDate.getMonth(), startDate.getDate());
             
@@ -116,6 +120,21 @@ const Home = () => {
                 years,
                 date: anniversaryThisYear,
                 isToday: isSameDay(anniversaryThisYear, today)
+              });
+            }
+          }
+          
+          // Check 6-month anniversary (only for employees < 1 year)
+          if (years === 0) {
+            const sixMonthDate = addDays(startDate, 182); // ~6 months
+            if ((isSameDay(sixMonthDate, today) || isAfter(sixMonthDate, today)) && 
+                isBefore(sixMonthDate, addDays(today, 14))) {
+              results.push({ 
+                type: 'anniversary', 
+                name: `${emp.first_name} ${emp.last_name}`,
+                years: 0.5, // 6 months marker
+                date: sixMonthDate,
+                isToday: isSameDay(sixMonthDate, today)
               });
             }
           }
@@ -396,7 +415,7 @@ const Home = () => {
                       <p className="font-medium text-foreground">{celebration.name}</p>
                       <p className="text-sm text-muted-foreground">
                         {celebration.type === 'anniversary' 
-                          ? `${celebration.years} års jubilæum` 
+                          ? (celebration.years === 0.5 ? '6 mdr. jubilæum' : `${celebration.years} års jubilæum`)
                           : `Fylder ${celebration.years} år`
                         }
                         {" • "}
