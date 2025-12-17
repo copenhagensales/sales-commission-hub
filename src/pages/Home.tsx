@@ -64,17 +64,50 @@ const Home = () => {
       
       const results: { type: 'birthday' | 'anniversary'; name: string; years?: number; date: Date; isToday: boolean }[] = [];
       
+      // Helper to parse CPR birthday (format: DDMMYY-XXXX)
+      const parseCprBirthday = (cpr: string): Date | null => {
+        if (!cpr || cpr.length < 6) return null;
+        const day = parseInt(cpr.substring(0, 2), 10);
+        const month = parseInt(cpr.substring(2, 4), 10) - 1; // 0-indexed
+        let year = parseInt(cpr.substring(4, 6), 10);
+        
+        // Determine century: if year > current year's last 2 digits, assume 1900s
+        const currentYearShort = today.getFullYear() % 100;
+        year = year > currentYearShort ? 1900 + year : 2000 + year;
+        
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+        return new Date(year, month, day);
+      };
+      
       employees?.forEach(emp => {
+        // Check birthday from CPR (next 14 days)
+        if (emp.cpr_number) {
+          const birthDate = parseCprBirthday(emp.cpr_number);
+          if (birthDate) {
+            const birthdayThisYear = new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate());
+            const age = differenceInYears(today, birthDate);
+            
+            if ((isSameDay(birthdayThisYear, today) || isAfter(birthdayThisYear, today)) && 
+                isBefore(birthdayThisYear, addDays(today, 14))) {
+              results.push({ 
+                type: 'birthday', 
+                name: `${emp.first_name} ${emp.last_name}`,
+                years: age + (isAfter(birthdayThisYear, today) ? 1 : 0), // Age they'll turn
+                date: birthdayThisYear,
+                isToday: isSameDay(birthdayThisYear, today)
+              });
+            }
+          }
+        }
+        
         // Check anniversary (next 14 days)
         if (emp.employment_start_date) {
           const startDate = parseISO(emp.employment_start_date);
           const years = differenceInYears(today, startDate);
           
           if (years > 0) {
-            // Create this year's anniversary date
             const anniversaryThisYear = new Date(today.getFullYear(), startDate.getMonth(), startDate.getDate());
             
-            // Check if it's within next 14 days
             if ((isSameDay(anniversaryThisYear, today) || isAfter(anniversaryThisYear, today)) && 
                 isBefore(anniversaryThisYear, addDays(today, 14))) {
               results.push({ 
@@ -364,7 +397,7 @@ const Home = () => {
                       <p className="text-sm text-muted-foreground">
                         {celebration.type === 'anniversary' 
                           ? `${celebration.years} års jubilæum` 
-                          : "Fødselsdag"
+                          : `Fylder ${celebration.years} år`
                         }
                         {" • "}
                         <span className={celebration.isToday ? "font-semibold text-amber-600 dark:text-amber-400" : ""}>
