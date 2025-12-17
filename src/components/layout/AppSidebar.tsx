@@ -332,7 +332,18 @@ const [personnelOpen, setPersonnelOpen] = useState(
   const hasSomeAccess = isMenuItemGranted("some");
   
   // Debug logging
-  console.log("AppSidebar - grantedMenuItems:", grantedMenuItems, "hasSomeAccess:", hasSomeAccess, "user:", user?.id, "isRekruttering:", isRekruttering);
+  console.log("AppSidebar DEBUG:", {
+    isOwner,
+    isTeamlederOrAbove,
+    isRekruttering,
+    role,
+    positionName: positionPermissions.position?.name,
+    positionLoading: positionPermissions.isLoading,
+    canViewFmOverview: positionPermissions.canViewFmOverview,
+    canViewFmTimeOff: positionPermissions.canViewFmTimeOff,
+    canViewMgTest: positionPermissions.canViewMgTest,
+    grantedMenuItems,
+  });
   
   // Build navigation based on ALL roles the user has (not just one)
   const buildCombinedNavigation = () => {
