@@ -2317,6 +2317,7 @@ export type Database = {
       }
       h2h_challenges: {
         Row: {
+          accepted_at: string | null
           battle_mode: string
           challenger_employee_id: string
           comment: string | null
@@ -2328,6 +2329,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          accepted_at?: string | null
           battle_mode?: string
           challenger_employee_id: string
           comment?: string | null
@@ -2339,6 +2341,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          accepted_at?: string | null
           battle_mode?: string
           challenger_employee_id?: string
           comment?: string | null
