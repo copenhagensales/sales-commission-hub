@@ -9,7 +9,7 @@ export interface StandardProduct {
 // Data filter rule - filters out leads that don't match criteria
 export interface DataFilterRule {
   field: string; // Dot notation path e.g., "lastModifiedByUser.orgCode"
-  operator: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'regex' | 'notEquals' | 'notContains';
+  operator: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'regex' | 'notEquals' | 'notContains' | 'isEmpty' | 'isNotEmpty' | 'notExists';
   value: string;
 }
 

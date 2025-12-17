@@ -1279,6 +1279,9 @@ export function DialerIntegrations() {
                                           <SelectItem value="startsWith">Starts With</SelectItem>
                                           <SelectItem value="endsWith">Ends With</SelectItem>
                                           <SelectItem value="regex">Regex</SelectItem>
+                                          <SelectItem value="isEmpty">Is Empty</SelectItem>
+                                          <SelectItem value="isNotEmpty">Is Not Empty</SelectItem>
+                                          <SelectItem value="notExists">Not Exists</SelectItem>
                                         </SelectContent>
                                       </Select>
                                     </div>
