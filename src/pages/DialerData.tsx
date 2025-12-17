@@ -248,6 +248,31 @@ export default function DialerData() {
     },
   });
 
+  // Fetch ASE Lead sales (temporary debug tab)
+  const { data: aseLeadSales, isLoading: aseLeadLoading } = useQuery({
+    queryKey: ["ase-lead-sales"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sales")
+        .select(`
+          id, adversus_external_id, agent_name, agent_email, sale_datetime, adversus_opp_number, 
+          customer_company, customer_phone, source, integration_type, dialer_campaign_id, raw_payload
+        `)
+        .eq("source", "ase")
+        .order("sale_datetime", { ascending: false });
+      
+      if (error) throw error;
+      
+      // Filter client-side for "Ja - Afdeling": "Lead"
+      const filtered = (data || []).filter((sale: any) => {
+        const payload = sale.raw_payload as any;
+        return payload?.data?.["Ja - Afdeling"] === "Lead";
+      });
+      
+      return filtered as Sale[];
+    },
+  });
+
   // Get unique dialer names for filter
   const { data: dialerNames } = useQuery({
     queryKey: ["dialer-names", activeTab],
@@ -337,6 +362,10 @@ export default function DialerData() {
             <TabsTrigger value="enreach" className="gap-2">
               <Badge className="bg-purple-600 text-xs">Enreach</Badge>
               {stats?.enreach || 0}
+            </TabsTrigger>
+            <TabsTrigger value="ase-lead" className="gap-2">
+              <Badge className="bg-orange-600 text-xs">ASE Lead</Badge>
+              {aseLeadSales?.length || 0}
             </TabsTrigger>
           </TabsList>
 
@@ -546,6 +575,96 @@ export default function DialerData() {
                       </div>
                     </div>
                   </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ASE Lead Tab - Temporary Debug */}
+          <TabsContent value="ase-lead" className="mt-4">
+            <Card className="border-orange-500/50">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-orange-600">
+                    <AlertTriangle className="h-5 w-5" />
+                    ASE Lead Sales (Temporary Debug)
+                  </CardTitle>
+                  <Badge variant="outline" className="text-orange-600 border-orange-600">
+                    {aseLeadSales?.length || 0} sales
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Sales from ASE dialer where "Ja - Afdeling" = "Lead" - for debugging purposes
+                </p>
+              </CardHeader>
+              <CardContent>
+                {aseLeadLoading ? (
+                  <div className="flex items-center justify-center py-8 text-muted-foreground">
+                    <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                    {t("dialerData.loading")}
+                  </div>
+                ) : aseLeadSales && aseLeadSales.length > 0 ? (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Dialer ID</TableHead>
+                          <TableHead>Agent</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Dato</TableHead>
+                          <TableHead>Ja - Afdeling</TableHead>
+                          <TableHead>Leadtype</TableHead>
+                          <TableHead>JSON</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {aseLeadSales.map((sale) => {
+                          const payload = sale.raw_payload as any;
+                          return (
+                            <TableRow key={sale.id}>
+                              <TableCell className="font-mono text-sm">{sale.adversus_external_id || "-"}</TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="text-sm">{sale.agent_name || "-"}</p>
+                                  <p className="text-xs text-muted-foreground">{sale.agent_email || ""}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="max-w-[150px]">
+                                <div>
+                                  <p className="truncate">{sale.customer_company || payload?.data?.Fornavn || "-"}</p>
+                                  <p className="text-xs text-muted-foreground font-mono">{sale.customer_phone || payload?.data?.Telefon || ""}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {sale.sale_datetime
+                                  ? format(new Date(sale.sale_datetime), "dd. MMM yyyy HH:mm", { locale: dateLocale })
+                                  : "-"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge className="bg-orange-600">{payload?.data?.["Ja - Afdeling"] || "-"}</Badge>
+                              </TableCell>
+                              <TableCell className="text-sm">{payload?.data?.Leadtype || "-"}</TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setShowRawJson(sale)}
+                                  className="h-7 px-2"
+                                >
+                                  <Code className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                    <p>No ASE Lead sales found</p>
+                  </div>
                 )}
               </CardContent>
             </Card>
