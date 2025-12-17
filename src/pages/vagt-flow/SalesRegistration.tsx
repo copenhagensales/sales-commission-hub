@@ -59,14 +59,24 @@ const SalesRegistration = () => {
     },
   });
 
-  // Fetch Eesy products
+  // Fetch Eesy FM Gaden products
   const { data: products } = useQuery({
-    queryKey: ["eesy-products"],
+    queryKey: ["eesy-fm-gaden-products"],
     queryFn: async () => {
+      // Get eesy FM Gaden Products campaign ID
+      const { data: campaigns } = await supabase
+        .from("client_campaigns")
+        .select("id")
+        .eq("name", "eesy FM Gaden Products")
+        .single();
+      
+      if (!campaigns) return [];
+      
       const { data, error } = await supabase
         .from("products")
         .select("id, name")
-        .or("name.ilike.%eesy%,name.ilike.%5G%,name.ilike.%Fri tale%")
+        .eq("client_campaign_id", campaigns.id)
+        .neq("name", "Lokation") // Exclude non-product items
         .order("name");
       if (error) throw error;
       return data;
