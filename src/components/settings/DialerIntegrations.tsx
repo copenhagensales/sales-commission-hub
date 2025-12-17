@@ -18,6 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useTranslation } from "react-i18next";
+import { BatchMigrationDialog } from "./BatchMigrationDialog";
 
 // Data filter rule
 interface DataFilterRule {
@@ -1355,6 +1356,11 @@ export function DialerIntegrations() {
                               <Play className="h-4 w-4" />
                             )}
                           </Button>
+                          <BatchMigrationDialog
+                            integrationId={integration.id}
+                            integrationName={integration.name}
+                            provider={integration.provider}
+                          />
                           {integration.provider === 'adversus' && (
                             <>
                               <Button
