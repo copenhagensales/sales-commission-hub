@@ -59,7 +59,7 @@ const SalesRegistration = () => {
     },
   });
 
-  // Fetch Eesy FM Gaden products
+  // Fetch Eesy FM Gaden products (deduplicated by name)
   const { data: products } = useQuery({
     queryKey: ["eesy-fm-gaden-products"],
     queryFn: async () => {
@@ -79,7 +79,14 @@ const SalesRegistration = () => {
         .neq("name", "Lokation") // Exclude non-product items
         .order("name");
       if (error) throw error;
-      return data;
+      
+      // Deduplicate by product name (keep first occurrence)
+      const seen = new Set<string>();
+      return (data || []).filter((p) => {
+        if (seen.has(p.name)) return false;
+        seen.add(p.name);
+        return true;
+      });
     },
   });
 
