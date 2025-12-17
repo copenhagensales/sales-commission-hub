@@ -18,6 +18,7 @@ export const TdcErhverv = lazyPage(() => import("@/pages/TdcErhverv"));
 export const TdcErhvervDashboard = lazyPage(() => import("@/pages/TdcErhvervDashboard"));
 export const RelatelDashboard = lazyPage(() => import("@/pages/RelatelDashboard"));
 export const TrygDashboard = lazyPage(() => import("@/pages/TrygDashboard"));
+export const AseDashboard = lazyPage(() => import("@/pages/AseDashboard"));
 export const NotFound = lazyPage(() => import("@/pages/NotFound"));
 export const AdversusData = lazyPage(() => import("@/pages/AdversusData"));
 export const DialerData = lazyPage(() => import("@/pages/DialerData"));
