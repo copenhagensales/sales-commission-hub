@@ -1,19 +1,17 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useRolePreview } from "@/contexts/RolePreviewContext";
+import { useRolePreview, RolePreviewPermissions } from "@/contexts/RolePreviewContext";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
 // Owner position name
 const OWNER_POSITION_NAME = "Ejer";
 
-interface PositionPermissions {
-  [key: string]: boolean | { view: boolean; edit: boolean };
-}
+type DataScope = "egen" | "team" | "alt";
 
 // Generate all permissions for owner - visible menu items and tabs
-const generateAllPermissions = (): PositionPermissions => ({
+const generateAllPermissions = (): RolePreviewPermissions => ({
   // Main menu
   menu_dashboard: true,
   menu_wallboard: true,
@@ -106,6 +104,14 @@ const generateAllPermissions = (): PositionPermissions => ({
   tab_settings_webhooks: { view: true, edit: true },
   tab_settings_logs: { view: true, edit: true },
   tab_settings_excel_crm: { view: true, edit: true },
+  // Data scope permissions - owner sees all
+  scope_employees: "alt" as DataScope,
+  scope_shifts: "alt" as DataScope,
+  scope_absence: "alt" as DataScope,
+  scope_time_tracking: "alt" as DataScope,
+  scope_contracts: "alt" as DataScope,
+  scope_payroll: "alt" as DataScope,
+  scope_career_wishes: "alt" as DataScope,
 });
 
 export default function RolePreview() {
@@ -131,9 +137,9 @@ export default function RolePreview() {
   useEffect(() => {
     if (position) {
       const isOwner = position.name.toLowerCase() === OWNER_POSITION_NAME.toLowerCase();
-      const permissions: PositionPermissions = isOwner 
+      const permissions: RolePreviewPermissions = isOwner 
         ? generateAllPermissions() 
-        : (position.permissions as PositionPermissions) || {};
+        : (position.permissions as RolePreviewPermissions) || {};
       
       // Enter preview mode with the role's permissions
       enterPreviewMode(position.name, permissions);

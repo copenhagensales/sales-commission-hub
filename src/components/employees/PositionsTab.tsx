@@ -28,9 +28,10 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Shield, ChevronDown, ChevronRight, Eye, Edit, Lock, Play, Info, LayoutGrid, Layers } from "lucide-react";
+import { Plus, Pencil, Trash2, Shield, ChevronDown, ChevronRight, Eye, Edit, Lock, Play, Info, LayoutGrid, Layers, Database, User, Users, Globe } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -44,11 +45,19 @@ const OWNER_POSITION_NAME = "Ejer";
 
 const isOwnerPosition = (name: string) => name.toLowerCase() === OWNER_POSITION_NAME.toLowerCase();
 
+type DataScope = "egen" | "team" | "alt";
+
 interface Permission {
   key: string;
   label: string;
   description: string;
   hasEditOption?: boolean; // If true, show separate view/edit toggles
+}
+
+interface DataScopePermission {
+  key: string;
+  label: string;
+  description: string;
 }
 
 interface PermissionCategory {
@@ -57,6 +66,17 @@ interface PermissionCategory {
   icon: string;
   permissions: Permission[];
 }
+
+// Data scope permissions - applies to areas where users can see data about others
+const DATA_SCOPE_PERMISSIONS: DataScopePermission[] = [
+  { key: "scope_employees", label: "Medarbejdere", description: "Hvem kan brugeren se i medarbejderlisten" },
+  { key: "scope_shifts", label: "Vagter", description: "Hvem kan brugeren se vagter for" },
+  { key: "scope_absence", label: "Fravær", description: "Hvem kan brugeren se fraværsdata for" },
+  { key: "scope_time_tracking", label: "Tidsregistrering", description: "Hvem kan brugeren se tidsregistreringer for" },
+  { key: "scope_contracts", label: "Kontrakter", description: "Hvem kan brugeren se kontrakter for" },
+  { key: "scope_payroll", label: "Løndata", description: "Hvem kan brugeren se løndata for" },
+  { key: "scope_career_wishes", label: "Karriereønsker", description: "Hvem kan brugeren se karriereønsker for" },
+];
 
 const PERMISSION_CATEGORIES: PermissionCategory[] = [
   {
@@ -262,8 +282,8 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
 ];
 
 // Generate all permissions with full access (must be after PERMISSION_CATEGORIES)
-const generateAllPermissions = (): Record<string, boolean | { view: boolean; edit: boolean }> => {
-  const allPermissions: Record<string, boolean | { view: boolean; edit: boolean }> = {};
+const generateAllPermissions = (): Record<string, boolean | { view: boolean; edit: boolean } | DataScope> => {
+  const allPermissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope> = {};
   PERMISSION_CATEGORIES.forEach(category => {
     category.permissions.forEach(permission => {
       if (permission.hasEditOption) {
@@ -273,6 +293,10 @@ const generateAllPermissions = (): Record<string, boolean | { view: boolean; edi
       }
     });
   });
+  // Add data scope permissions - owner sees all
+  DATA_SCOPE_PERMISSIONS.forEach(scope => {
+    allPermissions[scope.key] = "alt";
+  });
   return allPermissions;
 };
 
@@ -280,7 +304,7 @@ interface JobPosition {
   id: string;
   name: string;
   description: string | null;
-  permissions: Record<string, boolean | { view: boolean; edit: boolean }>;
+  permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope>;
   is_active: boolean;
   created_at: string;
 }
@@ -288,7 +312,7 @@ interface JobPosition {
 interface FormData {
   name: string;
   description: string;
-  permissions: Record<string, boolean | { view: boolean; edit: boolean }>;
+  permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope>;
 }
 
 export function PositionsTab() {
@@ -315,7 +339,7 @@ export function PositionsTab() {
       if (error) throw error;
       return data.map(p => ({
         ...p,
-        permissions: (p.permissions as Record<string, boolean | { view: boolean; edit: boolean }>) || {}
+        permissions: (p.permissions as Record<string, boolean | { view: boolean; edit: boolean } | DataScope>) || {}
       })) as JobPosition[];
     },
   });
@@ -477,9 +501,26 @@ export function PositionsTab() {
     });
   };
 
-  const countActivePermissions = (permissions: Record<string, boolean | { view: boolean; edit: boolean }>) => {
+  const handleScopeChange = (key: string, scope: DataScope) => {
+    setFormData(prev => ({
+      ...prev,
+      permissions: { ...prev.permissions, [key]: scope }
+    }));
+  };
+
+  const getScopeValue = (key: string): DataScope => {
+    const value = formData.permissions[key];
+    if (value === "egen" || value === "team" || value === "alt") {
+      return value;
+    }
+    return "egen"; // Default
+  };
+
+  const countActivePermissions = (permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope>) => {
     let count = 0;
-    Object.values(permissions).forEach(value => {
+    Object.entries(permissions).forEach(([key, value]) => {
+      // Don't count data scope permissions in this count
+      if (key.startsWith("scope_")) return;
       if (typeof value === "boolean" && value) count++;
       if (typeof value === "object" && value !== null && (value.view || value.edit)) count++;
     });
@@ -844,6 +885,110 @@ export function PositionsTab() {
                   })}
                 </div>
               </TooltipProvider>
+            </div>
+
+            {/* Data Scope Section */}
+            <div className="space-y-2">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <Database className="h-4 w-4" />
+                Data synlighed
+                {editingPosition && isOwnerPosition(editingPosition.name) && (
+                  <Badge variant="secondary" className="gap-1 ml-2">
+                    <Lock className="h-3 w-3" />
+                    Fuld adgang
+                  </Badge>
+                )}
+              </Label>
+              {!(editingPosition && isOwnerPosition(editingPosition.name)) && (
+                <p className="text-sm text-muted-foreground">
+                  Bestem hvilke data brugeren kan se: egen (kun sig selv), team (sit team), eller alt (alle)
+                </p>
+              )}
+
+              <div className="border rounded-lg mt-4 overflow-hidden">
+                {DATA_SCOPE_PERMISSIONS.map((scopePerm, idx) => {
+                  const isOwnerLocked = editingPosition && isOwnerPosition(editingPosition.name);
+                  const currentScope = isOwnerLocked ? "alt" : getScopeValue(scopePerm.key);
+
+                  return (
+                    <div
+                      key={scopePerm.key}
+                      className={cn(
+                        "flex items-center justify-between gap-4 px-4 py-3 transition-colors",
+                        isOwnerLocked && "bg-green-500/5",
+                        idx !== DATA_SCOPE_PERMISSIONS.length - 1 && "border-b",
+                        !isOwnerLocked && "hover:bg-muted/30"
+                      )}
+                    >
+                      <TooltipProvider delayDuration={200}>
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="cursor-help">
+                                <Info className="h-4 w-4 text-muted-foreground/60 hover:text-primary transition-colors" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs">
+                              <p className="font-medium mb-1">{scopePerm.label}</p>
+                              <p className="text-muted-foreground text-xs">{scopePerm.description}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm">{scopePerm.label}</div>
+                          </div>
+                        </div>
+                      </TooltipProvider>
+
+                      <RadioGroup
+                        value={currentScope}
+                        onValueChange={(value) => handleScopeChange(scopePerm.key, value as DataScope)}
+                        className="flex items-center gap-4"
+                        disabled={!!isOwnerLocked}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <RadioGroupItem value="egen" id={`${scopePerm.key}-egen`} />
+                          <Label 
+                            htmlFor={`${scopePerm.key}-egen`} 
+                            className={cn(
+                              "text-xs font-medium cursor-pointer flex items-center gap-1",
+                              currentScope === "egen" && "text-primary"
+                            )}
+                          >
+                            <User className="h-3 w-3" />
+                            Egen
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <RadioGroupItem value="team" id={`${scopePerm.key}-team`} />
+                          <Label 
+                            htmlFor={`${scopePerm.key}-team`} 
+                            className={cn(
+                              "text-xs font-medium cursor-pointer flex items-center gap-1",
+                              currentScope === "team" && "text-primary"
+                            )}
+                          >
+                            <Users className="h-3 w-3" />
+                            Team
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <RadioGroupItem value="alt" id={`${scopePerm.key}-alt`} />
+                          <Label 
+                            htmlFor={`${scopePerm.key}-alt`} 
+                            className={cn(
+                              "text-xs font-medium cursor-pointer flex items-center gap-1",
+                              currentScope === "alt" && "text-primary"
+                            )}
+                          >
+                            <Globe className="h-3 w-3" />
+                            Alt
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
