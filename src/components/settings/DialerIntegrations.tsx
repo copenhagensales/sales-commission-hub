@@ -978,7 +978,7 @@ export function DialerIntegrations() {
                                   <Label className="text-xs">Extraction Type</Label>
                                   <Select
                                     value={rule.extractionType}
-                                    onValueChange={(value: 'specific_fields' | 'regex' | 'static_value') => {
+                                    onValueChange={(value: 'specific_fields' | 'regex' | 'static_value' | 'composite') => {
                                       const updated = [...formData.conditionalRules];
                                       updated[index] = { ...rule, extractionType: value };
                                       setFormData({ ...formData, conditionalRules: updated });
@@ -991,6 +991,7 @@ export function DialerIntegrations() {
                                       <SelectItem value="specific_fields">Extract from Fields</SelectItem>
                                       <SelectItem value="regex">Regex Pattern</SelectItem>
                                       <SelectItem value="static_value">Static Product Name</SelectItem>
+                                      <SelectItem value="composite">Composite (Template)</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
