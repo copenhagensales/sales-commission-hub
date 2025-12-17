@@ -397,7 +397,13 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     formatFn?: (n: number) => string;
   }) => {
     const total = leftValue + rightValue || 1;
-    const leftPercent = (leftValue / total) * 100;
+    const leftPercent = Math.min((leftValue / total) * 100, 100);
+    const rightPercent = Math.min((rightValue / total) * 100, 100);
+    
+    // Scale to max 45% so bars don't meet in the middle
+    const maxBarWidth = 45;
+    const leftBarWidth = (leftPercent / 100) * maxBarWidth;
+    const rightBarWidth = (rightPercent / 100) * maxBarWidth;
     
     return (
       <div className="group relative">
@@ -461,36 +467,40 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
           </div>
         </div>
         
-        {/* Progress bar */}
-        <div className="relative h-2 mt-2 rounded-full overflow-hidden bg-slate-800/80">
-          <div className="relative flex h-full">
-            <div 
-              className={`transition-all duration-700 ease-out ${
-                winner === 'left' 
-                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-400' 
-                  : winner === 'tie' 
-                    ? 'bg-gradient-to-r from-amber-600 to-amber-400' 
-                    : 'bg-gradient-to-r from-slate-600 to-slate-500'
-              }`}
-              style={{ 
-                width: `${leftPercent}%`,
-                boxShadow: winner === 'left' ? '0 0 15px rgba(52, 211, 153, 0.4)' : 'none'
-              }}
-            />
-            <div className="w-px bg-slate-900" />
-            <div 
-              className={`flex-1 transition-all duration-700 ease-out ${
-                winner === 'right' 
-                  ? 'bg-gradient-to-l from-emerald-600 to-emerald-400' 
-                  : winner === 'tie' 
-                    ? 'bg-gradient-to-l from-amber-600 to-amber-400' 
-                    : 'bg-gradient-to-l from-slate-600 to-slate-500'
-              }`}
-              style={{ 
-                boxShadow: winner === 'right' ? '0 0 15px rgba(52, 211, 153, 0.4)' : 'none'
-              }}
-            />
-          </div>
+        {/* Progress bar - bars start from each side */}
+        <div className="relative h-2.5 mt-2 rounded-full overflow-hidden bg-slate-800/80">
+          {/* Center divider */}
+          <div className="absolute left-1/2 top-0 w-0.5 h-full bg-slate-600 z-10 -translate-x-1/2" />
+          
+          {/* Left bar - grows from left edge toward center */}
+          <div 
+            className={`absolute left-0 top-0 h-full rounded-l-full transition-all duration-700 ease-out ${
+              winner === 'left' 
+                ? 'bg-gradient-to-r from-emerald-600 to-emerald-400' 
+                : winner === 'tie' 
+                  ? 'bg-gradient-to-r from-amber-600 to-amber-400' 
+                  : 'bg-gradient-to-r from-blue-600/80 to-blue-400/80'
+            }`}
+            style={{ 
+              width: `${leftBarWidth}%`,
+              boxShadow: winner === 'left' ? '0 0 15px rgba(52, 211, 153, 0.4)' : 'none'
+            }}
+          />
+          
+          {/* Right bar - grows from right edge toward center */}
+          <div 
+            className={`absolute right-0 top-0 h-full rounded-r-full transition-all duration-700 ease-out ${
+              winner === 'right' 
+                ? 'bg-gradient-to-l from-emerald-600 to-emerald-400' 
+                : winner === 'tie' 
+                  ? 'bg-gradient-to-l from-amber-600 to-amber-400' 
+                  : 'bg-gradient-to-l from-rose-600/80 to-rose-400/80'
+            }`}
+            style={{ 
+              width: `${rightBarWidth}%`,
+              boxShadow: winner === 'right' ? '0 0 15px rgba(52, 211, 153, 0.4)' : 'none'
+            }}
+          />
         </div>
       </div>
     );
@@ -633,32 +643,34 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
             Head to Head
           </span>
           
-          {/* Mode toggle */}
-          <div className="ml-auto flex items-center gap-2">
-            <div className="flex bg-slate-800/80 rounded-full p-0.5 border border-slate-700/50">
+          {/* Mode toggle - more prominent */}
+          <div className="ml-auto flex items-center gap-3">
+            <div className="flex bg-slate-800 rounded-xl p-1 border border-slate-600/50 shadow-lg">
               <button
                 onClick={() => {
                   setBattleMode("1v1");
                   setMyTeam([]);
                   setOpponentTeam(opponentTeam.slice(0, 1));
                 }}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                   battleMode === "1v1" 
-                    ? "bg-amber-500 text-white" 
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30" 
+                    : "text-slate-400 hover:text-white hover:bg-slate-700/50"
                 }`}
               >
-                1v1
+                <Swords className="w-4 h-4" />
+                <span>1v1</span>
               </button>
               <button
                 onClick={() => setBattleMode("team")}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                   battleMode === "team" 
-                    ? "bg-amber-500 text-white" 
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30" 
+                    : "text-slate-400 hover:text-white hover:bg-slate-700/50"
                 }`}
               >
-                Hold
+                <Users className="w-4 h-4" />
+                <span>Hold</span>
               </button>
             </div>
           </div>
