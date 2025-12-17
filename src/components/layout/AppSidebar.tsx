@@ -131,6 +131,7 @@ const getVagtFlowNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.bookings"), href: "/vagt-flow/bookings", icon: Calendar },
   { name: t("sidebar.locations"), href: "/vagt-flow/locations", icon: MapPin },
   { name: t("sidebar.vehicles"), href: "/vagt-flow/vehicles", icon: Car },
+  { name: t("sidebar.timeOff"), href: "/vagt-flow/time-off", icon: Clock },
   { name: t("sidebar.salesRegistration"), href: "/vagt-flow/sales-registration", icon: ShoppingCart },
   { name: t("sidebar.billing"), href: "/vagt-flow/billing", icon: Receipt },
 ];
@@ -733,6 +734,7 @@ const [personnelOpen, setPersonnelOpen] = useState(
                   if (item.href === "/vagt-flow/bookings") return positionPermissions.canViewFmBookings;
                   if (item.href === "/vagt-flow/locations") return positionPermissions.canViewFmLocations;
                   if (item.href === "/vagt-flow/vehicles") return positionPermissions.canViewFmVehicles;
+                  if (item.href === "/vagt-flow/time-off") return positionPermissions.canViewFmTimeOff;
                   if (item.href === "/vagt-flow/sales-registration") return positionPermissions.canViewFmOverview;
                   if (item.href === "/vagt-flow/billing") return positionPermissions.canViewFmBilling;
                   return isTeamlederOrAbove || isMenuItemGranted("fieldmarketing");
