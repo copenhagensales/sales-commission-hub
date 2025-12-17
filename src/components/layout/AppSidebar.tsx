@@ -710,8 +710,8 @@ const [personnelOpen, setPersonnelOpen] = useState(
             </Collapsible>
           )}
 
-          {/* Fieldmarketing menu - for owners, teamleders, or users with fieldmarketing permission */}
-          {(isOwner || isTeamlederOrAbove || isMenuItemGranted("fieldmarketing")) && (
+          {/* Fieldmarketing menu - for owners, teamleders, or users with fieldmarketing permission or position permission */}
+          {(isOwner || isTeamlederOrAbove || isMenuItemGranted("fieldmarketing") || positionPermissions.canViewFmOverview) && (
             <Collapsible open={vagtFlowOpen} onOpenChange={setVagtFlowOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
@@ -724,7 +724,19 @@ const [personnelOpen, setPersonnelOpen] = useState(
                 {vagtFlowOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {vagtFlowNav.map((item) => {
+                {vagtFlowNav.filter(item => {
+                  // Filter FM items based on position permissions for non-owners
+                  if (isOwner) return true;
+                  if (item.href === "/vagt-flow") return positionPermissions.canViewFmOverview;
+                  if (item.href === "/vagt-flow/min-uge") return positionPermissions.canViewFmMyWeek;
+                  if (item.href === "/vagt-flow/book-week") return positionPermissions.canViewFmBookWeek;
+                  if (item.href === "/vagt-flow/bookings") return positionPermissions.canViewFmBookings;
+                  if (item.href === "/vagt-flow/locations") return positionPermissions.canViewFmLocations;
+                  if (item.href === "/vagt-flow/vehicles") return positionPermissions.canViewFmVehicles;
+                  if (item.href === "/vagt-flow/sales-registration") return positionPermissions.canViewFmOverview;
+                  if (item.href === "/vagt-flow/billing") return positionPermissions.canViewFmBilling;
+                  return isTeamlederOrAbove || isMenuItemGranted("fieldmarketing");
+                }).map((item) => {
                   const isActive = location.pathname === item.href;
                   return (
                     <NavLink
