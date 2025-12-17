@@ -50,6 +50,7 @@
     "locations": "Locations",
     "vehicles": "Vehicles",
     "billing": "Billing",
+    "salesRegistration": "Sales Registration",
     "test": "Test",
     "testMenu": "Test",
     "economic": "E-conomic",
@@ -65,7 +66,8 @@
     "new": "New",
     "bookings": "Bookings",
     "permissions": "Permissions",
-    "management": "Management"
+    "management": "Management",
+    "personnel": "Personnel"
   },
   "dialerIntegrations": {
     "title": "Dialer Integrations",

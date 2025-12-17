@@ -1,12 +1,15 @@
 import { ReactNode, useState } from "react";
 import { AppSidebar } from "./AppSidebar";
+import { PreviewSidebar } from "./PreviewSidebar";
 import { ContractLockOverlay } from "./ContractLockOverlay";
 import { CarQuizLockOverlay } from "./CarQuizLockOverlay";
+import { RolePreviewBanner } from "./RolePreviewBanner";
 import { usePendingContractLock } from "@/hooks/usePendingContractLock";
 import { useCarQuizLock } from "@/hooks/useCarQuiz";
+import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PendingAbsencePopup } from "@/components/absence/PendingAbsencePopup";
-import { Menu, X } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
@@ -18,6 +21,7 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const { isLocked: isContractLocked, contract, isLoading: contractLoading } = usePendingContractLock();
   const { isLocked: isQuizLocked, isLoading: quizLoading } = useCarQuizLock();
+  const { isPreviewMode } = useRolePreview();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -25,8 +29,12 @@ export function MainLayout({ children }: MainLayoutProps) {
   // Don't show car quiz lock if we're already on the car-quiz page
   const showQuizLock = isQuizLocked && location.pathname !== "/car-quiz";
 
-  // Show loading state while checking locks
-  if (contractLoading || quizLoading) {
+  // Skip locks in preview mode
+  const showContractLock = isContractLocked && !isPreviewMode;
+  const showCarQuizLock = showQuizLock && !isContractLocked && !isPreviewMode;
+
+  // Show loading state while checking locks (skip in preview mode)
+  if ((contractLoading || quizLoading) && !isPreviewMode) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Indlæser...</div>
@@ -34,25 +42,31 @@ export function MainLayout({ children }: MainLayoutProps) {
     );
   }
 
+  // Choose sidebar based on preview mode
+  const SidebarComponent = isPreviewMode ? PreviewSidebar : AppSidebar;
+
   return (
     <div className="min-h-screen bg-background">
-      {isContractLocked && contract && (
+      {/* Preview banner at very top */}
+      <RolePreviewBanner />
+      
+      {showContractLock && contract && (
         <ContractLockOverlay 
           contractId={contract.id} 
           contractTitle={contract.title} 
         />
       )}
-      {showQuizLock && !isContractLocked && (
+      {showCarQuizLock && (
         <CarQuizLockOverlay />
       )}
       
       {/* Desktop sidebar */}
       <div className="hidden md:block">
-        <AppSidebar />
+        <SidebarComponent />
       </div>
       
       {/* Mobile header with burger menu */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4">
+      <div className={`md:hidden fixed left-0 right-0 z-50 h-14 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4 ${isPreviewMode ? "top-10" : "top-0"}`}>
         <div 
           onClick={() => navigate("/")} 
           className="flex items-center cursor-pointer"
@@ -67,20 +81,20 @@ export function MainLayout({ children }: MainLayoutProps) {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0 bg-sidebar border-sidebar-border">
-            <AppSidebar isMobile onNavigate={() => setMobileMenuOpen(false)} />
+            <SidebarComponent isMobile onNavigate={() => setMobileMenuOpen(false)} />
           </SheetContent>
         </Sheet>
       </div>
       
       {/* Main content with responsive margin */}
-      <main className="md:ml-64 min-h-screen pt-14 md:pt-0">
+      <main className={`md:ml-64 min-h-screen ${isPreviewMode ? "pt-24 md:pt-10" : "pt-14 md:pt-0"}`}>
         <div className="p-4 md:p-8">
           {children}
         </div>
       </main>
       
-      {/* Popup for pending absence requests - shown to team leaders */}
-      <PendingAbsencePopup />
+      {/* Popup for pending absence requests - shown to team leaders (skip in preview mode) */}
+      {!isPreviewMode && <PendingAbsencePopup />}
     </div>
   );
 }

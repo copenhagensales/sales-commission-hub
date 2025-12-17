@@ -1816,6 +1816,42 @@ export type Database = {
           },
         ]
       }
+      employee_agent_mapping: {
+        Row: {
+          agent_id: string
+          created_at: string
+          employee_id: string
+          id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          employee_id: string
+          id?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_agent_mapping_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_agent_mapping_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_identity: {
         Row: {
           created_at: string | null
@@ -2273,6 +2309,36 @@ export type Database = {
           integration_type?: string
           message?: string
           status?: string
+        }
+        Relationships: []
+      }
+      job_positions: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          permissions: Json
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          permissions?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          permissions?: Json
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -3451,8 +3517,45 @@ export type Database = {
           },
         ]
       }
+      team_members: {
+        Row: {
+          created_at: string | null
+          employee_id: string
+          id: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          employee_id: string
+          id?: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string | null
+          employee_id?: string
+          id?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
+          assistant_team_leader_id: string | null
           created_at: string | null
           description: string | null
           id: string
@@ -3461,6 +3564,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          assistant_team_leader_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -3469,6 +3573,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          assistant_team_leader_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -3477,6 +3582,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "teams_assistant_team_leader_id_fkey"
+            columns: ["assistant_team_leader_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "teams_team_leader_id_fkey"
             columns: ["team_leader_id"]
@@ -4048,6 +4160,10 @@ export type Database = {
         Args: { _employee_id: string; _user_id: string }
         Returns: boolean
       }
+      is_in_my_teams: {
+        Args: { _target_employee_id: string }
+        Returns: boolean
+      }
       is_manager_or_above: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_owner_only: { Args: { _user_id: string }; Returns: boolean }
@@ -4075,6 +4191,10 @@ export type Database = {
           p_schedule: string
         }
         Returns: number
+      }
+      shares_team_with_user: {
+        Args: { _target_employee_id: string; _user_id: string }
+        Returns: boolean
       }
       unschedule_integration_sync: {
         Args: { p_job_name: string }

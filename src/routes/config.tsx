@@ -30,6 +30,7 @@ import {
   VagtTimeOffRequests,
   VagtLocationDetail,
   VagtBilling,
+  VagtSalesRegistration,
   ShiftOverview,
   MySchedule,
   AbsenceManagement,
@@ -67,6 +68,7 @@ import {
   SalesDashboard,
   ClosingShifts,
   Permissions,
+  RolePreview,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -105,6 +107,7 @@ export const routes: RouteConfig[] = [
   { path: "/logikker", component: Logikker, access: "role", requireTeamlederOrAbove: true },
   { path: "/employees", component: EmployeeMasterData, access: "role", requireTeamlederOrAbove: true },
   { path: "/employees/:id", component: EmployeeDetail, access: "role", requireTeamlederOrAbove: true },
+  
   { path: "/settings", component: Settings, access: "role", requireTeamlederOrAbove: true },
 
   {
@@ -119,6 +122,7 @@ export const routes: RouteConfig[] = [
       { path: "bookings", component: VagtBookings, access: "role", requireTeamlederOrAbove: true },
       { path: "vehicles", component: VagtVehicles, access: "role", requireTeamlederOrAbove: true },
       { path: "time-off", component: VagtTimeOffRequests, access: "role", requireTeamlederOrAbove: true },
+      { path: "sales-registration", component: VagtSalesRegistration, access: "role", requireTeamlederOrAbove: true },
       { path: "billing", component: VagtBilling, access: "role", requireTeamlederOrAbove: true },
       { path: "min-uge", component: VagtMinUge, access: "protected" },
     ],
@@ -170,5 +174,6 @@ export const routes: RouteConfig[] = [
 
   { path: "/admin", component: Admin, access: "role", requiredRole: "ejer" },
   { path: "/permissions", component: Permissions, access: "role", requiredRole: "ejer" },
+  { path: "/role-preview/:id", component: RolePreview, access: "role", requireTeamlederOrAbove: true },
   { path: "*", component: NotFound, access: "public" },
 ];

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff } from "lucide-react";
@@ -18,6 +19,9 @@ import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useCanAccess } from "@/hooks/useSystemRoles";
 import { EmployeeExcelImport } from "@/components/employees/EmployeeExcelImport";
+import { DialerMappingTab } from "@/components/employees/DialerMappingTab";
+import { TeamsTab } from "@/components/employees/TeamsTab";
+import { PositionsTab } from "@/components/employees/PositionsTab";
 
 
 interface EmployeeMasterDataRecord {
@@ -406,115 +410,10 @@ export default function EmployeeMasterData() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Medarbejdere</h1>
-            <p className="text-muted-foreground">Stamkort og medarbejderdata</p>
-          </div>
-          <div className="flex gap-2">
-            <EmployeeExcelImport />
-            <Dialog open={createDialogOpen} onOpenChange={(open) => {
-              setCreateDialogOpen(open);
-              if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
-            }}>
-              <DialogTrigger asChild>
-                <Button><Plus className="mr-2 h-4 w-4" /> Opret ny medarbejder</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Opret ny medarbejder</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <p className="text-sm text-muted-foreground">
-                    Opret medarbejder med login. Giv medarbejderen login-oplysningerne.
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Fornavn *</Label>
-                      <Input 
-                        value={createData.first_name} 
-                        onChange={(e) => setCreateData({ ...createData, first_name: e.target.value })} 
-                        placeholder="Fornavn"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Efternavn</Label>
-                      <Input 
-                        value={createData.last_name} 
-                        onChange={(e) => setCreateData({ ...createData, last_name: e.target.value })} 
-                        placeholder="Efternavn"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Email *</Label>
-                    <Input 
-                      type="email"
-                      value={createData.email} 
-                      onChange={(e) => setCreateData({ ...createData, email: e.target.value })} 
-                      placeholder="medarbejder@email.dk"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Kodeord *</Label>
-                    <div className="relative">
-                      <Input 
-                        type={showPassword ? "text" : "password"}
-                        value={createData.password} 
-                        onChange={(e) => setCreateData({ ...createData, password: e.target.value })} 
-                        placeholder="Mindst 6 tegn"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Medarbejderen kan ændre koden efter første login.
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Stilling *</Label>
-                    <Select 
-                      value={createData.job_title} 
-                      onValueChange={(value) => setCreateData({ ...createData, job_title: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Vælg stilling" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Salgskonsulent">Salgskonsulent</SelectItem>
-                        <SelectItem value="Fieldmarketing">Fieldmarketing</SelectItem>
-                        <SelectItem value="SOME">SOME</SelectItem>
-                        <SelectItem value="Teamleder">Teamleder</SelectItem>
-                        <SelectItem value="Assisterende Teamleder">Assisterende Teamleder</SelectItem>
-                        <SelectItem value="Rekruttering">Rekruttering</SelectItem>
-                        <SelectItem value="Backoffice">Backoffice</SelectItem>
-                        <SelectItem value="Projektleder">Projektleder</SelectItem>
-                        <SelectItem value="Ejer">Ejer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Rettigheder tildeles automatisk baseret på stilling.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <Button onClick={handleCreateEmployee} disabled={creatingEmployee}>
-                    {creatingEmployee ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opretter...</>
-                    ) : (
-                      <><Plus className="mr-2 h-4 w-4" /> Opret medarbejder</>
-                    )}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Medarbejdere</h1>
+          <p className="text-muted-foreground">Stamkort og medarbejderdata</p>
+        </div>
 
 
             <Dialog open={dialogOpen} onOpenChange={(open) => {
@@ -797,10 +696,17 @@ export default function EmployeeMasterData() {
               </div>
             </DialogContent>
           </Dialog>
-          </div>
-        </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <Tabs defaultValue="all-employees" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="all-employees">Alle medarbejdere</TabsTrigger>
+            <TabsTrigger value="teams">Teams</TabsTrigger>
+            <TabsTrigger value="positions">Stillinger</TabsTrigger>
+            <TabsTrigger value="dialer-mapping">Dialer mapping</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="all-employees" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-xl bg-card/50 p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-muted-foreground">Aktive medarbejdere</span>
@@ -863,6 +769,111 @@ export default function EmployeeMasterData() {
                   className="pl-9 bg-muted/50 border-0 focus-visible:ring-1 h-9" 
                 />
               </div>
+              <div className="flex items-center gap-2">
+                <EmployeeExcelImport />
+                <Dialog open={createDialogOpen} onOpenChange={(open) => {
+                  setCreateDialogOpen(open);
+                  if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+                }}>
+                  <DialogTrigger asChild>
+                    <Button><Plus className="mr-2 h-4 w-4" /> Opret ny medarbejder</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Opret ny medarbejder</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <p className="text-sm text-muted-foreground">
+                        Opret medarbejder med login. Giv medarbejderen login-oplysningerne.
+                      </p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Fornavn *</Label>
+                          <Input 
+                            value={createData.first_name} 
+                            onChange={(e) => setCreateData({ ...createData, first_name: e.target.value })} 
+                            placeholder="Fornavn"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Efternavn</Label>
+                          <Input 
+                            value={createData.last_name} 
+                            onChange={(e) => setCreateData({ ...createData, last_name: e.target.value })} 
+                            placeholder="Efternavn"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Email *</Label>
+                        <Input 
+                          type="email"
+                          value={createData.email} 
+                          onChange={(e) => setCreateData({ ...createData, email: e.target.value })} 
+                          placeholder="medarbejder@email.dk"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Kodeord *</Label>
+                        <div className="relative">
+                          <Input 
+                            type={showPassword ? "text" : "password"}
+                            value={createData.password} 
+                            onChange={(e) => setCreateData({ ...createData, password: e.target.value })} 
+                            placeholder="Mindst 6 tegn"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0 top-0 h-full px-3"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Medarbejderen kan ændre koden efter første login.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Stilling *</Label>
+                        <Select 
+                          value={createData.job_title} 
+                          onValueChange={(value) => setCreateData({ ...createData, job_title: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Vælg stilling" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Salgskonsulent">Salgskonsulent</SelectItem>
+                            <SelectItem value="Fieldmarketing">Fieldmarketing</SelectItem>
+                            <SelectItem value="SOME">SOME</SelectItem>
+                            <SelectItem value="Teamleder">Teamleder</SelectItem>
+                            <SelectItem value="Assisterende Teamleder">Assisterende Teamleder</SelectItem>
+                            <SelectItem value="Rekruttering">Rekruttering</SelectItem>
+                            <SelectItem value="Backoffice">Backoffice</SelectItem>
+                            <SelectItem value="Projektleder">Projektleder</SelectItem>
+                            <SelectItem value="Ejer">Ejer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Rettigheder tildeles automatisk baseret på stilling.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button onClick={handleCreateEmployee} disabled={creatingEmployee}>
+                        {creatingEmployee ? (
+                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opretter...</>
+                        ) : (
+                          <><Plus className="mr-2 h-4 w-4" /> Opret medarbejder</>
+                        )}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
           </div>
           
@@ -876,7 +887,7 @@ export default function EmployeeMasterData() {
                     <TableHead className="text-xs font-medium text-muted-foreground">Navn</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">E-mail</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Telefon</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Afdeling</TableHead>
+                    
                     <TableHead className="text-xs font-medium text-muted-foreground">Stilling</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Løntype</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
@@ -919,7 +930,7 @@ export default function EmployeeMasterData() {
                         ) : <span className="text-muted-foreground/50">-</span>}
                       </TableCell>
                       <TableCell className="py-3 text-sm">{employee.private_phone || <span className="text-muted-foreground/50">-</span>}</TableCell>
-                      <TableCell className="py-3 text-sm">{employee.department || <span className="text-muted-foreground/50">-</span>}</TableCell>
+                      
                       <TableCell className="py-3">
                         {employee.job_title ? (
                           <Badge variant="secondary" className="text-xs font-normal">{employee.job_title}</Badge>
@@ -992,6 +1003,20 @@ export default function EmployeeMasterData() {
             )}
           </div>
         </div>
+          </TabsContent>
+
+          <TabsContent value="teams" className="space-y-6">
+            <TeamsTab />
+          </TabsContent>
+
+          <TabsContent value="positions" className="space-y-6">
+            <PositionsTab />
+          </TabsContent>
+
+          <TabsContent value="dialer-mapping" className="space-y-6">
+            <DialerMappingTab />
+          </TabsContent>
+        </Tabs>
 
         {/* Delete confirmation dialog */}
         <AlertDialog open={!!deleteEmployeeId} onOpenChange={(open) => !open && setDeleteEmployeeId(null)}>

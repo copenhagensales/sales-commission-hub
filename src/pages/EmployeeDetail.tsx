@@ -117,6 +117,20 @@ export default function EmployeeDetail() {
     },
   });
 
+  // Fetch job positions from the positions tab
+  const { data: jobPositions = [] } = useQuery({
+    queryKey: ["job-positions-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("job_positions")
+        .select("id, name, description")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Find corresponding vagt-flow employee by email
   const { data: vagtFlowEmployee } = useQuery({
     queryKey: ["vagt-flow-employee-match", employee?.private_email, employee?.work_email],
@@ -659,28 +673,23 @@ export default function EmployeeDetail() {
                     label="Jobtitel" 
                     value={employee.job_title} 
                     field="job_title" 
-                    options={[
-                      { value: "Salgskonsulent", label: "Salgskonsulent" },
-                      { value: "Fieldmarketing", label: "Fieldmarketing" },
-                      { value: "Teamleder", label: "Teamleder" },
-                      { value: "Assisterende Teamleder", label: "Assisterende Teamleder" },
-                      { value: "Rekruttering", label: "Rekruttering" },
-                      { value: "SOME", label: "SOME" },
-                      { value: "Backoffice", label: "Backoffice" },
-                      { value: "Projektleder", label: "Projektleder" },
-                      { value: "Ejer", label: "Ejer" },
-                    ]}
+                    options={jobPositions.length > 0 
+                      ? jobPositions.map(p => ({ value: p.name, label: p.name }))
+                      : [
+                          { value: "Salgskonsulent", label: "Salgskonsulent" },
+                          { value: "Fieldmarketing", label: "Fieldmarketing" },
+                          { value: "Teamleder", label: "Teamleder" },
+                          { value: "Assisterende Teamleder", label: "Assisterende Teamleder" },
+                          { value: "Rekruttering", label: "Rekruttering" },
+                          { value: "SOME", label: "SOME" },
+                          { value: "Backoffice", label: "Backoffice" },
+                          { value: "Projektleder", label: "Projektleder" },
+                          { value: "Ejer", label: "Ejer" },
+                        ]
+                    }
                     onSave={handleSave}
                     displayValue={employee.job_title}
-                  />
-                  <SelectRow 
-                    label="Afdeling" 
-                    value={employee.department} 
-                    field="department" 
-                    options={clients.map(c => ({ value: c.name, label: c.name }))}
-                    onSave={handleSave}
-                    displayValue={employee.department}
-                    allowClear
+                    required
                   />
                   <SelectRow 
                     label="Arbejdssted" 

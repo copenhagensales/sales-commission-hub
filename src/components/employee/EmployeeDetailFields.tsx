@@ -176,9 +176,10 @@ interface SelectRowProps {
   onSave: (field: string, value: string | null) => void;
   displayValue?: string | null;
   allowClear?: boolean;
+  required?: boolean;
 }
 
-export function SelectRow({ label, value, field, options, onSave, displayValue, allowClear = false }: SelectRowProps) {
+export function SelectRow({ label, value, field, options, onSave, displayValue, allowClear = false, required = false }: SelectRowProps) {
   const [isEditing, setIsEditing] = useState(false);
 
   const handleChange = (newValue: string) => {
@@ -193,15 +194,18 @@ export function SelectRow({ label, value, field, options, onSave, displayValue, 
   if (isEditing) {
     return (
       <tr className="border-b border-border/50 last:border-0">
-        <td className="py-2 pr-4 text-sm text-muted-foreground w-1/3">{label}</td>
+        <td className="py-2 pr-4 text-sm text-muted-foreground w-1/3">
+          {label}
+          {required && <span className="text-destructive ml-0.5">*</span>}
+        </td>
         <td className="py-1">
           <div className="flex items-center gap-1">
             <Select value={value || ""} onValueChange={handleChange}>
               <SelectTrigger className="h-8 text-sm flex-1">
-                <SelectValue />
+                <SelectValue placeholder={required ? "Vælg..." : undefined} />
               </SelectTrigger>
               <SelectContent className="z-50 bg-popover">
-                {allowClear && (
+                {allowClear && !required && (
                   <SelectItem value="__clear__" className="text-muted-foreground italic">Fjern</SelectItem>
                 )}
                 {options.map((opt) => (
@@ -223,10 +227,15 @@ export function SelectRow({ label, value, field, options, onSave, displayValue, 
       className="border-b border-border/50 last:border-0 cursor-pointer hover:bg-muted/30 transition-colors group"
       onClick={() => setIsEditing(true)}
     >
-      <td className="py-2.5 pr-4 text-sm text-muted-foreground w-1/3">{label}</td>
+      <td className="py-2.5 pr-4 text-sm text-muted-foreground w-1/3">
+        {label}
+        {required && <span className="text-destructive ml-0.5">*</span>}
+      </td>
       <td className="py-2.5 text-sm font-medium">
         <div className="flex items-center justify-between">
-          <span>{displayValue ?? "-"}</span>
+          <span className={!displayValue && required ? "text-destructive" : ""}>
+            {displayValue ?? (required ? "Ikke valgt" : "-")}
+          </span>
           <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
       </td>
