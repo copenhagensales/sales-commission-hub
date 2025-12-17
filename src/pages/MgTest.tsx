@@ -60,6 +60,7 @@ interface AggregatedProduct {
   campaignId: string | null;
   campaignLabel: string;
   isManual?: boolean;
+  sale_source?: string | null;
 }
 
 interface EditEntry {
@@ -438,6 +439,7 @@ export default function MgTest() {
               : null,
             campaignId: clientId,
             campaignLabel: clientName ?? "Ingen kunde valgt",
+            sale_source: item.sale_source,
           });
         }
       });
@@ -1962,7 +1964,7 @@ export default function MgTest() {
                                       />
                                     </TableCell>
                                     <TableCell className="text-center">
-                                      {row.isManual && row.product?.id && (
+                                      {row.isManual && row.product?.id && !row.sale_source && (
                                         <Button
                                           variant="ghost"
                                           size="icon"
