@@ -591,10 +591,22 @@ export class EnreachAdapter implements DialerAdapter {
 
   private passesDataFilters(lead: HeroBaseLead, filters: DataFilterRule[]): boolean {
     for (const filter of filters) {
-      const fieldValue = this.getNestedValue(lead, filter.field);
+      // Compat: algunas configs usan "agentEmail" como campo lógico.
+      // En Enreach el identificador del agente viene en firstProcessedByUser.orgCode / lastModifiedByUser.orgCode.
+      let fieldValue = this.getNestedValue(lead, filter.field);
+
+      if ((fieldValue === undefined || fieldValue === null || fieldValue === "") && filter.field === "agentEmail") {
+        fieldValue =
+          this.getNestedValue(lead, "firstProcessedByUser.orgCode") ??
+          this.getNestedValue(lead, "FirstProcessedByUser.orgCode") ??
+          this.getNestedValue(lead, "lastModifiedByUser.orgCode") ??
+          this.getNestedValue(lead, "LastModifiedByUser.orgCode");
+      }
+
       const strValue = fieldValue !== undefined && fieldValue !== null ? String(fieldValue) : "";
       const filterValue = filter.value;
       let passes = false;
+
       switch (filter.operator) {
         case "equals":
           passes = strValue.toLowerCase() === filterValue.toLowerCase();
@@ -617,13 +629,14 @@ export class EnreachAdapter implements DialerAdapter {
         case "regex":
           try {
             passes = new RegExp(filterValue, "i").test(strValue);
-          } catch (e) {
+          } catch {
             passes = false;
           }
           break;
         default:
           passes = true;
       }
+
       if (!passes) return false;
     }
     return true;
