@@ -35,7 +35,8 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
   const [myTeam, setMyTeam] = useState<string[]>([]);
   const [opponentTeam, setOpponentTeam] = useState<string[]>([]);
   const [period, setPeriod] = useState<PeriodType>("week");
-  const [showInviteOptions, setShowInviteOptions] = useState(false);
+  const [showInviteOptions, setShowInviteOptions] = useState(true); // Start with period selection visible
+  const [matchStarted, setMatchStarted] = useState(false); // Track if match has actually started
   const [momentum, setMomentum] = useState(50); // 0-100, 50 = neutral
   const [animateScore, setAnimateScore] = useState<'left' | 'right' | null>(null);
 
@@ -75,16 +76,41 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     return { percentComplete, timeRemainingText };
   }, [dateRange, period]);
 
-  // Fetch all agents for selection
+  // Fetch all agents for selection with team info
   const { data: agents = [] } = useQuery({
     queryKey: ["h2h-agents"],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data: agentsData } = await supabase
         .from("agents")
         .select("id, name, email, external_adversus_id")
         .eq("is_active", true)
         .order("name");
-      return data || [];
+      
+      // Get employee-agent mappings and team info
+      const { data: mappings } = await supabase
+        .from("employee_agent_mapping")
+        .select("agent_id, employee_id");
+      
+      const employeeIds = mappings?.map(m => m.employee_id) || [];
+      
+      const { data: employees } = await supabase
+        .from("employee_master_data")
+        .select("id, team_id, teams:team_id(id, name)")
+        .in("id", employeeIds.length > 0 ? employeeIds : ['none']);
+      
+      // Build agent -> team mapping
+      const agentTeamMap: Record<string, string> = {};
+      mappings?.forEach(m => {
+        const employee = employees?.find(e => e.id === m.employee_id);
+        if (employee?.teams) {
+          agentTeamMap[m.agent_id] = (employee.teams as any).name || '';
+        }
+      });
+      
+      return (agentsData || []).map(agent => ({
+        ...agent,
+        teamName: agentTeamMap[agent.id] || null
+      }));
     },
   });
 
@@ -237,9 +263,9 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(num);
   };
 
-  // Calculate wins per KPI
+  // Calculate wins per KPI (without revenue)
   const calculateKpiWins = () => {
-    if (!stats?.opponentTeam) return { sales: 'none', revenue: 'none', commission: 'none', calls: 'none', talkTime: 'none' };
+    if (!stats?.opponentTeam) return { sales: 'none', commission: 'none', calls: 'none', talkTime: 'none' };
     
     const getWinner = (left: number, right: number): 'left' | 'right' | 'tie' => {
       if (left > right) return 'left';
@@ -249,7 +275,6 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     
     return {
       sales: getWinner(stats.myTeam.salesCount, stats.opponentTeam.salesCount),
-      revenue: getWinner(stats.myTeam.revenue, stats.opponentTeam.revenue),
       commission: getWinner(stats.myTeam.commission, stats.opponentTeam.commission),
       calls: getWinner(stats.myTeam.callCount, stats.opponentTeam.callCount),
       talkTime: getWinner(stats.myTeam.talkTimeSeconds, stats.opponentTeam.talkTimeSeconds),
@@ -272,12 +297,17 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
   };
 
   const wins = calculateWins();
-  const isWinning = wins.left > wins.right;
-  const isLosing = wins.left < wins.right;
-  const isTied = wins.left === wins.right && wins.left > 0;
+  
+  // Winner is determined by commission (provision) only
+  const isWinning = stats?.opponentTeam ? stats.myTeam.commission > stats.opponentTeam.commission : false;
+  const isLosing = stats?.opponentTeam ? stats.myTeam.commission < stats.opponentTeam.commission : false;
+  const isTied = stats?.opponentTeam ? stats.myTeam.commission === stats.opponentTeam.commission : false;
+  
+  // Check if match is ongoing (has opponent AND period selected = matchStarted)
+  const isMatchOngoing = matchStarted && opponentTeam.length > 0;
   const hasOpponents = opponentTeam.length > 0;
 
-  // Generate dynamic match narrative
+  // Generate dynamic match narrative with pep-talk
   const getMatchNarrative = () => {
     if (!stats?.opponentTeam) return null;
     
@@ -285,24 +315,34 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     const rightName = opponentTeamNames.length === 1 ? opponentTeamNames[0].split(" ")[0] : "Modstanderen";
     
     // Check for close battles
-    const salesDiff = Math.abs(stats.myTeam.salesCount - stats.opponentTeam.salesCount);
-    const revenueDiff = Math.abs(stats.myTeam.revenue - stats.opponentTeam.revenue);
+    const commissionDiff = Math.abs(stats.myTeam.commission - stats.opponentTeam.commission);
+    const hasMoreCalls = stats.myTeam.callCount > stats.opponentTeam.callCount;
+    const hasMoreTalkTime = stats.myTeam.talkTimeSeconds > stats.opponentTeam.talkTimeSeconds;
     
     if (isTied) {
-      if (salesDiff <= 1) return { text: "Tæt løb – kun 1 salg kan afgøre det!", type: "intense" };
-      return { text: "Jævnbyrdig kamp – hvem tager føringen?", type: "neutral" };
+      return { text: "Lige provision – næste salg afgør!", type: "intense" };
     }
     
     if (isWinning) {
-      if (wins.left - wins.right >= 3) return { text: `${leftName} dominerer kampen`, type: "winning" };
-      if (salesDiff === 1) return { text: `${rightName} mangler kun 1 salg for at indhente`, type: "intense" };
-      return { text: `${leftName} fører – hold momentum!`, type: "winning" };
+      if (commissionDiff > 1000) return { text: `${leftName} fører stort på provision! 💪`, type: "winning" };
+      return { text: `${leftName} fører på provision – hold momentum!`, type: "winning" };
     }
     
     if (isLosing) {
-      if (wins.right - wins.left >= 3) return { text: `${rightName} har overtaget – kæmp tilbage!`, type: "losing" };
-      if (salesDiff === 1) return { text: `Kun 1 salg fra at vende kampen!`, type: "comeback" };
-      return { text: `${rightName} fører – du kan stadig vinde!`, type: "losing" };
+      // Pep-talk based on activity
+      if (hasMoreCalls && hasMoreTalkTime) {
+        return { text: `Din aktivitet er stærk! 📞 Flere opkald og taletid – det skal nok vende!`, type: "comeback" };
+      }
+      if (hasMoreCalls) {
+        return { text: `Du har flere opkald – indsatsen er god! 💪 Bliv ved, det vender snart!`, type: "comeback" };
+      }
+      if (hasMoreTalkTime) {
+        return { text: `Din taletid er højere – gode samtaler betaler sig! 🎯`, type: "comeback" };
+      }
+      if (commissionDiff < 500) {
+        return { text: `Kun ${formatCurrency(commissionDiff)} fra at vende kampen!`, type: "comeback" };
+      }
+      return { text: `${rightName} fører på provision – du kan stadig vinde!`, type: "losing" };
     }
     
     return { text: "Kampen er i gang", type: "neutral" };
@@ -507,17 +547,22 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
   };
 
   // Team member badge component
-  const TeamMemberBadge = ({ name, onRemove }: { name: string; onRemove?: () => void }) => (
+  const TeamMemberBadge = ({ name, teamName, onRemove }: { name: string; teamName?: string | null; onRemove?: () => void }) => (
     <div className="relative group">
-      <div className="px-3 py-1.5 rounded-lg bg-slate-700/80 border border-slate-600/50 flex items-center gap-2">
-        <span className="text-xs font-medium text-slate-200 truncate max-w-[80px]">{name.split(" ")[0]}</span>
-        {onRemove && (
-          <button 
-            onClick={onRemove}
-            className="w-4 h-4 bg-rose-500/80 rounded-full flex items-center justify-center hover:bg-rose-500 transition-colors"
-          >
-            <X className="w-3 h-3 text-white" />
-          </button>
+      <div className="px-3 py-1.5 rounded-lg bg-slate-700/80 border border-slate-600/50 flex flex-col items-start gap-0.5">
+        <div className="flex items-center gap-2 w-full">
+          <span className="text-xs font-medium text-slate-200 truncate max-w-[80px]">{name.split(" ")[0]}</span>
+          {onRemove && !isMatchOngoing && (
+            <button 
+              onClick={onRemove}
+              className="w-4 h-4 bg-rose-500/80 rounded-full flex items-center justify-center hover:bg-rose-500 transition-colors"
+            >
+              <X className="w-3 h-3 text-white" />
+            </button>
+          )}
+        </div>
+        {teamName && (
+          <span className="text-[9px] text-slate-400 truncate max-w-[100px]">{teamName}</span>
         )}
       </div>
     </div>
@@ -530,7 +575,8 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     isLoser, 
     showCrown,
     role,
-    colorScheme
+    colorScheme,
+    teamName
   }: { 
     name: string; 
     isWinner: boolean; 
@@ -538,6 +584,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     showCrown?: boolean;
     role?: PlayerRole;
     colorScheme: 'blue' | 'rose' | 'emerald';
+    teamName?: string | null;
   }) => {
     const gradients = {
       blue: 'from-blue-500/20 to-blue-600/10 border-blue-400/30',
@@ -563,6 +610,13 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
             <p className="text-[10px] text-slate-400 truncate max-w-full">
               {name.split(" ").slice(1).join(" ")}
             </p>
+            {/* Team tag */}
+            {teamName && (
+              <div className="flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/30">
+                <Users className="w-3 h-3 text-blue-400" />
+                <span className="text-[9px] font-medium text-blue-300">{teamName}</span>
+              </div>
+            )}
             {roleInfo && (
               <div className="flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-700/50">
                 <roleInfo.icon className="w-3 h-3 text-amber-400" />
@@ -643,31 +697,37 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
             Head to Head
           </span>
           
-          {/* Mode toggle - more prominent */}
+          {/* Mode toggle - more prominent (disabled during match) */}
           <div className="ml-auto flex items-center gap-3">
-            <div className="flex bg-slate-800 rounded-xl p-1 border border-slate-600/50 shadow-lg">
+            <div className={`flex bg-slate-800 rounded-xl p-1 border border-slate-600/50 shadow-lg ${isMatchOngoing ? 'opacity-50' : ''}`}>
               <button
                 onClick={() => {
+                  if (isMatchOngoing) return;
                   setBattleMode("1v1");
                   setMyTeam([]);
                   setOpponentTeam(opponentTeam.slice(0, 1));
                 }}
+                disabled={isMatchOngoing}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                   battleMode === "1v1" 
                     ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30" 
                     : "text-slate-400 hover:text-white hover:bg-slate-700/50"
-                }`}
+                } ${isMatchOngoing ? 'cursor-not-allowed' : ''}`}
               >
                 <Swords className="w-4 h-4" />
                 <span>1v1</span>
               </button>
               <button
-                onClick={() => setBattleMode("team")}
+                onClick={() => {
+                  if (isMatchOngoing) return;
+                  setBattleMode("team");
+                }}
+                disabled={isMatchOngoing}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                   battleMode === "team" 
                     ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30" 
                     : "text-slate-400 hover:text-white hover:bg-slate-700/50"
-                }`}
+                } ${isMatchOngoing ? 'cursor-not-allowed' : ''}`}
               >
                 <Users className="w-4 h-4" />
                 <span>Hold</span>
@@ -736,6 +796,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
               showCrown={hasOpponents && isWinning}
               role={hasOpponents ? getPlayerRole(currentEmployeeName || "", true) : null}
               colorScheme="blue"
+              teamName={null} // Current employee team could be fetched separately if needed
             />
             
             {/* Team members */}
@@ -748,13 +809,14 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                     return (
                       <TeamMemberBadge 
                         key={id} 
-                        name={agent.name} 
-                        onRemove={() => removeFromMyTeam(id)}
+                        name={agent.name}
+                        teamName={agent.teamName}
+                        onRemove={!isMatchOngoing ? () => removeFromMyTeam(id) : undefined}
                       />
                     );
                   })}
                 </div>
-                {availableForMyTeam.length > 0 && myTeam.length < 3 && (
+                {availableForMyTeam.length > 0 && myTeam.length < 3 && !isMatchOngoing && (
                   <Select onValueChange={addToMyTeam}>
                     <SelectTrigger className="h-8 text-xs bg-slate-700/50 border-slate-600/50 hover:bg-slate-600/50">
                       <Plus className="w-3 h-3 mr-1" />
@@ -779,7 +841,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                   isLosing ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 
                   'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                 }`}>
-                  {wins.left} / 5
+                  {wins.left} / 4
                 </div>
               </div>
             )}
@@ -813,6 +875,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                   showCrown={isLosing}
                   role={getPlayerRole(opponentTeamNames[0] || "", false)}
                   colorScheme="rose"
+                  teamName={opponentTeam.length === 1 ? agents.find(a => a.id === opponentTeam[0])?.teamName : null}
                 />
                 
                 {/* Opponent team members */}
@@ -825,13 +888,14 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                         return (
                           <TeamMemberBadge 
                             key={id} 
-                            name={agent.name} 
-                            onRemove={() => removeFromOpponentTeam(id)}
+                            name={agent.name}
+                            teamName={agent.teamName}
+                            onRemove={!isMatchOngoing ? () => removeFromOpponentTeam(id) : undefined}
                           />
                         );
                       })}
                     </div>
-                    {availableForOpponentTeam.length > 0 && opponentTeam.length < 4 && (
+                    {availableForOpponentTeam.length > 0 && opponentTeam.length < 4 && !isMatchOngoing && (
                       <Select onValueChange={addToOpponentTeam}>
                         <SelectTrigger className="h-8 text-xs bg-slate-700/50 border-slate-600/50 hover:bg-slate-600/50">
                           <Plus className="w-3 h-3 mr-1" />
@@ -855,7 +919,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                     isWinning ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 
                     'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                   }`}>
-                    {wins.right} / 5
+                    {wins.right} / 4
                   </div>
                 </div>
               </>
@@ -905,7 +969,6 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
             </div>
 
             <KpiBattleRow label="Salg" icon={Target} leftValue={stats.myTeam.salesCount} rightValue={stats.opponentTeam.salesCount} winner={kpiWins.sales} />
-            <KpiBattleRow label="Omsætning" icon={TrendingUp} leftValue={stats.myTeam.revenue} rightValue={stats.opponentTeam.revenue} winner={kpiWins.revenue} formatFn={formatCurrency} />
             <KpiBattleRow label="Provision" icon={DollarSign} leftValue={stats.myTeam.commission} rightValue={stats.opponentTeam.commission} winner={kpiWins.commission} formatFn={formatCurrency} />
             <KpiBattleRow label="Opkald" icon={Phone} leftValue={stats.myTeam.callCount} rightValue={stats.opponentTeam.callCount} winner={kpiWins.calls} />
             <KpiBattleRow label="Taletid" icon={Clock} leftValue={stats.myTeam.talkTimeSeconds} rightValue={stats.opponentTeam.talkTimeSeconds} winner={kpiWins.talkTime} formatFn={formatTime} />
@@ -928,29 +991,19 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         {/* Action buttons when opponent is selected */}
         {hasOpponents && (
           <div className="flex flex-col gap-3 pt-2">
-            {!showInviteOptions ? (
-              <Button 
-                onClick={() => setShowInviteOptions(true)}
-                className="relative w-full h-12 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-600 hover:via-orange-600 hover:to-amber-600 text-white font-bold text-sm shadow-lg shadow-orange-500/25 border-0 overflow-hidden group"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-                <Swords className="h-5 w-5 mr-2 group-hover:rotate-12 transition-transform" />
-                <span className="relative">
-                  {isWinning ? "🔥 Fortsæt kampen" : isLosing ? "⚔️ Vend kampen" : "⚡ Start duellen"}
-                </span>
-              </Button>
-            ) : (
+            {/* Show period selection only if match not yet started */}
+            {!matchStarted ? (
               <div className="space-y-3 animate-fade-in">
                 <p className="text-center text-sm text-slate-300 font-medium">Vælg kampperiode</p>
                 <div className="grid grid-cols-2 gap-3">
                   <Button 
                     onClick={() => {
                       setPeriod("today");
+                      setMatchStarted(true);
                       const teamLabel = battleMode === "team" ? ` (${myTeamNames.length}v${opponentTeamNames.length})` : "";
                       toast.success(`⚔️ Duel startet!${teamLabel}`, {
                         description: "Kampen gælder for i dag."
                       });
-                      setShowInviteOptions(false);
                     }}
                     variant="outline"
                     className="h-16 flex flex-col gap-1 bg-slate-800/80 border-slate-600/50 hover:bg-blue-500/20 hover:border-blue-400/50 text-white transition-all group"
@@ -961,11 +1014,11 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                   <Button 
                     onClick={() => {
                       setPeriod("week");
+                      setMatchStarted(true);
                       const teamLabel = battleMode === "team" ? ` (${myTeamNames.length}v${opponentTeamNames.length})` : "";
                       toast.success(`⚔️ Duel startet!${teamLabel}`, {
                         description: "Kampen gælder for denne uge."
                       });
-                      setShowInviteOptions(false);
                     }}
                     variant="outline"
                     className="h-16 flex flex-col gap-1 bg-slate-800/80 border-slate-600/50 hover:bg-emerald-500/20 hover:border-emerald-400/50 text-white transition-all group"
@@ -975,23 +1028,24 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                   </Button>
                 </div>
                 <button 
-                  onClick={() => setShowInviteOptions(false)}
+                  onClick={() => {
+                    setOpponentTeam([]);
+                    setMyTeam([]);
+                  }}
                   className="w-full text-xs text-slate-500 hover:text-white transition-colors py-1"
                 >
                   Annuller
                 </button>
               </div>
+            ) : (
+              <div className="flex items-center justify-center gap-2">
+                {/* Match status indicator */}
+                <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/60 border border-slate-700/50">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs text-slate-300 font-medium">Kamp i gang • {dateRange.label}</span>
+                </div>
+              </div>
             )}
-            <button 
-              onClick={() => {
-                setOpponentTeam([]);
-                setMyTeam([]);
-                setShowInviteOptions(false);
-              }}
-              className="w-full text-xs text-slate-500 hover:text-white transition-colors py-2"
-            >
-              Nulstil duel
-            </button>
           </div>
         )}
       </CardContent>
