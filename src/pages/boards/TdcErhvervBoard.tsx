@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfMonth, startOfDay, subDays } from "date-fns";
+import { format, startOfMonth, startOfDay, startOfWeek, subDays, parseISO, isAfter } from "date-fns";
 import { da } from "date-fns/locale";
 import { 
   Users, Target, Phone, TrendingUp, Award, Zap, 
@@ -108,7 +108,10 @@ export default function TdcErhvervBoard() {
   });
 
   // Process data into team stats and members
-  const { teamStats, teamMembers, recognition } = useMemo(() => {
+  const { teamStats, teamMembers, recognition, salesToday, salesThisWeek } = useMemo(() => {
+    const today = startOfDay(new Date());
+    const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }); // Monday
+
     if (!data) {
       return {
         teamStats: {
@@ -122,6 +125,8 @@ export default function TdcErhvervBoard() {
         },
         teamMembers: [],
         recognition: { mostRingetimer: null, bestEfficiency: null, dealOfWeek: null },
+        salesToday: 0,
+        salesThisWeek: 0,
       };
     }
 
@@ -130,10 +135,13 @@ export default function TdcErhvervBoard() {
     let totalSales = 0;
     let totalRevenue = 0;
     let totalCommission = 0;
+    let salesTodayCount = 0;
+    let salesWeekCount = 0;
 
     data.forEach((sale: any) => {
       const agentName = sale.agent_name?.trim() || "Ukendt";
       const existing = memberMap.get(agentName) || { sales: 0, commission: 0, revenue: 0 };
+      const saleDate = sale.sale_datetime ? parseISO(sale.sale_datetime) : null;
 
       let saleSales = 0;
       let saleCommission = 0;
@@ -154,6 +162,16 @@ export default function TdcErhvervBoard() {
       totalSales += saleSales;
       totalCommission += saleCommission;
       totalRevenue += saleRevenue;
+
+      // Calculate today and week sales
+      if (saleDate) {
+        if (!isAfter(today, saleDate) || saleDate >= today) {
+          salesTodayCount += saleSales;
+        }
+        if (!isAfter(weekStart, saleDate) || saleDate >= weekStart) {
+          salesWeekCount += saleSales;
+        }
+      }
     });
 
     // Convert to array and calculate status
@@ -213,6 +231,8 @@ export default function TdcErhvervBoard() {
         bestEfficiency,
         dealOfWeek,
       },
+      salesToday: salesTodayCount,
+      salesThisWeek: salesWeekCount,
     };
   }, [data]);
 
@@ -289,43 +309,29 @@ export default function TdcErhvervBoard() {
                 Team Performance
               </h2>
               
-              <div className="space-y-5">
-                {/* Sales Progress */}
-                <div>
+              <div className="grid grid-cols-3 gap-4">
+                {/* Salg i dag KPI */}
+                <div className="rounded-lg bg-muted/50 p-4 text-center">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Salg i dag</p>
+                  <p className="text-4xl font-bold text-primary">{salesToday}</p>
+                </div>
+
+                {/* Salg uge KPI */}
+                <div className="rounded-lg bg-muted/50 p-4 text-center">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Salg uge</p>
+                  <p className="text-4xl font-bold text-foreground">{salesThisWeek}</p>
+                </div>
+
+                {/* Salg måned KPI */}
+                <div className="rounded-lg bg-muted/50 p-4 text-center">
                   <div className="flex justify-between items-baseline mb-2">
-                    <span className="text-sm font-medium text-foreground">Salg</span>
-                    <span className="text-2xl font-bold text-foreground">
-                      {teamStats.totalSales} <span className="text-base font-normal text-muted-foreground">/ {teamStats.targetSales}</span>
-                    </span>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider">Salg måned</span>
                   </div>
-                  <Progress value={salesProgress} className="h-4" />
+                  <p className="text-4xl font-bold text-foreground">
+                    {teamStats.totalSales} <span className="text-lg font-normal text-muted-foreground">/ {teamStats.targetSales}</span>
+                  </p>
+                  <Progress value={salesProgress} className="h-2 mt-2" />
                   <p className="text-xs text-muted-foreground mt-1">{Math.round(salesProgress)}% af mål</p>
-                </div>
-
-                {/* Revenue Progress */}
-                <div>
-                  <div className="flex justify-between items-baseline mb-2">
-                    <span className="text-sm font-medium text-foreground">Omsætning</span>
-                    <span className="text-2xl font-bold text-foreground">
-                      {formatCurrency(teamStats.totalRevenue)} <span className="text-base font-normal text-muted-foreground">/ {formatCurrency(teamStats.targetRevenue)} DKK</span>
-                    </span>
-                  </div>
-                  <Progress value={revenueProgress} className="h-4" />
-                  <p className="text-xs text-muted-foreground mt-1">{Math.round(revenueProgress)}% af mål</p>
-                </div>
-
-                {/* Ringetimer Progress */}
-                <div>
-                  <div className="flex justify-between items-baseline mb-2">
-                    <span className="text-sm font-medium text-foreground flex items-center gap-1">
-                      <Phone className="h-4 w-4" /> Ringetimer
-                    </span>
-                    <span className="text-2xl font-bold text-foreground">
-                      {teamStats.totalRingetimer} <span className="text-base font-normal text-muted-foreground">/ {teamStats.targetRingetimer} timer</span>
-                    </span>
-                  </div>
-                  <Progress value={ringetimerProgress} className="h-4" />
-                  <p className="text-xs text-muted-foreground mt-1">{Math.round(ringetimerProgress)}% af forventet</p>
                 </div>
               </div>
             </div>
