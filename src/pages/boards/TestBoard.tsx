@@ -125,7 +125,7 @@ export default function TestBoard() {
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
               <TrendingUp className="h-7 w-7 text-primary-foreground" />
             </div>
-            <h1 className="text-4xl font-bold text-foreground">Kampagne Wallboard</h1>
+            <h1 className="text-4xl font-bold text-foreground">TDC Erhverv</h1>
           </div>
           <div className="flex items-center gap-4">
             <Button
