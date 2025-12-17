@@ -376,7 +376,7 @@ export class EnreachAdapter implements DialerAdapter {
         const extractedProducts = this.extractFromRule(rule, dataObj, lead);
         if (extractedProducts.length > 0) {
           products.push(...extractedProducts);
-          break;
+          // Removed break to allow multiple matching rules
         }
       }
       if (products.length > 0) return products;

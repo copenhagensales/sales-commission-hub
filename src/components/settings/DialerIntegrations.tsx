@@ -923,7 +923,7 @@ export function DialerIntegrations() {
                               </Button>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                              Rules are evaluated in order. First matching rule extracts products.
+                              Rules are evaluated in order. All matching rules extract products.
                             </p>
                             
                             {formData.conditionalRules.map((rule, index) => (
