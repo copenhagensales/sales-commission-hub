@@ -2,11 +2,12 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Calendar } from "lucide-react";
+import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Calendar, Send } from "lucide-react";
 import { startOfMonth, endOfMonth, startOfWeek, startOfDay, endOfDay } from "date-fns";
-
+import { toast } from "sonner";
 interface AgentStats {
   id: string;
   name: string;
@@ -490,14 +491,27 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
           </div>
         )}
 
-        {/* Change opponent button */}
+        {/* Action buttons when opponent is selected */}
         {opponentId && (
-          <button 
-            onClick={() => setOpponentId("")}
-            className="w-full text-xs text-slate-400 hover:text-white transition-colors pt-2"
-          >
-            Vælg en anden modstander
-          </button>
+          <div className="flex flex-col gap-2 pt-2">
+            <Button 
+              onClick={() => {
+                toast.success(`Invitation sendt til ${stats?.opponent?.name || "modstander"}!`, {
+                  description: "De vil modtage en notifikation om din udfordring."
+                });
+              }}
+              className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Inviter til duel
+            </Button>
+            <button 
+              onClick={() => setOpponentId("")}
+              className="w-full text-xs text-slate-400 hover:text-white transition-colors"
+            >
+              Vælg en anden modstander
+            </button>
+          </div>
         )}
       </CardContent>
     </Card>
