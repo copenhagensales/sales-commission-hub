@@ -13,6 +13,12 @@ export interface DataFilterRule {
   value: string;
 }
 
+// Filter group - combines multiple rules with AND/OR logic
+export interface DataFilterGroup {
+  logic: 'AND' | 'OR';  // How rules within this group are combined
+  rules: DataFilterRule[];
+}
+
 // Conditional extraction rule - checks condition then extracts products
 export interface ConditionalExtractionRule {
   conditionKey: string;           // Key to check in data object (e.g., "Antal abonnementer", "5GI salg")
@@ -32,7 +38,9 @@ export interface ProductExtractionConfig {
   defaultName?: string;      // Fallback product name if nothing found
   validationKey?: string;    // DEPRECATED: Use conditional rules instead
   conditionalRules?: ConditionalExtractionRule[];  // For 'conditional' strategy
-  dataFilters?: DataFilterRule[];  // Filter leads before processing
+  dataFilters?: DataFilterRule[];  // Filter leads before processing (legacy: all AND)
+  dataFilterGroups?: DataFilterGroup[];  // New: explicit filter groups with AND/OR logic
+  dataFilterGroupsLogic?: 'AND' | 'OR'; // How groups are combined (default: AND)
 }
 
 // Full dialer integration config stored in JSONB

@@ -10,6 +10,7 @@ import {
   DialerIntegrationConfig,
   ConditionalExtractionRule,
   DataFilterRule,
+  DataFilterGroup,
 } from "../types.ts";
 
 interface EnreachCredentials {
@@ -218,6 +219,8 @@ export class EnreachAdapter implements DialerAdapter {
       }
 
       const dataFilters = this.config?.productExtraction?.dataFilters;
+      const dataFilterGroups = this.config?.productExtraction?.dataFilterGroups;
+      const dataFilterGroupsLogic = this.config?.productExtraction?.dataFilterGroupsLogic;
 
       // Procesador por página: filtrar closure=success client-side (igual que el simulador)
       const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
@@ -228,8 +231,8 @@ export class EnreachAdapter implements DialerAdapter {
         });
 
         // Aplicar filtros de datos adicionales si existen
-        if (dataFilters && dataFilters.length > 0) {
-          filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters));
+        if ((dataFilters && dataFilters.length > 0) || (dataFilterGroups && dataFilterGroups.length > 0)) {
+          filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters || [], dataFilterGroups, dataFilterGroupsLogic));
         }
 
         return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
@@ -262,6 +265,8 @@ export class EnreachAdapter implements DialerAdapter {
       }
 
       const dataFilters = this.config?.productExtraction?.dataFilters;
+      const dataFilterGroups = this.config?.productExtraction?.dataFilterGroups;
+      const dataFilterGroupsLogic = this.config?.productExtraction?.dataFilterGroupsLogic;
 
       const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
         // Filtrar solo closure=Success (case-insensitive)
@@ -270,8 +275,8 @@ export class EnreachAdapter implements DialerAdapter {
           return closure && closure.toLowerCase() === "success";
         });
 
-        if (dataFilters && dataFilters.length > 0) {
-          filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters));
+        if ((dataFilters && dataFilters.length > 0) || (dataFilterGroups && dataFilterGroups.length > 0)) {
+          filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters || [], dataFilterGroups, dataFilterGroupsLogic));
         }
 
         return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
@@ -606,57 +611,75 @@ export class EnreachAdapter implements DialerAdapter {
     return current;
   }
 
-  private passesDataFilters(lead: HeroBaseLead, filters: DataFilterRule[]): boolean {
-    for (const filter of filters) {
-      // Compat: algunas configs usan "agentEmail" como campo lógico.
-      // En Enreach el identificador del agente viene en firstProcessedByUser.orgCode / lastModifiedByUser.orgCode.
-      let fieldValue = this.getNestedValue(lead, filter.field);
+  // Check if a single rule passes
+  private checkRule(lead: HeroBaseLead, rule: DataFilterRule): boolean {
+    let fieldValue = this.getNestedValue(lead, rule.field);
 
-      if ((fieldValue === undefined || fieldValue === null || fieldValue === "") && filter.field === "agentEmail") {
-        fieldValue =
-          this.getNestedValue(lead, "firstProcessedByUser.orgCode") ??
-          this.getNestedValue(lead, "FirstProcessedByUser.orgCode") ??
-          this.getNestedValue(lead, "lastModifiedByUser.orgCode") ??
-          this.getNestedValue(lead, "LastModifiedByUser.orgCode");
-      }
-
-      const strValue = fieldValue !== undefined && fieldValue !== null ? String(fieldValue) : "";
-      const filterValue = filter.value;
-      let passes = false;
-
-      switch (filter.operator) {
-        case "equals":
-          passes = strValue.toLowerCase() === filterValue.toLowerCase();
-          break;
-        case "notEquals":
-          passes = strValue.toLowerCase() !== filterValue.toLowerCase();
-          break;
-        case "contains":
-          passes = strValue.toLowerCase().includes(filterValue.toLowerCase());
-          break;
-        case "notContains":
-          passes = !strValue.toLowerCase().includes(filterValue.toLowerCase());
-          break;
-        case "startsWith":
-          passes = strValue.toLowerCase().startsWith(filterValue.toLowerCase());
-          break;
-        case "endsWith":
-          passes = strValue.toLowerCase().endsWith(filterValue.toLowerCase());
-          break;
-        case "regex":
-          try {
-            passes = new RegExp(filterValue, "i").test(strValue);
-          } catch {
-            passes = false;
-          }
-          break;
-        default:
-          passes = true;
-      }
-
-      if (!passes) return false;
+    // Compat: "agentEmail" maps to orgCode fields
+    if ((fieldValue === undefined || fieldValue === null || fieldValue === "") && rule.field === "agentEmail") {
+      fieldValue =
+        this.getNestedValue(lead, "firstProcessedByUser.orgCode") ??
+        this.getNestedValue(lead, "FirstProcessedByUser.orgCode") ??
+        this.getNestedValue(lead, "lastModifiedByUser.orgCode") ??
+        this.getNestedValue(lead, "LastModifiedByUser.orgCode");
     }
-    return true;
+
+    const strValue = fieldValue !== undefined && fieldValue !== null ? String(fieldValue) : "";
+    const filterValue = rule.value;
+
+    switch (rule.operator) {
+      case "equals":
+        return strValue.toLowerCase() === filterValue.toLowerCase();
+      case "notEquals":
+        return strValue.toLowerCase() !== filterValue.toLowerCase();
+      case "contains":
+        return strValue.toLowerCase().includes(filterValue.toLowerCase());
+      case "notContains":
+        return !strValue.toLowerCase().includes(filterValue.toLowerCase());
+      case "startsWith":
+        return strValue.toLowerCase().startsWith(filterValue.toLowerCase());
+      case "endsWith":
+        return strValue.toLowerCase().endsWith(filterValue.toLowerCase());
+      case "regex":
+        try {
+          return new RegExp(filterValue, "i").test(strValue);
+        } catch {
+          return false;
+        }
+      default:
+        return true;
+    }
+  }
+
+  // Check if a filter group passes (rules combined with AND or OR)
+  private checkFilterGroup(lead: HeroBaseLead, group: DataFilterGroup): boolean {
+    if (!group.rules || group.rules.length === 0) return true;
+
+    if (group.logic === "OR") {
+      // OR: at least one rule must pass
+      return group.rules.some((rule) => this.checkRule(lead, rule));
+    } else {
+      // AND (default): all rules must pass
+      return group.rules.every((rule) => this.checkRule(lead, rule));
+    }
+  }
+
+  private passesDataFilters(lead: HeroBaseLead, filters: DataFilterRule[], groups?: DataFilterGroup[], groupsLogic?: 'AND' | 'OR'): boolean {
+    // If we have new-style filter groups, use those
+    if (groups && groups.length > 0) {
+      const logic = groupsLogic || 'AND';
+      if (logic === "OR") {
+        // OR: at least one group must pass
+        return groups.some((group) => this.checkFilterGroup(lead, group));
+      } else {
+        // AND (default): all groups must pass
+        return groups.every((group) => this.checkFilterGroup(lead, group));
+      }
+    }
+
+    // Legacy: single list of filters, all must pass (AND)
+    if (!filters || filters.length === 0) return true;
+    return filters.every((rule) => this.checkRule(lead, rule));
   }
 
   async fetchUsers(): Promise<StandardUser[]> {
