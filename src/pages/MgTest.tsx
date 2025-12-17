@@ -581,6 +581,46 @@ export default function MgTest() {
       }
 
       // 1) Opdater eksisterende produkt eller opret et nyt
+      // Hvis samme product_id bruges af flere forskellige adversus_product_title, så "splitter" vi og laver et nyt produkt
+      // så redigering af ét produkt ikke ændrer de andre.
+      if (productId && row.adversus_product_title) {
+        const { data: siblingMappings, error: siblingError } = await supabase
+          .from("adversus_product_mappings")
+          .select("adversus_product_title")
+          .eq("product_id", productId);
+        if (siblingError) throw siblingError;
+
+        const isShared = !!siblingMappings?.some(
+          (m) => (m.adversus_product_title ?? "") !== (row.adversus_product_title ?? "")
+        );
+
+        if (isShared) {
+          const insertPayload: {
+            name: string;
+            commission_dkk: number;
+            revenue_dkk: number;
+            client_campaign_id?: string | null;
+          } = {
+            name: row.adversus_product_title || "Adversus produkt",
+            commission_dkk: provision,
+            revenue_dkk: cpo,
+          };
+
+          if (clientCampaignId !== null) {
+            insertPayload.client_campaign_id = clientCampaignId;
+          }
+
+          const { data: newProduct, error: insertError } = await supabase
+            .from("products")
+            .insert(insertPayload)
+            .select("id")
+            .single();
+
+          if (insertError) throw insertError;
+          productId = newProduct.id as string;
+        }
+      }
+
       if (productId) {
         const updatePayload: {
           commission_dkk: number;
