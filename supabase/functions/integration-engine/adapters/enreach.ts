@@ -104,18 +104,22 @@ export class EnreachAdapter implements DialerAdapter {
     return response.json();
   }
 
-  // Helper para obtener TODAS las páginas de leads
-  private async fetchAllPages(baseEndpoint: string): Promise<HeroBaseLead[]> {
-    let allLeads: HeroBaseLead[] = [];
+  // Helper para procesar páginas una por una SIN acumular todo en memoria
+  private async processPageByPage(
+    baseEndpoint: string,
+    processor: (leads: HeroBaseLead[]) => StandardSale[],
+    maxLeads = 50000 // Límite de seguridad para evitar OOM
+  ): Promise<StandardSale[]> {
+    const allSales: StandardSale[] = [];
     let skip = 0;
-    const take = 1000; // Pedimos bloques de 1000
+    const take = 500; // Reducido de 1000 a 500 para menor uso de memoria por página
     let hasMore = true;
     let page = 1;
+    let totalProcessed = 0;
 
-    console.log(`[EnreachAdapter] Starting pagination loop on: ${baseEndpoint}`);
+    console.log(`[EnreachAdapter] Starting pagination on: ${baseEndpoint}`);
 
-    while (hasMore) {
-      // Importante: añadimos skip y take a la URL existente
+    while (hasMore && totalProcessed < maxLeads) {
       const separator = baseEndpoint.includes("?") ? "&" : "?";
       const pagedEndpoint = `${baseEndpoint}${separator}skip=${skip}&take=${take}`;
 
@@ -131,62 +135,51 @@ export class EnreachAdapter implements DialerAdapter {
         }
 
         if (pageResults.length > 0) {
-          allLeads.push(...pageResults);
-          console.log(`[EnreachAdapter] Page ${page}: fetched ${pageResults.length} leads (Total: ${allLeads.length})`);
+          // Procesar inmediatamente y liberar memoria de la página
+          const pageSales = processor(pageResults);
+          allSales.push(...pageSales);
+          totalProcessed += pageResults.length;
+          
+          console.log(`[EnreachAdapter] Page ${page}: ${pageResults.length} leads -> ${pageSales.length} sales (Total: ${allSales.length})`);
 
-          if (pageResults.length < take) {
-            hasMore = false; // Si devuelve menos de lo que pedimos, es la última página
+          if (pageResults.length < take || totalProcessed >= maxLeads) {
+            hasMore = false;
           } else {
             skip += take;
             page++;
-            // Pequeña pausa para no saturar la API
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            await new Promise((resolve) => setTimeout(resolve, 50));
           }
         } else {
           hasMore = false;
         }
       } catch (e) {
         console.error(`[EnreachAdapter] Error fetching page ${page}:`, e);
-        // En caso de error, paramos para no buclear infinitamente, pero devolvemos lo que tengamos
         hasMore = false;
       }
     }
 
-    return allLeads;
+    if (totalProcessed >= maxLeads) {
+      console.warn(`[EnreachAdapter] Reached max leads limit (${maxLeads}). Consider using smaller date ranges.`);
+    }
+
+    return allSales;
   }
 
   async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
     try {
-      console.log(`[EnreachAdapter] Fetching ONLY SUCCESS sales for last ${days} days`);
+      // IMPORTANTE: Limitar días para evitar OOM. Máximo 7 días por llamada.
+      const effectiveDays = Math.min(days, 7);
+      if (days > 7) {
+        console.warn(`[EnreachAdapter] Requested ${days} days, limiting to ${effectiveDays} to prevent OOM`);
+      }
+      
+      console.log(`[EnreachAdapter] Fetching SUCCESS sales for last ${effectiveDays} days`);
 
       const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - days);
+      cutoffDate.setDate(cutoffDate.getDate() - effectiveDays);
       const modifiedFrom = cutoffDate.toISOString().split("T")[0];
 
-      // FILTRADO ESTRICTO: Solo traemos ventas exitosas (LeadClosures=Success)
       const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true&LeadClosures=Success`;
-
-      // USAMOS LA LÓGICA DE PAGINACIÓN AHORA
-      const allLeads = await this.fetchAllPages(endpoint);
-
-      console.log(`[EnreachAdapter] Fetched TOTAL ${allLeads.length} raw leads from API`);
-
-      // FILTRO INTERNO: Solo procesamos leads que explícitamente tengan closure="Success"
-      let filteredLeads = allLeads.filter((lead) => {
-        const closure = this.getStr(lead, ["closure", "Closure"]);
-        return closure && closure.toLowerCase() === "success";
-      });
-
-      console.log(
-        `[EnreachAdapter] Filtered ${allLeads.length} raw leads down to ${filteredLeads.length} valid sales (closure=Success)`,
-      );
-
-      const dataFilters = this.config?.productExtraction?.dataFilters;
-      if (dataFilters && dataFilters.length > 0) {
-        const beforeCount = filteredLeads.length;
-        filteredLeads = filteredLeads.filter((lead) => this.passesDataFilters(lead, dataFilters));
-        console.log(`[EnreachAdapter] Data filters applied: ${beforeCount} -> ${filteredLeads.length} leads`);
-      }
 
       const mappingLookup = new Map<string, CampaignMappingConfig>();
       if (campaignMappings) {
@@ -195,7 +188,25 @@ export class EnreachAdapter implements DialerAdapter {
         }
       }
 
-      return filteredLeads.map((lead: HeroBaseLead) => this.mapLeadToSale(lead, mappingLookup));
+      const dataFilters = this.config?.productExtraction?.dataFilters;
+
+      // Procesador que filtra y mapea cada página
+      const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
+        // Filtrar solo closure=Success
+        let filtered = leads.filter((lead) => {
+          const closure = this.getStr(lead, ["closure", "Closure"]);
+          return closure && closure.toLowerCase() === "success";
+        });
+
+        // Aplicar filtros de datos si existen
+        if (dataFilters && dataFilters.length > 0) {
+          filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters));
+        }
+
+        return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
+      };
+
+      return await this.processPageByPage(endpoint, pageProcessor);
     } catch (error) {
       console.error("[EnreachAdapter] Critical error in fetchSales:", error);
       return [];
@@ -209,25 +220,9 @@ export class EnreachAdapter implements DialerAdapter {
     try {
       const fromStr = range.from.split("T")[0];
       const toStr = range.to.split("T")[0];
-      console.log(`[EnreachAdapter] Fetching ONLY SUCCESS sales for range ${fromStr} -> ${toStr}`);
+      console.log(`[EnreachAdapter] Fetching SUCCESS sales for range ${fromStr} -> ${toStr}`);
 
-      // Solo intentamos el endpoint más específico con paginación
       const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${fromStr}&ModifiedTo=${toStr}&AllClosedStatuses=true&LeadClosures=Success`;
-
-      const allLeads = await this.fetchAllPages(endpoint);
-
-      console.log(`[EnreachAdapter] Fetched TOTAL ${allLeads.length} raw leads from API (range)`);
-
-      let filteredLeads = allLeads.filter((lead) => {
-        const closure = this.getStr(lead, ["closure", "Closure"]);
-        return closure && closure.toLowerCase() === "success";
-      });
-
-      const dataFilters = this.config?.productExtraction?.dataFilters;
-      if (dataFilters && dataFilters.length > 0) {
-        const beforeCount = filteredLeads.length;
-        filteredLeads = filteredLeads.filter((lead) => this.passesDataFilters(lead, dataFilters));
-      }
 
       const mappingLookup = new Map<string, CampaignMappingConfig>();
       if (campaignMappings) {
@@ -236,7 +231,22 @@ export class EnreachAdapter implements DialerAdapter {
         }
       }
 
-      return filteredLeads.map((lead: HeroBaseLead) => this.mapLeadToSale(lead, mappingLookup));
+      const dataFilters = this.config?.productExtraction?.dataFilters;
+
+      const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
+        let filtered = leads.filter((lead) => {
+          const closure = this.getStr(lead, ["closure", "Closure"]);
+          return closure && closure.toLowerCase() === "success";
+        });
+
+        if (dataFilters && dataFilters.length > 0) {
+          filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters));
+        }
+
+        return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
+      };
+
+      return await this.processPageByPage(endpoint, pageProcessor);
     } catch (error) {
       console.error("[EnreachAdapter] Critical error in fetchSalesRange:", error);
       return [];
