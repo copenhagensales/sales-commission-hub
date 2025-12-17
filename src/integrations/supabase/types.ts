@@ -4311,6 +4311,28 @@ export type Database = {
           status: string
         }[]
       }
+      get_sales_with_unknown_products: {
+        Args: never
+        Returns: {
+          agent_email: string
+          agent_name: string
+          campaign_name: string
+          created_at: string
+          customer_company: string
+          customer_phone: string
+          dialer_campaign_id: string
+          integration_type: string
+          product_external_id: string
+          product_title: string
+          quantity: number
+          raw_payload: Json
+          sale_datetime: string
+          sale_external_id: string
+          sale_id: string
+          sale_item_id: string
+          source: string
+        }[]
+      }
       get_user_granted_permissions: {
         Args: { _user_id: string }
         Returns: string[]
