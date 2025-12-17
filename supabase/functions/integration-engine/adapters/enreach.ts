@@ -463,12 +463,25 @@ export class EnreachAdapter implements DialerAdapter {
     const closureData = (lead.closureData || lead.ClosureData) as any[];
     if (products.length === 0 && Array.isArray(closureData) && closureData.length > 0) {
       for (const item of closureData) {
-        products.push({
-          name: item.text || item.productName || "Unknown",
-          externalId: item.sku || item.id || "unknown",
-          quantity: Number(item.amount || item.quantity || 1),
-          unitPrice: Number(item.price || item.amount || 0),
-        });
+        // Handle both string items and object items
+        if (typeof item === "string") {
+          // Skip generic/empty closure strings
+          if (item && item.trim() && item.toLowerCase() !== "ja" && item.toLowerCase() !== "yes") {
+            products.push({
+              name: item.trim(),
+              externalId: item.trim(),
+              quantity: 1,
+              unitPrice: 0,
+            });
+          }
+        } else {
+          products.push({
+            name: item.text || item.productName || "Unknown",
+            externalId: item.sku || item.id || "unknown",
+            quantity: Number(item.amount || item.quantity || 1),
+            unitPrice: Number(item.price || item.amount || 0),
+          });
+        }
       }
     }
 
