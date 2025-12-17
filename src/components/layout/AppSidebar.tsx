@@ -476,7 +476,8 @@ const [personnelOpen, setPersonnelOpen] = useState(
     ? "h-full w-full bg-sidebar overflow-y-auto" 
     : "fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar overflow-y-auto";
 
-  if (isLoading || isSomeLoading) {
+  // Wait for ALL permission data to load before rendering sidebar
+  if (isLoading || isSomeLoading || positionPermissions.isLoading) {
     return (
       <aside className={sidebarClasses}>
         <div className="flex h-full flex-col">
