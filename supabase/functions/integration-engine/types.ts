@@ -17,7 +17,7 @@ export interface DataFilterRule {
 export interface ConditionalExtractionRule {
   conditionKey: string;           // Key to check in data object (e.g., "Antal abonnementer", "5GI salg")
   conditionValue?: string;        // Optional: specific value to match (e.g., "1"). If empty, just checks key exists
-  extractionType: 'specific_fields' | 'regex' | 'static_value';
+  extractionType: 'specific_fields' | 'regex' | 'static_value' | 'composite';
   targetKeys?: string[];          // For specific_fields: ["Abonnement1", "Abonnement2"]
   regexPattern?: string;          // For regex extraction
   staticProductName?: string;     // For static_value: directly use this product name
