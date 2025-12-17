@@ -22,7 +22,8 @@ import {
   Target,
   CalendarDays,
   Plus,
-  Trash2
+  Trash2,
+  Swords
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -36,6 +37,16 @@ const Home = () => {
   const queryClient = useQueryClient();
   const [addEventOpen, setAddEventOpen] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", event_date: "", event_time: "", location: "" });
+  const [showH2H, setShowH2H] = useState(() => {
+    try {
+      return localStorage.getItem("home-show-h2h") === "true";
+    } catch { return false; }
+  });
+
+  const toggleH2H = (show: boolean) => {
+    setShowH2H(show);
+    try { localStorage.setItem("home-show-h2h", show ? "true" : "false"); } catch {}
+  };
   
   // Fetch current employee data
   const { data: employee } = useQuery({
@@ -718,11 +729,43 @@ const Home = () => {
           </Card>
         </div>
 
-        {/* Head to Head Comparison */}
-        <HeadToHeadComparison 
-          currentEmployeeId={employee?.id}
-          currentEmployeeName={employee ? `${employee.first_name} ${employee.last_name}` : undefined}
-        />
+        {/* Head to Head - Opt-in Section */}
+        {showH2H ? (
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => toggleH2H(false)}
+              className="absolute top-4 right-4 z-20 text-slate-400 hover:text-white hover:bg-slate-700/50"
+            >
+              Skjul
+            </Button>
+            <HeadToHeadComparison 
+              currentEmployeeId={employee?.id}
+              currentEmployeeName={employee ? `${employee.first_name} ${employee.last_name}` : undefined}
+            />
+          </div>
+        ) : (
+          <Card 
+            className="border border-dashed border-slate-600/50 bg-gradient-to-r from-slate-900/50 to-slate-800/50 hover:border-amber-500/50 hover:from-slate-900/80 hover:to-slate-800/80 transition-all duration-300 cursor-pointer group"
+            onClick={() => toggleH2H(true)}
+          >
+            <CardContent className="py-6 flex items-center justify-center gap-4">
+              <div className="p-3 rounded-full bg-amber-500/10 group-hover:bg-amber-500/20 transition-colors">
+                <Swords className="w-6 h-6 text-amber-400" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-foreground group-hover:text-amber-400 transition-colors">
+                  Vil du udfordre en kollega?
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Klik her for at starte en Head-to-Head duel
+                </p>
+              </div>
+              <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Motivational Quote */}
         <Card className="border-0 shadow-lg bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5">

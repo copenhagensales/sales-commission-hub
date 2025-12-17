@@ -1072,7 +1072,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
             )}
           </div>
 
-          {/* VS Badge & Comment */}
+          {/* VS Badge */}
           <div className="text-center relative pt-2 flex flex-col items-center">
             <div className="relative inline-block">
               <div className="absolute inset-0 rounded-full border-2 border-amber-400/30 animate-ping" style={{ animationDuration: '3s' }} />
@@ -1087,29 +1087,6 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                 {myTeamNames.length}v{opponentTeamNames.length}
               </p>
             )}
-            
-            {/* Match Comment/Stake */}
-            <div className="mt-3 w-full max-w-[180px]">
-              {isMatchOngoing && matchComment ? (
-                <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                  <div className="flex items-center gap-1.5 justify-center">
-                    <MessageSquare className="w-3 h-3 text-amber-400" />
-                    <span className="text-[10px] text-amber-300 font-medium">Indsats</span>
-                  </div>
-                  <p className="text-xs text-amber-200 mt-1 text-center">{matchComment}</p>
-                </div>
-              ) : !isMatchOngoing ? (
-                <div className="space-y-1">
-                  <Input
-                    value={matchComment}
-                    onChange={(e) => setMatchComment(e.target.value)}
-                    placeholder="fx 'Vi spiller om en sodavand'"
-                    className="h-8 text-[10px] bg-slate-700/50 border-slate-600/50 text-slate-200 placeholder:text-slate-500 text-center"
-                    maxLength={50}
-                  />
-                </div>
-              ) : null}
-            </div>
           </div>
 
           {/* Right Team (Opponent Team) */}
