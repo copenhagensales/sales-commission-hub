@@ -200,14 +200,15 @@ export class EnreachAdapter implements DialerAdapter {
       if (days > 7) {
         console.warn(`[EnreachAdapter] Requested ${days} days, limiting to ${effectiveDays} to prevent OOM`);
       }
-      
-      console.log(`[EnreachAdapter] Fetching SUCCESS sales for last ${effectiveDays} days`);
+
+      console.log(`[EnreachAdapter] Fetching leads for last ${effectiveDays} days (will filter closure=success client-side)`);
 
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - effectiveDays);
       const modifiedFrom = cutoffDate.toISOString().split("T")[0];
 
-      const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true&LeadClosures=Success`;
+      // NO usar LeadClosures=Success - filtrar client-side como hace el simulador
+      const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true`;
 
       const mappingLookup = new Map<string, CampaignMappingConfig>();
       if (campaignMappings) {
@@ -216,19 +217,23 @@ export class EnreachAdapter implements DialerAdapter {
         }
       }
 
-       const dataFilters = this.config?.productExtraction?.dataFilters;
+      const dataFilters = this.config?.productExtraction?.dataFilters;
 
-       // Procesador por página: el endpoint ya viene filtrado por Success (LeadClosures=Success)
-       const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
-         let filtered = leads;
+      // Procesador por página: filtrar closure=success client-side (igual que el simulador)
+      const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
+        // Filtrar solo closure=Success (case-insensitive)
+        let filtered = leads.filter((lead) => {
+          const closure = this.getStr(lead, ["closure", "Closure"]);
+          return closure && closure.toLowerCase() === "success";
+        });
 
-         // Aplicar filtros de datos si existen
-         if (dataFilters && dataFilters.length > 0) {
-           filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters));
-         }
+        // Aplicar filtros de datos adicionales si existen
+        if (dataFilters && dataFilters.length > 0) {
+          filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters));
+        }
 
-         return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
-       };
+        return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
+      };
 
       return await this.processPageByPage(endpoint, pageProcessor);
     } catch (error) {
@@ -244,9 +249,10 @@ export class EnreachAdapter implements DialerAdapter {
     try {
       const fromStr = range.from.split("T")[0];
       const toStr = range.to.split("T")[0];
-      console.log(`[EnreachAdapter] Fetching SUCCESS sales for range ${fromStr} -> ${toStr}`);
+      console.log(`[EnreachAdapter] Fetching leads for range ${fromStr} -> ${toStr} (will filter closure=success client-side)`);
 
-      const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${fromStr}&ModifiedTo=${toStr}&AllClosedStatuses=true&LeadClosures=Success`;
+      // NO usar LeadClosures=Success - filtrar client-side como hace el simulador
+      const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${fromStr}&ModifiedTo=${toStr}&AllClosedStatuses=true`;
 
       const mappingLookup = new Map<string, CampaignMappingConfig>();
       if (campaignMappings) {
@@ -255,17 +261,21 @@ export class EnreachAdapter implements DialerAdapter {
         }
       }
 
-       const dataFilters = this.config?.productExtraction?.dataFilters;
+      const dataFilters = this.config?.productExtraction?.dataFilters;
 
-       const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
-         let filtered = leads;
+      const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
+        // Filtrar solo closure=Success (case-insensitive)
+        let filtered = leads.filter((lead) => {
+          const closure = this.getStr(lead, ["closure", "Closure"]);
+          return closure && closure.toLowerCase() === "success";
+        });
 
-         if (dataFilters && dataFilters.length > 0) {
-           filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters));
-         }
+        if (dataFilters && dataFilters.length > 0) {
+          filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters));
+        }
 
-         return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
-       };
+        return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
+      };
 
       return await this.processPageByPage(endpoint, pageProcessor);
     } catch (error) {
