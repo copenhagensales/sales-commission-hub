@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, ChevronDown, Search } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Loader2, ChevronDown, Search, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -207,6 +208,17 @@ export default function MgTest() {
     campaignName: string;
   } | null>(null);
   const [retroactiveSyncing, setRetroactiveSyncing] = useState(false);
+
+  // Create product dialog state
+  const [createProductDialog, setCreateProductDialog] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    name: "",
+    clientId: "",
+    commission: "0",
+    revenue: "0",
+    externalCode: "",
+    countsAsSale: true,
+  });
 
   // Inspector mutation - fetch sample fields from Adversus
   const inspectCampaignMutation = useMutation({
@@ -723,6 +735,64 @@ export default function MgTest() {
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke opdatere");
+    },
+  });
+
+  // Mutation to create a manual product
+  const createManualProduct = useMutation({
+    mutationFn: async (productData: typeof newProduct) => {
+      const commission = parseFloat(productData.commission.replace(",", ".")) || 0;
+      const revenue = parseFloat(productData.revenue.replace(",", ".")) || 0;
+
+      // Find or create client_campaign for the selected client
+      let clientCampaignId: string | null = null;
+      if (productData.clientId) {
+        const { data: campaigns } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", productData.clientId);
+
+        if (campaigns && campaigns.length > 0) {
+          clientCampaignId = campaigns[0].id;
+        } else {
+          const { data: newCampaign, error: insertError } = await supabase
+            .from("client_campaigns")
+            .insert({ client_id: productData.clientId, name: "Standard" })
+            .select("id")
+            .single();
+
+          if (insertError) throw insertError;
+          clientCampaignId = newCampaign.id;
+        }
+      }
+
+      const { error } = await supabase.from("products").insert({
+        name: productData.name.trim(),
+        client_campaign_id: clientCampaignId,
+        commission_dkk: commission,
+        revenue_dkk: revenue,
+        external_product_code: productData.externalCode.trim() || null,
+        counts_as_sale: productData.countsAsSale,
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Produkt oprettet");
+      setCreateProductDialog(false);
+      setNewProduct({
+        name: "",
+        clientId: "",
+        commission: "0",
+        revenue: "0",
+        externalCode: "",
+        countsAsSale: true,
+      });
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke oprette produkt");
     },
   });
 
@@ -1384,6 +1454,12 @@ export default function MgTest() {
 
           {/* Mapping produkt */}
           <TabsContent value="product" className="space-y-4">
+            <div className="flex justify-end">
+              <Button onClick={() => setCreateProductDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Opret produkt
+              </Button>
+            </div>
             {isLoadingProductsTab ? (
               <Card>
                 <CardContent className="flex items-center justify-center py-12 text-muted-foreground gap-2">
@@ -2315,6 +2391,110 @@ export default function MgTest() {
               className="w-full"
             >
               Nej, kun fremtidige
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Product Dialog */}
+      <Dialog open={createProductDialog} onOpenChange={setCreateProductDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Opret nyt produkt</DialogTitle>
+            <DialogDescription>
+              Opret et produkt manuelt uden at det kommer fra en integration.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="product-name">Produktnavn *</Label>
+              <Input
+                id="product-name"
+                value={newProduct.name}
+                onChange={(e) => setNewProduct((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Indtast produktnavn"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="product-client">Kunde</Label>
+              <Select
+                value={newProduct.clientId || undefined}
+                onValueChange={(value) => setNewProduct((prev) => ({ ...prev, clientId: value }))}
+              >
+                <SelectTrigger id="product-client">
+                  <SelectValue placeholder="Vælg kunde" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients?.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="product-commission">Provision (DKK)</Label>
+                <Input
+                  id="product-commission"
+                  type="text"
+                  inputMode="decimal"
+                  value={newProduct.commission}
+                  onChange={(e) => setNewProduct((prev) => ({ ...prev, commission: e.target.value }))}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="product-revenue">Omsætning (DKK)</Label>
+                <Input
+                  id="product-revenue"
+                  type="text"
+                  inputMode="decimal"
+                  value={newProduct.revenue}
+                  onChange={(e) => setNewProduct((prev) => ({ ...prev, revenue: e.target.value }))}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="product-code">Ekstern produktkode</Label>
+              <Input
+                id="product-code"
+                value={newProduct.externalCode}
+                onChange={(e) => setNewProduct((prev) => ({ ...prev, externalCode: e.target.value }))}
+                placeholder="Valgfrit"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="product-counts"
+                checked={newProduct.countsAsSale}
+                onCheckedChange={(checked) =>
+                  setNewProduct((prev) => ({ ...prev, countsAsSale: checked === true }))
+                }
+              />
+              <Label htmlFor="product-counts" className="text-sm font-normal">
+                Tæl som salg
+              </Label>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setCreateProductDialog(false)}>
+              Annuller
+            </Button>
+            <Button
+              onClick={() => createManualProduct.mutate(newProduct)}
+              disabled={!newProduct.name.trim() || createManualProduct.isPending}
+            >
+              {createManualProduct.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Opretter...
+                </>
+              ) : (
+                "Opret produkt"
+              )}
             </Button>
           </div>
         </DialogContent>
