@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Calendar, Send, Crown, Zap, Users } from "lucide-react";
-import { startOfMonth, endOfMonth, startOfWeek, startOfDay, endOfDay } from "date-fns";
+import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, CalendarRange } from "lucide-react";
+import { startOfWeek, startOfDay, endOfDay } from "date-fns";
 import { toast } from "sonner";
 
 interface AgentStats {
@@ -24,11 +24,12 @@ interface HeadToHeadComparisonProps {
   currentEmployeeName?: string;
 }
 
-type PeriodType = "today" | "week" | "month";
+type PeriodType = "today" | "week";
 
 export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }: HeadToHeadComparisonProps) => {
   const [opponentId, setOpponentId] = useState<string>("");
   const [period, setPeriod] = useState<PeriodType>("week");
+  const [showInviteOptions, setShowInviteOptions] = useState(false);
 
   // Calculate date range based on period
   const dateRange = useMemo(() => {
@@ -38,8 +39,6 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         return { start: startOfDay(now), end: endOfDay(now), label: "I dag" };
       case "week":
         return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfDay(now), label: "Denne uge" };
-      case "month":
-        return { start: startOfMonth(now), end: endOfMonth(now), label: "Denne måned" };
       default:
         return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfDay(now), label: "Denne uge" };
     }
@@ -389,21 +388,6 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
           <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
             Head to Head
           </span>
-          
-          {/* Period selector */}
-          <div className="ml-auto flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-slate-400" />
-            <Select value={period} onValueChange={(v) => setPeriod(v as PeriodType)}>
-              <SelectTrigger className="w-[120px] h-8 bg-slate-800/80 border-slate-600/50 text-white text-xs backdrop-blur-sm hover:bg-slate-700/80 transition-colors">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-800 border-slate-700">
-                <SelectItem value="today">I dag</SelectItem>
-                <SelectItem value="week">Denne uge</SelectItem>
-                <SelectItem value="month">Denne måned</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </CardTitle>
       </CardHeader>
       
@@ -577,20 +561,61 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
         {/* Action buttons when opponent is selected */}
         {opponentId && (
           <div className="flex flex-col gap-3 pt-2">
-            <Button 
-              onClick={() => {
-                toast.success(`Invitation sendt til ${stats?.opponent?.name || "modstander"}!`, {
-                  description: "De vil modtage en notifikation om din udfordring."
-                });
-              }}
-              className="relative w-full h-11 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-600 hover:via-orange-600 hover:to-amber-600 text-white font-bold text-sm shadow-lg shadow-orange-500/25 border-0 overflow-hidden group"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-              <Send className="h-4 w-4 mr-2 group-hover:translate-x-1 transition-transform" />
-              Inviter til duel
-            </Button>
+            {!showInviteOptions ? (
+              <Button 
+                onClick={() => setShowInviteOptions(true)}
+                className="relative w-full h-11 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-600 hover:via-orange-600 hover:to-amber-600 text-white font-bold text-sm shadow-lg shadow-orange-500/25 border-0 overflow-hidden group"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                <Send className="h-4 w-4 mr-2 group-hover:translate-x-1 transition-transform" />
+                Inviter til duel
+              </Button>
+            ) : (
+              <div className="space-y-3 animate-fade-in">
+                <p className="text-center text-sm text-slate-300 font-medium">Vælg duel-periode</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button 
+                    onClick={() => {
+                      setPeriod("today");
+                      toast.success(`Invitation sendt til ${stats?.opponent?.name || "modstander"}!`, {
+                        description: "Duellen gælder for i dag."
+                      });
+                      setShowInviteOptions(false);
+                    }}
+                    variant="outline"
+                    className="h-16 flex flex-col gap-1 bg-slate-800/80 border-slate-600/50 hover:bg-blue-500/20 hover:border-blue-400/50 text-white transition-all group"
+                  >
+                    <CalendarDays className="h-5 w-5 text-blue-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-bold">I dag</span>
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      setPeriod("week");
+                      toast.success(`Invitation sendt til ${stats?.opponent?.name || "modstander"}!`, {
+                        description: "Duellen gælder for denne uge."
+                      });
+                      setShowInviteOptions(false);
+                    }}
+                    variant="outline"
+                    className="h-16 flex flex-col gap-1 bg-slate-800/80 border-slate-600/50 hover:bg-emerald-500/20 hover:border-emerald-400/50 text-white transition-all group"
+                  >
+                    <CalendarRange className="h-5 w-5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-bold">Denne uge</span>
+                  </Button>
+                </div>
+                <button 
+                  onClick={() => setShowInviteOptions(false)}
+                  className="w-full text-xs text-slate-500 hover:text-white transition-colors py-1"
+                >
+                  Annuller
+                </button>
+              </div>
+            )}
             <button 
-              onClick={() => setOpponentId("")}
+              onClick={() => {
+                setOpponentId("");
+                setShowInviteOptions(false);
+              }}
               className="w-full text-xs text-slate-500 hover:text-white transition-colors py-2"
             >
               Vælg en anden modstander
