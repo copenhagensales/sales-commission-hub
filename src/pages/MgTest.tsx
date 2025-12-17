@@ -351,6 +351,19 @@ export default function MgTest() {
     },
   });
 
+  // Hent produkt-IDs der er mappet via adversus_product_mappings (disse må IKKE slettes)
+  const { data: mappedProductIds } = useQuery({
+    queryKey: ["mg-mapped-product-ids"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("adversus_product_mappings")
+        .select("product_id")
+        .not("product_id", "is", null);
+      if (error) throw error;
+      return new Set((data ?? []).map((row) => row.product_id as string));
+    },
+  });
+
   // Medarbejderkilder og master-profiler
   const { data: agents, isLoading: loadingAgents } = useQuery<AgentRow[]>({
     queryKey: ["mg-agents"],
@@ -392,9 +405,10 @@ export default function MgTest() {
   } = useVagtEmployees();
 
   // Transform RPC data to AggregatedProduct format (server already did the aggregation)
-  // Track product IDs that appear in aggregated data (linked to sales)
+  // Track product IDs that are linked to sales OR mapped via adversus_product_mappings
   const linkedProductIds = useMemo(() => {
     const ids = new Set<string>();
+    // Add products linked to sale_items
     if (aggregatedProductsRpc) {
       aggregatedProductsRpc.forEach((item) => {
         if (item.product_id) {
@@ -402,8 +416,12 @@ export default function MgTest() {
         }
       });
     }
+    // Add products from adversus_product_mappings
+    if (mappedProductIds) {
+      mappedProductIds.forEach((id) => ids.add(id));
+    }
     return ids;
-  }, [aggregatedProductsRpc]);
+  }, [aggregatedProductsRpc, mappedProductIds]);
 
   const aggregatedProducts: AggregatedProduct[] = useMemo(() => {
     const products: AggregatedProduct[] = [];
@@ -1002,6 +1020,7 @@ export default function MgTest() {
       toast.success("Produkt slettet");
       queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
       queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-mapped-product-ids"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
     onError: (error: any) => {
