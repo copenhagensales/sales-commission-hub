@@ -388,7 +388,7 @@ export default function MgTest() {
         }
       }
 
-      const productKey = item.adversus_external_id || item.adversus_product_title || "";
+      const productKey = `${item.adversus_external_id ?? ""}::${item.adversus_product_title ?? ""}`;
       const fullKey = `${clientId ?? "no-client"}::${productKey}`;
 
       return {
@@ -627,33 +627,51 @@ export default function MgTest() {
         productId = newProduct.id as string;
       }
 
-      // 2) Opret/opdatér mapping baseret på adversus_external_id + adversus_product_title (composite key)
-      if (row.adversus_external_id) {
-        // First check if mapping with this exact combination exists
-        const { data: existingMapping } = await supabase
+      // 2) Opret/opdatér mapping.
+      // Hvis adversus_external_id ikke er unik (samme external_id på flere titler), gemmer vi mappingen title-baseret (external_id = null)
+      // for at undgå at to forskellige produkter "kobles" sammen.
+      if (row.adversus_product_title) {
+        const hasExternalId = !!row.adversus_external_id;
+        const externalIdHasCollision = !!(
+          hasExternalId &&
+          aggregatedProductsRpc?.some(
+            (p) =>
+              p.adversus_external_id === row.adversus_external_id &&
+              (p.adversus_product_title ?? "") !== (row.adversus_product_title ?? "")
+          )
+        );
+
+        const mappingExternalId = hasExternalId && !externalIdHasCollision ? row.adversus_external_id : null;
+
+        const mappingQuery = supabase
           .from("adversus_product_mappings")
           .select("id")
-          .eq("adversus_external_id", row.adversus_external_id)
-          .eq("adversus_product_title", row.adversus_product_title || "")
-          .maybeSingle();
+          .eq("adversus_product_title", row.adversus_product_title);
+
+        const { data: existingMapping } = mappingExternalId
+          ? await mappingQuery.eq("adversus_external_id", mappingExternalId).maybeSingle()
+          : await mappingQuery.is("adversus_external_id", null).maybeSingle();
 
         if (existingMapping) {
-          // Update existing mapping
           const { error: updateError } = await supabase
             .from("adversus_product_mappings")
             .update({ product_id: productId })
             .eq("id", existingMapping.id);
           if (updateError) throw updateError;
         } else {
-          // Insert new mapping
-          const { error: insertError } = await supabase
-            .from("adversus_product_mappings")
-            .insert({
-              adversus_external_id: row.adversus_external_id,
-              adversus_product_title: row.adversus_product_title,
-              product_id: productId,
-            });
+          const { error: insertError } = await supabase.from("adversus_product_mappings").insert({
+            adversus_external_id: mappingExternalId,
+            adversus_product_title: row.adversus_product_title,
+            product_id: productId,
+          });
           if (insertError) throw insertError;
+        }
+
+        if (externalIdHasCollision) {
+          toast.message("Bemærk", {
+            description:
+              "Denne External ID bruges af flere produkter. Mapping gemmes derfor via produktnavn for at holde dem adskilt.",
+          });
         }
       }
 
@@ -727,14 +745,28 @@ export default function MgTest() {
         
         if (createError) throw createError;
         
-        // Create mapping if we have external_id (use composite key lookup)
-        if (row.adversus_external_id && newProduct) {
-          const { data: existingMapping } = await supabase
+        // Create mapping (same collision handling as above)
+        if (row.adversus_product_title && newProduct) {
+          const hasExternalId = !!row.adversus_external_id;
+          const externalIdHasCollision = !!(
+            hasExternalId &&
+            aggregatedProductsRpc?.some(
+              (p) =>
+                p.adversus_external_id === row.adversus_external_id &&
+                (p.adversus_product_title ?? "") !== (row.adversus_product_title ?? "")
+            )
+          );
+
+          const mappingExternalId = hasExternalId && !externalIdHasCollision ? row.adversus_external_id : null;
+
+          const mappingQuery = supabase
             .from("adversus_product_mappings")
             .select("id")
-            .eq("adversus_external_id", row.adversus_external_id)
-            .eq("adversus_product_title", row.adversus_product_title || "")
-            .maybeSingle();
+            .eq("adversus_product_title", row.adversus_product_title);
+
+          const { data: existingMapping } = mappingExternalId
+            ? await mappingQuery.eq("adversus_external_id", mappingExternalId).maybeSingle()
+            : await mappingQuery.is("adversus_external_id", null).maybeSingle();
 
           if (existingMapping) {
             await supabase
@@ -742,13 +774,11 @@ export default function MgTest() {
               .update({ product_id: newProduct.id })
               .eq("id", existingMapping.id);
           } else {
-            await supabase
-              .from("adversus_product_mappings")
-              .insert({
-                adversus_external_id: row.adversus_external_id,
-                adversus_product_title: row.adversus_product_title,
-                product_id: newProduct.id,
-              });
+            await supabase.from("adversus_product_mappings").insert({
+              adversus_external_id: mappingExternalId,
+              adversus_product_title: row.adversus_product_title,
+              product_id: newProduct.id,
+            });
           }
         }
         
