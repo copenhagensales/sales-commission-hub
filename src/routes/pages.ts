@@ -71,7 +71,7 @@ export const UpcomingHires = lazyPage(() => import("@/pages/recruitment/Upcoming
 export const Some = lazyPage(() => import("@/pages/Some"));
 export const TimeStamp = lazyPage(() => import("@/pages/TimeStamp"));
 
-export const TestBoard = lazyPage(() => import("@/pages/boards/TestBoard"));
+export const TestBoard = lazyPage(() => import("@/pages/boards/TdcErhvervBoard"));
 export const EconomicBoard = lazyPage(() => import("@/pages/boards/EconomicBoard"));
 export const ClientSalesOverview = lazyPage(() => import("@/pages/ClientSalesOverview"));
 export const SalesDashboard = lazyPage(() => import("@/pages/boards/SalesDashboard"));
