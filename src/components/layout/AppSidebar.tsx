@@ -29,7 +29,6 @@ const getOwnerNavigation = (t: (key: string) => string) => [
 // Personale (Personnel) submenu navigation
 const getPersonnelNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.employees"), href: "/employees", icon: Users },
-  { name: t("sidebar.teams"), href: "/teams", icon: Users },
 ];
 
 // Ledelse (Management) submenu navigation
@@ -71,7 +70,6 @@ const getTeamlederNavigation = (t: (key: string) => string) => [
 // Navigation items for rekruttering role (without Rekruttering - that's in submenu)
 const getRekrutteringNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.employees"), href: "/employees", icon: Users },
-  { name: t("sidebar.teams"), href: "/teams", icon: Users },
   { name: t("sidebar.contracts"), href: "/contracts", icon: FileText },
   { name: t("sidebar.myContracts"), href: "/my-contracts", icon: FileText },
   { name: t("sidebar.careerWishesOverview"), href: "/career-wishes-overview", icon: Sparkles },
@@ -168,8 +166,8 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [ledelseOpen, setLedelseOpen] = useState(
     ["/contracts", "/permissions", "/career-wishes-overview"].some(p => location.pathname.startsWith(p))
   );
-  const [personnelOpen, setPersonnelOpen] = useState(
-    ["/employees", "/teams"].some(p => location.pathname.startsWith(p))
+const [personnelOpen, setPersonnelOpen] = useState(
+    location.pathname.startsWith("/employees")
   );
   const [mgOpen, setMgOpen] = useState(
     ["/payroll", "/tdc-erhverv", "/codan", "/mg-test", "/mg-test-dashboard", "/dialer-data", "/adversus-data", "/calls-data"].includes(location.pathname)
@@ -373,7 +371,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     '/pulse-survey': 'pulse-survey',
     '/some': 'some',
     '/employees': 'employees',
-    '/teams': 'teams',
     '/contracts': 'contracts',
     '/my-contracts': 'my-contracts',
     '/my-profile': 'my-profile',
