@@ -835,62 +835,78 @@ export function PositionsTab() {
                                         }
                                       </TooltipContent>
                                     </Tooltip>
-                                    {permission.scopeKey && (
-                                      <div className="flex items-center gap-2 pl-2 border-l">
+                                    {permission.scopeKey && (() => {
+                                      const hasAccess = isOwnerLocked || getPermissionValue(permission.key, "view") || getPermissionValue(permission.key, "edit");
+                                      return (
                                         <Tooltip>
                                           <TooltipTrigger asChild>
-                                            <Database className="h-3.5 w-3.5 text-muted-foreground" />
+                                            <div className={cn(
+                                              "flex items-center gap-2 pl-2 border-l transition-opacity",
+                                              !hasAccess && "opacity-40"
+                                            )}>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <Database className="h-3.5 w-3.5 text-muted-foreground" />
+                                                </TooltipTrigger>
+                                                <TooltipContent>Data synlighed</TooltipContent>
+                                              </Tooltip>
+                                              <RadioGroup
+                                                value={isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)}
+                                                onValueChange={(value) => handleScopeChange(permission.scopeKey!, value as DataScope)}
+                                                className="flex items-center gap-2"
+                                                disabled={!!isOwnerLocked || !hasAccess}
+                                              >
+                                                <div className="flex items-center gap-1">
+                                                  <RadioGroupItem value="egen" id={`${permission.scopeKey}-egen`} className="h-3 w-3" />
+                                                  <Label 
+                                                    htmlFor={`${permission.scopeKey}-egen`} 
+                                                    className={cn(
+                                                      "text-xs cursor-pointer flex items-center gap-0.5",
+                                                      !hasAccess && "cursor-not-allowed",
+                                                      (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)) === "egen" && hasAccess && "text-primary font-medium"
+                                                    )}
+                                                  >
+                                                    <User className="h-3 w-3" />
+                                                    Egen
+                                                  </Label>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                  <RadioGroupItem value="team" id={`${permission.scopeKey}-team`} className="h-3 w-3" />
+                                                  <Label 
+                                                    htmlFor={`${permission.scopeKey}-team`} 
+                                                    className={cn(
+                                                      "text-xs cursor-pointer flex items-center gap-0.5",
+                                                      !hasAccess && "cursor-not-allowed",
+                                                      (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)) === "team" && hasAccess && "text-primary font-medium"
+                                                    )}
+                                                  >
+                                                    <Users className="h-3 w-3" />
+                                                    Team
+                                                  </Label>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                  <RadioGroupItem value="alt" id={`${permission.scopeKey}-alt`} className="h-3 w-3" />
+                                                  <Label 
+                                                    htmlFor={`${permission.scopeKey}-alt`} 
+                                                    className={cn(
+                                                      "text-xs cursor-pointer flex items-center gap-0.5",
+                                                      !hasAccess && "cursor-not-allowed",
+                                                      (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)) === "alt" && hasAccess && "text-primary font-medium"
+                                                    )}
+                                                  >
+                                                    <Globe className="h-3 w-3" />
+                                                    Alt
+                                                  </Label>
+                                                </div>
+                                              </RadioGroup>
+                                            </div>
                                           </TooltipTrigger>
-                                          <TooltipContent>Data synlighed</TooltipContent>
+                                          {!hasAccess && (
+                                            <TooltipContent>Aktiver 'Se' eller 'Ret' først</TooltipContent>
+                                          )}
                                         </Tooltip>
-                                        <RadioGroup
-                                          value={isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)}
-                                          onValueChange={(value) => handleScopeChange(permission.scopeKey!, value as DataScope)}
-                                          className="flex items-center gap-2"
-                                          disabled={!!isOwnerLocked}
-                                        >
-                                          <div className="flex items-center gap-1">
-                                            <RadioGroupItem value="egen" id={`${permission.scopeKey}-egen`} className="h-3 w-3" />
-                                            <Label 
-                                              htmlFor={`${permission.scopeKey}-egen`} 
-                                              className={cn(
-                                                "text-xs cursor-pointer flex items-center gap-0.5",
-                                                (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)) === "egen" && "text-primary font-medium"
-                                              )}
-                                            >
-                                              <User className="h-3 w-3" />
-                                              Egen
-                                            </Label>
-                                          </div>
-                                          <div className="flex items-center gap-1">
-                                            <RadioGroupItem value="team" id={`${permission.scopeKey}-team`} className="h-3 w-3" />
-                                            <Label 
-                                              htmlFor={`${permission.scopeKey}-team`} 
-                                              className={cn(
-                                                "text-xs cursor-pointer flex items-center gap-0.5",
-                                                (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)) === "team" && "text-primary font-medium"
-                                              )}
-                                            >
-                                              <Users className="h-3 w-3" />
-                                              Team
-                                            </Label>
-                                          </div>
-                                          <div className="flex items-center gap-1">
-                                            <RadioGroupItem value="alt" id={`${permission.scopeKey}-alt`} className="h-3 w-3" />
-                                            <Label 
-                                              htmlFor={`${permission.scopeKey}-alt`} 
-                                              className={cn(
-                                                "text-xs cursor-pointer flex items-center gap-0.5",
-                                                (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)) === "alt" && "text-primary font-medium"
-                                              )}
-                                            >
-                                              <Globe className="h-3 w-3" />
-                                              Alt
-                                            </Label>
-                                          </div>
-                                        </RadioGroup>
-                                      </div>
-                                    )}
+                                      );
+                                    })()}
                                   </div>
                                 ) : (
                                   <Tooltip>
