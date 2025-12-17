@@ -171,70 +171,51 @@ export default function SalesDashboard() {
     );
   }
 
+  const medals = ["🥇", "🥈", "🥉"];
+
   return (
     <div className="h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-[5%] flex flex-col overflow-hidden box-border">
-      {/* Header */}
-      <header className="flex items-center justify-between mb-3 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <img 
-            src="/images/cph-sales-logo-light.png" 
-            alt="Copenhagen Sales" 
-            className="h-10 lg:h-12"
-          />
-          <div>
-            <h1 className="text-xl lg:text-2xl font-bold tracking-tight">Sales Dashboard</h1>
-            <p className="text-slate-400 text-xs">Live kundeoversigt</p>
+      {/* Compact Header */}
+      <header className="flex-shrink-0 rounded-xl bg-gradient-to-r from-slate-800/50 to-slate-900/50 border border-slate-700/50 px-4 py-2 mb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <img 
+              src="/images/cph-sales-logo-light.png" 
+              alt="Copenhagen Sales" 
+              className="h-8"
+            />
+            <h1 className="text-lg font-bold">Sales Dashboard</h1>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
-              toast.success("Link kopieret til udklipsholder");
-            }}
-            className="gap-1.5 border-slate-700 bg-slate-800/50 hover:bg-slate-700 text-slate-300 h-8 text-xs"
-          >
-            <Link className="h-3.5 w-3.5" />
-            Kopier
-          </Button>
-          <div className="text-right">
-            <p className="text-2xl lg:text-3xl font-bold tabular-nums">
-              {currentTime.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}
-            </p>
-            <p className="text-slate-400 text-xs">
-              {currentTime.toLocaleDateString("da-DK", { weekday: "short", day: "numeric", month: "short" })}
-            </p>
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <p className="text-[10px] text-slate-400">I dag</p>
+              <p className="text-2xl font-bold text-emerald-400">{isLoading ? "..." : totalSalesToday}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-slate-400">Denne måned</p>
+              <p className="text-2xl font-bold">{isLoading ? "..." : totalSalesMonth}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold tabular-nums">
+                {currentTime.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" })}
+              </p>
+              <p className="text-slate-400 text-[10px]">
+                {currentTime.toLocaleDateString("da-DK", { weekday: "short", day: "numeric", month: "short" })}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleFullscreen}
+              className="h-8 w-8 border-slate-700 bg-slate-800/50 hover:bg-slate-700"
+            >
+              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            </Button>
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={toggleFullscreen}
-            className="h-8 w-8 border-slate-700 bg-slate-800/50 hover:bg-slate-700"
-          >
-            {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-          </Button>
         </div>
       </header>
 
-      {/* Totals strip */}
-      <div className="grid grid-cols-3 gap-2 mb-3 flex-shrink-0">
-        <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-900/30 rounded-xl p-3 border border-emerald-500/30">
-          <p className="text-emerald-300 text-[10px] uppercase tracking-wide mb-0.5">Salg i dag</p>
-          <p className="text-2xl lg:text-4xl font-bold">{isLoading ? "..." : totalSalesToday}</p>
-        </div>
-        <div className="bg-gradient-to-br from-blue-500/20 to-blue-900/30 rounded-xl p-3 border border-blue-500/30">
-          <p className="text-blue-300 text-[10px] uppercase tracking-wide mb-0.5">Salg denne måned</p>
-          <p className="text-2xl lg:text-4xl font-bold">{isLoading ? "..." : totalSalesMonth}</p>
-        </div>
-        <div className="bg-gradient-to-br from-amber-500/20 to-amber-900/30 rounded-xl p-3 border border-amber-500/30">
-          <p className="text-amber-300 text-[10px] uppercase tracking-wide mb-0.5">Omsætning denne måned</p>
-          <p className="text-xl lg:text-3xl font-bold">{isLoading ? "..." : formatCurrency(totalRevenueMonth)}</p>
-        </div>
-      </div>
-
-      {/* Client cards grid - optimized for TV safe zone */}
+      {/* Client cards grid */}
       {isLoading ? (
         <div className="grid gap-2 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 flex-1 min-h-0">
           {[...Array(10)].map((_, i) => (
@@ -288,14 +269,27 @@ export default function SalesDashboard() {
                   </div>
                 </div>
                 
-                {/* Top seller (only show #1 for space) */}
+                {/* Top sellers - show top 3 with medals */}
                 {client.top_sellers && client.top_sellers.length > 0 && (
-                  <div className="flex items-center gap-1.5 bg-black/20 backdrop-blur rounded-lg px-2 py-1 flex-shrink-0">
-                    <Trophy className="w-3 h-3 text-amber-400 shrink-0" />
-                    <span className="text-[10px] truncate flex-1">{client.top_sellers[0].agent_name}</span>
-                    <Badge variant="secondary" className="text-[8px] font-bold shrink-0 px-1 py-0">
-                      {client.top_sellers[0].count}
-                    </Badge>
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <div className="flex items-center gap-1 text-[8px] text-slate-400 mb-0.5">
+                      <Trophy className="w-2.5 h-2.5 text-amber-400" />
+                      <span>Top</span>
+                    </div>
+                    <div className="space-y-0.5">
+                      {client.top_sellers.slice(0, 3).map((seller, i) => (
+                        <div 
+                          key={`${client.client_id}-${seller.agent_name}-${i}`}
+                          className="flex items-center justify-between bg-black/20 rounded px-1 py-0.5 text-[10px]"
+                        >
+                          <div className="flex items-center gap-0.5 min-w-0">
+                            <span className="text-[8px]">{medals[i]}</span>
+                            <span className="truncate">{seller.agent_name}</span>
+                          </div>
+                          <span className="font-semibold text-[8px] flex-shrink-0 ml-0.5">{seller.count}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
