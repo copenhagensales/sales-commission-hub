@@ -15,6 +15,7 @@ export const MgTestDashboard = lazyPage(() => import("@/pages/MgTestDashboard"))
 export const KmTest = lazyPage(() => import("@/pages/KmTest"));
 export const Codan = lazyPage(() => import("@/pages/Codan"));
 export const TdcErhverv = lazyPage(() => import("@/pages/TdcErhverv"));
+export const TdcErhvervDashboard = lazyPage(() => import("@/pages/TdcErhvervDashboard"));
 export const NotFound = lazyPage(() => import("@/pages/NotFound"));
 export const AdversusData = lazyPage(() => import("@/pages/AdversusData"));
 export const DialerData = lazyPage(() => import("@/pages/DialerData"));
