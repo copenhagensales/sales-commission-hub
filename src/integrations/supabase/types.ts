@@ -2322,6 +2322,8 @@ export type Database = {
           challenger_employee_id: string
           comment: string | null
           created_at: string
+          forfeited_at: string | null
+          forfeited_by: string | null
           id: string
           opponent_employee_id: string
           period: string
@@ -2334,6 +2336,8 @@ export type Database = {
           challenger_employee_id: string
           comment?: string | null
           created_at?: string
+          forfeited_at?: string | null
+          forfeited_by?: string | null
           id?: string
           opponent_employee_id: string
           period?: string
@@ -2346,6 +2350,8 @@ export type Database = {
           challenger_employee_id?: string
           comment?: string | null
           created_at?: string
+          forfeited_at?: string | null
+          forfeited_by?: string | null
           id?: string
           opponent_employee_id?: string
           period?: string
@@ -2356,6 +2362,13 @@ export type Database = {
           {
             foreignKeyName: "h2h_challenges_challenger_employee_id_fkey"
             columns: ["challenger_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "h2h_challenges_forfeited_by_fkey"
+            columns: ["forfeited_by"]
             isOneToOne: false
             referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
