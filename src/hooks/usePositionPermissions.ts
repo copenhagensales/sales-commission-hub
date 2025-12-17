@@ -118,6 +118,10 @@ const generateAllPermissions = (): PositionPermissions => ({
   scope_contracts: "alt" as DataScope,
   scope_payroll: "alt" as DataScope,
   scope_career_wishes: "alt" as DataScope,
+  scope_sales: "alt" as DataScope,
+  scope_quiz: "alt" as DataScope,
+  scope_extra_work: "alt" as DataScope,
+  scope_fieldmarketing: "alt" as DataScope,
 });
 
 export function usePositionPermissions() {
@@ -256,6 +260,10 @@ export function usePermissions() {
     scopeContracts: getDataScope("scope_contracts"),
     scopePayroll: getDataScope("scope_payroll"),
     scopeCareerWishes: getDataScope("scope_career_wishes"),
+    scopeSales: getDataScope("scope_sales"),
+    scopeQuiz: getDataScope("scope_quiz"),
+    scopeExtraWork: getDataScope("scope_extra_work"),
+    scopeFieldmarketing: getDataScope("scope_fieldmarketing"),
     // Main menu permissions
     canViewDashboard: hasPermission("menu_dashboard"),
     canViewWallboard: hasPermission("menu_wallboard"),

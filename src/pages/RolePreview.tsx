@@ -112,6 +112,10 @@ const generateAllPermissions = (): RolePreviewPermissions => ({
   scope_contracts: "alt" as DataScope,
   scope_payroll: "alt" as DataScope,
   scope_career_wishes: "alt" as DataScope,
+  scope_sales: "alt" as DataScope,
+  scope_quiz: "alt" as DataScope,
+  scope_extra_work: "alt" as DataScope,
+  scope_fieldmarketing: "alt" as DataScope,
 });
 
 export default function RolePreview() {
