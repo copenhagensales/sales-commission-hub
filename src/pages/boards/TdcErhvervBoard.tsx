@@ -175,7 +175,7 @@ export default function TdcErhvervBoard() {
           status,
         };
       })
-      .sort((a, b) => a.name.localeCompare(b.name, 'da-DK')); // Alphabetical sort
+      .sort((a, b) => b.commission - a.commission); // Sort by commission descending
 
     // Calculate total ringetimer
     const totalRingetimer = members.reduce((sum, m) => sum + m.ringetimer, 0);
