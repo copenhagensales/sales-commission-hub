@@ -100,7 +100,7 @@ export const routes: RouteConfig[] = [
   { path: "/tdc-erhverv", component: TdcErhverv, access: "role", requireTeamlederOrAbove: true },
   
   { path: "/payroll", component: Payroll, access: "role", requireTeamlederOrAbove: true },
-  { path: "/mg-test", component: MgTest, access: "role", requireTeamlederOrAbove: true },
+  { path: "/mg-test", component: MgTest, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_mg_test" },
   { path: "/mg-test-dashboard", component: MgTestDashboard, access: "role", requireTeamlederOrAbove: true },
   { path: "/km-test", component: KmTest, access: "role", requireTeamlederOrAbove: true },
   { path: "/adversus-data", component: AdversusData, access: "role", requireTeamlederOrAbove: true },
