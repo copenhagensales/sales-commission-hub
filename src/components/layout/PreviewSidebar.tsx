@@ -93,7 +93,7 @@ const RECRUITMENT_ITEMS = {
 };
 
 const BOARDS_ITEMS = {
-  menu_boards_test: { name: "Test", href: "/boards/test", icon: Tv },
+  menu_boards_test: { name: "TDC Erhverv", href: "/boards/test", icon: Tv },
   menu_boards_economic: { name: "Økonomi", href: "/boards/economic", icon: Wallet },
   menu_boards_sales: { name: "Sales Dashboard", href: "/boards/sales", icon: ShoppingCart },
 };
