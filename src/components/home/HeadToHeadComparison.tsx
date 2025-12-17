@@ -5,9 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Calendar, Send } from "lucide-react";
+import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Calendar, Send, Crown, Zap, Users } from "lucide-react";
 import { startOfMonth, endOfMonth, startOfWeek, startOfDay, endOfDay } from "date-fns";
 import { toast } from "sonner";
+
 interface AgentStats {
   id: string;
   name: string;
@@ -250,46 +251,89 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
     leftValue, 
     rightValue, 
     formatFn = formatNumber,
-    reverseWinner = false 
+    delay = 0
   }: { 
     label: string; 
     icon: any; 
     leftValue: number; 
     rightValue: number; 
     formatFn?: (n: number) => string;
-    reverseWinner?: boolean;
+    delay?: number;
   }) => {
     const total = leftValue + rightValue || 1;
     const leftPercent = (leftValue / total) * 100;
     const rightPercent = (rightValue / total) * 100;
     
-    const leftWins = reverseWinner ? leftValue < rightValue : leftValue > rightValue;
-    const rightWins = reverseWinner ? rightValue < leftValue : rightValue > leftValue;
+    const leftWins = leftValue > rightValue;
+    const rightWins = rightValue > leftValue;
     const tie = leftValue === rightValue;
 
     return (
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className={`font-semibold ${leftWins && !tie ? "text-emerald-500" : ""}`}>
-            {formatFn(leftValue)}
-          </span>
-          <span className="flex items-center gap-1">
-            <Icon className="w-3 h-3" />
-            {label}
-          </span>
-          <span className={`font-semibold ${rightWins && !tie ? "text-emerald-500" : ""}`}>
-            {formatFn(rightValue)}
-          </span>
+      <div className="group relative" style={{ animationDelay: `${delay}ms` }}>
+        <div className="flex items-center justify-between mb-2">
+          <div className={`flex items-center gap-2 transition-all duration-300 ${leftWins ? "scale-105" : ""}`}>
+            {leftWins && <Zap className="w-3 h-3 text-amber-400 animate-pulse" />}
+            <span className={`font-bold text-sm tabular-nums ${leftWins ? "text-emerald-400" : tie ? "text-amber-300" : "text-slate-400"}`}>
+              {formatFn(leftValue)}
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-700/50 backdrop-blur-sm">
+            <Icon className="w-3.5 h-3.5 text-slate-300" />
+            <span className="text-xs font-medium text-slate-300">{label}</span>
+          </div>
+          
+          <div className={`flex items-center gap-2 transition-all duration-300 ${rightWins ? "scale-105" : ""}`}>
+            <span className={`font-bold text-sm tabular-nums ${rightWins ? "text-emerald-400" : tie ? "text-amber-300" : "text-slate-400"}`}>
+              {formatFn(rightValue)}
+            </span>
+            {rightWins && <Zap className="w-3 h-3 text-amber-400 animate-pulse" />}
+          </div>
         </div>
-        <div className="flex h-2 rounded-full overflow-hidden bg-muted">
-          <div 
-            className={`transition-all duration-500 ${leftWins ? "bg-emerald-500" : tie ? "bg-amber-400" : "bg-rose-400"}`}
-            style={{ width: `${leftPercent}%` }}
-          />
-          <div 
-            className={`transition-all duration-500 ${rightWins ? "bg-emerald-500" : tie ? "bg-amber-400" : "bg-rose-400"}`}
-            style={{ width: `${rightPercent}%` }}
-          />
+        
+        <div className="relative h-3 rounded-full overflow-hidden bg-slate-800/80 border border-slate-700/50">
+          {/* Glow effect */}
+          <div className="absolute inset-0 opacity-30">
+            <div 
+              className={`absolute left-0 top-0 h-full ${leftWins ? "bg-emerald-500" : tie ? "bg-amber-500" : "bg-rose-500"} blur-md`}
+              style={{ width: `${leftPercent}%` }}
+            />
+            <div 
+              className={`absolute right-0 top-0 h-full ${rightWins ? "bg-emerald-500" : tie ? "bg-amber-500" : "bg-rose-500"} blur-md`}
+              style={{ width: `${rightPercent}%` }}
+            />
+          </div>
+          
+          {/* Actual bars */}
+          <div className="relative flex h-full">
+            <div 
+              className={`transition-all duration-700 ease-out ${
+                leftWins 
+                  ? "bg-gradient-to-r from-emerald-600 to-emerald-400" 
+                  : tie 
+                    ? "bg-gradient-to-r from-amber-600 to-amber-400" 
+                    : "bg-gradient-to-r from-rose-600 to-rose-500"
+              }`}
+              style={{ 
+                width: `${leftPercent}%`,
+                boxShadow: leftWins ? '0 0 20px rgba(52, 211, 153, 0.5)' : 'none'
+              }}
+            />
+            <div className="w-0.5 bg-slate-900 z-10" />
+            <div 
+              className={`transition-all duration-700 ease-out ${
+                rightWins 
+                  ? "bg-gradient-to-l from-emerald-600 to-emerald-400" 
+                  : tie 
+                    ? "bg-gradient-to-l from-amber-600 to-amber-400" 
+                    : "bg-gradient-to-l from-rose-600 to-rose-500"
+              }`}
+              style={{ 
+                width: `${rightPercent}%`,
+                boxShadow: rightWins ? '0 0 20px rgba(52, 211, 153, 0.5)' : 'none'
+              }}
+            />
+          </div>
         </div>
       </div>
     );
@@ -319,25 +363,41 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
   };
 
   const wins = calculateWins();
+  const isWinning = wins.left > wins.right;
+  const isLosing = wins.left < wins.right;
 
   const getInitials = (name: string) => {
     return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
   };
 
   return (
-    <Card className="border-0 shadow-lg bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white overflow-hidden">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-white">
-          <Swords className="w-5 h-5 text-amber-400" />
-          Head to Head
+    <Card className="relative border-0 shadow-2xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Animated background effects */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-blue-500/10 to-transparent rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-rose-500/10 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      </div>
+      
+      <CardHeader className="relative pb-2 z-10">
+        <CardTitle className="flex items-center gap-3 text-lg font-bold text-white">
+          <div className="relative">
+            <Swords className="w-6 h-6 text-amber-400" />
+            <div className="absolute inset-0 text-amber-400 blur-sm opacity-50">
+              <Swords className="w-6 h-6" />
+            </div>
+          </div>
+          <span className="bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+            Head to Head
+          </span>
+          
           {/* Period selector */}
           <div className="ml-auto flex items-center gap-2">
             <Calendar className="h-4 w-4 text-slate-400" />
             <Select value={period} onValueChange={(v) => setPeriod(v as PeriodType)}>
-              <SelectTrigger className="w-[120px] h-7 bg-slate-700 border-slate-600 text-white text-xs">
+              <SelectTrigger className="w-[120px] h-8 bg-slate-800/80 border-slate-600/50 text-white text-xs backdrop-blur-sm hover:bg-slate-700/80 transition-colors">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-slate-800 border-slate-700">
                 <SelectItem value="today">I dag</SelectItem>
                 <SelectItem value="week">Denne uge</SelectItem>
                 <SelectItem value="month">Denne måned</SelectItem>
@@ -346,73 +406,117 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      
+      <CardContent className="relative space-y-6 z-10 text-white">
         {/* Player Cards */}
-        <div className="grid grid-cols-3 gap-4 items-center">
+        <div className="grid grid-cols-3 gap-3 items-center">
           {/* Left Player (Current User) */}
-          <div className="text-center">
-            <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-xl font-bold shadow-lg shadow-blue-500/30">
-              {currentEmployeeName ? getInitials(currentEmployeeName) : "?"}
+          <div className="text-center group">
+            <div className="relative inline-block">
+              {/* Crown for winner */}
+              {opponentId && isWinning && (
+                <Crown className="absolute -top-4 left-1/2 -translate-x-1/2 w-6 h-6 text-amber-400 animate-bounce" style={{ animationDuration: '2s' }} />
+              )}
+              {/* Glow ring */}
+              <div className={`absolute inset-0 rounded-full ${isWinning ? 'bg-emerald-500' : isLosing ? 'bg-rose-500' : 'bg-blue-500'} blur-xl opacity-30 scale-110 group-hover:scale-125 transition-transform duration-500`} />
+              {/* Avatar ring */}
+              <div className={`relative w-18 h-18 p-1 rounded-full bg-gradient-to-br ${isWinning ? 'from-emerald-400 to-emerald-600' : isLosing ? 'from-rose-400 to-rose-600' : 'from-blue-400 to-blue-600'}`}>
+                <div className="w-full h-full rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-xl font-bold shadow-inner">
+                  {currentEmployeeName ? getInitials(currentEmployeeName) : "?"}
+                </div>
+              </div>
             </div>
-            <p className="mt-2 font-semibold text-sm truncate">{currentEmployeeName?.split(" ")[0] || "Dig"}</p>
-            <Badge className={`mt-1 ${wins.left > wins.right ? "bg-emerald-500" : wins.left < wins.right ? "bg-rose-500" : "bg-amber-500"}`}>
-              {wins.left} sejre
-            </Badge>
-            {record.streak > 0 && (
-              <div className="flex items-center justify-center gap-1 mt-1">
-                <Badge variant="outline" className="text-[10px] border-orange-500/50 text-orange-400 bg-orange-500/10">
-                  <Flame className="h-3 w-3 mr-1" />
-                  {record.streak} streak
-                </Badge>
+            <p className="mt-3 font-bold text-sm truncate">{currentEmployeeName?.split(" ")[0] || "Dig"}</p>
+            {opponentId && (
+              <div className="flex flex-col items-center gap-1.5 mt-2">
+                <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                  isWinning ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 
+                  isLosing ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 
+                  'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                }`}>
+                  {wins.left} / 5 kategorier
+                </div>
+                {record.streak > 0 && (
+                  <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 gap-1 animate-pulse">
+                    <Flame className="h-3 w-3" />
+                    {record.streak} streak
+                  </Badge>
+                )}
               </div>
             )}
           </div>
 
           {/* VS Badge + Record */}
-          <div className="text-center">
-            <div className="text-3xl font-black text-amber-400 drop-shadow-lg">VS</div>
+          <div className="text-center relative">
+            <div className="relative inline-block">
+              {/* Animated ring around VS */}
+              <div className="absolute inset-0 rounded-full border-2 border-amber-400/30 animate-ping" style={{ animationDuration: '3s' }} />
+              <div className="relative w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 border-2 border-amber-400/50 flex items-center justify-center backdrop-blur-sm">
+                <span className="text-2xl font-black bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
+                  VS
+                </span>
+              </div>
+            </div>
+            
             {opponentId && record.wins + record.losses > 0 && (
-              <div className="mt-2">
-                <p className="text-lg font-bold">
+              <div className="mt-3 space-y-1">
+                <div className="flex items-center justify-center gap-1 text-lg font-black">
                   <span className="text-emerald-400">{record.wins}</span>
-                  <span className="text-slate-500 mx-1">-</span>
+                  <span className="text-slate-600">-</span>
                   <span className="text-rose-400">{record.losses}</span>
-                </p>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Historik</p>
+                </div>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest">Historik</p>
               </div>
             )}
           </div>
 
           {/* Right Player (Opponent) */}
-          <div className="text-center">
+          <div className="text-center group">
             {opponentId ? (
               <>
-                <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-rose-500 to-rose-700 flex items-center justify-center text-xl font-bold shadow-lg shadow-rose-500/30">
-                  {stats?.opponent?.name ? getInitials(stats.opponent.name) : "?"}
+                <div className="relative inline-block">
+                  {/* Crown for winner */}
+                  {isLosing && (
+                    <Crown className="absolute -top-4 left-1/2 -translate-x-1/2 w-6 h-6 text-amber-400 animate-bounce" style={{ animationDuration: '2s' }} />
+                  )}
+                  {/* Glow ring */}
+                  <div className={`absolute inset-0 rounded-full ${isLosing ? 'bg-emerald-500' : isWinning ? 'bg-rose-500' : 'bg-rose-500'} blur-xl opacity-30 scale-110 group-hover:scale-125 transition-transform duration-500`} />
+                  {/* Avatar ring */}
+                  <div className={`relative w-18 h-18 p-1 rounded-full bg-gradient-to-br ${isLosing ? 'from-emerald-400 to-emerald-600' : isWinning ? 'from-rose-400 to-rose-600' : 'from-rose-400 to-rose-600'}`}>
+                    <div className="w-full h-full rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-xl font-bold shadow-inner">
+                      {stats?.opponent?.name ? getInitials(stats.opponent.name) : "?"}
+                    </div>
+                  </div>
                 </div>
-                <p className="mt-2 font-semibold text-sm truncate">{stats?.opponent?.name?.split(" ")[0] || "Modstander"}</p>
-                <Badge className={`mt-1 ${wins.right > wins.left ? "bg-emerald-500" : wins.right < wins.left ? "bg-rose-500" : "bg-amber-500"}`}>
-                  {wins.right} sejre
-                </Badge>
-                {record.streak < 0 && (
-                  <div className="flex items-center justify-center gap-1 mt-1">
-                    <Badge variant="outline" className="text-[10px] border-orange-500/50 text-orange-400 bg-orange-500/10">
-                      <Flame className="h-3 w-3 mr-1" />
+                <p className="mt-3 font-bold text-sm truncate">{stats?.opponent?.name?.split(" ")[0] || "Modstander"}</p>
+                <div className="flex flex-col items-center gap-1.5 mt-2">
+                  <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    isLosing ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 
+                    isWinning ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 
+                    'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  }`}>
+                    {wins.right} / 5 kategorier
+                  </div>
+                  {record.streak < 0 && (
+                    <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0 gap-1 animate-pulse">
+                      <Flame className="h-3 w-3" />
                       {Math.abs(record.streak)} streak
                     </Badge>
-                  </div>
-                )}
+                  )}
+                </div>
               </>
             ) : (
-              <div className="space-y-2">
-                <div className="w-16 h-16 mx-auto rounded-full bg-slate-700 flex items-center justify-center text-2xl text-slate-500">
-                  ?
+              <div className="space-y-3">
+                <div className="relative inline-block">
+                  <div className="w-18 h-18 mx-auto rounded-full bg-slate-700/50 border-2 border-dashed border-slate-600 flex items-center justify-center">
+                    <Users className="w-8 h-8 text-slate-500" />
+                  </div>
                 </div>
                 <Select value={opponentId} onValueChange={setOpponentId}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-xs h-8">
+                  <SelectTrigger className="bg-slate-700/80 border-slate-600/50 text-white text-xs h-9 hover:bg-slate-600/80 transition-colors backdrop-blur-sm">
                     <SelectValue placeholder="Vælg modstander" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-slate-800 border-slate-700 max-h-48">
                     {agents
                       .filter(a => a.name !== currentEmployeeName)
                       .map(agent => (
@@ -429,85 +533,65 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
 
         {/* Stats Comparison Bars */}
         {stats?.opponent && (
-          <div className="space-y-3 pt-4 border-t border-slate-700">
+          <div className="space-y-4 pt-4 border-t border-slate-700/50">
             {/* Category wins summary */}
-            <div className="flex items-center justify-center gap-4 pb-2">
-              <div className="flex items-center gap-1">
-                <Trophy className={`h-4 w-4 ${wins.left > wins.right ? "text-amber-400" : "text-slate-500"}`} />
-                <span className={`font-bold ${wins.left > wins.right ? "text-amber-400" : "text-slate-500"}`}>
+            <div className="flex items-center justify-center gap-6 pb-2">
+              <div className="flex items-center gap-2">
+                <Trophy className={`h-5 w-5 ${isWinning ? "text-amber-400" : "text-slate-500"} transition-colors`} />
+                <span className={`text-lg font-black tabular-nums ${isWinning ? "text-amber-400" : "text-slate-500"}`}>
                   {wins.left}
                 </span>
               </div>
-              <span className="text-[10px] text-slate-500 uppercase tracking-wider">Kategorier</span>
-              <div className="flex items-center gap-1">
-                <span className={`font-bold ${wins.right > wins.left ? "text-amber-400" : "text-slate-500"}`}>
+              <div className="px-4 py-1 rounded-full bg-slate-800/50 border border-slate-700/50">
+                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-medium">Kategorier</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-lg font-black tabular-nums ${isLosing ? "text-amber-400" : "text-slate-500"}`}>
                   {wins.right}
                 </span>
-                <Trophy className={`h-4 w-4 ${wins.right > wins.left ? "text-amber-400" : "text-slate-500"}`} />
+                <Trophy className={`h-5 w-5 ${isLosing ? "text-amber-400" : "text-slate-500"} transition-colors`} />
               </div>
             </div>
 
-            <StatBar 
-              label="Salg" 
-              icon={Target} 
-              leftValue={stats.current.salesCount} 
-              rightValue={stats.opponent.salesCount} 
-            />
-            <StatBar 
-              label="Omsætning" 
-              icon={TrendingUp} 
-              leftValue={stats.current.revenue} 
-              rightValue={stats.opponent.revenue}
-              formatFn={formatCurrency}
-            />
-            <StatBar 
-              label="Provision" 
-              icon={DollarSign} 
-              leftValue={stats.current.commission} 
-              rightValue={stats.opponent.commission}
-              formatFn={formatCurrency}
-            />
-            <StatBar 
-              label="Opkald" 
-              icon={Phone} 
-              leftValue={stats.current.callCount} 
-              rightValue={stats.opponent.callCount} 
-            />
-            <StatBar 
-              label="Taletid" 
-              icon={Clock} 
-              leftValue={stats.current.talkTimeSeconds} 
-              rightValue={stats.opponent.talkTimeSeconds}
-              formatFn={formatTime}
-            />
+            <StatBar label="Salg" icon={Target} leftValue={stats.current.salesCount} rightValue={stats.opponent.salesCount} delay={0} />
+            <StatBar label="Omsætning" icon={TrendingUp} leftValue={stats.current.revenue} rightValue={stats.opponent.revenue} formatFn={formatCurrency} delay={100} />
+            <StatBar label="Provision" icon={DollarSign} leftValue={stats.current.commission} rightValue={stats.opponent.commission} formatFn={formatCurrency} delay={200} />
+            <StatBar label="Opkald" icon={Phone} leftValue={stats.current.callCount} rightValue={stats.opponent.callCount} delay={300} />
+            <StatBar label="Taletid" icon={Clock} leftValue={stats.current.talkTimeSeconds} rightValue={stats.opponent.talkTimeSeconds} formatFn={formatTime} delay={400} />
           </div>
         )}
 
         {/* No opponent selected state */}
         {!opponentId && (
-          <div className="text-center py-4 text-slate-400">
-            <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Vælg en modstander for at starte duellen</p>
+          <div className="text-center py-8">
+            <div className="relative inline-block mb-4">
+              <Target className="h-12 w-12 text-slate-600" />
+              <div className="absolute inset-0 animate-ping">
+                <Target className="h-12 w-12 text-slate-700/50" />
+              </div>
+            </div>
+            <p className="text-slate-400 text-sm">Vælg en modstander for at starte duellen</p>
           </div>
         )}
 
         {/* Action buttons when opponent is selected */}
         {opponentId && (
-          <div className="flex flex-col gap-2 pt-2">
+          <div className="flex flex-col gap-3 pt-2">
             <Button 
               onClick={() => {
                 toast.success(`Invitation sendt til ${stats?.opponent?.name || "modstander"}!`, {
                   description: "De vil modtage en notifikation om din udfordring."
                 });
               }}
-              className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold"
+              className="relative w-full h-11 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-600 hover:via-orange-600 hover:to-amber-600 text-white font-bold text-sm shadow-lg shadow-orange-500/25 border-0 overflow-hidden group"
             >
-              <Send className="h-4 w-4 mr-2" />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+              <Send className="h-4 w-4 mr-2 group-hover:translate-x-1 transition-transform" />
               Inviter til duel
             </Button>
             <button 
               onClick={() => setOpponentId("")}
-              className="w-full text-xs text-slate-400 hover:text-white transition-colors"
+              className="w-full text-xs text-slate-500 hover:text-white transition-colors py-2"
             >
               Vælg en anden modstander
             </button>
