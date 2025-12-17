@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Loader2, ChevronDown, Search, Plus } from "lucide-react";
+import { Loader2, ChevronDown, Search, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -59,6 +59,7 @@ interface AggregatedProduct {
   } | null;
   campaignId: string | null;
   campaignLabel: string;
+  isManual?: boolean;
 }
 
 interface EditEntry {
@@ -470,6 +471,7 @@ export default function MgTest() {
             },
             campaignId: clientId,
             campaignLabel: clientName,
+            isManual: true,
           });
         }
       });
@@ -964,6 +966,27 @@ export default function MgTest() {
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke oprette produkt");
+    },
+  });
+
+  // Mutation to delete a manual product
+  const deleteManualProduct = useMutation({
+    mutationFn: async (productId: string) => {
+      // Delete the product (will cascade delete related mappings if any)
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", productId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Produkt slettet");
+      queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-manual-products"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke slette produkt");
     },
   });
 
@@ -1792,12 +1815,13 @@ export default function MgTest() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="w-[26%]">{t("mgTest.adversusProductName")}</TableHead>
-                                <TableHead className="w-[14%]">{t("mgTest.externalId")}</TableHead>
-                                <TableHead className="w-[20%]">{t("mgTest.customer")}</TableHead>
-                                <TableHead className="w-[12%]">{t("mgTest.commission")}</TableHead>
-                                <TableHead className="w-[12%]">{t("mgTest.cpoRevenue")}</TableHead>
-                                <TableHead className="w-[16%] text-center">{t("mgTest.countAsSale")}</TableHead>
+                                <TableHead className="w-[24%]">{t("mgTest.adversusProductName")}</TableHead>
+                                <TableHead className="w-[12%]">{t("mgTest.externalId")}</TableHead>
+                                <TableHead className="w-[18%]">{t("mgTest.customer")}</TableHead>
+                                <TableHead className="w-[11%]">{t("mgTest.commission")}</TableHead>
+                                <TableHead className="w-[11%]">{t("mgTest.cpoRevenue")}</TableHead>
+                                <TableHead className="w-[14%] text-center">{t("mgTest.countAsSale")}</TableHead>
+                                <TableHead className="w-[10%] text-center"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1936,6 +1960,23 @@ export default function MgTest() {
                                           });
                                         }}
                                       />
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      {row.isManual && row.product?.id && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                          onClick={() => {
+                                            if (confirm("Er du sikker på at du vil slette dette produkt?")) {
+                                              deleteManualProduct.mutate(row.product!.id);
+                                            }
+                                          }}
+                                          disabled={deleteManualProduct.isPending}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
                                     </TableCell>
                                   </TableRow>
                                 );
