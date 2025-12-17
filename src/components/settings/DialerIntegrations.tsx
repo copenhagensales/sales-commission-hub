@@ -27,6 +27,12 @@ interface DataFilterRule {
   value: string;
 }
 
+// Filter group - combines multiple rules with AND/OR logic
+interface DataFilterGroup {
+  logic: 'AND' | 'OR';
+  rules: DataFilterRule[];
+}
+
 // Conditional extraction rule
 interface ConditionalExtractionRule {
   conditionKey: string;           // Key to check in data object
@@ -47,6 +53,8 @@ interface ProductExtractionConfig {
   validationKey?: string;
   conditionalRules?: ConditionalExtractionRule[];
   dataFilters?: DataFilterRule[];
+  dataFilterGroups?: DataFilterGroup[];
+  dataFilterGroupsLogic?: 'AND' | 'OR';
 }
 
 interface DialerIntegrationConfig {
@@ -79,6 +87,8 @@ interface FormData {
   productValidationKey: string;
   conditionalRules: ConditionalExtractionRule[];
   dataFilters: DataFilterRule[];
+  dataFilterGroups: DataFilterGroup[];
+  dataFilterGroupsLogic: 'AND' | 'OR';
 }
 
 const ADVERSUS_WEBHOOK_EVENTS = [
@@ -125,6 +135,8 @@ export function DialerIntegrations() {
     productValidationKey: "",
     conditionalRules: [],
     dataFilters: [],
+    dataFilterGroups: [],
+    dataFilterGroupsLogic: 'AND',
   });
 
   // Per-integration sync days state
@@ -278,6 +290,10 @@ export function DialerIntegrations() {
       if (data.dataFilters && data.dataFilters.length > 0) {
         productExtraction.dataFilters = data.dataFilters;
       }
+      if (data.dataFilterGroups && data.dataFilterGroups.length > 0) {
+        productExtraction.dataFilterGroups = data.dataFilterGroups;
+        productExtraction.dataFilterGroupsLogic = data.dataFilterGroupsLogic;
+      }
       
       const config: DialerIntegrationConfig = {
         productExtraction,
@@ -407,6 +423,8 @@ export function DialerIntegrations() {
       productValidationKey: "",
       conditionalRules: [],
       dataFilters: [],
+      dataFilterGroups: [],
+      dataFilterGroupsLogic: 'AND',
     });
     setEditingId(null);
     setIsDialogOpen(false);
@@ -1102,112 +1120,314 @@ export function DialerIntegrations() {
                           </p>
                         </div>
                         
-                        {/* Data Filters Section */}
+                        {/* Advanced Filter Groups Section */}
                         <Separator className="my-4" />
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
                             <div>
-                              <Label className="text-sm font-medium">Data Filters</Label>
+                              <Label className="text-sm font-medium">Filter Groups (AND/OR)</Label>
                               <p className="text-xs text-muted-foreground">
-                                Filter leads before processing. Leads that don't match ALL filters are skipped.
+                                Create filter groups with AND/OR logic. Groups are combined with the logic below.
                               </p>
                             </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setFormData({
-                                  ...formData,
-                                  dataFilters: [
-                                    ...formData.dataFilters,
-                                    { field: "", operator: "contains", value: "" }
-                                  ]
-                                });
-                              }}
-                            >
-                              <Plus className="h-4 w-4 mr-1" /> Add Filter
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Select
+                                value={formData.dataFilterGroupsLogic}
+                                onValueChange={(value: 'AND' | 'OR') => {
+                                  setFormData({ ...formData, dataFilterGroupsLogic: value });
+                                }}
+                              >
+                                <SelectTrigger className="w-24 h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="AND">AND</SelectItem>
+                                  <SelectItem value="OR">OR</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setFormData({
+                                    ...formData,
+                                    dataFilterGroups: [
+                                      ...formData.dataFilterGroups,
+                                      { logic: 'AND', rules: [{ field: "", operator: "contains", value: "" }] }
+                                    ]
+                                  });
+                                }}
+                              >
+                                <Plus className="h-4 w-4 mr-1" /> Add Group
+                              </Button>
+                            </div>
                           </div>
                           
-                          {formData.dataFilters.map((filter, index) => (
-                            <div key={index} className="border rounded-md p-3 space-y-2 bg-background">
+                          {formData.dataFilterGroups.map((group, groupIndex) => (
+                            <div key={groupIndex} className="border-2 border-primary/20 rounded-lg p-4 space-y-3 bg-muted/30">
                               <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium">Filter {index + 1}</span>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary">Group {groupIndex + 1}</Badge>
+                                  <Select
+                                    value={group.logic}
+                                    onValueChange={(value: 'AND' | 'OR') => {
+                                      const updated = [...formData.dataFilterGroups];
+                                      updated[groupIndex] = { ...group, logic: value };
+                                      setFormData({ ...formData, dataFilterGroups: updated });
+                                    }}
+                                  >
+                                    <SelectTrigger className="w-20 h-7 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="AND">AND</SelectItem>
+                                      <SelectItem value="OR">OR</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <span className="text-xs text-muted-foreground">between rules in this group</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const updated = [...formData.dataFilterGroups];
+                                      updated[groupIndex] = {
+                                        ...group,
+                                        rules: [...group.rules, { field: "", operator: "contains", value: "" }]
+                                      };
+                                      setFormData({ ...formData, dataFilterGroups: updated });
+                                    }}
+                                  >
+                                    <Plus className="h-3 w-3 mr-1" /> Rule
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setFormData({
+                                        ...formData,
+                                        dataFilterGroups: formData.dataFilterGroups.filter((_, i) => i !== groupIndex)
+                                      });
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </div>
+                              
+                              {group.rules.map((rule, ruleIndex) => (
+                                <div key={ruleIndex} className="border rounded-md p-3 space-y-2 bg-background">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-medium text-muted-foreground">
+                                      {ruleIndex > 0 && <Badge variant="outline" className="mr-2">{group.logic}</Badge>}
+                                      Rule {ruleIndex + 1}
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled={group.rules.length <= 1}
+                                      onClick={() => {
+                                        const updatedGroups = [...formData.dataFilterGroups];
+                                        updatedGroups[groupIndex] = {
+                                          ...group,
+                                          rules: group.rules.filter((_, i) => i !== ruleIndex)
+                                        };
+                                        setFormData({ ...formData, dataFilterGroups: updatedGroups });
+                                      }}
+                                    >
+                                      <Trash2 className="h-3 w-3 text-destructive" />
+                                    </Button>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <div>
+                                      <Label className="text-xs">Field</Label>
+                                      <Input
+                                        placeholder="e.g., lastModifiedByUser.orgCode"
+                                        className="h-8 text-sm"
+                                        value={rule.field}
+                                        onChange={(e) => {
+                                          const updatedGroups = [...formData.dataFilterGroups];
+                                          updatedGroups[groupIndex].rules[ruleIndex] = { ...rule, field: e.target.value };
+                                          setFormData({ ...formData, dataFilterGroups: updatedGroups });
+                                        }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs">Operator</Label>
+                                      <Select
+                                        value={rule.operator}
+                                        onValueChange={(value: DataFilterRule['operator']) => {
+                                          const updatedGroups = [...formData.dataFilterGroups];
+                                          updatedGroups[groupIndex].rules[ruleIndex] = { ...rule, operator: value };
+                                          setFormData({ ...formData, dataFilterGroups: updatedGroups });
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-8">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="equals">Equals</SelectItem>
+                                          <SelectItem value="notEquals">Not Equals</SelectItem>
+                                          <SelectItem value="contains">Contains</SelectItem>
+                                          <SelectItem value="notContains">Not Contains</SelectItem>
+                                          <SelectItem value="startsWith">Starts With</SelectItem>
+                                          <SelectItem value="endsWith">Ends With</SelectItem>
+                                          <SelectItem value="regex">Regex</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs">Value</Label>
+                                      <Input
+                                        placeholder="e.g., @copenhagensales.dk"
+                                        className="h-8 text-sm"
+                                        value={rule.value}
+                                        onChange={(e) => {
+                                          const updatedGroups = [...formData.dataFilterGroups];
+                                          updatedGroups[groupIndex].rules[ruleIndex] = { ...rule, value: e.target.value };
+                                          setFormData({ ...formData, dataFilterGroups: updatedGroups });
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                              
+                              {groupIndex < formData.dataFilterGroups.length - 1 && (
+                                <div className="flex justify-center py-1">
+                                  <Badge variant="default" className="text-xs">{formData.dataFilterGroupsLogic}</Badge>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                          
+                          {formData.dataFilterGroups.length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-3 border border-dashed rounded-md">
+                              No filter groups. Click "Add Group" to create combined filters with AND/OR logic.
+                            </p>
+                          )}
+                          
+                          {formData.dataFilterGroups.length > 0 && (
+                            <div className="p-3 bg-muted/50 rounded-md">
+                              <p className="text-xs text-muted-foreground">
+                                <strong>Logic:</strong> {formData.dataFilterGroups.map((g, i) => 
+                                  `(${g.rules.map((_, ri) => `R${ri + 1}`).join(` ${g.logic} `)})`
+                                ).join(` ${formData.dataFilterGroupsLogic} `)}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Legacy Simple Filters Section - kept for backward compatibility */}
+                        {formData.dataFilters.length > 0 && (
+                          <>
+                            <Separator className="my-4" />
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <Label className="text-sm font-medium text-muted-foreground">Legacy Filters (AND only)</Label>
+                                  <p className="text-xs text-muted-foreground">
+                                    These filters use AND logic only. Consider migrating to Filter Groups above.
+                                  </p>
+                                </div>
                                 <Button
                                   type="button"
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
                                   onClick={() => {
                                     setFormData({
                                       ...formData,
-                                      dataFilters: formData.dataFilters.filter((_, i) => i !== index)
+                                      dataFilters: [
+                                        ...formData.dataFilters,
+                                        { field: "", operator: "contains", value: "" }
+                                      ]
                                     });
                                   }}
                                 >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                  <Plus className="h-4 w-4 mr-1" /> Add Filter
                                 </Button>
                               </div>
                               
-                              <div className="grid grid-cols-3 gap-2">
-                                <div>
-                                  <Label className="text-xs">Field (dot notation)</Label>
-                                  <Input
-                                    placeholder="e.g., lastModifiedByUser.orgCode"
-                                    value={filter.field}
-                                    onChange={(e) => {
-                                      const updated = [...formData.dataFilters];
-                                      updated[index] = { ...filter, field: e.target.value };
-                                      setFormData({ ...formData, dataFilters: updated });
-                                    }}
-                                  />
+                              {formData.dataFilters.map((filter, index) => (
+                                <div key={index} className="border rounded-md p-3 space-y-2 bg-background opacity-80">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium">Filter {index + 1}</span>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setFormData({
+                                          ...formData,
+                                          dataFilters: formData.dataFilters.filter((_, i) => i !== index)
+                                        });
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <div>
+                                      <Label className="text-xs">Field (dot notation)</Label>
+                                      <Input
+                                        placeholder="e.g., lastModifiedByUser.orgCode"
+                                        value={filter.field}
+                                        onChange={(e) => {
+                                          const updated = [...formData.dataFilters];
+                                          updated[index] = { ...filter, field: e.target.value };
+                                          setFormData({ ...formData, dataFilters: updated });
+                                        }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs">Operator</Label>
+                                      <Select
+                                        value={filter.operator}
+                                        onValueChange={(value: DataFilterRule['operator']) => {
+                                          const updated = [...formData.dataFilters];
+                                          updated[index] = { ...filter, operator: value };
+                                          setFormData({ ...formData, dataFilters: updated });
+                                        }}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="equals">Equals</SelectItem>
+                                          <SelectItem value="notEquals">Not Equals</SelectItem>
+                                          <SelectItem value="contains">Contains</SelectItem>
+                                          <SelectItem value="notContains">Not Contains</SelectItem>
+                                          <SelectItem value="startsWith">Starts With</SelectItem>
+                                          <SelectItem value="endsWith">Ends With</SelectItem>
+                                          <SelectItem value="regex">Regex</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs">Value</Label>
+                                      <Input
+                                        placeholder="e.g., @copenhagensales.dk"
+                                        value={filter.value}
+                                        onChange={(e) => {
+                                          const updated = [...formData.dataFilters];
+                                          updated[index] = { ...filter, value: e.target.value };
+                                          setFormData({ ...formData, dataFilters: updated });
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
-                                <div>
-                                  <Label className="text-xs">Operator</Label>
-                                  <Select
-                                    value={filter.operator}
-                                    onValueChange={(value: DataFilterRule['operator']) => {
-                                      const updated = [...formData.dataFilters];
-                                      updated[index] = { ...filter, operator: value };
-                                      setFormData({ ...formData, dataFilters: updated });
-                                    }}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="equals">Equals</SelectItem>
-                                      <SelectItem value="notEquals">Not Equals</SelectItem>
-                                      <SelectItem value="contains">Contains</SelectItem>
-                                      <SelectItem value="notContains">Not Contains</SelectItem>
-                                      <SelectItem value="startsWith">Starts With</SelectItem>
-                                      <SelectItem value="endsWith">Ends With</SelectItem>
-                                      <SelectItem value="regex">Regex</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div>
-                                  <Label className="text-xs">Value</Label>
-                                  <Input
-                                    placeholder="e.g., @copenhagensales.dk"
-                                    value={filter.value}
-                                    onChange={(e) => {
-                                      const updated = [...formData.dataFilters];
-                                      updated[index] = { ...filter, value: e.target.value };
-                                      setFormData({ ...formData, dataFilters: updated });
-                                    }}
-                                  />
-                                </div>
-                              </div>
+                              ))}
                             </div>
-                          ))}
-                          
-                          {formData.dataFilters.length === 0 && (
-                            <p className="text-sm text-muted-foreground text-center py-2">
-                              No filters. All leads will be processed.
-                            </p>
-                          )}
-                        </div>
+                          </>
+                        )}
                       </div>
                     </>
                   )}
@@ -1441,6 +1661,8 @@ export function DialerIntegrations() {
                                 productValidationKey: extractionConfig?.validationKey || "",
                                 conditionalRules: extractionConfig?.conditionalRules || [],
                                 dataFilters: extractionConfig?.dataFilters || [],
+                                dataFilterGroups: extractionConfig?.dataFilterGroups || [],
+                                dataFilterGroupsLogic: extractionConfig?.dataFilterGroupsLogic || 'AND',
                               });
                               setIsDialogOpen(true);
                             }}
