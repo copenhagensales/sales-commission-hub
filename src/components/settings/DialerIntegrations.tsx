@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check, List, ExternalLink, MoreVertical, PhoneCall, Eye, AlertTriangle } from "lucide-react";
+import { Phone, Play, Loader2, Plus, Pencil, Trash2, Terminal, Webhook, Copy, Check, List, ExternalLink, MoreVertical, PhoneCall, Eye, AlertTriangle, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -33,10 +33,22 @@ interface DataFilterGroup {
   rules: DataFilterRule[];
 }
 
+// Extraction condition - same operators as filter rules
+interface ExtractionCondition {
+  field: string;
+  operator: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'regex' | 'notEquals' | 'notContains' | 'isEmpty' | 'isNotEmpty' | 'notExists';
+  value: string;
+}
+
 // Conditional extraction rule
 interface ConditionalExtractionRule {
-  conditionKey: string;           // Key to check in data object
+  // NEW: Multiple conditions with boolean logic
+  conditions?: ExtractionCondition[];
+  conditionsLogic?: 'AND' | 'OR';
+  // LEGACY: Single condition (backward compatible)
+  conditionKey?: string;           // Key to check in data object
   conditionValue?: string;        // Optional: specific value to match
+  // Extraction config
   extractionType: 'specific_fields' | 'regex' | 'static_value' | 'composite';
   targetKeys?: string[];          // For specific_fields
   regexPattern?: string;          // For regex extraction
@@ -929,8 +941,8 @@ export function DialerIntegrations() {
                                     conditionalRules: [
                                       ...formData.conditionalRules,
                                       {
-                                        conditionKey: "",
-                                        conditionValue: "",
+                                        conditions: [{ field: "", operator: "isNotEmpty", value: "" }],
+                                        conditionsLogic: "AND",
                                         extractionType: "specific_fields",
                                         targetKeys: [],
                                       }
@@ -964,32 +976,119 @@ export function DialerIntegrations() {
                                   </Button>
                                 </div>
                                 
-                                {/* Condition */}
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div>
-                                    <Label className="text-xs">Condition Key</Label>
-                                    <Input
-                                      placeholder="e.g., Antal abonnementer"
-                                      value={rule.conditionKey}
-                                      onChange={(e) => {
-                                        const updated = [...formData.conditionalRules];
-                                        updated[index] = { ...rule, conditionKey: e.target.value };
-                                        setFormData({ ...formData, conditionalRules: updated });
-                                      }}
-                                    />
+                                {/* Conditions */}
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <Label className="text-xs">Conditions</Label>
+                                    <div className="flex items-center gap-2">
+                                      <Select
+                                        value={rule.conditionsLogic || "AND"}
+                                        onValueChange={(value: 'AND' | 'OR') => {
+                                          const updated = [...formData.conditionalRules];
+                                          updated[index] = { ...rule, conditionsLogic: value };
+                                          setFormData({ ...formData, conditionalRules: updated });
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-20 h-7 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="AND">AND</SelectItem>
+                                          <SelectItem value="OR">OR</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => {
+                                          const updated = [...formData.conditionalRules];
+                                          const conditions = [...(rule.conditions || [])];
+                                          conditions.push({ field: "", operator: "isNotEmpty", value: "" });
+                                          updated[index] = { ...rule, conditions };
+                                          setFormData({ ...formData, conditionalRules: updated });
+                                        }}
+                                      >
+                                        <Plus className="h-3 w-3 mr-1" /> Condition
+                                      </Button>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <Label className="text-xs">Condition Value (optional)</Label>
-                                    <Input
-                                      placeholder="e.g., 1 (leave empty for any)"
-                                      value={rule.conditionValue || ""}
-                                      onChange={(e) => {
-                                        const updated = [...formData.conditionalRules];
-                                        updated[index] = { ...rule, conditionValue: e.target.value || undefined };
-                                        setFormData({ ...formData, conditionalRules: updated });
-                                      }}
-                                    />
-                                  </div>
+                                  
+                                  {(rule.conditions || []).map((cond, condIndex) => (
+                                    <div key={condIndex} className="flex items-center gap-2 bg-muted/50 p-2 rounded">
+                                      <Input
+                                        placeholder="Field"
+                                        className="flex-1 h-8 text-xs"
+                                        value={cond.field}
+                                        onChange={(e) => {
+                                          const updated = [...formData.conditionalRules];
+                                          const conditions = [...(rule.conditions || [])];
+                                          conditions[condIndex] = { ...cond, field: e.target.value };
+                                          updated[index] = { ...rule, conditions };
+                                          setFormData({ ...formData, conditionalRules: updated });
+                                        }}
+                                      />
+                                      <Select
+                                        value={cond.operator}
+                                        onValueChange={(value: ExtractionCondition['operator']) => {
+                                          const updated = [...formData.conditionalRules];
+                                          const conditions = [...(rule.conditions || [])];
+                                          conditions[condIndex] = { ...cond, operator: value };
+                                          updated[index] = { ...rule, conditions };
+                                          setFormData({ ...formData, conditionalRules: updated });
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-32 h-8 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="equals">equals</SelectItem>
+                                          <SelectItem value="notEquals">not equals</SelectItem>
+                                          <SelectItem value="contains">contains</SelectItem>
+                                          <SelectItem value="notContains">not contains</SelectItem>
+                                          <SelectItem value="startsWith">starts with</SelectItem>
+                                          <SelectItem value="endsWith">ends with</SelectItem>
+                                          <SelectItem value="isEmpty">is empty</SelectItem>
+                                          <SelectItem value="isNotEmpty">is not empty</SelectItem>
+                                          <SelectItem value="notExists">not exists</SelectItem>
+                                          <SelectItem value="regex">regex</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      {!['isEmpty', 'isNotEmpty', 'notExists'].includes(cond.operator) && (
+                                        <Input
+                                          placeholder="Value"
+                                          className="flex-1 h-8 text-xs"
+                                          value={cond.value}
+                                          onChange={(e) => {
+                                            const updated = [...formData.conditionalRules];
+                                            const conditions = [...(rule.conditions || [])];
+                                            conditions[condIndex] = { ...cond, value: e.target.value };
+                                            updated[index] = { ...rule, conditions };
+                                            setFormData({ ...formData, conditionalRules: updated });
+                                          }}
+                                        />
+                                      )}
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() => {
+                                          const updated = [...formData.conditionalRules];
+                                          const conditions = (rule.conditions || []).filter((_, i) => i !== condIndex);
+                                          updated[index] = { ...rule, conditions };
+                                          setFormData({ ...formData, conditionalRules: updated });
+                                        }}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                  
+                                  {(!rule.conditions || rule.conditions.length === 0) && (
+                                    <p className="text-xs text-muted-foreground italic">No conditions (rule always matches)</p>
+                                  )}
                                 </div>
                                 
                                 {/* Extraction Type */}
