@@ -16,6 +16,7 @@ import {
   TdcErhvervDashboard,
   RelatelDashboard,
   TrygDashboard,
+  AseDashboard,
   NotFound,
   AdversusData,
   DialerData,
@@ -102,6 +103,7 @@ export const routes: RouteConfig[] = [
   { path: "/tdc-erhverv-dashboard", component: TdcErhvervDashboard, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_tdc_erhverv" },
   { path: "/relatel-dashboard", component: RelatelDashboard, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_mg_test" },
   { path: "/tryg-dashboard", component: TrygDashboard, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_mg_test" },
+  { path: "/ase-dashboard", component: AseDashboard, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_mg_test" },
   
   { path: "/payroll", component: Payroll, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_payroll" },
   { path: "/mg-test", component: MgTest, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_mg_test" },

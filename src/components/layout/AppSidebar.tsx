@@ -53,6 +53,7 @@ const getMgNavigation = (t: (key: string) => string) => [
   { name: "TDC Dagsoverblik", href: "/tdc-erhverv-dashboard", icon: BarChart3 },
   { name: "Relatel Dagsoverblik", href: "/relatel-dashboard", icon: BarChart3 },
   { name: "Tryg Dagsoverblik", href: "/tryg-dashboard", icon: BarChart3 },
+  { name: "ASE Dagsoverblik", href: "/ase-dashboard", icon: BarChart3 },
   { name: t("sidebar.codan"), href: "/codan", icon: Shield },
   { name: t("sidebar.mgTest"), href: "/mg-test", icon: Percent },
   { name: t("sidebar.testDashboard"), href: "/mg-test-dashboard", icon: FlaskConical },
