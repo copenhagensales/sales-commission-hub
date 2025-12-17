@@ -137,18 +137,10 @@ export const routes: RouteConfig[] = [
     ],
   },
 
-  {
-    path: "/shift-planning",
-    component: ShiftOverview,
-    access: "role",
-    requireTeamlederOrAbove: true,
-    positionPermission: "menu_shift_overview",
-    children: [
-      { path: "my-schedule", component: MySchedule, access: "protected" },
-      { path: "absence", component: AbsenceManagement, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_absence" },
-      { path: "time-tracking", component: TimeTracking, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_time_tracking" },
-    ],
-  },
+  { path: "/shift-planning", component: ShiftOverview, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_shift_overview" },
+  { path: "/shift-planning/my-schedule", component: MySchedule, access: "protected" },
+  { path: "/shift-planning/absence", component: AbsenceManagement, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_absence" },
+  { path: "/shift-planning/time-tracking", component: TimeTracking, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_time_tracking" },
 
   { path: "/extra-work-admin", component: ExtraWorkAdmin, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_extra_work_admin" },
   { path: "/contracts", component: Contracts, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_contracts" },
