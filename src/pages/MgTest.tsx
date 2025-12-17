@@ -392,6 +392,19 @@ export default function MgTest() {
   } = useVagtEmployees();
 
   // Transform RPC data to AggregatedProduct format (server already did the aggregation)
+  // Track product IDs that appear in aggregated data (linked to sales)
+  const linkedProductIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (aggregatedProductsRpc) {
+      aggregatedProductsRpc.forEach((item) => {
+        if (item.product_id) {
+          ids.add(item.product_id);
+        }
+      });
+    }
+    return ids;
+  }, [aggregatedProductsRpc]);
+
   const aggregatedProducts: AggregatedProduct[] = useMemo(() => {
     const products: AggregatedProduct[] = [];
     const seenKeys = new Set<string>();
@@ -446,6 +459,7 @@ export default function MgTest() {
     }
 
     // 2. Add manually created products from products table
+    // Only mark as deletable (isManual) if the product is NOT linked to any sales
     if (manualProducts) {
       manualProducts.forEach((p) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -457,8 +471,11 @@ export default function MgTest() {
         const productKey = `manual::${p.id}`;
         const fullKey = `${clientId ?? "no-client"}::${productKey}`;
 
+        // Only add if not already in the list
         if (!seenKeys.has(fullKey)) {
           seenKeys.add(fullKey);
+          // Only mark as manual (deletable) if NOT linked to any sales
+          const isLinkedToSales = linkedProductIds.has(p.id);
           products.push({
             key: fullKey,
             adversus_external_id: p.external_product_code,
@@ -473,7 +490,7 @@ export default function MgTest() {
             },
             campaignId: clientId,
             campaignLabel: clientName,
-            isManual: true,
+            isManual: !isLinkedToSales, // Only deletable if NOT linked to sales
           });
         }
       });
@@ -487,7 +504,7 @@ export default function MgTest() {
       const titleB = b.adversus_product_title || "";
       return titleA.localeCompare(titleB, "da");
     });
-  }, [aggregatedProductsRpc, manualProducts, clients]);
+  }, [aggregatedProductsRpc, manualProducts, clients, linkedProductIds]);
 
   const productsByCampaign = useMemo(() => {
     const groups = new Map<
