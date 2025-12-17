@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Layers, Play, CheckCircle2, XCircle, Clock, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { format, subDays, addDays } from "date-fns";
+import { format, subDays } from "date-fns";
 
 interface BatchResult {
   batchNumber: number;
@@ -36,6 +37,7 @@ interface BatchMigrationDialogProps {
 }
 
 export function BatchMigrationDialog({ integrationId, integrationName, provider }: BatchMigrationDialogProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [totalDays, setTotalDays] = useState(90);
@@ -184,17 +186,17 @@ export function BatchMigrationDialog({ integrationId, integrationName, provider 
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" className="gap-2">
           <Layers className="h-4 w-4" />
-          Batch Sync
+          {t("batchMigration.batchSync")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Layers className="h-5 w-5" />
-            Batch Migration - {integrationName}
+            {t("batchMigration.title")} - {integrationName}
           </DialogTitle>
           <DialogDescription>
-            Synkroniser historiske data i batches for at undgå hukommelsesgrænser
+            {t("batchMigration.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -203,7 +205,7 @@ export function BatchMigrationDialog({ integrationId, integrationName, provider 
           {!isRunning && batches.length === 0 && (
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Antal dage</Label>
+                <Label>{t("batchMigration.totalDays")}</Label>
                 <Input
                   type="number"
                   min={7}
@@ -213,30 +215,30 @@ export function BatchMigrationDialog({ integrationId, integrationName, provider 
                 />
               </div>
               <div className="space-y-2">
-                <Label>Batch størrelse (dage)</Label>
+                <Label>{t("batchMigration.batchSize")}</Label>
                 <Select value={batchSizeDays.toString()} onValueChange={(v) => setBatchSizeDays(parseInt(v))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="3">3 dage</SelectItem>
-                    <SelectItem value="5">5 dage</SelectItem>
-                    <SelectItem value="7">7 dage</SelectItem>
-                    <SelectItem value="10">10 dage</SelectItem>
+                    <SelectItem value="3">3 {t("batchMigration.days")}</SelectItem>
+                    <SelectItem value="5">5 {t("batchMigration.days")}</SelectItem>
+                    <SelectItem value="7">7 {t("batchMigration.days")}</SelectItem>
+                    <SelectItem value="10">10 {t("batchMigration.days")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Parallelle kald</Label>
+                <Label>{t("batchMigration.parallelCalls")}</Label>
                 <Select value={concurrency.toString()} onValueChange={(v) => setConcurrency(parseInt(v))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">1 (sekventiel)</SelectItem>
-                    <SelectItem value="2">2 parallelle</SelectItem>
-                    <SelectItem value="3">3 parallelle</SelectItem>
-                    <SelectItem value="4">4 parallelle</SelectItem>
+                    <SelectItem value="1">1 ({t("batchMigration.sequential")})</SelectItem>
+                    <SelectItem value="2">2 {t("batchMigration.parallel")}</SelectItem>
+                    <SelectItem value="3">3 {t("batchMigration.parallel")}</SelectItem>
+                    <SelectItem value="4">4 {t("batchMigration.parallel")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -248,10 +250,14 @@ export function BatchMigrationDialog({ integrationId, integrationName, provider 
             <div className="p-4 rounded-lg bg-muted/50 border">
               <div className="flex items-center gap-2 text-sm">
                 <AlertCircle className="h-4 w-4 text-amber-500" />
-                <span>
-                  Dette vil oprette ca. <strong>{Math.ceil(totalDays / batchSizeDays)}</strong> batches 
-                  og sende <strong>{concurrency}</strong> parallelle forespørgsler ad gangen
-                </span>
+                <span
+                  dangerouslySetInnerHTML={{
+                    __html: t("batchMigration.previewInfo", {
+                      batches: Math.ceil(totalDays / batchSizeDays),
+                      concurrency,
+                    }),
+                  }}
+                />
               </div>
             </div>
           )}
@@ -262,8 +268,10 @@ export function BatchMigrationDialog({ integrationId, integrationName, provider 
               {/* Overall Progress */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span>Samlet fremskridt</span>
-                  <span className="font-medium">{completedBatches} / {batches.length} batches</span>
+                  <span>{t("batchMigration.overallProgress")}</span>
+                  <span className="font-medium">
+                    {t("batchMigration.batchesProgress", { completed: completedBatches, total: batches.length })}
+                  </span>
                 </div>
                 <Progress value={progressPercent} className="h-3" />
               </div>
@@ -272,15 +280,15 @@ export function BatchMigrationDialog({ integrationId, integrationName, provider 
               <div className="grid grid-cols-3 gap-4">
                 <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
                   <div className="text-2xl font-bold text-green-600">{totalSales}</div>
-                  <div className="text-xs text-muted-foreground">Salg synkroniseret</div>
+                  <div className="text-xs text-muted-foreground">{t("batchMigration.salesSynced")}</div>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
                   <div className="text-2xl font-bold text-primary">{successCount}</div>
-                  <div className="text-xs text-muted-foreground">Succesfulde batches</div>
+                  <div className="text-xs text-muted-foreground">{t("batchMigration.successfulBatches")}</div>
                 </div>
                 <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
                   <div className="text-2xl font-bold text-destructive">{errorCount}</div>
-                  <div className="text-xs text-muted-foreground">Fejlede batches</div>
+                  <div className="text-xs text-muted-foreground">{t("batchMigration.failedBatches")}</div>
                 </div>
               </div>
 
@@ -306,7 +314,7 @@ export function BatchMigrationDialog({ integrationId, integrationName, provider 
                       <div className="flex items-center gap-2">
                         {batch.salesProcessed !== undefined && (
                           <Badge variant="secondary" className="text-xs">
-                            {batch.salesProcessed} salg
+                            {batch.salesProcessed} {t("batchMigration.sales")}
                           </Badge>
                         )}
                         {batch.duration && (
@@ -316,7 +324,7 @@ export function BatchMigrationDialog({ integrationId, integrationName, provider 
                         )}
                         {batch.error && (
                           <Badge variant="destructive" className="text-xs">
-                            Fejl
+                            {t("batchMigration.error")}
                           </Badge>
                         )}
                       </div>
@@ -332,23 +340,23 @@ export function BatchMigrationDialog({ integrationId, integrationName, provider 
           {!isRunning && batches.length === 0 && (
             <Button onClick={runBatchMigration} className="gap-2">
               <Play className="h-4 w-4" />
-              Start Batch Migration
+              {t("batchMigration.startBatchMigration")}
             </Button>
           )}
           {!isRunning && batches.length > 0 && (
             <>
               <Button variant="outline" onClick={() => setBatches([])}>
-                Nulstil
+                {t("batchMigration.reset")}
               </Button>
               <Button onClick={() => setOpen(false)}>
-                Luk
+                {t("batchMigration.close")}
               </Button>
             </>
           )}
           {isRunning && (
             <Button disabled>
               <div className="h-4 w-4 rounded-full border-2 border-background border-t-transparent animate-spin mr-2" />
-              Synkroniserer...
+              {t("batchMigration.syncing")}
             </Button>
           )}
         </DialogFooter>

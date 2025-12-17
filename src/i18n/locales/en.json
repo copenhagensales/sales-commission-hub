@@ -325,5 +325,28 @@
     "showMore": "Show {{count}} more",
     "showLess": "Show less",
     "confirm": "Confirm"
+  },
+  "batchMigration": {
+    "title": "Batch Migration",
+    "description": "Sync historical data in batches to avoid memory limits",
+    "batchSync": "Batch Sync",
+    "totalDays": "Total Days",
+    "batchSize": "Batch Size (days)",
+    "parallelCalls": "Parallel Calls",
+    "days": "days",
+    "sequential": "sequential",
+    "parallel": "parallel",
+    "previewInfo": "This will create approx. <strong>{{batches}}</strong> batches and send <strong>{{concurrency}}</strong> parallel requests at a time",
+    "overallProgress": "Overall Progress",
+    "batchesProgress": "{{completed}} / {{total}} batches",
+    "salesSynced": "Sales synchronized",
+    "successfulBatches": "Successful batches",
+    "failedBatches": "Failed batches",
+    "sales": "sales",
+    "error": "Error",
+    "startBatchMigration": "Start Batch Migration",
+    "reset": "Reset",
+    "close": "Close",
+    "syncing": "Syncing..."
   }
 }
