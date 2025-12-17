@@ -30,6 +30,7 @@ interface Sale {
   integration_type: string | null;
   campaign_name: string | null;
   dialer_campaign_id: string | null;
+  original_campaign_name: string | null;
   raw_payload: Record<string, unknown> | null;
 }
 
@@ -150,13 +151,15 @@ export default function DialerData() {
       const { data, error, count } = await query;
       if (error) throw error;
       
-      // Transform data to include campaign_name from adversus_campaign_mappings (the actual dialer campaign name)
-      // NOT from client_campaigns which is the internal grouping name
+      // Transform data to include both campaign names:
+      // - campaign_name: from client_campaigns (internal grouping name) for table display
+      // - original_campaign_name: from adversus_campaign_mappings (actual dialer name) for modal detail
       const transformedData = (data || []).map((sale: any) => ({
         ...sale,
-        campaign_name: (sale.dialer_campaign_id && campaignMappings?.get(sale.dialer_campaign_id)) || 
-                       sale.client_campaigns?.name || 
+        campaign_name: sale.client_campaigns?.name || 
+                       (sale.dialer_campaign_id && campaignMappings?.get(sale.dialer_campaign_id)) || 
                        null,
+        original_campaign_name: (sale.dialer_campaign_id && campaignMappings?.get(sale.dialer_campaign_id)) || null,
         client_campaigns: undefined
       }));
       
@@ -518,75 +521,142 @@ export default function DialerData() {
           </TabsContent>
         </Tabs>
 
-        {/* Sale Detail Dialog */}
+        {/* Sale Detail Dialog - Improved Design */}
         <Dialog open={!!selectedSale} onOpenChange={() => setSelectedSale(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-3">
-                {t("dialerData.saleDetails")}
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader className="pb-4 border-b">
+              <div className="flex items-center justify-between">
+                <DialogTitle className="text-xl font-semibold">{t("dialerData.saleDetails")}</DialogTitle>
                 {selectedSale && getIntegrationBadge(selectedSale.integration_type)}
-              </DialogTitle>
-              <DialogDescription>
-                {selectedSale?.adversus_external_id || ""}
+              </div>
+              <DialogDescription className="font-mono text-base">
+                ID: {selectedSale?.adversus_external_id || "-"}
               </DialogDescription>
             </DialogHeader>
+            
             {selectedSale && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">{t("dialerData.dialerId")}:</span>
-                    <p className="font-mono">{selectedSale.adversus_external_id || "-"}</p>
+              <div className="space-y-6 pt-4">
+                {/* Primary Info - Most Important */}
+                <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    {t("dialerData.primaryInfo")}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">{t("dialerData.agent")}</p>
+                      <p className="text-lg font-medium">{selectedSale.agent_name || "-"}</p>
+                      <p className="text-sm text-muted-foreground">{selectedSale.agent_email || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">{t("dialerData.timestamp")}</p>
+                      <p className="text-lg font-medium">
+                        {selectedSale.sale_datetime
+                          ? format(new Date(selectedSale.sale_datetime), "dd. MMM yyyy", { locale: dateLocale })
+                          : "-"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedSale.sale_datetime
+                          ? format(new Date(selectedSale.sale_datetime), "HH:mm:ss", { locale: dateLocale })
+                          : ""}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">{t("dialerData.agent")}:</span>
-                    <p>{selectedSale.agent_name || "-"}</p>
+                </div>
+
+                {/* Campaign Info */}
+                <div className="bg-primary/5 rounded-lg p-4 space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    {t("dialerData.campaignInfo")}
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">{t("dialerData.originalCampaignName")}</p>
+                      <p className="text-base font-medium font-mono bg-background px-2 py-1 rounded border">
+                        {selectedSale.original_campaign_name || selectedSale.dialer_campaign_id || "-"}
+                      </p>
+                    </div>
+                    {selectedSale.campaign_name && selectedSale.campaign_name !== selectedSale.original_campaign_name && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">{t("dialerData.internalCampaignName")}</p>
+                        <p className="text-sm">{selectedSale.campaign_name}</p>
+                      </div>
+                    )}
+                    <div className="flex gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">{t("dialerData.dialer")}: </span>
+                        <span className="font-medium">{selectedSale.source || "-"}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Campaign ID: </span>
+                        <span className="font-mono text-xs">{selectedSale.dialer_campaign_id || "-"}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">{t("dialerData.agentEmail")}:</span>
-                    <p className="text-sm">{selectedSale.agent_email || "-"}</p>
+                </div>
+
+                {/* Customer Info */}
+                <div className="rounded-lg border p-4 space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    {t("dialerData.customerInfo")}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">{t("dialerData.customer")}</p>
+                      <p className="font-medium">{selectedSale.customer_company || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">{t("dialerData.phone")}</p>
+                      <p className="font-mono">{selectedSale.customer_phone || "-"}</p>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">{t("dialerData.customer")}:</span>
-                    <p>{selectedSale.customer_company || "-"}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">{t("dialerData.phone")}:</span>
-                    <p>{selectedSale.customer_phone || "-"}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">{t("dialerData.timestamp")}:</span>
-                    <p>
-                      {selectedSale.sale_datetime
-                        ? format(new Date(selectedSale.sale_datetime), "dd. MMMM yyyy HH:mm:ss", { locale: dateLocale })
-                        : "-"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">{t("dialerData.oppNumber")}:</span>
-                    <p className="font-mono">{selectedSale.adversus_opp_number || t("dialerData.notAvailable")}</p>
+                </div>
+
+                {/* Reference Numbers */}
+                <div className="rounded-lg border p-4 space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    {t("dialerData.references")}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">{t("dialerData.dialerId")}</p>
+                      <p className="font-mono text-sm bg-muted px-2 py-1 rounded">{selectedSale.adversus_external_id || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">{t("dialerData.oppNumber")}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-mono text-sm bg-muted px-2 py-1 rounded">{selectedSale.adversus_opp_number || "-"}</p>
+                        {selectedSale.adversus_opp_number ? (
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {/* Products */}
-                <div>
-                  <h4 className="font-medium mb-2">{t("dialerData.products")}</h4>
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    {t("dialerData.products")} ({saleItems?.length || 0})
+                  </h3>
                   {saleItems && saleItems.length > 0 ? (
-                    <div className="rounded-md border">
+                    <div className="rounded-lg border overflow-hidden">
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead>{t("dialerData.product")}</TableHead>
-                            <TableHead className="text-right">{t("dialerData.quantity")}</TableHead>
-                            <TableHead className="text-right">{t("dialerData.commission")}</TableHead>
-                            <TableHead>{t("dialerData.mapping")}</TableHead>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="font-semibold">{t("dialerData.product")}</TableHead>
+                            <TableHead className="text-right font-semibold">{t("dialerData.quantity")}</TableHead>
+                            <TableHead className="text-right font-semibold">{t("dialerData.commission")}</TableHead>
+                            <TableHead className="font-semibold">{t("dialerData.mapping")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {saleItems.map((item) => (
                             <TableRow key={item.id}>
-                              <TableCell>{item.adversus_product_title || t("dialerData.unknownProduct")}</TableCell>
+                              <TableCell className="font-medium">{item.adversus_product_title || t("dialerData.unknownProduct")}</TableCell>
                               <TableCell className="text-right">{item.quantity}</TableCell>
-                              <TableCell className="text-right">{item.mapped_commission} DKK</TableCell>
+                              <TableCell className="text-right font-medium">{item.mapped_commission} DKK</TableCell>
                               <TableCell>
                                 {item.needs_mapping ? (
                                   <Badge variant="outline" className="text-yellow-600 border-yellow-600">
@@ -604,7 +674,7 @@ export default function DialerData() {
                       </Table>
                     </div>
                   ) : (
-                    <p className="text-muted-foreground text-sm">{t("dialerData.noProducts")}</p>
+                    <p className="text-muted-foreground text-sm py-4 text-center bg-muted/30 rounded-lg">{t("dialerData.noProducts")}</p>
                   )}
                 </div>
               </div>

@@ -212,7 +212,13 @@
     "mapped": "Mapped",
     "noProducts": "No products registered",
     "rawJson": "Raw JSON Payload",
-    "noRawData": "No raw data available"
+    "noRawData": "No raw data available",
+    "primaryInfo": "Primary Information",
+    "campaignInfo": "Campaign Information",
+    "originalCampaignName": "Original Campaign Name (Dialer)",
+    "internalCampaignName": "Internal Campaign Name",
+    "customerInfo": "Customer Information",
+    "references": "References"
   },
   "mgTest": {
     "title": "MG Test – Adversus Mapping",

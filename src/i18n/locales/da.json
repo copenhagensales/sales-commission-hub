@@ -212,7 +212,13 @@
     "mapped": "Mappet",
     "noProducts": "Ingen produkter registreret",
     "rawJson": "Rå JSON Payload",
-    "noRawData": "Ingen rå data tilgængelig"
+    "noRawData": "Ingen rå data tilgængelig",
+    "primaryInfo": "Primær information",
+    "campaignInfo": "Kampagneinformation",
+    "originalCampaignName": "Original kampagnenavn (Dialer)",
+    "internalCampaignName": "Internt kampagnenavn",
+    "customerInfo": "Kundeinformation",
+    "references": "Referencer"
   },
   "mgTest": {
     "title": "MG test – Adversus mapping",
