@@ -1058,6 +1058,24 @@ export function DialerIntegrations() {
                                     </div>
                                   </div>
                                 )}
+
+                                {rule.extractionType === 'composite' && (
+                                  <div>
+                                    <Label className="text-xs">Product Name Template</Label>
+                                    <Input
+                                      placeholder="e.g., {{A-kasse type}} - {{Dækningssum}}"
+                                      value={rule.productNameTemplate || ""}
+                                      onChange={(e) => {
+                                        const updated = [...formData.conditionalRules];
+                                        updated[index] = { ...rule, productNameTemplate: e.target.value };
+                                        setFormData({ ...formData, conditionalRules: updated });
+                                      }}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground mt-1">
+                                      Use {"{{key}}"} to insert values from data or campaign (e.g. {"{{campaign.code}}"}).
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             ))}
                             
