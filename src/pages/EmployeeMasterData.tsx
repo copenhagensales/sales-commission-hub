@@ -140,6 +140,20 @@ export default function EmployeeMasterData() {
     },
   });
 
+  // Fetch job positions from database
+  const { data: jobPositions = [] } = useQuery({
+    queryKey: ["job-positions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("job_positions")
+        .select("id, name, is_active")
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Fetch contracts to check signed status
   const { data: contracts = [] } = useQuery({
     queryKey: ["employee-contracts-status"],
@@ -536,15 +550,11 @@ export default function EmployeeMasterData() {
                       <Select value={formData.job_title || ""} onValueChange={(v) => setFormData({ ...formData, job_title: v || null })}>
                         <SelectTrigger><SelectValue placeholder="Vælg stilling" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Salgskonsulent">Salgskonsulent</SelectItem>
-                          <SelectItem value="Fieldmarketing">Fieldmarketing</SelectItem>
-                          <SelectItem value="Teamleder">Teamleder</SelectItem>
-                          <SelectItem value="Assisterende Teamleder">Assisterende Teamleder</SelectItem>
-                          <SelectItem value="Rekruttering">Rekruttering</SelectItem>
-                          <SelectItem value="SOME">SOME</SelectItem>
-                          <SelectItem value="Backoffice">Backoffice</SelectItem>
-                          <SelectItem value="Projektleder">Projektleder</SelectItem>
-                          <SelectItem value="Ejer">Ejer</SelectItem>
+                          {jobPositions.map((position) => (
+                            <SelectItem key={position.id} value={position.name}>
+                              {position.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -846,15 +856,11 @@ export default function EmployeeMasterData() {
                             <SelectValue placeholder="Vælg stilling" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Salgskonsulent">Salgskonsulent</SelectItem>
-                            <SelectItem value="Fieldmarketing">Fieldmarketing</SelectItem>
-                            <SelectItem value="SOME">SOME</SelectItem>
-                            <SelectItem value="Teamleder">Teamleder</SelectItem>
-                            <SelectItem value="Assisterende Teamleder">Assisterende Teamleder</SelectItem>
-                            <SelectItem value="Rekruttering">Rekruttering</SelectItem>
-                            <SelectItem value="Backoffice">Backoffice</SelectItem>
-                            <SelectItem value="Projektleder">Projektleder</SelectItem>
-                            <SelectItem value="Ejer">Ejer</SelectItem>
+                            {jobPositions.map((position) => (
+                              <SelectItem key={position.id} value={position.name}>
+                                {position.name}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-muted-foreground">
