@@ -497,6 +497,23 @@ export class EnreachAdapter implements DialerAdapter {
           });
         }
         break;
+      case "composite":
+        if ((rule as any).productNameTemplate) {
+          let name = String((rule as any).productNameTemplate);
+          name = name.replace(/\{{1,2}([\w\.]+)\}{1,2}/g, (_, key) => {
+            const val = this.getValue(dataObj, [key]);
+            return val ? String(val) : "";
+          });
+          if (name) {
+            products.push({
+              name: name,
+              externalId: rule.conditionKey,
+              quantity: 1,
+              unitPrice: 0,
+            });
+          }
+        }
+        break;
     }
     return products;
   }

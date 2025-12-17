@@ -30,11 +30,12 @@ interface DataFilterRule {
 interface ConditionalExtractionRule {
   conditionKey: string;           // Key to check in data object
   conditionValue?: string;        // Optional: specific value to match
-  extractionType: 'specific_fields' | 'regex' | 'static_value';
+  extractionType: 'specific_fields' | 'regex' | 'static_value' | 'composite';
   targetKeys?: string[];          // For specific_fields
   regexPattern?: string;          // For regex extraction
   staticProductName?: string;     // For static_value
   staticProductPrice?: number;    // For static_value
+  productNameTemplate?: string;   // For composite extraction
 }
 
 interface ProductExtractionConfig {
