@@ -150,11 +150,12 @@ export default function DialerData() {
       const { data, error, count } = await query;
       if (error) throw error;
       
-      // Transform data to include campaign_name from either client_campaigns or adversus_campaign_mappings
+      // Transform data to include campaign_name from adversus_campaign_mappings (the actual dialer campaign name)
+      // NOT from client_campaigns which is the internal grouping name
       const transformedData = (data || []).map((sale: any) => ({
         ...sale,
-        campaign_name: sale.client_campaigns?.name || 
-                       (sale.dialer_campaign_id && campaignMappings?.get(sale.dialer_campaign_id)) || 
+        campaign_name: (sale.dialer_campaign_id && campaignMappings?.get(sale.dialer_campaign_id)) || 
+                       sale.client_campaigns?.name || 
                        null,
         client_campaigns: undefined
       }));
