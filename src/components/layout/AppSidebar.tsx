@@ -709,6 +709,59 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             </Collapsible>
           )}
 
+          {/* Dashboards menu */}
+          {p.canViewDashboard && (
+            <Collapsible open={location.pathname.startsWith("/dashboards")} defaultOpen={location.pathname.startsWith("/dashboards")}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname.startsWith("/dashboards") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <BarChart3 className="h-5 w-5" />
+                  Dashboards
+                </div>
+                {location.pathname.startsWith("/dashboards") ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                <NavLink to="/dashboards/fieldmarketing" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/dashboards/fieldmarketing" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <BarChart3 className="h-4 w-4" />
+                  Fieldmarketing
+                </NavLink>
+                <NavLink to="/dashboards/eesy-tm" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/dashboards/eesy-tm" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <BarChart3 className="h-4 w-4" />
+                  Eesy TM
+                </NavLink>
+                <NavLink to="/dashboards/tdc-erhverv" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/dashboards/tdc-erhverv" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <BarChart3 className="h-4 w-4" />
+                  TDC Erhverv
+                </NavLink>
+                <NavLink to="/dashboards/relatel" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/dashboards/relatel" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <BarChart3 className="h-4 w-4" />
+                  Relatel
+                </NavLink>
+                <NavLink to="/dashboards/united" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/dashboards/united" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <BarChart3 className="h-4 w-4" />
+                  United
+                </NavLink>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
           {/* Test menu */}
           {showTestMenu && (
             <Collapsible open={testOpen} onOpenChange={setTestOpen}>
