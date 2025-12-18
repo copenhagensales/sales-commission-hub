@@ -502,12 +502,32 @@ export class EnreachAdapter implements DialerAdapter {
       case "specific_fields":
         if (rule.targetKeys) {
           for (const key of rule.targetKeys) {
-            const val = this.getValue(dataObj, [key]);
-            if (val && String(val).trim().length > 0) {
-              // FIX: Use product name as externalId instead of field key name
-              // This ensures unique products (e.g., different Abonnement values) get unique IDs
-              const productName = String(val).trim();
-              products.push({ name: productName, externalId: productName, quantity: 1, unitPrice: 0 });
+            // Check if the key contains template placeholders like {{field}}
+            if (key.includes("{{") && key.includes("}}")) {
+              // Process as a template (like composite type)
+              let productName = key.replace(/\{\{([^}]+)\}\}/g, (_, fieldKey) => {
+                const trimmedKey = fieldKey.trim();
+                let val = this.getNestedValue(lead, trimmedKey);
+                if (val === undefined || val === null) {
+                  val = this.getNestedValue(dataObj, trimmedKey);
+                }
+                if (val === undefined || val === null) {
+                  val = this.getValue(dataObj, [trimmedKey]);
+                }
+                return val ? String(val) : "";
+              });
+              // Clean up extra spaces from empty values
+              productName = productName.replace(/\s+-\s*$/g, "").replace(/^\s*-\s+/g, "").trim();
+              if (productName && productName.length > 0) {
+                products.push({ name: productName, externalId: productName, quantity: 1, unitPrice: 0 });
+              }
+            } else {
+              // Original behavior: look up the field value directly
+              const val = this.getValue(dataObj, [key]);
+              if (val && String(val).trim().length > 0) {
+                const productName = String(val).trim();
+                products.push({ name: productName, externalId: productName, quantity: 1, unitPrice: 0 });
+              }
             }
           }
         }
