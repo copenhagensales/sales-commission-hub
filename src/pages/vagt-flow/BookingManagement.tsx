@@ -35,7 +35,7 @@ export default function BookingManagement() {
             </TabsTrigger>
             <TabsTrigger value="bookings" className="flex items-center gap-2">
               <ListChecks className="h-4 w-4" />
-              {t("sidebar.bookings", "Bookinger")}
+              Kommende bookinger
             </TabsTrigger>
             <TabsTrigger value="locations" className="flex items-center gap-2">
               <MapPin className="h-4 w-4" />
