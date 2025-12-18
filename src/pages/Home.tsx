@@ -627,20 +627,49 @@ const Home = () => {
       
       const { data: agents } = await supabase
         .from("agents")
-        .select("name, email")
+        .select("id, name, email")
         .in("name", allAgentNames.length > 0 ? allAgentNames : ["__none__"]);
       
+      // Get team info via employee_agent_mapping (primary method)
+      const agentIds = agents?.map(a => a.id).filter(Boolean) || [];
+      const { data: agentMappings } = agentIds.length > 0 ? await supabase
+        .from("employee_agent_mapping")
+        .select(`
+          agent_id,
+          employee:employee_id(
+            id, 
+            first_name, 
+            last_name,
+            teams:team_id(name)
+          )
+        `)
+        .in("agent_id", agentIds) : { data: [] };
+      
+      // Fallback: Get team info via email matching
       const agentEmails = agents?.map(a => a.email).filter(Boolean) || [];
-      const { data: employees } = agentEmails.length > 0 ? await supabase
+      const { data: employeesByEmail } = agentEmails.length > 0 ? await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, work_email, private_email, team_id, teams:team_id(name)")
         .or(agentEmails.map(e => `work_email.eq.${e},private_email.eq.${e}`).join(",")) : { data: [] };
       
       const getTeamForAgent = (agentName: string) => {
         const agent = agents?.find(a => a.name === agentName);
-        if (!agent?.email) return null;
-        const emp = employees?.find(e => e.work_email === agent.email || e.private_email === agent.email);
-        return emp?.teams as { name: string } | null;
+        if (!agent) return null;
+        
+        // First try employee_agent_mapping
+        const mapping = agentMappings?.find(m => m.agent_id === agent.id);
+        if (mapping?.employee) {
+          const emp = mapping.employee as { teams: { name: string } | null };
+          if (emp.teams?.name) return emp.teams;
+        }
+        
+        // Fallback to email matching
+        if (agent.email) {
+          const emp = employeesByEmail?.find(e => e.work_email === agent.email || e.private_email === agent.email);
+          if (emp?.teams) return emp.teams as { name: string };
+        }
+        
+        return null;
       };
       
       return {
