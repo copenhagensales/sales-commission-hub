@@ -747,7 +747,7 @@ const [personnelOpen, setPersonnelOpen] = useState(
                   if (item.href === "/vagt-flow/locations") return positionPermissions.canViewFmLocations;
                   if (item.href === "/vagt-flow/vehicles") return positionPermissions.canViewFmVehicles;
                   if (item.href === "/vagt-flow/time-off") return positionPermissions.canViewFmTimeOff;
-                  if (item.href === "/vagt-flow/sales-registration") return positionPermissions.canViewFmOverview;
+                  if (item.href === "/vagt-flow/sales-registration") return positionPermissions.canViewFmSalesRegistration;
                   if (item.href === "/vagt-flow/billing") return positionPermissions.canViewFmBilling;
                   return isTeamlederOrAbove || isMenuItemGranted("fieldmarketing");
                 }).map((item) => {
