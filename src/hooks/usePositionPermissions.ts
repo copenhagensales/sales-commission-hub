@@ -136,20 +136,33 @@ export function usePositionPermissions() {
         return { position: null, permissions: {} };
       }
 
-      // Get employee's job_title
-      const { data: employee, error: empError } = await supabase
+      // Get employee's job_title - check both email fields
+      // First try private_email
+      let employee = null;
+      const { data: empByPrivate } = await supabase
         .from("employee_master_data")
         .select("job_title")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .ilike("private_email", user.email)
         .eq("is_active", true)
         .maybeSingle();
-
-      if (empError) {
-        console.error("Error fetching employee:", empError);
-        return { position: null, permissions: {} };
+      
+      employee = empByPrivate;
+      
+      // If not found, try work_email
+      if (!employee) {
+        const { data: empByWork } = await supabase
+          .from("employee_master_data")
+          .select("job_title")
+          .ilike("work_email", user.email)
+          .eq("is_active", true)
+          .maybeSingle();
+        employee = empByWork;
       }
+      
+      console.log("usePositionPermissions: employee lookup", { email: user.email, employee });
 
       if (!employee?.job_title) {
+        console.log("usePositionPermissions: No job_title found for user");
         return { position: null, permissions: {} };
       }
 
