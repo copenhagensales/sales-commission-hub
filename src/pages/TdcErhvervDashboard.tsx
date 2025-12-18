@@ -1,12 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, Package, DollarSign, ShoppingCart, TrendingUp } from "lucide-react";
+import { Users, Package, DollarSign, ShoppingCart, TrendingUp, CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface ProductStat {
   name: string;
@@ -26,13 +30,15 @@ const formatCurrency = (value: number) =>
   new Intl.NumberFormat('da-DK', { style: 'decimal', maximumFractionDigits: 0 }).format(value) + ' DKK';
 
 export default function TdcErhvervDashboard() {
-  // Fetch today's TDC Erhverv sales with product mapping
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+  // Fetch TDC Erhverv sales for selected date with product mapping
   const { data, isLoading } = useQuery({
-    queryKey: ["tdc-erhverv-today-dashboard"],
+    queryKey: ["tdc-erhverv-dashboard", selectedDate.toISOString().split("T")[0]],
     queryFn: async () => {
-      const today = startOfDay(new Date());
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      const dayStart = startOfDay(selectedDate);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
 
       // Find TDC Erhverv client
       const { data: clients } = await supabase
@@ -53,7 +59,7 @@ export default function TdcErhvervDashboard() {
       const campaignIds = (campaigns || []).map(c => c.id);
       if (campaignIds.length === 0) return { sales: [], campaignIds: [] };
 
-      // Fetch today's sales with product mappings
+      // Fetch sales for selected date with product mappings
       const { data: sales } = await supabase
         .from("sales")
         .select(`
@@ -76,8 +82,8 @@ export default function TdcErhvervDashboard() {
           )
         `)
         .in("client_campaign_id", campaignIds)
-        .gte("sale_datetime", today.toISOString())
-        .lt("sale_datetime", tomorrow.toISOString())
+        .gte("sale_datetime", dayStart.toISOString())
+        .lt("sale_datetime", dayEnd.toISOString())
         .order("sale_datetime", { ascending: false });
 
       return { sales: sales || [], campaignIds };
@@ -147,15 +153,36 @@ export default function TdcErhvervDashboard() {
     return { totalSales, totalRevenue, totalCommission, agentStats, productStats };
   }, [data]);
 
+  const isToday = startOfDay(selectedDate).getTime() === startOfDay(new Date()).getTime();
+
   return (
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">TDC Erhverv – Dagsoverblik</h1>
-          <p className="text-muted-foreground">
-            Salg for i dag ({format(new Date(), "EEEE d. MMMM yyyy", { locale: da })}) • Baseret på produkt-mapping fra MG Test
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">TDC Erhverv – Dagsoverblik</h1>
+            <p className="text-muted-foreground">
+              Salg for {isToday ? "i dag" : format(selectedDate, "d. MMMM yyyy", { locale: da })} • Baseret på produkt-mapping fra MG Test
+            </p>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(selectedDate, "PPP", { locale: da })}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && setSelectedDate(date)}
+                initialFocus
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* KPI Cards */}
