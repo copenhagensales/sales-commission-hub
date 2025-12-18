@@ -51,8 +51,6 @@ export default function BookingsContent() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set([`${selectedYear}-${selectedWeek}`]));
-  const [absenceExpanded, setAbsenceExpanded] = useState(true);
-  const [openAssignPopover, setOpenAssignPopover] = useState<string | null>(null);
   const [addEmployeeDialogBooking, setAddEmployeeDialogBooking] = useState<any>(null);
   const [addVehicleDialogBooking, setAddVehicleDialogBooking] = useState<any>(null);
 
@@ -116,6 +114,32 @@ export default function BookingsContent() {
         .eq("team_id", team.id);
       
       return teamClients?.map((tc: any) => tc.clients).filter(Boolean) || [];
+    },
+  });
+
+  // Fetch employees for the dialog
+  const { data: employees = [] } = useQuery({
+    queryKey: ["vagt-employees-for-booking"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("employee")
+        .select("id, full_name, team")
+        .eq("is_active", true)
+        .order("full_name");
+      return data || [];
+    },
+  });
+
+  // Fetch vehicles for the dialog
+  const { data: vehicles = [] } = useQuery({
+    queryKey: ["vagt-vehicles-for-booking"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("vehicle")
+        .select("id, name, license_plate")
+        .eq("is_active", true)
+        .order("name");
+      return data || [];
     },
   });
 
@@ -393,6 +417,10 @@ export default function BookingsContent() {
         open={!!addEmployeeDialogBooking}
         onOpenChange={(open) => !open && setAddEmployeeDialogBooking(null)}
         booking={addEmployeeDialogBooking}
+        weekNumber={selectedWeek}
+        year={selectedYear}
+        weekStart={weekStart}
+        employees={employees}
         onAddAssignments={() => {
           queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
           setAddEmployeeDialogBooking(null);
@@ -404,6 +432,10 @@ export default function BookingsContent() {
         open={!!addVehicleDialogBooking}
         onOpenChange={(open) => !open && setAddVehicleDialogBooking(null)}
         booking={addVehicleDialogBooking}
+        weekNumber={selectedWeek}
+        year={selectedYear}
+        weekStart={weekStart}
+        vehicles={vehicles}
         onAddAssignments={() => {
           queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
           setAddVehicleDialogBooking(null);
