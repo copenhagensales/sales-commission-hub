@@ -669,6 +669,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
       const campaignIds = campaigns?.map(c => c.id) || [];
       if (campaignIds.length === 0) return { salesToday: 0, salesThisWeek: 0, salesThisMonth: 0, totalSales: 0 };
 
+      // Fetch sales from month start to avoid hitting row limits
       const { data: sales, error } = await supabase
         .from("sales")
         .select(`
@@ -679,7 +680,8 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
             products (counts_as_sale)
           )
         `)
-        .in("client_campaign_id", campaignIds);
+        .in("client_campaign_id", campaignIds)
+        .gte("sale_datetime", monthStart);
       
       if (error) throw error;
 
@@ -695,7 +697,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
       return {
         salesToday: allSales.filter(s => s.sale_datetime >= todayStart).reduce((sum, s) => sum + countValidSales(s), 0),
         salesThisWeek: allSales.filter(s => s.sale_datetime >= weekStart).reduce((sum, s) => sum + countValidSales(s), 0),
-        salesThisMonth: allSales.filter(s => s.sale_datetime >= monthStart).reduce((sum, s) => sum + countValidSales(s), 0),
+        salesThisMonth: allSales.reduce((sum, s) => sum + countValidSales(s), 0),
         totalSales: allSales.reduce((sum, s) => sum + countValidSales(s), 0),
       };
     },
