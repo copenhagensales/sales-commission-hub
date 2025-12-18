@@ -1,10 +1,17 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { format, startOfDay } from "date-fns";
+import { da } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, Users, Package, DollarSign } from "lucide-react";
+import { TrendingUp, Users, Package, DollarSign, CalendarIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface SaleItem {
   id: string;
@@ -42,12 +49,14 @@ interface ProductStats {
 }
 
 const AseDashboard = () => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayISO = today.toISOString();
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  
+  const dayStart = startOfDay(selectedDate);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
 
   const { data: saleItems, isLoading } = useQuery({
-    queryKey: ['ase-dashboard-sales', todayISO],
+    queryKey: ['ase-dashboard-sales', selectedDate.toDateString()],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('sale_items')
@@ -71,7 +80,8 @@ const AseDashboard = () => {
             source
           )
         `)
-        .gte('sales.sale_datetime', todayISO)
+        .gte('sales.sale_datetime', dayStart.toISOString())
+        .lt('sales.sale_datetime', dayEnd.toISOString())
         .ilike('sales.source', '%ase%');
 
       if (error) throw error;
@@ -139,14 +149,42 @@ const AseDashboard = () => {
   return (
     <MainLayout>
       <div className="p-6 space-y-6">
-        <h1 className="text-2xl font-bold">ASE - Dagsoverblik</h1>
-        <p className="text-muted-foreground">Salgsdata for i dag baseret på produkt mapping</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">ASE - Dagsoverblik</h1>
+            <p className="text-muted-foreground">Salgsdata baseret på produkt mapping</p>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-[240px] justify-start text-left font-normal",
+                  !selectedDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && setSelectedDate(date)}
+                initialFocus
+                className="pointer-events-auto"
+                locale={da}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Salg i dag</CardTitle>
+              <CardTitle className="text-sm font-medium">Salg</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -205,7 +243,7 @@ const AseDashboard = () => {
                   {agentList.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center text-muted-foreground">
-                        Ingen salg i dag
+                        Ingen salg denne dag
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -242,7 +280,7 @@ const AseDashboard = () => {
                   {productList.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center text-muted-foreground">
-                        Ingen produkter solgt i dag
+                        Ingen produkter solgt denne dag
                       </TableCell>
                     </TableRow>
                   ) : (
