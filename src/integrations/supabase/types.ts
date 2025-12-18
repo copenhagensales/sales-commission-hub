@@ -2367,6 +2367,7 @@ export type Database = {
           period: string
           responded_at: string | null
           status: string
+          target_commission: number | null
         }
         Insert: {
           accepted_at?: string | null
@@ -2381,6 +2382,7 @@ export type Database = {
           period?: string
           responded_at?: string | null
           status?: string
+          target_commission?: number | null
         }
         Update: {
           accepted_at?: string | null
@@ -2395,6 +2397,7 @@ export type Database = {
           period?: string
           responded_at?: string | null
           status?: string
+          target_commission?: number | null
         }
         Relationships: [
           {
