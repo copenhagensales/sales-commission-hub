@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO, differenceInYears, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subWeeks, addDays, isSameDay, isAfter, isBefore } from "date-fns";
@@ -36,7 +37,16 @@ import { toast } from "sonner";
 
 const Home = () => {
   const { user } = useAuth();
-  const { canEditHomeGoals } = usePermissions();
+  const { canEditHomeGoals: realCanEditHomeGoals } = usePermissions();
+  const { isPreviewMode, previewPermissions } = useRolePreview();
+  
+  // In preview mode, check preview permissions for canEditHomeGoals
+  const canEditHomeGoals = isPreviewMode 
+    ? (previewPermissions?.menu_home_goals === true || 
+       (typeof previewPermissions?.menu_home_goals === 'object' && 
+        (previewPermissions.menu_home_goals as { edit?: boolean })?.edit))
+    : realCanEditHomeGoals;
+  
   const queryClient = useQueryClient();
   const [addEventOpen, setAddEventOpen] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", event_date: "", event_time: "", location: "" });
