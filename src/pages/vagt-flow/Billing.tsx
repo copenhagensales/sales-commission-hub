@@ -26,7 +26,7 @@ import {
 export default function VagtBilling() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
-  const [brandFilter, setBrandFilter] = useState<string>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
 
   const monthStart = startOfMonth(new Date(selectedMonth + "-01"));
   const monthEnd = endOfMonth(monthStart);
@@ -39,7 +39,7 @@ export default function VagtBilling() {
         .select(`
           *,
           location(id, name, address_city, daily_rate, type),
-          brand(id, name, color_hex)
+          clients(id, name)
         `)
         .gte("start_date", format(monthStart, "yyyy-MM-dd"))
         .lte("start_date", format(monthEnd, "yyyy-MM-dd"))
@@ -49,18 +49,30 @@ export default function VagtBilling() {
     },
   });
 
-  const { data: brands } = useQuery({
-    queryKey: ["vagt-brands"],
+  // Fetch Fieldmarketing team clients
+  const { data: fieldmarketingClients } = useQuery({
+    queryKey: ["fieldmarketing-team-clients-billing"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("brand").select("*").eq("is_active", true);
-      if (error) throw error;
-      return data;
+      const { data: team } = await supabase
+        .from("teams")
+        .select("id")
+        .ilike("name", "%fieldmarketing%")
+        .single();
+      
+      if (!team) return [];
+      
+      const { data: teamClients } = await supabase
+        .from("team_clients")
+        .select("client_id, clients(id, name)")
+        .eq("team_id", team.id);
+      
+      return teamClients?.map((tc: any) => tc.clients).filter(Boolean) || [];
     },
   });
 
-  // Filter by brand
+  // Filter by client
   const filteredBookings = bookings?.filter((b: any) => 
-    brandFilter === "all" || b.brand_id === brandFilter
+    clientFilter === "all" || b.client_id === clientFilter
   );
 
   // Group bookings by location
@@ -71,7 +83,7 @@ export default function VagtBilling() {
     if (!acc[locationId]) {
       acc[locationId] = {
         location: booking.location,
-        brand: booking.brand,
+        client: booking.clients,
         bookings: [],
         totalDays: 0,
         totalAmount: 0,
@@ -135,15 +147,15 @@ export default function VagtBilling() {
             <p className="text-muted-foreground">Oversigt over bookinger til fakturering</p>
           </div>
           <div className="flex items-center gap-3">
-            <Select value={brandFilter} onValueChange={setBrandFilter}>
+            <Select value={clientFilter} onValueChange={setClientFilter}>
               <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Alle brands" />
+                <SelectValue placeholder="Alle kunder" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Alle brands</SelectItem>
-                {brands?.map((brand) => (
-                  <SelectItem key={brand.id} value={brand.id}>
-                    {brand.name}
+                <SelectItem value="all">Alle kunder</SelectItem>
+                {fieldmarketingClients?.map((client: any) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -247,7 +259,7 @@ export default function VagtBilling() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Lokation</TableHead>
-                    <TableHead>Brand</TableHead>
+                    <TableHead>Kunde</TableHead>
                     <TableHead>Dato Periode</TableHead>
                     <TableHead className="text-right">Bookinger</TableHead>
                     <TableHead className="text-right">Dage</TableHead>
@@ -269,13 +281,8 @@ export default function VagtBilling() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          style={{
-                            backgroundColor: loc.brand?.color_hex,
-                            color: "white",
-                          }}
-                        >
-                          {loc.brand?.name}
+                        <Badge variant="outline">
+                          {loc.client?.name || "Ukendt kunde"}
                         </Badge>
                       </TableCell>
                       <TableCell>{formatDateRange(loc.minDate, loc.maxDate)}</TableCell>

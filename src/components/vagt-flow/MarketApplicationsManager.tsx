@@ -3,7 +3,6 @@ import { usePendingApplications, useReviewApplication } from "@/hooks/useMarketA
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BrandBadge } from "./BrandBadge";
 import { format, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 import { Check, X, Users, MapPin, Calendar, Loader2, ChevronDown, ChevronRight } from "lucide-react";
@@ -114,10 +113,9 @@ export function MarketApplicationsManager() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <BrandBadge
-                      brandName={app.booking?.brand?.name}
-                      brandColor={app.booking?.brand?.color_hex}
-                    />
+                    <Badge variant="outline">
+                      {app.booking?.clients?.name || "Ukendt kunde"}
+                    </Badge>
                     <Button
                       size="sm"
                       variant="outline"

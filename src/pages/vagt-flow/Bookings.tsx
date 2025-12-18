@@ -48,7 +48,7 @@ export default function VagtBookings() {
   const now = new Date();
   const [selectedWeek, setSelectedWeek] = useState(getWeek(now, { weekStartsOn: 1 }));
   const [selectedYear, setSelectedYear] = useState(getYear(now));
-  const [brandFilter, setBrandFilter] = useState<string>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set([`${selectedYear}-${selectedWeek}`]));
@@ -69,7 +69,7 @@ export default function VagtBookings() {
         .select(`
           *,
           location(name, address_city, type),
-          brand(name, color_hex),
+          clients(id, name),
           booking_assignment(id, date, employee_id)
         `)
         .eq("week_number", selectedWeek)
@@ -322,21 +322,21 @@ export default function VagtBookings() {
   });
 
   const filteredBookings = bookings?.filter((b: any) => {
-    if (brandFilter !== "all" && b.brand_id !== brandFilter) return false;
+    if (clientFilter !== "all" && b.client_id !== clientFilter) return false;
     if (statusFilter !== "all" && b.status !== statusFilter) return false;
     return true;
   });
 
-  // Group bookings by brand
-  const bookingsByBrand = filteredBookings?.reduce((acc: any, booking: any) => {
-    const brandId = booking.brand_id;
-    if (!acc[brandId]) {
-      acc[brandId] = {
-        brand: booking.brand,
+  // Group bookings by client
+  const bookingsByClient = filteredBookings?.reduce((acc: any, booking: any) => {
+    const clientId = booking.client_id || "unknown";
+    if (!acc[clientId]) {
+      acc[clientId] = {
+        client: booking.clients,
         bookings: [],
       };
     }
-    acc[brandId].bookings.push(booking);
+    acc[clientId].bookings.push(booking);
     return acc;
   }, {});
 
@@ -384,8 +384,8 @@ export default function VagtBookings() {
   };
 
   const expandAll = () => {
-    if (bookingsByBrand) {
-      const allKeys = Object.keys(bookingsByBrand).map((brandId) => `${selectedYear}-${selectedWeek}-${brandId}`);
+    if (bookingsByClient) {
+      const allKeys = Object.keys(bookingsByClient).map((clientId) => `${selectedYear}-${selectedWeek}-${clientId}`);
       setExpandedWeeks(new Set([`${selectedYear}-${selectedWeek}`, ...allKeys]));
     }
   };
@@ -484,7 +484,7 @@ export default function VagtBookings() {
               </div>
               <div>
                 <label className="text-xs font-medium uppercase text-muted-foreground mb-2 block">Kunde</label>
-                <Select value={brandFilter} onValueChange={setBrandFilter}>
+                <Select value={clientFilter} onValueChange={setClientFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="Alle kunder" />
                   </SelectTrigger>
@@ -572,23 +572,23 @@ export default function VagtBookings() {
           </Button>
         </div>
 
-        {/* Bookings by brand */}
+        {/* Bookings by client */}
         {isLoading ? (
           <p>Indlæser...</p>
-        ) : bookingsByBrand && Object.keys(bookingsByBrand).length > 0 ? (
-          Object.entries(bookingsByBrand).map(([brandId, data]: [string, any]) => {
-            const weekKey = `${selectedYear}-${selectedWeek}-${brandId}`;
+        ) : bookingsByClient && Object.keys(bookingsByClient).length > 0 ? (
+          Object.entries(bookingsByClient).map(([clientId, data]: [string, any]) => {
+            const weekKey = `${selectedYear}-${selectedWeek}-${clientId}`;
             const isExpanded = expandedWeeks.has(weekKey);
             
             return (
-              <Collapsible key={brandId} open={isExpanded} onOpenChange={() => toggleWeek(weekKey)}>
+              <Collapsible key={clientId} open={isExpanded} onOpenChange={() => toggleWeek(weekKey)}>
                 <Card>
                   <CardContent className="pt-4 pb-4 flex items-center justify-between">
                     <CollapsibleTrigger asChild>
                       <div className="flex items-center gap-3 cursor-pointer flex-1">
                         <span className="font-bold text-lg">Uge {selectedWeek}, {selectedYear}</span>
-                        <Badge style={{ backgroundColor: data.brand?.color_hex, color: "#fff" }}>
-                          {data.brand?.name}
+                        <Badge variant="outline">
+                          {data.client?.name || "Ukendt kunde"}
                         </Badge>
                         <Badge variant="secondary" className="bg-green-100 text-green-700">
                           {data.bookings.length} booking{data.bookings.length !== 1 ? "s" : ""}
@@ -609,8 +609,8 @@ export default function VagtBookings() {
                           {/* Booking header */}
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              <Badge style={{ backgroundColor: data.brand?.color_hex, color: "#fff" }}>
-                                {data.brand?.name}
+                              <Badge variant="outline">
+                                {data.client?.name || "Ukendt kunde"}
                               </Badge>
                               <span className="font-medium">{booking.location?.name}</span>
                               {hasUnderstaffing(booking) && (

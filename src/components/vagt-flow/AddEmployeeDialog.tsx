@@ -29,7 +29,8 @@ interface Employee {
 interface Booking {
   id: string;
   location?: { name: string };
-  brand?: { name: string };
+  clients?: { name: string };
+  client_id?: string;
   start_date: string;
   end_date: string;
   booked_days?: number[] | null;
@@ -70,13 +71,13 @@ export function AddEmployeeDialog({
   const [selectedEmployees, setSelectedEmployees] = useState<(string | null)[]>([null]);
   const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
 
-  // Filter employees by brand/department match (department contains brand name)
-  const brandName = booking?.brand?.name?.toLowerCase();
+  // Filter employees by client/department match (department contains client name)
+  const clientName = booking?.clients?.name?.toLowerCase();
   const filteredEmployees = employees.filter((emp) => {
-    if (!brandName) return true;
+    if (!clientName) return true;
     const empTeam = emp.team?.toLowerCase() || "";
-    // Match if employee's department/team contains the brand name
-    return empTeam.includes(brandName);
+    // Match if employee's department/team contains the client name
+    return empTeam.includes(clientName);
   });
 
   // Fetch absences for the week period from absence_request_v2
