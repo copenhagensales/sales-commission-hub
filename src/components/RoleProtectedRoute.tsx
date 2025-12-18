@@ -1,6 +1,9 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -29,11 +32,20 @@ export function RoleProtectedRoute({
     permissions,
     isLoading,
   });
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/auth";
+  };
   
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
         <div className="animate-pulse text-muted-foreground">Indlæser...</div>
+        <Button variant="outline" size="sm" onClick={handleLogout} className="mt-4">
+          <LogOut className="h-4 w-4 mr-2" />
+          Log ud
+        </Button>
       </div>
     );
   }
