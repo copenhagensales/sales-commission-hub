@@ -125,7 +125,7 @@ export const routes: RouteConfig[] = [
   { path: "/vagt-flow/bookings", component: VagtBookings, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_fm_bookings" },
   { path: "/vagt-flow/vehicles", component: VagtVehicles, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_fm_vehicles" },
   { path: "/vagt-flow/time-off", component: VagtTimeOffRequests, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_fm_time_off" },
-  { path: "/vagt-flow/sales-registration", component: VagtSalesRegistration, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_fm_overview" },
+  { path: "/vagt-flow/sales-registration", component: VagtSalesRegistration, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_fm_sales_registration" },
   { path: "/vagt-flow/billing", component: VagtBilling, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_fm_billing" },
   { path: "/vagt-flow/min-uge", component: VagtMinUge, access: "protected" },
 

@@ -202,6 +202,7 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: "menu_fm_vehicles", label: "Køretøjer", description: "Adgang til køretøjer", hasEditOption: true },
       { key: "menu_fm_billing", label: "Fakturering", description: "Adgang til fakturering", hasEditOption: true },
       { key: "menu_fm_time_off", label: "Fraværsanmodninger", description: "Adgang til fraværsanmodninger", hasEditOption: true },
+      { key: "menu_fm_sales_registration", label: "Salgsregistrering", description: "Adgang til salgsregistrering", hasEditOption: true },
     ],
   },
   {

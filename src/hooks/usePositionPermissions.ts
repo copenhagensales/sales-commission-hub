@@ -83,6 +83,7 @@ const generateAllPermissions = (): PositionPermissions => ({
   menu_fm_vehicles: { view: true, edit: true },
   menu_fm_billing: { view: true, edit: true },
   menu_fm_time_off: { view: true, edit: true },
+  menu_fm_sales_registration: { view: true, edit: true },
   // Recruitment menu
   menu_recruitment_dashboard: { view: true, edit: true },
   menu_candidates: { view: true, edit: true },
@@ -315,6 +316,7 @@ export function usePermissions() {
     canViewFmVehicles: canView("menu_fm_vehicles"),
     canViewFmBilling: canView("menu_fm_billing"),
     canViewFmTimeOff: canView("menu_fm_time_off"),
+    canViewFmSalesRegistration: canView("menu_fm_sales_registration"),
     // Recruitment menu
     canViewRecruitmentDashboard: canView("menu_recruitment_dashboard"),
     canViewCandidates: canView("menu_candidates"),
