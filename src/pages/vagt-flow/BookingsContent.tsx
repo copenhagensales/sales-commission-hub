@@ -117,16 +117,22 @@ export default function BookingsContent() {
     },
   });
 
-  // Fetch employees for the dialog
+  // Fetch Fieldmarketing employees from employee_master_data
   const { data: employees = [] } = useQuery({
-    queryKey: ["vagt-employees-for-booking"],
+    queryKey: ["vagt-employees-for-booking-fieldmarketing"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("employee")
-        .select("id, full_name, team")
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, department")
+        .eq("job_title", "Fieldmarketing")
         .eq("is_active", true)
-        .order("full_name");
-      return data || [];
+        .order("first_name");
+      if (error) throw error;
+      return data?.map(e => ({
+        id: e.id,
+        full_name: `${e.first_name} ${e.last_name}`,
+        team: e.department,
+      })) || [];
     },
   });
 
