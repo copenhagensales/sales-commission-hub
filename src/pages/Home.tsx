@@ -248,7 +248,63 @@ const Home = () => {
     },
   });
 
-  // Fetch team monthly goals with sales progress
+  // Fetch ALL team monthly goals for owners/managers
+  const { data: allTeamGoals = [] } = useQuery({
+    queryKey: ["home-all-team-goals", canEditHomeGoals],
+    queryFn: async () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const monthStart = startOfMonth(now).toISOString();
+      const monthEnd = endOfMonth(now).toISOString();
+
+      const { data: goals } = await supabase
+        .from("team_monthly_goals")
+        .select("*, teams(id, name)")
+        .eq("year", year)
+        .eq("month", month);
+
+      if (!goals || goals.length === 0) return [];
+
+      // Calculate progress for each goal
+      const goalsWithProgress = await Promise.all(goals.map(async (goal) => {
+        const { data: teamMembers } = await supabase
+          .from("team_members")
+          .select("employee_id")
+          .eq("team_id", goal.team_id);
+
+        const employeeIds = teamMembers?.map(m => m.employee_id) || [];
+        if (employeeIds.length === 0) return { ...goal, currentSales: 0, progress: 0 };
+
+        const { data: agentMappings } = await supabase
+          .from("employee_agent_mapping")
+          .select("agent_id, agents(name)")
+          .in("employee_id", employeeIds);
+
+        const agentNames = agentMappings?.map(m => (m.agents as { name: string })?.name).filter(Boolean) || [];
+        if (agentNames.length === 0) return { ...goal, currentSales: 0, progress: 0 };
+
+        const { data: sales } = await supabase
+          .from("sales")
+          .select("id, sale_items(quantity)")
+          .in("agent_name", agentNames)
+          .gte("sale_datetime", monthStart)
+          .lte("sale_datetime", monthEnd);
+
+        const currentSales = sales?.reduce((sum, s) => {
+          return sum + (s.sale_items?.reduce((itemSum, item) => itemSum + (item.quantity || 1), 0) || 0);
+        }, 0) || 0;
+
+        const progress = goal.sales_target > 0 ? Math.min((currentSales / goal.sales_target) * 100, 100) : 0;
+        return { ...goal, currentSales, progress };
+      }));
+
+      return goalsWithProgress;
+    },
+    enabled: canEditHomeGoals,
+  });
+
+  // Fetch team monthly goals with sales progress (for regular employees)
   const { data: teamGoal } = useQuery({
     queryKey: ["home-team-goal", userTeams],
     queryFn: async () => {
@@ -263,7 +319,6 @@ const Home = () => {
       const teamIds = userTeams.map(t => (t.teams as { id: string })?.id).filter(Boolean);
       if (teamIds.length === 0) return null;
 
-      // Fetch goal for user's team(s)
       const { data: goals } = await supabase
         .from("team_monthly_goals")
         .select("*, teams(id, name)")
@@ -275,7 +330,6 @@ const Home = () => {
 
       if (!goals) return null;
 
-      // Get all employees in the team
       const { data: teamMembers } = await supabase
         .from("team_members")
         .select("employee_id")
@@ -284,7 +338,6 @@ const Home = () => {
       const employeeIds = teamMembers?.map(m => m.employee_id) || [];
       if (employeeIds.length === 0) return { ...goals, currentSales: 0, progress: 0 };
 
-      // Get agent mappings for team employees
       const { data: agentMappings } = await supabase
         .from("employee_agent_mapping")
         .select("agent_id, agents(name)")
@@ -293,7 +346,6 @@ const Home = () => {
       const agentNames = agentMappings?.map(m => (m.agents as { name: string })?.name).filter(Boolean) || [];
       if (agentNames.length === 0) return { ...goals, currentSales: 0, progress: 0 };
 
-      // Fetch sales for team's agents
       const { data: sales } = await supabase
         .from("sales")
         .select("id, sale_items(quantity)")
@@ -308,7 +360,7 @@ const Home = () => {
       const progress = goals.sales_target > 0 ? Math.min((currentSales / goals.sales_target) * 100, 100) : 0;
       return { ...goals, currentSales, progress };
     },
-    enabled: userTeams.length > 0,
+    enabled: userTeams.length > 0 && !canEditHomeGoals,
   });
 
   // Add/update team goal mutation
@@ -328,6 +380,7 @@ const Home = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["home-team-goal"] });
+      queryClient.invalidateQueries({ queryKey: ["home-all-team-goals"] });
       setAddTeamGoalOpen(false);
       setNewSalesTarget("100");
       setNewBonusDescription("");
@@ -347,6 +400,7 @@ const Home = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["home-team-goal"] });
+      queryClient.invalidateQueries({ queryKey: ["home-all-team-goals"] });
       toast.success("Teammål slettet");
     }
   });
@@ -744,8 +798,54 @@ const Home = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Team Progress */}
-              {teamGoal ? (
+              {/* Owner/Manager view - show all teams */}
+              {canEditHomeGoals ? (
+                allTeamGoals.length > 0 ? (
+                  <div className="space-y-4">
+                    {allTeamGoals.map((goal: any) => (
+                      <div key={goal.id} className="p-4 rounded-lg bg-muted/50 border">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium">{(goal.teams as { name: string })?.name || "Team"}</span>
+                          <span className="text-lg font-bold text-primary">
+                            {goal.progress?.toFixed(0)}%
+                          </span>
+                        </div>
+                        <Progress value={goal.progress || 0} className="h-3 bg-muted" />
+                        <div className="flex justify-between mt-2 text-sm text-muted-foreground">
+                          <span>{goal.currentSales || 0} salg</span>
+                          <span>Mål: {goal.sales_target} salg</span>
+                        </div>
+                        
+                        {goal.bonus_description && (
+                          <div className="mt-3 p-2 rounded bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800">
+                            <div className="flex items-center gap-2">
+                              <Gift className="w-3 h-3 text-amber-600" />
+                              <span className="text-xs text-amber-700 dark:text-amber-300">{goal.bonus_description}</span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="mt-3 flex justify-end">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-xs text-muted-foreground hover:text-destructive"
+                            onClick={() => deleteTeamGoalMutation.mutate(goal.id)}
+                          >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Slet
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-muted-foreground text-sm py-6">
+                    <p>Ingen teammål sat for denne måned.</p>
+                    <p className="text-xs mt-1">Klik "Sæt mål" for at komme i gang.</p>
+                  </div>
+                )
+              ) : teamGoal ? (
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm text-muted-foreground">Teamets månedsmål</span>
@@ -762,7 +862,6 @@ const Home = () => {
                     <span>Mål: {teamPerformance.targetSales} salg</span>
                   </div>
                   
-                  {/* Bonus description */}
                   {teamGoal.bonus_description && (
                     <div className="mt-4 p-3 rounded-lg bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800">
                       <div className="flex items-center gap-2">
@@ -772,30 +871,10 @@ const Home = () => {
                       <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">{teamGoal.bonus_description}</p>
                     </div>
                   )}
-                  
-                  {/* Delete button for owners */}
-                  {canEditHomeGoals && (
-                    <div className="mt-4 pt-4 border-t flex justify-end">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => deleteTeamGoalMutation.mutate(teamGoal.id)}
-                      >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Slet mål
-                      </Button>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="text-center text-muted-foreground text-sm py-6">
-                  {canEditHomeGoals ? (
-                    <>
-                      <p>Ingen teammål sat for denne måned.</p>
-                      <p className="text-xs mt-1">Klik "Sæt mål" for at komme i gang.</p>
-                    </>
-                  ) : userTeams.length > 0 ? (
+                  {userTeams.length > 0 ? (
                     <p>Ingen teammål sat for denne måned.</p>
                   ) : (
                     <p>Du er ikke tilknyttet et team endnu.</p>
