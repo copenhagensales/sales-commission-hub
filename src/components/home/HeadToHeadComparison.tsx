@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, CalendarRange, Plus, X, Sparkles, Timer, Activity, MessageSquare, Bell, Check, XCircle } from "lucide-react";
+import { Swords, Phone, Clock, TrendingUp, DollarSign, Trophy, Flame, Target, Send, Crown, Zap, Users, CalendarDays, CalendarRange, Plus, X, Sparkles, Timer, Activity, MessageSquare, Bell, Check, XCircle, EyeOff } from "lucide-react";
 import { startOfWeek, startOfDay, endOfDay, endOfWeek, differenceInHours, differenceInDays, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
@@ -25,6 +25,7 @@ interface AgentStats {
 interface HeadToHeadComparisonProps {
   currentEmployeeId?: string;
   currentEmployeeName?: string;
+  onHide?: () => void;
 }
 
 type PeriodType = "today" | "week";
@@ -56,7 +57,7 @@ interface ActiveChallenge {
   opponent_employee_id: string;
 }
 
-export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }: HeadToHeadComparisonProps) => {
+export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, onHide }: HeadToHeadComparisonProps) => {
   // Load initial state from localStorage
   const getInitialState = (): StoredBattleState | null => {
     try {
@@ -986,6 +987,19 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName }:
                 <span>Hold</span>
               </button>
             </div>
+
+            {/* Hide button */}
+            {onHide && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onHide}
+                className="text-slate-400 hover:text-white hover:bg-slate-700/50"
+              >
+                <EyeOff className="w-4 h-4 mr-1" />
+                Skjul
+              </Button>
+            )}
           </div>
         </CardTitle>
       </CardHeader>
