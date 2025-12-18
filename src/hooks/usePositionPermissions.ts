@@ -206,7 +206,8 @@ export function usePositionPermissions() {
       };
     },
     enabled: !!user && !authLoading,
-    staleTime: 1000 * 60, // Cache for 1 minute
+    staleTime: 0, // Always refetch to ensure fresh data
+    retry: 2,
   });
 }
 
@@ -235,8 +236,17 @@ export function useHasPermission(permissionKey: string, type?: "view" | "edit"):
 
 // Helper hook to check multiple permissions at once
 export function usePermissions() {
-  const { data, isLoading } = usePositionPermissions();
+  const { data, isLoading, error } = usePositionPermissions();
   const { isPreviewMode, previewPermissions, previewRole } = useRolePreview();
+  
+  // Debug logging
+  console.log("usePermissions DEBUG:", { 
+    isLoading, 
+    hasData: !!data, 
+    position: data?.position?.name,
+    permissionCount: Object.keys(data?.permissions || {}).length,
+    error: error?.message
+  });
   
   // Use preview permissions when in preview mode, otherwise use actual permissions
   const permissions = isPreviewMode && previewPermissions 
