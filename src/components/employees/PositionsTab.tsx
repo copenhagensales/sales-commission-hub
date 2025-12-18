@@ -101,7 +101,7 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     permissions: [
       { key: "menu_contracts", label: "Kontrakter", description: "Adgang til kontraktmodul", hasEditOption: true, scopeKey: "scope_contracts" },
       { key: "menu_permissions", label: "Rettigheder", description: "Adgang til rettighedsstyring", hasEditOption: true },
-      { key: "menu_career_wishes_overview", label: "Karriereønsker overblik", description: "Adgang til karriereønsker overblik", hasEditOption: true, scopeKey: "scope_career_wishes" },
+      { key: "menu_career_wishes_overview", label: "Karriereønsker", description: "Adgang til karriereønsker overblik", hasEditOption: true, scopeKey: "scope_career_wishes" },
     ],
   },
   {
@@ -118,9 +118,9 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Test menu",
     icon: "🧪",
     permissions: [
-      { key: "menu_car_quiz_admin", label: "Bil Quiz Admin", description: "Adgang til bil quiz administration", hasEditOption: true, scopeKey: "scope_quiz" },
-      { key: "menu_coc_admin", label: "Code of Conduct Admin", description: "Adgang til Code of Conduct administration", hasEditOption: true },
-      { key: "menu_pulse_survey", label: "Pulsmåling resultater", description: "Adgang til pulsmåling resultater", hasEditOption: true },
+      { key: "menu_car_quiz_admin", label: "Bil-quiz overblik", description: "Adgang til bil quiz administration", hasEditOption: true, scopeKey: "scope_quiz" },
+      { key: "menu_coc_admin", label: "Code of Conduct overblik", description: "Adgang til Code of Conduct administration", hasEditOption: true },
+      { key: "menu_pulse_survey", label: "Pulsmåling", description: "Adgang til pulsmåling resultater", hasEditOption: true },
     ],
   },
   {
@@ -159,11 +159,11 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: "menu_payroll", label: "Lønkørsel", description: "Adgang til lønkørsel", hasEditOption: true, scopeKey: "scope_payroll" },
       { key: "menu_tdc_erhverv", label: "TDC Erhverv", description: "Adgang til TDC Erhverv dashboard", hasEditOption: true },
       { key: "menu_codan", label: "Codan", description: "Adgang til Codan dashboard", hasEditOption: true },
-      { key: "menu_mg_test", label: "MG Test", description: "Adgang til MG Test", hasEditOption: true },
+      { key: "menu_mg_test", label: "MG test", description: "Adgang til MG Test", hasEditOption: true },
       { key: "menu_test_dashboard", label: "Test Dashboard", description: "Adgang til test dashboard", hasEditOption: true },
       { key: "menu_dialer_data", label: "Dialer Data", description: "Adgang til dialer data", hasEditOption: true },
-      { key: "menu_calls_data", label: "Calls Data", description: "Adgang til opkaldsdata", hasEditOption: true },
-      { key: "menu_adversus_data", label: "Adversus Data", description: "Adgang til Adversus data", hasEditOption: true },
+      { key: "menu_calls_data", label: "Opkaldsdata", description: "Adgang til opkaldsdata", hasEditOption: true },
+      { key: "menu_adversus_data", label: "Datakilder info", description: "Adgang til datakilder info", hasEditOption: true },
     ],
   },
   {
@@ -181,7 +181,7 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Vagtplan menu",
     icon: "📅",
     permissions: [
-      { key: "menu_shift_overview", label: "Vagtplan oversigt", description: "Adgang til vagtplan oversigt", hasEditOption: true, scopeKey: "scope_shifts" },
+      { key: "menu_shift_overview", label: "Vagtplan", description: "Adgang til vagtplan oversigt", hasEditOption: true, scopeKey: "scope_shifts" },
       { key: "menu_my_schedule", label: "Min kalender", description: "Adgang til egen kalender", hasEditOption: false },
       { key: "menu_absence", label: "Fravær", description: "Adgang til fraværsmodul", hasEditOption: true, scopeKey: "scope_absence" },
       { key: "menu_time_tracking", label: "Tidsregistrering", description: "Adgang til tidsregistrering", hasEditOption: true, scopeKey: "scope_time_tracking" },
@@ -194,7 +194,7 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Fieldmarketing menu",
     icon: "🚗",
     permissions: [
-      { key: "menu_fm_overview", label: "Oversigt", description: "Adgang til fieldmarketing oversigt", hasEditOption: true, scopeKey: "scope_fieldmarketing" },
+      { key: "menu_fm_overview", label: "Dashboard", description: "Adgang til fieldmarketing dashboard", hasEditOption: true, scopeKey: "scope_fieldmarketing" },
       { key: "menu_fm_my_week", label: "Min uge", description: "Adgang til min uge", hasEditOption: false },
       { key: "menu_fm_book_week", label: "Book uge", description: "Adgang til book uge", hasEditOption: true },
       { key: "menu_fm_bookings", label: "Bookinger", description: "Adgang til bookinger", hasEditOption: true },
@@ -210,14 +210,14 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Rekruttering menu",
     icon: "🎯",
     permissions: [
-      { key: "menu_recruitment_dashboard", label: "Rekruttering Dashboard", description: "Adgang til rekruttering dashboard", hasEditOption: true },
+      { key: "menu_recruitment_dashboard", label: "Rekruttering", description: "Adgang til rekruttering dashboard", hasEditOption: true },
       { key: "menu_candidates", label: "Kandidater", description: "Adgang til kandidatliste", hasEditOption: true },
-      { key: "menu_upcoming_interviews", label: "Kommende interviews", description: "Adgang til kommende interviews", hasEditOption: true },
+      { key: "menu_upcoming_interviews", label: "Kommende samtaler", description: "Adgang til kommende samtaler", hasEditOption: true },
       { key: "menu_winback", label: "Winback", description: "Adgang til winback", hasEditOption: true },
-      { key: "menu_upcoming_hires", label: "Kommende ansættelser", description: "Adgang til kommende ansættelser", hasEditOption: true },
+      { key: "menu_upcoming_hires", label: "Ansættelser", description: "Adgang til kommende ansættelser", hasEditOption: true },
       { key: "menu_messages", label: "Beskeder", description: "Adgang til beskeder", hasEditOption: true },
-      { key: "menu_sms_templates", label: "SMS skabeloner", description: "Adgang til SMS skabeloner", hasEditOption: true },
-      { key: "menu_email_templates", label: "Email skabeloner", description: "Adgang til email skabeloner", hasEditOption: true },
+      { key: "menu_sms_templates", label: "SMS-skabeloner", description: "Adgang til SMS skabeloner", hasEditOption: true },
+      { key: "menu_email_templates", label: "Email-skabeloner", description: "Adgang til email skabeloner", hasEditOption: true },
     ],
   },
   {
@@ -237,8 +237,8 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     permissions: [
       { key: "menu_my_profile", label: "Min profil", description: "Adgang til egen profil", hasEditOption: true },
       { key: "menu_my_contracts", label: "Mine kontrakter", description: "Adgang til egne kontrakter", hasEditOption: false },
-      { key: "menu_career_wishes", label: "Karriereønsker", description: "Adgang til at udfylde karriereønsker", hasEditOption: false },
-      { key: "menu_time_stamp", label: "Stempel ind/ud", description: "Adgang til stempel ind/ud", hasEditOption: false },
+      { key: "menu_career_wishes", label: "Teamønsker & karriere", description: "Adgang til at udfylde karriereønsker", hasEditOption: false },
+      { key: "menu_time_stamp", label: "Stempelur", description: "Adgang til stempel ind/ud", hasEditOption: false },
     ],
   },
   {
