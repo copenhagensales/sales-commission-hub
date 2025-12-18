@@ -216,6 +216,7 @@ export default function MgTest() {
 
   // Create product dialog state
   const [createProductDialog, setCreateProductDialog] = useState(false);
+  const [showCampaignOverrides, setShowCampaignOverrides] = useState(false);
   const [newProduct, setNewProduct] = useState<{
     name: string;
     clientId: string;
@@ -1040,6 +1041,7 @@ export default function MgTest() {
     onSuccess: () => {
       toast.success("Produkt oprettet");
       setCreateProductDialog(false);
+      setShowCampaignOverrides(false);
       setNewProduct({
         name: "",
         clientId: "",
@@ -2984,51 +2986,58 @@ export default function MgTest() {
             </div>
 
             {/* Campaign-specific overrides */}
-            <div className="space-y-2 border-t pt-4">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Kampagne-specifikke værdier</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setNewProduct((prev) => ({
-                      ...prev,
-                      campaignOverrides: [
-                        ...prev.campaignOverrides,
-                        { campaignId: "", commission: "", revenue: "" },
-                      ],
-                    }))
-                  }
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Tilføj
-                </Button>
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="campaign-overrides-toggle"
+                  checked={showCampaignOverrides}
+                  onCheckedChange={(checked) => {
+                    setShowCampaignOverrides(checked === true);
+                    if (checked && newProduct.campaignOverrides.length === 0) {
+                      setNewProduct((prev) => ({
+                        ...prev,
+                        campaignOverrides: [{ campaignId: "", commission: "", revenue: "" }],
+                      }));
+                    }
+                    if (!checked) {
+                      setNewProduct((prev) => ({
+                        ...prev,
+                        campaignOverrides: [],
+                      }));
+                    }
+                  }}
+                />
+                <Label htmlFor="campaign-overrides-toggle" className="text-sm font-medium cursor-pointer">
+                  Forskellige provision/omsætning per kampagne
+                </Label>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Sæt forskellige provision/omsætning alt efter hvilken kampagne produktet kommer fra.
-              </p>
 
-              {newProduct.campaignOverrides.length > 0 && (
-                <div className="space-y-3 mt-3">
+              {showCampaignOverrides && (
+                <div className="pl-6 space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Sæt forskellige provision/omsætning alt efter hvilken kampagne produktet kommer fra.
+                  </p>
+                  
                   {newProduct.campaignOverrides.map((override, index) => (
                     <div key={index} className="p-3 bg-muted/50 rounded-md space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label className="text-xs font-medium">Override #{index + 1}</Label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-destructive"
-                          onClick={() =>
-                            setNewProduct((prev) => ({
-                              ...prev,
-                              campaignOverrides: prev.campaignOverrides.filter((_, i) => i !== index),
-                            }))
-                          }
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        <Label className="text-xs font-medium">Kampagne #{index + 1}</Label>
+                        {newProduct.campaignOverrides.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-destructive"
+                            onClick={() =>
+                              setNewProduct((prev) => ({
+                                ...prev,
+                                campaignOverrides: prev.campaignOverrides.filter((_, i) => i !== index),
+                              }))
+                            }
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
                       <Select
                         value={override.campaignId || undefined}
@@ -3092,6 +3101,25 @@ export default function MgTest() {
                       </div>
                     </div>
                   ))}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() =>
+                      setNewProduct((prev) => ({
+                        ...prev,
+                        campaignOverrides: [
+                          ...prev.campaignOverrides,
+                          { campaignId: "", commission: "", revenue: "" },
+                        ],
+                      }))
+                    }
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Tilføj flere kampagner
+                  </Button>
                 </div>
               )}
             </div>
