@@ -23,6 +23,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import ClientSalesOverviewContent from "@/pages/ClientSalesOverview";
+import { ProductCampaignOverrides } from "@/components/mg-test/ProductCampaignOverrides";
 
 interface InspectorField {
   fieldId: string;
@@ -1931,139 +1932,153 @@ export default function MgTest() {
                                   (parsedClient ? parsedClient.id : null);
 
                                 return (
-                                  <TableRow key={row.key}>
-                                    <TableCell>
-                                      <div className="flex flex-col">
-                                        <span className="font-medium">
-                                          {row.adversus_product_title || t("mgTest.noTitle")}
-                                        </span>
-                                        {row.product && (
-                                          <span className="text-xs text-muted-foreground">
-                                            {t("mgTest.internalProduct")}: {row.product.name}
+                                  <>
+                                    <TableRow key={row.key}>
+                                      <TableCell>
+                                        <div className="flex flex-col">
+                                          <span className="font-medium">
+                                            {row.adversus_product_title || t("mgTest.noTitle")}
                                           </span>
-                                        )}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <span className="text-xs font-mono text-muted-foreground">
-                                        {row.adversus_external_id || t("mgTest.missing")}
-                                      </span>
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="flex flex-col gap-2 max-w-xs">
-                                        <Select
-                                          value={selectedClientId ?? undefined}
-                                          onValueChange={(value) => {
-                                            const newClientId = value === "unmapped" ? null : value;
+                                          {row.product && (
+                                            <span className="text-xs text-muted-foreground">
+                                              {t("mgTest.internalProduct")}: {row.product.name}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <span className="text-xs font-mono text-muted-foreground">
+                                          {row.adversus_external_id || t("mgTest.missing")}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex flex-col gap-2 max-w-xs">
+                                          <Select
+                                            value={selectedClientId ?? undefined}
+                                            onValueChange={(value) => {
+                                              const newClientId = value === "unmapped" ? null : value;
 
-                                            if (productId) {
-                                              setProductClientSelections((prev) => ({
+                                              if (productId) {
+                                                setProductClientSelections((prev) => ({
+                                                  ...prev,
+                                                  [productId]: newClientId,
+                                                }));
+                                              }
+
+                                              setProductClientDrafts((prev) => ({
                                                 ...prev,
-                                                [productId]: newClientId,
+                                                [row.key]: newClientId,
                                               }));
-                                            }
 
-                                            setProductClientDrafts((prev) => ({
-                                              ...prev,
-                                              [row.key]: newClientId,
-                                            }));
-
-                                            if (productId && newClientId !== selectedClientId) {
-                                              updateProductClient.mutate({
-                                                productId,
-                                                clientId: newClientId,
-                                              });
-                                            }
-                                            
-                                            // Auto-confirm new products with 0/0 when client is selected
-                                            if (!productId && newClientId && newClientId !== "unmapped") {
-                                              upsertProductValues.mutate({
-                                                row,
-                                                provision: 0,
-                                                cpo: 0,
-                                                clientId: newClientId,
-                                              });
-                                            }
-                                          }}
-                                        >
-                                          <SelectTrigger className="w-full">
-                                            <SelectValue placeholder={t("mgTest.selectCustomer")} />
-                                          </SelectTrigger>
-                                          <SelectContent className="bg-background border z-50 max-h-72">
-                                            <SelectItem value="unmapped" className="text-sm text-muted-foreground">
-                                              {t("mgTest.missingMapping")}
-                                            </SelectItem>
-                                            {clients?.map((client) => (
-                                              <SelectItem key={client.id} value={client.id} className="text-sm">
-                                                {client.name}
+                                              if (productId && newClientId !== selectedClientId) {
+                                                updateProductClient.mutate({
+                                                  productId,
+                                                  clientId: newClientId,
+                                                });
+                                              }
+                                              
+                                              // Auto-confirm new products with 0/0 when client is selected
+                                              if (!productId && newClientId && newClientId !== "unmapped") {
+                                                upsertProductValues.mutate({
+                                                  row,
+                                                  provision: 0,
+                                                  cpo: 0,
+                                                  clientId: newClientId,
+                                                });
+                                              }
+                                            }}
+                                          >
+                                            <SelectTrigger className="w-full">
+                                              <SelectValue placeholder={t("mgTest.selectCustomer")} />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-background border z-50 max-h-72">
+                                              <SelectItem value="unmapped" className="text-sm text-muted-foreground">
+                                                {t("mgTest.missingMapping")}
                                               </SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Input
-                                        type="text"
-                                        inputMode="decimal"
-                                        className="h-9"
-                                        value={
-                                          current?.provision ??
-                                          (row.product?.commission_dkk !== null &&
-                                          row.product?.commission_dkk !== undefined
-                                            ? String(row.product.commission_dkk)
-                                            : "0")
-                                        }
-                                        onChange={(e) => handleChange(row.key, "provision", e.target.value, row)}
-                                        placeholder="0,00"
-                                      />
-                                    </TableCell>
-                                    <TableCell>
-                                      <Input
-                                        type="text"
-                                        inputMode="decimal"
-                                        className="h-9"
-                                        value={
-                                          current?.cpo ??
-                                          (row.product?.revenue_dkk !== null &&
-                                          row.product?.revenue_dkk !== undefined
-                                            ? String(row.product.revenue_dkk)
-                                            : "0")
-                                        }
-                                        onChange={(e) => handleChange(row.key, "cpo", e.target.value, row)}
-                                        placeholder="0,00"
-                                      />
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                      <Checkbox
-                                        checked={row.product?.counts_as_sale ?? true}
-                                        onCheckedChange={(checked) => {
-                                          toggleCountsAsSale.mutate({
-                                            productId: row.product?.id ?? null,
-                                            countsAsSale: checked === true,
-                                            row,
-                                          });
-                                        }}
-                                      />
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                      {row.isManual && row.product?.id && !row.sale_source && (
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                          onClick={() => {
-                                            if (confirm("Er du sikker på at du vil slette dette produkt?")) {
-                                              deleteManualProduct.mutate(row.product!.id);
-                                            }
+                                              {clients?.map((client) => (
+                                                <SelectItem key={client.id} value={client.id} className="text-sm">
+                                                  {client.name}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Input
+                                          type="text"
+                                          inputMode="decimal"
+                                          className="h-9"
+                                          value={
+                                            current?.provision ??
+                                            (row.product?.commission_dkk !== null &&
+                                            row.product?.commission_dkk !== undefined
+                                              ? String(row.product.commission_dkk)
+                                              : "0")
+                                          }
+                                          onChange={(e) => handleChange(row.key, "provision", e.target.value, row)}
+                                          placeholder="0,00"
+                                        />
+                                      </TableCell>
+                                      <TableCell>
+                                        <Input
+                                          type="text"
+                                          inputMode="decimal"
+                                          className="h-9"
+                                          value={
+                                            current?.cpo ??
+                                            (row.product?.revenue_dkk !== null &&
+                                            row.product?.revenue_dkk !== undefined
+                                              ? String(row.product.revenue_dkk)
+                                              : "0")
+                                          }
+                                          onChange={(e) => handleChange(row.key, "cpo", e.target.value, row)}
+                                          placeholder="0,00"
+                                        />
+                                      </TableCell>
+                                      <TableCell className="text-center">
+                                        <Checkbox
+                                          checked={row.product?.counts_as_sale ?? true}
+                                          onCheckedChange={(checked) => {
+                                            toggleCountsAsSale.mutate({
+                                              productId: row.product?.id ?? null,
+                                              countsAsSale: checked === true,
+                                              row,
+                                            });
                                           }}
-                                          disabled={deleteManualProduct.isPending}
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      )}
-                                    </TableCell>
-                                  </TableRow>
+                                        />
+                                      </TableCell>
+                                      <TableCell className="text-center">
+                                        {row.isManual && row.product?.id && !row.sale_source && (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                            onClick={() => {
+                                              if (confirm("Er du sikker på at du vil slette dette produkt?")) {
+                                                deleteManualProduct.mutate(row.product!.id);
+                                              }
+                                            }}
+                                            disabled={deleteManualProduct.isPending}
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        )}
+                                      </TableCell>
+                                    </TableRow>
+                                    {row.product?.id && (
+                                      <TableRow key={`${row.key}-overrides`} className="hover:bg-transparent">
+                                        <TableCell colSpan={7} className="pt-0 pb-2">
+                                          <ProductCampaignOverrides
+                                            productId={row.product.id}
+                                            productName={row.product.name || row.adversus_product_title || "Produkt"}
+                                            baseCommission={row.product.commission_dkk ?? 0}
+                                            baseRevenue={row.product.revenue_dkk ?? 0}
+                                          />
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </>
                                 );
                               })}
                             </TableBody>
