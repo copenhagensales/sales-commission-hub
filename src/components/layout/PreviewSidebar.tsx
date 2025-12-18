@@ -6,7 +6,8 @@ import {
   LayoutDashboard, Users, ShoppingCart, Wallet, Settings, Tv, 
   Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight,
   Car, Clock, UserCheck, Receipt, Database, ListChecks, Timer, 
-  FileText, Crown, User, Sparkles, BarChart3, Video, Phone, FlaskConical
+  FileText, Crown, User, Sparkles, BarChart3, Video, Phone, FlaskConical,
+  Home
 } from "lucide-react";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -232,6 +233,19 @@ export function PreviewSidebar({ isMobile = false, onNavigate }: PreviewSidebarP
         )}
         
         <nav className="flex-1 space-y-1 p-4 pt-6">
+          {/* Home link - always first */}
+          <NavLink
+            to="/home"
+            onClick={handleNavClick}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              location.pathname === "/home" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}
+          >
+            <Home className="h-5 w-5" />
+            Hjem
+          </NavLink>
+          
           {/* Main navigation items */}
           {mainItems.map(renderNavItem)}
           
