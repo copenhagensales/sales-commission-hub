@@ -340,22 +340,31 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
   );
 };
 
-const CLIENT_LOGOS: Record<string, { name: string; logoUrl: string | null }> = {
-  "eesy-fm": {
-    name: "Eesy FM",
-    logoUrl: "https://jwlimmeijpfmaksvmuru.supabase.co/storage/v1/object/public/client-logos/logos/9a92ea4c-6404-4b58-be08-065e7552d552-1766068836963.avif",
-  },
-  "yousee": {
-    name: "Yousee",
-    logoUrl: null, // No logo uploaded yet
-  },
+const TAB_TO_CLIENT_ID: Record<string, string> = {
+  "eesy-fm": FIELDMARKETING_CLIENTS.EESY_FM,
+  "yousee": FIELDMARKETING_CLIENTS.YOUSEE,
 };
 
 const FieldmarketingDashboard = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<string>("eesy-fm");
 
-  const activeClient = CLIENT_LOGOS[activeTab];
+  // Fetch client logos dynamically from the database
+  const { data: clients } = useQuery({
+    queryKey: ["fieldmarketing-clients", Object.values(FIELDMARKETING_CLIENTS)],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name, logo_url")
+        .in("id", Object.values(FIELDMARKETING_CLIENTS));
+      
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const activeClientId = TAB_TO_CLIENT_ID[activeTab];
+  const activeClient = clients?.find(c => c.id === activeClientId);
 
   return (
     <MainLayout>
@@ -369,15 +378,15 @@ const FieldmarketingDashboard = () => {
               Oversigt over salg fra fieldmarketing events
             </p>
           </div>
-          {activeClient?.logoUrl ? (
+          {activeClient?.logo_url ? (
             <img 
-              src={activeClient.logoUrl} 
+              src={activeClient.logo_url} 
               alt={activeClient.name} 
               className="h-16 w-auto object-contain"
             />
           ) : (
             <div className="h-16 px-6 bg-muted rounded-lg flex items-center justify-center">
-              <span className="text-xl font-bold text-muted-foreground">{activeClient?.name}</span>
+              <span className="text-xl font-bold text-muted-foreground">{activeClient?.name || "..."}</span>
             </div>
           )}
         </div>
