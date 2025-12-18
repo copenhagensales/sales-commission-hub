@@ -206,7 +206,11 @@ export function usePositionPermissions() {
       };
     },
     enabled: !!user && !authLoading,
-    staleTime: 0, // Always refetch to ensure fresh data
+    staleTime: 0, // Data is immediately stale
+    gcTime: 0, // Don't cache - always fetch fresh
+    refetchOnWindowFocus: true, // Refetch when user returns to tab
+    refetchOnMount: "always", // Always refetch when component mounts
+    refetchOnReconnect: true, // Refetch when network reconnects
     retry: 2,
   });
 }

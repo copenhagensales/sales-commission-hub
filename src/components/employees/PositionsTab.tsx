@@ -400,6 +400,7 @@ export function PositionsTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["job-positions"] });
+      queryClient.invalidateQueries({ queryKey: ["position-permissions"] });
       toast.success("Stilling oprettet");
       handleCloseDialog();
     },
@@ -425,6 +426,7 @@ export function PositionsTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["job-positions"] });
+      queryClient.invalidateQueries({ queryKey: ["position-permissions"] });
       toast.success("Stilling opdateret");
       handleCloseDialog();
     },
@@ -444,6 +446,7 @@ export function PositionsTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["job-positions"] });
+      queryClient.invalidateQueries({ queryKey: ["position-permissions"] });
       toast.success("Stilling slettet");
     },
     onError: (error: Error) => {
