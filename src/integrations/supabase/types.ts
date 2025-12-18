@@ -346,7 +346,7 @@ export type Database = {
         Row: {
           application_deadline: string | null
           booked_days: number[] | null
-          brand_id: string
+          brand_id: string | null
           client_id: string | null
           comment: string | null
           created_at: string | null
@@ -365,7 +365,7 @@ export type Database = {
         Insert: {
           application_deadline?: string | null
           booked_days?: number[] | null
-          brand_id: string
+          brand_id?: string | null
           client_id?: string | null
           comment?: string | null
           created_at?: string | null
@@ -384,7 +384,7 @@ export type Database = {
         Update: {
           application_deadline?: string | null
           booked_days?: number[] | null
-          brand_id?: string
+          brand_id?: string | null
           client_id?: string | null
           comment?: string | null
           created_at?: string | null

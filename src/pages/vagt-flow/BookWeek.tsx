@@ -152,7 +152,7 @@ export default function VagtBookWeek() {
         open_for_applications: openForApplications,
         visible_from: visibleFrom ? format(visibleFrom, "yyyy-MM-dd") : null,
         application_deadline: applicationDeadline ? format(applicationDeadline, "yyyy-MM-dd") : null,
-      });
+      } as any);
 
       if (error) throw error;
     },
@@ -169,14 +169,14 @@ export default function VagtBookWeek() {
     },
   });
 
-  const selectedBrand = brands?.find((b) => b.id === selectedBrandId);
+  const selectedClient = fieldmarketingClients?.find((c: any) => c.id === selectedClientId);
   const weekStartDate = getWeekStartDate(selectedYear, selectedWeek);
 
-  // Process locations into categories
+  // Process locations into categories based on selected client
   const processedLocations = useMemo(() => {
-    if (!locations || !selectedBrand) return { mulige: [], cooldown: [], utilgaengelige: [] };
+    if (!locations || !selectedClient) return { mulige: [], cooldown: [], utilgaengelige: [] };
 
-    const brandName = selectedBrand.name;
+    const clientName = selectedClient.name?.toLowerCase() || "";
     
     const categorized = {
       mulige: [] as any[],
@@ -185,17 +185,19 @@ export default function VagtBookWeek() {
     };
 
     locations.forEach((loc: any) => {
-      // Check if brand can book this location
-      const canBook = (brandName === "Eesy" && loc.can_book_eesy) || (brandName === "YouSee" && loc.can_book_yousee);
+      // Check if client can book this location (flexible name matching)
+      const canBookEesy = clientName.includes("eesy") && loc.can_book_eesy;
+      const canBookYousee = clientName.includes("yousee") && loc.can_book_yousee;
+      const canBook = canBookEesy || canBookYousee;
       
-      // Check if already booked this week for this brand
+      // Check if already booked this week for this client
       const hasBookingInWeek = loc.booking?.some(
-        (b: any) => b.brand_id === selectedBrandId && b.week_number === selectedWeek && b.year === selectedYear
+        (b: any) => b.client_id === selectedClientId && b.week_number === selectedWeek && b.year === selectedYear
       );
 
-      // Get last booking for this brand
+      // Get last booking for this client
       const lastBooking = loc.booking
-        ?.filter((b: any) => b.brand_id === selectedBrandId)
+        ?.filter((b: any) => b.client_id === selectedClientId)
         .sort((a: any, b: any) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime())[0];
 
       const weeksSince = lastBooking ? differenceInWeeks(weekStartDate, new Date(lastBooking.end_date)) : 999;
@@ -226,7 +228,7 @@ export default function VagtBookWeek() {
     categorized.utilgaengelige.sort(sortFn);
 
     return categorized;
-  }, [locations, selectedBrand, selectedBrandId, selectedWeek, selectedYear, weekStartDate]);
+  }, [locations, selectedClient, selectedClientId, selectedWeek, selectedYear, weekStartDate]);
 
   // Filter by search and type
   const filteredLocations = useMemo(() => {
@@ -312,14 +314,14 @@ export default function VagtBookWeek() {
             <div className="grid gap-4 md:grid-cols-3">
               <div>
                 <label className="text-xs font-medium mb-2 block uppercase text-muted-foreground">Kunde *</label>
-                <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
+                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Vælg kunde" />
                   </SelectTrigger>
                   <SelectContent>
-                    {brands?.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id}>
-                        {brand.name}
+                    {fieldmarketingClients?.map((client: any) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -357,12 +359,12 @@ export default function VagtBookWeek() {
         </Card>
 
         {/* Location list with tabs */}
-        {selectedBrandId ? (
+        {selectedClientId ? (
           <Card>
             <CardHeader className="pb-0">
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
-                Lokationer for {selectedBrand?.name}
+                Lokationer for {selectedClient?.name}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
@@ -617,8 +619,8 @@ export default function VagtBookWeek() {
                   toast({ title: "Fejl", description: "Ingen lokation valgt", variant: "destructive" });
                   return;
                 }
-                if (!selectedBrandId) {
-                  toast({ title: "Fejl", description: "Ingen brand valgt", variant: "destructive" });
+                if (!selectedClientId) {
+                  toast({ title: "Fejl", description: "Ingen kunde valgt", variant: "destructive" });
                   return;
                 }
                 if (selectedDays.length === 0) {
@@ -627,7 +629,7 @@ export default function VagtBookWeek() {
                 }
                 createBookingMutation.mutate({
                   locationId: selectedLocation.id,
-                  brandId: selectedBrandId,
+                  clientId: selectedClientId,
                 });
               }}
               disabled={selectedDays.length === 0 || createBookingMutation.isPending}

@@ -128,28 +128,7 @@ export default function VagtBookings() {
     },
   });
 
-  const { data: brands } = useQuery({
-    queryKey: ["vagt-brands", fieldmarketingClients],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("brand").select("*").eq("is_active", true);
-      if (error) throw error;
-      
-      // Filter brands to only those matching Fieldmarketing team clients (flexible matching)
-      if (fieldmarketingClients && fieldmarketingClients.length > 0) {
-        const clientNames = fieldmarketingClients.map((c: any) => c.name?.toLowerCase());
-        return data?.filter(brand => {
-          const brandNameLower = brand.name?.toLowerCase() || "";
-          // Check if any client name contains the brand name or vice versa
-          return clientNames.some((clientName: string) => 
-            clientName.includes(brandNameLower) || brandNameLower.includes(clientName)
-          );
-        }) || [];
-      }
-      
-      return data;
-    },
-    enabled: !!fieldmarketingClients,
-  });
+  // Use fieldmarketingClients directly - no need to map to brands
 
   // Fetch Fieldmarketing employee IDs first
   const { data: fieldmarketingEmployeeIds } = useQuery({
@@ -511,9 +490,9 @@ export default function VagtBookings() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Alle kunder</SelectItem>
-                    {brands?.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id}>
-                        {brand.name}
+                    {fieldmarketingClients?.map((client: any) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
