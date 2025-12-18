@@ -347,6 +347,7 @@ export type Database = {
           application_deadline: string | null
           booked_days: number[] | null
           brand_id: string
+          client_id: string | null
           comment: string | null
           created_at: string | null
           end_date: string
@@ -365,6 +366,7 @@ export type Database = {
           application_deadline?: string | null
           booked_days?: number[] | null
           brand_id: string
+          client_id?: string | null
           comment?: string | null
           created_at?: string | null
           end_date: string
@@ -383,6 +385,7 @@ export type Database = {
           application_deadline?: string | null
           booked_days?: number[] | null
           brand_id?: string
+          client_id?: string | null
           comment?: string | null
           created_at?: string | null
           end_date?: string
@@ -403,6 +406,13 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brand"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
           {
