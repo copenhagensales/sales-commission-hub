@@ -952,7 +952,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
       <Card>
         <CardHeader className="flex flex-row items-center gap-2">
           <Trophy className="h-5 w-5 text-yellow-500" />
-          <CardTitle className="text-lg">Dagens sælgere ({todaySellers?.reduce((sum, s) => sum + s.sales, 0) || 0} salg)</CardTitle>
+          <CardTitle className="text-lg">Dagens sælgere</CardTitle>
         </CardHeader>
         <CardContent>
           {todaySellers && todaySellers.length > 0 ? (
