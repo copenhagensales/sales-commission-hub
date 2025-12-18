@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useRef } from "react";
+import { useRolePreview } from "@/contexts/RolePreviewContext";
 
 export type SystemRole = "medarbejder" | "teamleder" | "ejer" | "rekruttering" | "some";
 
@@ -175,11 +176,43 @@ export function useRemoveRole() {
 export function useCanAccess() {
   const { user, loading: authLoading } = useAuth();
   const { data: rolesData, isPending, isLoading: queryLoading } = useCurrentUserRoles();
+  const { isPreviewMode, previewRole } = useRolePreview();
 
   // Show loading if no user yet, or if query is still loading
   const isRoleLoading = authLoading || (!user ? false : (isPending || queryLoading));
 
-  // Get all roles for the user
+  // IN PREVIEW MODE: Use preview role instead of actual roles
+  if (isPreviewMode && previewRole) {
+    const previewRoleLower = previewRole.toLowerCase();
+    const isOwner = previewRoleLower === "ejer";
+    const isTeamleder = previewRoleLower === "teamleder";
+    const isRekruttering = previewRoleLower === "rekruttering";
+    const isSome = previewRoleLower === "some";
+    const isMedarbejder = !isOwner && !isTeamleder && !isRekruttering && !isSome;
+    
+    console.log("useCanAccess PREVIEW MODE - role:", previewRole);
+
+    return {
+      isLoading: false,
+      role: previewRoleLower as SystemRole,
+      roles: [previewRoleLower],
+      isOwner,
+      isTeamleder,
+      isRekruttering,
+      isSome,
+      isTeamlederOrAbove: isTeamleder || isOwner,
+      isRekrutteringOrAbove: isRekruttering || isTeamleder || isOwner,
+      isMedarbejder,
+      canManageTeam: isTeamleder || isOwner,
+      canSeeAllData: isOwner,
+      canManageRoles: isOwner,
+      canCreateEmployees: isRekruttering || isTeamleder || isOwner,
+      canSendContracts: isRekruttering || isTeamleder || isOwner,
+      hasMultipleRoles: false,
+    };
+  }
+
+  // NORMAL MODE: Use actual system roles
   const roles = rolesData || [];
   const roleNames = roles.map(r => r.role);
   
@@ -212,7 +245,6 @@ export function useCanAccess() {
     canManageRoles: isOwner,
     canCreateEmployees: isRekruttering || isTeamleder || isOwner,
     canSendContracts: isRekruttering || isTeamleder || isOwner,
-    // User has multiple roles
     hasMultipleRoles: roles.length > 1,
   };
 }
