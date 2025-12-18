@@ -26,6 +26,7 @@ import {
   Swords
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO, differenceInYears, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subWeeks, addDays, isSameDay, isAfter, isBefore } from "date-fns";
@@ -34,6 +35,7 @@ import { toast } from "sonner";
 
 const Home = () => {
   const { user } = useAuth();
+  const { canEditHomeGoals } = usePermissions();
   const queryClient = useQueryClient();
   const [addEventOpen, setAddEventOpen] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", event_date: "", event_time: "", location: "" });
@@ -642,52 +644,54 @@ const Home = () => {
                   <Target className="w-5 h-5 text-primary" />
                   Virksomhedens mål ({format(new Date(), "MMMM yyyy", { locale: da })})
                 </CardTitle>
-                <Dialog open={addClientGoalOpen} onOpenChange={setAddClientGoalOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-1">
-                      <Plus className="w-4 h-4" /> Tilføj kunde
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Tilføj kundemål for {format(new Date(), "MMMM yyyy", { locale: da })}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <div className="space-y-2">
-                        <Label>Vælg kunde</Label>
-                        <select 
-                          className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                          value={selectedClientId}
-                          onChange={(e) => setSelectedClientId(e.target.value)}
-                        >
-                          <option value="">Vælg en kunde...</option>
-                          {availableClients.map(client => (
-                            <option key={client.id} value={client.id}>{client.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Salgsmål (antal salg)</Label>
-                        <Input 
-                          type="number" 
-                          value={newSalesTarget}
-                          onChange={(e) => setNewSalesTarget(e.target.value)}
-                          min="1"
-                        />
-                      </div>
-                      <Button 
-                        className="w-full" 
-                        onClick={() => addClientGoalMutation.mutate({ 
-                          clientId: selectedClientId, 
-                          target: parseInt(newSalesTarget) || 100 
-                        })}
-                        disabled={!selectedClientId || addClientGoalMutation.isPending}
-                      >
-                        Tilføj kundemål
+                {canEditHomeGoals && (
+                  <Dialog open={addClientGoalOpen} onOpenChange={setAddClientGoalOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-1">
+                        <Plus className="w-4 h-4" /> Tilføj kunde
                       </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Tilføj kundemål for {format(new Date(), "MMMM yyyy", { locale: da })}</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <Label>Vælg kunde</Label>
+                          <select 
+                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                            value={selectedClientId}
+                            onChange={(e) => setSelectedClientId(e.target.value)}
+                          >
+                            <option value="">Vælg en kunde...</option>
+                            {availableClients.map(client => (
+                              <option key={client.id} value={client.id}>{client.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Salgsmål (antal salg)</Label>
+                          <Input 
+                            type="number" 
+                            value={newSalesTarget}
+                            onChange={(e) => setNewSalesTarget(e.target.value)}
+                            min="1"
+                          />
+                        </div>
+                        <Button 
+                          className="w-full" 
+                          onClick={() => addClientGoalMutation.mutate({ 
+                            clientId: selectedClientId, 
+                            target: parseInt(newSalesTarget) || 100 
+                          })}
+                          disabled={!selectedClientId || addClientGoalMutation.isPending}
+                        >
+                          Tilføj kundemål
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -722,21 +726,23 @@ const Home = () => {
                         </div>
                         <Progress value={goal.progress || 0} className="h-2" />
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => deleteClientGoalMutation.mutate(goal.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {canEditHomeGoals && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => deleteClientGoalMutation.mutate(goal.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="pt-4 border-t text-center text-muted-foreground text-sm py-6">
                   <p>Ingen kundemål sat for denne måned.</p>
-                  <p className="text-xs mt-1">Klik "Tilføj kunde" for at komme i gang.</p>
+                  {canEditHomeGoals && <p className="text-xs mt-1">Klik "Tilføj kunde" for at komme i gang.</p>}
                 </div>
               )}
             </CardContent>
