@@ -40,9 +40,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
-  const [bookingSubmenuOpen, setBookingSubmenuOpen] = useState(
-    ["/vagt-flow/book-week", "/vagt-flow/bookings", "/vagt-flow/locations"].some(path => location.pathname.startsWith(path))
-  );
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const [ledelseOpen, setLedelseOpen] = useState(
     ["/contracts", "/permissions", "/career-wishes-overview"].some(path => location.pathname.startsWith(path))
@@ -488,51 +485,20 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     {t("sidebar.myWeek")}
                   </NavLink>
                 )}
-                {/* Booking submenu */}
+                {/* Booking - single link to tabbed page */}
                 {(p.canViewFmBookWeek || p.canViewFmBookings || p.canViewFmLocations) && (
-                  <Collapsible open={bookingSubmenuOpen} onOpenChange={setBookingSubmenuOpen}>
-                    <CollapsibleTrigger className={cn(
-                      "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                      ["/vagt-flow/book-week", "/vagt-flow/bookings", "/vagt-flow/locations"].some(path => location.pathname.startsWith(path))
-                        ? "bg-sidebar-accent/70 text-sidebar-accent-foreground" 
-                        : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                    )}>
-                      <div className="flex items-center gap-3">
-                        <CalendarDays className="h-4 w-4" />
-                        {t("sidebar.booking", "Booking")}
-                      </div>
-                      {bookingSubmenuOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                      {p.canViewFmBookWeek && (
-                        <NavLink to="/vagt-flow/book-week" onClick={handleNavClick} className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                          location.pathname === "/vagt-flow/book-week" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                        )}>
-                          <Calendar className="h-4 w-4" />
-                          {t("sidebar.bookWeek")}
-                        </NavLink>
-                      )}
-                      {p.canViewFmLocations && (
-                        <NavLink to="/vagt-flow/locations" onClick={handleNavClick} className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                          location.pathname.startsWith("/vagt-flow/locations") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                        )}>
-                          <MapPin className="h-4 w-4" />
-                          {t("sidebar.locations")}
-                        </NavLink>
-                      )}
-                      {p.canViewFmBookings && (
-                        <NavLink to="/vagt-flow/bookings" onClick={handleNavClick} className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                          location.pathname === "/vagt-flow/bookings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                        )}>
-                          <ListChecks className="h-4 w-4" />
-                          {t("sidebar.bookings")}
-                        </NavLink>
-                      )}
-                    </CollapsibleContent>
-                  </Collapsible>
+                  <NavLink to="/vagt-flow/booking" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname.startsWith("/vagt-flow/booking") || 
+                    location.pathname === "/vagt-flow/book-week" || 
+                    location.pathname === "/vagt-flow/bookings" || 
+                    location.pathname.startsWith("/vagt-flow/locations")
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <CalendarDays className="h-4 w-4" />
+                    {t("sidebar.booking", "Booking")}
+                  </NavLink>
                 )}
                 {p.canViewFmVehicles && (
                   <NavLink to="/vagt-flow/vehicles" onClick={handleNavClick} className={cn(

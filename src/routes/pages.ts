@@ -33,6 +33,7 @@ export const VagtFlowIndex = lazyPage(() => import("@/pages/vagt-flow/Index"));
 export const VagtBookWeek = lazyPage(() => import("@/pages/vagt-flow/BookWeek"));
 export const VagtLocations = lazyPage(() => import("@/pages/vagt-flow/Locations"));
 export const VagtBookings = lazyPage(() => import("@/pages/vagt-flow/Bookings"));
+export const VagtBookingManagement = lazyPage(() => import("@/pages/vagt-flow/BookingManagement"));
 export const VagtMinUge = lazyPage(() => import("@/pages/vagt-flow/MinUge"));
 export const VagtVehicles = lazyPage(() => import("@/pages/vagt-flow/Vehicles"));
 export const VagtTimeOffRequests = lazyPage(() => import("@/pages/vagt-flow/TimeOffRequests"));

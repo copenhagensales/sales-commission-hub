@@ -30,6 +30,7 @@ import {
   VagtBookWeek,
   VagtLocations,
   VagtBookings,
+  VagtBookingManagement,
   VagtMinUge,
   VagtVehicles,
   VagtTimeOffRequests,
@@ -121,6 +122,7 @@ export const routes: RouteConfig[] = [
   { path: "/settings", component: Settings, access: "role", positionPermission: "menu_settings" },
 
   { path: "/vagt-flow", component: VagtFlowIndex, access: "role", positionPermission: "menu_fm_overview" },
+  { path: "/vagt-flow/booking", component: VagtBookingManagement, access: "role", positionPermission: "menu_fm_book_week" },
   { path: "/vagt-flow/book-week", component: VagtBookWeek, access: "role", positionPermission: "menu_fm_book_week" },
   { path: "/vagt-flow/locations", component: VagtLocations, access: "role", positionPermission: "menu_fm_locations" },
   { path: "/vagt-flow/locations/:id", component: VagtLocationDetail, access: "role", positionPermission: "menu_fm_locations" },
