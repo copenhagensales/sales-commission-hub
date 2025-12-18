@@ -390,13 +390,13 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                         </span>
                       )}
                     </div>
-                    <div className="flex gap-4 mt-1">
+                    <div className="flex gap-6 mt-2">
                       <div className="text-center">
-                        <div className="text-xl font-bold text-foreground">{client.salesToday}</div>
+                        <div className="text-3xl font-bold text-foreground">{client.salesToday}</div>
                         <div className="text-xs text-muted-foreground">i dag</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-xl font-bold text-foreground">{client.salesThisMonth}</div>
+                        <div className="text-3xl font-bold text-foreground">{client.salesThisMonth}</div>
                         <div className="text-xs text-muted-foreground">måned</div>
                       </div>
                     </div>
@@ -457,8 +457,8 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right">{seller.sales}</TableCell>
-                          <TableCell className="text-right font-mono font-medium">
+                          <TableCell className="text-right text-lg font-semibold">{seller.sales}</TableCell>
+                          <TableCell className="text-right font-mono text-lg font-bold">
                             {seller.commission.toLocaleString("da-DK")} kr
                           </TableCell>
                         </TableRow>
@@ -514,8 +514,8 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right">{seller.sales}</TableCell>
-                          <TableCell className="text-right font-mono font-medium">
+                          <TableCell className="text-right text-lg font-semibold">{seller.sales}</TableCell>
+                          <TableCell className="text-right font-mono text-lg font-bold">
                             {seller.commission.toLocaleString("da-DK")} kr
                           </TableCell>
                         </TableRow>
@@ -572,7 +572,7 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                           </div>
                         </TableCell>
                         <TableCell className="font-mono">{sale.customer_phone || "-"}</TableCell>
-                        <TableCell className="text-right font-mono">
+                        <TableCell className="text-right font-mono text-lg font-bold">
                           {(sale.total_commission || 0).toLocaleString("da-DK")} kr
                         </TableCell>
                       </TableRow>
