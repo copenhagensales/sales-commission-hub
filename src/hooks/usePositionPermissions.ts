@@ -236,12 +236,11 @@ export function useHasPermission(permissionKey: string, type?: "view" | "edit"):
 
 // Helper hook to check multiple permissions at once
 export function usePermissions() {
-  const { data, isLoading, isFetched, isFetching } = usePositionPermissions();
+  const { data, isLoading, isFetched } = usePositionPermissions();
   const { isPreviewMode, previewPermissions, previewRole } = useRolePreview();
   
-  // Consider loading if: query is loading OR query hasn't fetched yet OR is currently fetching
-  // This prevents the race condition where isLoading is false but data hasn't arrived
-  const actuallyLoading = isLoading || !isFetched || isFetching;
+  // Consider loading only on initial fetch - once we have data, don't show loading on refetches
+  const actuallyLoading = isLoading || (!isFetched && !data);
   
   // Use preview permissions when in preview mode, otherwise use actual permissions
   const permissions = isPreviewMode && previewPermissions 
