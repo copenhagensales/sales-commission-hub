@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfDay, startOfMonth } from "date-fns";
+import { format, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, Building2, ShoppingCart, TrendingUp, CalendarIcon, ChevronDown, ChevronRight } from "lucide-react";
+import { Users, Building2, ShoppingCart, TrendingUp, CalendarIcon, ChevronDown, ChevronRight, Trophy, Medal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,23 +13,26 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 
-interface TeamData {
-  teamId: string;
-  teamName: string;
-  clients: ClientData[];
-  totalSalesToday: number;
-  totalSalesMonth: number;
-  totalCommissionToday: number;
-  totalCommissionMonth: number;
+interface TopSeller {
+  name: string;
+  sales: number;
+  commission: number;
 }
 
 interface ClientData {
   clientId: string;
   clientName: string;
   salesToday: number;
-  salesMonth: number;
   commissionToday: number;
-  commissionMonth: number;
+  topSellers: TopSeller[];
+}
+
+interface TeamData {
+  teamId: string;
+  teamName: string;
+  clients: ClientData[];
+  totalSalesToday: number;
+  totalCommissionToday: number;
 }
 
 const formatNumber = (value: number) => 
@@ -48,8 +51,6 @@ export default function TeamOverview() {
       const dayStart = startOfDay(selectedDate);
       const dayEnd = new Date(dayStart);
       dayEnd.setDate(dayEnd.getDate() + 1);
-      
-      const monthStart = startOfMonth(selectedDate);
 
       // Get teams with their clients
       const { data: teamsWithClients } = await supabase
@@ -82,12 +83,13 @@ export default function TeamOverview() {
       const campaignIds = (allCampaigns || []).map(c => c.id);
       if (campaignIds.length === 0) return [];
 
-      // Fetch today's sales
+      // Fetch today's sales with agent info
       const { data: todaySales } = await supabase
         .from("sales")
         .select(`
           id,
           client_campaign_id,
+          agent_name,
           sale_items (
             quantity,
             mapped_commission,
@@ -101,52 +103,45 @@ export default function TeamOverview() {
         .gte("sale_datetime", dayStart.toISOString())
         .lt("sale_datetime", dayEnd.toISOString());
 
-      // Fetch month's sales
-      const { data: monthSales } = await supabase
-        .from("sales")
-        .select(`
-          id,
-          client_campaign_id,
-          sale_items (
-            quantity,
-            mapped_commission,
-            products (
-              commission_dkk,
-              counts_as_sale
-            )
-          )
-        `)
-        .in("client_campaign_id", campaignIds)
-        .gte("sale_datetime", monthStart.toISOString())
-        .lt("sale_datetime", dayEnd.toISOString());
-
-      // Aggregate sales by client
-      const aggregateSales = (sales: any[]) => {
-        const clientStats = new Map<string, { sales: number; commission: number }>();
-        
-        sales.forEach((sale: any) => {
-          const clientId = campaignToClient.get(sale.client_campaign_id);
-          if (!clientId) return;
-
-          (sale.sale_items || []).forEach((item: any) => {
-            const countsAsSale = item.products?.counts_as_sale !== false;
-            if (!countsAsSale) return;
-
-            const qty = Number(item.quantity) || 1;
-            const commission = qty * (Number(item.products?.commission_dkk) || Number(item.mapped_commission) || 0);
-
-            const existing = clientStats.get(clientId) || { sales: 0, commission: 0 };
-            existing.sales += qty;
-            existing.commission += commission;
-            clientStats.set(clientId, existing);
-          });
-        });
-
-        return clientStats;
+      // Aggregate sales by client with top sellers
+      type ClientStats = {
+        sales: number;
+        commission: number;
+        agents: Map<string, { sales: number; commission: number }>;
       };
+      
+      const clientStats = new Map<string, ClientStats>();
+      
+      (todaySales || []).forEach((sale: any) => {
+        const clientId = campaignToClient.get(sale.client_campaign_id);
+        if (!clientId) return;
 
-      const todayStats = aggregateSales(todaySales || []);
-      const monthStats = aggregateSales(monthSales || []);
+        const agentName = sale.agent_name?.trim() || "Ukendt";
+
+        (sale.sale_items || []).forEach((item: any) => {
+          const countsAsSale = item.products?.counts_as_sale !== false;
+          if (!countsAsSale) return;
+
+          const qty = Number(item.quantity) || 1;
+          const commission = qty * (Number(item.products?.commission_dkk) || Number(item.mapped_commission) || 0);
+
+          const existing = clientStats.get(clientId) || { 
+            sales: 0, 
+            commission: 0, 
+            agents: new Map() 
+          };
+          
+          existing.sales += qty;
+          existing.commission += commission;
+
+          const agentStats = existing.agents.get(agentName) || { sales: 0, commission: 0 };
+          agentStats.sales += qty;
+          agentStats.commission += commission;
+          existing.agents.set(agentName, agentStats);
+
+          clientStats.set(clientId, existing);
+        });
+      });
 
       // Build team data
       const teamData: TeamData[] = teamsWithClients.map(team => {
@@ -154,30 +149,33 @@ export default function TeamOverview() {
           .filter((tc: any) => tc.clients)
           .map((tc: any) => {
             const clientId = tc.clients.id;
-            const todayData = todayStats.get(clientId) || { sales: 0, commission: 0 };
-            const monthData = monthStats.get(clientId) || { sales: 0, commission: 0 };
+            const stats = clientStats.get(clientId);
+            
+            const topSellers: TopSeller[] = stats 
+              ? Array.from(stats.agents.entries())
+                  .map(([name, data]) => ({ name, ...data }))
+                  .sort((a, b) => b.sales - a.sales)
+                  .slice(0, 5)
+              : [];
 
             return {
               clientId,
               clientName: tc.clients.name,
-              salesToday: todayData.sales,
-              salesMonth: monthData.sales,
-              commissionToday: todayData.commission,
-              commissionMonth: monthData.commission,
+              salesToday: stats?.sales || 0,
+              commissionToday: stats?.commission || 0,
+              topSellers,
             };
           })
-          .sort((a: ClientData, b: ClientData) => b.salesMonth - a.salesMonth);
+          .sort((a: ClientData, b: ClientData) => b.salesToday - a.salesToday);
 
         return {
           teamId: team.id,
           teamName: team.name,
           clients,
           totalSalesToday: clients.reduce((sum, c) => sum + c.salesToday, 0),
-          totalSalesMonth: clients.reduce((sum, c) => sum + c.salesMonth, 0),
           totalCommissionToday: clients.reduce((sum, c) => sum + c.commissionToday, 0),
-          totalCommissionMonth: clients.reduce((sum, c) => sum + c.commissionMonth, 0),
         };
-      }).sort((a, b) => b.totalSalesMonth - a.totalSalesMonth);
+      }).sort((a, b) => b.totalSalesToday - a.totalSalesToday);
 
       return teamData;
     },
@@ -197,14 +195,19 @@ export default function TeamOverview() {
   };
 
   const totals = useMemo(() => {
-    if (!teamsData?.length) return { salesToday: 0, salesMonth: 0, commissionToday: 0, commissionMonth: 0 };
+    if (!teamsData?.length) return { salesToday: 0, commissionToday: 0 };
     return {
       salesToday: teamsData.reduce((sum, t) => sum + t.totalSalesToday, 0),
-      salesMonth: teamsData.reduce((sum, t) => sum + t.totalSalesMonth, 0),
       commissionToday: teamsData.reduce((sum, t) => sum + t.totalCommissionToday, 0),
-      commissionMonth: teamsData.reduce((sum, t) => sum + t.totalCommissionMonth, 0),
     };
   }, [teamsData]);
+
+  const getRankIcon = (index: number) => {
+    if (index === 0) return <Trophy className="h-4 w-4 text-amber-500" />;
+    if (index === 1) return <Medal className="h-4 w-4 text-slate-400" />;
+    if (index === 2) return <Medal className="h-4 w-4 text-amber-700" />;
+    return <span className="text-xs text-muted-foreground w-4 text-center">{index + 1}</span>;
+  };
 
   return (
     <MainLayout>
@@ -214,7 +217,7 @@ export default function TeamOverview() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Teamsoverblik</h1>
             <p className="text-muted-foreground">
-              Salgsstatistik fordelt på teams og kunder
+              Dagens salgsstatistik fordelt på teams og kunder
             </p>
           </div>
           <Popover>
@@ -244,44 +247,24 @@ export default function TeamOverview() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4">
           <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Salg i dag</CardTitle>
               <ShoppingCart className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{formatNumber(totals.salesToday)}</div>
+              <div className="text-4xl font-bold text-primary">{formatNumber(totals.salesToday)}</div>
             </CardContent>
           </Card>
 
           <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salg denne måned</CardTitle>
+              <CardTitle className="text-sm font-medium">Provision i dag</CardTitle>
               <TrendingUp className="h-4 w-4 text-emerald-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-emerald-600">{formatNumber(totals.salesMonth)}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Provision i dag</CardTitle>
-              <Users className="h-4 w-4 text-amber-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-amber-600">{formatCurrency(totals.commissionToday)}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-violet-500/10 to-violet-500/5 border-violet-500/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Provision denne måned</CardTitle>
-              <Building2 className="h-4 w-4 text-violet-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-violet-600">{formatCurrency(totals.commissionMonth)}</div>
+              <div className="text-4xl font-bold text-emerald-600">{formatCurrency(totals.commissionToday)}</div>
             </CardContent>
           </Card>
         </div>
@@ -339,47 +322,78 @@ export default function TeamOverview() {
                     </CardHeader>
                   </CollapsibleTrigger>
                   
-                  <CardContent className="pt-4">
-                    {/* Team Summary */}
-                    <div className="grid grid-cols-2 gap-3 mb-4 p-3 rounded-lg bg-muted/30">
-                      <div>
-                        <div className="text-xs text-muted-foreground uppercase tracking-wide">Måned</div>
-                        <div className="text-xl font-semibold">{formatNumber(team.totalSalesMonth)} salg</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground uppercase tracking-wide">Provision måned</div>
-                        <div className="text-xl font-semibold">{formatCurrency(team.totalCommissionMonth)}</div>
-                      </div>
-                    </div>
-
-                    <CollapsibleContent>
+                  <CollapsibleContent>
+                    <CardContent className="pt-4">
                       {/* Clients List */}
-                      <div className="space-y-2 mt-4 border-t pt-4">
-                        <div className="text-xs text-muted-foreground uppercase tracking-wide mb-3">Kunder</div>
+                      <div className="space-y-4">
                         {team.clients.map(client => (
                           <div 
                             key={client.clientId} 
-                            className="flex items-center justify-between p-3 rounded-lg bg-background border hover:border-primary/30 transition-colors"
+                            className="p-4 rounded-xl bg-muted/30 border"
                           >
-                            <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center">
-                                <Building2 className="h-4 w-4 text-muted-foreground" />
+                            {/* Client Header */}
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-md bg-background flex items-center justify-center border">
+                                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                                <span className="font-semibold">{client.clientName}</span>
                               </div>
-                              <span className="font-medium">{client.clientName}</span>
+                              <div className="flex items-center gap-3">
+                                <Badge className="bg-primary/10 text-primary hover:bg-primary/20 tabular-nums text-base px-3 py-1">
+                                  {client.salesToday} salg
+                                </Badge>
+                                <Badge variant="outline" className="tabular-nums">
+                                  {formatCurrency(client.commissionToday)}
+                                </Badge>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-4">
-                              <Badge variant="secondary" className="tabular-nums">
-                                {client.salesToday} i dag
-                              </Badge>
-                              <Badge variant="outline" className="tabular-nums">
-                                {client.salesMonth} måned
-                              </Badge>
-                            </div>
+                            
+                            {/* Top Sellers */}
+                            {client.topSellers.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-border/50">
+                                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+                                  <Trophy className="h-3 w-3" />
+                                  Topsælgere i dag
+                                </div>
+                                <div className="space-y-1.5">
+                                  {client.topSellers.map((seller, idx) => (
+                                    <div 
+                                      key={seller.name} 
+                                      className={cn(
+                                        "flex items-center justify-between py-1.5 px-2 rounded-md",
+                                        idx === 0 && "bg-amber-500/10"
+                                      )}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        {getRankIcon(idx)}
+                                        <span className={cn(
+                                          "text-sm",
+                                          idx === 0 && "font-semibold"
+                                        )}>
+                                          {seller.name}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-3 text-sm tabular-nums">
+                                        <span className="font-medium">{seller.sales} salg</span>
+                                        <span className="text-muted-foreground">{formatCurrency(seller.commission)}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {client.topSellers.length === 0 && client.salesToday === 0 && (
+                              <p className="text-sm text-muted-foreground text-center py-2">
+                                Ingen salg i dag
+                              </p>
+                            )}
                           </div>
                         ))}
                       </div>
-                    </CollapsibleContent>
-                  </CardContent>
+                    </CardContent>
+                  </CollapsibleContent>
                 </Collapsible>
               </Card>
             ))}
