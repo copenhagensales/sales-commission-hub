@@ -19,7 +19,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,6 +27,8 @@ interface Booking {
   id: string;
   location?: { name: string };
   clients?: { name: string };
+  client_id?: string | null;
+  brand_id?: string | null;
   status: string;
   booked_days?: number[] | null;
   comment?: string | null;
@@ -63,6 +65,44 @@ export function EditBookingDialog({
   const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
   const [comment, setComment] = useState<string>("");
   const [expectedStaffCount, setExpectedStaffCount] = useState<number>(1);
+  const [clientId, setClientId] = useState<string>("");
+  const [brandId, setBrandId] = useState<string>("");
+
+  // Fetch fieldmarketing clients
+  const { data: clients = [] } = useQuery({
+    queryKey: ["fieldmarketing-clients-edit"],
+    queryFn: async () => {
+      const { data: team } = await supabase
+        .from("teams")
+        .select("id")
+        .ilike("name", "%fieldmarketing%")
+        .single();
+      
+      if (!team) return [];
+      
+      const { data: teamClients } = await supabase
+        .from("team_clients")
+        .select("client_id, clients(id, name)")
+        .eq("team_id", team.id);
+      
+      return teamClients?.map((tc: any) => tc.clients).filter(Boolean) || [];
+    },
+    enabled: open,
+  });
+
+  // Fetch brands
+  const { data: brands = [] } = useQuery({
+    queryKey: ["brands-edit"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("brand")
+        .select("id, name, color_hex")
+        .eq("is_active", true)
+        .order("name");
+      return data || [];
+    },
+    enabled: open,
+  });
 
   useEffect(() => {
     if (open && booking) {
@@ -70,6 +110,8 @@ export function EditBookingDialog({
       setSelectedDays(new Set(booking.booked_days || []));
       setComment(booking.comment || "");
       setExpectedStaffCount(booking.expected_staff_count || 1);
+      setClientId(booking.client_id || "");
+      setBrandId(booking.brand_id || "");
     }
   }, [open, booking]);
 
@@ -79,6 +121,8 @@ export function EditBookingDialog({
       booked_days: number[];
       comment: string | null;
       expected_staff_count: number;
+      client_id: string | null;
+      brand_id: string | null;
     }) => {
       if (!booking) throw new Error("No booking selected");
 
@@ -89,6 +133,8 @@ export function EditBookingDialog({
           booked_days: data.booked_days,
           comment: data.comment || null,
           expected_staff_count: data.expected_staff_count,
+          client_id: data.client_id || null,
+          brand_id: data.brand_id || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", booking.id);
@@ -126,6 +172,8 @@ export function EditBookingDialog({
       booked_days: Array.from(selectedDays).sort((a, b) => a - b),
       comment: comment.trim() || null,
       expected_staff_count: expectedStaffCount,
+      client_id: clientId || null,
+      brand_id: brandId || null,
     });
   };
 
@@ -140,8 +188,48 @@ export function EditBookingDialog({
           <div>
             <p className="font-medium">{booking?.location?.name}</p>
             <p className="text-sm text-muted-foreground">
-              {booking?.clients?.name} • Uge {weekNumber}, {year}
+              Uge {weekNumber}, {year}
             </p>
+          </div>
+
+          {/* Client */}
+          <div className="space-y-2">
+            <Label>Kunde</Label>
+            <Select value={clientId} onValueChange={setClientId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Vælg kunde" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((client: any) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Brand/Campaign */}
+          <div className="space-y-2">
+            <Label>Kampagne/Brand</Label>
+            <Select value={brandId} onValueChange={setBrandId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Vælg kampagne" />
+              </SelectTrigger>
+              <SelectContent>
+                {brands.map((brand: any) => (
+                  <SelectItem key={brand.id} value={brand.id}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: brand.color_hex }}
+                      />
+                      {brand.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Status */}
