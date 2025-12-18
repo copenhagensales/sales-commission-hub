@@ -1,10 +1,10 @@
 import { useRolePreview } from "@/contexts/RolePreviewContext";
-import { X, Eye } from "lucide-react";
+import { X, Eye, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
 export function RolePreviewBanner() {
-  const { isPreviewMode, previewRole, exitPreviewMode } = useRolePreview();
+  const { isPreviewMode, previewRole, previewEmployee, exitPreviewMode } = useRolePreview();
   const navigate = useNavigate();
 
   if (!isPreviewMode) return null;
@@ -20,6 +20,12 @@ export function RolePreviewBanner() {
         <Eye className="h-5 w-5" />
         <span className="font-medium">
           Preview-tilstand: Du ser appen som en <strong>{previewRole}</strong> ville se den
+          {previewEmployee && (
+            <span className="ml-2 inline-flex items-center gap-1.5 bg-orange-600 rounded px-2 py-0.5 text-sm">
+              <User className="h-3.5 w-3.5" />
+              {previewEmployee.name}
+            </span>
+          )}
         </span>
       </div>
       <Button

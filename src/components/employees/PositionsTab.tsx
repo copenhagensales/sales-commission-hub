@@ -314,6 +314,14 @@ interface FormData {
   permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope>;
 }
 
+interface Employee {
+  id: string;
+  first_name: string;
+  last_name: string;
+  private_email: string | null;
+  job_title: string | null;
+}
+
 export function PositionsTab() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -327,6 +335,12 @@ export function PositionsTab() {
   });
   const [permissionSearch, setPermissionSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  
+  // Test dialog state
+  const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
+  const [testPosition, setTestPosition] = useState<JobPosition | null>(null);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
 
   // Fetch positions
   const { data: positions = [], isLoading } = useQuery({
@@ -344,6 +358,32 @@ export function PositionsTab() {
       })) as JobPosition[];
     },
   });
+
+  // Fetch employees for test selection
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees-for-test"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, private_email, job_title")
+        .eq("is_active", true)
+        .order("first_name");
+      
+      if (error) throw error;
+      return data as Employee[];
+    },
+  });
+
+  // Filter employees based on search
+  const filteredEmployees = useMemo(() => {
+    if (!employeeSearch.trim()) return employees;
+    const search = employeeSearch.toLowerCase();
+    return employees.filter(e => 
+      `${e.first_name} ${e.last_name}`.toLowerCase().includes(search) ||
+      e.private_email?.toLowerCase().includes(search) ||
+      e.job_title?.toLowerCase().includes(search)
+    );
+  }, [employees, employeeSearch]);
 
   // Create mutation
   const createMutation = useMutation({
@@ -444,6 +484,21 @@ export function PositionsTab() {
     setFormData({ name: "", description: "", default_landing_page: "/home", permissions: {} });
     setPermissionSearch("");
     setActiveCategory(null);
+  };
+
+  const handleOpenTest = (position: JobPosition) => {
+    setTestPosition(position);
+    setSelectedEmployeeId("");
+    setEmployeeSearch("");
+    setIsTestDialogOpen(true);
+  };
+
+  const handleStartTest = () => {
+    if (!testPosition) return;
+    
+    const employeeParam = selectedEmployeeId ? `?employee=${selectedEmployeeId}` : "";
+    navigate(`/role-preview/${testPosition.id}${employeeParam}`);
+    setIsTestDialogOpen(false);
   };
 
   // Filter categories and permissions based on search
@@ -613,7 +668,7 @@ export function PositionsTab() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => navigate(`/role-preview/${position.id}`)}
+                            onClick={() => handleOpenTest(position)}
                             title="Test"
                             className="text-primary hover:text-primary"
                           >
@@ -873,6 +928,97 @@ export function PositionsTab() {
                 {editingPosition ? "Gem ændringer" : "Opret"}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Test Position Dialog */}
+      <Dialog open={isTestDialogOpen} onOpenChange={setIsTestDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Play className="h-5 w-5 text-primary" />
+              Test stilling: {testPosition?.name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Vælg en medarbejder hvis data du vil se i preview, eller start uden valg for at se generelt view.
+            </p>
+            
+            <div className="space-y-2">
+              <Label>Søg medarbejder</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Søg efter navn, email eller stilling..."
+                  value={employeeSearch}
+                  onChange={(e) => setEmployeeSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Vælg medarbejder (valgfrit)</Label>
+              <ScrollArea className="h-[200px] border rounded-md">
+                <div className="p-1">
+                  <div
+                    className={cn(
+                      "flex items-center gap-3 p-2 rounded cursor-pointer transition-colors",
+                      selectedEmployeeId === "" 
+                        ? "bg-primary/10 text-primary" 
+                        : "hover:bg-muted"
+                    )}
+                    onClick={() => setSelectedEmployeeId("")}
+                  >
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">Ingen medarbejder valgt</span>
+                  </div>
+                  {filteredEmployees.map((employee) => (
+                    <div
+                      key={employee.id}
+                      className={cn(
+                        "flex items-center gap-3 p-2 rounded cursor-pointer transition-colors",
+                        selectedEmployeeId === employee.id 
+                          ? "bg-primary/10 text-primary" 
+                          : "hover:bg-muted"
+                      )}
+                      onClick={() => setSelectedEmployeeId(employee.id)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">
+                          {employee.first_name} {employee.last_name}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {employee.private_email || "Ingen email"} 
+                          {employee.job_title && ` • ${employee.job_title}`}
+                        </div>
+                      </div>
+                      {selectedEmployeeId === employee.id && (
+                        <Check className="h-4 w-4 text-primary shrink-0" />
+                      )}
+                    </div>
+                  ))}
+                  {filteredEmployees.length === 0 && (
+                    <div className="p-4 text-center text-sm text-muted-foreground">
+                      Ingen medarbejdere fundet
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTestDialogOpen(false)}>
+              Annuller
+            </Button>
+            <Button onClick={handleStartTest}>
+              <Play className="h-4 w-4 mr-2" />
+              Start test
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
