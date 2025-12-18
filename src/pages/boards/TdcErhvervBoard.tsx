@@ -91,12 +91,23 @@ export default function TdcErhvervBoard() {
       const campaignIds = (campaigns || []).map(c => c.id);
       if (campaignIds.length === 0) return null;
 
-      // Fetch this month's sales
+      // Fetch this month's sales with product info for counts_as_sale filtering
       const { data: sales } = await supabase
         .from("sales")
         .select(`
           id, sale_datetime, agent_name,
-          sale_items ( mapped_commission, mapped_revenue, quantity )
+          sale_items ( 
+            mapped_commission, 
+            mapped_revenue, 
+            quantity,
+            product_id,
+            products (
+              id,
+              commission_dkk,
+              revenue_dkk,
+              counts_as_sale
+            )
+          )
         `)
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", monthStart)
@@ -148,10 +159,16 @@ export default function TdcErhvervBoard() {
       let saleRevenue = 0;
 
       (sale.sale_items || []).forEach((item: any) => {
+        const product = item.products;
+        
+        // Only count if counts_as_sale is true (or null/undefined, default to true)
+        const countsAsSale = product?.counts_as_sale !== false;
+        if (!countsAsSale) return;
+
         const qty = Number(item.quantity) || 1;
         saleSales += qty;
-        saleCommission += qty * (Number(item.mapped_commission) || 0);
-        saleRevenue += qty * (Number(item.mapped_revenue) || 0);
+        saleCommission += qty * (Number(product?.commission_dkk) || Number(item.mapped_commission) || 0);
+        saleRevenue += qty * (Number(product?.revenue_dkk) || Number(item.mapped_revenue) || 0);
       });
 
       existing.sales += saleSales;
