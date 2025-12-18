@@ -2978,6 +2978,51 @@ export type Database = {
           },
         ]
       }
+      product_campaign_overrides: {
+        Row: {
+          campaign_mapping_id: string
+          commission_dkk: number | null
+          created_at: string
+          id: string
+          product_id: string
+          revenue_dkk: number | null
+          updated_at: string
+        }
+        Insert: {
+          campaign_mapping_id: string
+          commission_dkk?: number | null
+          created_at?: string
+          id?: string
+          product_id: string
+          revenue_dkk?: number | null
+          updated_at?: string
+        }
+        Update: {
+          campaign_mapping_id?: string
+          commission_dkk?: number | null
+          created_at?: string
+          id?: string
+          product_id?: string
+          revenue_dkk?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_campaign_overrides_campaign_mapping_id_fkey"
+            columns: ["campaign_mapping_id"]
+            isOneToOne: false
+            referencedRelation: "adversus_campaign_mappings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_campaign_overrides_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           client_campaign_id: string | null
