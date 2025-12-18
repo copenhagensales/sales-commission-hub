@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Minus, Phone, Save } from "lucide-react";
+import { Plus, Minus, Phone, Save, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
 interface ProductSelection {
@@ -26,6 +27,7 @@ interface ProductSelection {
 
 const SalesRegistration = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [sellerId, setSellerId] = useState<string>("");
   const [locationId, setLocationId] = useState<string>("");
   const [comment, setComment] = useState("");
@@ -209,13 +211,18 @@ const SalesRegistration = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          {t("sidebar.salesRegistration")}
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Registrer salg fra fieldmarketing events
-        </p>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            {t("sidebar.salesRegistration")}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Registrer salg fra fieldmarketing events
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
