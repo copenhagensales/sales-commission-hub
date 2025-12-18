@@ -21,36 +21,135 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { TrendingUp, Users, Calendar, Package } from "lucide-react";
+import { TrendingUp, Users, Calendar, Package, Trophy } from "lucide-react";
+
+interface ProductCommission {
+  name: string;
+  commission_dkk: number;
+}
 
 const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientName: string }) => {
   const { data: sales, isLoading: salesLoading } = useFieldmarketingSales(clientId);
   const { data: stats, isLoading: statsLoading } = useFieldmarketingSalesStats(clientId);
 
-  // Fetch seller names for top sellers
+  // Fetch product commissions for this client
+  const { data: productCommissions } = useQuery({
+    queryKey: ["fieldmarketing-product-commissions", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select(`
+          name,
+          commission_dkk,
+          client_campaign:client_campaign_id (
+            client_id
+          )
+        `)
+        .not("client_campaign_id", "is", null);
+      
+      if (error) throw error;
+      
+      // Filter by client and create a map of product name -> commission
+      const commissionMap: Record<string, number> = {};
+      (data || []).forEach((p: any) => {
+        if (p.client_campaign?.client_id === clientId) {
+          commissionMap[p.name] = p.commission_dkk || 0;
+        }
+      });
+      return commissionMap;
+    },
+  });
+
+  // Fetch seller names and calculate commission for top sellers
   const { data: topSellers } = useQuery({
-    queryKey: ["fieldmarketing-top-sellers", clientId, stats?.topSellerIds],
+    queryKey: ["fieldmarketing-top-sellers", clientId, stats?.topSellerIds, productCommissions],
     queryFn: async () => {
       if (!stats?.topSellerIds?.length) return [];
       
       const sellerIds = stats.topSellerIds.map(s => s.sellerId);
-      const { data, error } = await supabase
+      const { data: sellers, error: sellersError } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name")
         .in("id", sellerIds);
       
-      if (error) throw error;
+      if (sellersError) throw sellersError;
+
+      // Get all sales for these sellers this month to calculate commission
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      
+      const { data: monthSales, error: salesError } = await supabase
+        .from("fieldmarketing_sales")
+        .select("seller_id, product_name")
+        .eq("client_id", clientId)
+        .gte("registered_at", monthStart)
+        .in("seller_id", sellerIds);
+      
+      if (salesError) throw salesError;
+
+      // Calculate commission per seller
+      const sellerCommissions: Record<string, number> = {};
+      (monthSales || []).forEach(sale => {
+        const commission = productCommissions?.[sale.product_name] || 0;
+        sellerCommissions[sale.seller_id] = (sellerCommissions[sale.seller_id] || 0) + commission;
+      });
       
       return stats.topSellerIds.map(ts => {
-        const seller = data?.find(s => s.id === ts.sellerId);
+        const seller = sellers?.find(s => s.id === ts.sellerId);
         return {
           name: seller ? `${seller.first_name} ${seller.last_name}` : "Ukendt",
           count: ts.count,
+          commission: sellerCommissions[ts.sellerId] || 0,
         };
-      });
+      }).sort((a, b) => b.commission - a.commission);
     },
-    enabled: !!stats?.topSellerIds?.length,
+    enabled: !!stats?.topSellerIds?.length && !!productCommissions,
   });
+
+  // Calculate today's sellers with sales and commission
+  const { data: todaySellers } = useQuery({
+    queryKey: ["fieldmarketing-today-sellers", clientId, productCommissions],
+    queryFn: async () => {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      
+      const { data: todaySales, error } = await supabase
+        .from("fieldmarketing_sales")
+        .select(`
+          seller_id,
+          product_name,
+          seller:employee_master_data!seller_id(first_name, last_name)
+        `)
+        .eq("client_id", clientId)
+        .gte("registered_at", todayStart);
+      
+      if (error) throw error;
+
+      // Group by seller
+      const sellerStats: Record<string, { name: string; sales: number; commission: number }> = {};
+      (todaySales || []).forEach((sale: any) => {
+        const sellerId = sale.seller_id;
+        const sellerName = sale.seller ? `${sale.seller.first_name} ${sale.seller.last_name}` : "Ukendt";
+        const commission = productCommissions?.[sale.product_name] || 0;
+        
+        if (!sellerStats[sellerId]) {
+          sellerStats[sellerId] = { name: sellerName, sales: 0, commission: 0 };
+        }
+        sellerStats[sellerId].sales += 1;
+        sellerStats[sellerId].commission += commission;
+      });
+
+      // Convert to array and sort by commission
+      return Object.values(sellerStats).sort((a, b) => b.commission - a.commission);
+    },
+    enabled: !!productCommissions,
+  });
+
+  // Calculate commission for each sale
+  const salesWithCommission = sales?.map(sale => ({
+    ...sale,
+    commission: productCommissions?.[sale.product_name] || 0,
+  }));
 
   if (salesLoading || statsLoading) {
     return (
@@ -110,7 +209,7 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Top Sellers */}
+        {/* Top Sellers with Commission */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Top sælgere (måned)</CardTitle>
@@ -126,7 +225,12 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
                       </Badge>
                       <span className="font-medium">{seller.name}</span>
                     </div>
-                    <span className="text-muted-foreground">{seller.count} salg</span>
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className="text-muted-foreground">{seller.count} salg</span>
+                      <Badge variant="outline" className="font-mono">
+                        {seller.commission.toLocaleString("da-DK")} kr
+                      </Badge>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -158,13 +262,57 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
         </Card>
       </div>
 
-      {/* Recent Sales Table */}
+      {/* Today's Sellers Table */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-2">
+          <Trophy className="h-5 w-5 text-yellow-500" />
+          <CardTitle className="text-lg">Dagens sælgere</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {todaySellers && todaySellers.length > 0 ? (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>Sælger</TableHead>
+                    <TableHead className="text-right">Salg</TableHead>
+                    <TableHead className="text-right">Provision</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {todaySellers.map((seller, index) => (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <Badge variant={index === 0 ? "default" : index < 3 ? "secondary" : "outline"}>
+                          {index + 1}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">{seller.name}</TableCell>
+                      <TableCell className="text-right">{seller.sales}</TableCell>
+                      <TableCell className="text-right font-mono font-medium">
+                        {seller.commission.toLocaleString("da-DK")} kr
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm text-center py-8">
+              Ingen salg registreret i dag
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recent Sales Table with Commission */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Seneste salg</CardTitle>
         </CardHeader>
         <CardContent>
-          {sales && sales.length > 0 ? (
+          {salesWithCommission && salesWithCommission.length > 0 ? (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -174,10 +322,11 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
                     <TableHead>Lokation</TableHead>
                     <TableHead>Produkt</TableHead>
                     <TableHead>Telefon</TableHead>
+                    <TableHead className="text-right">Provision</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sales.slice(0, 10).map((sale) => (
+                  {salesWithCommission.slice(0, 10).map((sale) => (
                     <TableRow key={sale.id}>
                       <TableCell>
                         {format(new Date(sale.registered_at), "dd/MM/yyyy HH:mm", { locale: da })}
@@ -188,6 +337,9 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
                       <TableCell>{sale.location?.name || "-"}</TableCell>
                       <TableCell>{sale.product_name}</TableCell>
                       <TableCell className="font-mono">{sale.phone_number}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {sale.commission.toLocaleString("da-DK")} kr
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
