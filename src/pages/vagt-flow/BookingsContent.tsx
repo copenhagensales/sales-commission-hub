@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { ChevronUp, ChevronDown, Trash2, Plus, Calendar, Car, AlertTriangle, Users, FileText, X } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar, Car, AlertTriangle, Users, FileText, X, Pencil } from "lucide-react";
 import { format, addDays, getWeek, getYear } from "date-fns";
 import { getWeekStartDate } from "@/lib/vagt-flow-date-utils";
 import { da } from "date-fns/locale";
@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/popover";
 import { AddEmployeeDialog } from "@/components/vagt-flow/AddEmployeeDialog";
 import { AddVehicleDialog } from "@/components/vagt-flow/AddVehicleDialog";
+import { EditBookingDialog } from "@/components/vagt-flow/EditBookingDialog";
 
 export default function BookingsContent() {
   const { toast } = useToast();
@@ -53,6 +54,7 @@ export default function BookingsContent() {
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set([`${selectedYear}-${selectedWeek}`]));
   const [addEmployeeDialogBooking, setAddEmployeeDialogBooking] = useState<any>(null);
   const [addVehicleDialogBooking, setAddVehicleDialogBooking] = useState<any>(null);
+  const [editBookingDialog, setEditBookingDialog] = useState<any>(null);
 
   const weekStart = getWeekStartDate(selectedYear, selectedWeek);
   const DAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
@@ -214,7 +216,7 @@ export default function BookingsContent() {
     Planlagt: "bg-blue-100 text-blue-700",
     Bekræftet: "bg-green-100 text-green-700",
     Afsluttet: "bg-gray-100 text-gray-700",
-    Annulleret: "bg-red-100 text-red-700",
+    Aflyst: "bg-red-100 text-red-700",
   };
 
   return (
@@ -264,7 +266,7 @@ export default function BookingsContent() {
                 <SelectItem value="Planlagt">Planlagt</SelectItem>
                 <SelectItem value="Bekræftet">Bekræftet</SelectItem>
                 <SelectItem value="Afsluttet">Afsluttet</SelectItem>
-                <SelectItem value="Annulleret">Annulleret</SelectItem>
+                <SelectItem value="Aflyst">Aflyst</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -332,7 +334,16 @@ export default function BookingsContent() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => setEditBookingDialog(booking)}
+                            title="Rediger booking"
+                          >
+                            <Pencil className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => setDeleteBookingId(booking.id)}
+                            title="Slet booking"
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -446,6 +457,16 @@ export default function BookingsContent() {
           queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
           setAddVehicleDialogBooking(null);
         }}
+      />
+
+      {/* Edit Booking Dialog */}
+      <EditBookingDialog
+        open={!!editBookingDialog}
+        onOpenChange={(open) => !open && setEditBookingDialog(null)}
+        booking={editBookingDialog}
+        weekNumber={selectedWeek}
+        year={selectedYear}
+        weekStart={weekStart}
       />
     </div>
   );
