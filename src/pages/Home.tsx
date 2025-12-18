@@ -483,18 +483,20 @@ const Home = () => {
         .lte("sale_datetime", todayEnd);
       
       // Calculate totals
+      // mapped_commission is already pre-multiplied by quantity, don't multiply again
       const monthlyCommission = monthlySales?.reduce((total, sale) => {
         return total + (sale.sale_items?.reduce((sum, item) => {
-          return sum + ((item.mapped_commission || 0) * (item.quantity || 1));
+          return sum + (item.mapped_commission || 0);
         }, 0) || 0);
       }, 0) || 0;
       
       const monthlySalesCount = monthlySales?.length || 0;
       const todaySalesCount = todaySales?.length || 0;
       
+      // mapped_commission is already pre-multiplied by quantity, don't multiply again
       const todayCommission = todaySales?.reduce((total, sale) => {
         return total + (sale.sale_items?.reduce((sum, item) => {
-          return sum + ((item.mapped_commission || 0) * (item.quantity || 1));
+          return sum + (item.mapped_commission || 0);
         }, 0) || 0);
       }, 0) || 0;
       
@@ -560,8 +562,9 @@ const Home = () => {
         const agentName = sale.agent_name || "Unknown";
         const saleDate = sale.sale_datetime ? sale.sale_datetime.split("T")[0] : "";
         
+        // mapped_commission is already pre-multiplied by quantity, don't multiply again
         const saleCommission = sale.sale_items?.reduce((sum, item) => {
-          return sum + ((item.mapped_commission || 0) * (item.quantity || 1));
+          return sum + (item.mapped_commission || 0);
         }, 0) || 0;
         
         agentTotals[agentName] = (agentTotals[agentName] || 0) + saleCommission;
