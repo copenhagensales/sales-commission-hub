@@ -340,20 +340,46 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
   );
 };
 
+const CLIENT_LOGOS: Record<string, { name: string; logoUrl: string | null }> = {
+  "eesy-fm": {
+    name: "Eesy FM",
+    logoUrl: "https://jwlimmeijpfmaksvmuru.supabase.co/storage/v1/object/public/client-logos/logos/9a92ea4c-6404-4b58-be08-065e7552d552-1766068836963.avif",
+  },
+  "yousee": {
+    name: "Yousee",
+    logoUrl: null, // No logo uploaded yet
+  },
+};
+
 const FieldmarketingDashboard = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<string>("eesy-fm");
 
+  const activeClient = CLIENT_LOGOS[activeTab];
+
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            Fieldmarketing Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Oversigt over salg fra fieldmarketing events
-          </p>
+        <div className="flex items-center gap-6">
+          {activeClient?.logoUrl ? (
+            <img 
+              src={activeClient.logoUrl} 
+              alt={activeClient.name} 
+              className="h-16 w-auto object-contain"
+            />
+          ) : (
+            <div className="h-16 w-32 bg-muted rounded-lg flex items-center justify-center">
+              <span className="text-xl font-bold text-muted-foreground">{activeClient?.name}</span>
+            </div>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              Fieldmarketing Dashboard
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Oversigt over salg fra fieldmarketing events
+            </p>
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
