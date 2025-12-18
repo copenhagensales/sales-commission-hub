@@ -133,7 +133,6 @@ const getVagtFlowNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.bookings"), href: "/vagt-flow/bookings", icon: Calendar },
   { name: t("sidebar.locations"), href: "/vagt-flow/locations", icon: MapPin },
   { name: t("sidebar.vehicles"), href: "/vagt-flow/vehicles", icon: Car },
-  { name: t("sidebar.timeOff"), href: "/vagt-flow/time-off", icon: Clock },
   { name: t("sidebar.salesRegistration"), href: "/vagt-flow/sales-registration", icon: ShoppingCart },
   { name: t("sidebar.billing"), href: "/vagt-flow/billing", icon: Receipt },
 ];
