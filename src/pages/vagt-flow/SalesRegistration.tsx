@@ -34,6 +34,7 @@ interface TodayBooking {
   location: { id: string; name: string } | null;
   client: { id: string; name: string } | null;
   brand: { id: string; name: string; color_hex: string } | null;
+  campaign: { id: string; name: string } | null;
   startTime: string;
   endTime: string;
 }
@@ -83,7 +84,8 @@ const SalesRegistration = () => {
             id,
             location:location_id (id, name),
             client:client_id (id, name),
-            brand:brand_id (id, name, color_hex)
+            brand:brand_id (id, name, color_hex),
+            campaign:campaign_id (id, name)
           )
         `)
         .eq("employee_id", currentEmployee.id)
@@ -100,6 +102,7 @@ const SalesRegistration = () => {
         location: booking?.location || null,
         client: booking?.client || null,
         brand: booking?.brand || null,
+        campaign: booking?.campaign || null,
         startTime: assignment.start_time,
         endTime: assignment.end_time,
       } as TodayBooking;
@@ -127,13 +130,31 @@ const SalesRegistration = () => {
     },
   });
 
-  // Fetch products based on the campaign (brand) from today's booking
+  // Fetch products based on the campaign from today's booking
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ["campaign-products", todayBooking?.brand?.name],
+    queryKey: ["campaign-products", todayBooking?.campaign?.id, todayBooking?.brand?.name],
     queryFn: async () => {
+      // If booking has a direct campaign_id, use it
+      if (todayBooking?.campaign?.id) {
+        const { data, error } = await supabase
+          .from("products")
+          .select("id, name")
+          .eq("client_campaign_id", todayBooking.campaign.id)
+          .neq("name", "Lokation")
+          .order("name");
+        if (error) throw error;
+        
+        const seen = new Set<string>();
+        return (data || []).filter((p) => {
+          if (seen.has(p.name)) return false;
+          seen.add(p.name);
+          return true;
+        });
+      }
+      
+      // Fallback: search by brand name if no campaign_id
       if (!todayBooking?.brand?.name) return [];
       
-      // Find client_campaigns that match the brand name
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id, name")
@@ -147,11 +168,10 @@ const SalesRegistration = () => {
         .from("products")
         .select("id, name")
         .in("client_campaign_id", campaignIds)
-        .neq("name", "Lokation") // Exclude non-product items
+        .neq("name", "Lokation")
         .order("name");
       if (error) throw error;
       
-      // Deduplicate by product name (keep first occurrence)
       const seen = new Set<string>();
       return (data || []).filter((p) => {
         if (seen.has(p.name)) return false;
@@ -159,7 +179,7 @@ const SalesRegistration = () => {
         return true;
       });
     },
-    enabled: !!todayBooking?.brand?.name,
+    enabled: !!(todayBooking?.campaign?.id || todayBooking?.brand?.name),
   });
 
   const addProduct = (productId: string) => {
