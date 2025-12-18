@@ -731,20 +731,11 @@ const Home = () => {
 
         {/* Head to Head - Opt-in Section */}
         {showH2H ? (
-          <div className="relative">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => toggleH2H(false)}
-              className="absolute top-4 right-4 z-20 text-slate-400 hover:text-white hover:bg-slate-700/50"
-            >
-              Skjul
-            </Button>
-            <HeadToHeadComparison 
-              currentEmployeeId={employee?.id}
-              currentEmployeeName={employee ? `${employee.first_name} ${employee.last_name}` : undefined}
-            />
-          </div>
+          <HeadToHeadComparison 
+            currentEmployeeId={employee?.id}
+            currentEmployeeName={employee ? `${employee.first_name} ${employee.last_name}` : undefined}
+            onHide={() => toggleH2H(false)}
+          />
         ) : (
           <Card 
             className="border border-dashed border-slate-600/50 bg-gradient-to-r from-slate-900/50 to-slate-800/50 hover:border-amber-500/50 hover:from-slate-900/80 hover:to-slate-800/80 transition-all duration-300 cursor-pointer group"
