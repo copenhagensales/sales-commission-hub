@@ -37,6 +37,7 @@ import {
   VagtLocationDetail,
   VagtBilling,
   VagtSalesRegistration,
+  VagtFieldmarketingDashboard,
   ShiftOverview,
   MySchedule,
   AbsenceManagement,
@@ -130,6 +131,7 @@ export const routes: RouteConfig[] = [
   { path: "/vagt-flow/vehicles", component: VagtVehicles, access: "role", positionPermission: "menu_fm_vehicles" },
   { path: "/vagt-flow/time-off", component: VagtTimeOffRequests, access: "role", positionPermission: "menu_fm_time_off" },
   { path: "/vagt-flow/sales-registration", component: VagtSalesRegistration, access: "role", positionPermission: "menu_fm_sales_registration" },
+  { path: "/vagt-flow/fieldmarketing-dashboard", component: VagtFieldmarketingDashboard, access: "role", positionPermission: "menu_fm_sales_registration" },
   { path: "/vagt-flow/billing", component: VagtBilling, access: "role", positionPermission: "menu_fm_billing" },
   { path: "/vagt-flow/min-uge", component: VagtMinUge, access: "protected" },
 

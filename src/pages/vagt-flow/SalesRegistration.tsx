@@ -17,6 +17,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Minus, Phone, Save, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { useCreateFieldmarketingSale, FIELDMARKETING_CLIENTS } from "@/hooks/useFieldmarketingSales";
 
 interface ProductSelection {
   productId: string;
@@ -30,8 +31,26 @@ const SalesRegistration = () => {
   const navigate = useNavigate();
   const [sellerId, setSellerId] = useState<string>("");
   const [locationId, setLocationId] = useState<string>("");
+  const [clientId, setClientId] = useState<string>(FIELDMARKETING_CLIENTS.EESY_FM);
   const [comment, setComment] = useState("");
   const [productSelections, setProductSelections] = useState<ProductSelection[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const createSalesMutation = useCreateFieldmarketingSale();
+
+  // Fetch fieldmarketing clients
+  const { data: clients } = useQuery({
+    queryKey: ["fieldmarketing-clients"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name")
+        .in("id", [FIELDMARKETING_CLIENTS.EESY_FM, FIELDMARKETING_CLIENTS.YOUSEE])
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
 
   // Fetch fieldmarketing employees
   const { data: employees } = useQuery({
@@ -177,6 +196,10 @@ const SalesRegistration = () => {
       toast.error("Vælg en lokation");
       return;
     }
+    if (!clientId) {
+      toast.error("Vælg en kunde");
+      return;
+    }
     if (productSelections.length === 0) {
       toast.error("Tilføj mindst ét produkt");
       return;
@@ -191,20 +214,36 @@ const SalesRegistration = () => {
       return;
     }
 
-    // TODO: Save to database
-    toast.success("Salg registreret!");
-    console.log({
-      sellerId,
-      locationId,
-      comment,
-      products: productSelections,
-    });
+    setIsSubmitting(true);
+    
+    try {
+      // Create sales records - one per product/phone combination
+      const salesRecords = productSelections.flatMap((selection) =>
+        selection.phoneNumbers.map((phone) => ({
+          seller_id: sellerId,
+          location_id: locationId,
+          client_id: clientId,
+          product_name: selection.productName,
+          phone_number: phone.trim(),
+          comment: comment || undefined,
+        }))
+      );
 
-    // Reset form
-    setSellerId("");
-    setLocationId("");
-    setComment("");
-    setProductSelections([]);
+      await createSalesMutation.mutateAsync(salesRecords);
+      
+      toast.success(`${salesRecords.length} salg registreret!`);
+
+      // Reset form
+      setSellerId("");
+      setLocationId("");
+      setComment("");
+      setProductSelections([]);
+    } catch (error) {
+      console.error("Error saving sales:", error);
+      toast.error("Kunne ikke gemme salg");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const totalProducts = productSelections.reduce((sum, p) => sum + p.quantity, 0);
@@ -244,6 +283,23 @@ const SalesRegistration = () => {
                     {employees?.map((emp) => (
                       <SelectItem key={emp.id} value={emp.id}>
                         {emp.first_name} {emp.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Kunde */}
+              <div className="space-y-2">
+                <Label htmlFor="client">Kunde *</Label>
+                <Select value={clientId} onValueChange={setClientId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg kunde" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients?.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -383,10 +439,10 @@ const SalesRegistration = () => {
             onClick={handleSubmit}
             className="w-full"
             size="lg"
-            disabled={!sellerId || !locationId || productSelections.length === 0}
+            disabled={!sellerId || !locationId || !clientId || productSelections.length === 0 || isSubmitting}
           >
             <Save className="h-5 w-5 mr-2" />
-            Registrer salg
+            {isSubmitting ? "Gemmer..." : "Registrer salg"}
           </Button>
         </div>
       </div>

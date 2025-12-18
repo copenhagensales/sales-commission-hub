@@ -2242,6 +2242,64 @@ export type Database = {
           },
         ]
       }
+      fieldmarketing_sales: {
+        Row: {
+          client_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          location_id: string
+          phone_number: string
+          product_name: string
+          registered_at: string
+          seller_id: string
+        }
+        Insert: {
+          client_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          location_id: string
+          phone_number: string
+          product_name: string
+          registered_at?: string
+          seller_id: string
+        }
+        Update: {
+          client_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          location_id?: string
+          phone_number?: string
+          product_name?: string
+          registered_at?: string
+          seller_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fieldmarketing_sales_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fieldmarketing_sales_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fieldmarketing_sales_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fixed_costs: {
         Row: {
           active: boolean | null
