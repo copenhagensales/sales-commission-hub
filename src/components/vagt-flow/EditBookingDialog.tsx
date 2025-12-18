@@ -66,7 +66,7 @@ export function EditBookingDialog({
   const [comment, setComment] = useState<string>("");
   const [expectedStaffCount, setExpectedStaffCount] = useState<number>(1);
   const [clientId, setClientId] = useState<string>("");
-  const [brandId, setBrandId] = useState<string>("");
+  const [campaignId, setCampaignId] = useState<string>("");
 
   // Fetch fieldmarketing clients
   const { data: clients = [] } = useQuery({
@@ -90,19 +90,25 @@ export function EditBookingDialog({
     enabled: open,
   });
 
-  // Fetch brands
-  const { data: brands = [] } = useQuery({
-    queryKey: ["brands-edit"],
+  // Fetch campaigns for selected client
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ["client-campaigns-edit", clientId],
     queryFn: async () => {
+      if (!clientId) return [];
       const { data } = await supabase
-        .from("brand")
-        .select("id, name, color_hex")
-        .eq("is_active", true)
+        .from("client_campaigns")
+        .select("id, name")
+        .eq("client_id", clientId)
         .order("name");
       return data || [];
     },
-    enabled: open,
+    enabled: open && !!clientId,
   });
+
+  // Reset campaign when client changes
+  useEffect(() => {
+    setCampaignId("");
+  }, [clientId]);
 
   useEffect(() => {
     if (open && booking) {
@@ -111,7 +117,7 @@ export function EditBookingDialog({
       setComment(booking.comment || "");
       setExpectedStaffCount(booking.expected_staff_count || 1);
       setClientId(booking.client_id || "");
-      setBrandId(booking.brand_id || "");
+      setCampaignId((booking as any).campaign_id || "");
     }
   }, [open, booking]);
 
@@ -122,7 +128,7 @@ export function EditBookingDialog({
       comment: string | null;
       expected_staff_count: number;
       client_id: string | null;
-      brand_id: string | null;
+      campaign_id: string | null;
     }) => {
       if (!booking) throw new Error("No booking selected");
 
@@ -134,9 +140,8 @@ export function EditBookingDialog({
           comment: data.comment || null,
           expected_staff_count: data.expected_staff_count,
           client_id: data.client_id || null,
-          brand_id: data.brand_id || null,
           updated_at: new Date().toISOString(),
-        })
+        } as any)
         .eq("id", booking.id);
 
       if (error) throw error;
@@ -173,7 +178,7 @@ export function EditBookingDialog({
       comment: comment.trim() || null,
       expected_staff_count: expectedStaffCount,
       client_id: clientId || null,
-      brand_id: brandId || null,
+      campaign_id: campaignId || null,
     });
   };
 
@@ -209,23 +214,21 @@ export function EditBookingDialog({
             </Select>
           </div>
 
-          {/* Brand/Campaign */}
+          {/* Campaign */}
           <div className="space-y-2">
-            <Label>Kampagne/Brand</Label>
-            <Select value={brandId} onValueChange={setBrandId}>
+            <Label>Kampagne</Label>
+            <Select 
+              value={campaignId} 
+              onValueChange={setCampaignId}
+              disabled={!clientId}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Vælg kampagne" />
+                <SelectValue placeholder={clientId ? "Vælg kampagne" : "Vælg først en kunde"} />
               </SelectTrigger>
               <SelectContent>
-                {brands.map((brand: any) => (
-                  <SelectItem key={brand.id} value={brand.id}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: brand.color_hex }}
-                      />
-                      {brand.name}
-                    </div>
+                {campaigns.map((campaign: any) => (
+                  <SelectItem key={campaign.id} value={campaign.id}>
+                    {campaign.name}
                   </SelectItem>
                 ))}
               </SelectContent>
