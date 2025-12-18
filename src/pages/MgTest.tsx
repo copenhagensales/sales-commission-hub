@@ -198,6 +198,7 @@ export default function MgTest() {
   // Performance: limit visible items per section
   const ITEMS_PER_SECTION = 3;
   const [expandedProductSections, setExpandedProductSections] = useState<Record<string, boolean>>({});
+  const [productOverridesEnabled, setProductOverridesEnabled] = useState<Record<string, boolean>>({});
   const [expandedCampaignSections, setExpandedCampaignSections] = useState<Record<string, boolean>>({});
 
   // Field Inspector state
@@ -1934,13 +1935,14 @@ export default function MgTest() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="w-[24%]">{t("mgTest.adversusProductName")}</TableHead>
-                                <TableHead className="w-[12%]">{t("mgTest.externalId")}</TableHead>
-                                <TableHead className="w-[18%]">{t("mgTest.customer")}</TableHead>
-                                <TableHead className="w-[11%]">{t("mgTest.commission")}</TableHead>
-                                <TableHead className="w-[11%]">{t("mgTest.cpoRevenue")}</TableHead>
-                                <TableHead className="w-[14%] text-center">{t("mgTest.countAsSale")}</TableHead>
-                                <TableHead className="w-[10%] text-center"></TableHead>
+                                <TableHead className="w-[22%]">{t("mgTest.adversusProductName")}</TableHead>
+                                <TableHead className="w-[10%]">{t("mgTest.externalId")}</TableHead>
+                                <TableHead className="w-[16%]">{t("mgTest.customer")}</TableHead>
+                                <TableHead className="w-[10%]">{t("mgTest.commission")}</TableHead>
+                                <TableHead className="w-[10%]">{t("mgTest.cpoRevenue")}</TableHead>
+                                <TableHead className="w-[12%] text-center">{t("mgTest.countAsSale")}</TableHead>
+                                <TableHead className="w-[12%] text-center">Kamp. provi</TableHead>
+                                <TableHead className="w-[8%] text-center"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -2082,6 +2084,19 @@ export default function MgTest() {
                                         />
                                       </TableCell>
                                       <TableCell className="text-center">
+                                        {row.product?.id && (
+                                          <Checkbox
+                                            checked={productOverridesEnabled[row.product.id] ?? false}
+                                            onCheckedChange={(checked) => {
+                                              setProductOverridesEnabled(prev => ({
+                                                ...prev,
+                                                [row.product!.id]: checked === true,
+                                              }));
+                                            }}
+                                          />
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="text-center">
                                         {row.isManual && row.product?.id && !row.sale_source && (
                                           <Button
                                             variant="ghost"
@@ -2099,9 +2114,9 @@ export default function MgTest() {
                                         )}
                                       </TableCell>
                                     </TableRow>
-                                    {row.product?.id && (
+                                    {row.product?.id && productOverridesEnabled[row.product.id] && (
                                       <TableRow key={`${row.key}-overrides`} className="hover:bg-transparent">
-                                        <TableCell colSpan={7} className="pt-0 pb-2">
+                                        <TableCell colSpan={8} className="pt-0 pb-2">
                                           <ProductCampaignOverrides
                                             productId={row.product.id}
                                             productName={row.product.name || row.adversus_product_title || "Produkt"}
