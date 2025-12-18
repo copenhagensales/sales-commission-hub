@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -16,16 +16,27 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Minus, Phone, Save, ArrowLeft } from "lucide-react";
+import { Plus, Minus, Phone, Save, ArrowLeft, MapPin, Building2, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateFieldmarketingSale, FIELDMARKETING_CLIENTS } from "@/hooks/useFieldmarketingSales";
 import { useAuth } from "@/hooks/useAuth";
+import { format } from "date-fns";
+import { da } from "date-fns/locale";
 
 interface ProductSelection {
   productId: string;
   productName: string;
   quantity: number;
   phoneNumbers: string[];
+}
+
+interface TodayBooking {
+  id: string;
+  location: { id: string; name: string } | null;
+  client: { id: string; name: string } | null;
+  brand: { id: string; name: string; color_hex: string } | null;
+  startTime: string;
+  endTime: string;
 }
 
 const SalesRegistration = () => {
@@ -39,6 +50,7 @@ const SalesRegistration = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const createSalesMutation = useCreateFieldmarketingSale();
+  const today = format(new Date(), "yyyy-MM-dd");
 
   // Get current employee ID from logged-in user
   const { data: currentEmployee } = useQuery({
@@ -56,6 +68,53 @@ const SalesRegistration = () => {
     },
     enabled: !!user?.email,
   });
+
+  // Fetch today's booking assignment for the current employee
+  const { data: todayBooking } = useQuery({
+    queryKey: ["today-booking-assignment", currentEmployee?.id, today],
+    queryFn: async () => {
+      if (!currentEmployee?.id) return null;
+      
+      const { data: assignment, error } = await supabase
+        .from("booking_assignment")
+        .select(`
+          id,
+          start_time,
+          end_time,
+          booking:booking_id (
+            id,
+            location:location_id (id, name),
+            client:client_id (id, name),
+            brand:brand_id (id, name, color_hex)
+          )
+        `)
+        .eq("employee_id", currentEmployee.id)
+        .eq("date", today)
+        .maybeSingle();
+      
+      if (error) throw error;
+      if (!assignment) return null;
+
+      const booking = assignment.booking as any;
+      
+      return {
+        id: assignment.id,
+        location: booking?.location || null,
+        client: booking?.client || null,
+        brand: booking?.brand || null,
+        startTime: assignment.start_time,
+        endTime: assignment.end_time,
+      } as TodayBooking;
+    },
+    enabled: !!currentEmployee?.id,
+  });
+
+  // Auto-set location when today's booking is loaded
+  useEffect(() => {
+    if (todayBooking?.location?.id && !locationId) {
+      setLocationId(todayBooking.location.id);
+    }
+  }, [todayBooking, locationId]);
 
   // Fetch locations
   const { data: locations } = useQuery({
@@ -409,6 +468,72 @@ const SalesRegistration = () => {
           )}
         </div>
       </div>
+
+      {/* Today's booking info card */}
+      {todayBooking && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <span className="text-primary">Dagens vagt</span>
+              <span className="text-muted-foreground text-sm font-normal">
+                ({format(new Date(), "EEEE d. MMMM", { locale: da })})
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {todayBooking.location && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Lokation</p>
+                    <p className="font-medium">{todayBooking.location.name}</p>
+                  </div>
+                </div>
+              )}
+              {todayBooking.client && (
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Kunde</p>
+                    <p className="font-medium">{todayBooking.client.name}</p>
+                  </div>
+                </div>
+              )}
+              {todayBooking.brand && (
+                <div className="flex items-center gap-2">
+                  <Tag className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Kampagne</p>
+                    <p className="font-medium flex items-center gap-2">
+                      <span 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: todayBooking.brand.color_hex }}
+                      />
+                      {todayBooking.brand.name}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+            {todayBooking.startTime && todayBooking.endTime && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Arbejdstid: {todayBooking.startTime.slice(0, 5)} - {todayBooking.endTime.slice(0, 5)}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {!todayBooking && currentEmployee && (
+        <Card className="border-muted bg-muted/20">
+          <CardContent className="py-4">
+            <p className="text-sm text-muted-foreground text-center">
+              Ingen booking fundet for i dag. Vælg lokation manuelt nedenfor.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={activeClient} onValueChange={handleClientChange}>
         <TabsList className="grid w-full max-w-md grid-cols-2">
