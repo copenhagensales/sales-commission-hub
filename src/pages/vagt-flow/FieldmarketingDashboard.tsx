@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -208,37 +209,39 @@ const FieldmarketingDashboard = () => {
   const [activeTab, setActiveTab] = useState<string>("eesy-fm");
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          Fieldmarketing Dashboard
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Oversigt over salg fra fieldmarketing events
-        </p>
+    <MainLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            Fieldmarketing Dashboard
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Oversigt over salg fra fieldmarketing events
+          </p>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="eesy-fm">Eesy FM</TabsTrigger>
+            <TabsTrigger value="yousee">Yousee</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="eesy-fm" className="mt-6">
+            <ClientDashboard 
+              clientId={FIELDMARKETING_CLIENTS.EESY_FM} 
+              clientName="Eesy FM" 
+            />
+          </TabsContent>
+
+          <TabsContent value="yousee" className="mt-6">
+            <ClientDashboard 
+              clientId={FIELDMARKETING_CLIENTS.YOUSEE} 
+              clientName="Yousee" 
+            />
+          </TabsContent>
+        </Tabs>
       </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="eesy-fm">Eesy FM</TabsTrigger>
-          <TabsTrigger value="yousee">Yousee</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="eesy-fm" className="mt-6">
-          <ClientDashboard 
-            clientId={FIELDMARKETING_CLIENTS.EESY_FM} 
-            clientName="Eesy FM" 
-          />
-        </TabsContent>
-
-        <TabsContent value="yousee" className="mt-6">
-          <ClientDashboard 
-            clientId={FIELDMARKETING_CLIENTS.YOUSEE} 
-            clientName="Yousee" 
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
+    </MainLayout>
   );
 };
 
