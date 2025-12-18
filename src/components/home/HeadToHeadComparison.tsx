@@ -28,7 +28,7 @@ interface HeadToHeadComparisonProps {
   onHide?: () => void;
 }
 
-type PeriodType = "today" | "week";
+type PeriodType = "today" | "week" | "target";
 type BattleMode = "1v1" | "team";
 
 // Player role types based on performance
@@ -84,6 +84,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
   const [setupOpponent, setSetupOpponent] = useState<string>("");
   const [setupPeriod, setSetupPeriod] = useState<PeriodType>("today");
   const [setupComment, setSetupComment] = useState("");
+  const [setupTargetCommission, setSetupTargetCommission] = useState<number>(1000);
   const [activeChallengeId, setActiveChallengeId] = useState<string | null>(initialState?.activeChallengeId ?? null);
   const [matchStartTime, setMatchStartTime] = useState<string | null>(initialState?.matchStartTime ?? null);
 
@@ -136,13 +137,14 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
 
   // Create challenge mutation
   const createChallengeMutation = useMutation({
-    mutationFn: async ({ opponentId, battleMode, period, comment }: { opponentId: string; battleMode: string; period: string; comment: string }) => {
+    mutationFn: async ({ opponentId, battleMode, period, comment, targetCommission }: { opponentId: string; battleMode: string; period: string; comment: string; targetCommission?: number }) => {
       const { error } = await supabase.from("h2h_challenges").insert({
         challenger_employee_id: currentEmployeeId,
         opponent_employee_id: opponentId,
         battle_mode: battleMode,
         period: period,
         comment: comment || null,
+        target_commission: period === "target" ? targetCommission : null,
       });
       if (error) throw error;
     },
@@ -1401,32 +1403,65 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
             {/* Period Selection */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-300">Kampperiode</label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => setSetupPeriod("today")}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all ${
                     setupPeriod === "today" 
                       ? "bg-blue-500/20 border-blue-400/50 text-blue-400" 
                       : "bg-slate-800/50 border-slate-600/50 text-slate-400 hover:border-slate-500"
                   }`}
                 >
-                  <CalendarDays className="w-6 h-6" />
-                  <span className="text-sm font-medium">I dag</span>
-                  <span className="text-[10px] text-slate-500">Fra nu til midnat</span>
+                  <CalendarDays className="w-5 h-5" />
+                  <span className="text-xs font-medium">I dag</span>
+                  <span className="text-[9px] text-slate-500">Til midnat</span>
                 </button>
                 <button
                   onClick={() => setSetupPeriod("week")}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all ${
                     setupPeriod === "week" 
                       ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-400" 
                       : "bg-slate-800/50 border-slate-600/50 text-slate-400 hover:border-slate-500"
                   }`}
                 >
-                  <CalendarRange className="w-6 h-6" />
-                  <span className="text-sm font-medium">Denne uge</span>
-                  <span className="text-[10px] text-slate-500">Fra nu til søndag</span>
+                  <CalendarRange className="w-5 h-5" />
+                  <span className="text-xs font-medium">Denne uge</span>
+                  <span className="text-[9px] text-slate-500">Til søndag</span>
+                </button>
+                <button
+                  onClick={() => setSetupPeriod("target")}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all ${
+                    setupPeriod === "target" 
+                      ? "bg-amber-500/20 border-amber-400/50 text-amber-400" 
+                      : "bg-slate-800/50 border-slate-600/50 text-slate-400 hover:border-slate-500"
+                  }`}
+                >
+                  <Target className="w-5 h-5" />
+                  <span className="text-xs font-medium">Først til mål</span>
+                  <span className="text-[9px] text-slate-500">Provision</span>
                 </button>
               </div>
+              
+              {/* Target commission input */}
+              {setupPeriod === "target" && (
+                <div className="mt-3 p-3 bg-amber-500/10 border border-amber-400/30 rounded-lg">
+                  <label className="text-xs font-medium text-amber-300 block mb-2">
+                    Provisionsmål (DKK)
+                  </label>
+                  <Input
+                    type="number"
+                    min={100}
+                    step={100}
+                    value={setupTargetCommission}
+                    onChange={(e) => setSetupTargetCommission(parseInt(e.target.value) || 1000)}
+                    className="bg-slate-800 border-amber-500/30 text-white text-center font-bold"
+                    placeholder="1000"
+                  />
+                  <p className="text-[10px] text-amber-400/70 mt-1 text-center">
+                    Første til {setupTargetCommission.toLocaleString()} kr i provision vinder!
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Comment/Stake */}
@@ -1458,10 +1493,14 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                       opponentId: opponentEmployeeId,
                       battleMode: battleMode,
                       period: setupPeriod,
-                      comment: setupComment
+                      comment: setupComment,
+                      targetCommission: setupPeriod === "target" ? setupTargetCommission : undefined
                     });
+                    const periodText = setupPeriod === "target" 
+                      ? `Først til ${setupTargetCommission.toLocaleString()} kr!` 
+                      : setupPeriod === "today" ? "i dag" : "denne uge";
                     toast.success(`⚔️ Invitation sendt!`, {
-                      description: `${opponentAgent?.name} vil modtage din udfordring. Duellen starter når de accepterer.`
+                      description: `${opponentAgent?.name} vil modtage din udfordring (${periodText}). Duellen starter når de accepterer.`
                     });
                     
                     // Only set up local state if no match is currently active
