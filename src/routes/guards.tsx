@@ -77,12 +77,7 @@ export function wrapWithGuard(
   if (meta.access === "auth") return <AuthRoute>{element}</AuthRoute>;
   if (meta.access === "protected") return <ProtectedRoute>{element}</ProtectedRoute>;
   if (meta.access === "role") {
-    if (meta.requiredRole) {
-      return <RoleProtectedRoute requiredRole={meta.requiredRole} positionPermission={meta.positionPermission}>{element}</RoleProtectedRoute>;
-    }
-    if (meta.requireTeamlederOrAbove) {
-      return <RoleProtectedRoute requireTeamlederOrAbove positionPermission={meta.positionPermission}>{element}</RoleProtectedRoute>;
-    }
+    // Only use position permissions - system roles are no longer used
     return <RoleProtectedRoute positionPermission={meta.positionPermission}>{element}</RoleProtectedRoute>;
   }
   return element;
