@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Loader2, ChevronDown, Search, Plus, Trash2 } from "lucide-react";
+import { Loader2, ChevronDown, Search, Plus, Trash2, Upload, ImageIcon, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -98,6 +98,7 @@ interface ClientCampaignRow {
 interface ClientRow {
   id: string;
   name: string;
+  logo_url: string | null;
 }
 
 interface AgentRow {
@@ -288,13 +289,32 @@ export default function MgTest() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name")
+        .select("id, name, logo_url")
         .order("name");
 
       if (error) throw error;
       return data as ClientRow[];
     },
   });
+
+  // Hent team_clients for at vise hvilke teams der har kunden tildelt
+  const { data: teamClientsMap = [] } = useQuery({
+    queryKey: ["team-clients-for-customers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_clients")
+        .select("team_id, client_id, teams!inner(id, name)");
+      if (error) throw error;
+      return data as { team_id: string; client_id: string; teams: { id: string; name: string } }[];
+    },
+  });
+
+  // Helper to get teams for a client
+  const getTeamsForClient = (clientId: string) => {
+    return teamClientsMap
+      .filter((tc) => tc.client_id === clientId)
+      .map((tc) => tc.teams);
+  };
 
   // Hent alle interne kampagner + kunder
   const { data: clientCampaigns, isLoading: loadingClientCampaigns } = useQuery<ClientCampaignRow[]>({
@@ -1704,19 +1724,24 @@ export default function MgTest() {
   });
 
   const updateClientMutation = useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+    mutationFn: async ({ id, name, logo_url }: { id: string; name: string; logo_url?: string | null }) => {
       const trimmed = name.trim();
       if (!trimmed) throw new Error("Kundenavn må ikke være tomt");
 
+      const updateData: { name: string; logo_url?: string | null } = { name: trimmed };
+      if (logo_url !== undefined) {
+        updateData.logo_url = logo_url;
+      }
+
       const { error } = await supabase
         .from("clients")
-        .update({ name: trimmed })
+        .update(updateData)
         .eq("id", id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Kundenavn opdateret");
+      toast.success("Kunde opdateret");
       setEditingClientId(null);
       setEditingClientName("");
       queryClient.invalidateQueries({ queryKey: ["mg-clients"] });
@@ -1726,6 +1751,28 @@ export default function MgTest() {
       toast.error(error?.message || "Kunne ikke opdatere kunde");
     },
   });
+
+  // Upload client logo
+  const uploadClientLogo = async (clientId: string, file: File): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${clientId}-${Date.now()}.${fileExt}`;
+    const filePath = `logos/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('client-logos')
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadError) {
+      toast.error("Kunne ikke uploade logo");
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('client-logos')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  };
 
   const deleteClientMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -2548,24 +2595,100 @@ export default function MgTest() {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead className="w-[60px]">Logo</TableHead>
                           <TableHead>Kundenavn</TableHead>
+                          <TableHead>Teams</TableHead>
                           <TableHead className="w-[200px] text-right">Handling</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {clients.map((client) => {
                           const isEditing = editingClientId === client.id;
+                          const clientTeams = getTeamsForClient(client.id);
                           return (
                             <TableRow key={client.id}>
                               <TableCell>
-                                {isEditing ? (
-                                  <Input
-                                    value={editingClientName}
-                                    onChange={(e) => setEditingClientName(e.target.value)}
-                                    autoFocus
+                                {client.logo_url ? (
+                                  <img
+                                    src={client.logo_url}
+                                    alt={`${client.name} logo`}
+                                    className="h-8 w-8 object-contain rounded"
                                   />
                                 ) : (
+                                  <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
+                                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {isEditing ? (
+                                  <div className="space-y-2">
+                                    <Input
+                                      value={editingClientName}
+                                      onChange={(e) => setEditingClientName(e.target.value)}
+                                      autoFocus
+                                    />
+                                    <div className="flex items-center gap-2">
+                                      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                                        <Upload className="h-3.5 w-3.5" />
+                                        Upload logo
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                              const url = await uploadClientLogo(client.id, file);
+                                              if (url) {
+                                                updateClientMutation.mutate({
+                                                  id: client.id,
+                                                  name: editingClientName,
+                                                  logo_url: url,
+                                                });
+                                              }
+                                            }
+                                          }}
+                                        />
+                                      </label>
+                                      {client.logo_url && (
+                                        <button
+                                          type="button"
+                                          className="text-xs text-destructive hover:underline"
+                                          onClick={() => {
+                                            updateClientMutation.mutate({
+                                              id: client.id,
+                                              name: editingClientName,
+                                              logo_url: null,
+                                            });
+                                          }}
+                                        >
+                                          Fjern logo
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
                                   <span className="font-medium">{client.name}</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {clientTeams.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {clientTeams.slice(0, 3).map((team) => (
+                                      <Badge key={team.id} variant="secondary" className="text-xs">
+                                        <Users className="h-3 w-3 mr-1" />
+                                        {team.name}
+                                      </Badge>
+                                    ))}
+                                    {clientTeams.length > 3 && (
+                                      <Badge variant="outline" className="text-xs">
+                                        +{clientTeams.length - 3}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">Ingen teams</span>
                                 )}
                               </TableCell>
                               <TableCell className="text-right space-x-2">
