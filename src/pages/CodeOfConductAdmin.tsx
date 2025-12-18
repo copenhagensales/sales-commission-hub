@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCanAccess } from "@/hooks/useSystemRoles";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -42,7 +42,7 @@ interface CodeOfConductQuestion {
 }
 
 export default function CodeOfConductAdmin() {
-  const { isOwner, isTeamlederOrAbove } = useCanAccess();
+  const { scopeQuiz, canViewCocAdmin } = usePermissions();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set([1]));
@@ -84,7 +84,7 @@ export default function CodeOfConductAdmin() {
 
   // Fetch all Salgskonsulenter with their Code of Conduct status
   const { data: employees, isLoading } = useQuery({
-    queryKey: ["code-of-conduct-admin", currentEmployeeId, isOwner],
+    queryKey: ["code-of-conduct-admin", currentEmployeeId, scopeQuiz],
     queryFn: async () => {
       // Get all Salgskonsulenter
       let query = supabase
@@ -93,8 +93,8 @@ export default function CodeOfConductAdmin() {
         .eq("is_active", true)
         .eq("job_title", "Salgskonsulent");
 
-      // If not owner, filter by manager_id (teamleder can only see their team)
-      if (!isOwner && currentEmployeeId) {
+      // If scope is not "alt", filter by manager_id (teamleder can only see their team)
+      if (scopeQuiz !== "alt" && currentEmployeeId) {
         query = query.eq("manager_id", currentEmployeeId);
       }
 
@@ -161,7 +161,7 @@ export default function CodeOfConductAdmin() {
         } as EmployeeWithStatus;
       });
     },
-    enabled: isTeamlederOrAbove && !!currentEmployeeId,
+    enabled: canViewCocAdmin && !!currentEmployeeId,
   });
 
   // Filter employees by search
@@ -241,7 +241,7 @@ export default function CodeOfConductAdmin() {
     setQuestions(prev => prev.filter(q => q.id !== id));
   };
 
-  if (!isTeamlederOrAbove) {
+  if (!canViewCocAdmin) {
     return (
       <MainLayout>
         <div className="container mx-auto">
@@ -266,7 +266,7 @@ export default function CodeOfConductAdmin() {
           <div>
             <h1 className="text-2xl font-bold">Code of Conduct Overblik</h1>
             <p className="text-muted-foreground">
-              {isOwner ? "Alle salgskonsulenter" : "Dit team"}
+              {scopeQuiz === "alt" ? "Alle salgskonsulenter" : "Dit team"}
             </p>
           </div>
         </div>
