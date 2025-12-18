@@ -75,6 +75,8 @@ import {
   ClosingShifts,
   Permissions,
   RolePreview,
+  TeamDashboard,
+  FieldmarketingDashboardFull,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -161,6 +163,11 @@ export const routes: RouteConfig[] = [
   { path: "/boards/economic", component: EconomicBoard, access: "public" },
   { path: "/client-sales-overview", component: ClientSalesOverview, access: "role", positionPermission: "menu_sales" },
   { path: "/boards/sales", component: SalesDashboard, access: "public" },
+  
+  // Team Dashboards (full screen, no sidebar)
+  { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "role", positionPermission: "menu_fm_sales_registration" },
+  { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "role", positionPermission: "menu_dashboard" },
+  
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
 
   { path: "/closing-shifts", component: ClosingShifts, access: "role", positionPermission: "menu_closing_shifts" },

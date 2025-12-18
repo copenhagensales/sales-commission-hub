@@ -86,3 +86,7 @@ export const Permissions = lazyPage(() => import("@/pages/Permissions"));
 
 export const RolePreview = lazyPage(() => import("@/pages/RolePreview"));
 
+// Team Dashboards
+export const TeamDashboard = lazyPage(() => import("@/pages/dashboards/TeamDashboard"));
+export const FieldmarketingDashboardFull = lazyPage(() => import("@/pages/dashboards/FieldmarketingDashboardFull"));
+
