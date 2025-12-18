@@ -24,7 +24,8 @@ import {
   CalendarDays,
   Plus,
   Trash2,
-  Swords
+  Swords,
+  Zap
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -528,14 +529,17 @@ const Home = () => {
     },
   });
 
-  // Fetch weekly recognition data
+  // Fetch weekly recognition data for both last week and current week
   const { data: weeklyRecognition } = useQuery({
     queryKey: ["home-weekly-recognition"],
     queryFn: async () => {
       const now = new Date();
       const lastWeekStart = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 }).toISOString();
       const lastWeekEnd = endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 }).toISOString();
+      const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 }).toISOString();
+      const currentWeekEnd = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
       
+      // Fetch sales for both weeks
       const { data: sales } = await supabase
         .from("sales")
         .select(`
@@ -549,65 +553,88 @@ const Home = () => {
           )
         `)
         .gte("sale_datetime", lastWeekStart)
-        .lte("sale_datetime", lastWeekEnd);
+        .lte("sale_datetime", currentWeekEnd);
       
       if (!sales || sales.length === 0) {
-        return { topWeekly: null, bestDay: null };
+        return { lastWeek: { topWeekly: null, bestDay: null }, currentWeek: { topWeekly: null, bestDay: null } };
       }
       
-      const agentTotals: Record<string, number> = {};
-      const agentDailyTotals: Record<string, Record<string, number>> = {};
-      
-      sales.forEach(sale => {
-        const agentName = sale.agent_name || "Unknown";
-        const saleDate = sale.sale_datetime ? sale.sale_datetime.split("T")[0] : "";
+      // Helper to process sales for a specific week
+      const processWeekSales = (weekSales: typeof sales) => {
+        const agentTotals: Record<string, number> = {};
+        const agentDailyTotals: Record<string, Record<string, number>> = {};
         
-        // mapped_commission is already pre-multiplied by quantity, don't multiply again
-        const saleCommission = sale.sale_items?.reduce((sum, item) => {
-          return sum + (item.mapped_commission || 0);
-        }, 0) || 0;
+        weekSales.forEach(sale => {
+          const agentName = sale.agent_name || "Unknown";
+          const saleDate = sale.sale_datetime ? sale.sale_datetime.split("T")[0] : "";
+          
+          // mapped_commission is already pre-multiplied by quantity, don't multiply again
+          const saleCommission = sale.sale_items?.reduce((sum, item) => {
+            return sum + (item.mapped_commission || 0);
+          }, 0) || 0;
+          
+          agentTotals[agentName] = (agentTotals[agentName] || 0) + saleCommission;
+          
+          if (!agentDailyTotals[agentName]) {
+            agentDailyTotals[agentName] = {};
+          }
+          agentDailyTotals[agentName][saleDate] = (agentDailyTotals[agentName][saleDate] || 0) + saleCommission;
+        });
         
-        agentTotals[agentName] = (agentTotals[agentName] || 0) + saleCommission;
-        
-        if (!agentDailyTotals[agentName]) {
-          agentDailyTotals[agentName] = {};
-        }
-        agentDailyTotals[agentName][saleDate] = (agentDailyTotals[agentName][saleDate] || 0) + saleCommission;
-      });
-      
-      let topWeeklyAgent = "";
-      let topWeeklyCommission = 0;
-      Object.entries(agentTotals).forEach(([agent, total]) => {
-        if (total > topWeeklyCommission) {
-          topWeeklyCommission = total;
-          topWeeklyAgent = agent;
-        }
-      });
-      
-      let bestDayAgent = "";
-      let bestDayDate = "";
-      let bestDayCommission = 0;
-      Object.entries(agentDailyTotals).forEach(([agent, days]) => {
-        Object.entries(days).forEach(([date, total]) => {
-          if (total > bestDayCommission) {
-            bestDayCommission = total;
-            bestDayAgent = agent;
-            bestDayDate = date;
+        let topWeeklyAgent = "";
+        let topWeeklyCommission = 0;
+        Object.entries(agentTotals).forEach(([agent, total]) => {
+          if (total > topWeeklyCommission) {
+            topWeeklyCommission = total;
+            topWeeklyAgent = agent;
           }
         });
+        
+        let bestDayAgent = "";
+        let bestDayDate = "";
+        let bestDayCommission = 0;
+        Object.entries(agentDailyTotals).forEach(([agent, days]) => {
+          Object.entries(days).forEach(([date, total]) => {
+            if (total > bestDayCommission) {
+              bestDayCommission = total;
+              bestDayAgent = agent;
+              bestDayDate = date;
+            }
+          });
+        });
+        
+        return { topWeeklyAgent, topWeeklyCommission, bestDayAgent, bestDayDate, bestDayCommission };
+      };
+      
+      // Filter sales by week
+      const lastWeekSales = sales.filter(s => {
+        const dt = s.sale_datetime;
+        return dt && dt >= lastWeekStart && dt <= lastWeekEnd;
+      });
+      const currentWeekSales = sales.filter(s => {
+        const dt = s.sale_datetime;
+        return dt && dt >= currentWeekStart && dt <= currentWeekEnd;
       });
       
-      const agentNames = [topWeeklyAgent, bestDayAgent].filter(Boolean);
+      const lastWeekData = processWeekSales(lastWeekSales);
+      const currentWeekData = processWeekSales(currentWeekSales);
+      
+      // Get all unique agent names for team lookup
+      const allAgentNames = [
+        lastWeekData.topWeeklyAgent, lastWeekData.bestDayAgent,
+        currentWeekData.topWeeklyAgent, currentWeekData.bestDayAgent
+      ].filter(Boolean);
+      
       const { data: agents } = await supabase
         .from("agents")
         .select("name, email")
-        .in("name", agentNames);
+        .in("name", allAgentNames.length > 0 ? allAgentNames : ["__none__"]);
       
       const agentEmails = agents?.map(a => a.email).filter(Boolean) || [];
-      const { data: employees } = await supabase
+      const { data: employees } = agentEmails.length > 0 ? await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, work_email, private_email, team_id, teams:team_id(name)")
-        .or(agentEmails.map(e => `work_email.eq.${e},private_email.eq.${e}`).join(",") || "id.is.null");
+        .or(agentEmails.map(e => `work_email.eq.${e},private_email.eq.${e}`).join(",")) : { data: [] };
       
       const getTeamForAgent = (agentName: string) => {
         const agent = agents?.find(a => a.name === agentName);
@@ -617,17 +644,32 @@ const Home = () => {
       };
       
       return {
-        topWeekly: topWeeklyAgent ? {
-          name: topWeeklyAgent,
-          commission: topWeeklyCommission,
-          team: getTeamForAgent(topWeeklyAgent)?.name || null
-        } : null,
-        bestDay: bestDayAgent ? {
-          name: bestDayAgent,
-          date: bestDayDate,
-          commission: bestDayCommission,
-          team: getTeamForAgent(bestDayAgent)?.name || null
-        } : null
+        lastWeek: {
+          topWeekly: lastWeekData.topWeeklyAgent ? {
+            name: lastWeekData.topWeeklyAgent,
+            commission: lastWeekData.topWeeklyCommission,
+            team: getTeamForAgent(lastWeekData.topWeeklyAgent)?.name || null
+          } : null,
+          bestDay: lastWeekData.bestDayAgent ? {
+            name: lastWeekData.bestDayAgent,
+            date: lastWeekData.bestDayDate,
+            commission: lastWeekData.bestDayCommission,
+            team: getTeamForAgent(lastWeekData.bestDayAgent)?.name || null
+          } : null
+        },
+        currentWeek: {
+          topWeekly: currentWeekData.topWeeklyAgent ? {
+            name: currentWeekData.topWeeklyAgent,
+            commission: currentWeekData.topWeeklyCommission,
+            team: getTeamForAgent(currentWeekData.topWeeklyAgent)?.name || null
+          } : null,
+          bestDay: currentWeekData.bestDayAgent ? {
+            name: currentWeekData.bestDayAgent,
+            date: currentWeekData.bestDayDate,
+            commission: currentWeekData.bestDayCommission,
+            team: getTeamForAgent(currentWeekData.bestDayAgent)?.name || null
+          } : null
+        }
       };
     },
   });
@@ -950,66 +992,105 @@ const Home = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Employee of the Week */}
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
-                <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900/50">
-                  <Award className="w-6 h-6 text-amber-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-amber-700 dark:text-amber-400 uppercase tracking-wider">Ugens medarbejder</p>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-amber-900 dark:text-amber-100">{weeklyRecognition?.topWeekly?.name || "Ingen data"}</p>
-                    {weeklyRecognition?.topWeekly?.team && (
-                      <Badge variant="secondary" className="text-xs">{weeklyRecognition.topWeekly.team}</Badge>
-                    )}
+              {/* Employee of the Week - Last Week */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Top medarbejder</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Last Week */}
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
+                    <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900/50">
+                      <Award className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-amber-700 dark:text-amber-400 uppercase tracking-wider">Sidste uge</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="font-semibold text-sm text-amber-900 dark:text-amber-100 truncate">
+                          {weeklyRecognition?.lastWeek?.topWeekly?.name || "Ingen data"}
+                        </p>
+                        {weeklyRecognition?.lastWeek?.topWeekly?.team && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5">{weeklyRecognition.lastWeek.topWeekly.team}</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        {weeklyRecognition?.lastWeek?.topWeekly 
+                          ? formatCommission(weeklyRecognition.lastWeek.topWeekly.commission)
+                          : "—"}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm text-amber-700 dark:text-amber-300">
-                    {weeklyRecognition?.topWeekly 
-                      ? `Højeste provision: ${formatCommission(weeklyRecognition.topWeekly.commission)}`
-                      : "Mest provision i sidste uge"}
-                  </p>
+                  {/* Current Week */}
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 border-2 border-amber-200 dark:border-amber-800">
+                    <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900/50">
+                      <Zap className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-orange-700 dark:text-orange-400 uppercase tracking-wider">Denne uge</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="font-semibold text-sm text-orange-900 dark:text-orange-100 truncate">
+                          {weeklyRecognition?.currentWeek?.topWeekly?.name || "Ingen data endnu"}
+                        </p>
+                        {weeklyRecognition?.currentWeek?.topWeekly?.team && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5">{weeklyRecognition.currentWeek.topWeekly.team}</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-orange-700 dark:text-orange-300">
+                        {weeklyRecognition?.currentWeek?.topWeekly 
+                          ? formatCommission(weeklyRecognition.currentWeek.topWeekly.commission)
+                          : "—"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Best Day of the Week */}
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
-                <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/50">
-                  <CalendarDays className="w-6 h-6 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-blue-700 dark:text-blue-400 uppercase tracking-wider">Ugens bedste dag</p>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-blue-900 dark:text-blue-100">{weeklyRecognition?.bestDay?.name || "Ingen data"}</p>
-                    {weeklyRecognition?.bestDay?.team && (
-                      <Badge variant="secondary" className="text-xs">{weeklyRecognition.bestDay.team}</Badge>
-                    )}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Bedste dag</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Last Week */}
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
+                    <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/50">
+                      <CalendarDays className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-blue-700 dark:text-blue-400 uppercase tracking-wider">Sidste uge</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="font-semibold text-sm text-blue-900 dark:text-blue-100 truncate">
+                          {weeklyRecognition?.lastWeek?.bestDay?.name || "Ingen data"}
+                        </p>
+                        {weeklyRecognition?.lastWeek?.bestDay?.team && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5">{weeklyRecognition.lastWeek.bestDay.team}</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        {weeklyRecognition?.lastWeek?.bestDay 
+                          ? `${formatDateLong(weeklyRecognition.lastWeek.bestDay.date)} - ${formatCommission(weeklyRecognition.lastWeek.bestDay.commission)}`
+                          : "—"}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
-                    {weeklyRecognition?.bestDay 
-                      ? `${formatDateLong(weeklyRecognition.bestDay.date)} - ${formatCommission(weeklyRecognition.bestDay.commission)}`
-                      : "Bedste enkeltdag i sidste uge"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Deal of the Week */}
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
-                <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/50">
-                  <Sparkles className="w-6 h-6 text-green-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-green-700 dark:text-green-400 uppercase tracking-wider">Ugens handel</p>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-green-900 dark:text-green-100">{weeklyRecognition?.bestDay?.name || "Ingen data"}</p>
-                    {weeklyRecognition?.bestDay?.team && (
-                      <Badge variant="secondary" className="text-xs">{weeklyRecognition.bestDay.team}</Badge>
-                    )}
+                  {/* Current Week */}
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-950/30 border-2 border-blue-200 dark:border-blue-800">
+                    <div className="p-2 rounded-full bg-indigo-100 dark:bg-indigo-900/50">
+                      <Sparkles className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">Denne uge</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="font-semibold text-sm text-indigo-900 dark:text-indigo-100 truncate">
+                          {weeklyRecognition?.currentWeek?.bestDay?.name || "Ingen data endnu"}
+                        </p>
+                        {weeklyRecognition?.currentWeek?.bestDay?.team && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5">{weeklyRecognition.currentWeek.bestDay.team}</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-indigo-700 dark:text-indigo-300">
+                        {weeklyRecognition?.currentWeek?.bestDay 
+                          ? `${formatDateLong(weeklyRecognition.currentWeek.bestDay.date)} - ${formatCommission(weeklyRecognition.currentWeek.bestDay.commission)}`
+                          : "—"}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm text-green-700 dark:text-green-300">
-                    {weeklyRecognition?.bestDay 
-                      ? `Bedste enkeltdag: ${formatCommission(weeklyRecognition.bestDay.commission)}`
-                      : "Bedste dag målt i provision"}
-                  </p>
                 </div>
               </div>
             </CardContent>
