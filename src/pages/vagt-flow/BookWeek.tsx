@@ -54,7 +54,7 @@ export default function VagtBookWeek() {
   const [selectedYear, setSelectedYear] = useState(
     yearParam ? parseInt(yearParam) : getYear(new Date())
   );
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [locationType, setLocationType] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<LocationTab>("mulige");
@@ -99,31 +99,7 @@ export default function VagtBookWeek() {
     },
   });
 
-  const { data: brands } = useQuery({
-    queryKey: ["vagt-brands", fieldmarketingClients],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("brand")
-        .select("*")
-        .eq("is_active", true);
-      if (error) throw error;
-      
-      // Filter brands to only those matching Fieldmarketing team clients (flexible matching)
-      if (fieldmarketingClients && fieldmarketingClients.length > 0) {
-        const clientNames = fieldmarketingClients.map((c: any) => c.name?.toLowerCase());
-        return data?.filter(brand => {
-          const brandNameLower = brand.name?.toLowerCase() || "";
-          // Check if any client name contains the brand name or vice versa
-          return clientNames.some((clientName: string) => 
-            clientName.includes(brandNameLower) || brandNameLower.includes(clientName)
-          );
-        }) || [];
-      }
-      
-      return data;
-    },
-    enabled: !!fieldmarketingClients,
-  });
+  // Use clients directly from fieldmarketingClients - no need to map to brands
 
   const { data: locations } = useQuery({
     queryKey: ["vagt-locations-bookweek"],
@@ -138,7 +114,7 @@ export default function VagtBookWeek() {
   });
 
   const createBookingMutation = useMutation({
-    mutationFn: async ({ locationId, brandId }: { locationId: string; brandId: string }) => {
+    mutationFn: async ({ locationId, clientId }: { locationId: string; clientId: string }) => {
       const weekStart = getWeekStartDate(selectedYear, selectedWeek);
       
       const sortedDays = [...selectedDays].sort((a, b) => a - b);
@@ -165,7 +141,7 @@ export default function VagtBookWeek() {
 
       const { error } = await supabase.from("booking").insert({
         location_id: locationId,
-        brand_id: brandId,
+        client_id: clientId,
         start_date: format(startDate, "yyyy-MM-dd"),
         end_date: format(endDate, "yyyy-MM-dd"),
         week_number: selectedWeek,
