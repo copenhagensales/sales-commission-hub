@@ -42,9 +42,35 @@ export default function LocationDetail() {
     enabled: !!id,
   });
 
+  // Fetch Fieldmarketing team clients
+  const { data: fieldmarketingClients = [] } = useQuery({
+    queryKey: ["fieldmarketing-clients"],
+    queryFn: async () => {
+      // Find Fieldmarketing team
+      const { data: fmTeam } = await supabase
+        .from("teams")
+        .select("id")
+        .ilike("name", "%fieldmarketing%")
+        .maybeSingle();
+      
+      if (!fmTeam) return [];
+
+      // Get clients assigned to Fieldmarketing team
+      const { data: teamClients } = await supabase
+        .from("team_clients")
+        .select("client_id, clients(id, name)")
+        .eq("team_id", fmTeam.id);
+
+      return teamClients?.map((tc: any) => tc.clients).filter(Boolean) || [];
+    },
+  });
+
   useEffect(() => {
     if (location) {
-      setFormData(location);
+      setFormData({
+        ...location,
+        bookable_client_ids: location.bookable_client_ids || [],
+      });
     }
   }, [location]);
 
@@ -318,26 +344,31 @@ export default function LocationDetail() {
               <CardTitle>Booking indstillinger</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Checkbox
-                  id="eesy"
-                  checked={formData.can_book_eesy || false}
-                  onCheckedChange={(c) => setFormData({ ...formData, can_book_eesy: !!c })}
-                />
-                <Label htmlFor="eesy" className="cursor-pointer">
-                  Kan bookes til <Badge variant="outline" className="text-orange-500 border-orange-500 ml-1">Eesy</Badge>
-                </Label>
-              </div>
-              <div className="flex items-center gap-3">
-                <Checkbox
-                  id="yousee"
-                  checked={formData.can_book_yousee || false}
-                  onCheckedChange={(c) => setFormData({ ...formData, can_book_yousee: !!c })}
-                />
-                <Label htmlFor="yousee" className="cursor-pointer">
-                  Kan bookes til <Badge variant="outline" className="text-blue-600 border-blue-600 ml-1">YouSee</Badge>
-                </Label>
-              </div>
+              {fieldmarketingClients.length === 0 ? (
+                <p className="text-muted-foreground text-sm">Ingen kunder tildelt Fieldmarketing team</p>
+              ) : (
+                fieldmarketingClients.map((client: any) => {
+                  const isChecked = formData.bookable_client_ids?.includes(client.id) || false;
+                  return (
+                    <div key={client.id} className="flex items-center gap-3">
+                      <Checkbox
+                        id={`client-${client.id}`}
+                        checked={isChecked}
+                        onCheckedChange={(checked) => {
+                          const currentIds = formData.bookable_client_ids || [];
+                          const newIds = checked
+                            ? [...currentIds, client.id]
+                            : currentIds.filter((id: string) => id !== client.id);
+                          setFormData({ ...formData, bookable_client_ids: newIds });
+                        }}
+                      />
+                      <Label htmlFor={`client-${client.id}`} className="cursor-pointer">
+                        Kan bookes til <Badge variant="outline" className="ml-1">{client.name}</Badge>
+                      </Label>
+                    </div>
+                  );
+                })
+              )}
             </CardContent>
           </Card>
 

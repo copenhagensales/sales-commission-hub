@@ -2613,6 +2613,7 @@ export type Database = {
           address_postal_code: string | null
           address_street: string | null
           available_after_date: string | null
+          bookable_client_ids: string[] | null
           can_book_eesy: boolean | null
           can_book_yousee: boolean | null
           contact_email: string | null
@@ -2635,6 +2636,7 @@ export type Database = {
           address_postal_code?: string | null
           address_street?: string | null
           available_after_date?: string | null
+          bookable_client_ids?: string[] | null
           can_book_eesy?: boolean | null
           can_book_yousee?: boolean | null
           contact_email?: string | null
@@ -2657,6 +2659,7 @@ export type Database = {
           address_postal_code?: string | null
           address_street?: string | null
           available_after_date?: string | null
+          bookable_client_ids?: string[] | null
           can_book_eesy?: boolean | null
           can_book_yousee?: boolean | null
           contact_email?: string | null
