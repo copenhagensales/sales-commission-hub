@@ -376,18 +376,20 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
             {clientsWithSales.map((client) => (
               <Card key={client.clientId} className="relative overflow-hidden">
                 <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center gap-2">
-                    {client.logoUrl ? (
-                      <img 
-                        src={client.logoUrl} 
-                        alt={client.clientName} 
-                        className="h-8 max-w-full object-contain"
-                      />
-                    ) : (
-                      <span className="text-sm font-semibold text-foreground truncate max-w-full">
-                        {client.clientName}
-                      </span>
-                    )}
+                <div className="flex flex-col items-center text-center gap-2">
+                    <div className="h-8 w-full flex items-center justify-center">
+                      {client.logoUrl ? (
+                        <img 
+                          src={client.logoUrl} 
+                          alt={client.clientName} 
+                          className="max-h-8 max-w-full object-contain"
+                        />
+                      ) : (
+                        <span className="text-sm font-semibold text-foreground truncate max-w-full">
+                          {client.clientName}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex gap-4 mt-1">
                       <div className="text-center">
                         <div className="text-xl font-bold text-foreground">{client.salesToday}</div>
@@ -442,16 +444,18 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                           </TableCell>
                           <TableCell className="font-medium">{seller.name}</TableCell>
                           <TableCell>
-                            {seller.clientLogo ? (
-                              <img 
-                                src={seller.clientLogo} 
-                                alt={seller.clientName} 
-                                className="h-5 max-w-16 object-contain"
-                                title={seller.clientName}
-                              />
-                            ) : (
-                              <span className="text-xs text-muted-foreground">{seller.clientName}</span>
-                            )}
+                            <div className="h-6 w-20 flex items-center">
+                              {seller.clientLogo ? (
+                                <img 
+                                  src={seller.clientLogo} 
+                                  alt={seller.clientName} 
+                                  className="max-h-6 max-w-20 object-contain"
+                                  title={seller.clientName}
+                                />
+                              ) : (
+                                <span className="text-xs text-muted-foreground">{seller.clientName}</span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">{seller.sales}</TableCell>
                           <TableCell className="text-right font-mono font-medium">
@@ -497,16 +501,18 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                           </TableCell>
                           <TableCell className="font-medium">{seller.name}</TableCell>
                           <TableCell>
-                            {seller.clientLogo ? (
-                              <img 
-                                src={seller.clientLogo} 
-                                alt={seller.clientName} 
-                                className="h-5 max-w-16 object-contain"
-                                title={seller.clientName}
-                              />
-                            ) : (
-                              <span className="text-xs text-muted-foreground">{seller.clientName}</span>
-                            )}
+                            <div className="h-6 w-20 flex items-center">
+                              {seller.clientLogo ? (
+                                <img 
+                                  src={seller.clientLogo} 
+                                  alt={seller.clientName} 
+                                  className="max-h-6 max-w-20 object-contain"
+                                  title={seller.clientName}
+                                />
+                              ) : (
+                                <span className="text-xs text-muted-foreground">{seller.clientName}</span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">{seller.sales}</TableCell>
                           <TableCell className="text-right font-mono font-medium">
@@ -552,16 +558,18 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                         </TableCell>
                         <TableCell>{sale.agent_name}</TableCell>
                         <TableCell>
-                          {sale.clientLogo ? (
-                            <img 
-                              src={sale.clientLogo} 
-                              alt={sale.clientName} 
-                              className="h-5 max-w-16 object-contain"
-                              title={sale.clientName}
-                            />
-                          ) : (
-                            <span className="text-xs text-muted-foreground">{sale.clientName}</span>
-                          )}
+                          <div className="h-6 w-20 flex items-center">
+                            {sale.clientLogo ? (
+                              <img 
+                                src={sale.clientLogo} 
+                                alt={sale.clientName} 
+                                className="max-h-6 max-w-20 object-contain"
+                                title={sale.clientName}
+                              />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">{sale.clientName}</span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="font-mono">{sale.customer_phone || "-"}</TableCell>
                         <TableCell className="text-right font-mono">
