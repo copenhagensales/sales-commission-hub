@@ -221,7 +221,7 @@ export default function MgTest() {
   const [newProduct, setNewProduct] = useState<{
     name: string;
     clientId: string;
-    campaignId: string;
+    campaignIds: string[];
     commission: string;
     revenue: string;
     externalCode: string;
@@ -230,7 +230,7 @@ export default function MgTest() {
   }>({
     name: "",
     clientId: "",
-    campaignId: "",
+    campaignIds: [],
     commission: "0",
     revenue: "0",
     externalCode: "",
@@ -988,8 +988,8 @@ export default function MgTest() {
       const commission = parseFloat(productData.commission.replace(",", ".")) || 0;
       const revenue = parseFloat(productData.revenue.replace(",", ".")) || 0;
 
-      // Use selected campaign or find/create default client_campaign for the selected client
-      let clientCampaignId: string | null = productData.campaignId || null;
+      // Use first selected campaign or find/create default client_campaign for the selected client
+      let clientCampaignId: string | null = productData.campaignIds[0] || null;
       
       if (!clientCampaignId && productData.clientId) {
         const { data: campaigns } = await supabase
@@ -1049,7 +1049,7 @@ export default function MgTest() {
       setNewProduct({
         name: "",
         clientId: "",
-        campaignId: "",
+        campaignIds: [],
         commission: "0",
         revenue: "0",
         externalCode: "",
@@ -3019,7 +3019,7 @@ export default function MgTest() {
               <Label htmlFor="product-client">Kunde</Label>
               <Select
                 value={newProduct.clientId || undefined}
-                onValueChange={(value) => setNewProduct((prev) => ({ ...prev, clientId: value, campaignId: "" }))}
+                onValueChange={(value) => setNewProduct((prev) => ({ ...prev, clientId: value, campaignIds: [] }))}
               >
                 <SelectTrigger id="product-client">
                   <SelectValue placeholder="Vælg kunde" />
@@ -3035,24 +3035,33 @@ export default function MgTest() {
             </div>
             {newProduct.clientId && (
               <div className="space-y-2">
-                <Label htmlFor="product-campaign">Kampagne</Label>
-                <Select
-                  value={newProduct.campaignId || undefined}
-                  onValueChange={(value) => setNewProduct((prev) => ({ ...prev, campaignId: value }))}
-                >
-                  <SelectTrigger id="product-campaign">
-                    <SelectValue placeholder="Vælg kampagne (valgfrit)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientCampaigns
-                      ?.filter((c) => c.client_id === newProduct.clientId)
-                      .map((campaign) => (
-                        <SelectItem key={campaign.id} value={campaign.id}>
+                <Label>Kampagner</Label>
+                <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
+                  {clientCampaigns
+                    ?.filter((c) => c.client_id === newProduct.clientId)
+                    .map((campaign) => (
+                      <div key={campaign.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`campaign-${campaign.id}`}
+                          checked={newProduct.campaignIds.includes(campaign.id)}
+                          onCheckedChange={(checked) => {
+                            setNewProduct((prev) => ({
+                              ...prev,
+                              campaignIds: checked
+                                ? [...prev.campaignIds, campaign.id]
+                                : prev.campaignIds.filter((id) => id !== campaign.id),
+                            }));
+                          }}
+                        />
+                        <Label htmlFor={`campaign-${campaign.id}`} className="text-sm cursor-pointer">
                           {campaign.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                        </Label>
+                      </div>
+                    ))}
+                  {clientCampaigns?.filter((c) => c.client_id === newProduct.clientId).length === 0 && (
+                    <p className="text-xs text-muted-foreground">Ingen kampagner for denne kunde</p>
+                  )}
+                </div>
               </div>
             )}
             
