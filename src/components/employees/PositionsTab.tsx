@@ -660,7 +660,7 @@ export function PositionsTab() {
       </Table>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6 pb-4 border-b">
             <DialogTitle className="flex items-center gap-2">
               {editingPosition && isOwnerPosition(editingPosition.name) ? (
@@ -740,9 +740,9 @@ export function PositionsTab() {
               </div>
             </TabsContent>
 
-            <TabsContent value="permissions" className="flex-1 flex flex-col min-h-0 px-6 py-4">
+            <TabsContent value="permissions" className="flex-1 flex flex-col min-h-0 overflow-hidden px-6 py-4">
               {/* Search and category selector */}
-              <div className="flex gap-4 mb-4">
+              <div className="flex gap-4 mb-4 flex-shrink-0">
                 <div className="relative flex-1 max-w-xs">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -772,7 +772,7 @@ export function PositionsTab() {
               </div>
 
               {/* Categories grid */}
-              <ScrollArea className="flex-1 -mx-2 px-2">
+              <ScrollArea className="flex-1 min-h-0 -mx-2 px-2">
                 <TooltipProvider delayDuration={200}>
                   <div className="grid grid-cols-2 gap-4 pb-4">
                     {(activeCategory 
