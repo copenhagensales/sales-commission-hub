@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HeadToHeadComparison } from "@/components/home/HeadToHeadComparison";
 import { 
   Cake, 
@@ -217,6 +218,7 @@ const Home = () => {
 
   // State for team goal dialog
   const [addTeamGoalOpen, setAddTeamGoalOpen] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [newSalesTarget, setNewSalesTarget] = useState<string>("100");
   const [newBonusDescription, setNewBonusDescription] = useState<string>("");
 
@@ -660,8 +662,19 @@ const Home = () => {
                   <Target className="w-5 h-5 text-primary" />
                   {teamGoal ? `${(teamGoal.teams as { name: string })?.name || "Team"} mål` : "Teammål"} ({format(new Date(), "MMMM yyyy", { locale: da })})
                 </CardTitle>
-                {canEditHomeGoals && userTeams.length > 0 && (
-                  <Dialog open={addTeamGoalOpen} onOpenChange={setAddTeamGoalOpen}>
+                {canEditHomeGoals && manageableTeams.length > 0 && (
+                  <Dialog open={addTeamGoalOpen} onOpenChange={(open) => {
+                    setAddTeamGoalOpen(open);
+                    if (open) {
+                      // Pre-select team if user has one or if editing existing goal
+                      const preselectedTeam = teamGoal?.team_id || (userTeams[0]?.teams as { id: string })?.id || "";
+                      setSelectedTeamId(preselectedTeam);
+                      if (teamGoal) {
+                        setNewSalesTarget(String(teamGoal.sales_target || 100));
+                        setNewBonusDescription(teamGoal.bonus_description || "");
+                      }
+                    }
+                  }}>
                     <DialogTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-1">
                         <Plus className="w-4 h-4" /> {teamGoal ? "Rediger mål" : "Sæt mål"}
@@ -672,6 +685,21 @@ const Home = () => {
                         <DialogTitle>Sæt teammål for {format(new Date(), "MMMM yyyy", { locale: da })}</DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <Label>Vælg team</Label>
+                          <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Vælg team" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {manageableTeams.map((team) => (
+                                <SelectItem key={team.id} value={team.id}>
+                                  {team.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <div className="space-y-2">
                           <Label>Salgsmål (antal salg)</Label>
                           <Input 
@@ -695,16 +723,17 @@ const Home = () => {
                         <Button 
                           className="w-full" 
                           onClick={() => {
-                            const teamId = userTeams[0]?.teams ? (userTeams[0].teams as { id: string }).id : null;
-                            if (teamId) {
+                            if (selectedTeamId) {
                               addTeamGoalMutation.mutate({ 
-                                teamId, 
+                                teamId: selectedTeamId, 
                                 target: parseInt(newSalesTarget) || 100,
                                 bonusDescription: newBonusDescription || undefined
                               });
+                            } else {
+                              toast.error("Vælg venligst et team");
                             }
                           }}
-                          disabled={addTeamGoalMutation.isPending}
+                          disabled={addTeamGoalMutation.isPending || !selectedTeamId}
                         >
                           Gem teammål
                         </Button>
@@ -761,11 +790,13 @@ const Home = () => {
                 </div>
               ) : (
                 <div className="text-center text-muted-foreground text-sm py-6">
-                  {userTeams.length > 0 ? (
+                  {canEditHomeGoals ? (
                     <>
                       <p>Ingen teammål sat for denne måned.</p>
-                      {canEditHomeGoals && <p className="text-xs mt-1">Klik "Sæt mål" for at komme i gang.</p>}
+                      <p className="text-xs mt-1">Klik "Sæt mål" for at komme i gang.</p>
                     </>
+                  ) : userTeams.length > 0 ? (
+                    <p>Ingen teammål sat for denne måned.</p>
                   ) : (
                     <p>Du er ikke tilknyttet et team endnu.</p>
                   )}
