@@ -349,6 +349,7 @@ const SalesRegistration = () => {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Phone className="h-5 w-5" />
+                Telefonnumre *
                 Telefonnumre
               </CardTitle>
             </CardHeader>
@@ -365,7 +366,7 @@ const SalesRegistration = () => {
                       </span>
                       <Input
                         type="tel"
-                        placeholder="Telefonnummer"
+                        placeholder="Telefonnummer *"
                         value={phone}
                         onChange={(e) =>
                           updatePhoneNumber(
@@ -375,6 +376,7 @@ const SalesRegistration = () => {
                           )
                         }
                         className="flex-1"
+                        required
                       />
                     </div>
                   ))}
