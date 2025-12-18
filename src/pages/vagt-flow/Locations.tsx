@@ -59,8 +59,7 @@ export default function VagtLocations() {
     contact_person_name: "",
     contact_phone: "",
     contact_email: "",
-    can_book_eesy: false,
-    can_book_yousee: false,
+    bookable_client_ids: [] as string[],
     daily_rate: 1000,
   });
   const navigate = useNavigate();
@@ -78,6 +77,27 @@ export default function VagtLocations() {
 
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Fetch Fieldmarketing clients
+  const { data: fieldmarketingClients = [] } = useQuery({
+    queryKey: ["fieldmarketing-clients-locations"],
+    queryFn: async () => {
+      const { data: team } = await supabase
+        .from("teams")
+        .select("id")
+        .ilike("name", "%fieldmarketing%")
+        .maybeSingle();
+      
+      if (!team) return [];
+
+      const { data: teamClients } = await supabase
+        .from("team_clients")
+        .select("client_id, clients(id, name)")
+        .eq("team_id", team.id);
+
+      return teamClients?.map((tc: any) => tc.clients).filter(Boolean) || [];
     },
   });
 
@@ -112,8 +132,7 @@ export default function VagtLocations() {
         contact_person_name: "",
         contact_phone: "",
         contact_email: "",
-        can_book_eesy: false,
-        can_book_yousee: false,
+        bookable_client_ids: [],
         daily_rate: 1000,
       });
     },
@@ -305,7 +324,7 @@ export default function VagtLocations() {
                     <TableHead>Dagspris</TableHead>
                     <TableHead>Cooldown</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Brands</TableHead>
+                    <TableHead>Kunder</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -382,9 +401,13 @@ export default function VagtLocations() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
-                          {loc.can_book_eesy && <Badge variant="outline" className="text-orange-500 border-orange-500">Eesy</Badge>}
-                          {loc.can_book_yousee && <Badge variant="outline" className="text-blue-600 border-blue-600">YouSee</Badge>}
+                        <div className="flex gap-1 flex-wrap">
+                          {(loc.bookable_client_ids || []).map((clientId: string) => {
+                            const client = fieldmarketingClients.find((c: any) => c.id === clientId);
+                            return client ? (
+                              <Badge key={clientId} variant="outline">{client.name}</Badge>
+                            ) : null;
+                          })}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -484,22 +507,24 @@ export default function VagtLocations() {
                 <Input value={newLocation.contact_email} onChange={(e) => setNewLocation({ ...newLocation, contact_email: e.target.value })} />
               </div>
             </div>
-            <div className="flex gap-6">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="eesy"
-                  checked={newLocation.can_book_eesy}
-                  onCheckedChange={(c) => setNewLocation({ ...newLocation, can_book_eesy: !!c })}
-                />
-                <Label htmlFor="eesy">Kan bookes til Eesy</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="yousee"
-                  checked={newLocation.can_book_yousee}
-                  onCheckedChange={(c) => setNewLocation({ ...newLocation, can_book_yousee: !!c })}
-                />
-                <Label htmlFor="yousee">Kan bookes til YouSee</Label>
+            <div className="space-y-2">
+              <Label>Kan bookes til kunder</Label>
+              <div className="flex flex-wrap gap-4">
+                {fieldmarketingClients.map((client: any) => (
+                  <div key={client.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`client-${client.id}`}
+                      checked={newLocation.bookable_client_ids.includes(client.id)}
+                      onCheckedChange={(checked) => {
+                        const newIds = checked
+                          ? [...newLocation.bookable_client_ids, client.id]
+                          : newLocation.bookable_client_ids.filter(id => id !== client.id);
+                        setNewLocation({ ...newLocation, bookable_client_ids: newIds });
+                      }}
+                    />
+                    <Label htmlFor={`client-${client.id}`}>{client.name}</Label>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
