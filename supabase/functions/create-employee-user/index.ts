@@ -39,9 +39,28 @@ serve(async (req) => {
     const existingUser = existingUsers?.users?.find(u => u.email === email);
     
     if (existingUser) {
+      // Update password for existing user
+      const { error: updateError } = await supabase.auth.admin.updateUserById(
+        existingUser.id,
+        { password }
+      );
+
+      if (updateError) {
+        console.error("Password update error:", updateError);
+        return new Response(
+          JSON.stringify({ error: updateError.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log(`Updated password for existing user ${email}`);
       return new Response(
-        JSON.stringify({ error: "En bruger med denne email findes allerede" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ 
+          success: true, 
+          userId: existingUser.id,
+          message: "Adgangskode opdateret" 
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
