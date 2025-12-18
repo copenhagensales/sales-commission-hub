@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useRolePreview } from "@/contexts/RolePreviewContext";
 
 export type DataScope = "egen" | "team" | "alt";
 
@@ -214,7 +215,12 @@ export function useHasPermission(permissionKey: string, type?: "view" | "edit"):
 // Helper hook to check multiple permissions at once
 export function usePermissions() {
   const { data, isLoading } = usePositionPermissions();
-  const permissions = data?.permissions || {};
+  const { isPreviewMode, previewPermissions, previewRole } = useRolePreview();
+  
+  // Use preview permissions when in preview mode, otherwise use actual permissions
+  const permissions = isPreviewMode && previewPermissions 
+    ? previewPermissions as PositionPermissions 
+    : (data?.permissions || {});
   
   const hasPermission = (key: string, type?: "view" | "edit"): boolean => {
     const value = permissions[key];
@@ -247,7 +253,8 @@ export function usePermissions() {
 
   return {
     isLoading,
-    position: data?.position,
+    isPreviewMode,
+    position: isPreviewMode && previewRole ? { id: "preview", name: previewRole, permissions } : data?.position,
     permissions,
     hasPermission,
     canView,
