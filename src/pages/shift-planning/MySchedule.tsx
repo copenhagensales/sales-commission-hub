@@ -12,11 +12,13 @@ import { useTimeStampsForRange } from "@/hooks/useTimeStamps";
 import { CreateAbsenceDialog } from "@/components/shift-planning/CreateAbsenceDialog";
 import { cn } from "@/lib/utils";
 import VagtMinUge from "@/pages/vagt-flow/MinUge";
+import { useRolePreview } from "@/contexts/RolePreviewContext";
 
 export default function MySchedule() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [absenceDialogOpen, setAbsenceDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const { isPreviewMode, previewRole } = useRolePreview();
   
   const { data: employee, isLoading: employeeLoading } = useCurrentEmployee();
   
@@ -112,8 +114,11 @@ export default function MySchedule() {
     );
   }
 
-  // If employee is Fieldmarketing, show the vagt-flow calendar instead
-  if (employee?.job_title === "Fieldmarketing") {
+  // If employee is Fieldmarketing (or previewing Fieldmarketing role), show the vagt-flow calendar instead
+  const isFieldmarketing = employee?.job_title === "Fieldmarketing" || 
+    (isPreviewMode && previewRole === "Fieldmarketing");
+  
+  if (isFieldmarketing) {
     return <VagtMinUge />;
   }
 
