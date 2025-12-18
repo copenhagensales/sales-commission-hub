@@ -11,66 +11,80 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { TrendingUp, Users, Calendar, Package, Trophy } from "lucide-react";
+import { TrendingUp, Users, Calendar, Package, Trophy, Building2 } from "lucide-react";
 
-// Team configuration
-const TEAM_CONFIG: Record<string, { name: string; clientId?: string }> = {
-  "eesy-tm": { name: "Eesy TM", clientId: "c37fbb01-a8b0-4ac5-a927-c96d63d6a6b7" }, // Eesy client
+// Team configuration - name mapping only, clients come from team_clients table
+const TEAM_CONFIG: Record<string, { name: string }> = {
+  "eesy-tm": { name: "Eesy TM" },
   "fieldmarketing": { name: "Fieldmarketing" },
-  "relatel": { name: "Relatel", clientId: "d8a6e3b4-5c2f-4a1e-9b8d-7c6e5f4a3b2c" },
-  "tdc-erhverv": { name: "TDC Erhverv", clientId: "7d3e8a9b-6c5f-4d2e-a1b0-9c8d7e6f5a4b" },
+  "relatel": { name: "Relatel" },
+  "tdc-erhverv": { name: "TDC Erhverv" },
   "united": { name: "United" },
 };
+
+interface TeamClient {
+  id: string;
+  name: string;
+  logo_url: string | null;
+}
 
 interface TeamDashboardContentProps {
   teamSlug: string;
   teamName: string;
-  clientId?: string;
 }
 
-const TeamDashboardContent = ({ teamSlug, teamName, clientId }: TeamDashboardContentProps) => {
-  // Fetch team info with logo
-  const { data: teamInfo } = useQuery({
-    queryKey: ["team-dashboard-info", teamName],
+const TeamDashboardContent = ({ teamSlug, teamName }: TeamDashboardContentProps) => {
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+
+  // Fetch team and its clients from team_clients table
+  const { data: teamData, isLoading: isLoadingTeam } = useQuery({
+    queryKey: ["team-dashboard-team", teamName],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First find the team
+      const { data: team, error: teamError } = await supabase
         .from("teams")
         .select("id, name")
         .ilike("name", `%${teamName}%`)
         .maybeSingle();
       
-      if (error) throw error;
-      return data;
+      if (teamError) throw teamError;
+      if (!team) return { team: null, clients: [] };
+
+      // Then get associated clients via team_clients
+      const { data: teamClients, error: clientsError } = await supabase
+        .from("team_clients")
+        .select(`
+          client_id,
+          clients (id, name, logo_url)
+        `)
+        .eq("team_id", team.id);
+      
+      if (clientsError) throw clientsError;
+
+      const clients: TeamClient[] = (teamClients || [])
+        .map((tc: any) => tc.clients)
+        .filter(Boolean)
+        .sort((a: TeamClient, b: TeamClient) => a.name.localeCompare(b.name, 'da'));
+
+      return { team, clients };
     },
   });
 
-  // Fetch client info with logo if clientId is provided
-  const { data: clientInfo } = useQuery({
-    queryKey: ["team-dashboard-client", clientId],
-    queryFn: async () => {
-      if (!clientId) return null;
-      
-      const { data, error } = await supabase
-        .from("clients")
-        .select("id, name, logo_url")
-        .eq("id", clientId)
-        .maybeSingle();
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!clientId,
-  });
+  // Set default selected client
+  const clients = teamData?.clients || [];
+  const activeClientId = selectedClientId || (clients.length > 0 ? clients[0].id : null);
+  const activeClient = clients.find(c => c.id === activeClientId);
 
-  // Fetch sales stats for this client
+  // Fetch sales stats for selected client
   const { data: salesStats } = useQuery({
-    queryKey: ["team-dashboard-sales-stats", clientId],
+    queryKey: ["team-dashboard-sales-stats", activeClientId],
     queryFn: async () => {
-      if (!clientId) return null;
+      if (!activeClientId) return null;
 
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -81,7 +95,7 @@ const TeamDashboardContent = ({ teamSlug, teamName, clientId }: TeamDashboardCon
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
-        .eq("client_id", clientId);
+        .eq("client_id", activeClientId);
       
       const campaignIds = campaigns?.map(c => c.id) || [];
       if (campaignIds.length === 0) return { salesToday: 0, salesThisWeek: 0, salesThisMonth: 0, totalSales: 0 };
@@ -102,14 +116,14 @@ const TeamDashboardContent = ({ teamSlug, teamName, clientId }: TeamDashboardCon
         totalSales: allSales.length,
       };
     },
-    enabled: !!clientId,
+    enabled: !!activeClientId,
   });
 
   // Fetch top sellers this month with commission from sale_items
   const { data: topSellers } = useQuery({
-    queryKey: ["team-dashboard-top-sellers", clientId],
+    queryKey: ["team-dashboard-top-sellers", activeClientId],
     queryFn: async () => {
-      if (!clientId) return [];
+      if (!activeClientId) return [];
 
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -118,7 +132,7 @@ const TeamDashboardContent = ({ teamSlug, teamName, clientId }: TeamDashboardCon
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
-        .eq("client_id", clientId);
+        .eq("client_id", activeClientId);
       
       const campaignIds = campaigns?.map(c => c.id) || [];
       if (campaignIds.length === 0) return [];
@@ -149,14 +163,14 @@ const TeamDashboardContent = ({ teamSlug, teamName, clientId }: TeamDashboardCon
         .map(([name, stats]) => ({ name, ...stats }))
         .sort((a, b) => b.commission - a.commission);
     },
-    enabled: !!clientId,
+    enabled: !!activeClientId,
   });
 
   // Fetch today's sellers
   const { data: todaySellers } = useQuery({
-    queryKey: ["team-dashboard-today-sellers", clientId],
+    queryKey: ["team-dashboard-today-sellers", activeClientId],
     queryFn: async () => {
-      if (!clientId) return [];
+      if (!activeClientId) return [];
 
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -165,7 +179,7 @@ const TeamDashboardContent = ({ teamSlug, teamName, clientId }: TeamDashboardCon
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
-        .eq("client_id", clientId);
+        .eq("client_id", activeClientId);
       
       const campaignIds = campaigns?.map(c => c.id) || [];
       if (campaignIds.length === 0) return [];
@@ -196,20 +210,20 @@ const TeamDashboardContent = ({ teamSlug, teamName, clientId }: TeamDashboardCon
         .map(([name, stats]) => ({ name, ...stats }))
         .sort((a, b) => b.commission - a.commission);
     },
-    enabled: !!clientId,
+    enabled: !!activeClientId,
   });
 
   // Fetch recent sales
   const { data: recentSales } = useQuery({
-    queryKey: ["team-dashboard-recent-sales", clientId],
+    queryKey: ["team-dashboard-recent-sales", activeClientId],
     queryFn: async () => {
-      if (!clientId) return [];
+      if (!activeClientId) return [];
 
       // Get client campaigns
       const { data: campaigns } = await supabase
         .from("client_campaigns")
         .select("id")
-        .eq("client_id", clientId);
+        .eq("client_id", activeClientId);
       
       const campaignIds = campaigns?.map(c => c.id) || [];
       if (campaignIds.length === 0) return [];
@@ -235,45 +249,74 @@ const TeamDashboardContent = ({ teamSlug, teamName, clientId }: TeamDashboardCon
         total_commission: (sale.sale_items || []).reduce((sum: number, item: any) => sum + (item.mapped_commission || 0), 0),
       }));
     },
-    enabled: !!clientId,
+    enabled: !!activeClientId,
   });
 
-  if (!clientId) {
+  if (isLoadingTeam) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Indlæser...</p>
+      </div>
+    );
+  }
+
+  if (clients.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
-        <div className="h-20 w-40 flex items-center justify-center mb-4">
-          <span className="text-3xl font-bold text-muted-foreground">{teamName}</span>
-        </div>
-        <p className="text-muted-foreground">Dashboard kommer snart...</p>
+        <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold text-foreground mb-2">{teamName}</h2>
+        <p className="text-muted-foreground">Ingen kunder tilknyttet dette team endnu.</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Tilføj kunder under Personale → Teams
+        </p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header with logo */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            {teamName} Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Oversigt over salg og performance
-          </p>
+      {/* Header with team name and client tabs */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              {teamName} Dashboard
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Oversigt over salg og performance
+            </p>
+          </div>
+          <div className="h-16 w-40 flex items-center justify-end">
+            {activeClient?.logo_url ? (
+              <img 
+                src={activeClient.logo_url} 
+                alt={activeClient.name} 
+                className="max-h-16 max-w-40 object-contain"
+              />
+            ) : (
+              <div className="h-16 px-6 bg-muted rounded-lg flex items-center justify-center">
+                <span className="text-xl font-bold text-muted-foreground">{activeClient?.name || teamName}</span>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="h-16 w-40 flex items-center justify-end">
-          {clientInfo?.logo_url ? (
-            <img 
-              src={clientInfo.logo_url} 
-              alt={clientInfo.name} 
-              className="max-h-16 max-w-40 object-contain"
-            />
-          ) : (
-            <div className="h-16 px-6 bg-muted rounded-lg flex items-center justify-center">
-              <span className="text-xl font-bold text-muted-foreground">{teamName}</span>
-            </div>
-          )}
-        </div>
+
+        {/* Client tabs */}
+        {clients.length > 1 && (
+          <Tabs value={activeClientId || undefined} onValueChange={setSelectedClientId}>
+            <TabsList className="h-auto flex-wrap gap-1">
+              {clients.map((client) => (
+                <TabsTrigger 
+                  key={client.id} 
+                  value={client.id}
+                  className="px-4 py-2"
+                >
+                  {client.name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        )}
       </div>
 
       {/* KPI Cards */}
@@ -476,7 +519,6 @@ const TeamDashboard = () => {
       <TeamDashboardContent 
         teamSlug={teamSlug!} 
         teamName={config.name}
-        clientId={config.clientId}
       />
     </DashboardLayout>
   );
