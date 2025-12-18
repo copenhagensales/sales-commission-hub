@@ -2017,6 +2017,7 @@ export type Database = {
           contract_version: string | null
           cpr_number: string | null
           created_at: string | null
+          default_landing_page: string | null
           department: string | null
           employment_end_date: string | null
           employment_start_date: string | null
@@ -2058,6 +2059,7 @@ export type Database = {
           contract_version?: string | null
           cpr_number?: string | null
           created_at?: string | null
+          default_landing_page?: string | null
           department?: string | null
           employment_end_date?: string | null
           employment_start_date?: string | null
@@ -2099,6 +2101,7 @@ export type Database = {
           contract_version?: string | null
           cpr_number?: string | null
           created_at?: string | null
+          default_landing_page?: string | null
           department?: string | null
           employment_end_date?: string | null
           employment_start_date?: string | null
@@ -2526,6 +2529,7 @@ export type Database = {
       job_positions: {
         Row: {
           created_at: string | null
+          default_landing_page: string | null
           description: string | null
           id: string
           is_active: boolean | null
@@ -2535,6 +2539,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          default_landing_page?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
@@ -2544,6 +2549,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          default_landing_page?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null

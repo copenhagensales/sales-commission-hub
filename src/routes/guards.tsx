@@ -24,32 +24,44 @@ export function SmartRedirect() {
   const [redirectPath, setRedirectPath] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    async function checkRole() {
+    async function checkLandingPage() {
       if (!user) {
         setRedirectPath("/auth");
         return;
       }
       try {
         const { supabase } = await import("@/integrations/supabase/client");
-        const { data, error } = await supabase
-          .from("system_roles")
-          .select("role")
-          .eq("user_id", user.id)
+        
+        // Get employee with their individual override and position default
+        const { data: employee } = await supabase
+          .from("employee_master_data")
+          .select(`
+            default_landing_page,
+            job_title,
+            job_positions!employee_master_data_job_title_fkey(default_landing_page)
+          `)
+          .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+          .eq("is_active", true)
           .maybeSingle();
-        if (error) {
-          setRedirectPath("/my-schedule");
+        
+        // Priority: 1. Employee override, 2. Position default, 3. "/home"
+        if (employee?.default_landing_page) {
+          setRedirectPath(employee.default_landing_page);
           return;
         }
-        if (data?.role === "teamleder" || data?.role === "ejer") {
-          setRedirectPath("/shift-planning");
-        } else {
-          setRedirectPath("/my-schedule");
+        
+        const positionDefault = (employee?.job_positions as any)?.default_landing_page;
+        if (positionDefault) {
+          setRedirectPath(positionDefault);
+          return;
         }
+        
+        setRedirectPath("/home");
       } catch {
-        setRedirectPath("/my-schedule");
+        setRedirectPath("/home");
       }
     }
-    if (!loading) checkRole();
+    if (!loading) checkLandingPage();
   }, [user, loading]);
 
   if (loading || !redirectPath) return <PageLoader />;
