@@ -369,10 +369,12 @@ export default function BookingsContent() {
                               <p className="font-medium">{day}</p>
                               <p className="text-muted-foreground">{format(dayDate, "d/M")}</p>
                               {isBooked && dayAssignments?.length > 0 && (
-                                <div className="mt-1">
-                                  <Badge variant="secondary" className="text-[10px]">
-                                    {dayAssignments.length} tildelt
-                                  </Badge>
+                                <div className="mt-1 space-y-0.5">
+                                  {dayAssignments.map((assignment: any) => (
+                                    <div key={assignment.id} className="text-[10px] text-primary font-medium truncate">
+                                      {assignment.employee_name?.split(' ')[0]}
+                                    </div>
+                                  ))}
                                 </div>
                               )}
                             </div>
