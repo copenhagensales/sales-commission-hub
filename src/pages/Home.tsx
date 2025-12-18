@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -213,27 +213,133 @@ const Home = () => {
     }
   });
 
-  // Fetch company sales performance
-  const { data: companyPerformance } = useQuery({
-    queryKey: ["home-company-performance"],
+  // State for client goals dialog
+  const [addClientGoalOpen, setAddClientGoalOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [newSalesTarget, setNewSalesTarget] = useState<string>("100");
+
+  // Fetch all clients
+  const { data: allClients = [] } = useQuery({
+    queryKey: ["home-all-clients"],
     queryFn: async () => {
-      const now = new Date();
-      const monthStart = startOfMonth(now).toISOString();
-      const monthEnd = endOfMonth(now).toISOString();
-      
-      const { count } = await supabase
-        .from("sale_items")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", monthStart)
-        .lte("created_at", monthEnd);
-      
-      return {
-        currentSales: count || 0,
-        targetSales: 500,
-        progress: Math.min(((count || 0) / 500) * 100, 100)
-      };
+      const { data } = await supabase
+        .from("clients")
+        .select("id, name")
+        .order("name");
+      return data || [];
     },
   });
+
+  // Fetch client monthly goals with sales progress
+  const { data: clientGoals = [] } = useQuery({
+    queryKey: ["home-client-goals"],
+    queryFn: async () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const monthStart = startOfMonth(now).toISOString();
+      const monthEnd = endOfMonth(now).toISOString();
+
+      // Fetch goals for this month
+      const { data: goals } = await supabase
+        .from("client_monthly_goals")
+        .select("*, clients(id, name)")
+        .eq("year", year)
+        .eq("month", month);
+
+      if (!goals || goals.length === 0) return [];
+
+      // Fetch sales for each client
+      const clientIds = goals.map(g => g.client_id);
+      const { data: campaigns } = await supabase
+        .from("client_campaigns")
+        .select("id, client_id")
+        .in("client_id", clientIds);
+
+      const campaignsByClient = (campaigns || []).reduce((acc, c) => {
+        if (!acc[c.client_id]) acc[c.client_id] = [];
+        acc[c.client_id].push(c.id);
+        return acc;
+      }, {} as Record<string, string[]>);
+
+      // Fetch sales count for each client
+      const results = await Promise.all(goals.map(async (goal) => {
+        const clientCampaignIds = campaignsByClient[goal.client_id] || [];
+        if (clientCampaignIds.length === 0) {
+          return { ...goal, currentSales: 0, progress: 0 };
+        }
+
+        const { data: sales } = await supabase
+          .from("sales")
+          .select("id, sale_items(quantity)")
+          .in("client_campaign_id", clientCampaignIds)
+          .gte("sale_datetime", monthStart)
+          .lte("sale_datetime", monthEnd);
+
+        const currentSales = sales?.reduce((sum, s) => {
+          return sum + (s.sale_items?.reduce((itemSum, item) => itemSum + (item.quantity || 1), 0) || 0);
+        }, 0) || 0;
+
+        const progress = goal.sales_target > 0 ? Math.min((currentSales / goal.sales_target) * 100, 100) : 0;
+        return { ...goal, currentSales, progress };
+      }));
+
+      return results;
+    },
+  });
+
+  // Add client goal mutation
+  const addClientGoalMutation = useMutation({
+    mutationFn: async ({ clientId, target }: { clientId: string; target: number }) => {
+      const now = new Date();
+      const { error } = await supabase
+        .from("client_monthly_goals")
+        .upsert({
+          client_id: clientId,
+          year: now.getFullYear(),
+          month: now.getMonth() + 1,
+          sales_target: target
+        }, { onConflict: "client_id,year,month" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["home-client-goals"] });
+      setAddClientGoalOpen(false);
+      setSelectedClientId("");
+      setNewSalesTarget("100");
+      toast.success("Kundemål tilføjet");
+    },
+    onError: () => toast.error("Kunne ikke tilføje kundemål")
+  });
+
+  // Delete client goal mutation
+  const deleteClientGoalMutation = useMutation({
+    mutationFn: async (goalId: string) => {
+      const { error } = await supabase
+        .from("client_monthly_goals")
+        .delete()
+        .eq("id", goalId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["home-client-goals"] });
+      toast.success("Kunde fjernet fra mål");
+    }
+  });
+
+  // Calculate total company performance from client goals
+  const companyPerformance = useMemo(() => {
+    const totalTarget = clientGoals.reduce((sum, g) => sum + (g.sales_target || 0), 0);
+    const totalCurrent = clientGoals.reduce((sum, g) => sum + (g.currentSales || 0), 0);
+    const progress = totalTarget > 0 ? Math.min((totalCurrent / totalTarget) * 100, 100) : 0;
+    return { currentSales: totalCurrent, targetSales: totalTarget, progress };
+  }, [clientGoals]);
+
+  // Clients not yet added to goals
+  const availableClients = useMemo(() => {
+    const goalClientIds = clientGoals.map(g => g.client_id);
+    return allClients.filter(c => !goalClientIds.includes(c.id));
+  }, [allClients, clientGoals]);
 
   // Fetch employee's personal sales stats via agent mapping
   const { data: personalStats } = useQuery({
@@ -531,40 +637,108 @@ const Home = () => {
           {/* Company Performance */}
           <Card className="lg:col-span-2 border-0 shadow-lg bg-card/80 backdrop-blur-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                <Target className="w-5 h-5 text-primary" />
-                Virksomhedens mål
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                  <Target className="w-5 h-5 text-primary" />
+                  Virksomhedens mål ({format(new Date(), "MMMM yyyy", { locale: da })})
+                </CardTitle>
+                <Dialog open={addClientGoalOpen} onOpenChange={setAddClientGoalOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1">
+                      <Plus className="w-4 h-4" /> Tilføj kunde
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Tilføj kundemål for {format(new Date(), "MMMM yyyy", { locale: da })}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <div className="space-y-2">
+                        <Label>Vælg kunde</Label>
+                        <select 
+                          className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                          value={selectedClientId}
+                          onChange={(e) => setSelectedClientId(e.target.value)}
+                        >
+                          <option value="">Vælg en kunde...</option>
+                          {availableClients.map(client => (
+                            <option key={client.id} value={client.id}>{client.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Salgsmål (antal salg)</Label>
+                        <Input 
+                          type="number" 
+                          value={newSalesTarget}
+                          onChange={(e) => setNewSalesTarget(e.target.value)}
+                          min="1"
+                        />
+                      </div>
+                      <Button 
+                        className="w-full" 
+                        onClick={() => addClientGoalMutation.mutate({ 
+                          clientId: selectedClientId, 
+                          target: parseInt(newSalesTarget) || 100 
+                        })}
+                        disabled={!selectedClientId || addClientGoalMutation.isPending}
+                      >
+                        Tilføj kundemål
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Total Progress */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm text-muted-foreground">Månedligt salgsmål</span>
+                  <span className="text-sm text-muted-foreground">Samlet månedsmål</span>
                   <span className="text-2xl font-bold text-primary">
-                    {companyPerformance?.progress.toFixed(0) || 0}%
+                    {companyPerformance.progress.toFixed(0)}%
                   </span>
                 </div>
                 <Progress 
-                  value={companyPerformance?.progress || 0} 
+                  value={companyPerformance.progress} 
                   className="h-4 bg-muted"
                 />
                 <div className="flex justify-between mt-2 text-sm text-muted-foreground">
-                  <span>{companyPerformance?.currentSales || 0} salg</span>
-                  <span>Mål: {companyPerformance?.targetSales || 500} salg</span>
+                  <span>{companyPerformance.currentSales} salg</span>
+                  <span>Mål: {companyPerformance.targetSales} salg</span>
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
-                {['Team A', 'Team B', 'Team C'].map((team, idx) => (
-                  <div key={team} className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium">{team}</span>
-                      <span className="text-muted-foreground">{[78, 92, 65][idx]}%</span>
+              {/* Client Goals */}
+              {clientGoals.length > 0 ? (
+                <div className="space-y-3 pt-4 border-t">
+                  <p className="text-sm font-medium text-muted-foreground">Kundemål</p>
+                  {clientGoals.map((goal) => (
+                    <div key={goal.id} className="flex items-center gap-3 group">
+                      <div className="flex-1 space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="font-medium">{(goal.clients as { name: string })?.name || "Ukendt"}</span>
+                          <span className="text-muted-foreground">{goal.currentSales}/{goal.sales_target} ({goal.progress?.toFixed(0)}%)</span>
+                        </div>
+                        <Progress value={goal.progress || 0} className="h-2" />
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => deleteClientGoalMutation.mutate(goal.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
-                    <Progress value={[78, 92, 65][idx]} className="h-2" />
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="pt-4 border-t text-center text-muted-foreground text-sm py-6">
+                  <p>Ingen kundemål sat for denne måned.</p>
+                  <p className="text-xs mt-1">Klik "Tilføj kunde" for at komme i gang.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
