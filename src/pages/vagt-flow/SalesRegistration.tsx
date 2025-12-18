@@ -402,9 +402,11 @@ const SalesRegistration = () => {
           <h1 className="text-2xl font-bold text-foreground">
             {t("sidebar.salesRegistration")}
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Registrer salg fra fieldmarketing events
-          </p>
+          {currentEmployee && (
+            <p className="text-muted-foreground mt-1">
+              {currentEmployee.first_name} {currentEmployee.last_name}
+            </p>
+          )}
         </div>
       </div>
 
