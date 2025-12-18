@@ -1,7 +1,7 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useRolePreview, RolePreviewPermissions } from "@/contexts/RolePreviewContext";
+import { useRolePreview, RolePreviewPermissions, PreviewEmployee } from "@/contexts/RolePreviewContext";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
@@ -119,10 +119,13 @@ const generateAllPermissions = (): RolePreviewPermissions => ({
 
 export default function RolePreview() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { enterPreviewMode } = useRolePreview();
+  
+  const employeeId = searchParams.get("employee");
 
-  const { data: position, isLoading, error } = useQuery({
+  const { data: position, isLoading: positionLoading, error: positionError } = useQuery({
     queryKey: ["job-position", id],
     queryFn: async () => {
       if (!id) return null;
@@ -137,20 +140,47 @@ export default function RolePreview() {
     enabled: !!id,
   });
 
+  const { data: employee, isLoading: employeeLoading } = useQuery({
+    queryKey: ["preview-employee", employeeId],
+    queryFn: async () => {
+      if (!employeeId) return null;
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, private_email")
+        .eq("id", employeeId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!employeeId,
+  });
+
   useEffect(() => {
+    // Wait for all data to be loaded
+    if (positionLoading || (employeeId && employeeLoading)) return;
+    
     if (position) {
       const isOwner = position.name.toLowerCase() === OWNER_POSITION_NAME.toLowerCase();
       const permissions: RolePreviewPermissions = isOwner 
         ? generateAllPermissions() 
         : (position.permissions as RolePreviewPermissions) || {};
       
-      // Enter preview mode with the role's permissions
-      enterPreviewMode(position.name, permissions);
+      // Build preview employee object if employee was selected
+      const previewEmployee: PreviewEmployee | undefined = employee ? {
+        id: employee.id,
+        name: `${employee.first_name} ${employee.last_name}`,
+        email: employee.private_email,
+      } : undefined;
+      
+      // Enter preview mode with the role's permissions and optionally the employee
+      enterPreviewMode(position.name, permissions, previewEmployee);
       
       // Navigate to my-schedule (typical employee landing page)
       navigate("/my-schedule", { replace: true });
     }
-  }, [position, enterPreviewMode, navigate]);
+  }, [position, employee, positionLoading, employeeLoading, employeeId, enterPreviewMode, navigate]);
+
+  const isLoading = positionLoading || (employeeId && employeeLoading);
 
   if (isLoading) {
     return (
@@ -163,7 +193,7 @@ export default function RolePreview() {
     );
   }
 
-  if (error || !position) {
+  if (positionError || !position) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -183,7 +213,10 @@ export default function RolePreview() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-3">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">Starter preview som {position.name}...</p>
+        <p className="text-muted-foreground">
+          Starter preview som {position.name}
+          {employee && ` (${employee.first_name} ${employee.last_name})`}...
+        </p>
       </div>
     </div>
   );
