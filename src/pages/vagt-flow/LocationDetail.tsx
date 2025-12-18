@@ -68,16 +68,29 @@ export default function LocationDetail() {
     },
   });
 
-  // Fetch campaigns for selected clients
+  // Fetch campaigns for selected clients (only campaigns that are mapped in adversus_campaign_mappings)
   const { data: clientCampaigns = [] } = useQuery({
     queryKey: ["client-campaigns-for-location", formData?.bookable_client_ids],
     queryFn: async () => {
       if (!formData?.bookable_client_ids?.length) return [];
       
+      // Get client_campaign_ids that are mapped in adversus_campaign_mappings
+      const { data: mappings, error: mappingError } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("client_campaign_id")
+        .not("client_campaign_id", "is", null);
+      
+      if (mappingError) throw mappingError;
+      
+      const mappedCampaignIds = mappings?.map(m => m.client_campaign_id).filter(Boolean) || [];
+      
+      if (mappedCampaignIds.length === 0) return [];
+      
       const { data, error } = await supabase
         .from("client_campaigns")
         .select("id, name, client_id")
-        .in("client_id", formData.bookable_client_ids);
+        .in("client_id", formData.bookable_client_ids)
+        .in("id", mappedCampaignIds);
       
       if (error) throw error;
       return data || [];
