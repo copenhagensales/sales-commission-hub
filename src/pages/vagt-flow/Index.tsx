@@ -23,7 +23,8 @@ export default function VagtFlowIndex() {
         .select(`
           *,
           location(name, address_city),
-          brand(name, color_hex)
+          clients(id, name),
+          client_campaigns:campaign_id(id, name)
         `)
         .eq("week_number", currentWeek)
         .eq("year", currentYear)
@@ -57,8 +58,8 @@ export default function VagtFlowIndex() {
     },
   });
 
-  const eesyCount = thisWeekBookings?.filter((b: any) => b.brand?.name === "Eesy").length || 0;
-  const youseeCount = thisWeekBookings?.filter((b: any) => b.brand?.name === "YouSee").length || 0;
+  const eesyCount = thisWeekBookings?.filter((b: any) => b.clients?.name?.toLowerCase().includes("eesy")).length || 0;
+  const youseeCount = thisWeekBookings?.filter((b: any) => b.clients?.name?.toLowerCase().includes("yousee")).length || 0;
 
   return (
     <MainLayout>
@@ -154,8 +155,8 @@ export default function VagtFlowIndex() {
                           {format(new Date(booking.start_date), "d/M")} - {format(new Date(booking.end_date), "d/M")}
                         </p>
                       </div>
-                      <Badge style={{ backgroundColor: booking.brand?.color_hex, color: "#fff" }}>
-                        {booking.brand?.name}
+                      <Badge variant="secondary">
+                        {booking.client_campaigns?.name || booking.clients?.name || "-"}
                       </Badge>
                     </div>
                   ))}

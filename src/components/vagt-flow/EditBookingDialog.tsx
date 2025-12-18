@@ -140,6 +140,7 @@ export function EditBookingDialog({
           comment: data.comment || null,
           expected_staff_count: data.expected_staff_count,
           client_id: data.client_id || null,
+          campaign_id: data.campaign_id || null,
           updated_at: new Date().toISOString(),
         } as any)
         .eq("id", booking.id);

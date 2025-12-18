@@ -24,10 +24,14 @@ export interface MarketApplication {
       name: string;
       address_city: string | null;
     };
-    brand: {
+    clients: {
+      id: string;
       name: string;
-      color_hex: string;
-    };
+    } | null;
+    client_campaigns: {
+      id: string;
+      name: string;
+    } | null;
   };
   employee?: {
     id: string;
@@ -50,7 +54,8 @@ export function useOpenMarkets() {
         .select(`
           *,
           location (name, address_street, address_city, contact_person_name),
-          brand (name, color_hex)
+          clients (id, name),
+          client_campaigns:campaign_id (id, name)
         `)
         .eq("open_for_applications", true)
         .lte("visible_from", today)
@@ -80,7 +85,8 @@ export function useMyApplications() {
           booking (
             id, start_date, end_date, application_deadline,
             location (name, address_city),
-            brand (name, color_hex)
+            clients (id, name),
+            client_campaigns:campaign_id (id, name)
           )
         `)
         .eq("employee_id", employee.id)
@@ -128,7 +134,8 @@ export function usePendingApplications() {
           booking (
             id, start_date, end_date,
             location (name, address_city),
-            brand (name, color_hex)
+            clients (id, name),
+            client_campaigns:campaign_id (id, name)
           ),
           employee:employee_id (id, first_name, last_name, department)
         `)

@@ -5,7 +5,7 @@ import { useVagtEmployee } from "@/hooks/useVagtEmployee";
 import { useOpenMarkets, useMyApplications, useApplyToMarket } from "@/hooks/useMarketApplications";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { BrandBadge } from "@/components/vagt-flow/BrandBadge";
+import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, MapPin, Clock, Phone, Navigation, Calendar, List, Users, Send, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { 
@@ -27,7 +27,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 
 export default function VagtMinUge() {
   const { data: vagtEmployee } = useVagtEmployee();
@@ -70,7 +69,8 @@ export default function VagtMinUge() {
           booking (
             *,
             location (name, address_street, address_city, contact_person_name, contact_phone),
-            brand (name, color_hex)
+            clients (id, name),
+            client_campaigns:campaign_id (id, name)
           )
         `)
         .eq("employee_id", vagtEmployee.id)
@@ -245,12 +245,7 @@ export default function VagtMinUge() {
                         {dayAssignments.slice(0, 2).map((assignment: any) => (
                           <div
                             key={assignment.id}
-                            className="text-[10px] sm:text-xs px-1 py-0.5 rounded truncate"
-                            style={{ 
-                              backgroundColor: assignment.booking.brand.color_hex + "20",
-                              color: assignment.booking.brand.color_hex,
-                              borderLeft: `2px solid ${assignment.booking.brand.color_hex}`
-                            }}
+                            className="text-[10px] sm:text-xs px-1 py-0.5 rounded truncate bg-primary/10 text-primary border-l-2 border-primary"
                           >
                             <span className="font-medium">{assignment.booking.location.name}</span>
                             <span className="hidden sm:inline text-[9px] opacity-70 ml-1">
@@ -333,8 +328,7 @@ export default function VagtMinUge() {
                               className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 hover:bg-accent cursor-pointer transition-colors"
                             >
                               <div
-                                className="w-1 h-10 rounded-full"
-                                style={{ backgroundColor: assignment.booking.brand.color_hex }}
+                                className="w-1 h-10 rounded-full bg-primary"
                               />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
@@ -350,11 +344,9 @@ export default function VagtMinUge() {
                                   {assignment.start_time?.slice(0, 5)} - {assignment.end_time?.slice(0, 5)}
                                 </div>
                               </div>
-                              <BrandBadge
-                                brandName={assignment.booking.brand.name}
-                                brandColor={assignment.booking.brand.color_hex}
-                                className="text-xs"
-                              />
+                              <Badge variant="secondary" className="text-xs">
+                                {assignment.booking.client_campaigns?.name || assignment.booking.clients?.name || "-"}
+                              </Badge>
                             </div>
                           ))}
                         </div>
@@ -424,10 +416,9 @@ export default function VagtMinUge() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 space-y-2">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <BrandBadge
-                                brandName={market.brand?.name}
-                                brandColor={market.brand?.color_hex}
-                              />
+                              <Badge variant="outline">
+                                {market.clients?.name || "-"}
+                              </Badge>
                               {applied && (
                                 <Badge 
                                   variant={status === "approved" ? "default" : status === "rejected" ? "destructive" : "secondary"}
@@ -546,10 +537,9 @@ export default function VagtMinUge() {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="space-y-1">
-                            <BrandBadge
-                              brandName={assignment.booking.brand.name}
-                              brandColor={assignment.booking.brand.color_hex}
-                            />
+                            <Badge variant="secondary">
+                              {assignment.booking.client_campaigns?.name || assignment.booking.clients?.name || "-"}
+                            </Badge>
                             <p className="font-medium">{assignment.booking.location.name}</p>
                             <p className="text-sm text-muted-foreground">{assignment.booking.location.address_city}</p>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -583,10 +573,9 @@ export default function VagtMinUge() {
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="space-y-1">
-                              <BrandBadge
-                                brandName={market.brand?.name}
-                                brandColor={market.brand?.color_hex}
-                              />
+                              <Badge variant="outline">
+                                {market.clients?.name || "-"}
+                              </Badge>
                               <p className="font-medium">{market.location?.name}</p>
                               <p className="text-sm text-muted-foreground">{market.location?.address_city}</p>
                             </div>
@@ -632,10 +621,9 @@ export default function VagtMinUge() {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <BrandBadge
-                    brandName={selectedAssignment.booking.brand.name}
-                    brandColor={selectedAssignment.booking.brand.color_hex}
-                  />
+                  <Badge variant="secondary">
+                    {selectedAssignment.booking.client_campaigns?.name || selectedAssignment.booking.clients?.name || "-"}
+                  </Badge>
                   Vagtdetaljer
                 </DialogTitle>
               </DialogHeader>

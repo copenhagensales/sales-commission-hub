@@ -68,6 +68,7 @@ export default function BookingsContent() {
           *,
           location(name, address_city, type),
           clients(id, name),
+          client_campaigns:campaign_id(id, name),
           booking_assignment(id, date, employee_id)
         `)
         .eq("week_number", selectedWeek)
