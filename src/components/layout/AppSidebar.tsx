@@ -49,6 +49,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     ["/payroll", "/tdc-erhverv", "/tdc-erhverv-dashboard", "/relatel-dashboard", "/tryg-dashboard", "/ase-dashboard", "/codan", "/mg-test", "/mg-test-dashboard", "/dialer-data", "/adversus-data", "/calls-data", "/team-overview"].includes(location.pathname)
   );
   const [boardsOpen, setBoardsOpen] = useState(location.pathname.startsWith("/boards"));
+  const [dashboardsOpen, setDashboardsOpen] = useState(location.pathname.startsWith("/dashboards"));
   const [testOpen, setTestOpen] = useState(
     ["/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results"].includes(location.pathname)
   );
@@ -709,19 +710,18 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             </Collapsible>
           )}
 
-          {/* Dashboards menu */}
-          {p.canViewDashboard && (
-            <Collapsible open={location.pathname.startsWith("/dashboards")} defaultOpen={location.pathname.startsWith("/dashboards")}>
-              <CollapsibleTrigger className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname.startsWith("/dashboards") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}>
-                <div className="flex items-center gap-3">
-                  <BarChart3 className="h-5 w-5" />
-                  Dashboards
-                </div>
-                {location.pathname.startsWith("/dashboards") ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </CollapsibleTrigger>
+          {/* Dashboards menu - Always visible */}
+          <Collapsible open={dashboardsOpen} onOpenChange={setDashboardsOpen}>
+            <CollapsibleTrigger className={cn(
+              "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              location.pathname.startsWith("/dashboards") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}>
+              <div className="flex items-center gap-3">
+                <Monitor className="h-5 w-5" />
+                Dashboards
+              </div>
+              {dashboardsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
                 <NavLink to="/dashboards/fieldmarketing" onClick={handleNavClick} className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
@@ -758,9 +758,8 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   <BarChart3 className="h-4 w-4" />
                   United
                 </NavLink>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Test menu */}
           {showTestMenu && (
