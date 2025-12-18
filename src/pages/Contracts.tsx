@@ -16,7 +16,7 @@ import { da } from "date-fns/locale";
 import { FileText, Plus, Send, Eye, Check, X, Clock, Edit, Trash2, Search, Upload, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RichTextEditor } from "@/components/contracts/RichTextEditor";
-import { useCanAccess } from "@/hooks/useSystemRoles";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 
 type ContractType = "employment" | "amendment" | "nda" | "company_car" | "termination" | "other";
 type ContractStatus = "draft" | "pending_employee" | "pending_manager" | "signed" | "rejected" | "expired";
@@ -85,7 +85,7 @@ const statusColors: Record<ContractStatus, string> = {
 
 export default function Contracts() {
   const queryClient = useQueryClient();
-  const { isOwner } = useCanAccess();
+  const { canEditContracts } = usePermissions();
   const [searchTerm, setSearchTerm] = useState("");
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ContractTemplate | null>(null);
@@ -414,7 +414,7 @@ export default function Contracts() {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            {isOwner && contract.status !== "signed" && (
+                            {canEditContracts && contract.status !== "signed" && (
                               <Button
                                 variant="ghost"
                                 size="icon"

@@ -21,7 +21,7 @@ import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-import { useCanAccess } from "@/hooks/useSystemRoles";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 interface EmployeeMasterDataRecord {
   id: string;
   first_name: string;
@@ -68,7 +68,7 @@ export default function EmployeeDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isOwner } = useCanAccess();
+  const { canEditEmployees } = usePermissions();
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
   const [sendContractOpen, setSendContractOpen] = useState(false);
   const [setPasswordOpen, setSetPasswordOpen] = useState(false);
@@ -576,7 +576,7 @@ export default function EmployeeDetail() {
               <RotateCcw className="h-4 w-4 mr-2" />
               Nulstil login
             </Button>
-            {isOwner && (
+            {canEditEmployees && (
               <Button 
                 variant="outline" 
                 size="sm"

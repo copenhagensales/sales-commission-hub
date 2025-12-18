@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { useCanAccess } from "@/hooks/useSystemRoles";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 import { EmployeeExcelImport } from "@/components/employees/EmployeeExcelImport";
 import { DialerMappingTab } from "@/components/employees/DialerMappingTab";
 import { TeamsTab } from "@/components/employees/TeamsTab";
@@ -117,7 +117,7 @@ export default function EmployeeMasterData() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [deleteEmployeeId, setDeleteEmployeeId] = useState<string | null>(null);
   
-  const { isOwner } = useCanAccess();
+  const { canEditEmployees } = usePermissions();
 
   const dialogSteps = [
     { title: "Identitet", key: "identity" },
@@ -983,7 +983,7 @@ export default function EmployeeMasterData() {
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          {isOwner && (
+                          {canEditEmployees && (
                             <Button 
                               variant="ghost" 
                               size="icon" 

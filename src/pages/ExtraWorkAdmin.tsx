@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO, subDays } from "date-fns";
 import { da } from "date-fns/locale";
-import { useCanAccess } from "@/hooks/useSystemRoles";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useAuth } from "@/hooks/useAuth";
 
 const STATUS_CONFIG = {
@@ -25,7 +25,7 @@ const STATUS_CONFIG = {
 };
 
 export default function ExtraWorkAdmin() {
-  const { isTeamlederOrAbove, isOwner } = useCanAccess();
+  const { scopeExtraWork, canViewExtraWorkAdmin } = usePermissions();
   const { user } = useAuth();
   
   // Filters
@@ -62,8 +62,8 @@ export default function ExtraWorkAdmin() {
         .eq("is_active", true)
         .order("first_name");
 
-      // If not owner, filter to only their team
-      if (currentEmployee && !isOwner) {
+      // If scope is not "alt", filter to only their team
+      if (currentEmployee && scopeExtraWork !== "alt") {
         query = query.eq("manager_id", currentEmployee.id);
       }
 
@@ -71,7 +71,7 @@ export default function ExtraWorkAdmin() {
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.email && isTeamlederOrAbove,
+    enabled: !!user?.email && canViewExtraWorkAdmin,
   });
 
   // Get extra work entries
@@ -161,7 +161,7 @@ export default function ExtraWorkAdmin() {
       .reduce((sum, e) => sum + Number(e.hours), 0) || 0,
   };
 
-  if (!isTeamlederOrAbove) {
+  if (!canViewExtraWorkAdmin) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-64">

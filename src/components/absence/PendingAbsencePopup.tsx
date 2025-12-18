@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useCanAccess } from "@/hooks/useSystemRoles";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +22,7 @@ const ABSENCE_TYPE_LABELS: Record<string, string> = {
 
 export function PendingAbsencePopup() {
   const { user } = useAuth();
-  const { isTeamlederOrAbove, isOwner } = useCanAccess();
+  const { scopeAbsence, canViewAbsence } = usePermissions();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
@@ -60,8 +60,8 @@ export function PendingAbsencePopup() {
         .or(`postponed_until.is.null,postponed_until.lt.${now}`)
         .order("created_at", { ascending: true });
 
-      // If not owner, filter to team members only
-      if (!isOwner && currentEmployee) {
+      // If scope is not "alt", filter to team members only
+      if (scopeAbsence !== "alt" && currentEmployee) {
         const { data: teamMembers } = await supabase
           .from("employee_master_data")
           .select("id")
@@ -77,7 +77,7 @@ export function PendingAbsencePopup() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user?.email && isTeamlederOrAbove,
+    enabled: !!user?.email && canViewAbsence,
     refetchOnWindowFocus: true,
     staleTime: 30000,
   });
@@ -162,7 +162,7 @@ export function PendingAbsencePopup() {
     }
   };
 
-  if (!isTeamlederOrAbove || !currentRequest) return null;
+  if (!canViewAbsence || !currentRequest) return null;
 
   const employee = currentRequest.employee;
   const employeeName = employee ? `${employee.first_name} ${employee.last_name}` : "Ukendt medarbejder";
