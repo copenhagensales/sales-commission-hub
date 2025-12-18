@@ -108,10 +108,16 @@ export default function VagtBookWeek() {
         .eq("is_active", true);
       if (error) throw error;
       
-      // Filter brands to only those matching Fieldmarketing team clients
+      // Filter brands to only those matching Fieldmarketing team clients (flexible matching)
       if (fieldmarketingClients && fieldmarketingClients.length > 0) {
         const clientNames = fieldmarketingClients.map((c: any) => c.name?.toLowerCase());
-        return data?.filter(brand => clientNames.includes(brand.name?.toLowerCase())) || [];
+        return data?.filter(brand => {
+          const brandNameLower = brand.name?.toLowerCase() || "";
+          // Check if any client name contains the brand name or vice versa
+          return clientNames.some((clientName: string) => 
+            clientName.includes(brandNameLower) || brandNameLower.includes(clientName)
+          );
+        }) || [];
       }
       
       return data;
