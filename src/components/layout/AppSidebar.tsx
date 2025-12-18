@@ -11,6 +11,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { useRolePreview } from "@/contexts/RolePreviewContext";
 
 import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
 import { useIsSomeEmployee } from "@/hooks/useSomeEmployee";
@@ -161,6 +162,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const { isTeamlederOrAbove, isOwner, isRekruttering, isRekrutteringOrAbove, isTeamleder, isSome, isLoading, role } = useCanAccess();
   const { user } = useAuth();
   const positionPermissions = usePermissions();
+  const { isPreviewMode } = useRolePreview();
   
   const { data: isFieldmarketing } = useIsFieldmarketingEmployee();
   const { data: isSomeEmployee, isLoading: isSomeLoading } = useIsSomeEmployee();
@@ -738,8 +740,8 @@ const [personnelOpen, setPersonnelOpen] = useState(
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
                 {vagtFlowNav.filter(item => {
-                  // Filter FM items based on position permissions for non-owners
-                  if (isOwner) return true;
+                  // Filter FM items based on position permissions - in preview mode, only use permissions
+                  if (isOwner && !isPreviewMode) return true;
                   if (item.href === "/vagt-flow") return positionPermissions.canViewFmOverview;
                   if (item.href === "/vagt-flow/min-uge") return positionPermissions.canViewFmMyWeek;
                   if (item.href === "/vagt-flow/book-week") return positionPermissions.canViewFmBookWeek;
