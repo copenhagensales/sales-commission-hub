@@ -104,13 +104,45 @@ export default function VagtBookings() {
     },
   });
 
+  // Fetch Fieldmarketing team and its assigned clients
+  const { data: fieldmarketingClients } = useQuery({
+    queryKey: ["fieldmarketing-team-clients"],
+    queryFn: async () => {
+      // Find Fieldmarketing team
+      const { data: team, error: teamError } = await supabase
+        .from("teams")
+        .select("id")
+        .ilike("name", "%fieldmarketing%")
+        .single();
+      
+      if (teamError || !team) return [];
+      
+      // Get clients assigned to Fieldmarketing team
+      const { data: teamClients, error: tcError } = await supabase
+        .from("team_clients")
+        .select("client_id, clients(id, name)")
+        .eq("team_id", team.id);
+      
+      if (tcError) throw tcError;
+      return teamClients?.map((tc: any) => tc.clients).filter(Boolean) || [];
+    },
+  });
+
   const { data: brands } = useQuery({
-    queryKey: ["vagt-brands"],
+    queryKey: ["vagt-brands", fieldmarketingClients],
     queryFn: async () => {
       const { data, error } = await supabase.from("brand").select("*").eq("is_active", true);
       if (error) throw error;
+      
+      // Filter brands to only those matching Fieldmarketing team clients
+      if (fieldmarketingClients && fieldmarketingClients.length > 0) {
+        const clientNames = fieldmarketingClients.map((c: any) => c.name?.toLowerCase());
+        return data?.filter(brand => clientNames.includes(brand.name?.toLowerCase())) || [];
+      }
+      
       return data;
     },
+    enabled: !!fieldmarketingClients,
   });
 
   // Fetch Fieldmarketing employee IDs first
@@ -466,13 +498,13 @@ export default function VagtBookings() {
                 </Select>
               </div>
               <div>
-                <label className="text-xs font-medium uppercase text-muted-foreground mb-2 block">Brand</label>
+                <label className="text-xs font-medium uppercase text-muted-foreground mb-2 block">Kunde</label>
                 <Select value={brandFilter} onValueChange={setBrandFilter}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Alle brands" />
+                    <SelectValue placeholder="Alle kunder" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Alle brands</SelectItem>
+                    <SelectItem value="all">Alle kunder</SelectItem>
                     {brands?.map((brand) => (
                       <SelectItem key={brand.id} value={brand.id}>
                         {brand.name}
