@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 
 export default function LocationDetail() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +27,8 @@ export default function LocationDetail() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [formData, setFormData] = useState<any>(null);
+  const { canEdit } = usePermissions();
+  const canEditLocation = canEdit("menu_fm_locations");
 
   const { data: location, isLoading } = useQuery({
     queryKey: ["vagt-location", id],
@@ -147,9 +150,11 @@ export default function LocationDetail() {
             <Badge className={`${statusColors[formData.status || "Ny"]} text-white`}>
               {formData.status || "Ny"}
             </Badge>
-            <Button onClick={handleSave} disabled={updateMutation.isPending}>
-              <Save className="h-4 w-4 mr-2" /> Gem ændringer
-            </Button>
+            {canEditLocation && (
+              <Button onClick={handleSave} disabled={updateMutation.isPending}>
+                <Save className="h-4 w-4 mr-2" /> Gem ændringer
+              </Button>
+            )}
           </div>
         </div>
 
@@ -167,6 +172,7 @@ export default function LocationDetail() {
                 <Input
                   value={formData.name || ""}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  disabled={!canEditLocation}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -179,6 +185,7 @@ export default function LocationDetail() {
                       type: v,
                       daily_rate: formData.daily_rate || (v === "Storcenter" ? 1500 : 1000)
                     })}
+                    disabled={!canEditLocation}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Vælg type" />
@@ -196,6 +203,7 @@ export default function LocationDetail() {
                   <Select
                     value={formData.status || "Ny"}
                     onValueChange={(v) => setFormData({ ...formData, status: v })}
+                    disabled={!canEditLocation}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -215,6 +223,7 @@ export default function LocationDetail() {
                   type="number"
                   value={formData.daily_rate || 1000}
                   onChange={(e) => setFormData({ ...formData, daily_rate: parseInt(e.target.value) || 1000 })}
+                  disabled={!canEditLocation}
                 />
               </div>
               <div>
@@ -222,6 +231,7 @@ export default function LocationDetail() {
                 <Input
                   value={formData.region || ""}
                   onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                  disabled={!canEditLocation}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -231,6 +241,7 @@ export default function LocationDetail() {
                     type="number"
                     value={formData.cooldown_weeks || 4}
                     onChange={(e) => setFormData({ ...formData, cooldown_weeks: parseInt(e.target.value) || 4 })}
+                    disabled={!canEditLocation}
                   />
                 </div>
                 <div>
@@ -239,6 +250,7 @@ export default function LocationDetail() {
                     type="date"
                     value={formData.available_after_date || ""}
                     onChange={(e) => setFormData({ ...formData, available_after_date: e.target.value || null })}
+                    disabled={!canEditLocation}
                   />
                 </div>
               </div>
@@ -258,6 +270,7 @@ export default function LocationDetail() {
                 <Input
                   value={formData.address_street || ""}
                   onChange={(e) => setFormData({ ...formData, address_street: e.target.value })}
+                  disabled={!canEditLocation}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -266,6 +279,7 @@ export default function LocationDetail() {
                   <Input
                     value={formData.address_postal_code || ""}
                     onChange={(e) => setFormData({ ...formData, address_postal_code: e.target.value })}
+                    disabled={!canEditLocation}
                   />
                 </div>
                 <div>
@@ -273,6 +287,7 @@ export default function LocationDetail() {
                   <Input
                     value={formData.address_city || ""}
                     onChange={(e) => setFormData({ ...formData, address_city: e.target.value })}
+                    disabled={!canEditLocation}
                   />
                 </div>
               </div>
@@ -292,6 +307,7 @@ export default function LocationDetail() {
                 <Input
                   value={formData.contact_person_name || ""}
                   onChange={(e) => setFormData({ ...formData, contact_person_name: e.target.value })}
+                  disabled={!canEditLocation}
                 />
               </div>
               <div>
@@ -303,6 +319,7 @@ export default function LocationDetail() {
                     value={formData.contact_phone || ""}
                     onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
                     className="flex-1"
+                    disabled={!canEditLocation}
                   />
                   {formData.contact_phone && (
                     <a
@@ -324,6 +341,7 @@ export default function LocationDetail() {
                     value={formData.contact_email || ""}
                     onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
                     className="flex-1"
+                    disabled={!canEditLocation}
                   />
                   {formData.contact_email && (
                     <a
@@ -354,6 +372,7 @@ export default function LocationDetail() {
                       <Checkbox
                         id={`client-${client.id}`}
                         checked={isChecked}
+                        disabled={!canEditLocation}
                         onCheckedChange={(checked) => {
                           const currentIds = formData.bookable_client_ids || [];
                           const newIds = checked
@@ -383,6 +402,7 @@ export default function LocationDetail() {
                 value={formData.notes || ""}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={4}
+                disabled={!canEditLocation}
               />
             </CardContent>
           </Card>
