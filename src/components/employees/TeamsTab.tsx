@@ -31,6 +31,7 @@ interface Employee {
 interface Client {
   id: string;
   name: string;
+  logo_url: string | null;
 }
 
 export function TeamsTab() {
@@ -95,7 +96,7 @@ export function TeamsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name")
+        .select("id, name, logo_url")
         .order("name");
       if (error) throw error;
       return data as Client[];
@@ -363,12 +364,21 @@ export function TeamsTab() {
                         : "-"}
                     </TableCell>
                     <TableCell className="py-3">
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1.5">
                         {teamClientIds.length > 0 ? (
                           teamClientIds.slice(0, 3).map((clientId) => {
                             const client = clients.find((c) => c.id === clientId);
                             return client ? (
-                              <Badge key={clientId} variant="secondary" className="text-xs">
+                              <Badge key={clientId} variant="secondary" className="text-xs flex items-center gap-1.5 pr-2">
+                                {client.logo_url ? (
+                                  <img
+                                    src={client.logo_url}
+                                    alt=""
+                                    className="h-4 w-4 object-contain rounded-sm"
+                                  />
+                                ) : (
+                                  <Building2 className="h-3 w-3" />
+                                )}
                                 {client.name}
                               </Badge>
                             ) : null;

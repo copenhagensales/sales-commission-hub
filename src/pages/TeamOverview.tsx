@@ -22,6 +22,7 @@ interface TopSeller {
 interface ClientData {
   clientId: string;
   clientName: string;
+  clientLogo: string | null;
   salesToday: number;
   commissionToday: number;
   topSellers: TopSeller[];
@@ -62,7 +63,8 @@ export default function TeamOverview() {
             client_id,
             clients (
               id,
-              name
+              name,
+              logo_url
             )
           )
         `)
@@ -161,6 +163,7 @@ export default function TeamOverview() {
             return {
               clientId,
               clientName: tc.clients.name,
+              clientLogo: tc.clients.logo_url || null,
               salesToday: stats?.sales || 0,
               commissionToday: stats?.commission || 0,
               topSellers,
@@ -334,8 +337,12 @@ export default function TeamOverview() {
                             {/* Client Header */}
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-3">
-                                <div className="h-8 w-8 rounded-md bg-background flex items-center justify-center border">
-                                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                                <div className="h-8 w-8 rounded-md bg-background flex items-center justify-center border overflow-hidden">
+                                  {client.clientLogo ? (
+                                    <img src={client.clientLogo} alt="" className="h-6 w-6 object-contain" />
+                                  ) : (
+                                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                                  )}
                                 </div>
                                 <span className="font-semibold">{client.clientName}</span>
                               </div>
