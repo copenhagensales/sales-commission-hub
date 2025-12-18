@@ -167,10 +167,18 @@ export function usePositionPermissions() {
       }
 
       // Check if owner position - always full permissions
+      console.log("usePositionPermissions: Checking owner", { 
+        jobTitle: employee.job_title, 
+        ownerName: OWNER_POSITION_NAME,
+        isOwner: employee.job_title.toLowerCase() === OWNER_POSITION_NAME.toLowerCase()
+      });
+      
       if (employee.job_title.toLowerCase() === OWNER_POSITION_NAME.toLowerCase()) {
+        const allPermissions = generateAllPermissions();
+        console.log("usePositionPermissions: Owner detected, returning full permissions", allPermissions);
         return {
-          position: { id: "owner", name: OWNER_POSITION_NAME, permissions: generateAllPermissions() },
-          permissions: generateAllPermissions(),
+          position: { id: "owner", name: OWNER_POSITION_NAME, permissions: allPermissions },
+          permissions: allPermissions,
         };
       }
 
