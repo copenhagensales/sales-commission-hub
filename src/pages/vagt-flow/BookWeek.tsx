@@ -185,10 +185,9 @@ export default function VagtBookWeek() {
     };
 
     locations.forEach((loc: any) => {
-      // Check if client can book this location (flexible name matching)
-      const canBookEesy = clientName.includes("eesy") && loc.can_book_eesy;
-      const canBookYousee = clientName.includes("yousee") && loc.can_book_yousee;
-      const canBook = canBookEesy || canBookYousee;
+      // Check if client can book this location using bookable_client_ids array
+      const bookableIds = loc.bookable_client_ids || [];
+      const canBook = selectedClientId && bookableIds.includes(selectedClientId);
       
       // Check if already booked this week for this client
       const hasBookingInWeek = loc.booking?.some(
