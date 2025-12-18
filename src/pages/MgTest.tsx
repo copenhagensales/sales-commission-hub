@@ -221,6 +221,7 @@ export default function MgTest() {
   const [newProduct, setNewProduct] = useState<{
     name: string;
     clientId: string;
+    campaignId: string;
     commission: string;
     revenue: string;
     externalCode: string;
@@ -229,6 +230,7 @@ export default function MgTest() {
   }>({
     name: "",
     clientId: "",
+    campaignId: "",
     commission: "0",
     revenue: "0",
     externalCode: "",
@@ -986,9 +988,10 @@ export default function MgTest() {
       const commission = parseFloat(productData.commission.replace(",", ".")) || 0;
       const revenue = parseFloat(productData.revenue.replace(",", ".")) || 0;
 
-      // Find or create client_campaign for the selected client
-      let clientCampaignId: string | null = null;
-      if (productData.clientId) {
+      // Use selected campaign or find/create default client_campaign for the selected client
+      let clientCampaignId: string | null = productData.campaignId || null;
+      
+      if (!clientCampaignId && productData.clientId) {
         const { data: campaigns } = await supabase
           .from("client_campaigns")
           .select("id")
@@ -1046,6 +1049,7 @@ export default function MgTest() {
       setNewProduct({
         name: "",
         clientId: "",
+        campaignId: "",
         commission: "0",
         revenue: "0",
         externalCode: "",
@@ -3015,7 +3019,7 @@ export default function MgTest() {
               <Label htmlFor="product-client">Kunde</Label>
               <Select
                 value={newProduct.clientId || undefined}
-                onValueChange={(value) => setNewProduct((prev) => ({ ...prev, clientId: value }))}
+                onValueChange={(value) => setNewProduct((prev) => ({ ...prev, clientId: value, campaignId: "" }))}
               >
                 <SelectTrigger id="product-client">
                   <SelectValue placeholder="Vælg kunde" />
@@ -3029,6 +3033,28 @@ export default function MgTest() {
                 </SelectContent>
               </Select>
             </div>
+            {newProduct.clientId && (
+              <div className="space-y-2">
+                <Label htmlFor="product-campaign">Kampagne</Label>
+                <Select
+                  value={newProduct.campaignId || undefined}
+                  onValueChange={(value) => setNewProduct((prev) => ({ ...prev, campaignId: value }))}
+                >
+                  <SelectTrigger id="product-campaign">
+                    <SelectValue placeholder="Vælg kampagne (valgfrit)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clientCampaigns
+                      ?.filter((c) => c.client_id === newProduct.clientId)
+                      .map((campaign) => (
+                        <SelectItem key={campaign.id} value={campaign.id}>
+                          {campaign.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             
             {/* Standard provision/revenue */}
             <div className="space-y-2">
@@ -3128,11 +3154,17 @@ export default function MgTest() {
                           <SelectValue placeholder="Vælg kampagne" />
                         </SelectTrigger>
                         <SelectContent>
-                          {campaignMappings?.map((campaign) => (
-                            <SelectItem key={campaign.id} value={campaign.id} className="text-xs">
-                              {campaign.adversus_campaign_name || campaign.adversus_campaign_id}
-                            </SelectItem>
-                          ))}
+                          {campaignMappings
+                            ?.filter((campaign) => {
+                              if (!newProduct.clientId) return false;
+                              const clientCampaign = clientCampaigns?.find(c => c.id === campaign.client_campaign_id);
+                              return clientCampaign?.client_id === newProduct.clientId;
+                            })
+                            .map((campaign) => (
+                              <SelectItem key={campaign.id} value={campaign.id} className="text-xs">
+                                {campaign.adversus_campaign_name || campaign.adversus_campaign_id}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                       <div className="grid grid-cols-2 gap-2">
