@@ -3,8 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, ChevronDown, ChevronUp, Save } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
 interface CampaignMapping {
@@ -34,7 +33,6 @@ export function ProductCampaignOverrides({
   baseRevenue,
 }: ProductCampaignOverridesProps) {
   const queryClient = useQueryClient();
-  const [isExpanded, setIsExpanded] = useState(false);
   const [editedOverrides, setEditedOverrides] = useState<Record<string, { commission: string; revenue: string }>>({});
 
   // Fetch all campaign mappings
@@ -48,7 +46,6 @@ export function ProductCampaignOverrides({
       if (error) throw error;
       return data as CampaignMapping[];
     },
-    enabled: isExpanded,
   });
 
   // Fetch existing overrides for this product
@@ -62,7 +59,7 @@ export function ProductCampaignOverrides({
       if (error) throw error;
       return data as Override[];
     },
-    enabled: isExpanded && !!productId,
+    enabled: !!productId,
   });
 
   // Initialize edited values when overrides load
@@ -168,101 +165,80 @@ export function ProductCampaignOverrides({
     return existingOverrides?.some((o) => o.campaign_mapping_id === campaignId);
   };
 
-  const overrideCount = existingOverrides?.length ?? 0;
-
   return (
-    <div className="mt-2">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 px-2 text-xs gap-1"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-        Kampagne-overrides
-        {overrideCount > 0 && (
-          <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
-            {overrideCount}
-          </Badge>
-        )}
-      </Button>
+    <div className="mt-2 p-3 bg-muted/50 rounded-md border">
+      <p className="text-xs text-muted-foreground mb-3">
+        Sæt forskellige provision/omsætning alt efter hvilken kampagne produktet "{productName}" kommer fra.
+        Standard: {baseCommission} kr provision, {baseRevenue} kr omsætning.
+      </p>
 
-      {isExpanded && (
-        <div className="mt-2 p-3 bg-muted/50 rounded-md border">
-          <p className="text-xs text-muted-foreground mb-3">
-            Sæt forskellige provision/omsætning alt efter hvilken kampagne produktet "{productName}" kommer fra.
-            Standard: {baseCommission} kr provision, {baseRevenue} kr omsætning.
-          </p>
+      {(loadingCampaigns || loadingOverrides) ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Indlæser kampagner...
+        </div>
+      ) : !campaigns || campaigns.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Ingen kampagner fundet.</p>
+      ) : (
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {campaigns.map((campaign) => {
+            const override = getOverrideForCampaign(campaign.id);
+            const edited = editedOverrides[campaign.id] ?? {
+              commission: override ? String(override.commission_dkk) : "",
+              revenue: override ? String(override.revenue_dkk) : "",
+            };
+            const hasChanged =
+              edited.commission !== (override ? String(override.commission_dkk) : "") ||
+              edited.revenue !== (override ? String(override.revenue_dkk) : "");
 
-          {(loadingCampaigns || loadingOverrides) ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Indlæser kampagner...
-            </div>
-          ) : !campaigns || campaigns.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Ingen kampagner fundet.</p>
-          ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {campaigns.map((campaign) => {
-                const override = getOverrideForCampaign(campaign.id);
-                const edited = editedOverrides[campaign.id] ?? {
-                  commission: override ? String(override.commission_dkk) : "",
-                  revenue: override ? String(override.revenue_dkk) : "",
-                };
-                const hasChanged =
-                  edited.commission !== (override ? String(override.commission_dkk) : "") ||
-                  edited.revenue !== (override ? String(override.revenue_dkk) : "");
-
-                return (
-                  <div
-                    key={campaign.id}
-                    className={`flex items-center gap-2 p-2 rounded ${
-                      hasOverride(campaign.id) ? "bg-primary/5 border border-primary/20" : "bg-background"
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-medium truncate block">
-                        {campaign.adversus_campaign_name || campaign.adversus_campaign_id}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-muted-foreground">Prov:</span>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          className="h-7 w-16 text-xs"
-                          placeholder={String(baseCommission)}
-                          value={edited.commission}
-                          onChange={(e) => handleInputChange(campaign.id, "commission", e.target.value)}
-                        />
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-muted-foreground">Oms:</span>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          className="h-7 w-16 text-xs"
-                          placeholder={String(baseRevenue)}
-                          value={edited.revenue}
-                          onChange={(e) => handleInputChange(campaign.id, "revenue", e.target.value)}
-                        />
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => handleSave(campaign.id)}
-                        disabled={!hasChanged && !edited.commission && !edited.revenue}
-                      >
-                        <Save className="h-3 w-3" />
-                      </Button>
-                    </div>
+            return (
+              <div
+                key={campaign.id}
+                className={`flex items-center gap-2 p-2 rounded ${
+                  hasOverride(campaign.id) ? "bg-primary/5 border border-primary/20" : "bg-background"
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-medium truncate block">
+                    {campaign.adversus_campaign_name || campaign.adversus_campaign_id}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">Prov:</span>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      className="h-7 w-16 text-xs"
+                      placeholder={String(baseCommission)}
+                      value={edited.commission}
+                      onChange={(e) => handleInputChange(campaign.id, "commission", e.target.value)}
+                    />
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">Oms:</span>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      className="h-7 w-16 text-xs"
+                      placeholder={String(baseRevenue)}
+                      value={edited.revenue}
+                      onChange={(e) => handleInputChange(campaign.id, "revenue", e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => handleSave(campaign.id)}
+                    disabled={!hasChanged && !edited.commission && !edited.revenue}
+                  >
+                    <Save className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
