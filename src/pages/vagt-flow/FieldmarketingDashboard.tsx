@@ -360,18 +360,7 @@ const FieldmarketingDashboard = () => {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center gap-6">
-          {activeClient?.logoUrl ? (
-            <img 
-              src={activeClient.logoUrl} 
-              alt={activeClient.name} 
-              className="h-16 w-auto object-contain"
-            />
-          ) : (
-            <div className="h-16 w-32 bg-muted rounded-lg flex items-center justify-center">
-              <span className="text-xl font-bold text-muted-foreground">{activeClient?.name}</span>
-            </div>
-          )}
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">
               Fieldmarketing Dashboard
@@ -380,6 +369,17 @@ const FieldmarketingDashboard = () => {
               Oversigt over salg fra fieldmarketing events
             </p>
           </div>
+          {activeClient?.logoUrl ? (
+            <img 
+              src={activeClient.logoUrl} 
+              alt={activeClient.name} 
+              className="h-16 w-auto object-contain"
+            />
+          ) : (
+            <div className="h-16 px-6 bg-muted rounded-lg flex items-center justify-center">
+              <span className="text-xl font-bold text-muted-foreground">{activeClient?.name}</span>
+            </div>
+          )}
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
