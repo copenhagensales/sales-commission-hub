@@ -835,6 +835,44 @@ export type Database = {
           },
         ]
       }
+      client_monthly_goals: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          month: number
+          sales_target: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          month: number
+          sales_target?: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          month?: number
+          sales_target?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_monthly_goals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           created_at: string | null
