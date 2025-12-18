@@ -164,9 +164,9 @@ export const routes: RouteConfig[] = [
   { path: "/client-sales-overview", component: ClientSalesOverview, access: "role", positionPermission: "menu_sales" },
   { path: "/boards/sales", component: SalesDashboard, access: "public" },
   
-  // Team Dashboards (full screen, no sidebar)
-  { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "role", positionPermission: "menu_fm_sales_registration" },
-  { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "role", positionPermission: "menu_dashboard" },
+  // Team Dashboards (full screen, no sidebar) - public access for TV displays
+  { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "public" },
+  { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "public" },
   
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
 
