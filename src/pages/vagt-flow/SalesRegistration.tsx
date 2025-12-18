@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Minus, Phone, Save, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateFieldmarketingSale, FIELDMARKETING_CLIENTS } from "@/hooks/useFieldmarketingSales";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ProductSelection {
   productId: string;
@@ -30,8 +31,8 @@ interface ProductSelection {
 const SalesRegistration = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeClient, setActiveClient] = useState<string>(FIELDMARKETING_CLIENTS.EESY_FM);
-  const [sellerId, setSellerId] = useState<string>("");
   const [locationId, setLocationId] = useState<string>("");
   const [comment, setComment] = useState("");
   const [productSelections, setProductSelections] = useState<ProductSelection[]>([]);
@@ -39,19 +40,21 @@ const SalesRegistration = () => {
   
   const createSalesMutation = useCreateFieldmarketingSale();
 
-  // Fetch fieldmarketing employees
-  const { data: employees } = useQuery({
-    queryKey: ["fieldmarketing-employees"],
+  // Get current employee ID from logged-in user
+  const { data: currentEmployee } = useQuery({
+    queryKey: ["current-employee", user?.email],
     queryFn: async () => {
+      if (!user?.email) return null;
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name")
-        .eq("job_title", "Fieldmarketing")
+        .or(`private_email.ilike.${user.email},work_email.ilike.${user.email}`)
         .eq("is_active", true)
-        .order("first_name");
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
+    enabled: !!user?.email,
   });
 
   // Fetch locations
@@ -101,7 +104,6 @@ const SalesRegistration = () => {
   // Reset form when client tab changes
   const handleClientChange = (clientId: string) => {
     setActiveClient(clientId);
-    setSellerId("");
     setLocationId("");
     setComment("");
     setProductSelections([]);
@@ -184,8 +186,8 @@ const SalesRegistration = () => {
   };
 
   const handleSubmit = async () => {
-    if (!sellerId) {
-      toast.error("Vælg en sælger");
+    if (!currentEmployee) {
+      toast.error("Kunne ikke finde din medarbejderprofil");
       return;
     }
     if (!locationId) {
@@ -212,7 +214,7 @@ const SalesRegistration = () => {
       // Create sales records - one per product/phone combination
       const salesRecords = productSelections.flatMap((selection) =>
         selection.phoneNumbers.map((phone) => ({
-          seller_id: sellerId,
+          seller_id: currentEmployee.id,
           location_id: locationId,
           client_id: activeClient,
           product_name: selection.productName,
@@ -226,7 +228,6 @@ const SalesRegistration = () => {
       toast.success(`${salesRecords.length} salg registreret!`);
 
       // Reset form
-      setSellerId("");
       setLocationId("");
       setComment("");
       setProductSelections([]);
@@ -249,23 +250,6 @@ const SalesRegistration = () => {
             <CardTitle className="text-lg">Salgsoplysninger</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Sælger */}
-            <div className="space-y-2">
-              <Label htmlFor="seller">Sælger *</Label>
-              <Select value={sellerId} onValueChange={setSellerId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Vælg sælger" />
-                </SelectTrigger>
-                <SelectContent>
-                  {employees?.map((emp) => (
-                    <SelectItem key={emp.id} value={emp.id}>
-                      {emp.first_name} {emp.last_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Lokation */}
             <div className="space-y-2">
               <Label htmlFor="location">Lokation *</Label>
@@ -399,7 +383,7 @@ const SalesRegistration = () => {
           onClick={handleSubmit}
           className="w-full"
           size="lg"
-          disabled={!sellerId || !locationId || productSelections.length === 0 || isSubmitting}
+          disabled={!currentEmployee || !locationId || productSelections.length === 0 || isSubmitting}
         >
           <Save className="h-5 w-5 mr-2" />
           {isSubmitting ? "Gemmer..." : "Registrer salg"}
