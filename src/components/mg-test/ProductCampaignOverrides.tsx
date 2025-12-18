@@ -10,6 +10,8 @@ interface CampaignMapping {
   id: string;
   adversus_campaign_id: string;
   adversus_campaign_name: string | null;
+  client_campaign_id: string | null;
+  client_campaigns: { client_id: string } | null;
 }
 
 interface Override {
@@ -24,6 +26,7 @@ interface ProductCampaignOverridesProps {
   productName: string;
   baseCommission: number;
   baseRevenue: number;
+  clientId?: string;
 }
 
 export function ProductCampaignOverrides({
@@ -31,18 +34,31 @@ export function ProductCampaignOverrides({
   productName,
   baseCommission,
   baseRevenue,
+  clientId,
 }: ProductCampaignOverridesProps) {
   const queryClient = useQueryClient();
   const [editedOverrides, setEditedOverrides] = useState<Record<string, { commission: string; revenue: string }>>({});
 
-  // Fetch all campaign mappings
+  // Fetch campaign mappings filtered by client
   const { data: campaigns, isLoading: loadingCampaigns } = useQuery({
-    queryKey: ["campaign-mappings-for-overrides"],
+    queryKey: ["campaign-mappings-for-overrides", clientId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("adversus_campaign_mappings")
-        .select("id, adversus_campaign_id, adversus_campaign_name")
+        .select(`
+          id, 
+          adversus_campaign_id, 
+          adversus_campaign_name,
+          client_campaign_id,
+          client_campaigns!inner(client_id)
+        `)
         .order("adversus_campaign_name");
+      
+      if (clientId) {
+        query = query.eq("client_campaigns.client_id", clientId);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data as CampaignMapping[];
     },

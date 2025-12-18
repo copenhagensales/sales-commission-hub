@@ -2160,6 +2160,7 @@ export default function MgTest() {
                                             productName={row.product.name || row.adversus_product_title || "Produkt"}
                                             baseCommission={row.product.commission_dkk ?? 0}
                                             baseRevenue={row.product.revenue_dkk ?? 0}
+                                            clientId={clientCampaigns?.find(c => c.id === row.product?.client_campaign_id)?.client_id}
                                           />
                                         </TableCell>
                                       </TableRow>
