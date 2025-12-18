@@ -235,6 +235,89 @@ const Home = () => {
     },
   });
 
+  // Fetch employee's personal sales stats via agent mapping
+  const { data: personalStats } = useQuery({
+    queryKey: ["home-personal-stats", employee?.id],
+    queryFn: async () => {
+      if (!employee?.id) return null;
+      
+      // Get agent mappings for this employee
+      const { data: mappings } = await supabase
+        .from("employee_agent_mapping")
+        .select("agent_id, agents(name)")
+        .eq("employee_id", employee.id);
+      
+      if (!mappings || mappings.length === 0) return null;
+      
+      const agentNames = mappings.map(m => (m.agents as { name: string } | null)?.name).filter(Boolean);
+      if (agentNames.length === 0) return null;
+      
+      const now = new Date();
+      const monthStart = startOfMonth(now).toISOString();
+      const monthEnd = endOfMonth(now).toISOString();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+      
+      // Fetch monthly sales for this employee's agents
+      const { data: monthlySales } = await supabase
+        .from("sales")
+        .select(`
+          id,
+          agent_name,
+          sale_datetime,
+          sale_items (
+            id,
+            mapped_commission,
+            quantity
+          )
+        `)
+        .in("agent_name", agentNames)
+        .gte("sale_datetime", monthStart)
+        .lte("sale_datetime", monthEnd);
+      
+      // Fetch today's sales
+      const { data: todaySales } = await supabase
+        .from("sales")
+        .select(`
+          id,
+          agent_name,
+          sale_datetime,
+          sale_items (
+            id,
+            mapped_commission,
+            quantity
+          )
+        `)
+        .in("agent_name", agentNames)
+        .gte("sale_datetime", todayStart)
+        .lte("sale_datetime", todayEnd);
+      
+      // Calculate totals
+      const monthlyCommission = monthlySales?.reduce((total, sale) => {
+        return total + (sale.sale_items?.reduce((sum, item) => {
+          return sum + ((item.mapped_commission || 0) * (item.quantity || 1));
+        }, 0) || 0);
+      }, 0) || 0;
+      
+      const monthlySalesCount = monthlySales?.length || 0;
+      const todaySalesCount = todaySales?.length || 0;
+      
+      const todayCommission = todaySales?.reduce((total, sale) => {
+        return total + (sale.sale_items?.reduce((sum, item) => {
+          return sum + ((item.mapped_commission || 0) * (item.quantity || 1));
+        }, 0) || 0);
+      }, 0) || 0;
+      
+      return {
+        monthlyCommission,
+        monthlySalesCount,
+        todaySalesCount,
+        todayCommission
+      };
+    },
+    enabled: !!employee?.id,
+  });
+
   // Fetch new employees (started this month)
   const { data: newEmployees = [] } = useQuery({
     queryKey: ["home-new-employees"],
@@ -494,28 +577,36 @@ const Home = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="text-center py-4">
-                <div className="text-4xl font-bold text-primary mb-1">68%</div>
-                <p className="text-sm text-muted-foreground">af dit månedsmål</p>
-              </div>
-              
-              <div className="space-y-3 pt-2 border-t">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Estimeret provision</span>
-                  <span className="font-semibold">12.450 kr</span>
+              {personalStats ? (
+                <>
+                  <div className="text-center py-4">
+                    <div className="text-4xl font-bold text-primary mb-1">
+                      {formatCommission(personalStats.monthlyCommission)}
+                    </div>
+                    <p className="text-sm text-muted-foreground">provision denne måned</p>
+                  </div>
+                  
+                  <div className="space-y-3 pt-2 border-t">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Salg denne måned</span>
+                      <span className="font-semibold">{personalStats.monthlySalesCount}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Salg i dag</span>
+                      <span className="font-semibold">{personalStats.todaySalesCount}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Provision i dag</span>
+                      <span className="font-semibold">{formatCommission(personalStats.todayCommission)}</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <p className="text-sm">Ingen agent mapping fundet.</p>
+                  <p className="text-xs mt-1">Kontakt din leder for at blive koblet til en dialer agent.</p>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Til næste niveau</span>
-                  <Badge variant="outline" className="text-primary border-primary/30">
-                    5 salg mere
-                  </Badge>
-                </div>
-              </div>
-              
-              <Button className="w-full mt-4" variant="default">
-                Se mine tal
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
+              )}
             </CardContent>
           </Card>
         </div>
