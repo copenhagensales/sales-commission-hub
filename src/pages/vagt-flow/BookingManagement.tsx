@@ -33,13 +33,13 @@ export default function BookingManagement() {
               <Calendar className="h-4 w-4" />
               {t("sidebar.bookWeek", "Book uge")}
             </TabsTrigger>
-            <TabsTrigger value="locations" className="flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              {t("sidebar.locations", "Lokationer")}
-            </TabsTrigger>
             <TabsTrigger value="bookings" className="flex items-center gap-2">
               <ListChecks className="h-4 w-4" />
               {t("sidebar.bookings", "Bookinger")}
+            </TabsTrigger>
+            <TabsTrigger value="locations" className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              {t("sidebar.locations", "Lokationer")}
             </TabsTrigger>
           </TabsList>
 
@@ -49,15 +49,15 @@ export default function BookingManagement() {
             </Suspense>
           </TabsContent>
 
-          <TabsContent value="locations" className="mt-6">
-            <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
-              <LocationsContent />
-            </Suspense>
-          </TabsContent>
-
           <TabsContent value="bookings" className="mt-6">
             <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
               <BookingsContent />
+            </Suspense>
+          </TabsContent>
+
+          <TabsContent value="locations" className="mt-6">
+            <Suspense fallback={<div className="flex items-center justify-center py-12">Indlæser...</div>}>
+              <LocationsContent />
             </Suspense>
           </TabsContent>
         </Tabs>
