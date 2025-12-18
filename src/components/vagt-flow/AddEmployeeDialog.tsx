@@ -45,6 +45,16 @@ interface EmployeeAbsence {
   status: string;
 }
 
+interface ExistingAssignment {
+  id: string;
+  employee_id: string;
+  date: string;
+  booking_id: string;
+  booking?: {
+    location?: { name: string };
+  };
+}
+
 interface AddEmployeeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -103,6 +113,35 @@ export function AddEmployeeDialog({
     enabled: open && employeeIds.length > 0,
   });
 
+  // Fetch existing booking assignments for the week period (excluding current booking)
+  const { data: existingAssignments = [] } = useQuery({
+    queryKey: ["existing-assignments-week", format(weekStart, "yyyy-MM-dd"), format(weekEnd, "yyyy-MM-dd"), employeeIds, booking?.id],
+    queryFn: async () => {
+      if (employeeIds.length === 0) return [];
+      
+      const weekDates = Array.from({ length: 7 }, (_, i) => 
+        format(addDays(weekStart, i), "yyyy-MM-dd")
+      );
+      
+      let query = supabase
+        .from("booking_assignment")
+        .select("id, employee_id, date, booking_id, booking:booking_id(location:location_id(name))")
+        .in("employee_id", employeeIds)
+        .in("date", weekDates);
+      
+      // Exclude current booking's assignments
+      if (booking?.id) {
+        query = query.neq("booking_id", booking.id);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      return data as ExistingAssignment[];
+    },
+    enabled: open && employeeIds.length > 0,
+  });
+
   // Create a map of employee absences by day with type info
   const absencesByEmployeeAndDay = useMemo(() => {
     const map = new Map<string, Map<number, string>>();
@@ -125,6 +164,27 @@ export function AddEmployeeDialog({
     
     return map;
   }, [absences, weekStart]);
+
+  // Create a map of existing bookings by employee and day
+  const bookingsByEmployeeAndDay = useMemo(() => {
+    const map = new Map<string, Map<number, string>>();
+    
+    existingAssignments.forEach((assignment) => {
+      const assignmentDate = parseISO(assignment.date);
+      const dayIndex = Math.floor((assignmentDate.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (dayIndex >= 0 && dayIndex < 7) {
+        const key = assignment.employee_id;
+        if (!map.has(key)) {
+          map.set(key, new Map());
+        }
+        const locationName = (assignment.booking as any)?.location?.name || "Anden lokation";
+        map.get(key)!.set(dayIndex, locationName);
+      }
+    });
+    
+    return map;
+  }, [existingAssignments, weekStart]);
 
   // Get employees with absence in the selected days
   const employeesWithAbsence = useMemo(() => {
@@ -153,9 +213,46 @@ export function AddEmployeeDialog({
     return result;
   }, [selectedEmployees, selectedDays, absencesByEmployeeAndDay, filteredEmployees]);
 
+  // Get employees already booked on selected days
+  const employeesAlreadyBooked = useMemo(() => {
+    const result: { employeeId: string; employeeName: string; days: { dayIndex: number; location: string }[] }[] = [];
+    
+    selectedEmployees.forEach((empId) => {
+      if (!empId) return;
+      const bookedDays = bookingsByEmployeeAndDay.get(empId);
+      if (bookedDays) {
+        const overlappingDays = Array.from(selectedDays)
+          .filter((d) => bookedDays.has(d))
+          .map((d) => ({ dayIndex: d, location: bookedDays.get(d) || "Anden lokation" }));
+        if (overlappingDays.length > 0) {
+          const emp = filteredEmployees.find((e) => e.id === empId);
+          if (emp) {
+            result.push({
+              employeeId: empId,
+              employeeName: emp.full_name,
+              days: overlappingDays,
+            });
+          }
+        }
+      }
+    });
+    
+    return result;
+  }, [selectedEmployees, selectedDays, bookingsByEmployeeAndDay, filteredEmployees]);
+
   // Check if a specific employee has absence on a specific day
   const hasAbsenceOnDay = (employeeId: string, dayIndex: number) => {
     return absencesByEmployeeAndDay.get(employeeId)?.has(dayIndex) || false;
+  };
+
+  // Check if a specific employee is already booked on a specific day
+  const isBookedOnDay = (employeeId: string, dayIndex: number) => {
+    return bookingsByEmployeeAndDay.get(employeeId)?.has(dayIndex) || false;
+  };
+
+  // Get booking location for employee on day
+  const getBookingLocationOnDay = (employeeId: string, dayIndex: number) => {
+    return bookingsByEmployeeAndDay.get(employeeId)?.get(dayIndex) || null;
   };
 
   // Get absence type for employee on day
@@ -166,6 +263,11 @@ export function AddEmployeeDialog({
   // Check if any selected employee has absence on a specific day
   const anySelectedHasAbsenceOnDay = (dayIndex: number) => {
     return selectedEmployees.some((empId) => empId && hasAbsenceOnDay(empId, dayIndex));
+  };
+
+  // Check if any selected employee is already booked on a specific day
+  const anySelectedIsBookedOnDay = (dayIndex: number) => {
+    return selectedEmployees.some((empId) => empId && isBookedOnDay(empId, dayIndex));
   };
 
   useEffect(() => {
@@ -255,16 +357,21 @@ export function AddEmployeeDialog({
             
             {selectedEmployees.map((emp, index) => {
               const hasAbsence = emp && absencesByEmployeeAndDay.has(emp);
+              const hasBooking = emp && bookingsByEmployeeAndDay.has(emp);
               const absenceTypes = emp && hasAbsence 
                 ? [...new Set(Array.from(absencesByEmployeeAndDay.get(emp)!.values()))]
                 : [];
+              const bookingLocations = emp && hasBooking
+                ? [...new Set(Array.from(bookingsByEmployeeAndDay.get(emp)!.values()))]
+                : [];
+              const hasWarning = hasAbsence || hasBooking;
               return (
                 <div key={index} className="flex items-center gap-2">
                   <Select
                     value={emp || ""}
                     onValueChange={(value) => updateEmployee(index, value)}
                   >
-                    <SelectTrigger className={`flex-1 bg-background text-foreground ${hasAbsence ? "border-red-500 bg-red-50 dark:bg-red-950/20" : ""}`}>
+                    <SelectTrigger className={`flex-1 bg-background text-foreground ${hasAbsence ? "border-red-500 bg-red-50 dark:bg-red-950/20" : hasBooking ? "border-amber-500 bg-amber-50 dark:bg-amber-950/20" : ""}`}>
                       <SelectValue placeholder={`Medarbejder ${index + 1} (valgfri)`} />
                     </SelectTrigger>
                     <SelectContent className="bg-popover">
@@ -272,15 +379,20 @@ export function AddEmployeeDialog({
                         .filter(e => !selectedEmployees.includes(e.id) || e.id === emp)
                         .map((employee) => {
                           const empAbsences = absencesByEmployeeAndDay.get(employee.id);
+                          const empBookings = bookingsByEmployeeAndDay.get(employee.id);
                           const empHasAbsence = !!empAbsences;
+                          const empHasBooking = !!empBookings;
                           const empAbsenceTypes = empHasAbsence 
                             ? [...new Set(Array.from(empAbsences.values()))]
+                            : [];
+                          const empBookingLocations = empHasBooking
+                            ? [...new Set(Array.from(empBookings.values()))]
                             : [];
                           return (
                             <SelectItem 
                               key={employee.id} 
                               value={employee.id} 
-                              className={`text-popover-foreground ${empHasAbsence ? "text-red-600 bg-red-50 dark:bg-red-950/20" : ""}`}
+                              className={`text-popover-foreground ${empHasAbsence ? "text-red-600 bg-red-50 dark:bg-red-950/20" : empHasBooking ? "text-amber-600 bg-amber-50 dark:bg-amber-950/20" : ""}`}
                             >
                               <span className="flex items-center gap-2">
                                 {employee.full_name}
@@ -288,6 +400,12 @@ export function AddEmployeeDialog({
                                   <>
                                     <AlertTriangle className="h-3 w-3 text-red-500" />
                                     <span className="text-xs text-red-500">({empAbsenceTypes.join(", ")})</span>
+                                  </>
+                                )}
+                                {empHasBooking && !empHasAbsence && (
+                                  <>
+                                    <AlertTriangle className="h-3 w-3 text-amber-500" />
+                                    <span className="text-xs text-amber-500">(Booket)</span>
                                   </>
                                 )}
                               </span>
@@ -299,6 +417,11 @@ export function AddEmployeeDialog({
                   {hasAbsence && (
                     <span className="text-xs text-red-600 whitespace-nowrap">
                       {absenceTypes.join(", ")}
+                    </span>
+                  )}
+                  {hasBooking && !hasAbsence && (
+                    <span className="text-xs text-amber-600 whitespace-nowrap">
+                      Booket
                     </span>
                   )}
                   {selectedEmployees.length > 1 && (
@@ -355,19 +478,49 @@ export function AddEmployeeDialog({
             </div>
           )}
 
+          {/* Warning for employees already booked */}
+          {employeesAlreadyBooked.length > 0 && (
+            <div className="rounded-lg border border-amber-500 bg-amber-50 dark:bg-amber-950/20 p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold text-amber-800 dark:text-amber-200">
+                    ⚠️ Allerede booket - følgende medarbejdere er booket andetsteds:
+                  </p>
+                  <ul className="mt-2 space-y-1 text-amber-700 dark:text-amber-300">
+                    {employeesAlreadyBooked.map((e) => {
+                      const locations = [...new Set(e.days.map(d => d.location))];
+                      const dayNames = e.days.map(d => DAY_NAMES[d.dayIndex]).join(", ");
+                      return (
+                        <li key={e.employeeId} className="flex flex-col">
+                          <span className="font-medium">{e.employeeName}</span>
+                          <span className="text-xs">
+                            {locations.join(", ")} - {dayNames}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <p className="text-sm font-medium">Vælg hvilke dage medarbejderne skal bookes:</p>
             <div className="space-y-1">
               {DAY_NAMES.map((dayName, index) => {
                 const inRange = isDayInBookingRange(index);
                 const hasAbsenceWarning = anySelectedHasAbsenceOnDay(index);
+                const hasBookingWarning = anySelectedIsBookedOnDay(index);
+                const hasWarning = hasAbsenceWarning || hasBookingWarning;
                 return (
                   <div
                     key={index}
                     className={`flex items-center justify-between p-3 rounded-lg border ${
                       inRange ? "hover:bg-muted/50 cursor-pointer" : "opacity-50"
                     } ${selectedDays.has(index) ? "border-primary bg-primary/5" : ""} ${
-                      hasAbsenceWarning && inRange ? "border-amber-500" : ""
+                      hasAbsenceWarning && inRange ? "border-red-500" : hasBookingWarning && inRange ? "border-amber-500" : ""
                     }`}
                     onClick={() => inRange && toggleDay(index)}
                   >
@@ -381,6 +534,9 @@ export function AddEmployeeDialog({
                     </div>
                     <div className="flex items-center gap-2">
                       {hasAbsenceWarning && inRange && (
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                      )}
+                      {hasBookingWarning && !hasAbsenceWarning && inRange && (
                         <AlertTriangle className="h-4 w-4 text-amber-500" />
                       )}
                       <span className="text-sm text-muted-foreground">{getDateForDay(index)}</span>
