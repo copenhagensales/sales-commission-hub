@@ -2674,6 +2674,7 @@ export type Database = {
           bookable_client_ids: string[] | null
           can_book_eesy: boolean | null
           can_book_yousee: boolean | null
+          client_campaign_mapping: Json | null
           contact_email: string | null
           contact_person_name: string | null
           contact_phone: string | null
@@ -2697,6 +2698,7 @@ export type Database = {
           bookable_client_ids?: string[] | null
           can_book_eesy?: boolean | null
           can_book_yousee?: boolean | null
+          client_campaign_mapping?: Json | null
           contact_email?: string | null
           contact_person_name?: string | null
           contact_phone?: string | null
@@ -2720,6 +2722,7 @@ export type Database = {
           bookable_client_ids?: string[] | null
           can_book_eesy?: boolean | null
           can_book_yousee?: boolean | null
+          client_campaign_mapping?: Json | null
           contact_email?: string | null
           contact_person_name?: string | null
           contact_phone?: string | null

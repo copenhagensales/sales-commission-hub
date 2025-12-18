@@ -68,11 +68,29 @@ export default function LocationDetail() {
     },
   });
 
+  // Fetch campaigns for selected clients
+  const { data: clientCampaigns = [] } = useQuery({
+    queryKey: ["client-campaigns-for-location", formData?.bookable_client_ids],
+    queryFn: async () => {
+      if (!formData?.bookable_client_ids?.length) return [];
+      
+      const { data, error } = await supabase
+        .from("client_campaigns")
+        .select("id, name, client_id")
+        .in("client_id", formData.bookable_client_ids);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!formData?.bookable_client_ids?.length,
+  });
+
   useEffect(() => {
     if (location) {
       setFormData({
         ...location,
         bookable_client_ids: location.bookable_client_ids || [],
+        client_campaign_mapping: location.client_campaign_mapping || {},
       });
     }
   }, [location]);
@@ -367,23 +385,71 @@ export default function LocationDetail() {
               ) : (
                 fieldmarketingClients.map((client: any) => {
                   const isChecked = formData.bookable_client_ids?.includes(client.id) || false;
+                  const campaignsForClient = clientCampaigns.filter((c: any) => c.client_id === client.id);
+                  const selectedCampaignId = formData.client_campaign_mapping?.[client.id] || "";
+                  
                   return (
-                    <div key={client.id} className="flex items-center gap-3">
-                      <Checkbox
-                        id={`client-${client.id}`}
-                        checked={isChecked}
-                        disabled={!canEditLocation}
-                        onCheckedChange={(checked) => {
-                          const currentIds = formData.bookable_client_ids || [];
-                          const newIds = checked
-                            ? [...currentIds, client.id]
-                            : currentIds.filter((id: string) => id !== client.id);
-                          setFormData({ ...formData, bookable_client_ids: newIds });
-                        }}
-                      />
-                      <Label htmlFor={`client-${client.id}`} className="cursor-pointer">
-                        Kan bookes til <Badge variant="outline" className="ml-1">{client.name}</Badge>
-                      </Label>
+                    <div key={client.id} className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          id={`client-${client.id}`}
+                          checked={isChecked}
+                          disabled={!canEditLocation}
+                          onCheckedChange={(checked) => {
+                            const currentIds = formData.bookable_client_ids || [];
+                            const currentMapping = formData.client_campaign_mapping || {};
+                            const newIds = checked
+                              ? [...currentIds, client.id]
+                              : currentIds.filter((id: string) => id !== client.id);
+                            
+                            // Remove campaign mapping if unchecked
+                            const newMapping = { ...currentMapping };
+                            if (!checked) {
+                              delete newMapping[client.id];
+                            }
+                            
+                            setFormData({ 
+                              ...formData, 
+                              bookable_client_ids: newIds,
+                              client_campaign_mapping: newMapping,
+                            });
+                          }}
+                        />
+                        <Label htmlFor={`client-${client.id}`} className="cursor-pointer">
+                          Kan bookes til <Badge variant="outline" className="ml-1">{client.name}</Badge>
+                        </Label>
+                      </div>
+                      
+                      {/* Campaign dropdown - shows when client is checked */}
+                      {isChecked && campaignsForClient.length > 0 && (
+                        <div className="ml-7">
+                          <Select
+                            value={selectedCampaignId}
+                            onValueChange={(value) => {
+                              const currentMapping = formData.client_campaign_mapping || {};
+                              setFormData({
+                                ...formData,
+                                client_campaign_mapping: {
+                                  ...currentMapping,
+                                  [client.id]: value,
+                                },
+                              });
+                            }}
+                            disabled={!canEditLocation}
+                          >
+                            <SelectTrigger className="w-full max-w-xs">
+                              <SelectValue placeholder="Vælg kampagne" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {campaignsForClient.map((campaign: any) => (
+                                <SelectItem key={campaign.id} value={campaign.id}>
+                                  {campaign.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
                   );
                 })
