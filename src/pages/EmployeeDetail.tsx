@@ -725,6 +725,41 @@ export default function EmployeeDetail() {
                     onSave={handleSave}
                     displayValue={employee.standard_start_time}
                   />
+                  <SelectRow 
+                    label="Startside (override)" 
+                    value={(employee as any).default_landing_page} 
+                    field="default_landing_page" 
+                    options={[
+                      { value: "/home", label: "Hjem" },
+                      { value: "/my-schedule", label: "Min kalender" },
+                      { value: "/shift-planning", label: "Vagtplan" },
+                      { value: "/dashboard", label: "Dashboard" },
+                      { value: "/vagt-flow", label: "Fieldmarketing" },
+                      { value: "/employees", label: "Medarbejdere" },
+                      { value: "/contracts", label: "Kontrakter" },
+                      { value: "/recruitment", label: "Rekruttering" },
+                      { value: "/sales", label: "Salg" },
+                      { value: "/payroll", label: "Lønkørsel" },
+                    ]}
+                    onSave={handleSave}
+                    displayValue={
+                      (employee as any).default_landing_page 
+                        ? [
+                            { value: "/home", label: "Hjem" },
+                            { value: "/my-schedule", label: "Min kalender" },
+                            { value: "/shift-planning", label: "Vagtplan" },
+                            { value: "/dashboard", label: "Dashboard" },
+                            { value: "/vagt-flow", label: "Fieldmarketing" },
+                            { value: "/employees", label: "Medarbejdere" },
+                            { value: "/contracts", label: "Kontrakter" },
+                            { value: "/recruitment", label: "Rekruttering" },
+                            { value: "/sales", label: "Salg" },
+                            { value: "/payroll", label: "Lønkørsel" },
+                          ].find(o => o.value === (employee as any).default_landing_page)?.label
+                        : "Brug stilling standard"
+                    }
+                    allowClear
+                  />
                 </TableSection>
 
                 <TableSection title="Ferie & tillæg">

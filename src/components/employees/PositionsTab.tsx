@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -284,10 +285,25 @@ const generateAllPermissions = (): Record<string, boolean | { view: boolean; edi
   return allPermissions;
 };
 
+// Available landing pages
+const LANDING_PAGE_OPTIONS = [
+  { value: "/home", label: "Hjem" },
+  { value: "/my-schedule", label: "Min kalender" },
+  { value: "/shift-planning", label: "Vagtplan" },
+  { value: "/dashboard", label: "Dashboard" },
+  { value: "/vagt-flow", label: "Fieldmarketing" },
+  { value: "/employees", label: "Medarbejdere" },
+  { value: "/contracts", label: "Kontrakter" },
+  { value: "/recruitment", label: "Rekruttering" },
+  { value: "/sales", label: "Salg" },
+  { value: "/payroll", label: "Lønkørsel" },
+];
+
 interface JobPosition {
   id: string;
   name: string;
   description: string | null;
+  default_landing_page: string | null;
   permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope>;
   is_active: boolean;
   created_at: string;
@@ -296,6 +312,7 @@ interface JobPosition {
 interface FormData {
   name: string;
   description: string;
+  default_landing_page: string;
   permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope>;
 }
 
@@ -307,6 +324,7 @@ export function PositionsTab() {
   const [formData, setFormData] = useState<FormData>({
     name: "",
     description: "",
+    default_landing_page: "/home",
     permissions: {},
   });
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
@@ -336,6 +354,7 @@ export function PositionsTab() {
         .insert({
           name: data.name,
           description: data.description || null,
+          default_landing_page: data.default_landing_page || "/home",
           permissions: data.permissions as unknown as Json,
         });
       if (error) throw error;
@@ -358,6 +377,7 @@ export function PositionsTab() {
         .update({
           name: data.name,
           description: data.description || null,
+          default_landing_page: data.default_landing_page || "/home",
           permissions: data.permissions as unknown as Json,
           updated_at: new Date().toISOString(),
         })
@@ -397,6 +417,7 @@ export function PositionsTab() {
     setFormData({
       name: "",
       description: "",
+      default_landing_page: "/home",
       permissions: {},
     });
     setExpandedCategories([]);
@@ -409,6 +430,7 @@ export function PositionsTab() {
     setFormData({
       name: position.name,
       description: position.description || "",
+      default_landing_page: position.default_landing_page || "/home",
       // For Ejer, always show all permissions as enabled
       permissions: isOwner ? generateAllPermissions() : position.permissions,
     });
@@ -419,7 +441,7 @@ export function PositionsTab() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingPosition(null);
-    setFormData({ name: "", description: "", permissions: {} });
+    setFormData({ name: "", description: "", default_landing_page: "/home", permissions: {} });
     setExpandedCategories([]);
   };
 
@@ -673,6 +695,27 @@ export function PositionsTab() {
                   disabled={editingPosition && isOwnerPosition(editingPosition.name)}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Standardside ved login</Label>
+              <Select 
+                value={formData.default_landing_page} 
+                onValueChange={(value) => setFormData({ ...formData, default_landing_page: value })}
+                disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Vælg startside" />
+                </SelectTrigger>
+                <SelectContent className="z-50 bg-popover">
+                  {LANDING_PAGE_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Siden medarbejdere med denne stilling ser først ved login
+              </p>
             </div>
 
             <div className="space-y-2">
