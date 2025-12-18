@@ -122,10 +122,17 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
       const campaignIds = campaigns.map(c => c.id);
       const campaignToClient = new Map(campaigns.map(c => [c.id, c.client_id]));
 
-      // Get all sales
+      // Get all sales with product info for counts_as_sale filtering
       const { data: sales, error } = await supabase
         .from("sales")
-        .select("id, sale_datetime, client_campaign_id")
+        .select(`
+          id, sale_datetime, client_campaign_id,
+          sale_items (
+            quantity,
+            product_id,
+            products (counts_as_sale)
+          )
+        `)
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", monthStart);
       
@@ -135,13 +142,18 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
       const statsMap = new Map<string, { salesToday: number; salesThisMonth: number }>();
       clientIds.forEach(id => statsMap.set(id, { salesToday: 0, salesThisMonth: 0 }));
 
-      (sales || []).forEach(sale => {
+      (sales || []).forEach((sale: any) => {
         const clientId = campaignToClient.get(sale.client_campaign_id);
         if (clientId && statsMap.has(clientId)) {
           const stats = statsMap.get(clientId)!;
-          stats.salesThisMonth += 1;
+          // Count only items where counts_as_sale !== false
+          const validSales = (sale.sale_items || []).filter((item: any) => 
+            item.products?.counts_as_sale !== false
+          ).reduce((sum: number, item: any) => sum + (Number(item.quantity) || 1), 0);
+          
+          stats.salesThisMonth += validSales;
           if (sale.sale_datetime >= todayStart) {
-            stats.salesToday += 1;
+            stats.salesToday += validSales;
           }
         }
       });
@@ -188,7 +200,12 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
         .select(`
           agent_name,
           client_campaign_id,
-          sale_items (mapped_commission)
+          sale_items (
+            quantity,
+            mapped_commission,
+            product_id,
+            products (commission_dkk, counts_as_sale)
+          )
         `)
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", monthStart);
@@ -216,9 +233,13 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
         }
         
         const stats = agentClientStats.get(key)!;
-        stats.sales += 1;
-        const saleCommission = (sale.sale_items || []).reduce((sum: number, item: any) => sum + (item.mapped_commission || 0), 0);
-        stats.commission += saleCommission;
+        // Only count items where counts_as_sale !== false
+        (sale.sale_items || []).forEach((item: any) => {
+          if (item.products?.counts_as_sale === false) return;
+          const qty = Number(item.quantity) || 1;
+          stats.sales += qty;
+          stats.commission += qty * (Number(item.products?.commission_dkk) || Number(item.mapped_commission) || 0);
+        });
       });
 
       return Array.from(agentClientStats.values())
@@ -252,7 +273,12 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
         .select(`
           agent_name,
           client_campaign_id,
-          sale_items (mapped_commission)
+          sale_items (
+            quantity,
+            mapped_commission,
+            product_id,
+            products (commission_dkk, counts_as_sale)
+          )
         `)
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", todayStart);
@@ -280,9 +306,13 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
         }
         
         const stats = agentClientStats.get(key)!;
-        stats.sales += 1;
-        const saleCommission = (sale.sale_items || []).reduce((sum: number, item: any) => sum + (item.mapped_commission || 0), 0);
-        stats.commission += saleCommission;
+        // Only count items where counts_as_sale !== false
+        (sale.sale_items || []).forEach((item: any) => {
+          if (item.products?.counts_as_sale === false) return;
+          const qty = Number(item.quantity) || 1;
+          stats.sales += qty;
+          stats.commission += qty * (Number(item.products?.commission_dkk) || Number(item.mapped_commission) || 0);
+        });
       });
 
       return Array.from(agentClientStats.values())
@@ -317,7 +347,12 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
           customer_phone,
           created_at,
           client_campaign_id,
-          sale_items (mapped_commission)
+          sale_items (
+            quantity,
+            mapped_commission,
+            product_id,
+            products (commission_dkk, counts_as_sale)
+          )
         `)
         .in("client_campaign_id", campaignIds)
         .order("created_at", { ascending: false })
@@ -328,11 +363,17 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
       return (data || []).map((sale: any) => {
         const clientId = campaignToClient.get(sale.client_campaign_id);
         const client = clients.find(c => c.id === clientId);
+        // Only count items where counts_as_sale !== false
+        const validItems = (sale.sale_items || []).filter((item: any) => item.products?.counts_as_sale !== false);
+        const total_commission = validItems.reduce((sum: number, item: any) => {
+          const qty = Number(item.quantity) || 1;
+          return sum + qty * (Number(item.products?.commission_dkk) || Number(item.mapped_commission) || 0);
+        }, 0);
         return {
           ...sale,
           clientName: client?.name || "Ukendt",
           clientLogo: client?.logo_url,
-          total_commission: (sale.sale_items || []).reduce((sum: number, item: any) => sum + (item.mapped_commission || 0), 0),
+          total_commission,
         };
       });
     },
@@ -630,18 +671,32 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
 
       const { data: sales, error } = await supabase
         .from("sales")
-        .select("id, sale_datetime, agent_name")
+        .select(`
+          id, sale_datetime, agent_name,
+          sale_items (
+            quantity,
+            product_id,
+            products (counts_as_sale)
+          )
+        `)
         .in("client_campaign_id", campaignIds);
       
       if (error) throw error;
 
+      // Count only items where counts_as_sale !== false
+      const countValidSales = (sale: any) => {
+        return (sale.sale_items || [])
+          .filter((item: any) => item.products?.counts_as_sale !== false)
+          .reduce((sum: number, item: any) => sum + (Number(item.quantity) || 1), 0);
+      };
+
       const allSales = sales || [];
       
       return {
-        salesToday: allSales.filter(s => s.sale_datetime >= todayStart).length,
-        salesThisWeek: allSales.filter(s => s.sale_datetime >= weekStart).length,
-        salesThisMonth: allSales.filter(s => s.sale_datetime >= monthStart).length,
-        totalSales: allSales.length,
+        salesToday: allSales.filter(s => s.sale_datetime >= todayStart).reduce((sum, s) => sum + countValidSales(s), 0),
+        salesThisWeek: allSales.filter(s => s.sale_datetime >= weekStart).reduce((sum, s) => sum + countValidSales(s), 0),
+        salesThisMonth: allSales.filter(s => s.sale_datetime >= monthStart).reduce((sum, s) => sum + countValidSales(s), 0),
+        totalSales: allSales.reduce((sum, s) => sum + countValidSales(s), 0),
       };
     },
     enabled: !!activeClientId,
@@ -665,7 +720,15 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
 
       const { data: sales, error } = await supabase
         .from("sales")
-        .select(`agent_name, sale_items (mapped_commission)`)
+        .select(`
+          agent_name, 
+          sale_items (
+            quantity,
+            mapped_commission,
+            product_id,
+            products (commission_dkk, counts_as_sale)
+          )
+        `)
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", monthStart);
       
@@ -676,9 +739,13 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
         if (!agentStats[sale.agent_name]) {
           agentStats[sale.agent_name] = { sales: 0, commission: 0 };
         }
-        agentStats[sale.agent_name].sales += 1;
-        const saleCommission = (sale.sale_items || []).reduce((sum: number, item: any) => sum + (item.mapped_commission || 0), 0);
-        agentStats[sale.agent_name].commission += saleCommission;
+        // Only count items where counts_as_sale !== false
+        (sale.sale_items || []).forEach((item: any) => {
+          if (item.products?.counts_as_sale === false) return;
+          const qty = Number(item.quantity) || 1;
+          agentStats[sale.agent_name].sales += qty;
+          agentStats[sale.agent_name].commission += qty * (Number(item.products?.commission_dkk) || Number(item.mapped_commission) || 0);
+        });
       });
 
       return Object.entries(agentStats)
@@ -706,7 +773,15 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
 
       const { data: sales, error } = await supabase
         .from("sales")
-        .select(`agent_name, sale_items (mapped_commission)`)
+        .select(`
+          agent_name, 
+          sale_items (
+            quantity,
+            mapped_commission,
+            product_id,
+            products (commission_dkk, counts_as_sale)
+          )
+        `)
         .in("client_campaign_id", campaignIds)
         .gte("sale_datetime", todayStart);
       
@@ -717,9 +792,13 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
         if (!agentStats[sale.agent_name]) {
           agentStats[sale.agent_name] = { sales: 0, commission: 0 };
         }
-        agentStats[sale.agent_name].sales += 1;
-        const saleCommission = (sale.sale_items || []).reduce((sum: number, item: any) => sum + (item.mapped_commission || 0), 0);
-        agentStats[sale.agent_name].commission += saleCommission;
+        // Only count items where counts_as_sale !== false
+        (sale.sale_items || []).forEach((item: any) => {
+          if (item.products?.counts_as_sale === false) return;
+          const qty = Number(item.quantity) || 1;
+          agentStats[sale.agent_name].sales += qty;
+          agentStats[sale.agent_name].commission += qty * (Number(item.products?.commission_dkk) || Number(item.mapped_commission) || 0);
+        });
       });
 
       return Object.entries(agentStats)
@@ -744,17 +823,33 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
 
       const { data, error } = await supabase
         .from("sales")
-        .select(`id, sale_datetime, agent_name, customer_phone, created_at, sale_items (mapped_commission)`)
+        .select(`
+          id, sale_datetime, agent_name, customer_phone, created_at, 
+          sale_items (
+            quantity,
+            mapped_commission,
+            product_id,
+            products (commission_dkk, counts_as_sale)
+          )
+        `)
         .in("client_campaign_id", campaignIds)
         .order("created_at", { ascending: false })
         .limit(10);
       
       if (error) throw error;
       
-      return (data || []).map((sale: any) => ({
-        ...sale,
-        total_commission: (sale.sale_items || []).reduce((sum: number, item: any) => sum + (item.mapped_commission || 0), 0),
-      }));
+      return (data || []).map((sale: any) => {
+        // Only count items where counts_as_sale !== false
+        const validItems = (sale.sale_items || []).filter((item: any) => item.products?.counts_as_sale !== false);
+        const total_commission = validItems.reduce((sum: number, item: any) => {
+          const qty = Number(item.quantity) || 1;
+          return sum + qty * (Number(item.products?.commission_dkk) || Number(item.mapped_commission) || 0);
+        }, 0);
+        return {
+          ...sale,
+          total_commission,
+        };
+      });
     },
     enabled: !!activeClientId,
   });
