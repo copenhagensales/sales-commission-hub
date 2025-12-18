@@ -60,50 +60,43 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
     },
   });
 
-  // Fetch seller names and calculate commission for top sellers
+  // Fetch ALL sellers with sales this month and calculate commission
   const { data: topSellers } = useQuery({
-    queryKey: ["fieldmarketing-top-sellers", clientId, stats?.topSellerIds, productCommissions],
+    queryKey: ["fieldmarketing-month-sellers", clientId, productCommissions],
     queryFn: async () => {
-      if (!stats?.topSellerIds?.length) return [];
-      
-      const sellerIds = stats.topSellerIds.map(s => s.sellerId);
-      const { data: sellers, error: sellersError } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name")
-        .in("id", sellerIds);
-      
-      if (sellersError) throw sellersError;
-
-      // Get all sales for these sellers this month to calculate commission
       const now = new Date();
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       
-      const { data: monthSales, error: salesError } = await supabase
+      const { data: monthSales, error } = await supabase
         .from("fieldmarketing_sales")
-        .select("seller_id, product_name")
+        .select(`
+          seller_id,
+          product_name,
+          seller:employee_master_data!seller_id(first_name, last_name)
+        `)
         .eq("client_id", clientId)
-        .gte("registered_at", monthStart)
-        .in("seller_id", sellerIds);
+        .gte("registered_at", monthStart);
       
-      if (salesError) throw salesError;
+      if (error) throw error;
 
-      // Calculate commission per seller
-      const sellerCommissions: Record<string, number> = {};
-      (monthSales || []).forEach(sale => {
+      // Group by seller
+      const sellerStats: Record<string, { name: string; count: number; commission: number }> = {};
+      (monthSales || []).forEach((sale: any) => {
+        const sellerId = sale.seller_id;
+        const sellerName = sale.seller ? `${sale.seller.first_name} ${sale.seller.last_name}` : "Ukendt";
         const commission = productCommissions?.[sale.product_name] || 0;
-        sellerCommissions[sale.seller_id] = (sellerCommissions[sale.seller_id] || 0) + commission;
+        
+        if (!sellerStats[sellerId]) {
+          sellerStats[sellerId] = { name: sellerName, count: 0, commission: 0 };
+        }
+        sellerStats[sellerId].count += 1;
+        sellerStats[sellerId].commission += commission;
       });
-      
-      return stats.topSellerIds.map(ts => {
-        const seller = sellers?.find(s => s.id === ts.sellerId);
-        return {
-          name: seller ? `${seller.first_name} ${seller.last_name}` : "Ukendt",
-          count: ts.count,
-          commission: sellerCommissions[ts.sellerId] || 0,
-        };
-      }).sort((a, b) => b.commission - a.commission);
+
+      // Convert to array and sort by commission
+      return Object.values(sellerStats).sort((a, b) => b.commission - a.commission);
     },
-    enabled: !!stats?.topSellerIds?.length && !!productCommissions,
+    enabled: !!productCommissions,
   });
 
   // Calculate today's sellers with sales and commission
@@ -209,102 +202,93 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Top Sellers with Commission */}
+        {/* Month Sellers Table */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Top sælgere (måned)</CardTitle>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
+            <CardTitle className="text-lg">Månedens sælgere</CardTitle>
           </CardHeader>
           <CardContent>
             {topSellers && topSellers.length > 0 ? (
-              <div className="space-y-3">
-                {topSellers.map((seller, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Badge variant={index === 0 ? "default" : "secondary"}>
-                        #{index + 1}
-                      </Badge>
-                      <span className="font-medium">{seller.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm">
-                      <span className="text-muted-foreground">{seller.count} salg</span>
-                      <Badge variant="outline" className="font-mono">
-                        {seller.commission.toLocaleString("da-DK")} kr
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Sælger</TableHead>
+                      <TableHead className="text-right">Salg</TableHead>
+                      <TableHead className="text-right">Provision</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {topSellers.map((seller, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          <Badge variant={index === 0 ? "default" : index < 3 ? "secondary" : "outline"}>
+                            {index + 1}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{seller.name}</TableCell>
+                        <TableCell className="text-right">{seller.count}</TableCell>
+                        <TableCell className="text-right font-mono font-medium">
+                          {seller.commission.toLocaleString("da-DK")} kr
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm">Ingen salg denne måned</p>
+              <p className="text-muted-foreground text-sm text-center py-8">Ingen salg denne måned</p>
             )}
           </CardContent>
         </Card>
 
-        {/* Product Distribution */}
+        {/* Today's Sellers Table */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Produktfordeling (måned)</CardTitle>
+          <CardHeader className="flex flex-row items-center gap-2">
+            <Trophy className="h-5 w-5 text-yellow-500" />
+            <CardTitle className="text-lg">Dagens sælgere</CardTitle>
           </CardHeader>
           <CardContent>
-            {stats?.productDistribution && stats.productDistribution.length > 0 ? (
-              <div className="space-y-3">
-                {stats.productDistribution.slice(0, 5).map((product, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <span className="font-medium truncate max-w-[200px]">{product.productName}</span>
-                    <Badge variant="outline">{product.count}</Badge>
-                  </div>
-                ))}
+            {todaySellers && todaySellers.length > 0 ? (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Sælger</TableHead>
+                      <TableHead className="text-right">Salg</TableHead>
+                      <TableHead className="text-right">Provision</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {todaySellers.map((seller, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          <Badge variant={index === 0 ? "default" : index < 3 ? "secondary" : "outline"}>
+                            {index + 1}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{seller.name}</TableCell>
+                        <TableCell className="text-right">{seller.sales}</TableCell>
+                        <TableCell className="text-right font-mono font-medium">
+                          {seller.commission.toLocaleString("da-DK")} kr
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm">Ingen produkter denne måned</p>
+              <p className="text-muted-foreground text-sm text-center py-8">
+                Ingen salg registreret i dag
+              </p>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Today's Sellers Table */}
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2">
-          <Trophy className="h-5 w-5 text-yellow-500" />
-          <CardTitle className="text-lg">Dagens sælgere</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {todaySellers && todaySellers.length > 0 ? (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>Sælger</TableHead>
-                    <TableHead className="text-right">Salg</TableHead>
-                    <TableHead className="text-right">Provision</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {todaySellers.map((seller, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <Badge variant={index === 0 ? "default" : index < 3 ? "secondary" : "outline"}>
-                          {index + 1}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{seller.name}</TableCell>
-                      <TableCell className="text-right">{seller.sales}</TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        {seller.commission.toLocaleString("da-DK")} kr
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-sm text-center py-8">
-              Ingen salg registreret i dag
-            </p>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Recent Sales Table with Commission */}
       <Card>
