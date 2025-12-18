@@ -378,17 +378,19 @@ const FieldmarketingDashboard = () => {
               Oversigt over salg fra fieldmarketing events
             </p>
           </div>
-          {activeClient?.logo_url ? (
-            <img 
-              src={activeClient.logo_url} 
-              alt={activeClient.name} 
-              className="h-16 w-auto object-contain"
-            />
-          ) : (
-            <div className="h-16 px-6 bg-muted rounded-lg flex items-center justify-center">
-              <span className="text-xl font-bold text-muted-foreground">{activeClient?.name || "..."}</span>
-            </div>
-          )}
+          <div className="h-16 w-40 flex items-center justify-end">
+            {activeClient?.logo_url ? (
+              <img 
+                src={activeClient.logo_url} 
+                alt={activeClient.name} 
+                className="max-h-16 max-w-40 object-contain"
+              />
+            ) : (
+              <div className="h-16 px-6 bg-muted rounded-lg flex items-center justify-center">
+                <span className="text-xl font-bold text-muted-foreground">{activeClient?.name || "..."}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
