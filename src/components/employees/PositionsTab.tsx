@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
@@ -23,13 +22,10 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Shield, ChevronDown, ChevronRight, Eye, Edit, Lock, Play, Info, LayoutGrid, Layers, Database, User, Users, Globe } from "lucide-react";
+import { Plus, Pencil, Trash2, Shield, Eye, Edit, Lock, Play, Info, Layers, Database, User, Users, Globe, Search, Settings, Check, X } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -40,6 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Owner position name - this position is locked and cannot be edited
 const OWNER_POSITION_NAME = "Ejer";
@@ -327,7 +324,8 @@ export function PositionsTab() {
     default_landing_page: "/home",
     permissions: {},
   });
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+  const [permissionSearch, setPermissionSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   // Fetch positions
   const { data: positions = [], isLoading } = useQuery({
@@ -420,7 +418,8 @@ export function PositionsTab() {
       default_landing_page: "/home",
       permissions: {},
     });
-    setExpandedCategories([]);
+    setPermissionSearch("");
+    setActiveCategory(null);
     setIsDialogOpen(true);
   };
 
@@ -431,10 +430,10 @@ export function PositionsTab() {
       name: position.name,
       description: position.description || "",
       default_landing_page: position.default_landing_page || "/home",
-      // For Ejer, always show all permissions as enabled
       permissions: isOwner ? generateAllPermissions() : position.permissions,
     });
-    setExpandedCategories(PERMISSION_CATEGORIES.map(c => c.key));
+    setPermissionSearch("");
+    setActiveCategory(null);
     setIsDialogOpen(true);
   };
 
@@ -442,8 +441,22 @@ export function PositionsTab() {
     setIsDialogOpen(false);
     setEditingPosition(null);
     setFormData({ name: "", description: "", default_landing_page: "/home", permissions: {} });
-    setExpandedCategories([]);
+    setPermissionSearch("");
+    setActiveCategory(null);
   };
+
+  // Filter categories and permissions based on search
+  const filteredCategories = useMemo(() => {
+    if (!permissionSearch.trim()) return PERMISSION_CATEGORIES;
+    const search = permissionSearch.toLowerCase();
+    return PERMISSION_CATEGORIES.map(cat => ({
+      ...cat,
+      permissions: cat.permissions.filter(p => 
+        p.label.toLowerCase().includes(search) || 
+        p.description.toLowerCase().includes(search)
+      )
+    })).filter(cat => cat.permissions.length > 0);
+  }, [permissionSearch]);
 
   const handleSubmit = () => {
     if (!formData.name.trim()) {
@@ -457,15 +470,6 @@ export function PositionsTab() {
       createMutation.mutate(formData);
     }
   };
-
-  const toggleCategory = (categoryKey: string) => {
-    setExpandedCategories(prev =>
-      prev.includes(categoryKey)
-        ? prev.filter(k => k !== categoryKey)
-        : [...prev, categoryKey]
-    );
-  };
-
   const getPermissionValue = (key: string, type?: "view" | "edit"): boolean => {
     const value = formData.permissions[key];
     if (type) {
@@ -656,8 +660,8 @@ export function PositionsTab() {
       </Table>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b">
             <DialogTitle className="flex items-center gap-2">
               {editingPosition && isOwnerPosition(editingPosition.name) ? (
                 <>
@@ -675,321 +679,188 @@ export function PositionsTab() {
             )}
           </DialogHeader>
 
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Navn *</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="F.eks. Teamleder"
-                  disabled={editingPosition && isOwnerPosition(editingPosition.name)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Beskrivelse</Label>
-                <Input
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Kort beskrivelse"
-                  disabled={editingPosition && isOwnerPosition(editingPosition.name)}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Standardside ved login</Label>
-              <Select 
-                value={formData.default_landing_page} 
-                onValueChange={(value) => setFormData({ ...formData, default_landing_page: value })}
-                disabled={editingPosition && isOwnerPosition(editingPosition.name)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Vælg startside" />
-                </SelectTrigger>
-                <SelectContent className="z-50 bg-popover">
-                  {LANDING_PAGE_OPTIONS.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Siden medarbejdere med denne stilling ser først ved login
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-base font-semibold flex items-center gap-2">
+          <Tabs defaultValue="basic" className="flex-1 flex flex-col min-h-0">
+            <TabsList className="mx-6 mt-4 w-fit">
+              <TabsTrigger value="basic" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Grundlæggende
+              </TabsTrigger>
+              <TabsTrigger value="permissions" className="gap-2">
                 <Shield className="h-4 w-4" />
                 Rettigheder
-                {editingPosition && isOwnerPosition(editingPosition.name) && (
-                  <Badge variant="secondary" className="gap-1 ml-2">
-                    <Lock className="h-3 w-3" />
-                    Alle rettigheder
-                  </Badge>
-                )}
-              </Label>
-              {!(editingPosition && isOwnerPosition(editingPosition.name)) && (
-                <p className="text-sm text-muted-foreground">
-                  Klik på en kategori for at udvide og konfigurere rettigheder
-                </p>
-              )}
-              
-              <TooltipProvider delayDuration={200}>
-                <div className="space-y-3 mt-4">
-                  {PERMISSION_CATEGORIES.map((category) => {
-                    const isOwnerLocked = editingPosition && isOwnerPosition(editingPosition.name);
-                    const isTabCategory = category.key.startsWith("tabs_");
-                    const activeCount = isOwnerLocked 
-                      ? category.permissions.length
-                      : category.permissions.filter(p => getPermissionValue(p.key)).length;
-                    
-                    return (
-                      <Collapsible
-                        key={category.key}
-                        open={expandedCategories.includes(category.key)}
-                        onOpenChange={() => toggleCategory(category.key)}
-                      >
-                        <CollapsibleTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            className={cn(
-                              "w-full justify-between px-4 py-3 h-auto hover:bg-muted/50 border rounded-lg",
-                              isTabCategory && "ml-6 w-[calc(100%-1.5rem)] bg-muted/30 border-dashed",
-                              expandedCategories.includes(category.key) && "border-primary/30"
-                            )}
-                          >
-                            <div className="flex items-center gap-3">
-                              {isTabCategory ? (
-                                <Layers className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <span className="text-lg">{category.icon}</span>
-                              )}
-                              <div className="text-left">
-                                <span className="font-medium block">{category.label}</span>
-                                {isTabCategory && (
-                                  <span className="text-xs text-muted-foreground">Under-faner</span>
-                                )}
-                              </div>
+                <Badge variant="secondary" className="ml-1">
+                  {countActivePermissions(formData.permissions)}/{getTotalPermissions()}
+                </Badge>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="basic" className="flex-1 px-6 py-4 overflow-auto">
+              <div className="space-y-6 max-w-xl">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Navn *</Label>
+                    <Input
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="F.eks. Teamleder"
+                      disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Beskrivelse</Label>
+                    <Input
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Kort beskrivelse"
+                      disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Standardside ved login</Label>
+                  <Select 
+                    value={formData.default_landing_page} 
+                    onValueChange={(value) => setFormData({ ...formData, default_landing_page: value })}
+                    disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                  >
+                    <SelectTrigger className="w-full max-w-xs">
+                      <SelectValue placeholder="Vælg startside" />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-popover">
+                      {LANDING_PAGE_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Siden medarbejdere med denne stilling ser først ved login
+                  </p>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="permissions" className="flex-1 flex flex-col min-h-0 px-6 py-4">
+              {/* Search and category selector */}
+              <div className="flex gap-4 mb-4">
+                <div className="relative flex-1 max-w-xs">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Søg i rettigheder..."
+                    value={permissionSearch}
+                    onChange={(e) => setPermissionSearch(e.target.value)}
+                    className="pl-9"
+                    disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                  />
+                </div>
+                <Select 
+                  value={activeCategory || "all"} 
+                  onValueChange={(v) => setActiveCategory(v === "all" ? null : v)}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Alle kategorier" />
+                  </SelectTrigger>
+                  <SelectContent className="z-50 bg-popover">
+                    <SelectItem value="all">Alle kategorier</SelectItem>
+                    {PERMISSION_CATEGORIES.filter(c => !c.key.startsWith("tabs_")).map(cat => (
+                      <SelectItem key={cat.key} value={cat.key}>
+                        {cat.icon} {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Categories grid */}
+              <ScrollArea className="flex-1 -mx-2 px-2">
+                <TooltipProvider delayDuration={200}>
+                  <div className="grid grid-cols-2 gap-4 pb-4">
+                    {(activeCategory 
+                      ? filteredCategories.filter(c => c.key === activeCategory || c.key.startsWith(`tabs_${activeCategory.replace("menu_", "")}`))
+                      : filteredCategories
+                    ).filter(c => !c.key.startsWith("tabs_")).map((category) => {
+                      const isOwnerLocked = editingPosition && isOwnerPosition(editingPosition.name);
+                      const activeCount = isOwnerLocked 
+                        ? category.permissions.length
+                        : category.permissions.filter(p => getPermissionValue(p.key)).length;
+                      
+                      // Find associated tab category
+                      const tabCategory = filteredCategories.find(c => 
+                        c.key.startsWith("tabs_") && 
+                        c.key.replace("tabs_", "menu_").replace(/_.*$/, "") === category.key.replace("menu_", "").replace(/_.*$/, "")
+                      );
+
+                      return (
+                        <Card key={category.key} className={cn(
+                          "overflow-hidden",
+                          activeCount === category.permissions.length && !isOwnerLocked && "border-green-500/30"
+                        )}>
+                          <CardHeader className="py-3 px-4 bg-muted/30">
+                            <CardTitle className="text-sm font-medium flex items-center justify-between">
+                              <span className="flex items-center gap-2">
+                                <span className="text-base">{category.icon}</span>
+                                {category.label}
+                              </span>
                               <Badge 
                                 variant={activeCount === category.permissions.length ? "default" : "secondary"}
                                 className={cn(
-                                  "ml-2",
+                                  "text-xs",
                                   activeCount === category.permissions.length && "bg-green-600"
                                 )}
                               >
-                                {activeCount} / {category.permissions.length}
+                                {activeCount}/{category.permissions.length}
                               </Badge>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="p-0">
+                            <div className="divide-y">
+                              {category.permissions.map((permission) => (
+                                <PermissionRow
+                                  key={permission.key}
+                                  permission={permission}
+                                  isOwnerLocked={!!isOwnerLocked}
+                                  getPermissionValue={getPermissionValue}
+                                  handlePermissionChange={handlePermissionChange}
+                                  getScopeValue={getScopeValue}
+                                  handleScopeChange={handleScopeChange}
+                                />
+                              ))}
                             </div>
-                            {expandedCategories.includes(category.key) ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <div className={cn(
-                            "border rounded-lg mt-2 overflow-hidden",
-                            isTabCategory && "ml-6"
-                          )}>
-                            {category.permissions.map((permission, idx) => (
-                              <div
-                                key={permission.key}
-                                className={cn(
-                                  "flex items-center justify-between gap-4 px-4 py-3 transition-colors",
-                                  isOwnerLocked && "bg-green-500/5",
-                                  idx !== category.permissions.length - 1 && "border-b",
-                                  !isOwnerLocked && "hover:bg-muted/30"
-                                )}
-                              >
-                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="cursor-help">
-                                        <Info className="h-4 w-4 text-muted-foreground/60 hover:text-primary transition-colors" />
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right" className="max-w-xs">
-                                      <p className="font-medium mb-1">{permission.label}</p>
-                                      <p className="text-muted-foreground text-xs">{permission.description}</p>
-                                      {permission.hasEditOption && (
-                                        <div className="mt-2 pt-2 border-t text-xs space-y-1">
-                                          <p className="flex items-center gap-1.5">
-                                            <Eye className="h-3 w-3" /> <strong>Se:</strong> Kan se indholdet
-                                          </p>
-                                          <p className="flex items-center gap-1.5">
-                                            <Edit className="h-3 w-3" /> <strong>Ret:</strong> Kan ændre indholdet
-                                          </p>
-                                        </div>
-                                      )}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-sm">{permission.label}</div>
-                                  </div>
+                            
+                            {/* Associated tabs */}
+                            {tabCategory && tabCategory.permissions.length > 0 && (
+                              <div className="border-t bg-muted/20">
+                                <div className="px-3 py-2 text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                                  <Layers className="h-3.5 w-3.5" />
+                                  Under-faner
                                 </div>
-                                
-                                {permission.hasEditOption ? (
-                                  <div className="flex items-center gap-4">
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="flex items-center gap-2">
-                                          <div className={cn(
-                                            "flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors",
-                                            (isOwnerLocked || getPermissionValue(permission.key, "view")) && "bg-primary/10"
-                                          )}>
-                                            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-                                            <span className="text-xs font-medium">Se</span>
-                                          </div>
-                                          <Switch
-                                            checked={isOwnerLocked ? true : getPermissionValue(permission.key, "view")}
-                                            onCheckedChange={(checked) =>
-                                              handlePermissionChange(permission.key, checked, "view")
-                                            }
-                                            disabled={!!isOwnerLocked}
-                                          />
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Kan se dette indhold</TooltipContent>
-                                    </Tooltip>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="flex items-center gap-2">
-                                          <div className={cn(
-                                            "flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors",
-                                            (isOwnerLocked || getPermissionValue(permission.key, "edit")) && "bg-orange-500/10"
-                                          )}>
-                                            <Edit className="h-3.5 w-3.5 text-muted-foreground" />
-                                            <span className="text-xs font-medium">Ret</span>
-                                          </div>
-                                          <Switch
-                                            checked={isOwnerLocked ? true : getPermissionValue(permission.key, "edit")}
-                                            onCheckedChange={(checked) =>
-                                              handlePermissionChange(permission.key, checked, "edit")
-                                            }
-                                            disabled={!!isOwnerLocked || !getPermissionValue(permission.key, "view")}
-                                          />
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        {!getPermissionValue(permission.key, "view") 
-                                          ? "Aktiver 'Se' først for at kunne redigere"
-                                          : "Kan redigere dette indhold"
-                                        }
-                                      </TooltipContent>
-                                    </Tooltip>
-                                    {permission.scopeKey && (() => {
-                                      const hasAccess = isOwnerLocked || getPermissionValue(permission.key, "view") || getPermissionValue(permission.key, "edit");
-                                      return (
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <div className={cn(
-                                              "flex items-center gap-2 pl-2 border-l transition-opacity",
-                                              !hasAccess && "opacity-40"
-                                            )}>
-                                              <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                  <Database className="h-3.5 w-3.5 text-muted-foreground" />
-                                                </TooltipTrigger>
-                                                <TooltipContent>Data synlighed</TooltipContent>
-                                              </Tooltip>
-                                              <RadioGroup
-                                                value={isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)}
-                                                onValueChange={(value) => handleScopeChange(permission.scopeKey!, value as DataScope)}
-                                                className="flex items-center gap-2"
-                                                disabled={!!isOwnerLocked || !hasAccess}
-                                              >
-                                                <div className="flex items-center gap-1">
-                                                  <RadioGroupItem value="egen" id={`${permission.scopeKey}-egen`} className="h-3 w-3" />
-                                                  <Label 
-                                                    htmlFor={`${permission.scopeKey}-egen`} 
-                                                    className={cn(
-                                                      "text-xs cursor-pointer flex items-center gap-0.5",
-                                                      !hasAccess && "cursor-not-allowed",
-                                                      (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)) === "egen" && hasAccess && "text-primary font-medium"
-                                                    )}
-                                                  >
-                                                    <User className="h-3 w-3" />
-                                                    Egen
-                                                  </Label>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                  <RadioGroupItem value="team" id={`${permission.scopeKey}-team`} className="h-3 w-3" />
-                                                  <Label 
-                                                    htmlFor={`${permission.scopeKey}-team`} 
-                                                    className={cn(
-                                                      "text-xs cursor-pointer flex items-center gap-0.5",
-                                                      !hasAccess && "cursor-not-allowed",
-                                                      (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)) === "team" && hasAccess && "text-primary font-medium"
-                                                    )}
-                                                  >
-                                                    <Users className="h-3 w-3" />
-                                                    Team
-                                                  </Label>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                  <RadioGroupItem value="alt" id={`${permission.scopeKey}-alt`} className="h-3 w-3" />
-                                                  <Label 
-                                                    htmlFor={`${permission.scopeKey}-alt`} 
-                                                    className={cn(
-                                                      "text-xs cursor-pointer flex items-center gap-0.5",
-                                                      !hasAccess && "cursor-not-allowed",
-                                                      (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)) === "alt" && hasAccess && "text-primary font-medium"
-                                                    )}
-                                                  >
-                                                    <Globe className="h-3 w-3" />
-                                                    Alt
-                                                  </Label>
-                                                </div>
-                                              </RadioGroup>
-                                            </div>
-                                          </TooltipTrigger>
-                                          {!hasAccess && (
-                                            <TooltipContent>Aktiver 'Se' eller 'Ret' først</TooltipContent>
-                                          )}
-                                        </Tooltip>
-                                      );
-                                    })()}
-                                  </div>
-                                ) : (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="flex items-center gap-2">
-                                        <span className={cn(
-                                          "text-xs font-medium px-2 py-1 rounded-md transition-colors",
-                                          (isOwnerLocked || getPermissionValue(permission.key)) 
-                                            ? "bg-green-500/10 text-green-700" 
-                                            : "text-muted-foreground"
-                                        )}>
-                                          {(isOwnerLocked || getPermissionValue(permission.key)) ? "Aktiveret" : "Deaktiveret"}
-                                        </span>
-                                        <Switch
-                                          checked={isOwnerLocked ? true : getPermissionValue(permission.key)}
-                                          onCheckedChange={(checked) =>
-                                            handlePermissionChange(permission.key, checked)
-                                          }
-                                          disabled={!!isOwnerLocked}
-                                        />
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>{permission.description}</TooltipContent>
-                                  </Tooltip>
-                                )}
+                                <div className="divide-y">
+                                  {tabCategory.permissions.map((permission) => (
+                                    <PermissionRow
+                                      key={permission.key}
+                                      permission={permission}
+                                      isOwnerLocked={!!isOwnerLocked}
+                                      getPermissionValue={getPermissionValue}
+                                      handlePermissionChange={handlePermissionChange}
+                                      getScopeValue={getScopeValue}
+                                      handleScopeChange={handleScopeChange}
+                                      isSubItem
+                                    />
+                                  ))}
+                                </div>
                               </div>
-                            ))}
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    );
-                  })}
-                </div>
-              </TooltipProvider>
-            </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </TooltipProvider>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
 
-          </div>
-
-          <DialogFooter>
+          <DialogFooter className="px-6 py-4 border-t">
             <Button variant="outline" onClick={handleCloseDialog}>
               {editingPosition && isOwnerPosition(editingPosition.name) ? "Luk" : "Annuller"}
             </Button>
@@ -1004,6 +875,146 @@ export function PositionsTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// Separate component for permission row to keep things clean
+function PermissionRow({
+  permission,
+  isOwnerLocked,
+  getPermissionValue,
+  handlePermissionChange,
+  getScopeValue,
+  handleScopeChange,
+  isSubItem = false,
+}: {
+  permission: Permission;
+  isOwnerLocked: boolean;
+  getPermissionValue: (key: string, type?: "view" | "edit") => boolean;
+  handlePermissionChange: (key: string, checked: boolean, type?: "view" | "edit") => void;
+  getScopeValue: (key: string) => DataScope;
+  handleScopeChange: (key: string, scope: DataScope) => void;
+  isSubItem?: boolean;
+}) {
+  const hasView = isOwnerLocked || getPermissionValue(permission.key, "view");
+  const hasEdit = isOwnerLocked || getPermissionValue(permission.key, "edit");
+  const isActive = isOwnerLocked || getPermissionValue(permission.key);
+
+  return (
+    <div className={cn(
+      "flex items-center justify-between gap-3 px-3 py-2.5 transition-colors",
+      isOwnerLocked && "bg-green-500/5",
+      !isOwnerLocked && "hover:bg-muted/30",
+      isSubItem && "pl-6 bg-muted/10"
+    )}>
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Info className="h-3.5 w-3.5 text-muted-foreground/60 hover:text-primary cursor-help shrink-0" />
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-xs">
+            <p className="font-medium mb-1">{permission.label}</p>
+            <p className="text-muted-foreground text-xs">{permission.description}</p>
+          </TooltipContent>
+        </Tooltip>
+        <span className={cn(
+          "text-sm truncate",
+          isActive ? "text-foreground" : "text-muted-foreground"
+        )}>
+          {permission.label}
+        </span>
+      </div>
+      
+      {permission.hasEditOption ? (
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 bg-muted/50 rounded-md px-1.5 py-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => !isOwnerLocked && handlePermissionChange(permission.key, !hasView, "view")}
+                  disabled={isOwnerLocked}
+                  className={cn(
+                    "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors",
+                    hasView ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+                    isOwnerLocked && "cursor-default"
+                  )}
+                >
+                  <Eye className="h-3 w-3" />
+                  Se
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Kan se indhold</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => !isOwnerLocked && handlePermissionChange(permission.key, !hasEdit, "edit")}
+                  disabled={isOwnerLocked || !hasView}
+                  className={cn(
+                    "flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors",
+                    hasEdit ? "bg-orange-500 text-white" : "text-muted-foreground hover:bg-muted",
+                    (isOwnerLocked || !hasView) && "cursor-default opacity-50"
+                  )}
+                >
+                  <Edit className="h-3 w-3" />
+                  Ret
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {!hasView ? "Aktiver 'Se' først" : "Kan redigere indhold"}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          
+          {permission.scopeKey && hasView && (
+            <div className="flex items-center gap-1 text-xs border-l pl-2">
+              <Database className="h-3 w-3 text-muted-foreground" />
+              <RadioGroup
+                value={isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey)}
+                onValueChange={(value) => handleScopeChange(permission.scopeKey!, value as DataScope)}
+                className="flex items-center gap-1"
+                disabled={isOwnerLocked}
+              >
+                {[
+                  { value: "egen", icon: User, label: "Egen" },
+                  { value: "team", icon: Users, label: "Team" },
+                  { value: "alt", icon: Globe, label: "Alt" },
+                ].map(({ value, icon: Icon, label }) => (
+                  <Tooltip key={value}>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center">
+                        <RadioGroupItem value={value} id={`${permission.scopeKey}-${value}`} className="sr-only" />
+                        <Label 
+                          htmlFor={`${permission.scopeKey}-${value}`} 
+                          className={cn(
+                            "px-1.5 py-0.5 rounded cursor-pointer flex items-center gap-0.5 transition-colors",
+                            (isOwnerLocked ? "alt" : getScopeValue(permission.scopeKey!)) === value 
+                              ? "bg-primary/20 text-primary font-medium" 
+                              : "text-muted-foreground hover:bg-muted",
+                            isOwnerLocked && "cursor-default"
+                          )}
+                        >
+                          <Icon className="h-3 w-3" />
+                        </Label>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>{label} data</TooltipContent>
+                  </Tooltip>
+                ))}
+              </RadioGroup>
+            </div>
+          )}
+        </div>
+      ) : (
+        <Switch
+          checked={isActive}
+          onCheckedChange={(checked) => handlePermissionChange(permission.key, checked)}
+          disabled={isOwnerLocked}
+        />
+      )}
     </div>
   );
 }
