@@ -16,7 +16,16 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Users, Trophy, Building2 } from "lucide-react";
 
-// Team configuration - name mapping only, clients come from team_clients table
+// Helper function to shorten names: "John Doe" -> "John D."
+const shortenName = (name: string): string => {
+  if (!name) return "";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  const firstName = parts[0];
+  const lastInitial = parts[parts.length - 1].charAt(0).toUpperCase();
+  return `${firstName} ${lastInitial}.`;
+};
+
 const TEAM_CONFIG: Record<string, { name: string; multiClient?: boolean }> = {
   "eesy-tm": { name: "Eesy TM" },
   "fieldmarketing": { name: "Fieldmarketing" },
@@ -442,7 +451,7 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                               {index + 1}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-medium">{seller.name}</TableCell>
+                          <TableCell className="font-medium text-lg whitespace-nowrap">{shortenName(seller.name)}</TableCell>
                           <TableCell>
                             <div className="h-6 w-20 flex items-center">
                               {seller.clientLogo ? (
@@ -457,8 +466,8 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right text-lg font-semibold">{seller.sales}</TableCell>
-                          <TableCell className="text-right font-mono text-lg font-bold">
+                          <TableCell className="text-right text-lg font-semibold whitespace-nowrap">{seller.sales}</TableCell>
+                          <TableCell className="text-right font-mono text-lg font-bold whitespace-nowrap">
                             {seller.commission.toLocaleString("da-DK")} kr
                           </TableCell>
                         </TableRow>
@@ -499,7 +508,7 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                               {index + 1}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-medium">{seller.name}</TableCell>
+                          <TableCell className="font-medium text-lg whitespace-nowrap">{shortenName(seller.name)}</TableCell>
                           <TableCell>
                             <div className="h-6 w-20 flex items-center">
                               {seller.clientLogo ? (
@@ -514,8 +523,8 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right text-lg font-semibold">{seller.sales}</TableCell>
-                          <TableCell className="text-right font-mono text-lg font-bold">
+                          <TableCell className="text-right text-lg font-semibold whitespace-nowrap">{seller.sales}</TableCell>
+                          <TableCell className="text-right font-mono text-lg font-bold whitespace-nowrap">
                             {seller.commission.toLocaleString("da-DK")} kr
                           </TableCell>
                         </TableRow>
@@ -553,10 +562,10 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                   <TableBody>
                     {recentSales.map((sale: any) => (
                       <TableRow key={sale.id}>
-                        <TableCell>
+                        <TableCell className="text-lg whitespace-nowrap">
                           {format(new Date(sale.created_at), "dd/MM HH:mm", { locale: da })}
                         </TableCell>
-                        <TableCell>{sale.agent_name}</TableCell>
+                        <TableCell className="font-medium text-lg whitespace-nowrap">{shortenName(sale.agent_name)}</TableCell>
                         <TableCell>
                           <div className="h-6 w-20 flex items-center">
                             {sale.clientLogo ? (
@@ -571,8 +580,8 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono">{sale.customer_phone || "-"}</TableCell>
-                        <TableCell className="text-right font-mono text-lg font-bold">
+                        <TableCell className="font-mono text-lg whitespace-nowrap">{sale.customer_phone || "-"}</TableCell>
+                        <TableCell className="text-right font-mono text-lg font-bold whitespace-nowrap">
                           {(sale.total_commission || 0).toLocaleString("da-DK")} kr
                         </TableCell>
                       </TableRow>
