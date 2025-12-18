@@ -243,8 +243,8 @@ const SalesRegistration = () => {
       toast.error("Kunne ikke finde din medarbejderprofil");
       return;
     }
-    if (!locationId) {
-      toast.error("Vælg en lokation");
+    if (!todayBooking?.location?.id) {
+      toast.error("Ingen lokation fundet for dagens vagt");
       return;
     }
     if (productSelections.length === 0) {
@@ -277,7 +277,7 @@ const SalesRegistration = () => {
       const salesRecords = productSelections.flatMap((selection) =>
         selection.phoneNumbers.map((phone) => ({
           seller_id: currentEmployee.id,
-          location_id: locationId,
+          location_id: todayBooking.location.id,
           client_id: clientId,
           product_name: selection.productName,
           phone_number: phone.trim(),
@@ -290,7 +290,7 @@ const SalesRegistration = () => {
       toast.success(`${salesRecords.length} salg registreret!`);
 
       // Reset form
-      setLocationId("");
+      
       setComment("");
       setProductSelections([]);
     } catch (error) {
@@ -312,22 +312,6 @@ const SalesRegistration = () => {
             <CardTitle className="text-lg">Salgsoplysninger</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Lokation */}
-            <div className="space-y-2">
-              <Label htmlFor="location">Lokation *</Label>
-              <Select value={locationId} onValueChange={setLocationId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Vælg lokation" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations?.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
 
             {/* Kommentar */}
             <div className="space-y-2">
@@ -447,7 +431,7 @@ const SalesRegistration = () => {
           onClick={handleSubmit}
           className="w-full"
           size="lg"
-          disabled={!currentEmployee || !locationId || productSelections.length === 0 || isSubmitting}
+          disabled={!currentEmployee || !todayBooking?.location?.id || productSelections.length === 0 || isSubmitting}
         >
           <Save className="h-5 w-5 mr-2" />
           {isSubmitting ? "Gemmer..." : "Registrer salg"}
