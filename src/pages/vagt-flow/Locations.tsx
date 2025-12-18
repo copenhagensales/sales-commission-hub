@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 
 export default function VagtLocations() {
   const [search, setSearch] = useState("");
@@ -66,6 +67,8 @@ export default function VagtLocations() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { canEdit } = usePermissions();
+  const canEditLocation = canEdit("menu_fm_locations");
 
   const { data: locations, isLoading } = useQuery({
     queryKey: ["vagt-locations-list"],
@@ -269,19 +272,23 @@ export default function VagtLocations() {
             <p className="text-muted-foreground">Administrer butikker og steder</p>
           </div>
           <div className="flex gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              onChange={handleCsvImport}
-              className="hidden"
-            />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="h-4 w-4 mr-2" /> Importer kontaktinfo
-            </Button>
-            <Button onClick={() => setNewLocationOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" /> Ny lokation
-            </Button>
+            {canEditLocation && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCsvImport}
+                  className="hidden"
+                />
+                <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-4 w-4 mr-2" /> Importer kontaktinfo
+                </Button>
+                <Button onClick={() => setNewLocationOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" /> Ny lokation
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -357,6 +364,7 @@ export default function VagtLocations() {
                             min={0}
                             className="w-20 h-8 text-center"
                             defaultValue={loc.daily_rate || 1000}
+                            disabled={!canEditLocation}
                             onBlur={(e) => {
                               const value = parseInt(e.target.value) || 1000;
                               if (value !== (loc.daily_rate || 1000)) {
@@ -380,6 +388,7 @@ export default function VagtLocations() {
                             max={52}
                             className="w-16 h-8 text-center"
                             defaultValue={loc.cooldown_weeks || 4}
+                            disabled={!canEditLocation}
                             onBlur={(e) => {
                               const value = parseInt(e.target.value) || 4;
                               if (value !== (loc.cooldown_weeks || 4)) {
@@ -411,16 +420,18 @@ export default function VagtLocations() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setLocationToDelete(loc.id);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        {canEditLocation && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLocationToDelete(loc.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
