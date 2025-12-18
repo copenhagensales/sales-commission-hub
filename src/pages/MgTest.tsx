@@ -216,13 +216,22 @@ export default function MgTest() {
 
   // Create product dialog state
   const [createProductDialog, setCreateProductDialog] = useState(false);
-  const [newProduct, setNewProduct] = useState({
+  const [newProduct, setNewProduct] = useState<{
+    name: string;
+    clientId: string;
+    commission: string;
+    revenue: string;
+    externalCode: string;
+    countsAsSale: boolean;
+    campaignOverrides: Array<{ campaignId: string; commission: string; revenue: string }>;
+  }>({
     name: "",
     clientId: "",
     commission: "0",
     revenue: "0",
     externalCode: "",
     countsAsSale: true,
+    campaignOverrides: [],
   });
 
   // Create campaign dialog state
@@ -997,16 +1006,36 @@ export default function MgTest() {
         }
       }
 
-      const { error } = await supabase.from("products").insert({
+      const { data: insertedProduct, error } = await supabase.from("products").insert({
         name: productData.name.trim(),
         client_campaign_id: clientCampaignId,
         commission_dkk: commission,
         revenue_dkk: revenue,
         external_product_code: productData.externalCode.trim() || null,
         counts_as_sale: productData.countsAsSale,
-      });
+      }).select("id").single();
 
       if (error) throw error;
+
+      // Insert campaign overrides if any
+      if (productData.campaignOverrides.length > 0 && insertedProduct) {
+        const overridesToInsert = productData.campaignOverrides
+          .filter((o) => o.campaignId && (parseFloat(o.commission.replace(",", ".")) > 0 || parseFloat(o.revenue.replace(",", ".")) > 0))
+          .map((o) => ({
+            product_id: insertedProduct.id,
+            campaign_mapping_id: o.campaignId,
+            commission_dkk: parseFloat(o.commission.replace(",", ".")) || 0,
+            revenue_dkk: parseFloat(o.revenue.replace(",", ".")) || 0,
+          }));
+
+        if (overridesToInsert.length > 0) {
+          const { error: overrideError } = await supabase
+            .from("product_campaign_overrides")
+            .insert(overridesToInsert);
+
+          if (overrideError) throw overrideError;
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Produkt oprettet");
@@ -1018,9 +1047,11 @@ export default function MgTest() {
         revenue: "0",
         externalCode: "",
         countsAsSale: true,
+        campaignOverrides: [],
       });
       queryClient.invalidateQueries({ queryKey: ["mg-aggregated-products"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["product-campaign-overrides"] });
     },
     onError: (error: any) => {
       toast.error(error?.message || "Kunne ikke oprette produkt");
@@ -2887,7 +2918,7 @@ export default function MgTest() {
 
       {/* Create Product Dialog */}
       <Dialog open={createProductDialog} onOpenChange={setCreateProductDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Opret nyt produkt</DialogTitle>
             <DialogDescription>
@@ -2922,30 +2953,149 @@ export default function MgTest() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="product-commission">Provision (DKK)</Label>
-                <Input
-                  id="product-commission"
-                  type="text"
-                  inputMode="decimal"
-                  value={newProduct.commission}
-                  onChange={(e) => setNewProduct((prev) => ({ ...prev, commission: e.target.value }))}
-                  placeholder="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="product-revenue">Omsætning (DKK)</Label>
-                <Input
-                  id="product-revenue"
-                  type="text"
-                  inputMode="decimal"
-                  value={newProduct.revenue}
-                  onChange={(e) => setNewProduct((prev) => ({ ...prev, revenue: e.target.value }))}
-                  placeholder="0"
-                />
+            
+            {/* Standard provision/revenue */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Standard provision & omsætning</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="product-commission" className="text-xs text-muted-foreground">Provision (DKK)</Label>
+                  <Input
+                    id="product-commission"
+                    type="text"
+                    inputMode="decimal"
+                    value={newProduct.commission}
+                    onChange={(e) => setNewProduct((prev) => ({ ...prev, commission: e.target.value }))}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="product-revenue" className="text-xs text-muted-foreground">Omsætning (DKK)</Label>
+                  <Input
+                    id="product-revenue"
+                    type="text"
+                    inputMode="decimal"
+                    value={newProduct.revenue}
+                    onChange={(e) => setNewProduct((prev) => ({ ...prev, revenue: e.target.value }))}
+                    placeholder="0"
+                  />
+                </div>
               </div>
             </div>
+
+            {/* Campaign-specific overrides */}
+            <div className="space-y-2 border-t pt-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Kampagne-specifikke værdier</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setNewProduct((prev) => ({
+                      ...prev,
+                      campaignOverrides: [
+                        ...prev.campaignOverrides,
+                        { campaignId: "", commission: "", revenue: "" },
+                      ],
+                    }))
+                  }
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Tilføj
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Sæt forskellige provision/omsætning alt efter hvilken kampagne produktet kommer fra.
+              </p>
+
+              {newProduct.campaignOverrides.length > 0 && (
+                <div className="space-y-3 mt-3">
+                  {newProduct.campaignOverrides.map((override, index) => (
+                    <div key={index} className="p-3 bg-muted/50 rounded-md space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-medium">Override #{index + 1}</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive"
+                          onClick={() =>
+                            setNewProduct((prev) => ({
+                              ...prev,
+                              campaignOverrides: prev.campaignOverrides.filter((_, i) => i !== index),
+                            }))
+                          }
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <Select
+                        value={override.campaignId || undefined}
+                        onValueChange={(value) =>
+                          setNewProduct((prev) => ({
+                            ...prev,
+                            campaignOverrides: prev.campaignOverrides.map((o, i) =>
+                              i === index ? { ...o, campaignId: value } : o
+                            ),
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Vælg kampagne" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {campaignMappings?.map((campaign) => (
+                            <SelectItem key={campaign.id} value={campaign.id} className="text-xs">
+                              {campaign.adversus_campaign_name || campaign.adversus_campaign_id}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Provision</Label>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            className="h-8 text-xs"
+                            value={override.commission}
+                            onChange={(e) =>
+                              setNewProduct((prev) => ({
+                                ...prev,
+                                campaignOverrides: prev.campaignOverrides.map((o, i) =>
+                                  i === index ? { ...o, commission: e.target.value } : o
+                                ),
+                              }))
+                            }
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Omsætning</Label>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            className="h-8 text-xs"
+                            value={override.revenue}
+                            onChange={(e) =>
+                              setNewProduct((prev) => ({
+                                ...prev,
+                                campaignOverrides: prev.campaignOverrides.map((o, i) =>
+                                  i === index ? { ...o, revenue: e.target.value } : o
+                                ),
+                              }))
+                            }
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="product-code">Ekstern produktkode</Label>
               <Input
