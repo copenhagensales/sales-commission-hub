@@ -96,9 +96,32 @@ serve(async (req) => {
 
     if (roleError) {
       console.error("Role assignment error:", roleError);
-      // Don't fail the whole operation, just log it
     } else {
       console.log(`Assigned medarbejder role to user ${authData.user.id}`);
+    }
+
+    // Check if employee_master_data record exists, if not create one
+    const { data: existingEmployee } = await supabase
+      .from("employee_master_data")
+      .select("id")
+      .or(`private_email.eq.${email},work_email.eq.${email}`)
+      .maybeSingle();
+
+    if (!existingEmployee) {
+      const { error: employeeError } = await supabase
+        .from("employee_master_data")
+        .insert({
+          first_name: firstName,
+          last_name: lastName || '',
+          private_email: email,
+          is_active: true
+        });
+
+      if (employeeError) {
+        console.error("Employee creation error:", employeeError);
+      } else {
+        console.log(`Created employee_master_data record for ${email}`);
+      }
     }
 
     return new Response(
