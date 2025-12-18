@@ -3761,6 +3761,47 @@ export type Database = {
           },
         ]
       }
+      team_monthly_goals: {
+        Row: {
+          bonus_description: string | null
+          created_at: string
+          id: string
+          month: number
+          sales_target: number
+          team_id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          bonus_description?: string | null
+          created_at?: string
+          id?: string
+          month: number
+          sales_target?: number
+          team_id: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          bonus_description?: string | null
+          created_at?: string
+          id?: string
+          month?: number
+          sales_target?: number
+          team_id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_monthly_goals_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
           assistant_team_leader_id: string | null
