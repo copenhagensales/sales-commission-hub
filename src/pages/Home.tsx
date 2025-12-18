@@ -519,7 +519,7 @@ const Home = () => {
       
       const { data } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, job_title, employment_start_date")
+        .select("id, first_name, last_name, job_title, employment_start_date, teams:team_id(name)")
         .eq("is_active", true)
         .gte("employment_start_date", monthStart)
         .order("employment_start_date", { ascending: false })
@@ -1120,6 +1120,9 @@ const Home = () => {
                         className="px-3 py-1.5 bg-primary/10 text-primary border-0"
                       >
                         {emp.first_name} {emp.last_name}
+                        {(emp.teams as { name: string } | null)?.name && (
+                          <span className="ml-1 opacity-70">({(emp.teams as { name: string }).name})</span>
+                        )}
                       </Badge>
                     ))}
                   </div>
