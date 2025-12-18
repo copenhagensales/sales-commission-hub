@@ -15,10 +15,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Minus, Phone, Save, ArrowLeft, MapPin, Building2, Tag } from "lucide-react";
+import { Plus, Minus, Phone, Save, ArrowLeft, MapPin, Building2, Tag, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { useCreateFieldmarketingSale, FIELDMARKETING_CLIENTS } from "@/hooks/useFieldmarketingSales";
+import { useCreateFieldmarketingSale } from "@/hooks/useFieldmarketingSales";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -43,7 +42,6 @@ const SalesRegistration = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [activeClient, setActiveClient] = useState<string>(FIELDMARKETING_CLIENTS.EESY_FM);
   const [locationId, setLocationId] = useState<string>("");
   const [comment, setComment] = useState("");
   const [productSelections, setProductSelections] = useState<ProductSelection[]>([]);
@@ -129,23 +127,26 @@ const SalesRegistration = () => {
     },
   });
 
-  // Fetch Eesy FM Gaden products (deduplicated by name)
-  const { data: products } = useQuery({
-    queryKey: ["eesy-fm-gaden-products"],
+  // Fetch products based on the campaign (brand) from today's booking
+  const { data: products, isLoading: productsLoading } = useQuery({
+    queryKey: ["campaign-products", todayBooking?.brand?.name],
     queryFn: async () => {
-      // Get eesy FM Gaden Products campaign ID
+      if (!todayBooking?.brand?.name) return [];
+      
+      // Find client_campaigns that match the brand name
       const { data: campaigns } = await supabase
         .from("client_campaigns")
-        .select("id")
-        .ilike("name", "eesy FM Gaden Products")
-        .single();
+        .select("id, name")
+        .ilike("name", `%${todayBooking.brand.name}%`);
       
-      if (!campaigns) return [];
+      if (!campaigns || campaigns.length === 0) return [];
+      
+      const campaignIds = campaigns.map(c => c.id);
       
       const { data, error } = await supabase
         .from("products")
         .select("id, name")
-        .eq("client_campaign_id", campaigns.id)
+        .in("client_campaign_id", campaignIds)
         .neq("name", "Lokation") // Exclude non-product items
         .order("name");
       if (error) throw error;
@@ -158,15 +159,8 @@ const SalesRegistration = () => {
         return true;
       });
     },
+    enabled: !!todayBooking?.brand?.name,
   });
-
-  // Reset form when client tab changes
-  const handleClientChange = (clientId: string) => {
-    setActiveClient(clientId);
-    setLocationId("");
-    setComment("");
-    setProductSelections([]);
-  };
 
   const addProduct = (productId: string) => {
     const product = products?.find((p) => p.id === productId);
@@ -269,13 +263,22 @@ const SalesRegistration = () => {
 
     setIsSubmitting(true);
     
+    // Use client from booking if available, otherwise use locationId to look it up
+    const clientId = todayBooking?.client?.id;
+    
+    if (!clientId) {
+      toast.error("Kunne ikke finde kunde for denne booking");
+      setIsSubmitting(false);
+      return;
+    }
+    
     try {
       // Create sales records - one per product/phone combination
       const salesRecords = productSelections.flatMap((selection) =>
         selection.phoneNumbers.map((phone) => ({
           seller_id: currentEmployee.id,
           location_id: locationId,
-          client_id: activeClient,
+          client_id: clientId,
           product_name: selection.productName,
           phone_number: phone.trim(),
           comment: comment || undefined,
@@ -535,22 +538,37 @@ const SalesRegistration = () => {
         </Card>
       )}
 
-      <Tabs value={activeClient} onValueChange={handleClientChange}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value={FIELDMARKETING_CLIENTS.EESY_FM}>
-            Eesy FM
-          </TabsTrigger>
-          <TabsTrigger value={FIELDMARKETING_CLIENTS.YOUSEE}>
-            Yousee
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value={FIELDMARKETING_CLIENTS.EESY_FM} className="mt-6">
-          {renderFormContent()}
-        </TabsContent>
-        <TabsContent value={FIELDMARKETING_CLIENTS.YOUSEE} className="mt-6">
-          {renderFormContent()}
-        </TabsContent>
-      </Tabs>
+      {/* Show form content if there's a booking with products, or allow manual selection */}
+      {todayBooking ? (
+        products && products.length > 0 ? (
+          renderFormContent()
+        ) : productsLoading ? (
+          <Card>
+            <CardContent className="py-8">
+              <p className="text-center text-muted-foreground">Henter produkter...</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardContent className="py-6">
+              <div className="flex items-center gap-3 justify-center">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                <p className="text-sm text-destructive">
+                  Ingen produkter fundet for kampagnen "{todayBooking.brand?.name}".
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )
+      ) : (
+        <Card className="border-muted">
+          <CardContent className="py-8">
+            <p className="text-center text-muted-foreground">
+              Du har ingen booking i dag. Kontakt din leder for at få tildelt en vagt.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
