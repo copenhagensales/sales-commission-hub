@@ -112,8 +112,8 @@ export default function RelatelDashboard() {
       (sale.sale_items || []).forEach((item: any) => {
         const product = item.products;
         
-        const countsAsSale = product?.counts_as_sale !== false;
-        if (!countsAsSale) return;
+        // Skip items without a mapped product or with counts_as_sale = false
+        if (!product || product.counts_as_sale === false) return;
 
         const qty = Number(item.quantity) || 1;
         const itemCommission = qty * (Number(product?.commission_dkk) || Number(item.mapped_commission) || 0);
