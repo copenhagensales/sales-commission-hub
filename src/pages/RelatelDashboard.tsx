@@ -1,13 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, Package, DollarSign, ShoppingCart, TrendingUp } from "lucide-react";
+import { Users, Package, DollarSign, ShoppingCart, TrendingUp, CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 interface ProductStat {
   name: string;
   quantity: number;
@@ -26,12 +29,14 @@ const formatCurrency = (value: number) =>
   new Intl.NumberFormat('da-DK', { style: 'decimal', maximumFractionDigits: 0 }).format(value) + ' DKK';
 
 export default function RelatelDashboard() {
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
   const { data, isLoading } = useQuery({
-    queryKey: ["relatel-today-dashboard"],
+    queryKey: ["relatel-today-dashboard", selectedDate.toDateString()],
     queryFn: async () => {
-      const today = startOfDay(new Date());
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      const dayStart = startOfDay(selectedDate);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
 
       // Find Relatel client
       const { data: clients } = await supabase
@@ -75,8 +80,8 @@ export default function RelatelDashboard() {
           )
         `)
         .in("client_campaign_id", campaignIds)
-        .gte("sale_datetime", today.toISOString())
-        .lt("sale_datetime", tomorrow.toISOString())
+        .gte("sale_datetime", dayStart.toISOString())
+        .lt("sale_datetime", dayEnd.toISOString())
         .order("sale_datetime", { ascending: false });
 
       return { sales: sales || [], campaignIds };
@@ -142,17 +147,43 @@ export default function RelatelDashboard() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Relatel – Dagsoverblik</h1>
-          <p className="text-muted-foreground">
-            Salg for i dag ({format(new Date(), "EEEE d. MMMM yyyy", { locale: da })}) • Baseret på produkt-mapping fra MG Test
-          </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Relatel – Dagsoverblik</h1>
+            <p className="text-muted-foreground">
+              Baseret på produkt-mapping fra MG Test
+            </p>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-[240px] justify-start text-left font-normal",
+                  !selectedDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && setSelectedDate(date)}
+                initialFocus
+                className="pointer-events-auto"
+                locale={da}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Antal salg i dag</CardTitle>
+              <CardTitle className="text-sm font-medium">Antal salg</CardTitle>
               <ShoppingCart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -163,7 +194,7 @@ export default function RelatelDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Omsætning i dag</CardTitle>
+              <CardTitle className="text-sm font-medium">Omsætning</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -174,7 +205,7 @@ export default function RelatelDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Provision i dag</CardTitle>
+              <CardTitle className="text-sm font-medium">Provision</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -196,7 +227,7 @@ export default function RelatelDashboard() {
               {isLoading ? (
                 <p className="text-center text-muted-foreground py-8">Indlæser...</p>
               ) : agentStats.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Ingen salg registreret i dag</p>
+                <p className="text-center text-muted-foreground py-8">Ingen salg registreret denne dag</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -239,7 +270,7 @@ export default function RelatelDashboard() {
               {isLoading ? (
                 <p className="text-center text-muted-foreground py-8">Indlæser...</p>
               ) : productStats.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Ingen produkter solgt i dag</p>
+                <p className="text-center text-muted-foreground py-8">Ingen produkter solgt denne dag</p>
               ) : (
                 <Table>
                   <TableHeader>
