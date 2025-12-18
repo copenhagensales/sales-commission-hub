@@ -50,6 +50,7 @@ const getTestNavigation = (t: (key: string) => string) => [
 // MG submenu navigation
 const getMgNavigation = (t: (key: string) => string) => [
   { name: t("sidebar.payroll"), href: "/payroll", icon: Wallet },
+  { name: t("sidebar.teamOverview"), href: "/team-overview", icon: Users },
   { name: t("sidebar.tdcErhverv"), href: "/tdc-erhverv", icon: Building2 },
   { name: "TDC Dagsoverblik", href: "/tdc-erhverv-dashboard", icon: BarChart3 },
   { name: "Relatel Dagsoverblik", href: "/relatel-dashboard", icon: BarChart3 },

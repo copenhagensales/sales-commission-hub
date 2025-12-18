@@ -17,6 +17,7 @@ import {
   RelatelDashboard,
   TrygDashboard,
   AseDashboard,
+  TeamOverview,
   NotFound,
   AdversusData,
   DialerData,
@@ -104,6 +105,7 @@ export const routes: RouteConfig[] = [
   { path: "/relatel-dashboard", component: RelatelDashboard, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_mg_test" },
   { path: "/tryg-dashboard", component: TrygDashboard, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_mg_test" },
   { path: "/ase-dashboard", component: AseDashboard, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_mg_test" },
+  { path: "/team-overview", component: TeamOverview, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_mg_test" },
   
   { path: "/payroll", component: Payroll, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_payroll" },
   { path: "/mg-test", component: MgTest, access: "role", requireTeamlederOrAbove: true, positionPermission: "menu_mg_test" },
