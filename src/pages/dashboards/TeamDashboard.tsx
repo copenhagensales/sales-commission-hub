@@ -949,42 +949,42 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2">
-            <Trophy className="h-5 w-5 text-yellow-500" />
-            <CardTitle className="text-lg">Dagens sælgere</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {todaySellers && todaySellers.length > 0 ? (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Sælger</TableHead>
-                      <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Provision</TableHead>
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-2">
+          <Trophy className="h-5 w-5 text-yellow-500" />
+          <CardTitle className="text-lg">Dagens sælgere ({todaySellers?.reduce((sum, s) => sum + s.sales, 0) || 0} salg)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {todaySellers && todaySellers.length > 0 ? (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>Sælger</TableHead>
+                    <TableHead className="text-right">Salg</TableHead>
+                    <TableHead className="text-right">Provision</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {todaySellers.map((seller, index) => (
+                    <TableRow key={seller.name}>
+                      <TableCell>
+                        <Badge variant={index === 0 ? "default" : index < 3 ? "secondary" : "outline"}>{index + 1}</Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">{seller.name}</TableCell>
+                      <TableCell className="text-right">{seller.sales}</TableCell>
+                      <TableCell className="text-right font-mono font-medium">{seller.commission.toLocaleString("da-DK")} kr</TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {todaySellers.map((seller, index) => (
-                      <TableRow key={seller.name}>
-                        <TableCell>
-                          <Badge variant={index === 0 ? "default" : index < 3 ? "secondary" : "outline"}>{index + 1}</Badge>
-                        </TableCell>
-                        <TableCell className="font-medium">{seller.name}</TableCell>
-                        <TableCell className="text-right">{seller.sales}</TableCell>
-                        <TableCell className="text-right font-mono font-medium">{seller.commission.toLocaleString("da-DK")} kr</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm text-center py-8">Ingen salg i dag</p>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm text-center py-8">Ingen salg i dag</p>
+          )}
+        </CardContent>
+      </Card>
       </div>
 
       <Card>
