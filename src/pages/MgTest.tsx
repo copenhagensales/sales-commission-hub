@@ -1143,6 +1143,44 @@ export default function MgTest() {
     },
   });
 
+  // Delete manual campaign mutation
+  const deleteManualCampaign = useMutation({
+    mutationFn: async (mappingId: string) => {
+      // Get the mapping to find the client_campaign_id
+      const { data: mapping, error: fetchError } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("client_campaign_id")
+        .eq("id", mappingId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Delete the adversus_campaign_mapping
+      const { error: deleteError } = await supabase
+        .from("adversus_campaign_mappings")
+        .delete()
+        .eq("id", mappingId);
+
+      if (deleteError) throw deleteError;
+
+      // Also delete the related client_campaign if it exists
+      if (mapping?.client_campaign_id) {
+        await supabase
+          .from("client_campaigns")
+          .delete()
+          .eq("id", mapping.client_campaign_id);
+      }
+    },
+    onSuccess: () => {
+      toast.success("Kampagne slettet");
+      queryClient.invalidateQueries({ queryKey: ["mg-campaign-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["mg-client-campaigns"] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || "Kunne ikke slette kampagne");
+    },
+  });
+
   // Debounce refs for auto-save
   const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
@@ -2264,13 +2302,14 @@ export default function MgTest() {
                             <Table>
                               <TableHeader>
                               <TableRow>
-                                  <TableHead className="w-[20%]">{t("mgTest.adversusCampaignName")}</TableHead>
+                                  <TableHead className="w-[18%]">{t("mgTest.adversusCampaignName")}</TableHead>
                                   <TableHead className="w-[10%]">{t("mgTest.campaignId")}</TableHead>
-                                  <TableHead className="w-[10%]">API</TableHead>
+                                  <TableHead className="w-[8%]">API</TableHead>
                                   <TableHead className="w-[6%]">{t("mgTest.inspect")}</TableHead>
-                                  <TableHead className="w-[22%]">{t("mgTest.internalCampaign")}</TableHead>
-                                  <TableHead className="w-[17%]">{t("mgTest.oppFieldId")}</TableHead>
-                                  <TableHead className="w-[15%]">{t("mgTest.save")}</TableHead>
+                                  <TableHead className="w-[20%]">{t("mgTest.internalCampaign")}</TableHead>
+                                  <TableHead className="w-[15%]">{t("mgTest.oppFieldId")}</TableHead>
+                                  <TableHead className="w-[10%]">{t("mgTest.save")}</TableHead>
+                                  <TableHead className="w-[8%]"></TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -2298,6 +2337,9 @@ export default function MgTest() {
                                   const hasClientChange = selectedClientId !== existingClientId;
                                   const hasFieldIdChange = draftFieldId !== undefined && draftFieldId !== existingFieldId;
                                   const hasChanges = hasClientChange || hasFieldIdChange;
+
+                                  // Check if this is a manually created campaign
+                                  const isManualCampaign = mapping.adversus_campaign_id?.startsWith("manual-");
 
                                   return (
                                     <TableRow key={mapping.id}>
@@ -2386,6 +2428,22 @@ export default function MgTest() {
                                         >
                                           {t("mgTest.save")}
                                         </Button>
+                                      </TableCell>
+                                      <TableCell>
+                                        {isManualCampaign && (
+                                          <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            onClick={() => deleteManualCampaign.mutate(mapping.id)}
+                                            disabled={deleteManualCampaign.isPending}
+                                          >
+                                            {deleteManualCampaign.isPending ? (
+                                              <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                              <Trash2 className="h-4 w-4" />
+                                            )}
+                                          </Button>
+                                        )}
                                       </TableCell>
                                     </TableRow>
                                   );
