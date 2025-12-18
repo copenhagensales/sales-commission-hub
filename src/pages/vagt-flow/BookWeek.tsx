@@ -75,16 +75,48 @@ export default function VagtBookWeek() {
     { label: "Søndag", value: 6 },
   ];
 
+  // Fetch Fieldmarketing team and its assigned clients
+  const { data: fieldmarketingClients } = useQuery({
+    queryKey: ["fieldmarketing-team-clients"],
+    queryFn: async () => {
+      // Find Fieldmarketing team
+      const { data: team, error: teamError } = await supabase
+        .from("teams")
+        .select("id")
+        .ilike("name", "%fieldmarketing%")
+        .single();
+      
+      if (teamError || !team) return [];
+      
+      // Get clients assigned to Fieldmarketing team
+      const { data: teamClients, error: tcError } = await supabase
+        .from("team_clients")
+        .select("client_id, clients(id, name)")
+        .eq("team_id", team.id);
+      
+      if (tcError) throw tcError;
+      return teamClients?.map((tc: any) => tc.clients).filter(Boolean) || [];
+    },
+  });
+
   const { data: brands } = useQuery({
-    queryKey: ["vagt-brands"],
+    queryKey: ["vagt-brands", fieldmarketingClients],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("brand")
         .select("*")
         .eq("is_active", true);
       if (error) throw error;
+      
+      // Filter brands to only those matching Fieldmarketing team clients
+      if (fieldmarketingClients && fieldmarketingClients.length > 0) {
+        const clientNames = fieldmarketingClients.map((c: any) => c.name?.toLowerCase());
+        return data?.filter(brand => clientNames.includes(brand.name?.toLowerCase())) || [];
+      }
+      
       return data;
     },
+    enabled: !!fieldmarketingClients,
   });
 
   const { data: locations } = useQuery({
@@ -297,10 +329,10 @@ export default function VagtBookWeek() {
           <CardContent className="pt-6">
             <div className="grid gap-4 md:grid-cols-3">
               <div>
-                <label className="text-xs font-medium mb-2 block uppercase text-muted-foreground">Brand *</label>
+                <label className="text-xs font-medium mb-2 block uppercase text-muted-foreground">Kunde *</label>
                 <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Vælg brand" />
+                    <SelectValue placeholder="Vælg kunde" />
                   </SelectTrigger>
                   <SelectContent>
                     {brands?.map((brand) => (
