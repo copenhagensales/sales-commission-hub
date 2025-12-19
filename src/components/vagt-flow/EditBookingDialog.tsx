@@ -28,14 +28,12 @@ interface EditBookingDialogProps {
 export function EditBookingDialog({ open, onOpenChange, booking }: EditBookingDialogProps) {
   const queryClient = useQueryClient();
   const [clientId, setClientId] = useState<string>("");
-  const [brandId, setBrandId] = useState<string>("");
   const [campaignId, setCampaignId] = useState<string>("");
   const [status, setStatus] = useState<string>("");
 
   useEffect(() => {
     if (booking) {
       setClientId(booking.client_id || "");
-      setBrandId(booking.brand_id || "");
       setCampaignId(booking.campaign_id || "");
       setStatus(booking.status || "Bekræftet");
     }
@@ -63,20 +61,6 @@ export function EditBookingDialog({ open, onOpenChange, booking }: EditBookingDi
     enabled: open,
   });
 
-  // Fetch brands
-  const { data: brands } = useQuery({
-    queryKey: ["brands-for-edit"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("brand")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-      return data || [];
-    },
-    enabled: open,
-  });
-
   // Fetch campaigns based on selected client
   const { data: campaigns } = useQuery({
     queryKey: ["campaigns-for-edit", clientId],
@@ -95,7 +79,6 @@ export function EditBookingDialog({ open, onOpenChange, booking }: EditBookingDi
   const updateBookingMutation = useMutation({
     mutationFn: async (updates: {
       client_id: string | null;
-      brand_id: string | null;
       campaign_id: string | null;
       status: "Planlagt" | "Bekræftet" | "Afsluttet" | "Aflyst";
     }) => {
@@ -118,7 +101,6 @@ export function EditBookingDialog({ open, onOpenChange, booking }: EditBookingDi
   const handleSave = () => {
     updateBookingMutation.mutate({
       client_id: clientId || null,
-      brand_id: brandId || null,
       campaign_id: campaignId || null,
       status: status as "Planlagt" | "Bekræftet" | "Afsluttet" | "Aflyst",
     });
@@ -151,23 +133,6 @@ export function EditBookingDialog({ open, onOpenChange, booking }: EditBookingDi
                 {clients?.map((client: any) => (
                   <SelectItem key={client.id} value={client.id}>
                     {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="brand">Brand</Label>
-            <Select value={brandId || "none"} onValueChange={(v) => setBrandId(v === "none" ? "" : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Vælg brand" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Ingen brand</SelectItem>
-                {brands?.map((brand: any) => (
-                  <SelectItem key={brand.id} value={brand.id}>
-                    {brand.name}
                   </SelectItem>
                 ))}
               </SelectContent>
