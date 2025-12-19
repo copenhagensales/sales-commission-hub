@@ -60,10 +60,11 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     queryFn: async () => {
       if (!user?.email) return { name: null, pendingContracts: 0 };
 
+      const lowerEmail = user.email.toLowerCase();
       const { data: employee } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name")
-        .eq("private_email", user.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       if (!employee) return { name: null, pendingContracts: 0 };
@@ -89,10 +90,11 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     queryFn: async () => {
       if (!user?.email || !p.canViewAbsence) return 0;
 
+      const lowerEmail = user.email.toLowerCase();
       const { data: currentEmployee } = await supabase
         .from("employee_master_data")
         .select("id")
-        .eq("private_email", user.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       if (!currentEmployee) return 0;

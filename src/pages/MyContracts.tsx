@@ -53,10 +53,11 @@ export default function MyContracts() {
       }
 
       // Get employee ID from email
+      const lowerEmail = userData.user.email?.toLowerCase() || '';
       const { data: employee, error: empError } = await supabase
         .from("employee_master_data")
         .select("id")
-        .eq("private_email", userData.user.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       console.log("MyContracts - Employee lookup:", { employee, empError, email: userData.user.email });

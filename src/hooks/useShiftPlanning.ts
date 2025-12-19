@@ -416,10 +416,11 @@ export function useCurrentEmployee() {
     queryKey: ["current-employee", user?.email],
     queryFn: async () => {
       if (!user?.email) return null;
+      const lowerEmail = user.email.toLowerCase();
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("*")
-        .eq("private_email", user.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       if (error) throw error;

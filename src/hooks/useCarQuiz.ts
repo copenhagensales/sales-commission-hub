@@ -19,10 +19,11 @@ export function useCarQuizCompletion() {
       if (!user?.email) return null;
 
       // Get employee ID from email
+      const lowerEmail = user.email.toLowerCase();
       const { data: employee, error: employeeError } = await supabase
         .from("employee_master_data")
         .select("id")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       if (employeeError) {
@@ -68,10 +69,11 @@ export function useSubmitCarQuiz() {
       if (!user?.email) throw new Error("Not authenticated");
 
       // Get employee data from email
+      const lowerEmail = user.email.toLowerCase();
       const { data: employee, error: employeeError } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, private_email")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       if (employeeError) throw new Error("Error finding employee");
@@ -248,10 +250,11 @@ export function useCarQuizLock() {
 
       try {
         // Get employee data
+        const lowerEmail = user.email.toLowerCase();
         const { data: employee, error: employeeError } = await supabase
           .from("employee_master_data")
           .select("id, job_title, employment_start_date")
-          .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+          .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
           .maybeSingle();
 
         if (employeeError) {

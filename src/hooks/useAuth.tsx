@@ -14,10 +14,11 @@ export function useAuth() {
       return;
     }
     
+    const lowerEmail = userEmail.toLowerCase();
     const { data } = await supabase
       .from("employee_master_data")
       .select("must_change_password")
-      .or(`private_email.eq.${userEmail},work_email.eq.${userEmail}`)
+      .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
       .eq("is_active", true)
       .maybeSingle();
     
@@ -27,10 +28,11 @@ export function useAuth() {
   const clearMustChangePassword = useCallback(async () => {
     if (!user?.email) return;
     
+    const lowerEmail = user.email.toLowerCase();
     await supabase
       .from("employee_master_data")
       .update({ must_change_password: false })
-      .or(`private_email.eq.${user.email},work_email.eq.${user.email}`);
+      .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`);
     
     setMustChangePassword(false);
   }, [user?.email]);

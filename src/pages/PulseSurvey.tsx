@@ -118,10 +118,11 @@ export default function PulseSurvey() {
   const { data: employee } = useQuery({
     queryKey: ['employee-for-pulse', user?.email],
     queryFn: async () => {
+      const lowerEmail = user?.email?.toLowerCase() || '';
       const { data } = await supabase
         .from('employee_master_data')
         .select('id, department')
-        .eq('private_email', user?.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .single();
       return data;
     },

@@ -93,10 +93,11 @@ export default function ContractSign() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return null;
       
+      const lowerEmail = userData.user.email?.toLowerCase() || '';
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, private_email")
-        .eq("private_email", userData.user.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
       
       if (error) throw error;

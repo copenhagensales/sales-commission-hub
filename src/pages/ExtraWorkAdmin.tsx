@@ -50,10 +50,11 @@ export default function ExtraWorkAdmin() {
       if (!user?.email) return [];
 
       // Get current user's employee id
+      const lowerEmail = user.email.toLowerCase();
       const { data: currentEmployee } = await supabase
         .from("employee_master_data")
         .select("id")
-        .eq("private_email", user.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       let query = supabase

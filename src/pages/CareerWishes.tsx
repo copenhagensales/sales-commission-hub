@@ -37,10 +37,11 @@ export default function CareerWishes() {
   const { data: employee, isLoading: isLoadingEmployee } = useQuery({
     queryKey: ["current-employee-career"],
     queryFn: async () => {
+      const lowerEmail = user?.email?.toLowerCase() || '';
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, department, job_title")
-        .eq("private_email", user?.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .single();
       if (error) throw error;
       return data;

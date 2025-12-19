@@ -10,10 +10,11 @@ export function useIsFieldmarketingEmployee() {
     queryFn: async () => {
       if (!user?.email) return false;
 
+      const lowerEmail = user.email.toLowerCase();
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("job_title")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .eq("is_active", true)
         .maybeSingle();
 

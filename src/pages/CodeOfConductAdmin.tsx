@@ -72,10 +72,11 @@ export default function CodeOfConductAdmin() {
     queryKey: ["current-employee-id", user?.email],
     queryFn: async () => {
       if (!user?.email) return null;
+      const lowerEmail = user.email.toLowerCase();
       const { data } = await supabase
         .from("employee_master_data")
         .select("id")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
       return data?.id || null;
     },
