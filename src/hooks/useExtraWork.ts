@@ -45,10 +45,11 @@ export function useMyExtraWork() {
       if (!user?.email) return [];
 
       // Get employee id first
+      const lowerEmail = user.email.toLowerCase();
       const { data: employee } = await supabase
         .from("employee_master_data")
         .select("id")
-        .eq("private_email", user.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       if (!employee) return [];
@@ -117,10 +118,11 @@ export function useCreateExtraWork() {
       if (!user?.email) throw new Error("Ikke logget ind");
 
       // Get employee id
+      const lowerEmail = user.email.toLowerCase();
       const { data: employee } = await supabase
         .from("employee_master_data")
         .select("id")
-        .eq("private_email", user.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       if (!employee) throw new Error("Medarbejder ikke fundet");
@@ -209,10 +211,11 @@ export function useUpdateExtraWork() {
       if (!user?.email) throw new Error("Ikke logget ind");
 
       // Get manager employee id for approved_by
+      const lowerEmail = user.email.toLowerCase();
       const { data: manager } = await supabase
         .from("employee_master_data")
         .select("id")
-        .eq("private_email", user.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       const updateData: Record<string, unknown> = { ...updates };

@@ -93,10 +93,11 @@ export function useTimeStamps() {
     queryKey: ["current-employee-for-stamps", user?.email],
     queryFn: async () => {
       if (!user?.email) return null;
+      const lowerEmail = user.email.toLowerCase();
       const { data } = await supabase
         .from("employee_master_data")
         .select("id, standard_start_time, salary_type")
-        .eq("private_email", user.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
       return data;
     },

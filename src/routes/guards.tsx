@@ -33,6 +33,7 @@ export function SmartRedirect() {
         const { supabase } = await import("@/integrations/supabase/client");
         
         // Get employee with their individual override and position default
+        const lowerEmail = user.email?.toLowerCase() || '';
         const { data: employee } = await supabase
           .from("employee_master_data")
           .select(`
@@ -40,7 +41,7 @@ export function SmartRedirect() {
             job_title,
             job_positions!employee_master_data_job_title_fkey(default_landing_page)
           `)
-          .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+          .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
           .eq("is_active", true)
           .maybeSingle();
         

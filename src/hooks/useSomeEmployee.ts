@@ -10,25 +10,15 @@ export function useIsSomeEmployee() {
     queryFn: async () => {
       if (!user?.email) return false;
 
-      // Try private_email first
-      const { data: privateData } = await supabase
+      const lowerEmail = user.email.toLowerCase();
+      const { data } = await supabase
         .from("employee_master_data")
         .select("job_title")
         .eq("is_active", true)
-        .eq("private_email", user.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
-      if (privateData?.job_title === "SOME") return true;
-
-      // Try work_email
-      const { data: workData } = await supabase
-        .from("employee_master_data")
-        .select("job_title")
-        .eq("is_active", true)
-        .eq("work_email", user.email)
-        .maybeSingle();
-
-      return workData?.job_title === "SOME";
+      return data?.job_title === "SOME";
     },
     enabled: !!user?.email,
     staleTime: 10000,

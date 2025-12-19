@@ -202,10 +202,11 @@ export function useReviewApplication() {
       if (!user?.email) throw new Error("Ikke logget ind");
 
       // Get the current user's employee ID (works for any job_title)
+      const lowerEmail = user.email.toLowerCase();
       const { data: employeeData, error: empError } = await supabase
         .from("employee_master_data")
         .select("id")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .eq("is_active", true)
         .maybeSingle();
 

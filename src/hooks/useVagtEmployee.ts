@@ -20,10 +20,11 @@ export function useVagtEmployee() {
     queryFn: async () => {
       if (!user?.email) return null;
 
+      const lowerEmail = user.email.toLowerCase();
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, private_email, private_phone, is_active, department, job_title")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .eq("is_active", true)
         .maybeSingle();
 

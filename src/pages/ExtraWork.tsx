@@ -32,10 +32,11 @@ export default function ExtraWork() {
     queryFn: async () => {
       if (!user?.email) return [];
 
+      const lowerEmail = user.email.toLowerCase();
       const { data: employee } = await supabase
         .from("employee_master_data")
         .select("id")
-        .eq("private_email", user.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       if (!employee) return [];

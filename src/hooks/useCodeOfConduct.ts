@@ -332,10 +332,11 @@ export function useCodeOfConductCompletion() {
       if (!user?.email) return null;
 
       // Get employee ID from email
+      const lowerEmail = user.email.toLowerCase();
       const { data: employee, error: employeeError } = await supabase
         .from("employee_master_data")
         .select("id, employment_start_date")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       if (employeeError) {
@@ -373,10 +374,11 @@ export function useCodeOfConductCurrentAttempt() {
     queryFn: async () => {
       if (!user?.email) return null;
 
+      const lowerEmail = user.email.toLowerCase();
       const { data: employee, error: employeeError } = await supabase
         .from("employee_master_data")
         .select("id")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       if (employeeError) {
@@ -429,10 +431,11 @@ export function useSubmitCodeOfConduct() {
     mutationFn: async ({ answers, questionsToAnswer }: SubmitCodeOfConductParams) => {
       if (!user?.email) throw new Error("Not authenticated");
 
+      const lowerEmail = user.email.toLowerCase();
       const { data: employee, error: employeeError } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, private_email")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       if (employeeError) throw new Error("Error finding employee");
@@ -520,10 +523,11 @@ export function useCodeOfConductLock() {
     queryFn: async () => {
       if (!user?.email) return { isLocked: false, daysRemaining: null as number | null, isRequired: false };
 
+      const lowerEmail = user.email.toLowerCase();
       const { data: employee, error: employeeError } = await supabase
         .from("employee_master_data")
         .select("id, job_title, employment_start_date")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
 
       if (employeeError) {
@@ -601,10 +605,11 @@ export function useIsSalgskonsulent() {
     queryFn: async () => {
       if (!user?.email) return false;
 
+      const lowerEmail = user.email.toLowerCase();
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("job_title")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .eq("is_active", true)
         .maybeSingle();
 

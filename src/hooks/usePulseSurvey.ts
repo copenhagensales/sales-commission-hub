@@ -51,10 +51,11 @@ export function useHasCompletedSurvey(surveyId?: string) {
       if (!surveyId) return false;
 
       // Get current employee ID
+      const lowerEmail = user?.email?.toLowerCase() || '';
       const { data: employee } = await supabase
         .from('employee_master_data')
         .select('id')
-        .eq('private_email', user?.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .single();
 
       if (!employee) return false;
@@ -103,10 +104,11 @@ export function useSubmitPulseSurvey() {
       response: PulseSurveyResponse;
     }) => {
       // Get employee data including team
+      const lowerEmail = user?.email?.toLowerCase() || '';
       const { data: employee } = await supabase
         .from('employee_master_data')
         .select('id, team_id, team:teams(name)')
-        .eq('private_email', user?.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .single();
 
       // Insert anonymous response with team_id

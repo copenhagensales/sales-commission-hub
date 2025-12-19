@@ -118,10 +118,11 @@ export default function MyProfile() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return null;
 
+      const lowerEmail = userData.user.email?.toLowerCase() || '';
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("*")
-        .or(`private_email.eq.${userData.user.email},work_email.eq.${userData.user.email}`)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
       if (error) throw error;
       return data;
