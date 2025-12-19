@@ -416,14 +416,14 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
     const recentSales = allRecentSales || [];
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">
               {teamName} Dashboard
             </h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
               Oversigt over salg på tværs af kunder
             </p>
           </div>
@@ -432,12 +432,12 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
               <Button
                 variant="outline"
                 className={cn(
-                  "w-[240px] justify-start text-left font-normal",
+                  "w-full sm:w-[240px] justify-start text-left font-normal text-sm md:text-base",
                   !selectedDate && "text-muted-foreground"
                 )}
               >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}
+                <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                <span className="truncate">{format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
@@ -455,32 +455,32 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
 
         {/* Client cards grid */}
         {clientsWithSales.length > 0 ? (
-          <div className="grid gap-4 grid-cols-5">
+          <div className="grid gap-3 md:gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {clientsWithSales.map((client) => (
               <Card key={client.clientId} className="relative overflow-hidden">
-                <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center gap-2">
-                    <div className="h-8 w-full flex items-center justify-center">
+                <CardContent className="p-3 md:p-4">
+                  <div className="flex flex-col items-center text-center gap-1 md:gap-2">
+                    <div className="h-6 md:h-8 w-full flex items-center justify-center">
                       {client.logoUrl ? (
                         <img 
                           src={client.logoUrl} 
                           alt={client.clientName} 
-                          className="max-h-8 max-w-full object-contain"
+                          className="max-h-6 md:max-h-8 max-w-full object-contain"
                         />
                       ) : (
-                        <span className="text-sm font-semibold text-foreground truncate max-w-full">
+                        <span className="text-xs md:text-sm font-semibold text-foreground truncate max-w-full">
                           {client.clientName}
                         </span>
                       )}
                     </div>
-                    <div className="flex gap-6 mt-2">
+                    <div className="flex gap-4 md:gap-6 mt-1 md:mt-2">
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-foreground">{client.salesToday}</div>
-                        <div className="text-xs text-muted-foreground">i dag</div>
+                        <div className="text-xl md:text-3xl font-bold text-foreground">{client.salesToday}</div>
+                        <div className="text-[10px] md:text-xs text-muted-foreground">i dag</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-foreground">{client.salesThisMonth}</div>
-                        <div className="text-xs text-muted-foreground">måned</div>
+                        <div className="text-xl md:text-3xl font-bold text-foreground">{client.salesThisMonth}</div>
+                        <div className="text-[10px] md:text-xs text-muted-foreground">måned</div>
                       </div>
                     </div>
                   </div>
@@ -490,49 +490,49 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
           </div>
         ) : (
           <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
+            <CardContent className="py-6 md:py-8 text-center text-muted-foreground text-sm md:text-base">
               Ingen salg registreret denne måned
             </CardContent>
           </Card>
         )}
 
         {/* Tables side by side */}
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-2">
           {/* Month Sellers Table */}
           <Card>
-            <CardHeader className="flex flex-row items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Månedens sælgere</CardTitle>
+            <CardHeader className="flex flex-row items-center gap-2 p-3 md:p-6">
+              <Users className="h-4 w-4 md:h-5 md:w-5 text-primary shrink-0" />
+              <CardTitle className="text-base md:text-lg">Månedens sælgere</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0 md:p-6 md:pt-0">
               {monthSellers.length > 0 ? (
-                <div className="rounded-md border">
+                <div className="rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-12">#</TableHead>
-                        <TableHead>Sælger</TableHead>
-                        <TableHead>Kunde</TableHead>
-                        <TableHead className="text-right">Salg</TableHead>
-                        <TableHead className="text-right">Provision</TableHead>
+                        <TableHead className="w-10 md:w-12 text-xs md:text-sm">#</TableHead>
+                        <TableHead className="text-xs md:text-sm">Sælger</TableHead>
+                        <TableHead className="hidden sm:table-cell text-xs md:text-sm">Kunde</TableHead>
+                        <TableHead className="text-right text-xs md:text-sm">Salg</TableHead>
+                        <TableHead className="text-right text-xs md:text-sm">Provision</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {monthSellers.slice(0, 15).map((seller, index) => (
                         <TableRow key={`${seller.name}-${seller.clientId}`}>
-                          <TableCell>
-                            <Badge variant={index === 0 ? "default" : index < 3 ? "secondary" : "outline"}>
+                          <TableCell className="p-2 md:p-4">
+                            <Badge variant={index === 0 ? "default" : index < 3 ? "secondary" : "outline"} className="text-xs">
                               {index + 1}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-medium text-lg whitespace-nowrap">{shortenName(seller.name)}</TableCell>
-                          <TableCell>
-                            <div className="h-6 w-20 flex items-center">
+                          <TableCell className="font-medium text-sm md:text-lg whitespace-nowrap p-2 md:p-4">{shortenName(seller.name)}</TableCell>
+                          <TableCell className="hidden sm:table-cell p-2 md:p-4">
+                            <div className="h-5 md:h-6 w-16 md:w-20 flex items-center">
                               {seller.clientLogo ? (
                                 <img 
                                   src={seller.clientLogo} 
                                   alt={seller.clientName} 
-                                  className="max-h-6 max-w-20 object-contain"
+                                  className="max-h-5 md:max-h-6 max-w-16 md:max-w-20 object-contain"
                                   title={seller.clientName}
                                 />
                               ) : (
@@ -540,8 +540,8 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right text-lg font-semibold whitespace-nowrap">{seller.sales}</TableCell>
-                          <TableCell className="text-right font-mono text-lg font-bold whitespace-nowrap">
+                          <TableCell className="text-right text-sm md:text-lg font-semibold whitespace-nowrap p-2 md:p-4">{seller.sales}</TableCell>
+                          <TableCell className="text-right font-mono text-sm md:text-lg font-bold whitespace-nowrap p-2 md:p-4">
                             {seller.commission.toLocaleString("da-DK")} kr
                           </TableCell>
                         </TableRow>
@@ -550,46 +550,46 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                   </Table>
                 </div>
               ) : (
-                <p className="text-muted-foreground text-sm text-center py-8">Ingen salg denne måned</p>
+                <p className="text-muted-foreground text-sm text-center py-6 md:py-8">Ingen salg denne måned</p>
               )}
             </CardContent>
           </Card>
 
           {/* Today's Sellers Table */}
           <Card>
-            <CardHeader className="flex flex-row items-center gap-2">
-              <Trophy className="h-5 w-5 text-yellow-500" />
-              <CardTitle className="text-lg">Sælgere {format(selectedDate, "d. MMMM", { locale: da })}</CardTitle>
+            <CardHeader className="flex flex-row items-center gap-2 p-3 md:p-6">
+              <Trophy className="h-4 w-4 md:h-5 md:w-5 text-yellow-500 shrink-0" />
+              <CardTitle className="text-base md:text-lg">Sælgere {format(selectedDate, "d. MMMM", { locale: da })}</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0 md:p-6 md:pt-0">
               {todaySellers.length > 0 ? (
-                <div className="rounded-md border">
+                <div className="rounded-md border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-12">#</TableHead>
-                        <TableHead>Sælger</TableHead>
-                        <TableHead>Kunde</TableHead>
-                        <TableHead className="text-right">Salg</TableHead>
-                        <TableHead className="text-right">Provision</TableHead>
+                        <TableHead className="w-10 md:w-12 text-xs md:text-sm">#</TableHead>
+                        <TableHead className="text-xs md:text-sm">Sælger</TableHead>
+                        <TableHead className="hidden sm:table-cell text-xs md:text-sm">Kunde</TableHead>
+                        <TableHead className="text-right text-xs md:text-sm">Salg</TableHead>
+                        <TableHead className="text-right text-xs md:text-sm">Provision</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {todaySellers.map((seller, index) => (
                         <TableRow key={`${seller.name}-${seller.clientId}`}>
-                          <TableCell>
-                            <Badge variant={index === 0 ? "default" : index < 3 ? "secondary" : "outline"}>
+                          <TableCell className="p-2 md:p-4">
+                            <Badge variant={index === 0 ? "default" : index < 3 ? "secondary" : "outline"} className="text-xs">
                               {index + 1}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-medium text-lg whitespace-nowrap">{shortenName(seller.name)}</TableCell>
-                          <TableCell>
-                            <div className="h-6 w-20 flex items-center">
+                          <TableCell className="font-medium text-sm md:text-lg whitespace-nowrap p-2 md:p-4">{shortenName(seller.name)}</TableCell>
+                          <TableCell className="hidden sm:table-cell p-2 md:p-4">
+                            <div className="h-5 md:h-6 w-16 md:w-20 flex items-center">
                               {seller.clientLogo ? (
                                 <img 
                                   src={seller.clientLogo} 
                                   alt={seller.clientName} 
-                                  className="max-h-6 max-w-20 object-contain"
+                                  className="max-h-5 md:max-h-6 max-w-16 md:max-w-20 object-contain"
                                   title={seller.clientName}
                                 />
                               ) : (
@@ -597,8 +597,8 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right text-lg font-semibold whitespace-nowrap">{seller.sales}</TableCell>
-                          <TableCell className="text-right font-mono text-lg font-bold whitespace-nowrap">
+                          <TableCell className="text-right text-sm md:text-lg font-semibold whitespace-nowrap p-2 md:p-4">{seller.sales}</TableCell>
+                          <TableCell className="text-right font-mono text-sm md:text-lg font-bold whitespace-nowrap p-2 md:p-4">
                             {seller.commission.toLocaleString("da-DK")} kr
                           </TableCell>
                         </TableRow>
@@ -607,7 +607,7 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                   </Table>
                 </div>
               ) : (
-                <p className="text-muted-foreground text-sm text-center py-8">
+                <p className="text-muted-foreground text-sm text-center py-6 md:py-8">
                   Ingen salg registreret i dag
                 </p>
               )}
@@ -617,36 +617,36 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
 
         {/* Recent Sales Table */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Seneste salg</CardTitle>
+          <CardHeader className="p-3 md:p-6">
+            <CardTitle className="text-base md:text-lg">Seneste salg</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0 md:p-6 md:pt-0">
             {recentSales.length > 0 ? (
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Dato</TableHead>
-                      <TableHead>Sælger</TableHead>
-                      <TableHead>Kunde</TableHead>
-                      <TableHead>Telefon</TableHead>
-                      <TableHead className="text-right">Provision</TableHead>
+                      <TableHead className="text-xs md:text-sm">Dato</TableHead>
+                      <TableHead className="text-xs md:text-sm">Sælger</TableHead>
+                      <TableHead className="hidden sm:table-cell text-xs md:text-sm">Kunde</TableHead>
+                      <TableHead className="hidden md:table-cell text-xs md:text-sm">Telefon</TableHead>
+                      <TableHead className="text-right text-xs md:text-sm">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {recentSales.map((sale: any) => (
                       <TableRow key={sale.id}>
-                        <TableCell className="text-lg whitespace-nowrap">
+                        <TableCell className="text-sm md:text-lg whitespace-nowrap p-2 md:p-4">
                           {format(new Date(sale.created_at), "dd/MM HH:mm", { locale: da })}
                         </TableCell>
-                        <TableCell className="font-medium text-lg whitespace-nowrap">{shortenName(sale.agent_name)}</TableCell>
-                        <TableCell>
-                          <div className="h-6 w-20 flex items-center">
+                        <TableCell className="font-medium text-sm md:text-lg whitespace-nowrap p-2 md:p-4">{shortenName(sale.agent_name)}</TableCell>
+                        <TableCell className="hidden sm:table-cell p-2 md:p-4">
+                          <div className="h-5 md:h-6 w-16 md:w-20 flex items-center">
                             {sale.clientLogo ? (
                               <img 
                                 src={sale.clientLogo} 
                                 alt={sale.clientName} 
-                                className="max-h-6 max-w-20 object-contain"
+                                className="max-h-5 md:max-h-6 max-w-16 md:max-w-20 object-contain"
                                 title={sale.clientName}
                               />
                             ) : (
@@ -654,8 +654,8 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono text-lg whitespace-nowrap">{sale.customer_phone || "-"}</TableCell>
-                        <TableCell className="text-right font-mono text-lg font-bold whitespace-nowrap">
+                        <TableCell className="hidden md:table-cell font-mono text-sm md:text-lg whitespace-nowrap p-2 md:p-4">{sale.customer_phone || "-"}</TableCell>
+                        <TableCell className="text-right font-mono text-sm md:text-lg font-bold whitespace-nowrap p-2 md:p-4">
                           {(sale.total_commission || 0).toLocaleString("da-DK")} kr
                         </TableCell>
                       </TableRow>
@@ -664,7 +664,7 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
                 </Table>
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm text-center py-8">
+              <p className="text-muted-foreground text-sm text-center py-6 md:py-8">
                 Ingen salg registreret endnu
               </p>
             )}
