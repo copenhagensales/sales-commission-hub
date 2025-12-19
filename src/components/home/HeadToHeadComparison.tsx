@@ -12,7 +12,13 @@ import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
-interface AgentStats {
+interface EmployeeForH2H {
+  id: string;
+  name: string;
+  teamName: string | null;
+}
+
+interface TeamStats {
   id: string;
   name: string;
   salesCount: number;
@@ -282,58 +288,44 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
     return { percentComplete, timeRemainingText };
   }, [dateRange, period]);
 
-  // Fetch all agents for selection with team info and employee mapping
-  const { data: agents = [] } = useQuery({
-    queryKey: ["h2h-agents"],
-    queryFn: async () => {
-      const { data: agentsData } = await supabase
-        .from("agents")
-        .select("id, name, email, external_adversus_id")
-        .eq("is_active", true)
-        .order("name");
-      
-      // Get employee-agent mappings and team info
-      const { data: mappings } = await supabase
-        .from("employee_agent_mapping")
-        .select("agent_id, employee_id");
-      
-      const employeeIds = mappings?.map(m => m.employee_id) || [];
-      
-      const { data: employees } = await supabase
+  // Fetch all employees for selection with team info
+  const { data: employees = [] } = useQuery({
+    queryKey: ["h2h-employees"],
+    queryFn: async (): Promise<EmployeeForH2H[]> => {
+      const { data: employeesData } = await supabase
         .from("employee_master_data")
-        .select("id, team_id, teams:team_id(id, name)")
-        .in("id", employeeIds.length > 0 ? employeeIds : ['none']);
+        .select(`
+          id, 
+          first_name, 
+          last_name,
+          team_members(team_id, teams(name))
+        `)
+        .eq("is_active", true)
+        .order("first_name");
       
-      // Build agent -> team mapping and agent -> employee mapping
-      const agentTeamMap: Record<string, string> = {};
-      const agentEmployeeMap: Record<string, string> = {};
-      mappings?.forEach(m => {
-        agentEmployeeMap[m.agent_id] = m.employee_id;
-        const employee = employees?.find(e => e.id === m.employee_id);
-        if (employee?.teams) {
-          agentTeamMap[m.agent_id] = (employee.teams as any).name || '';
-        }
+      return (employeesData || []).map(emp => {
+        const teamMember = (emp.team_members as any)?.[0];
+        const teamName = teamMember?.teams?.name || null;
+        return {
+          id: emp.id,
+          name: `${emp.first_name} ${emp.last_name}`,
+          teamName
+        };
       });
-      
-      return (agentsData || []).map(agent => ({
-        ...agent,
-        teamName: agentTeamMap[agent.id] || null,
-        employeeId: agentEmployeeMap[agent.id] || null
-      }));
     },
   });
 
-  // Get team member names
-  const getTeamNames = (teamIds: string[]) => {
-    return teamIds.map(id => agents.find(a => a.id === id)?.name).filter(Boolean) as string[];
+  // Get team member names from employee IDs
+  const getTeamNames = (employeeIds: string[]) => {
+    return employeeIds.map(id => employees.find(e => e.id === id)?.name).filter(Boolean) as string[];
   };
 
   const myTeamNames = useMemo(() => {
     const names = [currentEmployeeName, ...getTeamNames(myTeam)].filter(Boolean) as string[];
     return names;
-  }, [currentEmployeeName, myTeam, agents]);
+  }, [currentEmployeeName, myTeam, employees]);
 
-  const opponentTeamNames = useMemo(() => getTeamNames(opponentTeam), [opponentTeam, agents]);
+  const opponentTeamNames = useMemo(() => getTeamNames(opponentTeam), [opponentTeam, employees]);
 
   // Fetch stats for teams
   const { data: stats, dataUpdatedAt } = useQuery({
@@ -389,7 +381,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       });
 
       // Helper function to calculate team stats
-      const calculateTeamStats = (teamNames: string[]): AgentStats => {
+      const calculateTeamStats = (teamNames: string[]): TeamStats => {
         const teamExternalIds = teamNames.map(name => 
           agentMappings?.find(a => a.name === name)?.external_adversus_id
         ).filter(Boolean);
@@ -617,16 +609,16 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
     setOpponentTeam(opponentTeam.filter(id => id !== agentId));
   };
 
-  const availableForMyTeam = agents.filter(a => 
-    a.name !== currentEmployeeName && 
-    !myTeam.includes(a.id) && 
-    !opponentTeam.includes(a.id)
+  const availableForMyTeam = employees.filter(e => 
+    e.name !== currentEmployeeName && 
+    !myTeam.includes(e.id) && 
+    !opponentTeam.includes(e.id)
   );
 
-  const availableForOpponentTeam = agents.filter(a => 
-    a.name !== currentEmployeeName && 
-    !myTeam.includes(a.id) && 
-    !opponentTeam.includes(a.id)
+  const availableForOpponentTeam = employees.filter(e => 
+    e.name !== currentEmployeeName && 
+    !myTeam.includes(e.id) && 
+    !opponentTeam.includes(e.id)
   );
 
   // KPI Battle Row Component
@@ -1168,13 +1160,13 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
               <div className="mt-3 space-y-2">
                 <div className="flex flex-wrap justify-center gap-1">
                   {myTeam.map(id => {
-                    const agent = agents.find(a => a.id === id);
-                    if (!agent) return null;
+                    const emp = employees.find(e => e.id === id);
+                    if (!emp) return null;
                     return (
                       <TeamMemberBadge 
                         key={id} 
-                        name={agent.name}
-                        teamName={agent.teamName}
+                        name={emp.name}
+                        teamName={emp.teamName}
                         onRemove={!isMatchOngoing ? () => removeFromMyTeam(id) : undefined}
                       />
                     );
@@ -1239,7 +1231,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                   showCrown={isLosing}
                   role={getPlayerRole(opponentTeamNames[0] || "", false)}
                   colorScheme="rose"
-                  teamName={opponentTeam.length === 1 ? agents.find(a => a.id === opponentTeam[0])?.teamName : null}
+                  teamName={opponentTeam.length === 1 ? employees.find(e => e.id === opponentTeam[0])?.teamName : null}
                 />
                 
                 {/* Opponent team members */}
@@ -1247,13 +1239,13 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                   <div className="mt-3 space-y-2">
                     <div className="flex flex-wrap justify-center gap-1">
                       {opponentTeam.map(id => {
-                        const agent = agents.find(a => a.id === id);
-                        if (!agent) return null;
+                        const emp = employees.find(e => e.id === id);
+                        if (!emp) return null;
                         return (
                           <TeamMemberBadge 
                             key={id} 
-                            name={agent.name}
-                            teamName={agent.teamName}
+                            name={emp.name}
+                            teamName={emp.teamName}
                             onRemove={!isMatchOngoing ? () => removeFromOpponentTeam(id) : undefined}
                           />
                         );
@@ -1386,12 +1378,12 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                   <SelectValue placeholder="Vælg modstander" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-700">
-                  {agents.filter(a => a.name !== currentEmployeeName && a.employeeId).map(agent => (
-                    <SelectItem key={agent.id} value={agent.id}>
+                  {employees.filter(e => e.name !== currentEmployeeName).map(emp => (
+                    <SelectItem key={emp.id} value={emp.id}>
                       <div className="flex items-center gap-2">
-                        <span>{agent.name}</span>
-                        {agent.teamName && (
-                          <span className="text-xs text-slate-500">({agent.teamName})</span>
+                        <span>{emp.name}</span>
+                        {emp.teamName && (
+                          <span className="text-xs text-slate-500">({emp.teamName})</span>
                         )}
                       </div>
                     </SelectItem>
@@ -1484,13 +1476,12 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                   return;
                 }
                 
-                const opponentAgent = agents.find(a => a.id === setupOpponent);
-                const opponentEmployeeId = opponentAgent?.employeeId;
+                const opponent = employees.find(e => e.id === setupOpponent);
                 
-                if (opponentEmployeeId && currentEmployeeId) {
+                if (setupOpponent && currentEmployeeId) {
                   try {
                     await createChallengeMutation.mutateAsync({
-                      opponentId: opponentEmployeeId,
+                      opponentId: setupOpponent,
                       battleMode: battleMode,
                       period: setupPeriod,
                       comment: setupComment,
@@ -1500,7 +1491,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                       ? `Først til ${setupTargetCommission.toLocaleString()} kr!` 
                       : setupPeriod === "today" ? "i dag" : "denne uge";
                     toast.success(`⚔️ Invitation sendt!`, {
-                      description: `${opponentAgent?.name} vil modtage din udfordring (${periodText}). Duellen starter når de accepterer.`
+                      description: `${opponent?.name} vil modtage din udfordring (${periodText}). Duellen starter når de accepterer.`
                     });
                     
                     // Only set up local state if no match is currently active
