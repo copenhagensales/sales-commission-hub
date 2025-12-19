@@ -28,6 +28,7 @@ export const Logikker = lazyPage(() => import("@/pages/Logikker"));
 export const EmployeeMasterData = lazyPage(() => import("@/pages/EmployeeMasterData"));
 export const EmployeeDetail = lazyPage(() => import("@/pages/EmployeeDetail"));
 export const EmployeeOnboarding = lazyPage(() => import("@/pages/EmployeeOnboarding"));
+export const ResetPassword = lazyPage(() => import("@/pages/ResetPassword"));
 
 export const VagtFlowIndex = lazyPage(() => import("@/pages/vagt-flow/Index"));
 export const VagtBookWeek = lazyPage(() => import("@/pages/vagt-flow/BookWeek"));
