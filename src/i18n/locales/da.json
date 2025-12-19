@@ -357,5 +357,146 @@
     "reset": "Nulstil",
     "close": "Luk",
     "syncing": "Synkroniserer..."
+  },
+  "employees": {
+    "title": "Medarbejdere",
+    "subtitle": "Stamkort og medarbejderdata",
+    "tabs": {
+      "allEmployees": "Alle medarbejdere",
+      "teams": "Teams",
+      "positions": "Stillinger",
+      "dialerMapping": "Dialer mapping"
+    },
+    "stats": {
+      "activeEmployees": "Aktive medarbejdere",
+      "inactiveEmployees": "Inaktive medarbejdere",
+      "total": "Total"
+    },
+    "filters": {
+      "active": "Aktive",
+      "inactive": "Inaktive",
+      "all": "Alle",
+      "searchPlaceholder": "Søg..."
+    },
+    "overview": "Medarbejderoversigt",
+    "table": {
+      "name": "Navn",
+      "email": "E-mail",
+      "phone": "Telefon",
+      "position": "Stilling",
+      "salaryType": "Løntype",
+      "status": "Status",
+      "contractSigned": "Kontrakt underskrevet",
+      "noContractSigned": "Ingen underskrevet kontrakt",
+      "noEmployeesFound": "Ingen medarbejdere fundet"
+    },
+    "salaryTypes": {
+      "provision": "Provision",
+      "fixed": "Fast løn",
+      "hourly": "Timeløn"
+    },
+    "actions": {
+      "call": "Ring op",
+      "softphoneComingSoon": "Softphone integration kommer snart",
+      "sendSms": "Send SMS",
+      "smsComingSoon": "SMS integration kommer snart",
+      "sendPasswordReset": "Send password reset email",
+      "edit": "Rediger",
+      "delete": "Slet"
+    },
+    "dialog": {
+      "editEmployee": "Rediger medarbejder",
+      "newEmployee": "Ny medarbejder",
+      "saving": "Gemmer...",
+      "savedAutomatically": "Gemt automatisk",
+      "back": "Tilbage",
+      "next": "Næste",
+      "finish": "Afslut"
+    },
+    "steps": {
+      "identity": "Identitet",
+      "contact": "Kontakt",
+      "employment": "Ansættelse",
+      "salary": "Løn",
+      "vacation": "Ferie",
+      "other": "Andet"
+    },
+    "fields": {
+      "firstName": "Fornavn(e)",
+      "lastName": "Efternavn",
+      "cprNumber": "CPR-nr. (følsomt)",
+      "cprPlaceholder": "XXXXXX-XXXX",
+      "address": "Adresse",
+      "addressPlaceholder": "Vej og nummer",
+      "postalCode": "Postnummer",
+      "city": "By",
+      "country": "Land",
+      "phone": "Telefon",
+      "email": "E-mail",
+      "employmentDate": "Ansættelsesdato",
+      "endDate": "Slutdato",
+      "jobTitle": "Stillingsbetegnelse",
+      "selectPosition": "Vælg stilling",
+      "department": "Afdeling / Team",
+      "workLocation": "Arbejdssted",
+      "contractId": "Kontrakt-ID",
+      "activeEmployee": "Aktiv medarbejder",
+      "salaryType": "Løntype",
+      "salaryAmount": "Lønbeløb (DKK)",
+      "regNumber": "Reg.nr.",
+      "accountNumber": "Kontonummer",
+      "vacationType": "Ferietype",
+      "vacationPay": "Ferieløn",
+      "vacationBonus": "Feriebonus",
+      "vacationBonusPercent": "Feriebonus %",
+      "parkingSpot": "Parkeringsplads",
+      "spotId": "Plads-ID",
+      "monthlyPrice": "Månedlig pris (DKK)",
+      "workingHoursModel": "Arbejdstidsmodel",
+      "workingHoursPlaceholder": "Fx. Flekstid, Fast",
+      "hoursPerWeek": "Timer pr. uge",
+      "standardStartTime": "Standard mødetid"
+    },
+    "create": {
+      "button": "Opret ny medarbejder",
+      "title": "Opret ny medarbejder",
+      "description": "Opret medarbejder med login. Giv medarbejderen login-oplysningerne.",
+      "firstNameRequired": "Fornavn *",
+      "lastNameLabel": "Efternavn",
+      "emailRequired": "Email *",
+      "emailPlaceholder": "medarbejder@email.dk",
+      "passwordRequired": "Kodeord *",
+      "passwordPlaceholder": "Mindst 6 tegn",
+      "passwordHint": "Medarbejderen kan ændre koden efter første login.",
+      "positionRequired": "Stilling *",
+      "selectPosition": "Vælg stilling",
+      "positionHint": "Rettigheder tildeles automatisk baseret på stilling.",
+      "creating": "Opretter...",
+      "createButton": "Opret medarbejder"
+    },
+    "delete": {
+      "title": "Slet medarbejder?",
+      "description": "Dette vil permanent slette medarbejderen og alle tilknyttede data. Handlingen kan ikke fortrydes.",
+      "cancel": "Annuller",
+      "confirm": "Slet"
+    },
+    "toast": {
+      "updated": "Medarbejder opdateret",
+      "created": "Medarbejder oprettet",
+      "deleted": "Medarbejder slettet",
+      "statusUpdated": "Status opdateret",
+      "error": "Fejl",
+      "fillNames": "Udfyld fornavn og efternavn",
+      "fillRequired": "Udfyld fornavn, email, kode og stilling",
+      "passwordTooShort": "Koden skal være mindst 6 tegn",
+      "userCreated": "Bruger oprettet med email: {{email}}. Giv medarbejderen login-oplysningerne.",
+      "couldNotCreate": "Kunne ikke oprette medarbejder",
+      "noEmail": "Ingen email",
+      "noEmailRegistered": "Medarbejderen har ingen email registreret.",
+      "emailSent": "Email sendt",
+      "resetLinkSent": "Link til nulstilling af adgangskode er sendt til {{email}}",
+      "couldNotSendEmail": "Kunne ikke sende email"
+    },
+    "loading": "Indlæser..."
   }
 }

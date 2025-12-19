@@ -357,5 +357,146 @@
     "reset": "Reset",
     "close": "Close",
     "syncing": "Syncing..."
+  },
+  "employees": {
+    "title": "Employees",
+    "subtitle": "Master data and employee information",
+    "tabs": {
+      "allEmployees": "All employees",
+      "teams": "Teams",
+      "positions": "Positions",
+      "dialerMapping": "Dialer mapping"
+    },
+    "stats": {
+      "activeEmployees": "Active employees",
+      "inactiveEmployees": "Inactive employees",
+      "total": "Total"
+    },
+    "filters": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "all": "All",
+      "searchPlaceholder": "Search..."
+    },
+    "overview": "Employee overview",
+    "table": {
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "position": "Position",
+      "salaryType": "Salary type",
+      "status": "Status",
+      "contractSigned": "Contract signed",
+      "noContractSigned": "No signed contract",
+      "noEmployeesFound": "No employees found"
+    },
+    "salaryTypes": {
+      "provision": "Commission",
+      "fixed": "Fixed salary",
+      "hourly": "Hourly wage"
+    },
+    "actions": {
+      "call": "Call",
+      "softphoneComingSoon": "Softphone integration coming soon",
+      "sendSms": "Send SMS",
+      "smsComingSoon": "SMS integration coming soon",
+      "sendPasswordReset": "Send password reset email",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "dialog": {
+      "editEmployee": "Edit employee",
+      "newEmployee": "New employee",
+      "saving": "Saving...",
+      "savedAutomatically": "Saved automatically",
+      "back": "Back",
+      "next": "Next",
+      "finish": "Finish"
+    },
+    "steps": {
+      "identity": "Identity",
+      "contact": "Contact",
+      "employment": "Employment",
+      "salary": "Salary",
+      "vacation": "Vacation",
+      "other": "Other"
+    },
+    "fields": {
+      "firstName": "First name(s)",
+      "lastName": "Last name",
+      "cprNumber": "CPR no. (sensitive)",
+      "cprPlaceholder": "XXXXXX-XXXX",
+      "address": "Address",
+      "addressPlaceholder": "Street and number",
+      "postalCode": "Postal code",
+      "city": "City",
+      "country": "Country",
+      "phone": "Phone",
+      "email": "Email",
+      "employmentDate": "Employment date",
+      "endDate": "End date",
+      "jobTitle": "Job title",
+      "selectPosition": "Select position",
+      "department": "Department / Team",
+      "workLocation": "Work location",
+      "contractId": "Contract ID",
+      "activeEmployee": "Active employee",
+      "salaryType": "Salary type",
+      "salaryAmount": "Salary amount (DKK)",
+      "regNumber": "Reg. no.",
+      "accountNumber": "Account number",
+      "vacationType": "Vacation type",
+      "vacationPay": "Vacation pay",
+      "vacationBonus": "Vacation bonus",
+      "vacationBonusPercent": "Vacation bonus %",
+      "parkingSpot": "Parking spot",
+      "spotId": "Spot ID",
+      "monthlyPrice": "Monthly price (DKK)",
+      "workingHoursModel": "Working hours model",
+      "workingHoursPlaceholder": "E.g. Flex time, Fixed",
+      "hoursPerWeek": "Hours per week",
+      "standardStartTime": "Standard start time"
+    },
+    "create": {
+      "button": "Create new employee",
+      "title": "Create new employee",
+      "description": "Create employee with login. Give the employee the login credentials.",
+      "firstNameRequired": "First name *",
+      "lastNameLabel": "Last name",
+      "emailRequired": "Email *",
+      "emailPlaceholder": "employee@email.com",
+      "passwordRequired": "Password *",
+      "passwordPlaceholder": "At least 6 characters",
+      "passwordHint": "The employee can change the password after first login.",
+      "positionRequired": "Position *",
+      "selectPosition": "Select position",
+      "positionHint": "Permissions are automatically assigned based on position.",
+      "creating": "Creating...",
+      "createButton": "Create employee"
+    },
+    "delete": {
+      "title": "Delete employee?",
+      "description": "This will permanently delete the employee and all associated data. This action cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Delete"
+    },
+    "toast": {
+      "updated": "Employee updated",
+      "created": "Employee created",
+      "deleted": "Employee deleted",
+      "statusUpdated": "Status updated",
+      "error": "Error",
+      "fillNames": "Fill in first and last name",
+      "fillRequired": "Fill in first name, email, password and position",
+      "passwordTooShort": "Password must be at least 6 characters",
+      "userCreated": "User created with email: {{email}}. Give the employee the login credentials.",
+      "couldNotCreate": "Could not create employee",
+      "noEmail": "No email",
+      "noEmailRegistered": "The employee has no registered email.",
+      "emailSent": "Email sent",
+      "resetLinkSent": "Password reset link has been sent to {{email}}",
+      "couldNotSendEmail": "Could not send email"
+    },
+    "loading": "Loading..."
   }
 }
