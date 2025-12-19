@@ -206,18 +206,6 @@ const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
   {
-    key: "actions_fieldmarketing",
-    label: "Fieldmarketing handlinger",
-    icon: "⚡",
-    permissions: [
-      { key: "action_fm_add_employee_to_booking", label: "Tilføj medarbejder til booking", description: "Ret til at tilføje medarbejdere til bookinger", hasEditOption: false },
-      { key: "action_fm_add_vehicle_to_booking", label: "Tilføj bil til booking", description: "Ret til at tilføje køretøjer til bookinger", hasEditOption: false },
-      { key: "action_fm_edit_booking", label: "Rediger booking", description: "Ret til at redigere bookinger", hasEditOption: false },
-      { key: "action_fm_delete_booking", label: "Slet booking", description: "Ret til at slette bookinger", hasEditOption: false },
-      { key: "action_fm_request_absence", label: "Anmod ferie", description: "Ret til at anmode om ferie fra Min Uge", hasEditOption: false },
-    ],
-  },
-  {
     key: "menu_recruitment",
     label: "Rekruttering menu",
     icon: "🎯",
