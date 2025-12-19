@@ -132,7 +132,7 @@ const SalesRegistration = () => {
 
   // Fetch products based on the campaign from today's booking
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ["campaign-products", todayBooking?.campaign?.id, todayBooking?.brand?.name],
+    queryKey: ["campaign-products", todayBooking?.campaign?.id, todayBooking?.brand?.name, todayBooking?.client?.id],
     queryFn: async () => {
       // If booking has a direct campaign_id, use it
       if (todayBooking?.campaign?.id) {
@@ -152,34 +152,63 @@ const SalesRegistration = () => {
         });
       }
       
-      // Fallback: search by brand name if no campaign_id
-      if (!todayBooking?.brand?.name) return [];
+      // Fallback 1: search by brand name if no campaign_id
+      if (todayBooking?.brand?.name) {
+        const { data: campaigns } = await supabase
+          .from("client_campaigns")
+          .select("id, name")
+          .ilike("name", `%${todayBooking.brand.name}%`);
+        
+        if (campaigns && campaigns.length > 0) {
+          const campaignIds = campaigns.map(c => c.id);
+          
+          const { data, error } = await supabase
+            .from("products")
+            .select("id, name")
+            .in("client_campaign_id", campaignIds)
+            .neq("name", "Lokation")
+            .order("name");
+          if (error) throw error;
+          
+          const seen = new Set<string>();
+          return (data || []).filter((p) => {
+            if (seen.has(p.name)) return false;
+            seen.add(p.name);
+            return true;
+          });
+        }
+      }
       
-      const { data: campaigns } = await supabase
-        .from("client_campaigns")
-        .select("id, name")
-        .ilike("name", `%${todayBooking.brand.name}%`);
+      // Fallback 2: search by client_id if no campaign or brand
+      if (todayBooking?.client?.id) {
+        const { data: campaigns } = await supabase
+          .from("client_campaigns")
+          .select("id")
+          .eq("client_id", todayBooking.client.id);
+        
+        if (campaigns && campaigns.length > 0) {
+          const campaignIds = campaigns.map(c => c.id);
+          
+          const { data, error } = await supabase
+            .from("products")
+            .select("id, name")
+            .in("client_campaign_id", campaignIds)
+            .neq("name", "Lokation")
+            .order("name");
+          if (error) throw error;
+          
+          const seen = new Set<string>();
+          return (data || []).filter((p) => {
+            if (seen.has(p.name)) return false;
+            seen.add(p.name);
+            return true;
+          });
+        }
+      }
       
-      if (!campaigns || campaigns.length === 0) return [];
-      
-      const campaignIds = campaigns.map(c => c.id);
-      
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name")
-        .in("client_campaign_id", campaignIds)
-        .neq("name", "Lokation")
-        .order("name");
-      if (error) throw error;
-      
-      const seen = new Set<string>();
-      return (data || []).filter((p) => {
-        if (seen.has(p.name)) return false;
-        seen.add(p.name);
-        return true;
-      });
+      return [];
     },
-    enabled: !!(todayBooking?.campaign?.id || todayBooking?.brand?.name),
+    enabled: !!(todayBooking?.campaign?.id || todayBooking?.brand?.name || todayBooking?.client?.id),
   });
 
   const addProduct = (productId: string) => {
