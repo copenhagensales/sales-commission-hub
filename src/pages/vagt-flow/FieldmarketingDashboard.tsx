@@ -408,12 +408,12 @@ const FieldmarketingDashboard = () => {
               Oversigt over salg fra fieldmarketing events
             </p>
           </div>
-          <div className="h-12 w-32 flex items-center justify-end">
+          <div className="h-14 w-36 flex items-center justify-center">
             {activeClient?.logo_url ? (
               <img 
                 src={activeClient.logo_url} 
                 alt={activeClient.name} 
-                className="h-12 w-32 object-contain"
+                className="w-full h-full object-contain"
               />
             ) : (
               <div className="h-16 px-6 bg-muted rounded-lg flex items-center justify-center">
