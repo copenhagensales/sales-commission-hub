@@ -4645,6 +4645,23 @@ export type Database = {
           source: string
         }[]
       }
+      get_team_employees_basic_info: {
+        Args: never
+        Returns: {
+          created_at: string
+          department: string
+          employment_start_date: string
+          first_name: string
+          id: string
+          is_active: boolean
+          job_title: string
+          last_name: string
+          private_email: string
+          private_phone: string
+          team_id: string
+          work_email: string
+        }[]
+      }
       get_user_granted_permissions: {
         Args: { _user_id: string }
         Returns: string[]
