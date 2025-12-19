@@ -154,6 +154,30 @@ export default function BookingsContent() {
     },
   });
 
+  const bulkAssignMutation = useMutation({
+    mutationFn: async (assignments: { bookingId: string; employeeId: string; dates: string[] }[]) => {
+      const inserts = assignments.flatMap(a => 
+        a.dates.map(date => ({
+          booking_id: a.bookingId,
+          employee_id: a.employeeId,
+          date,
+          start_time: "09:00",
+          end_time: "17:00",
+        }))
+      );
+      const { error } = await supabase.from("booking_assignment").insert(inserts);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Medarbejdere tilføjet" });
+      setAddEmployeeDialogBooking(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
   const deleteBookingMutation = useMutation({
     mutationFn: async (bookingId: string) => {
       const { error } = await supabase.from("booking").delete().eq("id", bookingId);
@@ -449,9 +473,15 @@ export default function BookingsContent() {
         year={selectedYear}
         weekStart={weekStart}
         employees={employees}
-        onAddAssignments={() => {
-          queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
-          setAddEmployeeDialogBooking(null);
+        onAddAssignments={(assignments) => {
+          if (!addEmployeeDialogBooking) return;
+          bulkAssignMutation.mutate(
+            assignments.map(a => ({
+              bookingId: addEmployeeDialogBooking.id,
+              employeeId: a.employeeId,
+              dates: a.dates,
+            }))
+          );
         }}
       />
 
