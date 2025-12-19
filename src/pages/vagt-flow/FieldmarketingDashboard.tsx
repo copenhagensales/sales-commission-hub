@@ -32,28 +32,54 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
   const { data: sales, isLoading: salesLoading } = useFieldmarketingSales(clientId);
   const { data: stats, isLoading: statsLoading } = useFieldmarketingSalesStats(clientId);
 
-  // Fetch product commissions for this client
+  // Fetch product commissions from product_campaign_overrides for this client
   const { data: productCommissions } = useQuery({
     queryKey: ["fieldmarketing-product-commissions", clientId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select(`
-          name,
-          commission_dkk,
-          client_campaign:client_campaign_id (
-            client_id
-          )
-        `)
-        .not("client_campaign_id", "is", null);
+      // First get the campaign mapping for this client's fieldmarketing (e.g. "Eesy gaden")
+      const { data: campaignMappings, error: mappingError } = await supabase
+        .from("adversus_campaign_mappings")
+        .select("id, adversus_campaign_name, client_campaign:client_campaign_id(client_id)")
+        .ilike("adversus_campaign_name", "%gaden%");
       
-      if (error) throw error;
+      if (mappingError) throw mappingError;
       
-      // Filter by client and create a map of product name -> commission
+      // Find the campaign mapping for this client
+      const clientCampaignMapping = campaignMappings?.find(
+        (m: any) => m.client_campaign?.client_id === clientId
+      );
+      
+      if (!clientCampaignMapping) {
+        // Fallback: try to get base commission from products table
+        const { data: products, error: productError } = await supabase
+          .from("products")
+          .select("name, commission_dkk, client_campaign:client_campaign_id(client_id)")
+          .not("client_campaign_id", "is", null);
+        
+        if (productError) throw productError;
+        
+        const commissionMap: Record<string, number> = {};
+        (products || []).forEach((p: any) => {
+          if (p.client_campaign?.client_id === clientId) {
+            commissionMap[p.name] = p.commission_dkk || 0;
+          }
+        });
+        return commissionMap;
+      }
+      
+      // Get campaign-specific overrides
+      const { data: overrides, error: overrideError } = await supabase
+        .from("product_campaign_overrides")
+        .select("commission_dkk, product:product_id(name)")
+        .eq("campaign_mapping_id", clientCampaignMapping.id);
+      
+      if (overrideError) throw overrideError;
+      
+      // Create a map of product name -> commission
       const commissionMap: Record<string, number> = {};
-      (data || []).forEach((p: any) => {
-        if (p.client_campaign?.client_id === clientId) {
-          commissionMap[p.name] = p.commission_dkk || 0;
+      (overrides || []).forEach((o: any) => {
+        if (o.product?.name) {
+          commissionMap[o.product.name] = o.commission_dkk || 0;
         }
       });
       return commissionMap;
