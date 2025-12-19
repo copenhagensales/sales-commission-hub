@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { ChevronUp, ChevronDown, Trash2, Plus, Calendar, Car, AlertTriangle, Users, FileText, X, Pencil } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar, Car, AlertTriangle, Users, FileText, X } from "lucide-react";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format, addDays, getWeek, getYear } from "date-fns";
 import { getWeekStartDate } from "@/lib/vagt-flow-date-utils";
@@ -40,7 +40,6 @@ import {
 } from "@/components/ui/popover";
 import { AddEmployeeDialog } from "@/components/vagt-flow/AddEmployeeDialog";
 import { AddVehicleDialog } from "@/components/vagt-flow/AddVehicleDialog";
-import { EditBookingDialog } from "@/components/vagt-flow/EditBookingDialog";
 
 export default function BookingsContent() {
   const { toast } = useToast();
@@ -56,7 +55,6 @@ export default function BookingsContent() {
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set([`${selectedYear}-${selectedWeek}`]));
   const [addEmployeeDialogBooking, setAddEmployeeDialogBooking] = useState<any>(null);
   const [addVehicleDialogBooking, setAddVehicleDialogBooking] = useState<any>(null);
-  const [editBookingDialog, setEditBookingDialog] = useState<any>(null);
 
   const weekStart = getWeekStartDate(selectedYear, selectedWeek);
   const DAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
@@ -373,24 +371,14 @@ export default function BookingsContent() {
                             {booking.status}
                           </Badge>
                           {canEditFmBookings && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setEditBookingDialog(booking)}
-                                title="Rediger booking"
-                              >
-                                <Pencil className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeleteBookingId(booking.id)}
-                                title="Slet booking"
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeleteBookingId(booking.id)}
+                              title="Slet booking"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
                           )}
                         </div>
                       </div>
@@ -526,15 +514,6 @@ export default function BookingsContent() {
         }}
       />
 
-      {/* Edit Booking Dialog */}
-      <EditBookingDialog
-        open={!!editBookingDialog}
-        onOpenChange={(open) => !open && setEditBookingDialog(null)}
-        booking={editBookingDialog}
-        weekNumber={selectedWeek}
-        year={selectedYear}
-        weekStart={weekStart}
-      />
     </div>
   );
 }
