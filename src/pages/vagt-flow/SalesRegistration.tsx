@@ -429,49 +429,58 @@ const SalesRegistration = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {products?.map((product) => {
-                const quantity = getProductQuantity(product.id);
-                return (
-                  <div
-                    key={product.id}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      quantity > 0
-                        ? "border-primary bg-primary/5"
-                        : "border-border"
-                    }`}
-                  >
-                    <span className="text-sm font-medium flex-1">
-                      {product.name}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => removeProduct(product.id)}
-                        disabled={quantity === 0}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-8 text-center font-medium">
-                        {quantity}
+            {productsLoading ? (
+              <p className="text-muted-foreground text-sm">Henter produkter...</p>
+            ) : !products || products.length === 0 ? (
+              <div className="flex items-center gap-2 p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                <p className="text-sm text-destructive">Din leder mangler at udfylde booking</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {products.map((product) => {
+                  const quantity = getProductQuantity(product.id);
+                  return (
+                    <div
+                      key={product.id}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        quantity > 0
+                          ? "border-primary bg-primary/5"
+                          : "border-border"
+                      }`}
+                    >
+                      <span className="text-sm font-medium flex-1">
+                        {product.name}
                       </span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => addProduct(product.id)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => removeProduct(product.id)}
+                          disabled={quantity === 0}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="w-8 text-center font-medium">
+                          {quantity}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => addProduct(product.id)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
