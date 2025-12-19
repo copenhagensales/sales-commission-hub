@@ -1,7 +1,11 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   Table, 
   TableBody, 
@@ -12,9 +16,10 @@ import {
 } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, Trophy, Building2 } from "lucide-react";
+import { Users, Trophy, Building2, CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // Helper function to shorten names: "John Doe" -> "John D."
 const shortenName = (name: string): string => {
@@ -64,6 +69,8 @@ interface TeamDashboardContentProps {
 }
 
 const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboardContentProps) => {
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  
   // Fetch team and its clients from team_clients table
   const { data: teamData, isLoading: isLoadingTeam } = useQuery({
     queryKey: ["team-dashboard-team", teamName],
@@ -103,13 +110,13 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
 
   // Fetch sales stats for ALL clients at once (for multi-client view)
   const { data: allClientStats } = useQuery({
-    queryKey: ["team-dashboard-all-client-stats", clientIds],
+    queryKey: ["team-dashboard-all-client-stats", clientIds, selectedDate.toDateString()],
     queryFn: async () => {
       if (clientIds.length === 0) return [];
 
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const dayStart = startOfDay(selectedDate);
+      const todayStart = dayStart.toISOString();
+      const monthStart = new Date(dayStart.getFullYear(), dayStart.getMonth(), 1).toISOString();
 
       // Get all campaigns for all clients
       const { data: campaigns } = await supabase
@@ -250,12 +257,12 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
 
   // Fetch today's sellers across ALL clients (for multi-client view)
   const { data: allTodaySellers } = useQuery({
-    queryKey: ["team-dashboard-all-today-sellers", clientIds],
+    queryKey: ["team-dashboard-all-today-sellers", clientIds, selectedDate.toDateString()],
     queryFn: async () => {
       if (clientIds.length === 0) return [];
 
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const dayStart = startOfDay(selectedDate);
+      const todayStart = dayStart.toISOString();
 
       // Get all campaigns
       const { data: campaigns } = await supabase
@@ -411,13 +418,39 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
     return (
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            {teamName} Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Oversigt over salg på tværs af kunder
-          </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              {teamName} Dashboard
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Oversigt over salg på tværs af kunder
+            </p>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-[240px] justify-start text-left font-normal",
+                  !selectedDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && setSelectedDate(date)}
+                initialFocus
+                className="pointer-events-auto"
+                locale={da}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Client cards grid */}
@@ -526,7 +559,7 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
           <Card>
             <CardHeader className="flex flex-row items-center gap-2">
               <Trophy className="h-5 w-5 text-yellow-500" />
-              <CardTitle className="text-lg">Dagens sælgere</CardTitle>
+              <CardTitle className="text-lg">Sælgere {format(selectedDate, "d. MMMM", { locale: da })}</CardTitle>
             </CardHeader>
             <CardContent>
               {todaySellers.length > 0 ? (
@@ -647,19 +680,20 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
 
 // Single client dashboard component (extracted for clarity)
 const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; teamName: string }) => {
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const activeClient = clients[0];
   const activeClientId = activeClient?.id;
 
   // Fetch sales stats for selected client
   const { data: salesStats } = useQuery({
-    queryKey: ["team-dashboard-sales-stats", activeClientId],
+    queryKey: ["team-dashboard-sales-stats", activeClientId, selectedDate.toDateString()],
     queryFn: async () => {
       if (!activeClientId) return null;
 
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() + 1).toISOString();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const dayStart = startOfDay(selectedDate);
+      const todayStart = dayStart.toISOString();
+      const weekStart = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate() - dayStart.getDay() + 1).toISOString();
+      const monthStart = new Date(dayStart.getFullYear(), dayStart.getMonth(), 1).toISOString();
 
       const { data: campaigns } = await supabase
         .from("client_campaigns")
@@ -758,12 +792,12 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
   });
 
   const { data: todaySellers } = useQuery({
-    queryKey: ["team-dashboard-today-sellers", activeClientId],
+    queryKey: ["team-dashboard-today-sellers", activeClientId, selectedDate.toDateString()],
     queryFn: async () => {
       if (!activeClientId) return [];
 
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const dayStart = startOfDay(selectedDate);
+      const todayStart = dayStart.toISOString();
 
       const { data: campaigns } = await supabase
         .from("client_campaigns")
@@ -858,26 +892,52 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{teamName} Dashboard</h1>
           <p className="text-muted-foreground mt-1">Oversigt over salg og performance</p>
         </div>
-        <div className="h-16 w-40 flex items-center justify-end">
-          {activeClient?.logo_url ? (
-            <img src={activeClient.logo_url} alt={activeClient.name} className="max-h-16 max-w-40 object-contain" />
-          ) : (
-            <div className="h-16 px-6 bg-muted rounded-lg flex items-center justify-center">
-              <span className="text-xl font-bold text-muted-foreground">{activeClient?.name || teamName}</span>
-            </div>
-          )}
+        <div className="flex items-center gap-4">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-[240px] justify-start text-left font-normal",
+                  !selectedDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && setSelectedDate(date)}
+                initialFocus
+                className="pointer-events-auto"
+                locale={da}
+              />
+            </PopoverContent>
+          </Popover>
+          <div className="h-16 w-40 flex items-center justify-end">
+            {activeClient?.logo_url ? (
+              <img src={activeClient.logo_url} alt={activeClient.name} className="max-h-16 max-w-40 object-contain" />
+            ) : (
+              <div className="h-16 px-6 bg-muted rounded-lg flex items-center justify-center">
+                <span className="text-xl font-bold text-muted-foreground">{activeClient?.name || teamName}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">I dag</CardTitle>
+            <CardTitle className="text-sm font-medium">{format(selectedDate, "d. MMM", { locale: da })}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{salesStats?.salesToday || 0}</div>
@@ -954,7 +1014,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
       <Card>
         <CardHeader className="flex flex-row items-center gap-2">
           <Trophy className="h-5 w-5 text-yellow-500" />
-          <CardTitle className="text-lg">Dagens sælgere</CardTitle>
+          <CardTitle className="text-lg">Sælgere {format(selectedDate, "d. MMMM", { locale: da })}</CardTitle>
         </CardHeader>
         <CardContent>
           {todaySellers && todaySellers.length > 0 ? (
