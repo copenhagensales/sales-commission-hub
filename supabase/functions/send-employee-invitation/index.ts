@@ -11,7 +11,6 @@ interface InvitationRequest {
   email: string;
   firstName: string;
   lastName: string;
-  appUrl?: string;
 }
 
 async function getM365AccessToken(): Promise<string> {
@@ -105,7 +104,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { employeeId, email, firstName, lastName, appUrl }: InvitationRequest = await req.json();
+    const { employeeId, email, firstName, lastName }: InvitationRequest = await req.json();
 
     if (!employeeId || !email || !firstName) {
       return new Response(
@@ -117,7 +116,16 @@ serve(async (req) => {
     // Generate unique token
     const token = generateToken();
 
-    // Create invitation record
+    // Invalidate any existing pending invitations for this employee
+    await supabase
+      .from("employee_invitations")
+      .update({ status: "invalidated" })
+      .eq("employee_id", employeeId)
+      .eq("status", "pending");
+
+    // Create invitation record with 7 day expiry
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    
     const { error: insertError } = await supabase
       .from("employee_invitations")
       .insert({
@@ -125,6 +133,7 @@ serve(async (req) => {
         email,
         token,
         status: "pending",
+        expires_at: expiresAt,
       });
 
     if (insertError) {
@@ -135,11 +144,17 @@ serve(async (req) => {
       );
     }
 
-    // Build invitation URL - always use production URL for emails
-    const productionUrl = "https://40ce8d9b-c988-4d3b-a8ed-63eb5bed2204.lovableproject.com";
-    const invitationUrl = `${productionUrl}/onboarding?token=${token}`;
+    // Update employee invitation status
+    await supabase
+      .from("employee_master_data")
+      .update({ invitation_status: "pending" })
+      .eq("id", employeeId);
+
+    // Build invitation URL - use PUBLIC_APP_URL or fallback to production
+    const appUrl = Deno.env.get("PUBLIC_APP_URL") || "https://40ce8d9b-c988-4d3b-a8ed-63eb5bed2204.lovableproject.com";
+    const invitationUrl = `${appUrl}/onboarding?token=${token}`;
     
-    console.log("Invitation URL:", invitationUrl);
+    console.log("Invitation URL created for:", email);
 
     // Get M365 access token and send email
     const accessToken = await getM365AccessToken();
@@ -158,6 +173,10 @@ serve(async (req) => {
           .content { padding: 30px; background: #ffffff; }
           .button { display: inline-block; background: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: 500; }
           .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; background: #f9f9f9; border-radius: 0 0 8px 8px; }
+          .steps { background: #f0f9ff; border-radius: 8px; padding: 16px; margin: 20px 0; }
+          .steps h3 { margin: 0 0 12px 0; color: #1e40af; }
+          .steps ol { margin: 0; padding-left: 20px; }
+          .steps li { margin: 8px 0; }
         </style>
       </head>
       <body>
@@ -168,10 +187,21 @@ serve(async (req) => {
           </div>
           <div class="content">
             <p>Hej ${firstName}${lastName ? " " + lastName : ""},</p>
-            <p>Du er blevet tilføjet som medarbejder hos Copenhagen Sales. Vi beder dig udfylde dine personlige oplysninger via linket nedenfor.</p>
-            <p>Klik på knappen for at udfylde dine stamdata:</p>
-            <a href="${invitationUrl}" class="button">Udfyld mine oplysninger</a>
-            <p>Linket er gyldigt i 7 dage.</p>
+            <p>Du er blevet tilføjet som medarbejder hos Copenhagen Sales. For at få adgang til systemet skal du:</p>
+            
+            <div class="steps">
+              <h3>Sådan kommer du i gang:</h3>
+              <ol>
+                <li>Klik på knappen nedenfor</li>
+                <li>Udfyld dine personlige oplysninger (CPR, adresse, bankoplysninger)</li>
+                <li>Opret din adgangskode</li>
+                <li>Log ind og begynd at bruge systemet</li>
+              </ol>
+            </div>
+            
+            <a href="${invitationUrl}" class="button">Start registrering</a>
+            
+            <p><strong>Vigtigt:</strong> Linket er gyldigt i 7 dage.</p>
             <p>Hvis du har spørgsmål, er du velkommen til at kontakte os.</p>
             <p>Med venlig hilsen,<br>Copenhagen Sales</p>
           </div>
@@ -186,7 +216,7 @@ serve(async (req) => {
     await sendEmail(
       accessToken,
       email,
-      "Velkommen til Copenhagen Sales - Udfyld dine oplysninger",
+      "Velkommen til Copenhagen Sales - Opret din profil",
       emailHtml
     );
 

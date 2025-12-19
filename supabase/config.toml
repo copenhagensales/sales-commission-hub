@@ -119,3 +119,6 @@ verify_jwt = false
 
 [functions.validate-reset-token]
 verify_jwt = false
+
+[functions.complete-employee-registration]
+verify_jwt = false
