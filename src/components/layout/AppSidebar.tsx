@@ -151,7 +151,11 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     navigate("/auth");
   };
 
-  const handleNavClick = () => {
+  const handleNavClick = (e?: React.MouseEvent) => {
+    // Stop propagation to prevent Collapsible from capturing the click
+    if (e) {
+      e.stopPropagation();
+    }
     if (isMobile && onNavigate) {
       onNavigate();
     }
