@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Mail, Phone, CheckCircle2, Send } from "lucide-react";
+import { Mail, Phone, CheckCircle2, Send, CalendarClock } from "lucide-react";
 
 const WEEKDAYS = [
   { day: 1, name: "Mandag" },
@@ -26,11 +26,24 @@ interface ClosingShift {
   tasks: string | null;
 }
 
+interface WeekendCleanupConfig {
+  id: string;
+  tasks: string | null;
+  recipients: string | null;
+  send_time: string | null;
+}
+
 export default function ClosingShifts() {
   const queryClient = useQueryClient();
   const [editingShifts, setEditingShifts] = useState<Record<number, Partial<ClosingShift>>>({});
   const [editingTasks, setEditingTasks] = useState<string | null>(null);
   const [tasksChanged, setTasksChanged] = useState(false);
+  
+  // Weekend cleanup state
+  const [editingWeekendTasks, setEditingWeekendTasks] = useState<string | null>(null);
+  const [editingWeekendRecipients, setEditingWeekendRecipients] = useState<string | null>(null);
+  const [weekendTasksChanged, setWeekendTasksChanged] = useState(false);
+  const [weekendRecipientsChanged, setWeekendRecipientsChanged] = useState(false);
 
   const { data: shifts, isLoading } = useQuery({
     queryKey: ["closing-shifts"],
@@ -44,8 +57,22 @@ export default function ClosingShifts() {
     },
   });
 
+  const { data: weekendConfig, isLoading: weekendLoading } = useQuery({
+    queryKey: ["weekend-cleanup-config"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("weekend_cleanup_config")
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as WeekendCleanupConfig;
+    },
+  });
+
   // Get tasks from weekday 1
   const currentTasks = editingTasks ?? shifts?.find(s => s.weekday === 1)?.tasks ?? "";
+  const currentWeekendTasks = editingWeekendTasks ?? weekendConfig?.tasks ?? "";
+  const currentWeekendRecipients = editingWeekendRecipients ?? weekendConfig?.recipients ?? "";
 
   const updateShiftMutation = useMutation({
     mutationFn: async ({ weekday, updates }: { weekday: number; updates: Partial<ClosingShift> }) => {
@@ -83,6 +110,27 @@ export default function ClosingShifts() {
     },
   });
 
+  const updateWeekendConfigMutation = useMutation({
+    mutationFn: async (updates: Partial<WeekendCleanupConfig>) => {
+      const { error } = await supabase
+        .from("weekend_cleanup_config")
+        .update(updates)
+        .eq("id", weekendConfig?.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["weekend-cleanup-config"] });
+      toast.success("Weekend oprydning opdateret");
+      setEditingWeekendTasks(null);
+      setEditingWeekendRecipients(null);
+      setWeekendTasksChanged(false);
+      setWeekendRecipientsChanged(false);
+    },
+    onError: () => {
+      toast.error("Kunne ikke opdatere weekend oprydning");
+    },
+  });
+
   const sendReminderMutation = useMutation({
     mutationFn: async (shift: ClosingShift) => {
       const tasksArray = currentTasks.split("\n").filter(t => t.trim());
@@ -101,6 +149,31 @@ export default function ClosingShifts() {
     },
     onError: (err: any) => {
       toast.error("Kunne ikke sende påmindelse: " + (err.message || "Ukendt fejl"));
+    },
+  });
+
+  const sendWeekendReminderMutation = useMutation({
+    mutationFn: async () => {
+      const tasksArray = currentWeekendTasks.split("\n").filter(t => t.trim());
+      const recipientsArray = currentWeekendRecipients.split(",").map(e => e.trim()).filter(e => e);
+      
+      if (recipientsArray.length === 0) {
+        throw new Error("Ingen modtagere angivet");
+      }
+      
+      const { error } = await supabase.functions.invoke("send-weekend-cleanup", {
+        body: {
+          recipients: recipientsArray,
+          tasks: tasksArray,
+        },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Weekend oprydnings-mail sendt!");
+    },
+    onError: (err: any) => {
+      toast.error("Kunne ikke sende weekend mail: " + (err.message || "Ukendt fejl"));
     },
   });
 
@@ -150,7 +223,7 @@ export default function ClosingShifts() {
     return !!editingShifts[weekday] && Object.keys(editingShifts[weekday]).length > 0;
   };
 
-  if (isLoading) {
+  if (isLoading || weekendLoading) {
     return (
       <MainLayout>
         <div className="p-6">Indlæser...</div>
@@ -266,6 +339,75 @@ export default function ClosingShifts() {
             );
           })}
         </div>
+
+        {/* Weekend Cleanup Section - Friday Special */}
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <CalendarClock className="h-5 w-5" />
+              Fredag: Oprydning før weekenden
+            </CardTitle>
+            <CardDescription>
+              Sendes automatisk kl. 16:10 hver fredag til alle ledere og valgte modtagere
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Modtagere (kommaseparerede emails)</label>
+              <Textarea
+                value={currentWeekendRecipients}
+                onChange={(e) => {
+                  setEditingWeekendRecipients(e.target.value);
+                  setWeekendRecipientsChanged(true);
+                }}
+                placeholder="leder1@firma.dk, leder2@firma.dk, reception@firma.dk"
+                rows={2}
+                className="resize-none"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tjekliste til weekend oprydning (én opgave per linje)</label>
+              <Textarea
+                value={currentWeekendTasks}
+                onChange={(e) => {
+                  setEditingWeekendTasks(e.target.value);
+                  setWeekendTasksChanged(true);
+                }}
+                placeholder="Skriv opgaver her (én per linje)"
+                rows={5}
+                className="resize-none"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              {(weekendTasksChanged || weekendRecipientsChanged) && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const updates: Partial<WeekendCleanupConfig> = {};
+                    if (weekendTasksChanged) updates.tasks = currentWeekendTasks;
+                    if (weekendRecipientsChanged) updates.recipients = currentWeekendRecipients;
+                    updateWeekendConfigMutation.mutate(updates);
+                  }}
+                  disabled={updateWeekendConfigMutation.isPending}
+                >
+                  Gem ændringer
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => sendWeekendReminderMutation.mutate()}
+                disabled={sendWeekendReminderMutation.isPending || !currentWeekendRecipients}
+                title="Send weekend oprydnings-mail nu"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Send nu
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </MainLayout>
   );
