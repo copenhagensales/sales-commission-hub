@@ -193,6 +193,20 @@ export default function BookingsContent() {
     },
   });
 
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      const { error } = await supabase.from("booking_assignment").delete().eq("id", assignmentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
+      toast({ title: "Medarbejder fjernet fra vagt" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
   const filtered = bookings?.filter((b: any) => {
     const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
     const matchesStatus = statusFilter === "all" || b.status === statusFilter;
@@ -402,8 +416,20 @@ export default function BookingsContent() {
                               {isBooked && dayAssignments?.length > 0 && (
                                 <div className="mt-1 space-y-0.5">
                                   {dayAssignments.map((assignment: any) => (
-                                    <div key={assignment.id} className="text-[10px] text-primary font-medium truncate">
-                                      {assignment.employee_name?.split(' ')[0]}
+                                    <div key={assignment.id} className="text-[10px] text-primary font-medium truncate flex items-center justify-center gap-0.5 group">
+                                      <span>{assignment.employee_name?.split(' ')[0]}</span>
+                                      {canEditFmBookings && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteAssignmentMutation.mutate(assignment.id);
+                                          }}
+                                          className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 transition-opacity"
+                                          title="Fjern medarbejder"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
