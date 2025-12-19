@@ -159,12 +159,12 @@ export function EditBookingDialog({ open, onOpenChange, booking }: EditBookingDi
 
           <div className="space-y-2">
             <Label htmlFor="brand">Brand</Label>
-            <Select value={brandId} onValueChange={setBrandId}>
+            <Select value={brandId || "none"} onValueChange={(v) => setBrandId(v === "none" ? "" : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Vælg brand" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Ingen brand</SelectItem>
+                <SelectItem value="none">Ingen brand</SelectItem>
                 {brands?.map((brand: any) => (
                   <SelectItem key={brand.id} value={brand.id}>
                     {brand.name}
@@ -176,12 +176,12 @@ export function EditBookingDialog({ open, onOpenChange, booking }: EditBookingDi
 
           <div className="space-y-2">
             <Label htmlFor="campaign">Kampagne</Label>
-            <Select value={campaignId} onValueChange={setCampaignId} disabled={!clientId}>
+            <Select value={campaignId || "none"} onValueChange={(v) => setCampaignId(v === "none" ? "" : v)} disabled={!clientId}>
               <SelectTrigger>
                 <SelectValue placeholder={clientId ? "Vælg kampagne" : "Vælg først kunde"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Ingen kampagne</SelectItem>
+                <SelectItem value="none">Ingen kampagne</SelectItem>
                 {campaigns?.map((campaign: any) => (
                   <SelectItem key={campaign.id} value={campaign.id}>
                     {campaign.name}
