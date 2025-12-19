@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -61,6 +61,8 @@ interface EmployeeMasterDataRecord {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  invitation_status: "none" | "pending" | "completed" | null;
+  auth_user_id: string | null;
 }
 
 type NewEmployee = Omit<EmployeeMasterDataRecord, "id" | "created_at" | "updated_at">;
@@ -98,6 +100,8 @@ const defaultEmployee: NewEmployee = {
   weekly_hours: null,
   standard_start_time: null,
   is_active: true,
+  invitation_status: "none",
+  auth_user_id: null,
 };
 
 export default function EmployeeMasterData() {
@@ -233,6 +237,8 @@ export default function EmployeeMasterData() {
       weekly_hours: employee.weekly_hours,
       standard_start_time: employee.standard_start_time,
       is_active: employee.is_active,
+      invitation_status: employee.invitation_status,
+      auth_user_id: employee.auth_user_id,
     });
     setDialogOpen(true);
   };
@@ -407,7 +413,7 @@ export default function EmployeeMasterData() {
     }
   };
 
-  const handleSendPasswordReset = async (employee: EmployeeMasterDataRecord) => {
+  const handleSendInvitation = async (employee: EmployeeMasterDataRecord) => {
     if (!employee.private_email) {
       toast({ title: t("employees.toast.noEmail"), description: t("employees.toast.noEmailRegistered"), variant: "destructive" });
       return;
@@ -415,7 +421,7 @@ export default function EmployeeMasterData() {
 
     setSendingResetTo(employee.id);
     try {
-      const response = await supabase.functions.invoke("send-password-reset", {
+      const response = await supabase.functions.invoke("send-employee-invitation", {
         body: {
           employeeId: employee.id,
           email: employee.private_email,
@@ -432,12 +438,13 @@ export default function EmployeeMasterData() {
         throw new Error(response.error.message || t("employees.toast.couldNotSendEmail"));
       }
 
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
       toast({ 
-        title: t("employees.toast.emailSent"), 
-        description: t("employees.toast.resetLinkSent", { email: employee.private_email }) 
+        title: t("employees.toast.invitationSent"), 
+        description: t("employees.toast.invitationSentDesc", { email: employee.private_email }) 
       });
     } catch (error) {
-      console.error("Send reset error:", error);
+      console.error("Send invitation error:", error);
       toast({
         title: t("employees.toast.error"),
         description: error instanceof Error ? error.message : t("employees.toast.couldNotSendEmail"),
@@ -1031,18 +1038,28 @@ export default function EmployeeMasterData() {
                                 className="h-8 w-8"
                                 onClick={(e) => { 
                                   e.stopPropagation(); 
-                                  handleSendPasswordReset(employee);
+                                  handleSendInvitation(employee);
                                 }}
-                                disabled={!employee.private_email || sendingResetTo === employee.id}
+                                disabled={!employee.private_email || sendingResetTo === employee.id || employee.invitation_status === "completed"}
                               >
                                 {sendingResetTo === employee.id ? (
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : employee.invitation_status === "completed" ? (
+                                  <UserCheck className="h-3.5 w-3.5 text-green-500" />
+                                ) : employee.invitation_status === "pending" ? (
+                                  <Send className="h-3.5 w-3.5 text-amber-500" />
                                 ) : (
                                   <Mail className="h-3.5 w-3.5" />
                                 )}
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>{t("employees.actions.sendPasswordReset")}</TooltipContent>
+                            <TooltipContent>
+                              {employee.invitation_status === "completed" 
+                                ? t("employees.actions.registered") 
+                                : employee.invitation_status === "pending"
+                                ? t("employees.actions.resendInvitation")
+                                : t("employees.actions.sendInvitation")}
+                            </TooltipContent>
                           </Tooltip>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
                             <Pencil className="h-3.5 w-3.5" />
