@@ -2953,6 +2953,44 @@ export type Database = {
           },
         ]
       }
+      password_reset_tokens: {
+        Row: {
+          created_at: string
+          email: string
+          employee_id: string
+          expires_at: string
+          id: string
+          token_hash: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          employee_id: string
+          expires_at?: string
+          id?: string
+          token_hash: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          employee_id?: string
+          expires_at?: string
+          id?: string
+          token_hash?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "password_reset_tokens_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       performance_reviews: {
         Row: {
           comments: string | null
@@ -4412,6 +4450,10 @@ export type Database = {
         Args: { _employee_id: string; _user_id: string }
         Returns: boolean
       }
+      consume_password_reset_token: {
+        Args: { _token_hash: string }
+        Returns: boolean
+      }
       contract_has_pending_signature: {
         Args: { contract_uuid: string }
         Returns: boolean
@@ -4627,6 +4669,17 @@ export type Database = {
           p_integration_id: string
         }
         Returns: undefined
+      }
+      validate_password_reset_token: {
+        Args: { _token_hash: string }
+        Returns: {
+          email: string
+          employee_id: string
+          expires_at: string
+          first_name: string
+          id: string
+          last_name: string
+        }[]
       }
     }
     Enums: {

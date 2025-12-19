@@ -26,6 +26,7 @@ import {
   EmployeeMasterData,
   EmployeeDetail,
   EmployeeOnboarding,
+  ResetPassword,
   VagtFlowIndex,
   VagtBookWeek,
   VagtLocations,
@@ -84,6 +85,7 @@ export const routes: RouteConfig[] = [
   { path: "/", component: SmartRedirect, access: "public" },
   { path: "/auth", component: Auth, access: "auth" },
   { path: "/onboarding", component: EmployeeOnboarding, access: "public" },
+  { path: "/reset-password", component: ResetPassword, access: "public" },
 
   { path: "/home", component: Home, access: "protected" },
   { path: "/my-schedule", component: MySchedule, access: "protected" },

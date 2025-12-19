@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -116,7 +116,7 @@ export default function EmployeeMasterData() {
   const [autoSaving, setAutoSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [deleteEmployeeId, setDeleteEmployeeId] = useState<string | null>(null);
-  
+  const [sendingResetTo, setSendingResetTo] = useState<string | null>(null);
   const { canEditEmployees } = usePermissions();
 
   const dialogSteps = [
@@ -402,6 +402,47 @@ export default function EmployeeMasterData() {
       });
     } finally {
       setCreatingEmployee(false);
+    }
+  };
+
+  const handleSendPasswordReset = async (employee: EmployeeMasterDataRecord) => {
+    if (!employee.private_email) {
+      toast({ title: "Ingen email", description: "Medarbejderen har ingen email registreret.", variant: "destructive" });
+      return;
+    }
+
+    setSendingResetTo(employee.id);
+    try {
+      const response = await supabase.functions.invoke("send-password-reset", {
+        body: {
+          employeeId: employee.id,
+          email: employee.private_email,
+          firstName: employee.first_name,
+          lastName: employee.last_name,
+        },
+      });
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      if (response.error) {
+        throw new Error(response.error.message || "Kunne ikke sende email");
+      }
+
+      toast({ 
+        title: "Email sendt", 
+        description: `Link til nulstilling af adgangskode er sendt til ${employee.private_email}` 
+      });
+    } catch (error) {
+      console.error("Send reset error:", error);
+      toast({
+        title: "Fejl",
+        description: error instanceof Error ? error.message : "Kunne ikke sende email",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingResetTo(null);
     }
   };
 
@@ -980,6 +1021,27 @@ export default function EmployeeMasterData() {
                           >
                             <MessageSquare className="h-3.5 w-3.5" />
                           </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  handleSendPasswordReset(employee);
+                                }}
+                                disabled={!employee.private_email || sendingResetTo === employee.id}
+                              >
+                                {sendingResetTo === employee.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Mail className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Send password reset email</TooltipContent>
+                          </Tooltip>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
