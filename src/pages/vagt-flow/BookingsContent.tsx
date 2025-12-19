@@ -165,15 +165,21 @@ export default function BookingsContent() {
           end_time: "17:00",
         }))
       );
-      const { error } = await supabase.from("booking_assignment").insert(inserts);
+      const { data, error } = await supabase.from("booking_assignment").insert(inserts).select();
       if (error) throw error;
+      // Check if RLS silently blocked the insert
+      if (!data || data.length === 0) {
+        throw new Error("Du har ikke rettigheder til at tilføje medarbejdere. Kontakt din administrator.");
+      }
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["vagt-bookings-list"] });
-      toast({ title: "Medarbejdere tilføjet" });
+      toast({ title: "Medarbejdere tilføjet", description: `${data.length} tildelinger oprettet` });
       setAddEmployeeDialogBooking(null);
     },
     onError: (error: any) => {
+      console.error("Fejl ved tilføjelse af medarbejdere:", error);
       toast({ title: "Fejl", description: error.message, variant: "destructive" });
     },
   });
