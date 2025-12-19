@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/popover";
 import { AddEmployeeDialog } from "@/components/vagt-flow/AddEmployeeDialog";
 import { AddVehicleDialog } from "@/components/vagt-flow/AddVehicleDialog";
+import { BookingsLast30DaysChart } from "@/components/vagt-flow/BookingsLast30DaysChart";
 
 export default function BookingsContent() {
   const { toast } = useToast();
@@ -512,6 +513,9 @@ export default function BookingsContent() {
           setAddVehicleDialogBooking(null);
         }}
       />
+
+      {/* Chart: Bookings last 30 days by client */}
+      <BookingsLast30DaysChart />
 
     </div>
   );
