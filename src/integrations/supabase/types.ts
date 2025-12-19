@@ -4419,6 +4419,33 @@ export type Database = {
         }
         Relationships: []
       }
+      weekend_cleanup_config: {
+        Row: {
+          created_at: string
+          id: string
+          recipients: string | null
+          send_time: string | null
+          tasks: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          recipients?: string | null
+          send_time?: string | null
+          tasks?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          recipients?: string | null
+          send_time?: string | null
+          tasks?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       weekly_goals: {
         Row: {
           created_at: string | null

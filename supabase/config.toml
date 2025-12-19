@@ -125,3 +125,9 @@ verify_jwt = false
 
 [functions.batch-set-fieldmarketing-passwords]
 verify_jwt = false
+
+[functions.send-closing-reminder]
+verify_jwt = true
+
+[functions.send-weekend-cleanup]
+verify_jwt = true
