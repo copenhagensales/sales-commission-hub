@@ -6,7 +6,7 @@ import { useOpenMarkets, useMyApplications, useApplyToMarket } from "@/hooks/use
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, MapPin, Clock, Phone, Navigation, Calendar, List, Users, Send, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Clock, Phone, Navigation, Calendar, List, Users, Send, CheckCircle, XCircle, AlertCircle, Palmtree } from "lucide-react";
 import { useState } from "react";
 import { 
   startOfWeek, 
@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CreateAbsenceDialog } from "@/components/shift-planning/CreateAbsenceDialog";
 
 export default function VagtMinUge() {
   const { data: vagtEmployee } = useVagtEmployee();
@@ -38,6 +39,8 @@ export default function VagtMinUge() {
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedMarket, setSelectedMarket] = useState<any>(null);
+  const [absenceDialogOpen, setAbsenceDialogOpen] = useState(false);
+  const [selectedAbsenceDate, setSelectedAbsenceDate] = useState<Date | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -140,6 +143,13 @@ export default function VagtMinUge() {
               {format(currentDate, "MMMM yyyy", { locale: da })}
             </p>
           </div>
+          <Button 
+            className="bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-200 font-semibold sm:hidden"
+            onClick={() => { setSelectedAbsenceDate(new Date()); setAbsenceDialogOpen(true); }}
+          >
+            <Palmtree className="h-5 w-5 mr-2" />
+            Anmod ferie
+          </Button>
           <div className="flex items-center gap-2">
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "month" | "list" | "markets")}>
               <TabsList className="h-9">
@@ -159,6 +169,13 @@ export default function VagtMinUge() {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
+            <Button 
+              className="bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-200 font-semibold hidden sm:flex"
+              onClick={() => { setSelectedAbsenceDate(new Date()); setAbsenceDialogOpen(true); }}
+            >
+              <Palmtree className="h-5 w-5 mr-2" />
+              Anmod ferie
+            </Button>
             <div className="flex gap-1">
               <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => navigateMonth(-1)}>
                 <ChevronLeft className="h-4 w-4" />
@@ -686,6 +703,16 @@ export default function VagtMinUge() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Absence Request Dialog */}
+      {vagtEmployee?.id && (
+        <CreateAbsenceDialog
+          open={absenceDialogOpen}
+          onOpenChange={setAbsenceDialogOpen}
+          employeeId={vagtEmployee.id}
+          selectedDate={selectedAbsenceDate}
+        />
+      )}
     </MainLayout>
   );
 }
