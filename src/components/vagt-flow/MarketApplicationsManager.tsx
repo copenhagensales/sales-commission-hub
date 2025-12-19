@@ -59,15 +59,9 @@ export function MarketApplicationsManager() {
     );
   }
 
+  // Hide completely when no pending applications
   if (!applications?.length) {
-    return (
-      <Card>
-        <CardContent className="py-8 text-center text-muted-foreground">
-          <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          Ingen afventende ansøgninger
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   return (
