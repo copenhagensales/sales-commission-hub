@@ -2059,6 +2059,7 @@ export type Database = {
           job_title: string | null
           last_name: string
           manager_id: string | null
+          must_change_password: boolean | null
           parking_monthly_cost: number | null
           parking_spot_id: string | null
           private_email: string | null
@@ -2103,6 +2104,7 @@ export type Database = {
           job_title?: string | null
           last_name: string
           manager_id?: string | null
+          must_change_password?: boolean | null
           parking_monthly_cost?: number | null
           parking_spot_id?: string | null
           private_email?: string | null
@@ -2147,6 +2149,7 @@ export type Database = {
           job_title?: string | null
           last_name?: string
           manager_id?: string | null
+          must_change_password?: boolean | null
           parking_monthly_cost?: number | null
           parking_spot_id?: string | null
           private_email?: string | null
