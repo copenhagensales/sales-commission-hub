@@ -22,7 +22,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { TrendingUp, Users, Calendar, Package, Trophy } from "lucide-react";
-import { BookingsLast30DaysChart } from "@/components/vagt-flow/BookingsLast30DaysChart";
 
 interface ProductCommission {
   name: string;
@@ -414,9 +413,6 @@ const FieldmarketingDashboard = () => {
             />
           </TabsContent>
         </Tabs>
-
-        {/* Bookings chart - outside tabs, visible for all */}
-        <BookingsLast30DaysChart />
       </div>
     </MainLayout>
   );
