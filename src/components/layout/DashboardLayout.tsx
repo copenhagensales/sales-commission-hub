@@ -27,7 +27,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="flex items-center gap-4">
           <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-sidebar-foreground">
+              <Button variant="outline" size="icon" className="bg-primary text-primary-foreground hover:bg-primary/90 border-primary">
                 <Menu className="h-6 w-6" />
               </Button>
             </SheetTrigger>
