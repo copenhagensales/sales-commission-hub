@@ -27,6 +27,7 @@ export default function VagtBilling() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(format(now, "yyyy-MM"));
   const [clientFilter, setClientFilter] = useState<string>("all");
+  const [locationTypeFilter, setLocationTypeFilter] = useState<string>("all");
 
   const monthStart = startOfMonth(new Date(selectedMonth + "-01"));
   const monthEnd = endOfMonth(monthStart);
@@ -70,10 +71,17 @@ export default function VagtBilling() {
     },
   });
 
-  // Filter by client
-  const filteredBookings = bookings?.filter((b: any) => 
-    clientFilter === "all" || b.client_id === clientFilter
-  );
+  // Get unique location types for the filter
+  const locationTypes = [...new Set(
+    bookings?.map((b: any) => b.location?.type).filter(Boolean) || []
+  )];
+
+  // Filter by client and location type
+  const filteredBookings = bookings?.filter((b: any) => {
+    const matchesClient = clientFilter === "all" || b.client_id === clientFilter;
+    const matchesLocationType = locationTypeFilter === "all" || b.location?.type === locationTypeFilter;
+    return matchesClient && matchesLocationType;
+  });
 
   // Group bookings by location
   const bookingsByLocation = filteredBookings?.reduce((acc: any, booking: any) => {
@@ -156,6 +164,19 @@ export default function VagtBilling() {
                 {fieldmarketingClients?.map((client: any) => (
                   <SelectItem key={client.id} value={client.id}>
                     {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={locationTypeFilter} onValueChange={setLocationTypeFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Alle typer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Alle typer</SelectItem>
+                {locationTypes.map((type: string) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
                   </SelectItem>
                 ))}
               </SelectContent>
