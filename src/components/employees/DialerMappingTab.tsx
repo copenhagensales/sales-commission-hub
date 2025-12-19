@@ -133,6 +133,10 @@ export function DialerMappingTab() {
     return agents.filter((a) => !existingAgentIds.includes(a.id));
   };
 
+  // Get unmapped agents (agents without any employee mapping)
+  const mappedAgentIds = mappings.map((m) => m.agent_id);
+  const unmappedAgents = agents.filter((a) => !mappedAgentIds.includes(a.id));
+
   const filteredEmployees = employees.filter((emp) =>
     `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -156,7 +160,27 @@ export function DialerMappingTab() {
 
       <div className="text-sm text-muted-foreground mb-4">
         Tilknyt dialer-agenter til medarbejdere. En medarbejder kan have flere agent-profiler fra forskellige API'er.
+        <strong className="block mt-1 text-foreground">Vigtigt: Alt data overføres til medarbejderen. Agenter uden medarbejder-tilknytning vil ikke kunne bruges.</strong>
       </div>
+
+      {/* Warning for unmapped agents */}
+      {unmappedAgents.length > 0 && (
+        <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 mb-4">
+          <div className="flex items-start gap-3">
+            <div className="text-destructive font-medium">⚠️ {unmappedAgents.length} agenter mangler mapping</div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {unmappedAgents.map((agent) => (
+              <Badge key={agent.id} variant="outline" className="border-destructive/30 text-destructive">
+                {agent.name} ({agent.email})
+              </Badge>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Disse agenter har ingen medarbejder-tilknytning og vil ikke kunne bruges i systemet.
+          </p>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
@@ -264,7 +288,10 @@ export function DialerMappingTab() {
       )}
 
       <div className="text-xs text-muted-foreground mt-4">
-        Totalt: {agents.length} agenter fra API'er • {mappings.length} tilknytninger
+        Totalt: {agents.length} agenter fra API'er • {mappings.length} tilknytninger • 
+        <span className={unmappedAgents.length > 0 ? "text-destructive font-medium" : "text-green-600"}>
+          {unmappedAgents.length > 0 ? `${unmappedAgents.length} agenter mangler mapping` : "Alle agenter er mappet ✓"}
+        </span>
       </div>
     </div>
   );
