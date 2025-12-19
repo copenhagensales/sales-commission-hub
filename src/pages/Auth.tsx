@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Lock, Wifi, WifiOff, RefreshCw, ArrowLeft, AlertTriangle } from "lucide-react";
+import { Mail, Lock, Wifi, WifiOff, RefreshCw, ArrowLeft, AlertTriangle, KeyRound } from "lucide-react";
 import cphSalesLogo from "@/assets/cph-sales-logo-dark.png";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
@@ -14,9 +15,20 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [isNewPasswordMode, setIsNewPasswordMode] = useState(false);
+  const [isForcedPasswordChange, setIsForcedPasswordChange] = useState(false);
   const [expiredLinkError, setExpiredLinkError] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const { toast } = useToast();
+  const { mustChangePassword, clearMustChangePassword, user } = useAuth();
+
+  // Check if user must change password after login
+  useEffect(() => {
+    if (mustChangePassword && user) {
+      setIsForcedPasswordChange(true);
+      setPassword("");
+      setConfirmPassword("");
+    }
+  }, [mustChangePassword, user]);
 
   const testConnection = async () => {
     setConnectionStatus('checking');
@@ -75,7 +87,40 @@ export default function Auth() {
     }
 
     try {
-      if (isNewPasswordMode) {
+      if (isForcedPasswordChange) {
+        // Forced password change after first login
+        if (password !== confirmPassword) {
+          toast({
+            title: "Fejl",
+            description: "Adgangskoderne matcher ikke.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        if (password.length < 6) {
+          toast({
+            title: "Fejl",
+            description: "Adgangskoden skal være mindst 6 tegn.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        
+        // Clear the must_change_password flag
+        await clearMustChangePassword();
+        
+        toast({
+          title: "Adgangskode ændret",
+          description: "Din nye adgangskode er gemt. Velkommen!",
+        });
+        setIsForcedPasswordChange(false);
+      } else if (isNewPasswordMode) {
         // Validate passwords match
         if (password !== confirmPassword) {
           toast({
@@ -158,6 +203,7 @@ export default function Auth() {
   };
 
   const getTitle = () => {
+    if (isForcedPasswordChange) return "Skift din adgangskode";
     if (isNewPasswordMode) return "Vælg ny adgangskode";
     if (isResetMode) return "Nulstil adgangskode";
     return "Log ind";
@@ -165,10 +211,13 @@ export default function Auth() {
 
   const getButtonText = () => {
     if (loading) return "Vent venligst...";
+    if (isForcedPasswordChange) return "Gem ny adgangskode";
     if (isNewPasswordMode) return "Gem ny adgangskode";
     if (isResetMode) return "Send nulstillingslink";
     return "Log ind";
   };
+
+  const showPasswordChangeForm = isForcedPasswordChange || isNewPasswordMode;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -238,6 +287,21 @@ export default function Auth() {
           </div>
         )}
 
+        {/* Forced password change warning */}
+        {isForcedPasswordChange && (
+          <div className="rounded-lg border border-primary/50 bg-primary/10 p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <KeyRound className="h-5 w-5 text-primary mt-0.5" />
+              <div>
+                <p className="font-medium text-primary">Du skal vælge en ny adgangskode</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  For din sikkerhed skal du ændre din midlertidige adgangskode før du kan fortsætte.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Form Card */}
         <div className="rounded-xl border border-border bg-card p-8 shadow-xl">
           <h2 className="text-xl font-semibold text-foreground mb-6">
@@ -246,7 +310,7 @@ export default function Auth() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email field - only show for login and reset request */}
-            {!isNewPasswordMode && (
+            {!showPasswordChangeForm && (
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
@@ -264,11 +328,11 @@ export default function Auth() {
               </div>
             )}
 
-            {/* Password field - show for login and new password mode */}
-            {(!isResetMode || isNewPasswordMode) && (
+            {/* Password field - show for login and password change modes */}
+            {(!isResetMode || showPasswordChangeForm) && (
               <div className="space-y-2">
                 <Label htmlFor="password">
-                  {isNewPasswordMode ? "Ny adgangskode" : "Adgangskode"}
+                  {showPasswordChangeForm ? "Ny adgangskode" : "Adgangskode"}
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -286,8 +350,8 @@ export default function Auth() {
               </div>
             )}
 
-            {/* Confirm password - only for new password mode */}
-            {isNewPasswordMode && (
+            {/* Confirm password - for password change modes */}
+            {showPasswordChangeForm && (
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Bekræft adgangskode</Label>
                 <div className="relative">
@@ -316,7 +380,7 @@ export default function Auth() {
           </form>
 
           {/* Footer links */}
-          {!isNewPasswordMode && (
+          {!showPasswordChangeForm && (
             <div className="mt-6 text-center">
               {isResetMode ? (
                 <button

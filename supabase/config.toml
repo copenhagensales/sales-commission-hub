@@ -122,3 +122,6 @@ verify_jwt = false
 
 [functions.complete-employee-registration]
 verify_jwt = false
+
+[functions.batch-set-fieldmarketing-passwords]
+verify_jwt = false
