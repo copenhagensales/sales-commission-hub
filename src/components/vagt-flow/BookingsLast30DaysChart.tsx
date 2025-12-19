@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { format, subDays, eachDayOfInterval } from "date-fns";
+import { format, subDays, eachDayOfInterval, getDay, isWithinInterval, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 
 // Color palette for clients
@@ -18,6 +18,13 @@ const CLIENT_COLORS = [
   "hsl(339, 82%, 51%)",
 ];
 
+// Convert JS getDay (0=Sunday) to our booked_days format (0=Monday)
+function getBookedDayIndex(date: Date): number {
+  const jsDay = getDay(date); // 0=Sunday, 1=Monday, ..., 6=Saturday
+  // Convert to 0=Monday, 1=Tuesday, ..., 6=Sunday
+  return jsDay === 0 ? 6 : jsDay - 1;
+}
+
 export function BookingsLast30DaysChart() {
   const { data: bookingsData, isLoading } = useQuery({
     queryKey: ["bookings-last-30-days-chart"],
@@ -25,16 +32,19 @@ export function BookingsLast30DaysChart() {
       const endDate = new Date();
       const startDate = subDays(endDate, 29);
 
+      // Fetch bookings that overlap with our date range
       const { data, error } = await supabase
         .from("booking")
         .select(`
           id,
           start_date,
+          end_date,
+          booked_days,
           client_id,
           clients(name)
         `)
-        .gte("start_date", format(startDate, "yyyy-MM-dd"))
-        .lte("start_date", format(endDate, "yyyy-MM-dd"));
+        .lte("start_date", format(endDate, "yyyy-MM-dd"))
+        .gte("end_date", format(startDate, "yyyy-MM-dd"));
 
       if (error) throw error;
       return data;
@@ -57,17 +67,33 @@ export function BookingsLast30DaysChart() {
     });
     const clients = Array.from(clientsMap.entries()).map(([id, name]) => ({ id, name }));
 
-    // Build data for each day
+    // Build data for each day - count locations booked on that day
     const data = days.map(day => {
-      const dateStr = format(day, "yyyy-MM-dd");
       const dayLabel = format(day, "d/M", { locale: da });
+      const bookedDayIndex = getBookedDayIndex(day);
 
       const entry: any = { date: dayLabel };
 
       clients.forEach(client => {
-        const count = bookingsData.filter(
-          (b: any) => b.start_date === dateStr && b.client_id === client.id
-        ).length;
+        // Count bookings where:
+        // 1. The day falls within start_date and end_date
+        // 2. The day of week is in booked_days array
+        const count = bookingsData.filter((b: any) => {
+          if (b.client_id !== client.id) return false;
+          
+          const bookingStart = parseISO(b.start_date);
+          const bookingEnd = parseISO(b.end_date);
+          
+          // Check if day is within booking date range
+          if (!isWithinInterval(day, { start: bookingStart, end: bookingEnd })) {
+            return false;
+          }
+          
+          // Check if this day of week is in booked_days
+          const bookedDays = b.booked_days || [0, 1, 2, 3, 4]; // Default to Mon-Fri
+          return bookedDays.includes(bookedDayIndex);
+        }).length;
+        
         entry[client.name] = count;
       });
 
@@ -81,7 +107,7 @@ export function BookingsLast30DaysChart() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Bookinger de sidste 30 dage</CardTitle>
+          <CardTitle className="text-lg">Lokationer pr. dag (sidste 30 dage)</CardTitle>
         </CardHeader>
         <CardContent className="h-[300px] flex items-center justify-center">
           <p className="text-muted-foreground">Indlæser...</p>
@@ -94,7 +120,7 @@ export function BookingsLast30DaysChart() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Bookinger de sidste 30 dage</CardTitle>
+          <CardTitle className="text-lg">Lokationer pr. dag (sidste 30 dage)</CardTitle>
         </CardHeader>
         <CardContent className="h-[300px] flex items-center justify-center">
           <p className="text-muted-foreground">Ingen bookinger i perioden</p>
@@ -106,7 +132,7 @@ export function BookingsLast30DaysChart() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Bookinger de sidste 30 dage pr. kunde</CardTitle>
+        <CardTitle className="text-lg">Lokationer pr. dag (sidste 30 dage)</CardTitle>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
