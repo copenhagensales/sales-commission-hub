@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { ChevronUp, ChevronDown, Trash2, Plus, Calendar, Car, AlertTriangle, Users, FileText, X, Pencil } from "lucide-react";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format, addDays, getWeek, getYear } from "date-fns";
 import { getWeekStartDate } from "@/lib/vagt-flow-date-utils";
 import { da } from "date-fns/locale";
@@ -45,6 +46,7 @@ export default function BookingsContent() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { canEditFmBookings } = usePermissions();
   const now = new Date();
   const [selectedWeek, setSelectedWeek] = useState(getWeek(now, { weekStartsOn: 1 }));
   const [selectedYear, setSelectedYear] = useState(getYear(now));
@@ -332,22 +334,26 @@ export default function BookingsContent() {
                           <Badge className={statusColors[booking.status] || "bg-gray-100 text-gray-700"}>
                             {booking.status}
                           </Badge>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditBookingDialog(booking)}
-                            title="Rediger booking"
-                          >
-                            <Pencil className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeleteBookingId(booking.id)}
-                            title="Slet booking"
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          {canEditFmBookings && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setEditBookingDialog(booking)}
+                                title="Rediger booking"
+                              >
+                                <Pencil className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeleteBookingId(booking.id)}
+                                title="Slet booking"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                       
@@ -383,25 +389,27 @@ export default function BookingsContent() {
                         })}
                       </div>
 
-                      {/* Quick actions */}
-                      <div className="flex gap-2 mt-3">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setAddEmployeeDialogBooking(booking)}
-                        >
-                          <Users className="h-4 w-4 mr-1" />
-                          Tilføj medarbejder
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setAddVehicleDialogBooking(booking)}
-                        >
-                          <Car className="h-4 w-4 mr-1" />
-                          Tilføj bil
-                        </Button>
-                      </div>
+                      {/* Quick actions - only show if user can edit */}
+                      {canEditFmBookings && (
+                        <div className="flex gap-2 mt-3">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAddEmployeeDialogBooking(booking)}
+                          >
+                            <Users className="h-4 w-4 mr-1" />
+                            Tilføj medarbejder
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAddVehicleDialogBooking(booking)}
+                          >
+                            <Car className="h-4 w-4 mr-1" />
+                            Tilføj bil
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
