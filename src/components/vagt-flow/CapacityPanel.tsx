@@ -16,7 +16,7 @@ interface CapacityPanelProps {
 const DAY_LABELS = ["M", "T", "O", "T", "F", "L", "S"];
 
 export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
