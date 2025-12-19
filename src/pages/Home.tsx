@@ -67,10 +67,11 @@ const Home = () => {
     queryKey: ["home-employee", user?.email],
     queryFn: async () => {
       if (!user?.email) return null;
+      const lowerEmail = user.email.toLowerCase();
       const { data } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, job_title, team_id, employment_start_date")
-        .or(`private_email.eq.${user.email},work_email.eq.${user.email}`)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .eq("is_active", true)
         .maybeSingle();
       return data;
