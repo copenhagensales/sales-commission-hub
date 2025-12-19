@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { format, startOfWeek, endOfWeek, getWeek, getYear } from "date-fns";
 import { da } from "date-fns/locale";
+import { BookingsLast30DaysChart } from "@/components/vagt-flow/BookingsLast30DaysChart";
 
 export default function VagtFlowIndex() {
   const navigate = useNavigate();
@@ -172,6 +173,9 @@ export default function VagtFlowIndex() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Bookings chart - last 30 days by client */}
+        <BookingsLast30DaysChart />
       </div>
     </MainLayout>
   );
