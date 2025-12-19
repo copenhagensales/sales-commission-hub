@@ -302,7 +302,6 @@ export default function BookingsContent() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Alle statusser</SelectItem>
-                <SelectItem value="Planlagt">Planlagt</SelectItem>
                 <SelectItem value="Bekræftet">Bekræftet</SelectItem>
                 <SelectItem value="Afsluttet">Afsluttet</SelectItem>
                 <SelectItem value="Aflyst">Aflyst</SelectItem>
