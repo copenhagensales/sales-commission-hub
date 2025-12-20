@@ -151,7 +151,9 @@ serve(async (req) => {
       .eq("id", employeeId);
 
     // Build invitation URL - use PUBLIC_APP_URL or fallback to production
-    const appUrl = Deno.env.get("PUBLIC_APP_URL") || "https://40ce8d9b-c988-4d3b-a8ed-63eb5bed2204.lovableproject.com";
+    const rawAppUrl = Deno.env.get("PUBLIC_APP_URL") || "https://40ce8d9b-c988-4d3b-a8ed-63eb5bed2204.lovableproject.com";
+    // Remove trailing slash to prevent double slashes in URL
+    const appUrl = rawAppUrl.replace(/\/+$/, "");
     const invitationUrl = `${appUrl}/onboarding?token=${token}`;
     
     console.log("Invitation URL created for:", email);
