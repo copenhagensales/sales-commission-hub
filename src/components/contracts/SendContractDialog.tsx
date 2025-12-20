@@ -271,6 +271,15 @@ export function SendContractDialog({
       current_date: format(new Date(), "d. MMMM yyyy", { locale: da }),
       dato: format(new Date(), "d. MMMM yyyy", { locale: da }),
       
+      // Freelance konsulent
+      firmanavn: (employee as any).freelance_company_name || "[Firmanavn ikke angivet]",
+      freelance_firmanavn: (employee as any).freelance_company_name || "[Firmanavn ikke angivet]",
+      cvr: (employee as any).freelance_cvr || "[CVR ikke angivet]",
+      cvr_nr: (employee as any).freelance_cvr || "[CVR ikke angivet]",
+      freelance_cvr: (employee as any).freelance_cvr || "[CVR ikke angivet]",
+      firmaadresse: (employee as any).freelance_company_address || "[Firmaadresse ikke angivet]",
+      freelance_firmaadresse: (employee as any).freelance_company_address || "[Firmaadresse ikke angivet]",
+      
       // Diverse
       effective_date: "[Angiv dato]",
       new_salary_details: "[Angiv nye lønoplysninger]",
