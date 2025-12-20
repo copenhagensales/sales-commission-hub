@@ -2052,10 +2052,14 @@ export type Database = {
           employment_end_date: string | null
           employment_start_date: string | null
           first_name: string
+          freelance_company_address: string | null
+          freelance_company_name: string | null
+          freelance_cvr: string | null
           has_parking: boolean | null
           id: string
           invitation_status: string | null
           is_active: boolean | null
+          is_freelance_consultant: boolean | null
           job_title: string | null
           last_name: string
           manager_id: string | null
@@ -2097,10 +2101,14 @@ export type Database = {
           employment_end_date?: string | null
           employment_start_date?: string | null
           first_name: string
+          freelance_company_address?: string | null
+          freelance_company_name?: string | null
+          freelance_cvr?: string | null
           has_parking?: boolean | null
           id?: string
           invitation_status?: string | null
           is_active?: boolean | null
+          is_freelance_consultant?: boolean | null
           job_title?: string | null
           last_name: string
           manager_id?: string | null
@@ -2142,10 +2150,14 @@ export type Database = {
           employment_end_date?: string | null
           employment_start_date?: string | null
           first_name?: string
+          freelance_company_address?: string | null
+          freelance_company_name?: string | null
+          freelance_cvr?: string | null
           has_parking?: boolean | null
           id?: string
           invitation_status?: string | null
           is_active?: boolean | null
+          is_freelance_consultant?: boolean | null
           job_title?: string | null
           last_name?: string
           manager_id?: string | null

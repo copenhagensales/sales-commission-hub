@@ -61,6 +61,11 @@ interface EmployeeMasterDataRecord {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Freelance consultant fields
+  is_freelance_consultant: boolean | null;
+  freelance_company_name: string | null;
+  freelance_cvr: string | null;
+  freelance_company_address: string | null;
 }
 
 export default function EmployeeDetail() {
@@ -663,6 +668,30 @@ export default function EmployeeDetail() {
                   )}
                   <EditableRow label="Reg.nr." value={employee.bank_reg_number} field="bank_reg_number" onSave={handleSave} masked />
                   <EditableRow label="Kontonummer" value={employee.bank_account_number} field="bank_account_number" onSave={handleSave} masked />
+                </TableSection>
+
+                <TableSection title="Freelance konsulent">
+                  <tr className="border-b border-border/50 last:border-0">
+                    <td className="py-2.5 pr-4 text-sm text-muted-foreground w-1/3">Freelance</td>
+                    <td className="py-2.5">
+                      <div className="flex items-center gap-2">
+                        <Switch 
+                          checked={employee.is_freelance_consultant ?? false} 
+                          onCheckedChange={(checked) => handleSave("is_freelance_consultant", checked)} 
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          {employee.is_freelance_consultant ? "Ja" : "Nej"}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                  {employee.is_freelance_consultant && (
+                    <>
+                      <EditableRow label="Firmanavn" value={employee.freelance_company_name} field="freelance_company_name" onSave={handleSave} />
+                      <EditableRow label="CVR-nr." value={employee.freelance_cvr} field="freelance_cvr" onSave={handleSave} />
+                      <EditableRow label="Firmaadresse" value={employee.freelance_company_address} field="freelance_company_address" onSave={handleSave} />
+                    </>
+                  )}
                 </TableSection>
               </div>
 
