@@ -3390,6 +3390,7 @@ export type Database = {
           coaching_required: boolean | null
           coaching_reviews_per_rep: number | null
           created_at: string
+          daily_message: string | null
           day: number
           drill_duration_min: number | null
           drill_id: string | null
@@ -3415,6 +3416,7 @@ export type Database = {
           coaching_required?: boolean | null
           coaching_reviews_per_rep?: number | null
           created_at?: string
+          daily_message?: string | null
           day: number
           drill_duration_min?: number | null
           drill_id?: string | null
@@ -3440,6 +3442,7 @@ export type Database = {
           coaching_required?: boolean | null
           coaching_reviews_per_rep?: number | null
           created_at?: string
+          daily_message?: string | null
           day?: number
           drill_duration_min?: number | null
           drill_id?: string | null
@@ -3507,6 +3510,60 @@ export type Database = {
           title?: string
           variants?: Json | null
           when_to_use?: string | null
+        }
+        Relationships: []
+      }
+      onboarding_week_expectations: {
+        Row: {
+          color: string
+          created_at: string
+          daily_message: string
+          do_not_measure_on: string[]
+          good_day_definition: string
+          good_week_criteria: string[]
+          id: string
+          measure_on: string[]
+          note: string | null
+          progression_text: string
+          title: string
+          updated_at: string
+          we_dont_expect: string[]
+          we_expect: string[]
+          week_number: number
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          daily_message: string
+          do_not_measure_on?: string[]
+          good_day_definition: string
+          good_week_criteria?: string[]
+          id?: string
+          measure_on?: string[]
+          note?: string | null
+          progression_text: string
+          title: string
+          updated_at?: string
+          we_dont_expect?: string[]
+          we_expect?: string[]
+          week_number: number
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          daily_message?: string
+          do_not_measure_on?: string[]
+          good_day_definition?: string
+          good_week_criteria?: string[]
+          id?: string
+          measure_on?: string[]
+          note?: string | null
+          progression_text?: string
+          title?: string
+          updated_at?: string
+          we_dont_expect?: string[]
+          we_expect?: string[]
+          week_number?: number
         }
         Relationships: []
       }
