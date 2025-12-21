@@ -455,26 +455,30 @@ export function useEmployeesForShifts(teamId?: string) {
       // Get current employee id
       const { data: currentEmployeeId } = await supabase.rpc("get_current_employee_id");
       
+      // Helper to fetch employees by IDs
+      const fetchEmployeesByIds = async (employeeIds: string[]) => {
+        if (employeeIds.length === 0) return [];
+        const { data, error } = await supabase
+          .from("employee_master_data")
+          .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount")
+          .in("id", employeeIds)
+          .eq("is_active", true)
+          .order("first_name");
+        if (error) throw error;
+        return data || [];
+      };
+      
       // If a specific team is selected, get employees from team_members
       if (teamId && teamId !== "all") {
         const { data: teamMembers, error: tmError } = await supabase
           .from("team_members")
-          .select(`
-            employee_id,
-            employee:employee_id(
-              id, first_name, last_name, department, standard_start_time, 
-              weekly_hours, manager_id, salary_type, salary_amount
-            )
-          `)
+          .select("employee_id")
           .eq("team_id", teamId);
 
         if (tmError) throw tmError;
         
-        const employees = (teamMembers || [])
-          .filter(tm => tm.employee)
-          .map(tm => tm.employee);
-        
-        return employees;
+        const employeeIds = (teamMembers || []).map(tm => tm.employee_id);
+        return fetchEmployeesByIds(employeeIds);
       }
       
       // No team selected - for teamledere, get employees from teams they lead
@@ -493,26 +497,16 @@ export function useEmployeesForShifts(teamId?: string) {
           // Get all employees from those teams
           const { data: teamMembers, error: tmError } = await supabase
             .from("team_members")
-            .select(`
-              employee_id,
-              employee:employee_id(
-                id, first_name, last_name, department, standard_start_time, 
-                weekly_hours, manager_id, salary_type, salary_amount
-              )
-            `)
+            .select("employee_id")
             .in("team_id", teamIds);
           
           if (tmError) throw tmError;
           
-          // Deduplicate employees (in case they're in multiple teams)
-          const employeeMap = new Map();
-          (teamMembers || []).forEach(tm => {
-            if (tm.employee && tm.employee.id !== currentEmployeeId) {
-              employeeMap.set(tm.employee.id, tm.employee);
-            }
-          });
+          // Deduplicate employee IDs and exclude current user
+          const employeeIds = [...new Set((teamMembers || []).map(tm => tm.employee_id))]
+            .filter(id => id !== currentEmployeeId);
           
-          return Array.from(employeeMap.values());
+          return fetchEmployeesByIds(employeeIds);
         }
         
         // Fallback: filter by manager_id if no teams led
