@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Users, TrendingUp, Phone, Target, Calendar, Clock, Award, Activity } from "lucide-react";
+import { ScreenResolutionIndicator } from "@/components/dashboard/ScreenResolutionIndicator";
 
 export default function CphSalesDashboard() {
   const today = new Date();
@@ -131,9 +132,12 @@ export default function CphSalesDashboard() {
               {format(today, "EEEE d. MMMM yyyy", { locale: da })}
             </p>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>Opdateres automatisk</span>
+          <div className="flex items-center gap-3">
+            <ScreenResolutionIndicator />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>Opdateres automatisk</span>
+            </div>
           </div>
         </div>
       </div>

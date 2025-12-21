@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { TrendingUp, Users, Calendar, Package, Trophy } from "lucide-react";
+import { ScreenResolutionIndicator } from "@/components/dashboard/ScreenResolutionIndicator";
 
 const TAB_TO_CLIENT_ID: Record<string, string> = {
   "eesy-fm": FIELDMARKETING_CLIENTS.EESY_FM,
@@ -356,13 +357,16 @@ const FieldmarketingDashboardFull = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Fieldmarketing Dashboard
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Oversigt over salg fra fieldmarketing events
-            </p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">
+                Fieldmarketing Dashboard
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Oversigt over salg fra fieldmarketing events
+              </p>
+            </div>
+            <ScreenResolutionIndicator />
           </div>
           <div className="h-16 w-40 flex items-center justify-end">
             {activeClient?.logo_url ? (

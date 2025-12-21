@@ -20,6 +20,7 @@ import { format, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { Users, Trophy, Building2, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ScreenResolutionIndicator } from "@/components/dashboard/ScreenResolutionIndicator";
 
 // Helper function to shorten names: "John Doe" -> "John D."
 const shortenName = (name: string): string => {
@@ -419,13 +420,16 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
       <div className="space-y-4 md:space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">
-              {teamName} Dashboard
-            </h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">
-              Oversigt over salg på tværs af kunder
-            </p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold text-foreground">
+                {teamName} Dashboard
+              </h1>
+              <p className="text-sm md:text-base text-muted-foreground mt-1">
+                Oversigt over salg på tværs af kunder
+              </p>
+            </div>
+            <ScreenResolutionIndicator />
           </div>
           <Popover>
             <PopoverTrigger asChild>
