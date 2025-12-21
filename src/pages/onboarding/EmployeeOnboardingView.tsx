@@ -128,7 +128,7 @@ export default function EmployeeOnboardingView() {
       </Tabs>
 
       <div className="grid gap-6 lg:grid-cols-3">
-      {/* Timeline Sidebar */}
+        {/* Timeline Sidebar */}
       <Card className="lg:col-span-1">
         <CardHeader>
           <CardTitle className="text-lg">Din Fremgang</CardTitle>
@@ -351,14 +351,15 @@ export default function EmployeeOnboardingView() {
           </Card>
         )}
       </div>
-
-      {/* Video Player Dialog */}
-      <VideoPlayerDialog
-        open={!!playingVideo}
-        onOpenChange={(open) => !open && setPlayingVideo(null)}
-        videoTitle={playingVideo?.title || ""}
-        videoUrl={playingVideo?.video_url}
-      />
     </div>
+
+    {/* Video Player Dialog */}
+    <VideoPlayerDialog
+      open={!!playingVideo}
+      onOpenChange={(open) => !open && setPlayingVideo(null)}
+      videoTitle={playingVideo?.title || ""}
+      videoUrl={playingVideo?.video_url}
+    />
+  </div>
   );
 }
