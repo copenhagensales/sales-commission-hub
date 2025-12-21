@@ -33,6 +33,19 @@ interface DashboardKpi {
   base_metric: string | null;
 }
 
+interface DashboardTheme {
+  id: string;
+  name: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  backgroundColor: string;
+  cardStyle: "flat" | "elevated" | "bordered" | "glass";
+  borderRadius: "none" | "small" | "medium" | "large";
+  fontSize: "small" | "medium" | "large" | "xlarge";
+  animations: boolean;
+}
+
 const KPI_TYPES = [
   { value: "number", label: "Antal" },
   { value: "percentage", label: "Procent" },
@@ -52,11 +65,101 @@ const BASE_METRICS = [
   { value: "antal_medarbejdere", label: "Antal medarbejdere", description: "Unikke sælgere med data" },
 ];
 
+const PRESET_THEMES: DashboardTheme[] = [
+  {
+    id: "modern-blue",
+    name: "Modern Blue",
+    primaryColor: "#3b82f6",
+    secondaryColor: "#1e40af",
+    accentColor: "#10b981",
+    backgroundColor: "#0f172a",
+    cardStyle: "glass",
+    borderRadius: "large",
+    fontSize: "large",
+    animations: true,
+  },
+  {
+    id: "corporate",
+    name: "Corporate",
+    primaryColor: "#1e3a5f",
+    secondaryColor: "#2d5a87",
+    accentColor: "#f59e0b",
+    backgroundColor: "#f8fafc",
+    cardStyle: "bordered",
+    borderRadius: "small",
+    fontSize: "medium",
+    animations: false,
+  },
+  {
+    id: "vibrant",
+    name: "Vibrant",
+    primaryColor: "#8b5cf6",
+    secondaryColor: "#ec4899",
+    accentColor: "#14b8a6",
+    backgroundColor: "#18181b",
+    cardStyle: "elevated",
+    borderRadius: "large",
+    fontSize: "xlarge",
+    animations: true,
+  },
+  {
+    id: "minimal",
+    name: "Minimal",
+    primaryColor: "#374151",
+    secondaryColor: "#6b7280",
+    accentColor: "#059669",
+    backgroundColor: "#ffffff",
+    cardStyle: "flat",
+    borderRadius: "medium",
+    fontSize: "medium",
+    animations: false,
+  },
+];
+
+const CARD_STYLES = [
+  { value: "flat", label: "Flad", description: "Simpel uden skygge" },
+  { value: "elevated", label: "Hævet", description: "Med skygge" },
+  { value: "bordered", label: "Rammet", description: "Med border" },
+  { value: "glass", label: "Glas", description: "Gennemsigtig effekt" },
+];
+
+const BORDER_RADIUS_OPTIONS = [
+  { value: "none", label: "Ingen", px: "0px" },
+  { value: "small", label: "Lille", px: "4px" },
+  { value: "medium", label: "Medium", px: "8px" },
+  { value: "large", label: "Stor", px: "16px" },
+];
+
+const FONT_SIZE_OPTIONS = [
+  { value: "small", label: "Lille", size: "24px" },
+  { value: "medium", label: "Medium", size: "32px" },
+  { value: "large", label: "Stor", size: "48px" },
+  { value: "xlarge", label: "Ekstra stor", size: "64px" },
+];
+
 const DashboardSettings = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingKpi, setEditingKpi] = useState<DashboardKpi | null>(null);
+  
+  // Design state
+  const [isDesignDialogOpen, setIsDesignDialogOpen] = useState(false);
+  const [savedThemes, setSavedThemes] = useState<DashboardTheme[]>([]);
+  const [editingTheme, setEditingTheme] = useState<DashboardTheme | null>(null);
+  const [themeFormData, setThemeFormData] = useState<DashboardTheme>({
+    id: "",
+    name: "",
+    primaryColor: "#3b82f6",
+    secondaryColor: "#1e40af",
+    accentColor: "#10b981",
+    backgroundColor: "#0f172a",
+    cardStyle: "elevated",
+    borderRadius: "medium",
+    fontSize: "large",
+    animations: true,
+  });
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -210,6 +313,91 @@ const DashboardSettings = () => {
     }));
   };
 
+  // Design functions
+  const openCreateThemeDialog = (preset?: DashboardTheme) => {
+    if (preset) {
+      setThemeFormData({ ...preset, id: "", name: `${preset.name} (kopi)` });
+    } else {
+      setThemeFormData({
+        id: "",
+        name: "",
+        primaryColor: "#3b82f6",
+        secondaryColor: "#1e40af",
+        accentColor: "#10b981",
+        backgroundColor: "#0f172a",
+        cardStyle: "elevated",
+        borderRadius: "medium",
+        fontSize: "large",
+        animations: true,
+      });
+    }
+    setEditingTheme(null);
+    setIsDesignDialogOpen(true);
+  };
+
+  const openEditThemeDialog = (theme: DashboardTheme) => {
+    setThemeFormData({ ...theme });
+    setEditingTheme(theme);
+    setIsDesignDialogOpen(true);
+  };
+
+  const handleSaveTheme = () => {
+    const newTheme = {
+      ...themeFormData,
+      id: editingTheme?.id || `theme-${Date.now()}`,
+    };
+    
+    if (editingTheme) {
+      setSavedThemes(prev => prev.map(t => t.id === editingTheme.id ? newTheme : t));
+    } else {
+      setSavedThemes(prev => [...prev, newTheme]);
+    }
+    
+    setIsDesignDialogOpen(false);
+    toast({
+      title: editingTheme ? "Tema opdateret" : "Tema oprettet",
+      description: `"${newTheme.name}" er blevet ${editingTheme ? "opdateret" : "gemt"}.`,
+    });
+  };
+
+  const deleteTheme = (id: string) => {
+    setSavedThemes(prev => prev.filter(t => t.id !== id));
+    toast({
+      title: "Tema slettet",
+      description: "Temaet er blevet slettet.",
+    });
+  };
+
+  const getCardStyleClasses = (theme: DashboardTheme) => {
+    const styles: Record<string, string> = {
+      flat: "",
+      elevated: "shadow-lg",
+      bordered: "border-2",
+      glass: "backdrop-blur-md bg-opacity-80",
+    };
+    return styles[theme.cardStyle] || "";
+  };
+
+  const getBorderRadiusClass = (radius: string) => {
+    const radiusMap: Record<string, string> = {
+      none: "rounded-none",
+      small: "rounded",
+      medium: "rounded-lg",
+      large: "rounded-2xl",
+    };
+    return radiusMap[radius] || "rounded-lg";
+  };
+
+  const getFontSizeClass = (size: string) => {
+    const sizeMap: Record<string, string> = {
+      small: "text-2xl",
+      medium: "text-3xl",
+      large: "text-4xl",
+      xlarge: "text-5xl",
+    };
+    return sizeMap[size] || "text-4xl";
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -330,233 +518,172 @@ const DashboardSettings = () => {
           </TabsContent>
 
           <TabsContent value="design" className="mt-6 space-y-6">
-            {/* Farvetema */}
+            {/* Gemte temaer */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Palette className="h-5 w-5" />
+                    Mine temaer
+                  </CardTitle>
+                  <CardDescription>
+                    Dine gemte dashboard-temaer
+                  </CardDescription>
+                </div>
+                <Button onClick={() => openCreateThemeDialog()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nyt tema
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {savedThemes.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Palette className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>Ingen temaer oprettet endnu.</p>
+                    <p className="text-sm">Vælg et preset nedenfor eller opret dit eget.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {savedThemes.map((theme) => (
+                      <div
+                        key={theme.id}
+                        className="group relative overflow-hidden border rounded-xl transition-all hover:shadow-lg"
+                      >
+                        {/* Preview */}
+                        <div
+                          className="p-4 h-32"
+                          style={{ backgroundColor: theme.backgroundColor }}
+                        >
+                          <div className="grid grid-cols-2 gap-2 h-full">
+                            <div
+                              className={`p-2 ${getBorderRadiusClass(theme.borderRadius)} ${getCardStyleClasses(theme)}`}
+                              style={{
+                                backgroundColor: theme.cardStyle === "glass" ? `${theme.primaryColor}40` : theme.primaryColor,
+                                borderColor: theme.cardStyle === "bordered" ? theme.secondaryColor : "transparent",
+                              }}
+                            >
+                              <div className={`${getFontSizeClass(theme.fontSize)} font-bold text-white`}>42</div>
+                              <div className="text-xs text-white/70">Salg</div>
+                            </div>
+                            <div
+                              className={`p-2 ${getBorderRadiusClass(theme.borderRadius)} ${getCardStyleClasses(theme)}`}
+                              style={{
+                                backgroundColor: theme.cardStyle === "glass" ? `${theme.accentColor}40` : theme.accentColor,
+                                borderColor: theme.cardStyle === "bordered" ? theme.secondaryColor : "transparent",
+                              }}
+                            >
+                              <div className={`${getFontSizeClass(theme.fontSize)} font-bold text-white`}>8.5</div>
+                              <div className="text-xs text-white/70">Timer</div>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Info */}
+                        <div className="p-3 bg-card border-t flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{theme.name}</p>
+                            <div className="flex gap-1 mt-1">
+                              {[theme.primaryColor, theme.secondaryColor, theme.accentColor].map((c, i) => (
+                                <div key={i} className="h-3 w-3 rounded-full" style={{ backgroundColor: c }} />
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEditThemeDialog(theme)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => deleteTheme(theme.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Preset temaer */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Palette className="h-5 w-5" />
-                  Farvetema
+                  <Sparkles className="h-5 w-5" />
+                  Preset temaer
                 </CardTitle>
                 <CardDescription>
-                  Vælg farvepaletten for dit dashboard
+                  Hurtigstart med et færdigt tema - klik for at tilpasse og gemme
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {[
-                    { name: "Standard", colors: ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"] },
-                    { name: "Mørk", colors: ["#6366f1", "#8b5cf6", "#ec4899", "#14b8a6"] },
-                    { name: "Professionel", colors: ["#1e40af", "#0f766e", "#b45309", "#991b1b"] },
-                    { name: "Pastel", colors: ["#93c5fd", "#86efac", "#fcd34d", "#fca5a5"] },
-                  ].map((theme) => (
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {PRESET_THEMES.map((theme) => (
                     <div
-                      key={theme.name}
-                      className="border rounded-lg p-3 cursor-pointer hover:border-primary transition-colors"
+                      key={theme.id}
+                      className="group relative overflow-hidden border rounded-xl cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02]"
+                      onClick={() => openCreateThemeDialog(theme)}
                     >
-                      <div className="flex gap-1 mb-2">
-                        {theme.colors.map((color, i) => (
+                      {/* Preview */}
+                      <div
+                        className="p-4 h-40 relative"
+                        style={{ backgroundColor: theme.backgroundColor }}
+                      >
+                        <div className="grid grid-cols-2 gap-2">
                           <div
-                            key={i}
-                            className="h-6 flex-1 rounded"
-                            style={{ backgroundColor: color }}
-                          />
-                        ))}
+                            className={`p-3 ${getBorderRadiusClass(theme.borderRadius)} ${getCardStyleClasses(theme)} ${theme.animations ? "transition-transform group-hover:scale-105" : ""}`}
+                            style={{
+                              backgroundColor: theme.cardStyle === "glass" ? `${theme.primaryColor}40` : theme.primaryColor,
+                              borderColor: theme.cardStyle === "bordered" ? theme.secondaryColor : "transparent",
+                            }}
+                          >
+                            <div className={`${getFontSizeClass(theme.fontSize)} font-bold text-white`}>156</div>
+                            <div className="text-xs text-white/70 mt-1">Antal salg</div>
+                          </div>
+                          <div
+                            className={`p-3 ${getBorderRadiusClass(theme.borderRadius)} ${getCardStyleClasses(theme)} ${theme.animations ? "transition-transform group-hover:scale-105" : ""}`}
+                            style={{
+                              backgroundColor: theme.cardStyle === "glass" ? `${theme.accentColor}40` : theme.accentColor,
+                              borderColor: theme.cardStyle === "bordered" ? theme.secondaryColor : "transparent",
+                            }}
+                          >
+                            <div className={`${getFontSizeClass(theme.fontSize)} font-bold text-white`}>87%</div>
+                            <div className="text-xs text-white/70 mt-1">Mål opnået</div>
+                          </div>
+                        </div>
+                        {/* Overlay */}
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Button variant="secondary" size="sm">
+                            <Plus className="h-4 w-4 mr-1" />
+                            Brug tema
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-sm font-medium text-center">{theme.name}</p>
+                      {/* Info */}
+                      <div className="p-3 bg-card border-t">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium">{theme.name}</p>
+                          <div className="flex gap-1">
+                            {[theme.primaryColor, theme.secondaryColor, theme.accentColor].map((c, i) => (
+                              <div key={i} className="h-3 w-3 rounded-full border" style={{ backgroundColor: c }} />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <Badge variant="outline" className="text-xs">
+                            {CARD_STYLES.find(s => s.value === theme.cardStyle)?.label}
+                          </Badge>
+                          {theme.animations && (
+                            <Badge variant="outline" className="text-xs">
+                              <Sparkles className="h-3 w-3 mr-1" />
+                              Animation
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
-
-            {/* Layout */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Layout className="h-5 w-5" />
-                  Layout
-                </CardTitle>
-                <CardDescription>
-                  Konfigurer layoutet og spacing
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Antal kolonner</Label>
-                    <Select defaultValue="4">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="2">2 kolonner</SelectItem>
-                        <SelectItem value="3">3 kolonner</SelectItem>
-                        <SelectItem value="4">4 kolonner</SelectItem>
-                        <SelectItem value="6">6 kolonner</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Afstand mellem kort</Label>
-                    <Select defaultValue="medium">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="small">Lille (8px)</SelectItem>
-                        <SelectItem value="medium">Medium (16px)</SelectItem>
-                        <SelectItem value="large">Stor (24px)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Typografi */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Type className="h-5 w-5" />
-                  Typografi
-                </CardTitle>
-                <CardDescription>
-                  Vælg skrifttyper og størrelser
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Overskrift font</Label>
-                    <Select defaultValue="inter">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="inter">Inter</SelectItem>
-                        <SelectItem value="roboto">Roboto</SelectItem>
-                        <SelectItem value="poppins">Poppins</SelectItem>
-                        <SelectItem value="montserrat">Montserrat</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>KPI værdi størrelse</Label>
-                    <Select defaultValue="large">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="small">Lille (24px)</SelectItem>
-                        <SelectItem value="medium">Medium (32px)</SelectItem>
-                        <SelectItem value="large">Stor (48px)</SelectItem>
-                        <SelectItem value="xlarge">Ekstra stor (64px)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Kort styling */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Square className="h-5 w-5" />
-                  Kort styling
-                </CardTitle>
-                <CardDescription>
-                  Tilpas udseendet af KPI-kortene
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>Hjørner</Label>
-                    <Select defaultValue="rounded">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Ingen</SelectItem>
-                        <SelectItem value="small">Små (4px)</SelectItem>
-                        <SelectItem value="rounded">Runde (8px)</SelectItem>
-                        <SelectItem value="large">Store (16px)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Skygge</Label>
-                    <Select defaultValue="medium">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Ingen</SelectItem>
-                        <SelectItem value="small">Let</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="large">Kraftig</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Border</Label>
-                    <Select defaultValue="thin">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Ingen</SelectItem>
-                        <SelectItem value="thin">Tynd (1px)</SelectItem>
-                        <SelectItem value="medium">Medium (2px)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Animationer */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5" />
-                  Animationer
-                </CardTitle>
-                <CardDescription>
-                  Konfigurer animationer og overgange
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Fade-in animation</p>
-                    <p className="text-sm text-muted-foreground">Kort fader ind ved indlæsning</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Tal animation</p>
-                    <p className="text-sm text-muted-foreground">KPI-værdier tæller op</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Hover effekter</p>
-                    <p className="text-sm text-muted-foreground">Kort løfter sig ved hover</p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="flex justify-end">
-              <Button disabled>
-                Gem designindstillinger
-              </Button>
-            </div>
           </TabsContent>
         </Tabs>
 
@@ -823,6 +950,315 @@ const DashboardSettings = () => {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Design Theme Dialog */}
+        <Dialog open={isDesignDialogOpen} onOpenChange={setIsDesignDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingTheme ? "Rediger tema" : "Opret nyt tema"}
+              </DialogTitle>
+              <DialogDescription>
+                Tilpas dit dashboard-tema og se en live preview.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Settings */}
+              <div className="space-y-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="theme_name">Tema navn *</Label>
+                  <Input
+                    id="theme_name"
+                    value={themeFormData.name}
+                    onChange={(e) =>
+                      setThemeFormData((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    placeholder="F.eks. Mit custom tema"
+                  />
+                </div>
+
+                {/* Colors */}
+                <div className="border rounded-lg p-4 space-y-4">
+                  <Label className="text-base font-semibold">Farver</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">Primær farve</Label>
+                      <div className="flex gap-2">
+                        <input
+                          type="color"
+                          value={themeFormData.primaryColor}
+                          onChange={(e) =>
+                            setThemeFormData((prev) => ({ ...prev, primaryColor: e.target.value }))
+                          }
+                          className="w-10 h-10 rounded cursor-pointer border-0"
+                        />
+                        <Input
+                          value={themeFormData.primaryColor}
+                          onChange={(e) =>
+                            setThemeFormData((prev) => ({ ...prev, primaryColor: e.target.value }))
+                          }
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">Sekundær farve</Label>
+                      <div className="flex gap-2">
+                        <input
+                          type="color"
+                          value={themeFormData.secondaryColor}
+                          onChange={(e) =>
+                            setThemeFormData((prev) => ({ ...prev, secondaryColor: e.target.value }))
+                          }
+                          className="w-10 h-10 rounded cursor-pointer border-0"
+                        />
+                        <Input
+                          value={themeFormData.secondaryColor}
+                          onChange={(e) =>
+                            setThemeFormData((prev) => ({ ...prev, secondaryColor: e.target.value }))
+                          }
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">Accent farve</Label>
+                      <div className="flex gap-2">
+                        <input
+                          type="color"
+                          value={themeFormData.accentColor}
+                          onChange={(e) =>
+                            setThemeFormData((prev) => ({ ...prev, accentColor: e.target.value }))
+                          }
+                          className="w-10 h-10 rounded cursor-pointer border-0"
+                        />
+                        <Input
+                          value={themeFormData.accentColor}
+                          onChange={(e) =>
+                            setThemeFormData((prev) => ({ ...prev, accentColor: e.target.value }))
+                          }
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">Baggrund</Label>
+                      <div className="flex gap-2">
+                        <input
+                          type="color"
+                          value={themeFormData.backgroundColor}
+                          onChange={(e) =>
+                            setThemeFormData((prev) => ({ ...prev, backgroundColor: e.target.value }))
+                          }
+                          className="w-10 h-10 rounded cursor-pointer border-0"
+                        />
+                        <Input
+                          value={themeFormData.backgroundColor}
+                          onChange={(e) =>
+                            setThemeFormData((prev) => ({ ...prev, backgroundColor: e.target.value }))
+                          }
+                          className="flex-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Style */}
+                <div className="grid gap-2">
+                  <Label>Kort stil</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {CARD_STYLES.map((style) => (
+                      <div
+                        key={style.value}
+                        className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                          themeFormData.cardStyle === style.value
+                            ? "border-primary bg-primary/10"
+                            : "hover:border-muted-foreground"
+                        }`}
+                        onClick={() =>
+                          setThemeFormData((prev) => ({
+                            ...prev,
+                            cardStyle: style.value as DashboardTheme["cardStyle"],
+                          }))
+                        }
+                      >
+                        <p className="font-medium text-sm">{style.label}</p>
+                        <p className="text-xs text-muted-foreground">{style.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Border Radius & Font Size */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Hjørner</Label>
+                    <Select
+                      value={themeFormData.borderRadius}
+                      onValueChange={(value) =>
+                        setThemeFormData((prev) => ({
+                          ...prev,
+                          borderRadius: value as DashboardTheme["borderRadius"],
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {BORDER_RADIUS_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label} ({opt.px})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tekststørrelse</Label>
+                    <Select
+                      value={themeFormData.fontSize}
+                      onValueChange={(value) =>
+                        setThemeFormData((prev) => ({
+                          ...prev,
+                          fontSize: value as DashboardTheme["fontSize"],
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FONT_SIZE_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label} ({opt.size})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Animations */}
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <p className="font-medium">Animationer</p>
+                    <p className="text-sm text-muted-foreground">Hover og fade effekter</p>
+                  </div>
+                  <Switch
+                    checked={themeFormData.animations}
+                    onCheckedChange={(checked) =>
+                      setThemeFormData((prev) => ({ ...prev, animations: checked }))
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Live Preview */}
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">Live preview</Label>
+                <div
+                  className="p-6 rounded-xl min-h-[300px]"
+                  style={{ backgroundColor: themeFormData.backgroundColor }}
+                >
+                  <div className="grid grid-cols-2 gap-4">
+                    <div
+                      className={`p-4 ${getBorderRadiusClass(themeFormData.borderRadius)} ${getCardStyleClasses(themeFormData)} ${
+                        themeFormData.animations ? "transition-all hover:scale-105" : ""
+                      }`}
+                      style={{
+                        backgroundColor:
+                          themeFormData.cardStyle === "glass"
+                            ? `${themeFormData.primaryColor}40`
+                            : themeFormData.primaryColor,
+                        borderColor:
+                          themeFormData.cardStyle === "bordered"
+                            ? themeFormData.secondaryColor
+                            : "transparent",
+                      }}
+                    >
+                      <div className={`${getFontSizeClass(themeFormData.fontSize)} font-bold text-white`}>
+                        156
+                      </div>
+                      <div className="text-sm text-white/70 mt-1">Antal salg</div>
+                    </div>
+                    <div
+                      className={`p-4 ${getBorderRadiusClass(themeFormData.borderRadius)} ${getCardStyleClasses(themeFormData)} ${
+                        themeFormData.animations ? "transition-all hover:scale-105" : ""
+                      }`}
+                      style={{
+                        backgroundColor:
+                          themeFormData.cardStyle === "glass"
+                            ? `${themeFormData.secondaryColor}40`
+                            : themeFormData.secondaryColor,
+                        borderColor:
+                          themeFormData.cardStyle === "bordered"
+                            ? themeFormData.primaryColor
+                            : "transparent",
+                      }}
+                    >
+                      <div className={`${getFontSizeClass(themeFormData.fontSize)} font-bold text-white`}>
+                        42
+                      </div>
+                      <div className="text-sm text-white/70 mt-1">Antal kunder</div>
+                    </div>
+                    <div
+                      className={`p-4 ${getBorderRadiusClass(themeFormData.borderRadius)} ${getCardStyleClasses(themeFormData)} ${
+                        themeFormData.animations ? "transition-all hover:scale-105" : ""
+                      }`}
+                      style={{
+                        backgroundColor:
+                          themeFormData.cardStyle === "glass"
+                            ? `${themeFormData.accentColor}40`
+                            : themeFormData.accentColor,
+                        borderColor:
+                          themeFormData.cardStyle === "bordered"
+                            ? themeFormData.secondaryColor
+                            : "transparent",
+                      }}
+                    >
+                      <div className={`${getFontSizeClass(themeFormData.fontSize)} font-bold text-white`}>
+                        87%
+                      </div>
+                      <div className="text-sm text-white/70 mt-1">Mål opnået</div>
+                    </div>
+                    <div
+                      className={`p-4 ${getBorderRadiusClass(themeFormData.borderRadius)} ${getCardStyleClasses(themeFormData)} ${
+                        themeFormData.animations ? "transition-all hover:scale-105" : ""
+                      }`}
+                      style={{
+                        backgroundColor:
+                          themeFormData.cardStyle === "glass"
+                            ? `${themeFormData.primaryColor}60`
+                            : `${themeFormData.primaryColor}cc`,
+                        borderColor:
+                          themeFormData.cardStyle === "bordered"
+                            ? themeFormData.accentColor
+                            : "transparent",
+                      }}
+                    >
+                      <div className={`${getFontSizeClass(themeFormData.fontSize)} font-bold text-white`}>
+                        8.5
+                      </div>
+                      <div className="text-sm text-white/70 mt-1">Timer</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDesignDialogOpen(false)}>
+                Annuller
+              </Button>
+              <Button onClick={handleSaveTheme} disabled={!themeFormData.name}>
+                {editingTheme ? "Opdater tema" : "Gem tema"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
