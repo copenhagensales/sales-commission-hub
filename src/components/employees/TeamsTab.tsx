@@ -488,7 +488,7 @@ export function TeamsTab() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Kun medarbejdere med stillingen "Teamleder" eller "Assisterende Teamleder" vises her.
+                  Kun stabsmedarbejdere vises her.
                 </p>
               </div>
               <div className="space-y-2">
