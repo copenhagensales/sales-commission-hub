@@ -6,20 +6,25 @@ export interface WidgetTypeConfig {
   iconName: string;
   description: string;
   isActive: boolean;
+  supportsMultiKpi: boolean;  // Whether this widget type can show multiple KPIs
+  supportsComparison: boolean; // Whether this widget type supports period comparison
+  supportsTarget: boolean;     // Whether this widget type can show a target value
 }
 
 const STORAGE_KEY = "dashboard-widget-types";
 
 const DEFAULT_WIDGET_TYPES: WidgetTypeConfig[] = [
-  { value: "kpi_card", label: "KPI Kort", iconName: "gauge", description: "Vis en enkelt KPI værdi", isActive: true },
-  { value: "bar_chart", label: "Søjlediagram", iconName: "bar-chart", description: "Sammenlign værdier", isActive: true },
-  { value: "line_chart", label: "Linjediagram", iconName: "line-chart", description: "Vis trends over tid", isActive: true },
-  { value: "pie_chart", label: "Cirkeldiagram", iconName: "pie-chart", description: "Vis fordeling", isActive: true },
-  { value: "table", label: "Tabel", iconName: "table", description: "Vis detaljerede data", isActive: true },
-  { value: "leaderboard", label: "Leaderboard", iconName: "award", description: "Top performere", isActive: true },
-  { value: "clock", label: "Ur/Dato", iconName: "clock", description: "Vis tid og dato", isActive: true },
-  { value: "goal_progress", label: "Mål fremgang", iconName: "trending-up", description: "Vis fremgang mod mål", isActive: true },
-  { value: "activity_feed", label: "Aktivitetsfeed", iconName: "activity", description: "Seneste aktivitet", isActive: true },
+  { value: "kpi_card", label: "KPI Kort", iconName: "gauge", description: "Vis en enkelt KPI værdi", isActive: true, supportsMultiKpi: false, supportsComparison: true, supportsTarget: true },
+  { value: "bar_chart", label: "Søjlediagram", iconName: "bar-chart", description: "Sammenlign værdier", isActive: true, supportsMultiKpi: true, supportsComparison: true, supportsTarget: false },
+  { value: "line_chart", label: "Linjediagram", iconName: "line-chart", description: "Vis trends over tid", isActive: true, supportsMultiKpi: true, supportsComparison: true, supportsTarget: false },
+  { value: "pie_chart", label: "Cirkeldiagram", iconName: "pie-chart", description: "Vis fordeling", isActive: true, supportsMultiKpi: true, supportsComparison: false, supportsTarget: false },
+  { value: "table", label: "Tabel", iconName: "table", description: "Vis detaljerede data", isActive: true, supportsMultiKpi: true, supportsComparison: true, supportsTarget: false },
+  { value: "leaderboard", label: "Leaderboard", iconName: "award", description: "Top performere", isActive: true, supportsMultiKpi: true, supportsComparison: false, supportsTarget: false },
+  { value: "clock", label: "Ur/Dato", iconName: "clock", description: "Vis tid og dato", isActive: true, supportsMultiKpi: false, supportsComparison: false, supportsTarget: false },
+  { value: "goal_progress", label: "Mål fremgang", iconName: "trending-up", description: "Vis fremgang mod mål", isActive: true, supportsMultiKpi: false, supportsComparison: true, supportsTarget: true },
+  { value: "activity_feed", label: "Aktivitetsfeed", iconName: "activity", description: "Seneste aktivitet", isActive: true, supportsMultiKpi: false, supportsComparison: false, supportsTarget: false },
+  { value: "comparison_card", label: "Sammenligning", iconName: "trending-up", description: "Sammenlign to perioder", isActive: true, supportsMultiKpi: false, supportsComparison: true, supportsTarget: true },
+  { value: "multi_kpi_card", label: "Multi-KPI Kort", iconName: "gauge", description: "Flere KPIs på ét kort", isActive: true, supportsMultiKpi: true, supportsComparison: true, supportsTarget: false },
 ];
 
 export const useWidgetTypes = () => {
@@ -27,7 +32,12 @@ export const useWidgetTypes = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        // Merge with defaults to add new properties
+        return DEFAULT_WIDGET_TYPES.map(defaultType => {
+          const storedType = parsed.find((s: WidgetTypeConfig) => s.value === defaultType.value);
+          return storedType ? { ...defaultType, ...storedType } : defaultType;
+        });
       } catch {
         return DEFAULT_WIDGET_TYPES;
       }
