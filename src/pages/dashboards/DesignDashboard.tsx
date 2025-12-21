@@ -154,7 +154,7 @@ export default function DesignDashboard() {
   const { activeDesignTypes } = useDesignTypes();
   const [placedWidgets, setPlacedWidgets] = useState<PlacedWidget[]>([]);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isDesignPanelOpen, setIsDesignPanelOpen] = useState(true);
   const [editingWidget, setEditingWidget] = useState<PlacedWidget | null>(null);
 
   const handleClose = () => {
@@ -361,18 +361,20 @@ export default function DesignDashboard() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-background overflow-auto">
+    <div className="fixed inset-0 z-50 bg-background flex flex-col">
       {/* Header with close button */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b shrink-0">
+        <div className="px-6 py-3 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Design Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Design dit eget dashboard med widgets fra indstillinger</p>
+            <h1 className="text-xl font-bold">Design Dashboard</h1>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={() => setIsPreviewOpen(true)}>
-              <Eye className="h-4 w-4 mr-2" />
-              Forhåndsvis
+            <Button 
+              variant={isDesignPanelOpen ? "default" : "outline"} 
+              onClick={() => setIsDesignPanelOpen(!isDesignPanelOpen)}
+            >
+              <Palette className="h-4 w-4 mr-2" />
+              Design
             </Button>
             <Button>
               <Save className="h-4 w-4 mr-2" />
@@ -390,187 +392,179 @@ export default function DesignDashboard() {
         </div>
       </div>
 
-      <div className="container mx-auto p-6 space-y-6">
+      {/* Main content area - Dashboard Canvas as main view */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Dashboard Canvas - Full size view */}
+        <div className={cn(
+          "flex-1 overflow-auto p-6 transition-all",
+          isDesignPanelOpen ? "pr-0" : ""
+        )}>
+          <div 
+            className="relative rounded-lg overflow-hidden bg-muted/10 p-4"
+            style={{ minHeight: `${CELL_HEIGHT * 4}px` }}
+          >
+            {/* Grid cells background - only show when design panel is open */}
+            {isDesignPanelOpen && (
+              <div 
+                className="absolute inset-4 grid gap-1 pointer-events-none"
+                style={{ 
+                  gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+                  gridTemplateRows: `repeat(4, ${CELL_HEIGHT}px)`,
+                }}
+              >
+                {Array.from({ length: GRID_COLS * 4 }).map((_, i) => (
+                  <div 
+                    key={i} 
+                    className="border border-dashed border-border/40 rounded-md bg-muted/20"
+                  />
+                ))}
+              </div>
+            )}
 
-        {/* Global Design Selector */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Palette className="h-5 w-5" />
-              Vælg Design
-            </CardTitle>
-            <CardDescription>Dette design anvendes på alle widgets</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {activeDesignTypes.map((design) => (
-                <div
-                  key={design.id}
-                  onClick={() => setGlobalDesign(design.id)}
-                  className={cn(
-                    "p-3 rounded-lg border-2 cursor-pointer transition-all",
-                    globalDesign === design.id 
-                      ? "border-primary bg-primary/5 ring-2 ring-primary/20" 
-                      : "border-border hover:border-primary/50"
-                  )}
-                >
-                  <div className={cn("h-12 rounded-md mb-2", design.preview)} />
-                  <p className="text-xs font-medium text-center">{design.name}</p>
-                  <p className="text-[10px] text-muted-foreground text-center">{design.description}</p>
+            {/* Content layer */}
+            {placedWidgets.length === 0 ? (
+              <div className="relative flex flex-col items-center justify-center h-[480px] text-center z-10">
+                <div className="p-4 rounded-full bg-background/80 backdrop-blur mb-4">
+                  <Plus className="h-8 w-8 text-muted-foreground" />
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                <h3 className="font-semibold text-lg mb-2">Ingen widgets endnu</h3>
+                <p className="text-muted-foreground max-w-sm mb-4">
+                  Åbn Design panelet og tilføj widgets
+                </p>
+                {!isDesignPanelOpen && (
+                  <Button onClick={() => setIsDesignPanelOpen(true)}>
+                    <Palette className="h-4 w-4 mr-2" />
+                    Åbn Design
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div 
+                className="relative grid gap-4 z-10"
+                style={{ 
+                  gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+                  gridAutoRows: `${CELL_HEIGHT}px`
+                }}
+              >
+                {placedWidgets.map((widget) => {
+                  const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
+                  const design = activeDesignTypes.find(d => d.id === globalDesign);
+                  const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
+                  const trackingScope = TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId);
+                  
+                  return (
+                    <ResizableWidgetCard
+                      key={widget.id}
+                      id={widget.id}
+                      title={widget.title || getWidgetTypeName(widget.widgetTypeId)}
+                      kpiLabel={getDisplayLabel(widget)}
+                      value={getExampleValue(widget)}
+                      size={{ width: widget.width, height: widget.height }}
+                      designClasses={getDesignClasses(globalDesign)}
+                      colorTheme={colorTheme}
+                      timePeriodName={timePeriod?.name}
+                      designName={design?.name}
+                      targetValue={widget.targetValue}
+                      showComparison={widget.showComparison}
+                      trackingScopeName={trackingScope?.id !== "all" ? trackingScope?.name : undefined}
+                      showTrend={widget.showTrend}
+                      trendValue={widget.showTrend ? getExampleTrend() : undefined}
+                      multiKpiCount={widget.kpiTypeIds.length > 1 ? widget.kpiTypeIds.length : undefined}
+                      icon={getWidgetTypeIcon(widget.widgetTypeId)}
+                      onEdit={() => openEditWidgetDialog(widget)}
+                      onRemove={() => removeWidget(widget.id)}
+                      onResize={(newSize) => resizeWidget(widget.id, newSize)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
 
-        {activeWidgetTypes.length === 0 && (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-8 text-center">
-              <LayoutGrid className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="font-semibold text-lg mb-2">Ingen aktive widget typer</h3>
-              <p className="text-muted-foreground max-w-sm">
-                Gå til Dashboard Indstillinger → Widgets for at aktivere widget typer.
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        {/* Design Panel - Sidebar */}
+        {isDesignPanelOpen && (
+          <div className="w-80 shrink-0 border-l bg-background overflow-y-auto">
+            <div className="p-4 space-y-4">
+              {/* Global Design Selector */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Palette className="h-4 w-4" />
+                  <h3 className="font-semibold text-sm">Vælg Design</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {activeDesignTypes.map((design) => (
+                    <div
+                      key={design.id}
+                      onClick={() => setGlobalDesign(design.id)}
+                      className={cn(
+                        "p-2 rounded-lg border-2 cursor-pointer transition-all",
+                        globalDesign === design.id 
+                          ? "border-primary bg-primary/5 ring-2 ring-primary/20" 
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      <div className={cn("h-8 rounded-md mb-1", design.preview)} />
+                      <p className="text-xs font-medium text-center">{design.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-        {activeWidgetTypes.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Widget Palette */}
-            <div className="lg:col-span-1 space-y-4">
+              {/* Add Widget Section */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Tilføj Widget</CardTitle>
-                  <CardDescription>Konfigurer og tilføj widgets</CardDescription>
+                <CardHeader className="pb-2 px-3 pt-3">
+                  <CardTitle className="text-sm">Tilføj Widget</CardTitle>
+                  <CardDescription className="text-xs">Konfigurer og tilføj widgets</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <Button onClick={openAddWidgetDialog} className="w-full">
+                <CardContent className="px-3 pb-3">
+                  <Button onClick={openAddWidgetDialog} className="w-full" size="sm">
                     <Plus className="h-4 w-4 mr-2" />
                     Tilføj ny widget
                   </Button>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Aktive Widget Typer</CardTitle>
-                  <CardDescription>Fra dashboard indstillinger</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2 max-h-[400px] overflow-y-auto">
-                  {activeWidgetTypes.map((widget) => (
-                    <div
-                      key={widget.value}
-                      onClick={() => {
-                        resetForm();
-                        setSelectedWidgetType(widget.value);
-                        setEditingWidget(null);
-                        setIsConfigDialogOpen(true);
-                      }}
-                      className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card hover:bg-accent cursor-pointer transition-colors"
-                    >
-                      <div className="p-2 rounded-md bg-primary/10 text-primary">
-                        {getWidgetIcon(widget.iconName)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{widget.label}</p>
-                        <p className="text-xs text-muted-foreground truncate">{widget.description}</p>
-                      </div>
-                      <Plus className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Dashboard Canvas */}
-            <div className="lg:col-span-3">
-              <Card className="min-h-[600px]">
-                <CardHeader className="pb-3 border-b">
-                  <CardTitle className="text-lg">Dashboard Canvas</CardTitle>
-                  <CardDescription>Dine widgets vises her - klik på en widget for at redigere</CardDescription>
-                </CardHeader>
-                <CardContent className="p-6">
-                  {/* Grid background overlay */}
-                  <div 
-                    className="relative rounded-lg overflow-hidden"
-                    style={{ minHeight: `${CELL_HEIGHT * 4}px` }}
-                  >
-                    {/* Grid cells background */}
-                    <div 
-                      className="absolute inset-0 grid gap-1 pointer-events-none"
-                      style={{ 
-                        gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-                        gridTemplateRows: `repeat(4, ${CELL_HEIGHT}px)`,
-                      }}
-                    >
-                      {Array.from({ length: GRID_COLS * 4 }).map((_, i) => (
-                        <div 
-                          key={i} 
-                          className="border border-dashed border-border/40 rounded-md bg-muted/20"
-                        />
-                      ))}
-                    </div>
-
-                    {/* Content layer */}
-                    {placedWidgets.length === 0 ? (
-                      <div className="relative flex flex-col items-center justify-center h-[480px] text-center z-10">
-                        <div className="p-4 rounded-full bg-background/80 backdrop-blur mb-4">
-                          <Plus className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                        <h3 className="font-semibold text-lg mb-2">Ingen widgets endnu</h3>
-                        <p className="text-muted-foreground max-w-sm mb-4">
-                          Klik på en widget type til venstre eller "Tilføj ny widget"
-                        </p>
-                        <Button onClick={openAddWidgetDialog}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Tilføj første widget
-                        </Button>
-                      </div>
-                    ) : (
-                      <div 
-                        className="relative grid gap-2 z-10"
-                        style={{ 
-                          gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-                          gridAutoRows: `${CELL_HEIGHT}px`
+              {activeWidgetTypes.length === 0 ? (
+                <Card className="border-dashed">
+                  <CardContent className="flex flex-col items-center justify-center py-6 text-center">
+                    <LayoutGrid className="h-8 w-8 text-muted-foreground mb-2" />
+                    <h3 className="font-semibold text-sm mb-1">Ingen aktive widget typer</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Gå til Dashboard Indstillinger → Widgets
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader className="pb-2 px-3 pt-3">
+                    <CardTitle className="text-sm">Widget Typer</CardTitle>
+                    <CardDescription className="text-xs">Klik for at tilføje</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-1 px-3 pb-3 max-h-[300px] overflow-y-auto">
+                    {activeWidgetTypes.map((widget) => (
+                      <div
+                        key={widget.value}
+                        onClick={() => {
+                          resetForm();
+                          setSelectedWidgetType(widget.value);
+                          setEditingWidget(null);
+                          setIsConfigDialogOpen(true);
                         }}
+                        className="flex items-center gap-2 p-2 rounded-lg border border-border bg-card hover:bg-accent cursor-pointer transition-colors"
                       >
-                      {placedWidgets.map((widget) => {
-                        const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
-                        const design = activeDesignTypes.find(d => d.id === globalDesign);
-                        const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
-                        const trackingScope = TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId);
-                        
-                        return (
-                          <ResizableWidgetCard
-                            key={widget.id}
-                            id={widget.id}
-                            title={widget.title || getWidgetTypeName(widget.widgetTypeId)}
-                            kpiLabel={getDisplayLabel(widget)}
-                            value={getExampleValue(widget)}
-                            size={{ width: widget.width, height: widget.height }}
-                            designClasses={getDesignClasses(globalDesign)}
-                            colorTheme={colorTheme}
-                            timePeriodName={timePeriod?.name}
-                            designName={design?.name}
-                            targetValue={widget.targetValue}
-                            showComparison={widget.showComparison}
-                            trackingScopeName={trackingScope?.id !== "all" ? trackingScope?.name : undefined}
-                            showTrend={widget.showTrend}
-                            trendValue={widget.showTrend ? getExampleTrend() : undefined}
-                            multiKpiCount={widget.kpiTypeIds.length > 1 ? widget.kpiTypeIds.length : undefined}
-                            icon={getWidgetTypeIcon(widget.widgetTypeId)}
-                            onEdit={() => openEditWidgetDialog(widget)}
-                            onRemove={() => removeWidget(widget.id)}
-                            onResize={(newSize) => resizeWidget(widget.id, newSize)}
-                          />
-                        );
-                      })}
-                    </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                        <div className="p-1.5 rounded-md bg-primary/10 text-primary">
+                          {getWidgetIcon(widget.iconName)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-xs">{widget.label}</p>
+                        </div>
+                        <Plus className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         )}
@@ -871,136 +865,6 @@ export default function DesignDashboard() {
             </Button>
             <Button onClick={handleSaveWidget}>
               {editingWidget ? "Gem ændringer" : "Tilføj widget"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Preview Dialog */}
-      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Dashboard Forhåndsvisning</DialogTitle>
-            <DialogDescription>Sådan vil dit dashboard se ud</DialogDescription>
-          </DialogHeader>
-          
-          <div className="p-4 bg-muted/30 rounded-lg min-h-[400px]">
-            {placedWidgets.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[300px] text-center">
-                <LayoutGrid className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="font-semibold text-lg mb-2">Ingen widgets at vise</h3>
-                <p className="text-muted-foreground">Tilføj widgets for at se en forhåndsvisning</p>
-              </div>
-            ) : (
-              <div 
-                className="grid gap-4"
-                style={{ 
-                  gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-                }}
-              >
-                {placedWidgets.map((widget) => {
-                  const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
-                  const trackingScope = TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId);
-                  const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
-                  const isLarge = widget.width >= 3 || widget.height >= 2;
-                  const exampleValue = getExampleValue(widget);
-                  const exampleTrend = widget.showTrend ? getExampleTrend() : undefined;
-                  
-                  return (
-                    <Card 
-                      key={widget.id} 
-                      className={cn(getDesignClasses(globalDesign), "transition-all")}
-                      style={{
-                        gridColumn: `span ${widget.width}`,
-                        gridRow: `span ${widget.height}`,
-                        minHeight: `${widget.height * CELL_HEIGHT}px`,
-                        ...(colorTheme && colorTheme.id !== "default" ? { 
-                          borderColor: colorTheme.primary,
-                          borderWidth: '2px'
-                        } : {})
-                      }}
-                    >
-                      <CardContent className={cn("p-4 h-full flex flex-col", isLarge && "p-6")}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div 
-                            className={cn("p-1.5 rounded-md", isLarge && "p-2")}
-                            style={{ 
-                              backgroundColor: colorTheme?.primary ? `${colorTheme.primary}20` : 'hsl(var(--primary) / 0.1)',
-                              color: colorTheme?.primary || 'hsl(var(--primary))'
-                            }}
-                          >
-                            {getWidgetTypeIcon(widget.widgetTypeId)}
-                          </div>
-                          <span className={cn("font-medium", isLarge ? "text-base" : "text-sm")}>
-                            {widget.title || getWidgetTypeName(widget.widgetTypeId)}
-                          </span>
-                        </div>
-                        
-                        <div className="flex-1 flex flex-col justify-center">
-                          <p className={cn("text-muted-foreground mb-1", isLarge ? "text-sm" : "text-xs")}>
-                            {getDisplayLabel(widget)}
-                          </p>
-                          <div className="flex items-end gap-2">
-                            <p 
-                              className={cn("font-bold", widget.width >= 4 ? "text-5xl" : isLarge ? "text-4xl" : "text-3xl")}
-                              style={{ color: colorTheme?.primary }}
-                            >
-                              {exampleValue}
-                            </p>
-                            {exampleTrend !== undefined && (
-                              <span className={cn(
-                                "text-sm font-medium mb-1",
-                                exampleTrend > 0 ? "text-green-500" : exampleTrend < 0 ? "text-red-500" : "text-muted-foreground"
-                              )}>
-                                {exampleTrend > 0 ? "+" : ""}{exampleTrend.toFixed(1)}%
-                              </span>
-                            )}
-                          </div>
-                          
-                          {widget.targetValue && (
-                            <div className="mt-2">
-                              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                                <span className="flex items-center gap-1">
-                                  <Target className="h-3 w-3" />
-                                  Mål: {widget.targetValue}
-                                </span>
-                                <span>{Math.min(100, Math.round((parseFloat(exampleValue.replace(/[^0-9.-]/g, '')) / widget.targetValue) * 100))}%</span>
-                              </div>
-                              {isLarge && (
-                                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                                  <div 
-                                    className="h-full rounded-full transition-all"
-                                    style={{ 
-                                      width: `${Math.min(100, (parseFloat(exampleValue.replace(/[^0-9.-]/g, '')) / widget.targetValue) * 100)}%`,
-                                      backgroundColor: colorTheme?.primary || 'hsl(var(--primary))'
-                                    }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center justify-between text-xs text-muted-foreground mt-auto pt-2 border-t border-border/50">
-                          <span>{timePeriod?.name}</span>
-                          {trackingScope && trackingScope.id !== "all" && (
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {trackingScope.name}
-                            </span>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>
-              Luk
             </Button>
           </DialogFooter>
         </DialogContent>
