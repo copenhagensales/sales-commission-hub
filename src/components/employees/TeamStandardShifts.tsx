@@ -753,11 +753,11 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[700px] max-w-[95vw] h-[80vh] max-h-[800px] flex flex-col overflow-hidden">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingShift ? "Rediger vagt" : "Tilføj standard vagt"}</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto space-y-4 py-4">
+          <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Navn *</Label>
               <Input
@@ -851,76 +851,84 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                 })}
               </div>
 
-              {/* Day-specific time settings - only when "Forskellige tider" and days are selected */}
+              {/* Individual day times and breaks - only show when "Forskellige tider" is selected and days are enabled */}
               {useDifferentTimes && enabledDaysCount > 0 && (
-                <div className="space-y-3 pt-2 border-t">
-                  <Label className="text-sm text-muted-foreground">Tidspunkter pr. dag</Label>
-                  {WEEKDAY_ORDER.map(day => {
-                    const config = dayConfigs[day];
-                    if (!config.enabled) return null;
-                    return (
-                      <div key={day} className="space-y-2 p-3 bg-muted/20 rounded-md">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">{DAY_NAMES[day]}</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <TimeSelect
-                            value={config.start_time}
-                            onChange={(value) => updateDayTime(day, "start_time", value)}
-                            placeholder="Start"
-                          />
-                          <TimeSelect
-                            value={config.end_time}
-                            onChange={(value) => updateDayTime(day, "end_time", value)}
-                            placeholder="Slut"
-                          />
-                        </div>
-                        {/* Day-specific breaks */}
-                        <div className="space-y-2">
-                          {config.breaks.map((brk, idx) => (
-                            <div key={idx} className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">Pause:</span>
+                    <div className="space-y-4 p-3 border rounded-lg bg-background">
+                      {WEEKDAY_ORDER.filter(day => dayConfigs[day].enabled).map(day => {
+                        const config = dayConfigs[day];
+                        return (
+                          <div key={day} className="space-y-2">
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-semibold w-12">{DAY_NAMES[day]}</span>
                               <TimeSelect
-                                value={brk.break_start}
-                                onChange={(value) => updateDayBreak(day, idx, "break_start", value)}
-                                placeholder="Fra"
+                                value={config.start_time}
+                                onChange={(value) => updateDayTime(day, "start_time", value)}
+                                placeholder="Start"
+                                className="flex-1"
                               />
-                              <span className="text-xs">-</span>
+                              <span className="text-muted-foreground">-</span>
                               <TimeSelect
-                                value={brk.break_end}
-                                onChange={(value) => updateDayBreak(day, idx, "break_end", value)}
-                                placeholder="Til"
+                                value={config.end_time}
+                                onChange={(value) => updateDayTime(day, "end_time", value)}
+                                placeholder="Slut"
+                                className="flex-1"
                               />
+                            </div>
+                            
+                            {/* Day-specific breaks */}
+                            <div className="ml-12 space-y-2">
+                              {config.breaks.map((b, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground w-12">Pause</span>
+                                  <TimeSelect
+                                    value={b.break_start}
+                                    onChange={(value) => updateDayBreak(day, index, "break_start", value)}
+                                    placeholder="Start"
+                                    className="flex-1"
+                                  />
+                                  <span className="text-muted-foreground">-</span>
+                                  <TimeSelect
+                                    value={b.break_end}
+                                    onChange={(value) => updateDayBreak(day, index, "break_end", value)}
+                                    placeholder="Slut"
+                                    className="flex-1"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+                                    onClick={() => removeDayBreak(day, index)}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
                               <Button
                                 type="button"
                                 variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => removeDayBreak(day, idx)}
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => addDayBreak(day)}
                               >
-                                <X className="h-3 w-3" />
+                                <Plus className="h-3 w-3 mr-1" />
+                                Tilføj pause
                               </Button>
                             </div>
-                          ))}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => addDayBreak(day)}
-                            className="h-7 text-xs"
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Pause
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+              <p className="text-xs text-muted-foreground">
+                {enabledDaysCount === 0 
+                  ? "Ingen dage valgt = gælder alle dage med standard tidspunkter" 
+                  : `${enabledDaysCount} dag(e) valgt`}
+              </p>
             </div>
 
-            {/* General breaks - only show when "Samme tider" */}
+            {/* Breaks - only show when "Samme tider" is selected */}
             {!useDifferentTimes && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -930,27 +938,31 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                     Tilføj pause
                   </Button>
                 </div>
-                {breaks.length > 0 && (
+                {breaks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Ingen pauser tilføjet.</p>
+                ) : (
                   <div className="space-y-2">
-                    {breaks.map((brk, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
+                    {breaks.map((b, index) => (
+                      <div key={index} className="flex items-center gap-2">
                         <TimeSelect
-                          value={brk.break_start}
-                          onChange={(value) => updateBreak(idx, "break_start", value)}
-                          placeholder="Fra"
+                          value={b.break_start}
+                          onChange={(value) => updateBreak(index, "break_start", value)}
+                          placeholder="Start"
+                          className="flex-1"
                         />
-                        <span className="text-sm">-</span>
+                        <span className="text-muted-foreground">-</span>
                         <TimeSelect
-                          value={brk.break_end}
-                          onChange={(value) => updateBreak(idx, "break_end", value)}
-                          placeholder="Til"
+                          value={b.break_end}
+                          onChange={(value) => updateBreak(index, "break_end", value)}
+                          placeholder="Slut"
+                          className="flex-1"
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
-                          onClick={() => removeBreak(idx)}
+                          className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
+                          onClick={() => removeBreak(index)}
                         >
                           <X className="h-4 w-4" />
                         </Button>
