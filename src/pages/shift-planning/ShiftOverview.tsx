@@ -882,6 +882,7 @@ export default function ShiftOverview() {
           selectedDate={selectedDate}
           employees={employees || []}
           preselectedEmployeeId={selectedEmployeeId || undefined}
+          teamId={selectedDepartment}
         />
 
         {/* Delay Input Dialog */}

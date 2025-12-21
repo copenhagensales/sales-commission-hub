@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { format } from "date-fns";
+import { useState, useEffect, useMemo } from "react";
+import { format, getDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -9,9 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Info } from "lucide-react";
 import { useCreateShift } from "@/hooks/useShiftPlanning";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 interface Employee {
   id: string;
@@ -28,6 +30,57 @@ interface CreateShiftDialogProps {
   selectedDate: Date | null;
   employees: Employee[];
   preselectedEmployeeId?: string;
+  teamId?: string;
+}
+
+interface StandardShift {
+  id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  is_primary: boolean;
+}
+
+interface StandardShiftDay {
+  id: string;
+  shift_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}
+
+// Hook to fetch primary standard shift for a team
+function usePrimaryStandardShift(teamId: string | undefined) {
+  return useQuery({
+    queryKey: ["primary-standard-shift", teamId],
+    queryFn: async () => {
+      if (!teamId || teamId === "all") return null;
+      
+      const { data: shift, error } = await supabase
+        .from("team_standard_shifts")
+        .select("*")
+        .eq("team_id", teamId)
+        .eq("is_primary", true)
+        .maybeSingle();
+      
+      if (error) throw error;
+      if (!shift) return null;
+      
+      // Also fetch shift days for day-specific times
+      const { data: shiftDays, error: daysError } = await supabase
+        .from("team_standard_shift_days")
+        .select("*")
+        .eq("shift_id", shift.id);
+      
+      if (daysError) throw daysError;
+      
+      return {
+        shift: shift as StandardShift,
+        days: (shiftDays || []) as StandardShiftDay[],
+      };
+    },
+    enabled: !!teamId && teamId !== "all",
+  });
 }
 
 export function CreateShiftDialog({
@@ -35,7 +88,8 @@ export function CreateShiftDialog({
   onOpenChange,
   selectedDate,
   employees,
-  preselectedEmployeeId
+  preselectedEmployeeId,
+  teamId
 }: CreateShiftDialogProps) {
   const [employeeId, setEmployeeId] = useState<string>("");
   const [date, setDate] = useState<Date | undefined>(selectedDate || undefined);
@@ -45,6 +99,7 @@ export function CreateShiftDialog({
   const [note, setNote] = useState("");
 
   const createShift = useCreateShift();
+  const { data: primaryShiftData } = usePrimaryStandardShift(teamId);
 
   useEffect(() => {
     if (selectedDate) {
@@ -58,8 +113,49 @@ export function CreateShiftDialog({
     }
   }, [preselectedEmployeeId]);
 
-  // Auto-fill times based on employee's standard start time
+  // Get times from primary standard shift based on day of week
+  const getShiftTimesForDay = (dayDate: Date | undefined) => {
+    if (!primaryShiftData || !dayDate) return null;
+    
+    // day_of_week: 0=Monday, 1=Tuesday, etc.
+    const dayOfWeek = getDay(dayDate);
+    // Convert from JS day (0=Sunday) to our format (0=Monday)
+    const adjustedDay = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    
+    // Check if there's a specific day configuration
+    const dayConfig = primaryShiftData.days.find(d => d.day_of_week === adjustedDay);
+    
+    if (dayConfig) {
+      return {
+        startTime: dayConfig.start_time.slice(0, 5), // "08:00:00" -> "08:00"
+        endTime: dayConfig.end_time.slice(0, 5),
+      };
+    }
+    
+    // Fallback to main shift times
+    return {
+      startTime: primaryShiftData.shift.start_time.slice(0, 5),
+      endTime: primaryShiftData.shift.end_time.slice(0, 5),
+    };
+  };
+
+  // Apply times when date changes (only if using primary shift)
   useEffect(() => {
+    if (date && primaryShiftData) {
+      const times = getShiftTimesForDay(date);
+      if (times) {
+        setStartTime(times.startTime);
+        setEndTime(times.endTime);
+      }
+    }
+  }, [date, primaryShiftData]);
+
+  // Priority: Primary shift > Employee standard time > defaults
+  useEffect(() => {
+    // If we have a primary shift, use it (handled above)
+    if (primaryShiftData) return;
+    
+    // Fallback to employee standard time
     if (employeeId) {
       const employee = employees.find(e => e.id === employeeId);
       if (employee?.standard_start_time) {
@@ -71,7 +167,7 @@ export function CreateShiftDialog({
         }
       }
     }
-  }, [employeeId, employees]);
+  }, [employeeId, employees, primaryShiftData]);
 
   const handleSubmit = () => {
     if (!employeeId || !date) return;
@@ -109,6 +205,16 @@ export function CreateShiftDialog({
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
+          {primaryShiftData && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm">
+              <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+              <div>
+                <span className="font-medium text-primary">Bruger team-vagt: </span>
+                <span className="text-muted-foreground">{primaryShiftData.shift.name}</span>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label>Medarbejder</Label>
             <Select value={employeeId} onValueChange={setEmployeeId}>
