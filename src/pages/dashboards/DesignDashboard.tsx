@@ -1,11 +1,17 @@
 import { useState } from "react";
+import { format } from "date-fns";
+import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 import { 
   BarChart3, 
   LineChart, 
@@ -16,7 +22,7 @@ import {
   Clock, 
   Trophy,
   Gauge,
-  Calendar,
+  Calendar as CalendarIcon,
   List,
   Activity,
   Plus,
@@ -42,6 +48,12 @@ interface KpiType {
   description: string;
 }
 
+interface TimePeriod {
+  id: string;
+  name: string;
+  description: string;
+}
+
 interface DesignOption {
   id: string;
   name: string;
@@ -52,7 +64,12 @@ interface DesignOption {
 interface PlacedWidget {
   id: string;
   widgetTypeId: string;
-  kpiTypeId: string;
+  dataSource: "kpi" | "custom";
+  kpiTypeId?: string;
+  customValue?: string;
+  customLabel?: string;
+  timePeriodId: string;
+  customFromDate?: Date;
   designId: string;
   x: number;
   y: number;
@@ -76,20 +93,28 @@ const INITIAL_WIDGET_TYPES: WidgetType[] = [
 ];
 
 const KPI_TYPES: KpiType[] = [
-  { id: "sales-today", name: "Salg i dag", description: "Antal salg i dag" },
-  { id: "sales-week", name: "Salg denne uge", description: "Antal salg denne uge" },
-  { id: "sales-month", name: "Salg denne måned", description: "Antal salg denne måned" },
-  { id: "revenue-today", name: "Omsætning i dag", description: "Omsætning i dag" },
-  { id: "revenue-month", name: "Omsætning måned", description: "Omsætning denne måned" },
+  { id: "sales", name: "Salg", description: "Antal salg" },
+  { id: "revenue", name: "Omsætning", description: "Total omsætning" },
   { id: "conversion-rate", name: "Konverteringsrate", description: "Konverteringsrate %" },
-  { id: "calls-today", name: "Opkald i dag", description: "Antal opkald i dag" },
-  { id: "calls-week", name: "Opkald denne uge", description: "Antal opkald denne uge" },
+  { id: "calls", name: "Opkald", description: "Antal opkald" },
   { id: "avg-call-duration", name: "Gns. opkaldstid", description: "Gennemsnitlig opkaldstid" },
   { id: "team-target", name: "Team mål", description: "Fremskridt mod team mål" },
   { id: "individual-target", name: "Individuelt mål", description: "Fremskridt mod individuelt mål" },
   { id: "leads-generated", name: "Leads genereret", description: "Antal nye leads" },
   { id: "appointments-booked", name: "Aftaler booket", description: "Antal bookede aftaler" },
   { id: "customer-satisfaction", name: "Kundetilfredshed", description: "Kundetilfredshedsscore" },
+];
+
+const TIME_PERIODS: TimePeriod[] = [
+  { id: "today", name: "I dag", description: "Data fra i dag" },
+  { id: "yesterday", name: "I går", description: "Data fra i går" },
+  { id: "this-week", name: "Denne uge", description: "Data fra denne uge" },
+  { id: "last-week", name: "Sidste uge", description: "Data fra sidste uge" },
+  { id: "this-month", name: "Denne måned", description: "Data fra denne måned" },
+  { id: "last-month", name: "Sidste måned", description: "Data fra sidste måned" },
+  { id: "this-year", name: "I år", description: "Data fra i år" },
+  { id: "last-year", name: "Sidste år", description: "Data fra sidste år" },
+  { id: "custom-from", name: "Fra dato til nu", description: "Vælg startdato" },
 ];
 
 const DESIGN_OPTIONS: DesignOption[] = [
@@ -112,7 +137,7 @@ const getWidgetIcon = (iconName: string) => {
     "users": Users,
     "target": Target,
     "clock": Clock,
-    "calendar": Calendar,
+    "calendar": CalendarIcon,
     "list": List,
     "activity": Activity,
   };
@@ -129,76 +154,115 @@ export default function DesignDashboard() {
   
   // Config form state
   const [selectedWidgetType, setSelectedWidgetType] = useState<string>("");
+  const [dataSource, setDataSource] = useState<"kpi" | "custom">("kpi");
   const [selectedKpiType, setSelectedKpiType] = useState<string>("");
+  const [customValue, setCustomValue] = useState<string>("");
+  const [customLabel, setCustomLabel] = useState<string>("");
+  const [selectedTimePeriod, setSelectedTimePeriod] = useState<string>("today");
+  const [customFromDate, setCustomFromDate] = useState<Date | undefined>();
   const [selectedDesign, setSelectedDesign] = useState<string>("minimal");
+
+  const resetForm = () => {
+    setSelectedWidgetType("");
+    setDataSource("kpi");
+    setSelectedKpiType("");
+    setCustomValue("");
+    setCustomLabel("");
+    setSelectedTimePeriod("today");
+    setCustomFromDate(undefined);
+    setSelectedDesign("minimal");
+  };
 
   const openAddWidgetDialog = () => {
     setEditingWidget(null);
-    setSelectedWidgetType("");
-    setSelectedKpiType("");
-    setSelectedDesign("minimal");
+    resetForm();
     setIsConfigDialogOpen(true);
   };
 
   const openEditWidgetDialog = (widget: PlacedWidget) => {
     setEditingWidget(widget);
     setSelectedWidgetType(widget.widgetTypeId);
-    setSelectedKpiType(widget.kpiTypeId);
+    setDataSource(widget.dataSource);
+    setSelectedKpiType(widget.kpiTypeId || "");
+    setCustomValue(widget.customValue || "");
+    setCustomLabel(widget.customLabel || "");
+    setSelectedTimePeriod(widget.timePeriodId);
+    setCustomFromDate(widget.customFromDate);
     setSelectedDesign(widget.designId);
     setIsConfigDialogOpen(true);
   };
 
   const handleSaveWidget = () => {
-    if (!selectedWidgetType || !selectedKpiType) {
-      toast({
-        title: "Manglende valg",
-        description: "Vælg venligst widget type og KPI type",
-        variant: "destructive",
-      });
+    if (!selectedWidgetType) {
+      toast({ title: "Vælg widget type", variant: "destructive" });
+      return;
+    }
+    if (dataSource === "kpi" && !selectedKpiType) {
+      toast({ title: "Vælg KPI type", variant: "destructive" });
+      return;
+    }
+    if (dataSource === "custom" && !customValue) {
+      toast({ title: "Indtast en værdi", variant: "destructive" });
+      return;
+    }
+    if (selectedTimePeriod === "custom-from" && !customFromDate) {
+      toast({ title: "Vælg en startdato", variant: "destructive" });
       return;
     }
 
+    const widgetData: Omit<PlacedWidget, "id" | "x" | "y" | "width" | "height"> = {
+      widgetTypeId: selectedWidgetType,
+      dataSource,
+      kpiTypeId: dataSource === "kpi" ? selectedKpiType : undefined,
+      customValue: dataSource === "custom" ? customValue : undefined,
+      customLabel: dataSource === "custom" ? customLabel : undefined,
+      timePeriodId: selectedTimePeriod,
+      customFromDate: selectedTimePeriod === "custom-from" ? customFromDate : undefined,
+      designId: selectedDesign,
+    };
+
     if (editingWidget) {
       setPlacedWidgets(prev => prev.map(w => 
-        w.id === editingWidget.id 
-          ? { ...w, widgetTypeId: selectedWidgetType, kpiTypeId: selectedKpiType, designId: selectedDesign }
-          : w
+        w.id === editingWidget.id ? { ...w, ...widgetData } : w
       ));
-      toast({
-        title: "Widget opdateret",
-        description: "Widget er blevet opdateret",
-      });
+      toast({ title: "Widget opdateret" });
     } else {
       const newWidget: PlacedWidget = {
+        ...widgetData,
         id: `widget-${Date.now()}`,
-        widgetTypeId: selectedWidgetType,
-        kpiTypeId: selectedKpiType,
-        designId: selectedDesign,
         x: placedWidgets.length % 3,
         y: Math.floor(placedWidgets.length / 3),
         width: 1,
         height: 1,
       };
       setPlacedWidgets(prev => [...prev, newWidget]);
-      toast({
-        title: "Widget tilføjet",
-        description: "Widget er tilføjet til dit dashboard",
-      });
+      toast({ title: "Widget tilføjet" });
     }
     setIsConfigDialogOpen(false);
   };
 
   const removeWidget = (widgetId: string) => {
     setPlacedWidgets(prev => prev.filter(w => w.id !== widgetId));
-    toast({
-      title: "Widget fjernet",
-      description: "Widget er fjernet fra dit dashboard",
-    });
+    toast({ title: "Widget fjernet" });
   };
 
   const getDesignClasses = (designId: string) => {
     const design = DESIGN_OPTIONS.find(d => d.id === designId);
     return design?.preview || "bg-card border";
+  };
+
+  const getDisplayLabel = (widget: PlacedWidget) => {
+    if (widget.dataSource === "custom") {
+      return widget.customLabel || "Brugerdefineret";
+    }
+    return KPI_TYPES.find(k => k.id === widget.kpiTypeId)?.name || "";
+  };
+
+  const getDisplayValue = (widget: PlacedWidget) => {
+    if (widget.dataSource === "custom") {
+      return widget.customValue || "0";
+    }
+    return "—"; // KPI data ville hentes fra database
   };
 
   const activeWidgetTypes = widgetTypes.filter(w => w.isActive);
@@ -239,7 +303,6 @@ export default function DesignDashboard() {
               </CardContent>
             </Card>
 
-            {/* Quick add from active types */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg">Hurtig tilføj</CardTitle>
@@ -250,9 +313,8 @@ export default function DesignDashboard() {
                   <div
                     key={widget.id}
                     onClick={() => {
+                      resetForm();
                       setSelectedWidgetType(widget.id);
-                      setSelectedKpiType("");
-                      setSelectedDesign("minimal");
                       setEditingWidget(null);
                       setIsConfigDialogOpen(true);
                     }}
@@ -298,7 +360,7 @@ export default function DesignDashboard() {
                   <div className="grid grid-cols-3 gap-4">
                     {placedWidgets.map((widget) => {
                       const widgetType = widgetTypes.find(w => w.id === widget.widgetTypeId);
-                      const kpiType = KPI_TYPES.find(k => k.id === widget.kpiTypeId);
+                      const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
                       const design = DESIGN_OPTIONS.find(d => d.id === widget.designId);
                       
                       return (
@@ -320,10 +382,7 @@ export default function DesignDashboard() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditWidgetDialog(widget);
-                                  }}
+                                  onClick={(e) => { e.stopPropagation(); openEditWidgetDialog(widget); }}
                                 >
                                   <Settings2 className="h-3 w-3" />
                                 </Button>
@@ -331,10 +390,7 @@ export default function DesignDashboard() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeWidget(widget.id);
-                                  }}
+                                  onClick={(e) => { e.stopPropagation(); removeWidget(widget.id); }}
                                 >
                                   <Trash2 className="h-3 w-3 text-destructive" />
                                 </Button>
@@ -342,10 +398,12 @@ export default function DesignDashboard() {
                             </div>
                             <div className="space-y-1 mb-3">
                               <p className="font-medium text-sm">{widgetType?.name}</p>
-                              <p className="text-xs text-muted-foreground">{kpiType?.name}</p>
+                              <p className="text-xs text-muted-foreground">{getDisplayLabel(widget)}</p>
+                              <p className="text-2xl font-bold">{getDisplayValue(widget)}</p>
                             </div>
-                            <div className="h-24 bg-muted/30 rounded-md flex items-center justify-center">
-                              <span className="text-xs text-muted-foreground">{design?.name} design</span>
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>{timePeriod?.name}</span>
+                              <span>{design?.name}</span>
                             </div>
                           </CardContent>
                         </Card>
@@ -361,18 +419,16 @@ export default function DesignDashboard() {
 
       {/* Widget Configuration Dialog */}
       <Dialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingWidget ? "Rediger Widget" : "Tilføj Widget"}</DialogTitle>
-            <DialogDescription>
-              Vælg widget type, KPI og design for din widget
-            </DialogDescription>
+            <DialogDescription>Konfigurer din widget</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            {/* Widget Type Selection */}
+            {/* 1. Widget Type */}
             <div className="space-y-2">
-              <Label>Widget Type</Label>
+              <Label className="text-base font-semibold">1. Widget Type</Label>
               <Select value={selectedWidgetType} onValueChange={setSelectedWidgetType}>
                 <SelectTrigger>
                   <SelectValue placeholder="Vælg widget type" />
@@ -390,41 +446,119 @@ export default function DesignDashboard() {
               </Select>
             </div>
 
-            {/* KPI Type Selection */}
+            {/* 2. Data Source (KPI or Custom) */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">2. Datakilde</Label>
+              <RadioGroup value={dataSource} onValueChange={(v) => setDataSource(v as "kpi" | "custom")} className="flex gap-4">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="kpi" id="kpi" />
+                  <Label htmlFor="kpi" className="cursor-pointer">Vælg KPI</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="custom" id="custom" />
+                  <Label htmlFor="custom" className="cursor-pointer">Eget tal</Label>
+                </div>
+              </RadioGroup>
+
+              {dataSource === "kpi" ? (
+                <Select value={selectedKpiType} onValueChange={setSelectedKpiType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg KPI" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {KPI_TYPES.map((kpi) => (
+                      <SelectItem key={kpi.id} value={kpi.id}>
+                        <div className="flex flex-col">
+                          <span>{kpi.name}</span>
+                          <span className="text-xs text-muted-foreground">{kpi.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="customLabel" className="text-sm">Label</Label>
+                    <Input
+                      id="customLabel"
+                      placeholder="f.eks. 'Mål opnået'"
+                      value={customLabel}
+                      onChange={(e) => setCustomLabel(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="customValue" className="text-sm">Værdi</Label>
+                    <Input
+                      id="customValue"
+                      placeholder="f.eks. '42' eller '85%'"
+                      value={customValue}
+                      onChange={(e) => setCustomValue(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Time Period */}
             <div className="space-y-2">
-              <Label>KPI Type</Label>
-              <Select value={selectedKpiType} onValueChange={setSelectedKpiType}>
+              <Label className="text-base font-semibold">3. Tidsperiode</Label>
+              <Select value={selectedTimePeriod} onValueChange={setSelectedTimePeriod}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Vælg KPI type" />
+                  <SelectValue placeholder="Vælg tidsperiode" />
                 </SelectTrigger>
                 <SelectContent>
-                  {KPI_TYPES.map((kpi) => (
-                    <SelectItem key={kpi.id} value={kpi.id}>
-                      <div className="flex flex-col">
-                        <span>{kpi.name}</span>
-                        <span className="text-xs text-muted-foreground">{kpi.description}</span>
-                      </div>
+                  {TIME_PERIODS.map((period) => (
+                    <SelectItem key={period.id} value={period.id}>
+                      {period.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+
+              {selectedTimePeriod === "custom-from" && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal mt-2",
+                        !customFromDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customFromDate ? format(customFromDate, "PPP", { locale: da }) : "Vælg startdato"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={customFromDate}
+                      onSelect={setCustomFromDate}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
 
-            {/* Design Selection */}
+            {/* 4. Design */}
             <div className="space-y-2">
-              <Label>Design</Label>
+              <Label className="text-base font-semibold">4. Design</Label>
               <div className="grid grid-cols-3 gap-2">
                 {DESIGN_OPTIONS.map((design) => (
                   <div
                     key={design.id}
                     onClick={() => setSelectedDesign(design.id)}
-                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    className={cn(
+                      "p-3 rounded-lg border-2 cursor-pointer transition-all",
                       selectedDesign === design.id 
                         ? "border-primary bg-primary/5" 
                         : "border-border hover:border-primary/50"
-                    }`}
+                    )}
                   >
-                    <div className={`h-12 rounded-md mb-2 ${design.preview}`} />
+                    <div className={cn("h-10 rounded-md mb-2", design.preview)} />
                     <p className="text-xs font-medium text-center">{design.name}</p>
                   </div>
                 ))}
