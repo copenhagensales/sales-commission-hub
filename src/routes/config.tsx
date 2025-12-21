@@ -81,6 +81,7 @@ import {
   FieldmarketingDashboardFull,
   CphSalesDashboard,
   TestDashboard,
+  DashboardSettings,
   Messages,
   OnboardingDashboard,
   EmployeeOnboardingView,
@@ -183,6 +184,7 @@ export const routes: RouteConfig[] = [
   { path: "/dashboards/ase", component: AseDashboard, access: "public" },
   { path: "/dashboards/mg-test", component: MgTestDashboard, access: "public" },
   { path: "/dashboards/test", component: TestDashboard, access: "public" },
+  { path: "/dashboards/settings", component: DashboardSettings, access: "protected" },
   { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "public" },
   
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
