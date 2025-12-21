@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { TimeSelect } from "@/components/ui/time-select";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Clock, X } from "lucide-react";
 
@@ -395,18 +396,18 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start tid *</Label>
-                <Input
-                  type="time"
+                <TimeSelect
                   value={formData.start_time}
-                  onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                  onChange={(value) => setFormData({ ...formData, start_time: value })}
+                  placeholder="Vælg start"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Slut tid *</Label>
-                <Input
-                  type="time"
+                <TimeSelect
                   value={formData.end_time}
-                  onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                  onChange={(value) => setFormData({ ...formData, end_time: value })}
+                  placeholder="Vælg slut"
                 />
               </div>
             </div>
@@ -426,24 +427,24 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                 <div className="space-y-2">
                   {breaks.map((b, index) => (
                     <div key={index} className="flex items-center gap-2">
-                      <Input
-                        type="time"
+                      <TimeSelect
                         value={b.break_start}
-                        onChange={(e) => updateBreak(index, "break_start", e.target.value)}
+                        onChange={(value) => updateBreak(index, "break_start", value)}
+                        placeholder="Start"
                         className="flex-1"
                       />
                       <span className="text-muted-foreground">-</span>
-                      <Input
-                        type="time"
+                      <TimeSelect
                         value={b.break_end}
-                        onChange={(e) => updateBreak(index, "break_end", e.target.value)}
+                        onChange={(value) => updateBreak(index, "break_end", value)}
+                        placeholder="Slut"
                         className="flex-1"
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
                         onClick={() => removeBreak(index)}
                       >
                         <X className="h-4 w-4" />
