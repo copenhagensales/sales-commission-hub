@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { PartyPopper, Sparkles, Star, Heart, Flame, Zap } from "lucide-react";
 
 interface CelebrationOverlayProps {
@@ -28,80 +28,6 @@ const EFFECT_COLORS = {
   sparkles: ["#48dbfb", "#0abde3", "#54a0ff", "#5f27cd", "#a55eea", "#8854d0"],
 };
 
-interface Particle {
-  id: number;
-  x: number;
-  y: number;
-  color: string;
-  size: number;
-  rotation: number;
-  velocityX: number;
-  velocityY: number;
-  delay: number;
-  type: "circle" | "square" | "star" | "heart";
-}
-
-const generateParticles = (effect: string, count: number = 50): Particle[] => {
-  const colors = EFFECT_COLORS[effect as keyof typeof EFFECT_COLORS] || EFFECT_COLORS.confetti;
-  const types: Particle["type"][] = 
-    effect === "hearts" ? ["heart"] :
-    effect === "stars" ? ["star"] :
-    effect === "flames" ? ["circle"] :
-    ["circle", "square", "star"];
-
-  return Array.from({ length: count }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: -10 - Math.random() * 20,
-    color: colors[Math.floor(Math.random() * colors.length)],
-    size: 8 + Math.random() * 16,
-    rotation: Math.random() * 360,
-    velocityX: (Math.random() - 0.5) * 4,
-    velocityY: 2 + Math.random() * 4,
-    delay: Math.random() * 2,
-    type: types[Math.floor(Math.random() * types.length)],
-  }));
-};
-
-const ParticleShape = ({ type, color, size }: { type: Particle["type"]; color: string; size: number }) => {
-  if (type === "heart") {
-    return (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-      </svg>
-    );
-  }
-  if (type === "star") {
-    return (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-      </svg>
-    );
-  }
-  if (type === "square") {
-    return (
-      <div 
-        style={{ 
-          width: size, 
-          height: size, 
-          backgroundColor: color,
-          borderRadius: 2,
-        }} 
-      />
-    );
-  }
-  return (
-    <div 
-      style={{ 
-        width: size, 
-        height: size, 
-        backgroundColor: color,
-        borderRadius: "50%",
-      }} 
-    />
-  );
-};
-
 export const CelebrationOverlay = ({
   isOpen,
   onClose,
@@ -110,13 +36,12 @@ export const CelebrationOverlay = ({
   text,
   primaryColor = "#8b5cf6",
 }: CelebrationOverlayProps) => {
-  const [particles, setParticles] = useState<Particle[]>([]);
   const [showContent, setShowContent] = useState(false);
   const IconComponent = EFFECT_ICONS[effect];
+  const colors = EFFECT_COLORS[effect];
 
   useEffect(() => {
     if (isOpen) {
-      setParticles(generateParticles(effect, 60));
       setShowContent(true);
 
       const timer = setTimeout(() => {
@@ -126,12 +51,213 @@ export const CelebrationOverlay = ({
 
       return () => clearTimeout(timer);
     } else {
-      setParticles([]);
       setShowContent(false);
     }
-  }, [isOpen, effect, duration, onClose]);
+  }, [isOpen, duration, onClose]);
 
   if (!isOpen) return null;
+
+  // Render different effects based on type
+  const renderEffect = () => {
+    switch (effect) {
+      case "fireworks":
+        return (
+          <>
+            {/* Firework bursts */}
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute"
+                style={{
+                  left: `${15 + Math.random() * 70}%`,
+                  top: `${10 + Math.random() * 40}%`,
+                  animation: `firework-burst 1.5s ease-out ${i * 0.2}s infinite`,
+                }}
+              >
+                {Array.from({ length: 12 }).map((_, j) => (
+                  <div
+                    key={j}
+                    className="absolute w-2 h-2 rounded-full"
+                    style={{
+                      backgroundColor: colors[j % colors.length],
+                      transform: `rotate(${j * 30}deg) translateY(-40px)`,
+                      animation: `firework-particle 1.5s ease-out ${i * 0.2}s infinite`,
+                      boxShadow: `0 0 10px ${colors[j % colors.length]}`,
+                    }}
+                  />
+                ))}
+              </div>
+            ))}
+          </>
+        );
+
+      case "confetti":
+        return (
+          <>
+            {Array.from({ length: 80 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `-5%`,
+                  width: `${8 + Math.random() * 8}px`,
+                  height: `${8 + Math.random() * 8}px`,
+                  backgroundColor: colors[i % colors.length],
+                  borderRadius: Math.random() > 0.5 ? "50%" : "2px",
+                  animation: `confetti-fall ${3 + Math.random() * 2}s linear ${Math.random() * 2}s infinite`,
+                  transform: `rotate(${Math.random() * 360}deg)`,
+                }}
+              />
+            ))}
+          </>
+        );
+
+      case "stars":
+        return (
+          <>
+            {Array.from({ length: 40 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  animation: `star-twinkle 1s ease-in-out ${Math.random() * 2}s infinite alternate`,
+                }}
+              >
+                <Star
+                  className="fill-current"
+                  style={{
+                    color: colors[i % colors.length],
+                    width: `${16 + Math.random() * 24}px`,
+                    height: `${16 + Math.random() * 24}px`,
+                    filter: `drop-shadow(0 0 8px ${colors[i % colors.length]})`,
+                  }}
+                />
+              </div>
+            ))}
+            {/* Shooting stars */}
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={`shooting-${i}`}
+                className="absolute w-1 h-1 rounded-full bg-yellow-300"
+                style={{
+                  left: `${Math.random() * 80}%`,
+                  top: `${Math.random() * 30}%`,
+                  boxShadow: "0 0 10px #feca57, 0 0 20px #feca57",
+                  animation: `shooting-star 2s linear ${i * 0.8}s infinite`,
+                }}
+              />
+            ))}
+          </>
+        );
+
+      case "hearts":
+        return (
+          <>
+            {Array.from({ length: 50 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  bottom: `-10%`,
+                  animation: `heart-float ${4 + Math.random() * 3}s ease-out ${Math.random() * 2}s infinite`,
+                }}
+              >
+                <Heart
+                  className="fill-current"
+                  style={{
+                    color: colors[i % colors.length],
+                    width: `${20 + Math.random() * 20}px`,
+                    height: `${20 + Math.random() * 20}px`,
+                    filter: `drop-shadow(0 0 6px ${colors[i % colors.length]})`,
+                  }}
+                />
+              </div>
+            ))}
+          </>
+        );
+
+      case "flames":
+        return (
+          <>
+            {/* Fire particles rising from bottom */}
+            {Array.from({ length: 60 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute rounded-full"
+                style={{
+                  left: `${20 + Math.random() * 60}%`,
+                  bottom: `-5%`,
+                  width: `${10 + Math.random() * 20}px`,
+                  height: `${10 + Math.random() * 20}px`,
+                  background: `radial-gradient(circle, ${colors[i % colors.length]} 0%, transparent 70%)`,
+                  animation: `flame-rise ${2 + Math.random() * 2}s ease-out ${Math.random() * 1}s infinite`,
+                  filter: `blur(2px)`,
+                }}
+              />
+            ))}
+            {/* Central flame glow */}
+            <div 
+              className="absolute left-1/2 bottom-0 -translate-x-1/2 w-96 h-96 rounded-full opacity-50"
+              style={{
+                background: `radial-gradient(circle, #ff6b6b 0%, #ff9f43 30%, transparent 70%)`,
+                filter: "blur(40px)",
+                animation: "flame-pulse 0.5s ease-in-out infinite alternate",
+              }}
+            />
+          </>
+        );
+
+      case "sparkles":
+        return (
+          <>
+            {Array.from({ length: 50 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  animation: `sparkle-pop 0.8s ease-out ${Math.random() * 3}s infinite`,
+                }}
+              >
+                <Zap
+                  className="fill-current"
+                  style={{
+                    color: colors[i % colors.length],
+                    width: `${12 + Math.random() * 16}px`,
+                    height: `${12 + Math.random() * 16}px`,
+                    filter: `drop-shadow(0 0 8px ${colors[i % colors.length]})`,
+                  }}
+                />
+              </div>
+            ))}
+            {/* Electric arcs */}
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={`arc-${i}`}
+                className="absolute w-0.5 rounded-full"
+                style={{
+                  left: `${30 + Math.random() * 40}%`,
+                  top: `${20 + Math.random() * 30}%`,
+                  height: `${50 + Math.random() * 100}px`,
+                  background: `linear-gradient(to bottom, ${colors[i % colors.length]}, transparent)`,
+                  transform: `rotate(${-30 + Math.random() * 60}deg)`,
+                  animation: `electric-flash 0.3s ease-out ${Math.random() * 2}s infinite`,
+                  boxShadow: `0 0 10px ${colors[i % colors.length]}`,
+                }}
+              />
+            ))}
+          </>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
     <div 
@@ -140,63 +266,25 @@ export const CelebrationOverlay = ({
     >
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-fade-in"
-        style={{ animationDuration: "0.3s" }}
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        style={{ animation: "fade-in 0.3s ease-out" }}
       />
 
-      {/* Radial glow */}
+      {/* Radial glow based on effect */}
       <div 
-        className="absolute inset-0 opacity-30"
+        className="absolute inset-0 opacity-40"
         style={{
-          background: `radial-gradient(circle at 50% 50%, ${primaryColor}40 0%, transparent 60%)`,
+          background: `radial-gradient(circle at 50% 50%, ${colors[0]}40 0%, transparent 60%)`,
         }}
       />
 
-      {/* Particles */}
-      {particles.map((particle) => (
-        <div
-          key={particle.id}
-          className="absolute pointer-events-none"
-          style={{
-            left: `${particle.x}%`,
-            top: `${particle.y}%`,
-            transform: `rotate(${particle.rotation}deg)`,
-            animation: `celebration-fall ${4 + Math.random() * 2}s ease-in-out ${particle.delay}s infinite`,
-          }}
-        >
-          <ParticleShape 
-            type={particle.type} 
-            color={particle.color} 
-            size={particle.size} 
-          />
-        </div>
-      ))}
-
-      {/* Burst effect from center */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute"
-            style={{
-              animation: `celebration-burst 1s ease-out ${i * 0.05}s forwards`,
-              transform: `rotate(${i * 30}deg)`,
-            }}
-          >
-            <div
-              className="w-2 h-8 rounded-full"
-              style={{
-                background: `linear-gradient(to bottom, ${EFFECT_COLORS[effect][i % 6]}, transparent)`,
-              }}
-            />
-          </div>
-        ))}
-      </div>
+      {/* Effect-specific animations */}
+      {renderEffect()}
 
       {/* Main content */}
       {showContent && (
         <div 
-          className="absolute inset-0 flex flex-col items-center justify-center p-8"
+          className="absolute inset-0 flex flex-col items-center justify-center p-8 pointer-events-none"
           style={{ animation: "celebration-pop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards" }}
         >
           {/* Icon with glow */}
@@ -205,13 +293,13 @@ export const CelebrationOverlay = ({
             style={{ animation: "celebration-bounce 0.6s ease-in-out infinite alternate" }}
           >
             <div 
-              className="absolute inset-0 blur-2xl opacity-50 rounded-full"
-              style={{ backgroundColor: primaryColor }}
+              className="absolute inset-0 blur-3xl opacity-60 rounded-full scale-150"
+              style={{ backgroundColor: colors[0] }}
             />
             <IconComponent 
-              className="relative w-24 h-24 text-white drop-shadow-2xl"
+              className="relative w-28 h-28 text-white drop-shadow-2xl"
               style={{ 
-                filter: `drop-shadow(0 0 30px ${primaryColor})`,
+                filter: `drop-shadow(0 0 40px ${colors[0]})`,
               }}
             />
           </div>
@@ -228,7 +316,7 @@ export const CelebrationOverlay = ({
 
           {/* Click to dismiss */}
           <p 
-            className="text-white/50 text-sm mt-8"
+            className="text-white/50 text-sm mt-8 pointer-events-auto"
             style={{ animation: "fade-in 1s ease-out 1s both" }}
           >
             Klik for at lukke
@@ -238,69 +326,85 @@ export const CelebrationOverlay = ({
 
       {/* CSS animations */}
       <style>{`
-        @keyframes celebration-fall {
-          0% {
-            transform: translateY(-20px) rotate(0deg);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(100vh) rotate(720deg);
-            opacity: 0;
-          }
-        }
-
-        @keyframes celebration-burst {
-          0% {
-            transform: rotate(var(--rotation)) translateY(0);
-            opacity: 1;
-          }
-          100% {
-            transform: rotate(var(--rotation)) translateY(-150px);
-            opacity: 0;
-          }
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
 
         @keyframes celebration-pop {
-          0% {
-            transform: scale(0.3);
-            opacity: 0;
-          }
-          50% {
-            transform: scale(1.1);
-          }
-          100% {
-            transform: scale(1);
-            opacity: 1;
-          }
+          0% { transform: scale(0.3); opacity: 0; }
+          50% { transform: scale(1.1); }
+          100% { transform: scale(1); opacity: 1; }
         }
 
         @keyframes celebration-bounce {
-          0% {
-            transform: translateY(0) scale(1);
-          }
-          100% {
-            transform: translateY(-10px) scale(1.05);
-          }
+          0% { transform: translateY(0) scale(1); }
+          100% { transform: translateY(-10px) scale(1.05); }
         }
 
         @keyframes celebration-slide-up {
-          0% {
-            transform: translateY(30px);
-            opacity: 0;
-          }
-          100% {
-            transform: translateY(0);
-            opacity: 1;
-          }
+          0% { transform: translateY(30px); opacity: 0; }
+          100% { transform: translateY(0); opacity: 1; }
         }
 
-        @keyframes fade-in {
-          0% {
-            opacity: 0;
-          }
-          100% {
-            opacity: 1;
-          }
+        /* Fireworks */
+        @keyframes firework-burst {
+          0% { transform: scale(0); opacity: 1; }
+          50% { transform: scale(1.5); opacity: 1; }
+          100% { transform: scale(2); opacity: 0; }
+        }
+
+        @keyframes firework-particle {
+          0% { transform: rotate(var(--rotation, 0deg)) translateY(0); opacity: 1; }
+          100% { transform: rotate(var(--rotation, 0deg)) translateY(-80px); opacity: 0; }
+        }
+
+        /* Confetti */
+        @keyframes confetti-fall {
+          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(100vh) rotate(720deg); opacity: 0.5; }
+        }
+
+        /* Stars */
+        @keyframes star-twinkle {
+          0% { transform: scale(0.5); opacity: 0.3; }
+          100% { transform: scale(1.2); opacity: 1; }
+        }
+
+        @keyframes shooting-star {
+          0% { transform: translate(0, 0); opacity: 1; }
+          100% { transform: translate(200px, 200px); opacity: 0; }
+        }
+
+        /* Hearts */
+        @keyframes heart-float {
+          0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+          50% { transform: translateY(-50vh) scale(1.2) rotate(15deg); opacity: 1; }
+          100% { transform: translateY(-100vh) scale(0.8) rotate(-15deg); opacity: 0; }
+        }
+
+        /* Flames */
+        @keyframes flame-rise {
+          0% { transform: translateY(0) scale(1); opacity: 1; }
+          50% { transform: translateY(-40vh) scale(0.8); opacity: 0.8; }
+          100% { transform: translateY(-80vh) scale(0.3); opacity: 0; }
+        }
+
+        @keyframes flame-pulse {
+          0% { transform: translateX(-50%) scale(1); }
+          100% { transform: translateX(-50%) scale(1.1); }
+        }
+
+        /* Sparkles */
+        @keyframes sparkle-pop {
+          0% { transform: scale(0) rotate(0deg); opacity: 0; }
+          50% { transform: scale(1.5) rotate(180deg); opacity: 1; }
+          100% { transform: scale(0) rotate(360deg); opacity: 0; }
+        }
+
+        @keyframes electric-flash {
+          0%, 100% { opacity: 0; }
+          50% { opacity: 1; }
         }
       `}</style>
     </div>
