@@ -49,7 +49,18 @@ interface DashboardTheme {
   celebrationEffect: "fireworks" | "confetti" | "stars" | "hearts" | "flames" | "sparkles";
   celebrationDuration: number; // seconds
   celebrationTrigger: "any_update" | "increase_only" | "goal_reached";
+  celebrationText: string;
+  celebrationDataFields: string[];
 }
+
+const CELEBRATION_DATA_FIELDS = [
+  { id: "employee_name", label: "Medarbejder navn", placeholder: "{{medarbejder}}" },
+  { id: "sale_number", label: "Salg nummer", placeholder: "{{salg_nummer}}" },
+  { id: "product_name", label: "Produkt navn", placeholder: "{{produkt}}" },
+  { id: "team_name", label: "Hold navn", placeholder: "{{hold}}" },
+  { id: "current_value", label: "Nuværende værdi", placeholder: "{{værdi}}" },
+  { id: "goal_value", label: "Mål værdi", placeholder: "{{mål}}" },
+];
 
 const CELEBRATION_EFFECTS = [
   { value: "fireworks", label: "Fyrværkeri", icon: PartyPopper, description: "Eksplosive farver" },
@@ -109,6 +120,8 @@ const PRESET_THEMES: DashboardTheme[] = [
     celebrationEffect: "fireworks",
     celebrationDuration: 5,
     celebrationTrigger: "increase_only",
+    celebrationText: "🎉 {{medarbejder}} har lige lavet salg nummer {{salg_nummer}}!",
+    celebrationDataFields: ["employee_name", "sale_number"],
   },
   {
     id: "corporate",
@@ -125,6 +138,8 @@ const PRESET_THEMES: DashboardTheme[] = [
     celebrationEffect: "confetti",
     celebrationDuration: 3,
     celebrationTrigger: "goal_reached",
+    celebrationText: "",
+    celebrationDataFields: [],
   },
   {
     id: "vibrant",
@@ -141,6 +156,8 @@ const PRESET_THEMES: DashboardTheme[] = [
     celebrationEffect: "stars",
     celebrationDuration: 5,
     celebrationTrigger: "any_update",
+    celebrationText: "⭐ {{medarbejder}} er on fire! Salg #{{salg_nummer}}",
+    celebrationDataFields: ["employee_name", "sale_number"],
   },
   {
     id: "minimal",
@@ -157,6 +174,8 @@ const PRESET_THEMES: DashboardTheme[] = [
     celebrationEffect: "sparkles",
     celebrationDuration: 2,
     celebrationTrigger: "goal_reached",
+    celebrationText: "",
+    celebrationDataFields: [],
   },
 ];
 
@@ -206,6 +225,8 @@ const DashboardSettings = () => {
     celebrationEffect: "fireworks",
     celebrationDuration: 5,
     celebrationTrigger: "increase_only",
+    celebrationText: "",
+    celebrationDataFields: [],
   });
 
   const [formData, setFormData] = useState({
@@ -381,6 +402,8 @@ const DashboardSettings = () => {
         celebrationEffect: "fireworks",
         celebrationDuration: 5,
         celebrationTrigger: "increase_only",
+        celebrationText: "",
+        celebrationDataFields: [],
       });
     }
     setEditingTheme(null);
@@ -1316,24 +1339,91 @@ const DashboardSettings = () => {
                         </div>
                       </div>
 
+                      {/* Celebration Text */}
+                      <div className="space-y-2">
+                        <Label className="text-sm">Fejringstekst</Label>
+                        <Textarea
+                          value={themeFormData.celebrationText}
+                          onChange={(e) =>
+                            setThemeFormData((prev) => ({
+                              ...prev,
+                              celebrationText: e.target.value,
+                            }))
+                          }
+                          placeholder="F.eks. 🎉 {{medarbejder}} har lige lavet salg nummer {{salg_nummer}}!"
+                          className="min-h-[60px] resize-none"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Brug data-felter herunder til at indsætte dynamiske værdier
+                        </p>
+                      </div>
+
+                      {/* Data Fields Selection */}
+                      <div className="space-y-2">
+                        <Label className="text-sm">Tilgængelige data-felter</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {CELEBRATION_DATA_FIELDS.map((field) => (
+                            <Badge
+                              key={field.id}
+                              variant={themeFormData.celebrationDataFields.includes(field.id) ? "default" : "outline"}
+                              className="cursor-pointer hover:bg-purple-500/20 transition-colors"
+                              onClick={() => {
+                                // Insert placeholder at cursor or append to text
+                                const newText = themeFormData.celebrationText
+                                  ? `${themeFormData.celebrationText} ${field.placeholder}`
+                                  : field.placeholder;
+                                setThemeFormData((prev) => ({
+                                  ...prev,
+                                  celebrationText: newText,
+                                  celebrationDataFields: prev.celebrationDataFields.includes(field.id)
+                                    ? prev.celebrationDataFields
+                                    : [...prev.celebrationDataFields, field.id],
+                                }));
+                              }}
+                            >
+                              {field.label}
+                              <span className="ml-1 text-muted-foreground text-[10px]">
+                                {field.placeholder}
+                              </span>
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+
                       {/* Preview */}
                       <div className="p-3 rounded-lg bg-muted/30 border border-dashed">
-                        <p className="text-xs text-muted-foreground text-center mb-2">Preview af valgt effekt</p>
-                        <div className="flex items-center justify-center gap-3">
+                        <p className="text-xs text-muted-foreground text-center mb-2">Preview af fejring</p>
+                        <div className="flex flex-col items-center gap-3">
                           {(() => {
                             const effect = CELEBRATION_EFFECTS.find(e => e.value === themeFormData.celebrationEffect);
                             if (!effect) return null;
                             const IconComponent = effect.icon;
+                            
+                            // Replace placeholders with example data
+                            const exampleText = themeFormData.celebrationText
+                              .replace("{{medarbejder}}", "Anders Jensen")
+                              .replace("{{salg_nummer}}", "42")
+                              .replace("{{produkt}}", "Premium Abonnement")
+                              .replace("{{hold}}", "Team Alpha")
+                              .replace("{{værdi}}", "1.250 kr")
+                              .replace("{{mål}}", "100 salg");
+                            
                             return (
-                              <div className="flex items-center gap-2 p-2 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20">
-                                <IconComponent className="h-6 w-6 text-purple-500 animate-pulse" />
-                                <div>
-                                  <p className="text-sm font-medium">{effect.label}</p>
-                                  <p className="text-xs text-muted-foreground">{effect.description}</p>
+                              <div className="w-full p-4 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-center">
+                                <IconComponent className="h-8 w-8 mx-auto mb-2 text-purple-500 animate-pulse" />
+                                {themeFormData.celebrationText ? (
+                                  <p className="text-sm font-medium">{exampleText}</p>
+                                ) : (
+                                  <p className="text-sm text-muted-foreground italic">Ingen tekst angivet</p>
+                                )}
+                                <div className="flex items-center justify-center gap-2 mt-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    {effect.label}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-xs">
+                                    {themeFormData.celebrationDuration}s
+                                  </Badge>
                                 </div>
-                                <Badge variant="outline" className="ml-2">
-                                  {themeFormData.celebrationDuration}s
-                                </Badge>
                               </div>
                             );
                           })()}
