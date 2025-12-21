@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle, TrendingUp, Phone, Users, Award, PartyPopper, Flame, Star, Zap, Heart, Clock } from "lucide-react";
+import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle, TrendingUp, Phone, Users, Award, PartyPopper, Flame, Star, Zap, Heart, Clock, Play } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DASHBOARD_LIST } from "@/config/dashboards";
+import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
 
 interface DashboardKpi {
   id: string;
@@ -210,6 +211,7 @@ const DashboardSettings = () => {
   const [isDesignDialogOpen, setIsDesignDialogOpen] = useState(false);
   const [savedThemes, setSavedThemes] = useState<DashboardTheme[]>([]);
   const [editingTheme, setEditingTheme] = useState<DashboardTheme | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
   const [themeFormData, setThemeFormData] = useState<DashboardTheme>({
     id: "",
     name: "",
@@ -1418,18 +1420,11 @@ const DashboardSettings = () => {
                                 )}
                                 <Button
                                   type="button"
-                                  variant="outline"
                                   size="sm"
-                                  className="mt-3 gap-2"
-                                  onClick={() => {
-                                    toast({
-                                      title: exampleText || "🎉 Fejring!",
-                                      description: `${effect.label} effekt i ${themeFormData.celebrationDuration} sekunder`,
-                                      duration: themeFormData.celebrationDuration * 1000,
-                                    });
-                                  }}
+                                  className="mt-3 gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0"
+                                  onClick={() => setShowCelebration(true)}
                                 >
-                                  <IconComponent className="h-4 w-4" />
+                                  <Play className="h-4 w-4" />
                                   Test effekt
                                 </Button>
                               </div>
@@ -1581,6 +1576,22 @@ const DashboardSettings = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Celebration Overlay */}
+        <CelebrationOverlay
+          isOpen={showCelebration}
+          onClose={() => setShowCelebration(false)}
+          effect={themeFormData.celebrationEffect}
+          duration={themeFormData.celebrationDuration}
+          text={themeFormData.celebrationText
+            .replace("{{medarbejder}}", "Anders Jensen")
+            .replace("{{salg_nummer}}", "42")
+            .replace("{{produkt}}", "Premium Abonnement")
+            .replace("{{hold}}", "Team Alpha")
+            .replace("{{værdi}}", "1.250 kr")
+            .replace("{{mål}}", "100 salg")}
+          primaryColor={themeFormData.primaryColor}
+        />
       </div>
     </MainLayout>
   );
