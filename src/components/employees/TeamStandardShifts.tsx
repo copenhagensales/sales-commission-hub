@@ -97,6 +97,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     end_time: "16:00",
   });
   const [breaks, setBreaks] = useState<BreakInput[]>([]);
+  const [useDifferentTimes, setUseDifferentTimes] = useState(false);
   
   // Day configurations - indexed by day_of_week (0-6)
   const [dayConfigs, setDayConfigs] = useState<Record<number, DayConfig>>(() => {
@@ -352,6 +353,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       end_time: "16:00",
     });
     setBreaks([]);
+    setUseDifferentTimes(false);
     // Reset day configs
     const initial: Record<number, DayConfig> = {};
     for (let i = 0; i < 7; i++) {
@@ -385,6 +387,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
 
     // Set day configs from existing data
     const newDayConfigs: Record<number, DayConfig> = {};
+    let hasDifferentTimes = false;
     for (let i = 0; i < 7; i++) {
       const existingDay = shiftDays.find(d => d.day_of_week === i);
       if (existingDay) {
@@ -393,6 +396,11 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
           start_time: existingDay.start_time.slice(0, 5),
           end_time: existingDay.end_time.slice(0, 5),
         };
+        // Check if this day has different times than the standard
+        if (existingDay.start_time.slice(0, 5) !== shift.start_time.slice(0, 5) ||
+            existingDay.end_time.slice(0, 5) !== shift.end_time.slice(0, 5)) {
+          hasDifferentTimes = true;
+        }
       } else {
         newDayConfigs[i] = {
           enabled: false,
@@ -402,6 +410,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       }
     }
     setDayConfigs(newDayConfigs);
+    setUseDifferentTimes(hasDifferentTimes);
     
     setDialogOpen(true);
   };
@@ -640,67 +649,105 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               </div>
             </div>
 
-            {/* Day selection with optional custom times */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <Label>Vælg dage (valgfrit)</Label>
+            {/* Day selection */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Label>Vælg dage (valgfrit)</Label>
+                </div>
               </div>
-              <div className="space-y-2">
+
+              {/* Day checkboxes - always visible */}
+              <div className="flex flex-wrap gap-2">
                 {WEEKDAY_ORDER.map(day => {
                   const config = dayConfigs[day];
-                  const hasCustomTime = config.enabled && 
-                    (config.start_time !== formData.start_time || config.end_time !== formData.end_time);
-                  
                   return (
-                    <div key={day} className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <label
-                          className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors min-w-[70px] justify-center ${
-                            config.enabled 
-                              ? "bg-primary/10 border-primary text-primary" 
-                              : "bg-muted/30 border-border hover:bg-muted/50"
-                          }`}
-                        >
-                          <Checkbox
-                            checked={config.enabled}
-                            onCheckedChange={() => toggleDay(day)}
-                            className="sr-only"
-                          />
-                          <span className="text-sm font-medium">{DAY_NAMES[day]}</span>
-                        </label>
-                        
-                        {config.enabled && (
-                          <div className="flex items-center gap-2 flex-1">
+                    <label
+                      key={day}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
+                        config.enabled 
+                          ? "bg-primary/10 border-primary text-primary" 
+                          : "bg-muted/30 border-border hover:bg-muted/50"
+                      }`}
+                    >
+                      <Checkbox
+                        checked={config.enabled}
+                        onCheckedChange={() => toggleDay(day)}
+                        className="sr-only"
+                      />
+                      <span className="text-sm font-medium">{DAY_NAMES[day]}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {/* Toggle for different times - only show when days are selected */}
+              {enabledDaysCount > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setUseDifferentTimes(false)}
+                        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                          !useDifferentTimes 
+                            ? "bg-primary text-primary-foreground" 
+                            : "bg-background hover:bg-muted"
+                        }`}
+                      >
+                        Samme tider
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUseDifferentTimes(true)}
+                        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                          useDifferentTimes 
+                            ? "bg-primary text-primary-foreground" 
+                            : "bg-background hover:bg-muted"
+                        }`}
+                      >
+                        Forskellige tider
+                      </button>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {useDifferentTimes ? "Angiv tid pr. dag" : "Bruger standard tidspunkter"}
+                    </span>
+                  </div>
+
+                  {/* Individual day times - only show when "Forskellige tider" is selected */}
+                  {useDifferentTimes && (
+                    <div className="space-y-2 p-3 border rounded-lg bg-background">
+                      {WEEKDAY_ORDER.filter(day => dayConfigs[day].enabled).map(day => {
+                        const config = dayConfigs[day];
+                        return (
+                          <div key={day} className="flex items-center gap-3">
+                            <span className="text-sm font-medium w-12">{DAY_NAMES[day]}</span>
                             <TimeSelect
                               value={config.start_time}
                               onChange={(value) => updateDayTime(day, "start_time", value)}
                               placeholder="Start"
-                              className="flex-1 max-w-[100px]"
+                              className="flex-1"
                             />
-                            <span className="text-muted-foreground text-sm">-</span>
+                            <span className="text-muted-foreground">-</span>
                             <TimeSelect
                               value={config.end_time}
                               onChange={(value) => updateDayTime(day, "end_time", value)}
                               placeholder="Slut"
-                              className="flex-1 max-w-[100px]"
+                              className="flex-1"
                             />
-                            {hasCustomTime && (
-                              <Badge variant="secondary" className="text-xs">
-                                Anden tid
-                              </Badge>
-                            )}
                           </div>
-                        )}
-                      </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
+                  )}
+                </div>
+              )}
+
               <p className="text-xs text-muted-foreground">
                 {enabledDaysCount === 0 
                   ? "Ingen dage valgt = gælder alle dage med standard tidspunkter" 
-                  : `${enabledDaysCount} dag(e) valgt - du kan ændre tider pr. dag`}
+                  : `${enabledDaysCount} dag(e) valgt`}
               </p>
             </div>
 
