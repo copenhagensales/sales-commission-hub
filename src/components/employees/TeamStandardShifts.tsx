@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { TimeSelect } from "@/components/ui/time-select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Clock, X, Star } from "lucide-react";
+import { Plus, Pencil, Trash2, Clock, X, Star, Calendar } from "lucide-react";
 
 interface StandardShift {
   id: string;
@@ -19,6 +19,14 @@ interface StandardShift {
   start_time: string;
   end_time: string;
   is_primary: boolean;
+}
+
+interface ShiftDay {
+  id: string;
+  shift_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
 }
 
 interface ShiftBreak {
@@ -33,9 +41,18 @@ interface BreakInput {
   break_end: string;
 }
 
+interface DayConfig {
+  enabled: boolean;
+  start_time: string;
+  end_time: string;
+}
+
 interface TeamStandardShiftsProps {
   teamId: string | null;
 }
+
+const DAY_NAMES = ["Søn", "Man", "Tirs", "Ons", "Tors", "Fre", "Lør"];
+const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday first
 
 // Helper to calculate minutes from time string
 const timeToMinutes = (time: string): number => {
@@ -80,6 +97,15 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     end_time: "16:00",
   });
   const [breaks, setBreaks] = useState<BreakInput[]>([]);
+  
+  // Day configurations - indexed by day_of_week (0-6)
+  const [dayConfigs, setDayConfigs] = useState<Record<number, DayConfig>>(() => {
+    const initial: Record<number, DayConfig> = {};
+    for (let i = 0; i < 7; i++) {
+      initial[i] = { enabled: false, start_time: "08:00", end_time: "16:00" };
+    }
+    return initial;
+  });
 
   // Fetch standard shifts for this team
   const { data: shifts = [], isLoading } = useQuery({
@@ -115,14 +141,43 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     enabled: !!teamId && shifts.length > 0,
   });
 
+  // Fetch all shift days for all shifts
+  const { data: allShiftDays = [] } = useQuery({
+    queryKey: ["team-shift-days", teamId],
+    queryFn: async () => {
+      if (!teamId) return [];
+      const shiftIds = shifts.map((s) => s.id);
+      if (shiftIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("team_standard_shift_days")
+        .select("*")
+        .in("shift_id", shiftIds)
+        .order("day_of_week");
+      if (error) throw error;
+      return data as ShiftDay[];
+    },
+    enabled: !!teamId && shifts.length > 0,
+  });
+
   // Get breaks for a specific shift
   const getShiftBreaks = (shiftId: string): ShiftBreak[] => {
     return allBreaks.filter((b) => b.shift_id === shiftId);
   };
 
+  // Get days for a specific shift
+  const getShiftDays = (shiftId: string): ShiftDay[] => {
+    return allShiftDays.filter((d) => d.shift_id === shiftId);
+  };
+
   // Create shift mutation
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; start_time: string; end_time: string; breaks: BreakInput[] }) => {
+    mutationFn: async (data: { 
+      name: string; 
+      start_time: string; 
+      end_time: string; 
+      breaks: BreakInput[];
+      dayConfigs: Record<number, DayConfig>;
+    }) => {
       // Create shift
       const { data: newShift, error: shiftError } = await supabase
         .from("team_standard_shifts")
@@ -148,10 +203,28 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
         );
         if (breaksError) throw breaksError;
       }
+
+      // Create day configurations
+      const enabledDays = Object.entries(data.dayConfigs)
+        .filter(([_, config]) => config.enabled)
+        .map(([day, config]) => ({
+          shift_id: newShift.id,
+          day_of_week: parseInt(day),
+          start_time: config.start_time,
+          end_time: config.end_time,
+        }));
+
+      if (enabledDays.length > 0) {
+        const { error: daysError } = await supabase
+          .from("team_standard_shift_days")
+          .insert(enabledDays);
+        if (daysError) throw daysError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team-standard-shifts", teamId] });
       queryClient.invalidateQueries({ queryKey: ["team-shift-breaks", teamId] });
+      queryClient.invalidateQueries({ queryKey: ["team-shift-days", teamId] });
       setDialogOpen(false);
       resetForm();
       toast({ title: "Standard vagt oprettet" });
@@ -163,7 +236,14 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
 
   // Update shift mutation
   const updateMutation = useMutation({
-    mutationFn: async (data: { id: string; name: string; start_time: string; end_time: string; breaks: BreakInput[] }) => {
+    mutationFn: async (data: { 
+      id: string; 
+      name: string; 
+      start_time: string; 
+      end_time: string; 
+      breaks: BreakInput[];
+      dayConfigs: Record<number, DayConfig>;
+    }) => {
       // Update shift
       const { error: shiftError } = await supabase
         .from("team_standard_shifts")
@@ -189,10 +269,30 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
         );
         if (breaksError) throw breaksError;
       }
+
+      // Delete existing days and re-add
+      await supabase.from("team_standard_shift_days").delete().eq("shift_id", data.id);
+
+      const enabledDays = Object.entries(data.dayConfigs)
+        .filter(([_, config]) => config.enabled)
+        .map(([day, config]) => ({
+          shift_id: data.id,
+          day_of_week: parseInt(day),
+          start_time: config.start_time,
+          end_time: config.end_time,
+        }));
+
+      if (enabledDays.length > 0) {
+        const { error: daysError } = await supabase
+          .from("team_standard_shift_days")
+          .insert(enabledDays);
+        if (daysError) throw daysError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team-standard-shifts", teamId] });
       queryClient.invalidateQueries({ queryKey: ["team-shift-breaks", teamId] });
+      queryClient.invalidateQueries({ queryKey: ["team-shift-days", teamId] });
       setDialogOpen(false);
       setEditingShift(null);
       resetForm();
@@ -212,6 +312,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team-standard-shifts", teamId] });
       queryClient.invalidateQueries({ queryKey: ["team-shift-breaks", teamId] });
+      queryClient.invalidateQueries({ queryKey: ["team-shift-days", teamId] });
       toast({ title: "Standard vagt slettet" });
     },
     onError: (error) => {
@@ -251,6 +352,12 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       end_time: "16:00",
     });
     setBreaks([]);
+    // Reset day configs
+    const initial: Record<number, DayConfig> = {};
+    for (let i = 0; i < 7; i++) {
+      initial[i] = { enabled: false, start_time: "08:00", end_time: "16:00" };
+    }
+    setDayConfigs(initial);
   };
 
   const openCreate = () => {
@@ -262,6 +369,8 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
   const openEdit = (shift: StandardShift) => {
     setEditingShift(shift);
     const shiftBreaks = getShiftBreaks(shift.id);
+    const shiftDays = getShiftDays(shift.id);
+    
     setFormData({
       name: shift.name,
       start_time: shift.start_time.slice(0, 5),
@@ -273,6 +382,27 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
         break_end: b.break_end.slice(0, 5),
       }))
     );
+
+    // Set day configs from existing data
+    const newDayConfigs: Record<number, DayConfig> = {};
+    for (let i = 0; i < 7; i++) {
+      const existingDay = shiftDays.find(d => d.day_of_week === i);
+      if (existingDay) {
+        newDayConfigs[i] = {
+          enabled: true,
+          start_time: existingDay.start_time.slice(0, 5),
+          end_time: existingDay.end_time.slice(0, 5),
+        };
+      } else {
+        newDayConfigs[i] = {
+          enabled: false,
+          start_time: shift.start_time.slice(0, 5),
+          end_time: shift.end_time.slice(0, 5),
+        };
+      }
+    }
+    setDayConfigs(newDayConfigs);
+    
     setDialogOpen(true);
   };
 
@@ -282,9 +412,9 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       return;
     }
     if (editingShift) {
-      updateMutation.mutate({ ...formData, id: editingShift.id, breaks });
+      updateMutation.mutate({ ...formData, id: editingShift.id, breaks, dayConfigs });
     } else {
-      createMutation.mutate({ ...formData, breaks });
+      createMutation.mutate({ ...formData, breaks, dayConfigs });
     }
   };
 
@@ -300,6 +430,29 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     setBreaks(breaks.map((b, i) => (i === index ? { ...b, [field]: value } : b)));
   };
 
+  const toggleDay = (day: number) => {
+    setDayConfigs(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        enabled: !prev[day].enabled,
+        // When enabling, use the default times from formData
+        start_time: !prev[day].enabled ? formData.start_time : prev[day].start_time,
+        end_time: !prev[day].enabled ? formData.end_time : prev[day].end_time,
+      }
+    }));
+  };
+
+  const updateDayTime = (day: number, field: "start_time" | "end_time", value: string) => {
+    setDayConfigs(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [field]: value,
+      }
+    }));
+  };
+
   const formatTime = (time: string | null) => {
     if (!time) return "-";
     return time.slice(0, 5);
@@ -307,6 +460,9 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
 
   // Calculate working time for display
   const workingMinutes = calculateWorkingTime(formData.start_time, formData.end_time, breaks);
+
+  // Get enabled days count
+  const enabledDaysCount = Object.values(dayConfigs).filter(c => c.enabled).length;
 
   if (!teamId) {
     return (
@@ -346,8 +502,8 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               <TableRow>
                 <TableHead className="text-xs w-16">Primær</TableHead>
                 <TableHead className="text-xs">Navn</TableHead>
-                <TableHead className="text-xs">Start</TableHead>
-                <TableHead className="text-xs">Slut</TableHead>
+                <TableHead className="text-xs">Standard tid</TableHead>
+                <TableHead className="text-xs">Dage</TableHead>
                 <TableHead className="text-xs">Pauser</TableHead>
                 <TableHead className="text-xs">Arbejdstid</TableHead>
                 <TableHead className="w-20"></TableHead>
@@ -356,6 +512,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
             <TableBody>
               {shifts.map((shift) => {
                 const shiftBreaks = getShiftBreaks(shift.id);
+                const shiftDays = getShiftDays(shift.id);
                 const breakInputs = shiftBreaks.map((b) => ({
                   break_start: b.break_start,
                   break_end: b.break_end,
@@ -381,8 +538,35 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                         {shift.name}
                       </div>
                     </TableCell>
-                    <TableCell>{formatTime(shift.start_time)}</TableCell>
-                    <TableCell>{formatTime(shift.end_time)}</TableCell>
+                    <TableCell>
+                      {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
+                    </TableCell>
+                    <TableCell>
+                      {shiftDays.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {WEEKDAY_ORDER.map(day => {
+                            const dayConfig = shiftDays.find(d => d.day_of_week === day);
+                            if (!dayConfig) return null;
+                            const hasCustomTime = 
+                              dayConfig.start_time.slice(0, 5) !== shift.start_time.slice(0, 5) ||
+                              dayConfig.end_time.slice(0, 5) !== shift.end_time.slice(0, 5);
+                            return (
+                              <Badge 
+                                key={day} 
+                                variant={hasCustomTime ? "default" : "secondary"} 
+                                className="text-xs"
+                                title={hasCustomTime ? `${formatTime(dayConfig.start_time)}-${formatTime(dayConfig.end_time)}` : undefined}
+                              >
+                                {DAY_NAMES[day]}
+                                {hasCustomTime && ` (${formatTime(dayConfig.start_time)}-${formatTime(dayConfig.end_time)})`}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">Alle dage</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {shiftBreaks.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
@@ -424,7 +608,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingShift ? "Rediger vagt" : "Tilføj standard vagt"}</DialogTitle>
           </DialogHeader>
@@ -439,7 +623,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Start tid *</Label>
+                <Label>Standard start tid *</Label>
                 <TimeSelect
                   value={formData.start_time}
                   onChange={(value) => setFormData({ ...formData, start_time: value })}
@@ -447,13 +631,63 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Slut tid *</Label>
+                <Label>Standard slut tid *</Label>
                 <TimeSelect
                   value={formData.end_time}
                   onChange={(value) => setFormData({ ...formData, end_time: value })}
                   placeholder="Vælg slut"
                 />
               </div>
+            </div>
+
+            {/* Day selection with custom times */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Label>Vælg dage (valgfrit - lad være tom for alle dage)</Label>
+              </div>
+              <div className="space-y-2">
+                {WEEKDAY_ORDER.map(day => (
+                  <div 
+                    key={day} 
+                    className={`flex items-center gap-3 p-2 rounded-md border transition-colors ${
+                      dayConfigs[day].enabled ? "bg-muted/50 border-primary/30" : "border-transparent"
+                    }`}
+                  >
+                    <Checkbox
+                      checked={dayConfigs[day].enabled}
+                      onCheckedChange={() => toggleDay(day)}
+                      id={`day-${day}`}
+                    />
+                    <label 
+                      htmlFor={`day-${day}`}
+                      className="text-sm font-medium w-12 cursor-pointer"
+                    >
+                      {DAY_NAMES[day]}
+                    </label>
+                    {dayConfigs[day].enabled && (
+                      <div className="flex items-center gap-2 flex-1">
+                        <TimeSelect
+                          value={dayConfigs[day].start_time}
+                          onChange={(value) => updateDayTime(day, "start_time", value)}
+                          className="w-24"
+                        />
+                        <span className="text-muted-foreground">-</span>
+                        <TimeSelect
+                          value={dayConfigs[day].end_time}
+                          onChange={(value) => updateDayTime(day, "end_time", value)}
+                          className="w-24"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {enabledDaysCount > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {enabledDaysCount} dag(e) valgt
+                </p>
+              )}
             </div>
 
             {/* Breaks */}

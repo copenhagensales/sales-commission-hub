@@ -4633,6 +4633,41 @@ export type Database = {
           },
         ]
       }
+      team_standard_shift_days: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          shift_id: string
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          shift_id: string
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          shift_id?: string
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_standard_shift_days_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "team_standard_shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_standard_shifts: {
         Row: {
           created_at: string
