@@ -226,6 +226,7 @@ const DashboardSettings = () => {
               <BarChart3 className="h-4 w-4" />
               KPI'er
             </TabsTrigger>
+            <TabsTrigger value="design">Design</TabsTrigger>
           </TabsList>
 
           <TabsContent value="kpis" className="mt-6">
@@ -324,6 +325,20 @@ const DashboardSettings = () => {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="design" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Design</CardTitle>
+                <CardDescription>
+                  Tilpas udseendet af dine dashboards
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">Designindstillinger kommer snart...</p>
               </CardContent>
             </Card>
           </TabsContent>
