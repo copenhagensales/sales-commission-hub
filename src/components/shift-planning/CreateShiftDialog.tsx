@@ -143,13 +143,14 @@ export function CreateShiftDialog({
   const getShiftTimesForDay = (dayDate: Date | undefined) => {
     if (!primaryShiftData || !dayDate) return null;
     
-    // day_of_week: 0=Monday, 1=Tuesday, etc.
-    const dayOfWeek = getDay(dayDate);
-    // Convert from JS day (0=Sunday) to our format (0=Monday)
-    const adjustedDay = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    // Database day_of_week: 1=Monday, 2=Tuesday, ..., 7=Sunday
+    // JS getDay(): 0=Sunday, 1=Monday, 2=Tuesday, ..., 6=Saturday
+    const jsDay = getDay(dayDate);
+    // Convert from JS day to database format (1-7 where 1=Monday)
+    const dbDayOfWeek = jsDay === 0 ? 7 : jsDay;
     
     // Check if there's a specific day configuration
-    const dayConfig = primaryShiftData.days.find(d => d.day_of_week === adjustedDay);
+    const dayConfig = primaryShiftData.days.find(d => d.day_of_week === dbDayOfWeek);
     
     if (dayConfig) {
       return {
