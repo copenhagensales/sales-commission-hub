@@ -40,6 +40,12 @@ export const CelebrationOverlay = ({
   const IconComponent = EFFECT_ICONS[effect];
   const colors = EFFECT_COLORS[effect];
 
+  const handleClose = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+  }, [onClose]);
+
   useEffect(() => {
     if (isOpen) {
       setShowContent(true);
@@ -259,11 +265,6 @@ export const CelebrationOverlay = ({
     }
   };
 
-  const handleClose = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onClose();
-  }, [onClose]);
 
   return (
     <div 
