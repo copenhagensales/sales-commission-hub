@@ -10,8 +10,9 @@ export interface DashboardConfig {
 export const DASHBOARD_LIST: DashboardConfig[] = [
   { slug: "cph-sales", name: "Dagsboard CPH Sales", path: "/dashboards/cph-sales" },
   { slug: "fieldmarketing", name: "Fieldmarketing", path: "/dashboards/fieldmarketing" },
-  { slug: "eesy-tm", name: "Eesy TM", path: "/dashboards/eesy-tm" },
-  { slug: "tdc-erhverv", name: "TDC Erhverv", path: "/dashboards/tdc-erhverv" },
+  { slug: "team", name: "Team Dashboard", path: "/dashboards/team" },
   { slug: "relatel", name: "Relatel", path: "/dashboards/relatel" },
-  { slug: "united", name: "United", path: "/dashboards/united" },
+  { slug: "tryg", name: "Tryg", path: "/dashboards/tryg" },
+  { slug: "tdc-erhverv", name: "TDC Erhverv", path: "/dashboards/tdc-erhverv" },
+  { slug: "mg-test", name: "Test Dashboard", path: "/dashboards/mg-test" },
 ];

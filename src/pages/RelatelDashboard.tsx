@@ -4,13 +4,14 @@ import { format, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { Users, Package, DollarSign, ShoppingCart, TrendingUp, CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+
 interface ProductStat {
   name: string;
   quantity: number;
@@ -144,41 +145,41 @@ export default function RelatelDashboard() {
     return { totalSales, totalRevenue, totalCommission, agentStats, productStats };
   }, [data]);
 
+  const datePickerContent = (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "w-[240px] justify-start text-left font-normal",
+            !selectedDate && "text-muted-foreground"
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="end">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          onSelect={(date) => date && setSelectedDate(date)}
+          initialFocus
+          className="pointer-events-auto"
+          locale={da}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+
   return (
-    <MainLayout>
+    <div className="min-h-screen bg-background p-6">
+      <DashboardHeader 
+        title="Relatel – Dagsoverblik" 
+        subtitle="Baseret på produkt-mapping fra MG Test"
+        rightContent={datePickerContent}
+      />
       <div className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Relatel – Dagsoverblik</h1>
-            <p className="text-muted-foreground">
-              Baseret på produkt-mapping fra MG Test
-            </p>
-          </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-[240px] justify-start text-left font-normal",
-                  !selectedDate && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => date && setSelectedDate(date)}
-                initialFocus
-                className="pointer-events-auto"
-                locale={da}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Card>
@@ -300,9 +301,9 @@ export default function RelatelDashboard() {
                 </Table>
               )}
             </CardContent>
-          </Card>
+        </Card>
         </div>
       </div>
-    </MainLayout>
+    </div>
   );
 }
