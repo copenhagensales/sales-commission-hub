@@ -4,6 +4,13 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { 
   Table, 
   TableBody, 
@@ -19,18 +26,22 @@ import {
 } from "@/hooks/useFieldmarketingSales";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { TrendingUp, Users, Calendar, Package, Trophy } from "lucide-react";
+import { TrendingUp, Users, Calendar, Package, Trophy, CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ProductCommission {
   name: string;
   commission_dkk: number;
 }
 
-const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientName: string }) => {
+const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: string; clientName: string; selectedDate: Date }) => {
   const { data: sales, isLoading: salesLoading } = useFieldmarketingSales(clientId);
   const { data: stats, isLoading: statsLoading } = useFieldmarketingSalesStats(clientId);
+  
+  const dayStart = startOfDay(selectedDate).toISOString();
+  const dayEnd = endOfDay(selectedDate).toISOString();
 
   // Fetch product commissions - prioritize campaign overrides, fallback to base commission
   const { data: productCommissions } = useQuery({
@@ -129,14 +140,11 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
     enabled: !!productCommissions,
   });
 
-  // Calculate today's sellers with sales and commission
-  const { data: todaySellers } = useQuery({
-    queryKey: ["fieldmarketing-today-sellers", clientId, productCommissions],
+  // Calculate selected day's sellers with sales and commission
+  const { data: daySellers } = useQuery({
+    queryKey: ["fieldmarketing-day-sellers", clientId, productCommissions, dayStart],
     queryFn: async () => {
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      
-      const { data: todaySales, error } = await supabase
+      const { data: daySales, error } = await supabase
         .from("fieldmarketing_sales")
         .select(`
           seller_id,
@@ -144,13 +152,14 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
           seller:employee_master_data!seller_id(first_name, last_name)
         `)
         .eq("client_id", clientId)
-        .gte("registered_at", todayStart);
+        .gte("registered_at", dayStart)
+        .lte("registered_at", dayEnd);
       
       if (error) throw error;
 
       // Group by seller
       const sellerStats: Record<string, { name: string; sales: number; commission: number }> = {};
-      (todaySales || []).forEach((sale: any) => {
+      (daySales || []).forEach((sale: any) => {
         const sellerId = sale.seller_id;
         const sellerName = sale.seller ? `${sale.seller.first_name} ${sale.seller.last_name}` : "Ukendt";
         const commission = productCommissions?.[sale.product_name] || 0;
@@ -274,14 +283,16 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
           </CardContent>
         </Card>
 
-        {/* Today's Sellers Table */}
+        {/* Selected Day's Sellers Table */}
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
             <Trophy className="h-5 w-5 text-yellow-500" />
-            <CardTitle className="text-lg">Dagens sælgere</CardTitle>
+            <CardTitle className="text-lg">
+              {format(selectedDate, "d. MMMM", { locale: da })} - Sælgere
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {todaySellers && todaySellers.length > 0 ? (
+            {daySellers && daySellers.length > 0 ? (
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
@@ -293,7 +304,7 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {todaySellers.map((seller, index) => (
+                    {daySellers.map((seller, index) => (
                       <TableRow key={index}>
                         <TableCell>
                           <Badge variant={index === 0 ? "default" : index < 3 ? "secondary" : "outline"}>
@@ -312,7 +323,7 @@ const ClientDashboard = ({ clientId, clientName }: { clientId: string; clientNam
               </div>
             ) : (
               <p className="text-muted-foreground text-sm text-center py-8">
-                Ingen salg registreret i dag
+                Ingen salg registreret denne dag
               </p>
             )}
           </CardContent>
@@ -378,6 +389,21 @@ const TAB_TO_CLIENT_ID: Record<string, string> = {
 const FieldmarketingDashboard = () => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<string>("eesy-fm");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+  const goToPreviousDay = () => {
+    const newDate = new Date(selectedDate);
+    newDate.setDate(newDate.getDate() - 1);
+    setSelectedDate(newDate);
+  };
+
+  const goToNextDay = () => {
+    const newDate = new Date(selectedDate);
+    newDate.setDate(newDate.getDate() + 1);
+    setSelectedDate(newDate);
+  };
+
+  const isToday = format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
 
   // Fetch client logos dynamically from the database
   const { data: clients } = useQuery({
@@ -408,18 +434,63 @@ const FieldmarketingDashboard = () => {
               Oversigt over salg fra fieldmarketing events
             </p>
           </div>
-          <div className="h-14 w-36 flex items-center justify-center">
-            {activeClient?.logo_url ? (
-              <img 
-                src={activeClient.logo_url} 
-                alt={activeClient.name} 
-                className="w-full h-full object-contain"
-              />
-            ) : (
-              <div className="h-16 px-6 bg-muted rounded-lg flex items-center justify-center">
-                <span className="text-xl font-bold text-muted-foreground">{activeClient?.name || "..."}</span>
-              </div>
-            )}
+          <div className="flex items-center gap-4">
+            {/* Date Picker */}
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={goToPreviousDay}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-[200px] justify-start text-left font-normal",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(selectedDate, "EEEE d. MMMM", { locale: da })}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => date && setSelectedDate(date)}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                    locale={da}
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={goToNextDay}
+                disabled={isToday}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              {!isToday && (
+                <Button variant="ghost" size="sm" onClick={() => setSelectedDate(new Date())}>
+                  I dag
+                </Button>
+              )}
+            </div>
+            <div className="h-14 w-36 flex items-center justify-center">
+              {activeClient?.logo_url ? (
+                <img 
+                  src={activeClient.logo_url} 
+                  alt={activeClient.name} 
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <div className="h-16 px-6 bg-muted rounded-lg flex items-center justify-center">
+                  <span className="text-xl font-bold text-muted-foreground">{activeClient?.name || "..."}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -432,14 +503,16 @@ const FieldmarketingDashboard = () => {
           <TabsContent value="eesy-fm" className="mt-6">
             <ClientDashboard 
               clientId={FIELDMARKETING_CLIENTS.EESY_FM} 
-              clientName="Eesy FM" 
+              clientName="Eesy FM"
+              selectedDate={selectedDate}
             />
           </TabsContent>
 
           <TabsContent value="yousee" className="mt-6">
             <ClientDashboard 
               clientId={FIELDMARKETING_CLIENTS.YOUSEE} 
-              clientName="Yousee" 
+              clientName="Yousee"
+              selectedDate={selectedDate}
             />
           </TabsContent>
         </Tabs>
