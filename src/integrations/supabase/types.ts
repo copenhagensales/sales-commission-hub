@@ -820,6 +820,122 @@ export type Database = {
           },
         ]
       }
+      chat_conversation_members: {
+        Row: {
+          conversation_id: string
+          employee_id: string
+          id: string
+          joined_at: string
+          last_read_at: string | null
+        }
+        Insert: {
+          conversation_id: string
+          employee_id: string
+          id?: string
+          joined_at?: string
+          last_read_at?: string | null
+        }
+        Update: {
+          conversation_id?: string
+          employee_id?: string
+          id?: string
+          joined_at?: string
+          last_read_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_conversation_members_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_conversation_members_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_conversations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_group: boolean
+          name: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_group?: boolean
+          name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_group?: boolean
+          name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_conversations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          sender_id: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          sender_id: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          sender_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_campaigns: {
         Row: {
           client_id: string
