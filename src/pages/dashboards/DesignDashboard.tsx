@@ -42,6 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useWidgetTypes, WidgetTypeConfig } from "@/hooks/useWidgetTypes";
 import { useKpiTypes } from "@/hooks/useKpiTypes";
 import { useDesignTypes } from "@/hooks/useDesignTypes";
+import { ResizableWidgetCard, GRID_COLS, CELL_HEIGHT } from "@/components/dashboard/ResizableWidgetCard";
 
 interface TimePeriod {
   id: string;
@@ -294,6 +295,33 @@ export default function DesignDashboard() {
     toast({ title: "Widget fjernet" });
   };
 
+  const resizeWidget = (widgetId: string, newSize: { width: number; height: number }) => {
+    setPlacedWidgets(prev => prev.map(w => 
+      w.id === widgetId ? { ...w, width: newSize.width, height: newSize.height } : w
+    ));
+  };
+
+  // Generate example values for preview
+  const getExampleValue = (widget: PlacedWidget) => {
+    if (widget.dataSource === "custom") {
+      return widget.customValue || "0";
+    }
+    // Generate realistic example based on KPI type
+    const firstKpi = widget.kpiTypeIds[0];
+    if (firstKpi?.includes("sales") || firstKpi?.includes("revenue")) return "847.520 kr";
+    if (firstKpi?.includes("calls")) return "1.247";
+    if (firstKpi?.includes("conversion") || firstKpi?.includes("rate")) return "23,4%";
+    if (firstKpi?.includes("target") || firstKpi?.includes("progress")) return "78%";
+    if (firstKpi?.includes("avg")) return "4.320 kr";
+    if (firstKpi?.includes("time") || firstKpi?.includes("duration")) return "3:45";
+    return Math.floor(Math.random() * 1000 + 100).toString();
+  };
+
+  const getExampleTrend = () => {
+    const trends = [12.5, -3.2, 8.7, -1.5, 5.3, 0, 15.2, -7.8];
+    return trends[Math.floor(Math.random() * trends.length)];
+  };
+
   const getDesignClasses = (designId: string) => {
     const design = activeDesignTypes.find(d => d.id === designId);
     return design?.preview || "bg-card border";
@@ -459,113 +487,42 @@ export default function DesignDashboard() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-3 gap-4">
+                    <div 
+                      className="grid gap-4"
+                      style={{ 
+                        gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+                        minHeight: `${CELL_HEIGHT * 2}px`
+                      }}
+                    >
                       {placedWidgets.map((widget) => {
                         const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
                         const design = activeDesignTypes.find(d => d.id === globalDesign);
                         const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
-                        const widgetConfig = activeWidgetTypes.find(w => w.value === widget.widgetTypeId);
+                        const trackingScope = TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId);
                         
                         return (
-                          <Card 
-                            key={widget.id} 
-                            className={`relative group cursor-pointer transition-all hover:shadow-lg ${getDesignClasses(globalDesign)}`}
-                            onClick={() => openEditWidgetDialog(widget)}
-                            style={colorTheme && colorTheme.id !== "default" ? { 
-                              borderColor: colorTheme.primary,
-                              borderWidth: '2px'
-                            } : undefined}
-                          >
-                            <CardContent className="p-4">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                                  <div 
-                                    className="p-1.5 rounded-md"
-                                    style={{ 
-                                      backgroundColor: colorTheme?.primary ? `${colorTheme.primary}20` : undefined,
-                                      color: colorTheme?.primary
-                                    }}
-                                  >
-                                    {getWidgetTypeIcon(widget.widgetTypeId)}
-                                  </div>
-                                </div>
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={(e) => { e.stopPropagation(); openEditWidgetDialog(widget); }}
-                                  >
-                                    <Settings2 className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={(e) => { e.stopPropagation(); removeWidget(widget.id); }}
-                                  >
-                                    <Trash2 className="h-3 w-3 text-destructive" />
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="space-y-1 mb-3">
-                                <p className="font-medium text-sm">
-                                  {widget.title || getWidgetTypeName(widget.widgetTypeId)}
-                                </p>
-                                <p className="text-xs text-muted-foreground line-clamp-2">
-                                  {getDisplayLabel(widget)}
-                                  {widget.kpiTypeIds.length > 1 && (
-                                    <span className="ml-1 text-primary">
-                                      ({widget.kpiTypeIds.length} KPI'er)
-                                    </span>
-                                  )}
-                                </p>
-                                <p className="text-2xl font-bold" style={{ color: colorTheme?.primary }}>
-                                  {getDisplayValue(widget)}
-                                </p>
-                                {widget.targetValue && (
-                                  <div className="flex items-center gap-1 text-xs">
-                                    <Target className="h-3 w-3 text-muted-foreground" />
-                                    <span className="text-muted-foreground">Mål: {widget.targetValue}</span>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  {timePeriod?.name}
-                                  {widget.showComparison && (
-                                    <ArrowUpDown className="h-3 w-3 text-primary" />
-                                  )}
-                                </span>
-                                <span>{design?.name}</span>
-                              </div>
-                              {/* Feature badges */}
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                {widget.trackingScopeId && widget.trackingScopeId !== "all" && (
-                                  <span className="text-[10px] bg-violet-500/10 text-violet-500 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                    <Users className="h-2.5 w-2.5" />
-                                    {TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId)?.name}
-                                  </span>
-                                )}
-                                {widgetConfig?.supportsMultiKpi && widget.kpiTypeIds.length > 1 && (
-                                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                                    Multi-KPI
-                                  </span>
-                                )}
-                                {widget.showComparison && (
-                                  <span className="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded">
-                                    Sammenligning
-                                  </span>
-                                )}
-                                {widget.targetValue && (
-                                  <span className="text-[10px] bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded">
-                                    Mål
-                                  </span>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
+                          <ResizableWidgetCard
+                            key={widget.id}
+                            id={widget.id}
+                            title={widget.title || getWidgetTypeName(widget.widgetTypeId)}
+                            kpiLabel={getDisplayLabel(widget)}
+                            value={getExampleValue(widget)}
+                            size={{ width: widget.width, height: widget.height }}
+                            designClasses={getDesignClasses(globalDesign)}
+                            colorTheme={colorTheme}
+                            timePeriodName={timePeriod?.name}
+                            designName={design?.name}
+                            targetValue={widget.targetValue}
+                            showComparison={widget.showComparison}
+                            trackingScopeName={trackingScope?.id !== "all" ? trackingScope?.name : undefined}
+                            showTrend={widget.showTrend}
+                            trendValue={widget.showTrend ? getExampleTrend() : undefined}
+                            multiKpiCount={widget.kpiTypeIds.length > 1 ? widget.kpiTypeIds.length : undefined}
+                            icon={getWidgetTypeIcon(widget.widgetTypeId)}
+                            onEdit={() => openEditWidgetDialog(widget)}
+                            onRemove={() => removeWidget(widget.id)}
+                            onResize={(newSize) => resizeWidget(widget.id, newSize)}
+                          />
                         );
                       })}
                     </div>
@@ -893,24 +850,38 @@ export default function DesignDashboard() {
                 <p className="text-muted-foreground">Tilføj widgets for at se en forhåndsvisning</p>
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-4">
+              <div 
+                className="grid gap-4"
+                style={{ 
+                  gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+                }}
+              >
                 {placedWidgets.map((widget) => {
                   const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
                   const trackingScope = TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId);
+                  const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
+                  const isLarge = widget.width >= 3 || widget.height >= 2;
+                  const exampleValue = getExampleValue(widget);
+                  const exampleTrend = widget.showTrend ? getExampleTrend() : undefined;
                   
                   return (
                     <Card 
                       key={widget.id} 
-                      className={getDesignClasses(globalDesign)}
-                      style={colorTheme && colorTheme.id !== "default" ? { 
-                        borderColor: colorTheme.primary,
-                        borderWidth: '2px'
-                      } : undefined}
+                      className={cn(getDesignClasses(globalDesign), "transition-all")}
+                      style={{
+                        gridColumn: `span ${widget.width}`,
+                        gridRow: `span ${widget.height}`,
+                        minHeight: `${widget.height * CELL_HEIGHT}px`,
+                        ...(colorTheme && colorTheme.id !== "default" ? { 
+                          borderColor: colorTheme.primary,
+                          borderWidth: '2px'
+                        } : {})
+                      }}
                     >
-                      <CardContent className="p-4">
+                      <CardContent className={cn("p-4 h-full flex flex-col", isLarge && "p-6")}>
                         <div className="flex items-center gap-2 mb-2">
                           <div 
-                            className="p-1.5 rounded-md"
+                            className={cn("p-1.5 rounded-md", isLarge && "p-2")}
                             style={{ 
                               backgroundColor: colorTheme?.primary ? `${colorTheme.primary}20` : 'hsl(var(--primary) / 0.1)',
                               color: colorTheme?.primary || 'hsl(var(--primary))'
@@ -918,28 +889,65 @@ export default function DesignDashboard() {
                           >
                             {getWidgetTypeIcon(widget.widgetTypeId)}
                           </div>
-                          <span className="font-medium text-sm">
+                          <span className={cn("font-medium", isLarge ? "text-base" : "text-sm")}>
                             {widget.title || getWidgetTypeName(widget.widgetTypeId)}
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mb-2">
-                          {getDisplayLabel(widget)}
-                        </p>
-                        <p className="text-3xl font-bold" style={{ color: colorTheme?.primary }}>
-                          {getDisplayValue(widget)}
-                        </p>
-                        {widget.targetValue && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                            <Target className="h-3 w-3" />
-                            <span>Mål: {widget.targetValue}</span>
+                        
+                        <div className="flex-1 flex flex-col justify-center">
+                          <p className={cn("text-muted-foreground mb-1", isLarge ? "text-sm" : "text-xs")}>
+                            {getDisplayLabel(widget)}
+                          </p>
+                          <div className="flex items-end gap-2">
+                            <p 
+                              className={cn("font-bold", widget.width >= 4 ? "text-5xl" : isLarge ? "text-4xl" : "text-3xl")}
+                              style={{ color: colorTheme?.primary }}
+                            >
+                              {exampleValue}
+                            </p>
+                            {exampleTrend !== undefined && (
+                              <span className={cn(
+                                "text-sm font-medium mb-1",
+                                exampleTrend > 0 ? "text-green-500" : exampleTrend < 0 ? "text-red-500" : "text-muted-foreground"
+                              )}>
+                                {exampleTrend > 0 ? "+" : ""}{exampleTrend.toFixed(1)}%
+                              </span>
+                            )}
                           </div>
-                        )}
-                        {trackingScope && trackingScope.id !== "all" && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                            <Users className="h-3 w-3" />
-                            <span>{trackingScope.name}</span>
-                          </div>
-                        )}
+                          
+                          {widget.targetValue && (
+                            <div className="mt-2">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                                <span className="flex items-center gap-1">
+                                  <Target className="h-3 w-3" />
+                                  Mål: {widget.targetValue}
+                                </span>
+                                <span>{Math.min(100, Math.round((parseFloat(exampleValue.replace(/[^0-9.-]/g, '')) / widget.targetValue) * 100))}%</span>
+                              </div>
+                              {isLarge && (
+                                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full rounded-full transition-all"
+                                    style={{ 
+                                      width: `${Math.min(100, (parseFloat(exampleValue.replace(/[^0-9.-]/g, '')) / widget.targetValue) * 100)}%`,
+                                      backgroundColor: colorTheme?.primary || 'hsl(var(--primary))'
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center justify-between text-xs text-muted-foreground mt-auto pt-2 border-t border-border/50">
+                          <span>{timePeriod?.name}</span>
+                          {trackingScope && trackingScope.id !== "all" && (
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {trackingScope.name}
+                            </span>
+                          )}
+                        </div>
                       </CardContent>
                     </Card>
                   );
