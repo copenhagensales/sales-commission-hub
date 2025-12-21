@@ -954,6 +954,27 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   <BarChart3 className="h-4 w-4" />
                   Relatel
                 </NavLink>
+                <NavLink to="/dashboards/tryg" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/dashboards/tryg" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <BarChart3 className="h-4 w-4" />
+                  Tryg
+                </NavLink>
+                <NavLink to="/dashboards/ase" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/dashboards/ase" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <BarChart3 className="h-4 w-4" />
+                  ASE
+                </NavLink>
+                <NavLink to="/dashboards/mg-test" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/dashboards/mg-test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <BarChart3 className="h-4 w-4" />
+                  Test Dashboard
+                </NavLink>
                 <NavLink to="/dashboards/united" onClick={handleNavClick} className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                   location.pathname === "/dashboards/united" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"

@@ -11,8 +11,11 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
   { slug: "cph-sales", name: "Dagsboard CPH Sales", path: "/dashboards/cph-sales" },
   { slug: "fieldmarketing", name: "Fieldmarketing", path: "/dashboards/fieldmarketing" },
   { slug: "team", name: "Team Dashboard", path: "/dashboards/team" },
+  { slug: "eesy-tm", name: "Eesy TM", path: "/dashboards/eesy-tm" },
+  { slug: "tdc-erhverv", name: "TDC Erhverv", path: "/dashboards/tdc-erhverv" },
   { slug: "relatel", name: "Relatel", path: "/dashboards/relatel" },
   { slug: "tryg", name: "Tryg", path: "/dashboards/tryg" },
-  { slug: "tdc-erhverv", name: "TDC Erhverv", path: "/dashboards/tdc-erhverv" },
+  { slug: "ase", name: "ASE", path: "/dashboards/ase" },
   { slug: "mg-test", name: "Test Dashboard", path: "/dashboards/mg-test" },
+  { slug: "united", name: "United", path: "/dashboards/united" },
 ];
