@@ -412,6 +412,43 @@ export function useMarkAsRead() {
   });
 }
 
+export function useDeleteConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      const employeeId = await getCurrentEmployeeId();
+      
+      // Delete membership (this effectively "leaves" the conversation)
+      // For 1:1 chats or if you're the creator, delete the whole conversation
+      const { data: conversation } = await supabase
+        .from("chat_conversations")
+        .select("created_by, is_group")
+        .eq("id", conversationId)
+        .single() as any;
+      
+      if (conversation?.created_by === employeeId || !conversation?.is_group) {
+        // Delete all related data
+        await supabase.from("chat_messages").delete().eq("conversation_id", conversationId);
+        await supabase.from("chat_conversation_members").delete().eq("conversation_id", conversationId);
+        await supabase.from("chat_conversations").delete().eq("id", conversationId);
+      } else {
+        // Just leave the group
+        await supabase
+          .from("chat_conversation_members")
+          .delete()
+          .eq("conversation_id", conversationId)
+          .eq("employee_id", employeeId);
+      }
+      
+      return conversationId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    },
+  });
+}
+
 export function useSearchMessages() {
   return useMutation({
     mutationFn: async (query: string) => {
