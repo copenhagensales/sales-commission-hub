@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle } from "lucide-react";
+import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle, TrendingUp, Phone, Users, Award } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -1158,94 +1158,130 @@ const DashboardSettings = () => {
                 </div>
               </div>
 
-              {/* Live Preview */}
+              {/* Live Preview - CPH Sales Dashboard Style */}
               <div className="space-y-3">
-                <Label className="text-base font-semibold">Live preview</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold">Live preview</Label>
+                  <Badge variant="outline" className="text-xs">CPH Sales Dashboard</Badge>
+                </div>
                 <div
-                  className="p-6 rounded-xl min-h-[300px]"
+                  className="p-4 rounded-xl min-h-[380px] space-y-4"
                   style={{ backgroundColor: themeFormData.backgroundColor }}
                 >
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* Header */}
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-white/90">Dagsboard CPH Sales</h3>
+                    <p className="text-xs text-white/50">Lørdag 21. december 2024</p>
+                  </div>
+
+                  {/* KPI Grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Salg i dag */}
                     <div
-                      className={`p-4 ${getBorderRadiusClass(themeFormData.borderRadius)} ${getCardStyleClasses(themeFormData)} ${
-                        themeFormData.animations ? "transition-all hover:scale-105" : ""
+                      className={`p-3 ${getBorderRadiusClass(themeFormData.borderRadius)} ${getCardStyleClasses(themeFormData)} ${
+                        themeFormData.animations ? "transition-all hover:scale-105 cursor-pointer" : ""
                       }`}
                       style={{
                         backgroundColor:
                           themeFormData.cardStyle === "glass"
-                            ? `${themeFormData.primaryColor}40`
-                            : themeFormData.primaryColor,
+                            ? `${themeFormData.accentColor}25`
+                            : `${themeFormData.accentColor}15`,
                         borderColor:
                           themeFormData.cardStyle === "bordered"
-                            ? themeFormData.secondaryColor
+                            ? `${themeFormData.accentColor}40`
                             : "transparent",
                       }}
                     >
-                      <div className={`${getFontSizeClass(themeFormData.fontSize)} font-bold text-white`}>
-                        156
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-white/60">Salg i dag</span>
+                        <TrendingUp className="h-4 w-4" style={{ color: themeFormData.accentColor }} />
                       </div>
-                      <div className="text-sm text-white/70 mt-1">Antal salg</div>
+                      <div className={`${getFontSizeClass(themeFormData.fontSize)} font-bold`} style={{ color: themeFormData.accentColor }}>
+                        24
+                      </div>
+                      <div className="flex gap-1 mt-1">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: `${themeFormData.accentColor}30`, color: themeFormData.accentColor }}>
+                          18 bekræftet
+                        </span>
+                      </div>
                     </div>
+
+                    {/* Opkald i dag */}
                     <div
-                      className={`p-4 ${getBorderRadiusClass(themeFormData.borderRadius)} ${getCardStyleClasses(themeFormData)} ${
-                        themeFormData.animations ? "transition-all hover:scale-105" : ""
+                      className={`p-3 ${getBorderRadiusClass(themeFormData.borderRadius)} ${getCardStyleClasses(themeFormData)} ${
+                        themeFormData.animations ? "transition-all hover:scale-105 cursor-pointer" : ""
                       }`}
                       style={{
                         backgroundColor:
                           themeFormData.cardStyle === "glass"
-                            ? `${themeFormData.secondaryColor}40`
-                            : themeFormData.secondaryColor,
+                            ? `${themeFormData.primaryColor}25`
+                            : `${themeFormData.primaryColor}15`,
                         borderColor:
                           themeFormData.cardStyle === "bordered"
-                            ? themeFormData.primaryColor
+                            ? `${themeFormData.primaryColor}40`
                             : "transparent",
                       }}
                     >
-                      <div className={`${getFontSizeClass(themeFormData.fontSize)} font-bold text-white`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-white/60">Opkald i dag</span>
+                        <Phone className="h-4 w-4" style={{ color: themeFormData.primaryColor }} />
+                      </div>
+                      <div className={`${getFontSizeClass(themeFormData.fontSize)} font-bold`} style={{ color: themeFormData.primaryColor }}>
+                        847
+                      </div>
+                      <p className="text-[10px] text-white/40 mt-1">Registrerede opkald</p>
+                    </div>
+
+                    {/* Aktive medarbejdere */}
+                    <div
+                      className={`p-3 ${getBorderRadiusClass(themeFormData.borderRadius)} ${getCardStyleClasses(themeFormData)} ${
+                        themeFormData.animations ? "transition-all hover:scale-105 cursor-pointer" : ""
+                      }`}
+                      style={{
+                        backgroundColor:
+                          themeFormData.cardStyle === "glass"
+                            ? `${themeFormData.secondaryColor}25`
+                            : `${themeFormData.secondaryColor}15`,
+                        borderColor:
+                          themeFormData.cardStyle === "bordered"
+                            ? `${themeFormData.secondaryColor}40`
+                            : "transparent",
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-white/60">Aktive medarbejdere</span>
+                        <Users className="h-4 w-4" style={{ color: themeFormData.secondaryColor }} />
+                      </div>
+                      <div className={`${getFontSizeClass(themeFormData.fontSize)} font-bold`} style={{ color: themeFormData.secondaryColor }}>
                         42
                       </div>
-                      <div className="text-sm text-white/70 mt-1">Antal kunder</div>
+                      <p className="text-[10px] text-white/40 mt-1">Sælgere</p>
                     </div>
+
+                    {/* Stabsmedarbejdere */}
                     <div
-                      className={`p-4 ${getBorderRadiusClass(themeFormData.borderRadius)} ${getCardStyleClasses(themeFormData)} ${
-                        themeFormData.animations ? "transition-all hover:scale-105" : ""
+                      className={`p-3 ${getBorderRadiusClass(themeFormData.borderRadius)} ${getCardStyleClasses(themeFormData)} ${
+                        themeFormData.animations ? "transition-all hover:scale-105 cursor-pointer" : ""
                       }`}
                       style={{
-                        backgroundColor:
-                          themeFormData.cardStyle === "glass"
-                            ? `${themeFormData.accentColor}40`
-                            : themeFormData.accentColor,
-                        borderColor:
-                          themeFormData.cardStyle === "bordered"
-                            ? themeFormData.secondaryColor
-                            : "transparent",
+                        backgroundColor: themeFormData.cardStyle === "glass" ? "#f97316" + "25" : "#f97316" + "15",
+                        borderColor: themeFormData.cardStyle === "bordered" ? "#f97316" + "40" : "transparent",
                       }}
                     >
-                      <div className={`${getFontSizeClass(themeFormData.fontSize)} font-bold text-white`}>
-                        87%
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-white/60">Stabsmedarbejdere</span>
+                        <Award className="h-4 w-4 text-orange-500" />
                       </div>
-                      <div className="text-sm text-white/70 mt-1">Mål opnået</div>
-                    </div>
-                    <div
-                      className={`p-4 ${getBorderRadiusClass(themeFormData.borderRadius)} ${getCardStyleClasses(themeFormData)} ${
-                        themeFormData.animations ? "transition-all hover:scale-105" : ""
-                      }`}
-                      style={{
-                        backgroundColor:
-                          themeFormData.cardStyle === "glass"
-                            ? `${themeFormData.primaryColor}60`
-                            : `${themeFormData.primaryColor}cc`,
-                        borderColor:
-                          themeFormData.cardStyle === "bordered"
-                            ? themeFormData.accentColor
-                            : "transparent",
-                      }}
-                    >
-                      <div className={`${getFontSizeClass(themeFormData.fontSize)} font-bold text-white`}>
-                        8.5
+                      <div className={`${getFontSizeClass(themeFormData.fontSize)} font-bold text-orange-500`}>
+                        8
                       </div>
-                      <div className="text-sm text-white/70 mt-1">Timer</div>
+                      <p className="text-[10px] text-white/40 mt-1">Aktive stabsmedarbejdere</p>
                     </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="text-center pt-2">
+                    <p className="text-[10px] text-white/30">CPH Sales Dashboard • 14:32</p>
                   </div>
                 </div>
               </div>
