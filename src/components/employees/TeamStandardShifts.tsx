@@ -608,7 +608,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               <TableRow>
                 <TableHead className="text-xs w-16">Primær</TableHead>
                 <TableHead className="text-xs">Navn</TableHead>
-                <TableHead className="text-xs">Standard tid</TableHead>
                 <TableHead className="text-xs">Dage</TableHead>
                 <TableHead className="text-xs">Pauser</TableHead>
                 <TableHead className="text-xs">Arbejdstid</TableHead>
@@ -660,40 +659,31 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
-                    </TableCell>
-                    <TableCell>
                       {shiftDays.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {WEEKDAY_ORDER.map(day => {
                             const dayConfig = shiftDays.find(d => d.day_of_week === day);
                             if (!dayConfig) return null;
-                            const hasCustomTime = 
-                              dayConfig.start_time.slice(0, 5) !== shift.start_time.slice(0, 5) ||
-                              dayConfig.end_time.slice(0, 5) !== shift.end_time.slice(0, 5);
                             const dayBreaks = shiftBreaks.filter(b => b.day_of_week === day);
                             const breakText = dayBreaks.length > 0 
-                              ? ` (pause: ${dayBreaks.map(b => `${formatTime(b.break_start)}-${formatTime(b.break_end)}`).join(', ')})`
+                              ? ` | pause: ${dayBreaks.map(b => `${formatTime(b.break_start)}-${formatTime(b.break_end)}`).join(', ')}`
                               : '';
                             return (
                               <Badge 
                                 key={day} 
-                                variant={hasCustomTime ? "default" : "secondary"} 
+                                variant="secondary" 
                                 className="text-xs"
                                 title={`${formatTime(dayConfig.start_time)}-${formatTime(dayConfig.end_time)}${breakText}`}
                               >
-                                {DAY_NAMES[day]}
-                                {hasCustomTime && (
-                                  <span className="opacity-70 ml-1">
-                                    {formatTime(dayConfig.start_time)}-{formatTime(dayConfig.end_time)}
-                                  </span>
-                                )}
+                                {DAY_NAMES[day]} {formatTime(dayConfig.start_time)}-{formatTime(dayConfig.end_time)}
                               </Badge>
                             );
                           })}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground text-xs">Alle dage</span>
+                        <span className="text-muted-foreground text-xs">
+                          Alle dage {formatTime(shift.start_time)}-{formatTime(shift.end_time)}
+                        </span>
                       )}
                     </TableCell>
                     <TableCell>
