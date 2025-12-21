@@ -536,10 +536,10 @@ export default function ShiftOverview() {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="h-10 px-4 text-sm font-semibold hover:bg-primary/20 hover:text-primary transition-all rounded-lg"
+                  className="h-10 px-5 text-sm font-semibold hover:bg-primary/20 hover:text-primary transition-all rounded-lg"
                   onClick={() => setCurrentDate(new Date())}
                 >
-                  I dag
+                  Uge {format(currentDate, "w", { locale: da })}
                 </Button>
                 <Button 
                   variant="ghost" 
