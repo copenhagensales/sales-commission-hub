@@ -460,7 +460,7 @@ export function useEmployeesForShifts(teamId?: string) {
         if (employeeIds.length === 0) return [];
         const { data, error } = await supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount")
+          .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
           .in("id", employeeIds)
           .eq("is_active", true)
           .order("first_name");
@@ -512,7 +512,7 @@ export function useEmployeesForShifts(teamId?: string) {
         // Fallback: filter by manager_id if no teams led
         const { data, error } = await supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount")
+          .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
           .eq("is_active", true)
           .eq("manager_id", currentEmployeeId)
           .neq("id", currentEmployeeId)
@@ -525,7 +525,7 @@ export function useEmployeesForShifts(teamId?: string) {
       // Owner - get all active employees
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount")
+        .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
         .eq("is_active", true)
         .order("first_name");
 

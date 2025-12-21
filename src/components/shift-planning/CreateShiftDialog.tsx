@@ -22,6 +22,7 @@ interface Employee {
   department: string | null;
   standard_start_time: string | null;
   weekly_hours: number | null;
+  team_id?: string | null;
 }
 
 interface CreateShiftDialogProps {
@@ -99,7 +100,12 @@ export function CreateShiftDialog({
   const [note, setNote] = useState("");
 
   const createShift = useCreateShift();
-  const { data: primaryShiftData } = usePrimaryStandardShift(teamId);
+  
+  // Get the selected employee's team_id for primary shift lookup
+  const selectedEmployee = employees.find(e => e.id === employeeId);
+  const employeeTeamId = selectedEmployee?.team_id;
+  
+  const { data: primaryShiftData } = usePrimaryStandardShift(employeeTeamId || undefined);
 
   useEffect(() => {
     if (selectedDate) {
