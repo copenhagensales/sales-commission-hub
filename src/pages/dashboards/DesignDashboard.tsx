@@ -70,7 +70,6 @@ interface PlacedWidget {
   customLabel?: string;
   timePeriodId: string;
   customFromDate?: Date;
-  designId: string;
   // New optional fields
   title?: string;  // Custom title override
   targetValue?: number;  // Target value for progress widgets
@@ -147,6 +146,9 @@ export default function DesignDashboard() {
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<PlacedWidget | null>(null);
   
+  // Global dashboard design state
+  const [globalDesign, setGlobalDesign] = useState<string>("minimal");
+  
   // Config form state
   const [selectedWidgetType, setSelectedWidgetType] = useState<string>("");
   const [dataSource, setDataSource] = useState<"kpi" | "custom">("kpi");
@@ -155,7 +157,6 @@ export default function DesignDashboard() {
   const [customLabel, setCustomLabel] = useState<string>("");
   const [selectedTimePeriod, setSelectedTimePeriod] = useState<string>("today");
   const [customFromDate, setCustomFromDate] = useState<Date | undefined>();
-  const [selectedDesign, setSelectedDesign] = useState<string>("minimal");
   // New config state
   const [customTitle, setCustomTitle] = useState<string>("");
   const [targetValue, setTargetValue] = useState<string>("");
@@ -177,7 +178,6 @@ export default function DesignDashboard() {
     setCustomLabel("");
     setSelectedTimePeriod("today");
     setCustomFromDate(undefined);
-    setSelectedDesign("minimal");
     setCustomTitle("");
     setTargetValue("");
     setShowComparison(false);
@@ -201,7 +201,6 @@ export default function DesignDashboard() {
     setCustomLabel(widget.customLabel || "");
     setSelectedTimePeriod(widget.timePeriodId);
     setCustomFromDate(widget.customFromDate);
-    setSelectedDesign(widget.designId);
     setCustomTitle(widget.title || "");
     setTargetValue(widget.targetValue?.toString() || "");
     setShowComparison(widget.showComparison || false);
@@ -249,7 +248,6 @@ export default function DesignDashboard() {
       customLabel: dataSource === "custom" ? customLabel : undefined,
       timePeriodId: selectedTimePeriod,
       customFromDate: selectedTimePeriod === "custom-from" ? customFromDate : undefined,
-      designId: selectedDesign,
       title: customTitle || undefined,
       targetValue: targetValue ? parseFloat(targetValue) : undefined,
       showComparison: supportsComparison ? showComparison : undefined,
@@ -333,6 +331,37 @@ export default function DesignDashboard() {
             </Button>
           </div>
         </div>
+
+        {/* Global Design Selector */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              Vælg Design
+            </CardTitle>
+            <CardDescription>Dette design anvendes på alle widgets</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-6 gap-3">
+              {DESIGN_OPTIONS.map((design) => (
+                <div
+                  key={design.id}
+                  onClick={() => setGlobalDesign(design.id)}
+                  className={cn(
+                    "p-3 rounded-lg border-2 cursor-pointer transition-all",
+                    globalDesign === design.id 
+                      ? "border-primary bg-primary/5 ring-2 ring-primary/20" 
+                      : "border-border hover:border-primary/50"
+                  )}
+                >
+                  <div className={cn("h-12 rounded-md mb-2", design.preview)} />
+                  <p className="text-xs font-medium text-center">{design.name}</p>
+                  <p className="text-[10px] text-muted-foreground text-center">{design.description}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {activeWidgetTypes.length === 0 && (
           <Card className="border-dashed">
@@ -420,14 +449,14 @@ export default function DesignDashboard() {
                     <div className="grid grid-cols-3 gap-4">
                       {placedWidgets.map((widget) => {
                         const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
-                        const design = DESIGN_OPTIONS.find(d => d.id === widget.designId);
+                        const design = DESIGN_OPTIONS.find(d => d.id === globalDesign);
                         const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
                         const widgetConfig = activeWidgetTypes.find(w => w.value === widget.widgetTypeId);
                         
                         return (
                           <Card 
                             key={widget.id} 
-                            className={`relative group cursor-pointer transition-all hover:shadow-lg ${getDesignClasses(widget.designId)}`}
+                            className={`relative group cursor-pointer transition-all hover:shadow-lg ${getDesignClasses(globalDesign)}`}
                             onClick={() => openEditWidgetDialog(widget)}
                             style={colorTheme && colorTheme.id !== "default" ? { 
                               borderColor: colorTheme.primary,
@@ -761,11 +790,11 @@ export default function DesignDashboard() {
               </div>
             )}
 
-            {/* 5. Color Theme */}
+            {/* Color Theme - renumbered to 4 */}
             <div className="space-y-2 border-t pt-4">
               <Label className="text-base font-semibold flex items-center gap-2">
                 <Palette className="h-4 w-4" />
-                5. Farvetema
+                4. Farvetema
               </Label>
               <div className="grid grid-cols-6 gap-2">
                 {COLOR_THEMES.map((theme) => (
@@ -784,28 +813,6 @@ export default function DesignDashboard() {
                     {colorThemeId === theme.id && (
                       <div className="w-2 h-2 rounded-full bg-white" />
                     )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 6. Design */}
-            <div className="space-y-2 border-t pt-4">
-              <Label className="text-base font-semibold">6. Design</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {DESIGN_OPTIONS.map((design) => (
-                  <div
-                    key={design.id}
-                    onClick={() => setSelectedDesign(design.id)}
-                    className={cn(
-                      "p-3 rounded-lg border-2 cursor-pointer transition-all",
-                      selectedDesign === design.id 
-                        ? "border-primary bg-primary/5" 
-                        : "border-border hover:border-primary/50"
-                    )}
-                  >
-                    <div className={cn("h-10 rounded-md mb-2", design.preview)} />
-                    <p className="text-xs font-medium text-center">{design.name}</p>
                   </div>
                 ))}
               </div>
