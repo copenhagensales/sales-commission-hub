@@ -50,12 +50,33 @@ interface StandardShiftDay {
   end_time: string;
 }
 
+// Hook to fetch employee's team via team_members table
+function useEmployeeTeamId(employeeId: string | undefined) {
+  return useQuery({
+    queryKey: ["employee-team-membership", employeeId],
+    queryFn: async () => {
+      if (!employeeId) return null;
+      
+      const { data, error } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("employee_id", employeeId)
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data?.team_id || null;
+    },
+    enabled: !!employeeId,
+  });
+}
+
 // Hook to fetch primary standard shift for a team
-function usePrimaryStandardShift(teamId: string | undefined) {
+function usePrimaryStandardShift(teamId: string | null | undefined) {
   return useQuery({
     queryKey: ["primary-standard-shift", teamId],
     queryFn: async () => {
-      if (!teamId || teamId === "all") return null;
+      if (!teamId) return null;
       
       const { data: shift, error } = await supabase
         .from("team_standard_shifts")
@@ -80,7 +101,7 @@ function usePrimaryStandardShift(teamId: string | undefined) {
         days: (shiftDays || []) as StandardShiftDay[],
       };
     },
-    enabled: !!teamId && teamId !== "all",
+    enabled: !!teamId,
   });
 }
 
@@ -101,11 +122,10 @@ export function CreateShiftDialog({
 
   const createShift = useCreateShift();
   
-  // Get the selected employee's team_id for primary shift lookup
-  const selectedEmployee = employees.find(e => e.id === employeeId);
-  const employeeTeamId = selectedEmployee?.team_id;
+  // Get the selected employee's team via team_members table
+  const { data: employeeTeamId } = useEmployeeTeamId(employeeId || undefined);
   
-  const { data: primaryShiftData } = usePrimaryStandardShift(employeeTeamId || undefined);
+  const { data: primaryShiftData } = usePrimaryStandardShift(employeeTeamId);
 
   useEffect(() => {
     if (selectedDate) {
