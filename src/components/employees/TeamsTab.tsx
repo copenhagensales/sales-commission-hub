@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Users, Building2, UserCheck } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Building2, UserCheck, Calendar } from "lucide-react";
 
 interface Team {
   id: string;
@@ -428,9 +429,17 @@ export function TeamsTab() {
           <DialogHeader>
             <DialogTitle>{editingTeam ? "Rediger team" : "Opret nyt team"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-6 py-4">
-            {/* Basic Info */}
-            <div className="space-y-4">
+          
+          <Tabs defaultValue="team" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="team">Team</TabsTrigger>
+              <TabsTrigger value="clients">Kunder</TabsTrigger>
+              <TabsTrigger value="employees">Medarbejdere</TabsTrigger>
+              <TabsTrigger value="schedule">Vagtplan</TabsTrigger>
+            </TabsList>
+
+            {/* Team Tab */}
+            <TabsContent value="team" className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Navn *</Label>
                 <Input
@@ -488,60 +497,82 @@ export function TeamsTab() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
+            </TabsContent>
 
-            {/* Clients */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-                <Label>Kunder</Label>
+            {/* Clients Tab */}
+            <TabsContent value="clients" className="py-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <Label>Kunder</Label>
+                  <Badge variant="secondary" className="ml-auto">
+                    {formData.client_ids.length} valgt
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto border rounded-md p-3">
+                  {clients.length === 0 ? (
+                    <p className="text-sm text-muted-foreground col-span-2">Ingen kunder fundet</p>
+                  ) : (
+                    clients.map((client) => (
+                      <div key={client.id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`client-${client.id}`}
+                          checked={formData.client_ids.includes(client.id)}
+                          onCheckedChange={() => toggleClient(client.id)}
+                        />
+                        <label htmlFor={`client-${client.id}`} className="text-sm cursor-pointer">
+                          {client.name}
+                        </label>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-md p-3">
-                {clients.length === 0 ? (
-                  <p className="text-sm text-muted-foreground col-span-2">Ingen kunder fundet</p>
-                ) : (
-                  clients.map((client) => (
-                    <div key={client.id} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`client-${client.id}`}
-                        checked={formData.client_ids.includes(client.id)}
-                        onCheckedChange={() => toggleClient(client.id)}
-                      />
-                      <label htmlFor={`client-${client.id}`} className="text-sm cursor-pointer">
-                        {client.name}
-                      </label>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+            </TabsContent>
 
-            {/* Employees */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <UserCheck className="h-4 w-4 text-muted-foreground" />
-                <Label>Medarbejdere</Label>
+            {/* Employees Tab */}
+            <TabsContent value="employees" className="py-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="h-4 w-4 text-muted-foreground" />
+                  <Label>Medarbejdere</Label>
+                  <Badge variant="secondary" className="ml-auto">
+                    {formData.employee_ids.length} valgt
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto border rounded-md p-3">
+                  {employees.length === 0 ? (
+                    <p className="text-sm text-muted-foreground col-span-2">Ingen medarbejdere fundet</p>
+                  ) : (
+                    employees.map((emp) => (
+                      <div key={emp.id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`emp-${emp.id}`}
+                          checked={formData.employee_ids.includes(emp.id)}
+                          onCheckedChange={() => toggleEmployee(emp.id)}
+                        />
+                        <label htmlFor={`emp-${emp.id}`} className="text-sm cursor-pointer">
+                          {emp.first_name} {emp.last_name}
+                        </label>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-md p-3">
-                {employees.length === 0 ? (
-                  <p className="text-sm text-muted-foreground col-span-2">Ingen medarbejdere fundet</p>
-                ) : (
-                  employees.map((emp) => (
-                    <div key={emp.id} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`emp-${emp.id}`}
-                        checked={formData.employee_ids.includes(emp.id)}
-                        onCheckedChange={() => toggleEmployee(emp.id)}
-                      />
-                      <label htmlFor={`emp-${emp.id}`} className="text-sm cursor-pointer">
-                        {emp.first_name} {emp.last_name}
-                      </label>
-                    </div>
-                  ))
-                )}
+            </TabsContent>
+
+            {/* Schedule Tab */}
+            <TabsContent value="schedule" className="py-4">
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Vagtplan</h3>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  Administrer vagtplaner for dette team. Funktionen kommer snart.
+                </p>
               </div>
-            </div>
-          </div>
+            </TabsContent>
+          </Tabs>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Annuller
