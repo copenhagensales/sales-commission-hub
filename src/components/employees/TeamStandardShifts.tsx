@@ -640,54 +640,36 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               </div>
             </div>
 
-            {/* Day selection with custom times */}
+            {/* Day selection - simple checkboxes */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                <Label>Vælg dage (valgfrit - lad være tom for alle dage)</Label>
+                <Label>Vælg dage (valgfrit)</Label>
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
                 {WEEKDAY_ORDER.map(day => (
-                  <div 
-                    key={day} 
-                    className={`flex items-center gap-3 p-2 rounded-md border transition-colors ${
-                      dayConfigs[day].enabled ? "bg-muted/50 border-primary/30" : "border-transparent"
+                  <label
+                    key={day}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
+                      dayConfigs[day].enabled 
+                        ? "bg-primary/10 border-primary text-primary" 
+                        : "bg-muted/30 border-border hover:bg-muted/50"
                     }`}
                   >
                     <Checkbox
                       checked={dayConfigs[day].enabled}
                       onCheckedChange={() => toggleDay(day)}
-                      id={`day-${day}`}
+                      className="sr-only"
                     />
-                    <label 
-                      htmlFor={`day-${day}`}
-                      className="text-sm font-medium w-12 cursor-pointer"
-                    >
-                      {DAY_NAMES[day]}
-                    </label>
-                    {dayConfigs[day].enabled && (
-                      <div className="flex items-center gap-2 flex-1">
-                        <TimeSelect
-                          value={dayConfigs[day].start_time}
-                          onChange={(value) => updateDayTime(day, "start_time", value)}
-                          className="w-24"
-                        />
-                        <span className="text-muted-foreground">-</span>
-                        <TimeSelect
-                          value={dayConfigs[day].end_time}
-                          onChange={(value) => updateDayTime(day, "end_time", value)}
-                          className="w-24"
-                        />
-                      </div>
-                    )}
-                  </div>
+                    <span className="text-sm font-medium">{DAY_NAMES[day]}</span>
+                  </label>
                 ))}
               </div>
-              {enabledDaysCount > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {enabledDaysCount} dag(e) valgt
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                {enabledDaysCount === 0 
+                  ? "Ingen dage valgt = gælder alle dage" 
+                  : `${enabledDaysCount} dag(e) valgt`}
+              </p>
             </div>
 
             {/* Breaks */}
