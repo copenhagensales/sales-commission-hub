@@ -474,38 +474,68 @@ export function useEmployeesForShifts(teamId?: string) {
           .filter(tm => tm.employee)
           .map(tm => tm.employee);
         
-        // If not owner, filter to team members managed by current user
-        if (!isOwner && currentEmployeeId) {
-          return employees.filter(emp => 
-            emp.manager_id === currentEmployeeId && emp.id !== currentEmployeeId
-          );
-        }
-        
         return employees;
       }
       
-      // No team selected - use existing logic
-      let query = supabase
+      // No team selected - for teamledere, get employees from teams they lead
+      if (!isOwner && currentEmployeeId) {
+        // Get teams where current user is team_leader
+        const { data: ledTeams, error: teamsError } = await supabase
+          .from("teams")
+          .select("id")
+          .eq("team_leader_id", currentEmployeeId);
+        
+        if (teamsError) throw teamsError;
+        
+        if (ledTeams && ledTeams.length > 0) {
+          const teamIds = ledTeams.map(t => t.id);
+          
+          // Get all employees from those teams
+          const { data: teamMembers, error: tmError } = await supabase
+            .from("team_members")
+            .select(`
+              employee_id,
+              employee:employee_id(
+                id, first_name, last_name, department, standard_start_time, 
+                weekly_hours, manager_id, salary_type, salary_amount
+              )
+            `)
+            .in("team_id", teamIds);
+          
+          if (tmError) throw tmError;
+          
+          // Deduplicate employees (in case they're in multiple teams)
+          const employeeMap = new Map();
+          (teamMembers || []).forEach(tm => {
+            if (tm.employee && tm.employee.id !== currentEmployeeId) {
+              employeeMap.set(tm.employee.id, tm.employee);
+            }
+          });
+          
+          return Array.from(employeeMap.values());
+        }
+        
+        // Fallback: filter by manager_id if no teams led
+        const { data, error } = await supabase
+          .from("employee_master_data")
+          .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount")
+          .eq("is_active", true)
+          .eq("manager_id", currentEmployeeId)
+          .neq("id", currentEmployeeId)
+          .order("first_name");
+        
+        if (error) throw error;
+        return data;
+      }
+      
+      // Owner - get all active employees
+      const { data, error } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount")
         .eq("is_active", true)
         .order("first_name");
 
-      const { data, error } = await query;
       if (error) throw error;
-      
-      // If owner, return all employees
-      if (isOwner) {
-        return data;
-      }
-      
-      // If teamleder, filter to only show team members
-      if (currentEmployeeId) {
-        return data.filter(emp => 
-          emp.manager_id === currentEmployeeId && emp.id !== currentEmployeeId
-        );
-      }
-      
       return data;
     },
     enabled: !!user?.id,
