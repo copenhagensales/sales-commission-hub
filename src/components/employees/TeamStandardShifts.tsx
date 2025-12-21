@@ -284,18 +284,25 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       // Delete existing breaks and re-add
       await supabase.from("team_shift_breaks").delete().eq("shift_id", data.id);
       
-      // Add general breaks
-      const validBreaks = data.breaks.filter((b) => b.break_start && b.break_end);
-      if (validBreaks.length > 0) {
-        const { error: breaksError } = await supabase.from("team_shift_breaks").insert(
-          validBreaks.map((b) => ({
-            shift_id: data.id,
-            break_start: b.break_start,
-            break_end: b.break_end,
-            day_of_week: null,
-          }))
-        );
-        if (breaksError) throw breaksError;
+      // Check if there are any day-specific breaks
+      const hasDaySpecificBreaks = Object.entries(data.dayConfigs).some(
+        ([_, config]) => config.enabled && config.breaks && config.breaks.some(b => b.break_start && b.break_end)
+      );
+      
+      // Only add general breaks if there are no day-specific breaks
+      if (!hasDaySpecificBreaks) {
+        const validBreaks = data.breaks.filter((b) => b.break_start && b.break_end);
+        if (validBreaks.length > 0) {
+          const { error: breaksError } = await supabase.from("team_shift_breaks").insert(
+            validBreaks.map((b) => ({
+              shift_id: data.id,
+              break_start: b.break_start,
+              break_end: b.break_end,
+              day_of_week: null,
+            }))
+          );
+          if (breaksError) throw breaksError;
+        }
       }
 
       // Add day-specific breaks
