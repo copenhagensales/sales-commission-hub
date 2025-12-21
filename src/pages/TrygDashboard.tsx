@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TrendingUp, Users, Package, DollarSign } from "lucide-react";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 
 interface SaleItem {
   id: string;
@@ -125,23 +125,22 @@ const TrygDashboard = () => {
 
   if (isLoading) {
     return (
-      <MainLayout>
-        <div className="p-6 space-y-6">
+      <div className="min-h-screen bg-background p-6">
+        <DashboardHeader title="Tryg – Dagsoverblik" subtitle="Salgsdata for i dag baseret på produkt mapping" />
+        <div className="space-y-6">
           <Skeleton className="h-8 w-64" />
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32" />)}
           </div>
         </div>
-      </MainLayout>
+      </div>
     );
   }
 
   return (
-    <MainLayout>
-      <div className="p-6 space-y-6">
-        <h1 className="text-2xl font-bold">Tryg - Dagsoverblik</h1>
-        <p className="text-muted-foreground">Salgsdata for i dag baseret på produkt mapping</p>
-
+    <div className="min-h-screen bg-background p-6">
+      <DashboardHeader title="Tryg – Dagsoverblik" subtitle="Salgsdata for i dag baseret på produkt mapping" />
+      <div className="space-y-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -261,7 +260,7 @@ const TrygDashboard = () => {
           </Card>
         </div>
       </div>
-    </MainLayout>
+    </div>
   );
 };
 

@@ -4,13 +4,13 @@ import { format, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { Users, Package, DollarSign, ShoppingCart, TrendingUp, CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 
 interface ProductStat {
   name: string;
@@ -155,35 +155,34 @@ export default function TdcErhvervDashboard() {
 
   const isToday = startOfDay(selectedDate).getTime() === startOfDay(new Date()).getTime();
 
+  const datePickerContent = (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className={cn("justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {format(selectedDate, "PPP", { locale: da })}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="end">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          onSelect={(date) => date && setSelectedDate(date)}
+          initialFocus
+          className="pointer-events-auto"
+        />
+      </PopoverContent>
+    </Popover>
+  );
+
   return (
-    <MainLayout>
+    <div className="min-h-screen bg-background p-6">
+      <DashboardHeader 
+        title="TDC Erhverv – Dagsoverblik" 
+        subtitle={`Salg for ${isToday ? "i dag" : format(selectedDate, "d. MMMM yyyy", { locale: da })} • Baseret på produkt-mapping fra MG Test`}
+        rightContent={datePickerContent}
+      />
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">TDC Erhverv – Dagsoverblik</h1>
-            <p className="text-muted-foreground">
-              Salg for {isToday ? "i dag" : format(selectedDate, "d. MMMM yyyy", { locale: da })} • Baseret på produkt-mapping fra MG Test
-            </p>
-          </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className={cn("justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(selectedDate, "PPP", { locale: da })}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => date && setSelectedDate(date)}
-                initialFocus
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -313,6 +312,6 @@ export default function TdcErhvervDashboard() {
           </Card>
         </div>
       </div>
-    </MainLayout>
+    </div>
   );
 }

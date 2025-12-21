@@ -1,12 +1,11 @@
-import { MainLayout } from "@/components/layout/MainLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Trophy, Users, Building2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TvPreviewOverlay } from "@/components/tv-preview/TvPreviewOverlay";
-
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 // Client brand colors for visual distinction
 const clientColors: Record<string, { bg: string; accent: string; text: string }> = {
   "TDC Erhverv": { bg: "from-violet-600/20 to-violet-900/40", accent: "bg-violet-500", text: "text-violet-300" },
@@ -86,40 +85,36 @@ export default function MgTestDashboard() {
   const totalSalesToday = allClients.reduce((sum, c) => sum + c.sales_today, 0);
   const totalSalesMonth = allClients.reduce((sum, c) => sum + c.sales_month, 0);
 
+  const statsContent = (
+    <div className="flex items-center gap-4">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => refetch()}
+        disabled={isFetching}
+        className="h-8 px-2"
+      >
+        <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+      </Button>
+      {lastUpdated && (
+        <span className="text-xs text-muted-foreground">Opdateret: {lastUpdated}</span>
+      )}
+      <div className="text-right">
+        <p className="text-xs text-muted-foreground">I dag</p>
+        <p className="text-xl font-bold text-primary">{isLoading ? "..." : totalSalesToday}</p>
+      </div>
+      <div className="text-right">
+        <p className="text-xs text-muted-foreground">Denne måned</p>
+        <p className="text-xl font-bold">{isLoading ? "..." : totalSalesMonth}</p>
+      </div>
+    </div>
+  );
+
   return (
-    <MainLayout>
+    <div className="min-h-screen bg-background p-6">
+      <DashboardHeader title="Test Dashboard" rightContent={statsContent} />
       <TvPreviewOverlay>
-      <div className="h-full flex flex-col p-[5%] overflow-hidden box-border">
-        {/* Compact Header */}
-        <div className="flex-shrink-0 rounded-xl bg-gradient-to-r from-primary/10 to-background border border-primary/20 px-4 py-2 mb-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-lg font-bold">Test Dashboard</h1>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => refetch()}
-                disabled={isFetching}
-                className="h-6 px-2"
-              >
-                <RefreshCw className={`h-3 w-3 ${isFetching ? "animate-spin" : ""}`} />
-              </Button>
-              {lastUpdated && (
-                <span className="text-[10px] text-muted-foreground">Opdateret: {lastUpdated}</span>
-              )}
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-[10px] text-muted-foreground">I dag</p>
-                <p className="text-xl font-bold text-primary">{isLoading ? "..." : totalSalesToday}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] text-muted-foreground">Denne måned</p>
-                <p className="text-xl font-bold">{isLoading ? "..." : totalSalesMonth}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="flex flex-col overflow-hidden box-border">
 
         {/* Client cards grid - fills remaining space */}
         {isLoading ? (
@@ -217,6 +212,6 @@ export default function MgTestDashboard() {
         )}
       </div>
       </TvPreviewOverlay>
-    </MainLayout>
+    </div>
   );
 }
