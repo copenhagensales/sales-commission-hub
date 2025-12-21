@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { useMessages, useSendMessage, useRealtimeMessages, useMarkAsRead, useTypingIndicator, Message } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Send, Loader2, Paperclip, X, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +10,7 @@ import { MessageBubble } from "./MessageBubble";
 import { MessageSearch } from "./MessageSearch";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { TypingIndicator } from "./TypingIndicator";
+import { MentionInput } from "./MentionInput";
 import { useUploadAttachment } from "@/hooks/useChat";
 import { toast } from "sonner";
 
@@ -245,15 +245,12 @@ export function ChatView({ conversationId }: ChatViewProps) {
               <Paperclip className="h-4 w-4" />
             )}
           </Button>
-          <Textarea
+          <MentionInput
             value={message}
-            onChange={(e) => {
-              setMessage(e.target.value);
-              handleTyping();
-            }}
+            onChange={setMessage}
             onKeyDown={handleKeyDown}
-            placeholder="Skriv en besked..."
-            className="min-h-[60px] resize-none flex-1"
+            placeholder="Skriv en besked... (brug @ for at nævne)"
+            onTyping={handleTyping}
           />
           <Button
             onClick={handleSend}

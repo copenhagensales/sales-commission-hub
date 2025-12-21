@@ -25,6 +25,17 @@ export interface ConversationMember {
   };
 }
 
+export interface MessageReadReceipt {
+  id: string;
+  message_id: string;
+  employee_id: string;
+  read_at: string;
+  employee?: {
+    id: string;
+    full_name: string;
+  };
+}
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -44,6 +55,7 @@ export interface Message {
   };
   reply_to?: Message | null;
   reactions?: MessageReaction[];
+  read_receipts?: MessageReadReceipt[];
 }
 
 export interface MessageReaction {
@@ -125,6 +137,17 @@ export function useConversations() {
   });
 }
 
+export interface ReadReceipt {
+  id: string;
+  message_id: string;
+  employee_id: string;
+  read_at: string;
+  employee?: {
+    id: string;
+    full_name: string;
+  };
+}
+
 export function useMessages(conversationId: string | null) {
   return useQuery({
     queryKey: ["chat-messages", conversationId],
@@ -145,8 +168,15 @@ export function useMessages(conversationId: string | null) {
       
       // Fetch reactions for all messages
       const messageIds = (data || []).map((m: any) => m.id);
+      
       const { data: reactions } = await supabase
         .from("chat_message_reactions")
+        .select(`*, employee:employee_master_data(id, first_name, last_name)`)
+        .in("message_id", messageIds) as any;
+      
+      // Fetch read receipts for all messages
+      const { data: readReceipts } = await supabase
+        .from("chat_message_read_receipts")
         .select(`*, employee:employee_master_data(id, first_name, last_name)`)
         .in("message_id", messageIds) as any;
       
@@ -161,11 +191,26 @@ export function useMessages(conversationId: string | null) {
       
       const replyMap = new Map((replyMessages || []).map((m: any) => [m.id, m]));
       const reactionsMap = new Map<string, any[]>();
+      const readReceiptsMap = new Map<string, any[]>();
+      
       (reactions || []).forEach((r: any) => {
         if (!reactionsMap.has(r.message_id)) {
           reactionsMap.set(r.message_id, []);
         }
         reactionsMap.get(r.message_id)!.push({
+          ...r,
+          employee: r.employee ? {
+            id: r.employee.id,
+            full_name: `${r.employee.first_name || ''} ${r.employee.last_name || ''}`.trim()
+          } : undefined
+        });
+      });
+      
+      (readReceipts || []).forEach((r: any) => {
+        if (!readReceiptsMap.has(r.message_id)) {
+          readReceiptsMap.set(r.message_id, []);
+        }
+        readReceiptsMap.get(r.message_id)!.push({
           ...r,
           employee: r.employee ? {
             id: r.employee.id,
@@ -191,11 +236,36 @@ export function useMessages(conversationId: string | null) {
               full_name: `${replyTo.sender.first_name || ''} ${replyTo.sender.last_name || ''}`.trim()
             } : undefined
           } : null,
-          reactions: reactionsMap.get(msg.id) || []
+          reactions: reactionsMap.get(msg.id) || [],
+          read_receipts: readReceiptsMap.get(msg.id) || []
         };
       }) as Message[];
     },
     enabled: !!conversationId,
+  });
+}
+
+export function useMarkMessageAsRead() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ messageId, conversationId }: { messageId: string; conversationId: string }) => {
+      const employeeId = await getCurrentEmployeeId();
+      
+      // Upsert read receipt
+      await supabase
+        .from("chat_message_read_receipts")
+        .upsert({ 
+          message_id: messageId, 
+          employee_id: employeeId,
+          read_at: new Date().toISOString()
+        }, { onConflict: 'message_id,employee_id' });
+      
+      return { conversationId };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["chat-messages", result.conversationId] });
+    },
   });
 }
 

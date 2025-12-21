@@ -933,6 +933,42 @@ export type Database = {
           },
         ]
       }
+      chat_message_read_receipts: {
+        Row: {
+          employee_id: string
+          id: string
+          message_id: string
+          read_at: string
+        }
+        Insert: {
+          employee_id: string
+          id?: string
+          message_id: string
+          read_at?: string
+        }
+        Update: {
+          employee_id?: string
+          id?: string
+          message_id?: string
+          read_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_message_read_receipts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_message_read_receipts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           attachment_name: string | null
