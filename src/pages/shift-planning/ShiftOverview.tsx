@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval } from "date-fns";
+import { useState, useMemo, useCallback } from "react";
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -111,6 +111,78 @@ export default function ShiftOverview() {
       return data as { id: string; employee_id: string; clock_in: string; clock_out: string | null; effective_clock_in: string | null; effective_clock_out: string | null; effective_hours: number | null; break_minutes: number | null; note: string | null }[];
     },
   });
+
+  // Fetch team memberships for all employees
+  const { data: teamMemberships } = useQuery({
+    queryKey: ["team-memberships-for-shifts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_members")
+        .select("employee_id, team_id");
+      if (error) throw error;
+      return data as { employee_id: string; team_id: string }[];
+    },
+  });
+
+  // Fetch primary shifts with their day configurations
+  const { data: primaryShiftsData } = useQuery({
+    queryKey: ["primary-shifts-all-teams"],
+    queryFn: async () => {
+      // Get all primary shifts
+      const { data: shifts, error } = await supabase
+        .from("team_standard_shifts")
+        .select("id, team_id, name, start_time, end_time")
+        .eq("is_primary", true);
+      if (error) throw error;
+      if (!shifts || shifts.length === 0) return { shifts: [], days: [] };
+
+      // Get day configurations for all primary shifts
+      const shiftIds = shifts.map(s => s.id);
+      const { data: days, error: daysError } = await supabase
+        .from("team_standard_shift_days")
+        .select("shift_id, day_of_week, start_time, end_time")
+        .in("shift_id", shiftIds);
+      if (daysError) throw daysError;
+
+      return { 
+        shifts: shifts as { id: string; team_id: string; name: string; start_time: string; end_time: string }[],
+        days: (days || []) as { shift_id: string; day_of_week: number; start_time: string; end_time: string }[]
+      };
+    },
+  });
+
+  // Helper to get work times from primary shift
+  const getWorkTimesForEmployeeAndDay = useCallback((employeeId: string, date: Date): string | null => {
+    if (!teamMemberships || !primaryShiftsData) return null;
+
+    // Find employee's team
+    const membership = teamMemberships.find(m => m.employee_id === employeeId);
+    if (!membership) return null;
+
+    // Find primary shift for team
+    const primaryShift = primaryShiftsData.shifts.find(s => s.team_id === membership.team_id);
+    if (!primaryShift) return null;
+
+    // Convert JS day to database format (1=Monday, 7=Sunday)
+    const jsDay = getDay(date);
+    const dbDayOfWeek = jsDay === 0 ? 7 : jsDay;
+
+    // Check for day-specific times
+    const dayConfig = primaryShiftsData.days.find(
+      d => d.shift_id === primaryShift.id && d.day_of_week === dbDayOfWeek
+    );
+
+    if (dayConfig) {
+      const start = dayConfig.start_time.slice(0, 5);
+      const end = dayConfig.end_time.slice(0, 5);
+      return `${start}-${end}`;
+    }
+
+    // Fallback to main shift times
+    const start = primaryShift.start_time.slice(0, 5);
+    const end = primaryShift.end_time.slice(0, 5);
+    return `${start}-${end}`;
+  }, [teamMemberships, primaryShiftsData]);
 
   // Get time stamp for specific employee and date
   const getTimeStampForDate = (employeeId: string, date: Date) => {
@@ -643,7 +715,7 @@ export default function ShiftOverview() {
                     const isSick = absenceDisplay?.type === "sick";
                     const isLate = !!lateness;
                     const isWorking = !absenceDisplay && !lateness && !holiday;
-                    const workTimes = employee.standard_start_time;
+                    const workTimes = getWorkTimesForEmployeeAndDay(employee.id, day) || employee.standard_start_time;
                     const hasStatus = isVacation || isSick || isLate;
                     
                     return (
