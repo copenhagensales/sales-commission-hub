@@ -82,6 +82,7 @@ import {
   CphSalesDashboard,
   TestDashboard,
   DashboardSettings,
+  DesignDashboard,
   Messages,
   OnboardingDashboard,
   EmployeeOnboardingView,
@@ -185,6 +186,7 @@ export const routes: RouteConfig[] = [
   { path: "/dashboards/mg-test", component: MgTestDashboard, access: "public" },
   { path: "/dashboards/test", component: TestDashboard, access: "public" },
   { path: "/dashboards/settings", component: DashboardSettings, access: "public" },
+  { path: "/dashboards/design", component: DesignDashboard, access: "protected" },
   { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "public" },
   
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
