@@ -2425,6 +2425,69 @@ export type Database = {
           },
         ]
       }
+      employee_onboarding_progress: {
+        Row: {
+          checkout_blockers: string[] | null
+          checkout_completed: boolean | null
+          checkout_confidence: number | null
+          completed_at: string | null
+          created_at: string
+          drill_completed: boolean | null
+          employee_id: string
+          id: string
+          onboarding_day_id: string
+          quiz_completed: boolean | null
+          quiz_score: number | null
+          updated_at: string
+          videos_completed: Json | null
+        }
+        Insert: {
+          checkout_blockers?: string[] | null
+          checkout_completed?: boolean | null
+          checkout_confidence?: number | null
+          completed_at?: string | null
+          created_at?: string
+          drill_completed?: boolean | null
+          employee_id: string
+          id?: string
+          onboarding_day_id: string
+          quiz_completed?: boolean | null
+          quiz_score?: number | null
+          updated_at?: string
+          videos_completed?: Json | null
+        }
+        Update: {
+          checkout_blockers?: string[] | null
+          checkout_completed?: boolean | null
+          checkout_confidence?: number | null
+          completed_at?: string | null
+          created_at?: string
+          drill_completed?: boolean | null
+          employee_id?: string
+          id?: string
+          onboarding_day_id?: string
+          quiz_completed?: boolean | null
+          quiz_score?: number | null
+          updated_at?: string
+          videos_completed?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_onboarding_progress_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_onboarding_progress_onboarding_day_id_fkey"
+            columns: ["onboarding_day_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_days"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       extra_work: {
         Row: {
           approved_at: string | null
@@ -3231,6 +3294,197 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      onboarding_coaching_tasks: {
+        Row: {
+          assigned_drill_id: string | null
+          call_id: string | null
+          call_timestamp: string | null
+          completed_at: string | null
+          created_at: string
+          due_date: string | null
+          employee_id: string
+          id: string
+          improvement: string | null
+          leader_id: string | null
+          onboarding_day_id: string
+          score: number | null
+          status: string
+          strength: string | null
+          suggested_phrase: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_drill_id?: string | null
+          call_id?: string | null
+          call_timestamp?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          employee_id: string
+          id?: string
+          improvement?: string | null
+          leader_id?: string | null
+          onboarding_day_id: string
+          score?: number | null
+          status?: string
+          strength?: string | null
+          suggested_phrase?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_drill_id?: string | null
+          call_id?: string | null
+          call_timestamp?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          employee_id?: string
+          id?: string
+          improvement?: string | null
+          leader_id?: string | null
+          onboarding_day_id?: string
+          score?: number | null
+          status?: string
+          strength?: string | null
+          suggested_phrase?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_coaching_tasks_assigned_drill_id_fkey"
+            columns: ["assigned_drill_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_drills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_coaching_tasks_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_coaching_tasks_leader_id_fkey"
+            columns: ["leader_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_coaching_tasks_onboarding_day_id_fkey"
+            columns: ["onboarding_day_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_days"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_days: {
+        Row: {
+          call_mission: string | null
+          checkout_blockers: string[] | null
+          checkout_confidence_scale: boolean | null
+          coaching_focus_only: boolean | null
+          coaching_required: boolean | null
+          coaching_reviews_per_rep: number | null
+          created_at: string
+          day: number
+          drill_duration_min: number | null
+          drill_id: string | null
+          drill_title: string | null
+          focus_description: string | null
+          focus_id: string
+          focus_title: string
+          id: string
+          leader_course_duration_min: number | null
+          leader_course_ppt_id: string | null
+          leader_course_title: string | null
+          quiz_pass_score: number | null
+          quiz_questions: number | null
+          updated_at: string
+          videos: Json
+          week: number
+        }
+        Insert: {
+          call_mission?: string | null
+          checkout_blockers?: string[] | null
+          checkout_confidence_scale?: boolean | null
+          coaching_focus_only?: boolean | null
+          coaching_required?: boolean | null
+          coaching_reviews_per_rep?: number | null
+          created_at?: string
+          day: number
+          drill_duration_min?: number | null
+          drill_id?: string | null
+          drill_title?: string | null
+          focus_description?: string | null
+          focus_id: string
+          focus_title: string
+          id?: string
+          leader_course_duration_min?: number | null
+          leader_course_ppt_id?: string | null
+          leader_course_title?: string | null
+          quiz_pass_score?: number | null
+          quiz_questions?: number | null
+          updated_at?: string
+          videos?: Json
+          week: number
+        }
+        Update: {
+          call_mission?: string | null
+          checkout_blockers?: string[] | null
+          checkout_confidence_scale?: boolean | null
+          coaching_focus_only?: boolean | null
+          coaching_required?: boolean | null
+          coaching_reviews_per_rep?: number | null
+          created_at?: string
+          day?: number
+          drill_duration_min?: number | null
+          drill_id?: string | null
+          drill_title?: string | null
+          focus_description?: string | null
+          focus_id?: string
+          focus_title?: string
+          id?: string
+          leader_course_duration_min?: number | null
+          leader_course_ppt_id?: string | null
+          leader_course_title?: string | null
+          quiz_pass_score?: number | null
+          quiz_questions?: number | null
+          updated_at?: string
+          videos?: Json
+          week?: number
+        }
+        Relationships: []
+      }
+      onboarding_drills: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_min: number | null
+          focus: string
+          id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_min?: number | null
+          focus: string
+          id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_min?: number | null
+          focus?: string
+          id?: string
+          title?: string
+        }
+        Relationships: []
       }
       password_reset_tokens: {
         Row: {
