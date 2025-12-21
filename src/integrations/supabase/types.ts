@@ -4606,6 +4606,7 @@ export type Database = {
           break_end: string
           break_start: string
           created_at: string
+          day_of_week: number | null
           id: string
           shift_id: string
         }
@@ -4613,6 +4614,7 @@ export type Database = {
           break_end: string
           break_start: string
           created_at?: string
+          day_of_week?: number | null
           id?: string
           shift_id: string
         }
@@ -4620,6 +4622,7 @@ export type Database = {
           break_end?: string
           break_start?: string
           created_at?: string
+          day_of_week?: number | null
           id?: string
           shift_id?: string
         }

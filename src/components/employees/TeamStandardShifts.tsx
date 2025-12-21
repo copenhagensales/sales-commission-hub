@@ -34,17 +34,20 @@ interface ShiftBreak {
   shift_id: string;
   break_start: string;
   break_end: string;
+  day_of_week: number | null;
 }
 
 interface BreakInput {
   break_start: string;
   break_end: string;
+  day_of_week?: number | null;
 }
 
 interface DayConfig {
   enabled: boolean;
   start_time: string;
   end_time: string;
+  breaks: BreakInput[];
 }
 
 interface TeamStandardShiftsProps {
@@ -103,7 +106,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
   const [dayConfigs, setDayConfigs] = useState<Record<number, DayConfig>>(() => {
     const initial: Record<number, DayConfig> = {};
     for (let i = 0; i < 7; i++) {
-      initial[i] = { enabled: false, start_time: "08:00", end_time: "16:00" };
+      initial[i] = { enabled: false, start_time: "08:00", end_time: "16:00", breaks: [] };
     }
     return initial;
   });
@@ -192,7 +195,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
         .single();
       if (shiftError) throw shiftError;
 
-      // Create breaks
+      // Create general breaks (for "Samme tider" mode)
       const validBreaks = data.breaks.filter((b) => b.break_start && b.break_end);
       if (validBreaks.length > 0) {
         const { error: breaksError } = await supabase.from("team_shift_breaks").insert(
@@ -200,9 +203,31 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
             shift_id: newShift.id,
             break_start: b.break_start,
             break_end: b.break_end,
+            day_of_week: null,
           }))
         );
         if (breaksError) throw breaksError;
+      }
+
+      // Create day-specific breaks (for "Forskellige tider" mode)
+      const dayBreaks: { shift_id: string; break_start: string; break_end: string; day_of_week: number }[] = [];
+      Object.entries(data.dayConfigs).forEach(([day, config]) => {
+        if (config.enabled && config.breaks) {
+          config.breaks.forEach(b => {
+            if (b.break_start && b.break_end) {
+              dayBreaks.push({
+                shift_id: newShift.id,
+                break_start: b.break_start,
+                break_end: b.break_end,
+                day_of_week: parseInt(day),
+              });
+            }
+          });
+        }
+      });
+      if (dayBreaks.length > 0) {
+        const { error: dayBreaksError } = await supabase.from("team_shift_breaks").insert(dayBreaks);
+        if (dayBreaksError) throw dayBreaksError;
       }
 
       // Create day configurations
@@ -259,6 +284,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       // Delete existing breaks and re-add
       await supabase.from("team_shift_breaks").delete().eq("shift_id", data.id);
       
+      // Add general breaks
       const validBreaks = data.breaks.filter((b) => b.break_start && b.break_end);
       if (validBreaks.length > 0) {
         const { error: breaksError } = await supabase.from("team_shift_breaks").insert(
@@ -266,9 +292,31 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
             shift_id: data.id,
             break_start: b.break_start,
             break_end: b.break_end,
+            day_of_week: null,
           }))
         );
         if (breaksError) throw breaksError;
+      }
+
+      // Add day-specific breaks
+      const dayBreaks: { shift_id: string; break_start: string; break_end: string; day_of_week: number }[] = [];
+      Object.entries(data.dayConfigs).forEach(([day, config]) => {
+        if (config.enabled && config.breaks) {
+          config.breaks.forEach(b => {
+            if (b.break_start && b.break_end) {
+              dayBreaks.push({
+                shift_id: data.id,
+                break_start: b.break_start,
+                break_end: b.break_end,
+                day_of_week: parseInt(day),
+              });
+            }
+          });
+        }
+      });
+      if (dayBreaks.length > 0) {
+        const { error: dayBreaksError } = await supabase.from("team_shift_breaks").insert(dayBreaks);
+        if (dayBreaksError) throw dayBreaksError;
       }
 
       // Delete existing days and re-add
@@ -357,7 +405,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     // Reset day configs
     const initial: Record<number, DayConfig> = {};
     for (let i = 0; i < 7; i++) {
-      initial[i] = { enabled: false, start_time: "08:00", end_time: "16:00" };
+      initial[i] = { enabled: false, start_time: "08:00", end_time: "16:00", breaks: [] };
     }
     setDayConfigs(initial);
   };
@@ -378,8 +426,10 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       start_time: shift.start_time.slice(0, 5),
       end_time: shift.end_time.slice(0, 5),
     });
+    // Get general breaks (day_of_week is null)
+    const generalBreaks = shiftBreaks.filter(b => b.day_of_week === null);
     setBreaks(
-      shiftBreaks.map((b) => ({
+      generalBreaks.map((b) => ({
         break_start: b.break_start.slice(0, 5),
         break_end: b.break_end.slice(0, 5),
       }))
@@ -390,15 +440,24 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     let hasDifferentTimes = false;
     for (let i = 0; i < 7; i++) {
       const existingDay = shiftDays.find(d => d.day_of_week === i);
+      const dayBreaks = shiftBreaks
+        .filter(b => b.day_of_week === i)
+        .map(b => ({
+          break_start: b.break_start.slice(0, 5),
+          break_end: b.break_end.slice(0, 5),
+        }));
+      
       if (existingDay) {
         newDayConfigs[i] = {
           enabled: true,
           start_time: existingDay.start_time.slice(0, 5),
           end_time: existingDay.end_time.slice(0, 5),
+          breaks: dayBreaks,
         };
-        // Check if this day has different times than the standard
+        // Check if this day has different times or breaks than the standard
         if (existingDay.start_time.slice(0, 5) !== shift.start_time.slice(0, 5) ||
-            existingDay.end_time.slice(0, 5) !== shift.end_time.slice(0, 5)) {
+            existingDay.end_time.slice(0, 5) !== shift.end_time.slice(0, 5) ||
+            dayBreaks.length > 0) {
           hasDifferentTimes = true;
         }
       } else {
@@ -406,6 +465,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
           enabled: false,
           start_time: shift.start_time.slice(0, 5),
           end_time: shift.end_time.slice(0, 5),
+          breaks: [],
         };
       }
     }
@@ -448,6 +508,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
         // When enabling, use the default times from formData
         start_time: !prev[day].enabled ? formData.start_time : prev[day].start_time,
         end_time: !prev[day].enabled ? formData.end_time : prev[day].end_time,
+        breaks: !prev[day].enabled ? [] : prev[day].breaks,
       }
     }));
   };
@@ -458,6 +519,36 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       [day]: {
         ...prev[day],
         [field]: value,
+      }
+    }));
+  };
+
+  const addDayBreak = (day: number) => {
+    setDayConfigs(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        breaks: [...prev[day].breaks, { break_start: "12:00", break_end: "12:30" }],
+      }
+    }));
+  };
+
+  const removeDayBreak = (day: number, index: number) => {
+    setDayConfigs(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        breaks: prev[day].breaks.filter((_, i) => i !== index),
+      }
+    }));
+  };
+
+  const updateDayBreak = (day: number, index: number, field: "break_start" | "break_end", value: string) => {
+    setDayConfigs(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        breaks: prev[day].breaks.map((b, i) => (i === index ? { ...b, [field]: value } : b)),
       }
     }));
   };
@@ -715,27 +806,70 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                     </span>
                   </div>
 
-                  {/* Individual day times - only show when "Forskellige tider" is selected */}
+                  {/* Individual day times and breaks - only show when "Forskellige tider" is selected */}
                   {useDifferentTimes && (
-                    <div className="space-y-2 p-3 border rounded-lg bg-background">
+                    <div className="space-y-4 p-3 border rounded-lg bg-background">
                       {WEEKDAY_ORDER.filter(day => dayConfigs[day].enabled).map(day => {
                         const config = dayConfigs[day];
                         return (
-                          <div key={day} className="flex items-center gap-3">
-                            <span className="text-sm font-medium w-12">{DAY_NAMES[day]}</span>
-                            <TimeSelect
-                              value={config.start_time}
-                              onChange={(value) => updateDayTime(day, "start_time", value)}
-                              placeholder="Start"
-                              className="flex-1"
-                            />
-                            <span className="text-muted-foreground">-</span>
-                            <TimeSelect
-                              value={config.end_time}
-                              onChange={(value) => updateDayTime(day, "end_time", value)}
-                              placeholder="Slut"
-                              className="flex-1"
-                            />
+                          <div key={day} className="space-y-2">
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-semibold w-12">{DAY_NAMES[day]}</span>
+                              <TimeSelect
+                                value={config.start_time}
+                                onChange={(value) => updateDayTime(day, "start_time", value)}
+                                placeholder="Start"
+                                className="flex-1"
+                              />
+                              <span className="text-muted-foreground">-</span>
+                              <TimeSelect
+                                value={config.end_time}
+                                onChange={(value) => updateDayTime(day, "end_time", value)}
+                                placeholder="Slut"
+                                className="flex-1"
+                              />
+                            </div>
+                            
+                            {/* Day-specific breaks */}
+                            <div className="ml-12 space-y-2">
+                              {config.breaks.map((b, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground w-12">Pause</span>
+                                  <TimeSelect
+                                    value={b.break_start}
+                                    onChange={(value) => updateDayBreak(day, index, "break_start", value)}
+                                    placeholder="Start"
+                                    className="flex-1"
+                                  />
+                                  <span className="text-muted-foreground">-</span>
+                                  <TimeSelect
+                                    value={b.break_end}
+                                    onChange={(value) => updateDayBreak(day, index, "break_end", value)}
+                                    placeholder="Slut"
+                                    className="flex-1"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+                                    onClick={() => removeDayBreak(day, index)}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => addDayBreak(day)}
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Tilføj pause
+                              </Button>
+                            </div>
                           </div>
                         );
                       })}
