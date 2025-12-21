@@ -49,23 +49,45 @@ export function useVagtEmployees() {
   return useQuery({
     queryKey: ["vagt-employees"],
     queryFn: async () => {
+      // First get the Fieldmarketing team ID
+      const { data: teamData, error: teamError } = await supabase
+        .from("teams")
+        .select("id")
+        .ilike("name", "Fieldmarketing")
+        .maybeSingle();
+
+      if (teamError) throw teamError;
+      if (!teamData) return [];
+
+      // Get all employees who are members of the Fieldmarketing team
       const { data, error } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name, private_email, private_phone, is_active, department")
-        .eq("job_title", "Fieldmarketing")
-        .eq("is_active", true)
-        .order("first_name");
+        .from("team_members")
+        .select(`
+          employee_id,
+          employee:employee_id(
+            id,
+            first_name,
+            last_name,
+            private_email,
+            private_phone,
+            is_active,
+            department
+          )
+        `)
+        .eq("team_id", teamData.id);
 
       if (error) throw error;
       
-      return (data || []).map(emp => ({
-        id: emp.id,
-        full_name: `${emp.first_name} ${emp.last_name}`,
-        email: emp.private_email,
-        phone: emp.private_phone,
-        is_active: emp.is_active ?? true,
-        team: emp.department, // Use department as team
-      })) as VagtEmployee[];
+      return (data || [])
+        .filter(tm => tm.employee && tm.employee.is_active)
+        .map(tm => ({
+          id: tm.employee.id,
+          full_name: `${tm.employee.first_name} ${tm.employee.last_name}`,
+          email: tm.employee.private_email,
+          phone: tm.employee.private_phone,
+          is_active: tm.employee.is_active ?? true,
+          team: tm.employee.department,
+        })) as VagtEmployee[];
     },
   });
 }
