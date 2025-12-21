@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
 import { WidgetSettingsTab } from "@/components/dashboard/WidgetSettingsTab";
+import { KpiSettingsTab } from "@/components/dashboard/KpiSettingsTab";
 
 interface DashboardKpi {
   id: string;
@@ -502,11 +503,15 @@ const DashboardSettings = () => {
           </p>
         </div>
 
-        <Tabs defaultValue="kpis" className="w-full">
+        <Tabs defaultValue="kpi-types" className="w-full">
           <TabsList>
+            <TabsTrigger value="kpi-types" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              KPI Typer
+            </TabsTrigger>
             <TabsTrigger value="kpis" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
-              KPI'er
+              KPI'er (Database)
             </TabsTrigger>
             <TabsTrigger value="widgets" className="flex items-center gap-2">
               <LayoutGrid className="h-4 w-4" />
@@ -517,6 +522,10 @@ const DashboardSettings = () => {
               Design
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="kpi-types" className="mt-6">
+            <KpiSettingsTab />
+          </TabsContent>
 
           <TabsContent value="kpis" className="mt-6">
             <Card>

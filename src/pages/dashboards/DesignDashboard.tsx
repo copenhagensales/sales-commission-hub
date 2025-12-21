@@ -34,12 +34,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useWidgetTypes } from "@/hooks/useWidgetTypes";
-
-interface KpiType {
-  id: string;
-  name: string;
-  description: string;
-}
+import { useKpiTypes } from "@/hooks/useKpiTypes";
 
 interface TimePeriod {
   id: string;
@@ -69,19 +64,6 @@ interface PlacedWidget {
   width: number;
   height: number;
 }
-
-const KPI_TYPES: KpiType[] = [
-  { id: "sales", name: "Salg", description: "Antal salg" },
-  { id: "revenue", name: "Omsætning", description: "Total omsætning" },
-  { id: "conversion-rate", name: "Konverteringsrate", description: "Konverteringsrate %" },
-  { id: "calls", name: "Opkald", description: "Antal opkald" },
-  { id: "avg-call-duration", name: "Gns. opkaldstid", description: "Gennemsnitlig opkaldstid" },
-  { id: "team-target", name: "Team mål", description: "Fremskridt mod team mål" },
-  { id: "individual-target", name: "Individuelt mål", description: "Fremskridt mod individuelt mål" },
-  { id: "leads-generated", name: "Leads genereret", description: "Antal nye leads" },
-  { id: "appointments-booked", name: "Aftaler booket", description: "Antal bookede aftaler" },
-  { id: "customer-satisfaction", name: "Kundetilfredshed", description: "Kundetilfredshedsscore" },
-];
 
 const TIME_PERIODS: TimePeriod[] = [
   { id: "today", name: "I dag", description: "Data fra i dag" },
@@ -124,6 +106,7 @@ const getWidgetIcon = (iconName: string) => {
 export default function DesignDashboard() {
   const { toast } = useToast();
   const { activeWidgetTypes } = useWidgetTypes();
+  const { activeKpiTypes } = useKpiTypes();
   const [placedWidgets, setPlacedWidgets] = useState<PlacedWidget[]>([]);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<PlacedWidget | null>(null);
@@ -231,7 +214,7 @@ export default function DesignDashboard() {
     if (widget.dataSource === "custom") {
       return widget.customLabel || "Brugerdefineret";
     }
-    return KPI_TYPES.find(k => k.id === widget.kpiTypeId)?.name || "";
+    return activeKpiTypes.find(k => k.id === widget.kpiTypeId)?.name || "";
   };
 
   const getDisplayValue = (widget: PlacedWidget) => {
@@ -462,7 +445,7 @@ export default function DesignDashboard() {
                     <SelectValue placeholder="Vælg KPI" />
                   </SelectTrigger>
                   <SelectContent>
-                    {KPI_TYPES.map((kpi) => (
+                    {activeKpiTypes.map((kpi) => (
                       <SelectItem key={kpi.id} value={kpi.id}>
                         <div className="flex flex-col">
                           <span>{kpi.name}</span>
