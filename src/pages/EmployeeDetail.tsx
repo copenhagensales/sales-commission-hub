@@ -720,6 +720,12 @@ export default function EmployeeDetail() {
                     displayValue={employee.job_title}
                     required
                   />
+                  <EditableRow 
+                    label="Afdeling" 
+                    value={employee.department} 
+                    field="department" 
+                    onSave={handleSave} 
+                  />
                   <SelectRow 
                     label="Arbejdssted" 
                     value={employee.work_location} 
