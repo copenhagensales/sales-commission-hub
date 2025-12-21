@@ -80,6 +80,7 @@ import {
   TeamDashboard,
   FieldmarketingDashboardFull,
   CphSalesDashboard,
+  TestDashboard,
   Messages,
 } from "./pages";
 import { SmartRedirect } from "./guards";
@@ -175,6 +176,7 @@ export const routes: RouteConfig[] = [
   { path: "/dashboards/tryg", component: TrygDashboard, access: "public" },
   { path: "/dashboards/ase", component: AseDashboard, access: "public" },
   { path: "/dashboards/mg-test", component: MgTestDashboard, access: "public" },
+  { path: "/dashboards/test", component: TestDashboard, access: "public" },
   { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "public" },
   
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
