@@ -102,4 +102,5 @@ export const EmployeeOnboardingView = lazyPage(() => import("@/pages/onboarding/
 export const LeaderOnboardingView = lazyPage(() => import("@/pages/onboarding/LeaderOnboardingView"));
 export const DrillLibrary = lazyPage(() => import("@/pages/onboarding/DrillLibrary"));
 export const OnboardingAdmin = lazyPage(() => import("@/pages/onboarding/OnboardingAdmin"));
+export const ExpectationsRamp = lazyPage(() => import("@/pages/onboarding/ExpectationsRamp"));
 

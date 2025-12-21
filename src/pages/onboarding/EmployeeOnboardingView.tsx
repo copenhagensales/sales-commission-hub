@@ -8,6 +8,8 @@ import { Play, CheckCircle2, Clock, Target, BookOpen, Dumbbell, PhoneCall } from
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { VideoPlayerDialog } from "@/components/onboarding/VideoPlayerDialog";
+import { DailyMessage } from "@/components/onboarding/DailyMessage";
+import { MyProgression } from "@/components/onboarding/MyProgression";
 
 export default function EmployeeOnboardingView() {
   const { data: employeeId } = useCurrentEmployeeId();
@@ -152,6 +154,19 @@ export default function EmployeeOnboardingView() {
 
       {/* Main Content */}
       <div className="lg:col-span-2 space-y-4">
+        {/* Daily Message */}
+        {selectedDayData && (
+          <DailyMessage 
+            currentWeek={selectedDayData.week} 
+            dayMessage={(selectedDayData as any).daily_message}
+          />
+        )}
+
+        {/* My Progression */}
+        {selectedDayData && (
+          <MyProgression currentWeek={selectedDayData.week} />
+        )}
+
         {selectedDayData ? (
           <>
             {/* Day Header */}

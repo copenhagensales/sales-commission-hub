@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { VideoUploadDialog } from "@/components/onboarding/VideoUploadDialog";
 import { useQueryClient } from "@tanstack/react-query";
+import { WeekExpectationsEditor } from "@/components/onboarding/WeekExpectationsEditor";
 
 // Seed data - the 15 onboarding days
 const SEED_DAYS = [
@@ -315,6 +316,9 @@ export default function OnboardingAdmin() {
             </CardContent>
           </Card>
         )}
+
+        {/* Week Expectations Editor */}
+        <WeekExpectationsEditor />
       </div>
 
       {/* Video Upload Dialog */}

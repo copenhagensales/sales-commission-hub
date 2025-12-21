@@ -87,6 +87,7 @@ import {
   LeaderOnboardingView,
   DrillLibrary,
   OnboardingAdmin,
+  ExpectationsRamp,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -194,6 +195,7 @@ export const routes: RouteConfig[] = [
   // Onboarding
   { path: "/onboarding-program", component: OnboardingDashboard, access: "role", positionPermission: "menu_onboarding" },
   { path: "/onboarding-program/employee", component: EmployeeOnboardingView, access: "protected" },
+  { path: "/onboarding-program/expectations", component: ExpectationsRamp, access: "protected" },
   { path: "/onboarding-program/leader", component: LeaderOnboardingView, access: "role", positionPermission: "menu_onboarding_leader" },
   { path: "/onboarding-program/drills", component: DrillLibrary, access: "protected" },
   { path: "/onboarding-program/admin", component: OnboardingAdmin, access: "role", positionPermission: "menu_onboarding_admin" },
