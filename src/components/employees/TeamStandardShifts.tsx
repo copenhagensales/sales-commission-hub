@@ -619,11 +619,26 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               {shifts.map((shift) => {
                 const shiftBreaks = getShiftBreaks(shift.id);
                 const shiftDays = getShiftDays(shift.id);
-                const breakInputs = shiftBreaks.map((b) => ({
-                  break_start: b.break_start,
-                  break_end: b.break_end,
-                }));
-                const workTime = calculateWorkingTime(shift.start_time, shift.end_time, breakInputs);
+                
+                // Calculate work time: sum of all days with their respective breaks
+                let workTime = 0;
+                if (shiftDays.length > 0) {
+                  // Sum working time for each enabled day
+                  workTime = shiftDays.reduce((sum, day) => {
+                    // Get breaks for this specific day, or general breaks (day_of_week is null)
+                    const dayBreaks = shiftBreaks.filter(
+                      b => b.day_of_week === day.day_of_week || b.day_of_week === null
+                    ).map(b => ({ break_start: b.break_start, break_end: b.break_end }));
+                    return sum + calculateWorkingTime(day.start_time, day.end_time, dayBreaks);
+                  }, 0);
+                } else {
+                  // No specific days - use standard times with all breaks
+                  const breakInputs = shiftBreaks.map((b) => ({
+                    break_start: b.break_start,
+                    break_end: b.break_end,
+                  }));
+                  workTime = calculateWorkingTime(shift.start_time, shift.end_time, breakInputs) * 5; // Default 5 days
+                }
                 
                 return (
                   <TableRow key={shift.id}>
