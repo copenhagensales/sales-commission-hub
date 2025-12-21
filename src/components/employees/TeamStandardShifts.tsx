@@ -559,7 +559,13 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
   };
 
   // Calculate working time for display
-  const workingMinutes = calculateWorkingTime(formData.start_time, formData.end_time, breaks);
+  const workingMinutes = useDifferentTimes
+    ? Object.entries(dayConfigs)
+        .filter(([_, config]) => config.enabled)
+        .reduce((sum, [_, config]) => {
+          return sum + calculateWorkingTime(config.start_time, config.end_time, config.breaks);
+        }, 0)
+    : calculateWorkingTime(formData.start_time, formData.end_time, breaks);
 
   // Get enabled days count
   const enabledDaysCount = Object.values(dayConfigs).filter(c => c.enabled).length;
