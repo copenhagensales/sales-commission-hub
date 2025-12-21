@@ -47,13 +47,13 @@ export function StaffEmployeesTab() {
   const { data: staffEmployees = [], isLoading } = useQuery<StaffEmployee[]>({
     queryKey: ["staff-employees"],
     queryFn: async () => {
-      const query = supabase
+      const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, private_email, private_phone, job_title, department, is_active, invitation_status");
-      // @ts-expect-error - Supabase type instantiation depth issue
-      const result = await query.eq("is_staff_employee", true).order("last_name", { ascending: true });
-      if (result.error) throw result.error;
-      return (result.data as StaffEmployee[]) ?? [];
+        .select("id, first_name, last_name, private_email, private_phone, job_title, department, is_active, invitation_status")
+        .eq("is_staff_employee", true)
+        .order("last_name", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as StaffEmployee[];
     },
   });
 

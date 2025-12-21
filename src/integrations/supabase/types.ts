@@ -2276,6 +2276,7 @@ export type Database = {
           invitation_status: string | null
           is_active: boolean | null
           is_freelance_consultant: boolean | null
+          is_staff_employee: boolean
           job_title: string | null
           last_name: string
           manager_id: string | null
@@ -2325,6 +2326,7 @@ export type Database = {
           invitation_status?: string | null
           is_active?: boolean | null
           is_freelance_consultant?: boolean | null
+          is_staff_employee?: boolean
           job_title?: string | null
           last_name: string
           manager_id?: string | null
@@ -2374,6 +2376,7 @@ export type Database = {
           invitation_status?: string | null
           is_active?: boolean | null
           is_freelance_consultant?: boolean | null
+          is_staff_employee?: boolean
           job_title?: string | null
           last_name?: string
           manager_id?: string | null
