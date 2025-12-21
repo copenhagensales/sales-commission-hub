@@ -7,26 +7,30 @@ import { format, formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { Users, Clock, Activity, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 export default function LoginLog() {
   const { recentLogins, loginStats, activeUsers, isLoading, refetch } = useLoginLog();
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-6 space-y-6">
-        <Skeleton className="h-10 w-64" />
-        <div className="grid gap-4 md:grid-cols-3">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+      <MainLayout>
+        <div className="container mx-auto py-6 space-y-6">
+          <Skeleton className="h-10 w-64" />
+          <div className="grid gap-4 md:grid-cols-3">
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+          </div>
+          <Skeleton className="h-96" />
         </div>
-        <Skeleton className="h-96" />
-      </div>
+      </MainLayout>
     );
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <MainLayout>
+      <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Login Log</h1>
@@ -136,6 +140,7 @@ export default function LoginLog() {
           </Table>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </MainLayout>
   );
 }
