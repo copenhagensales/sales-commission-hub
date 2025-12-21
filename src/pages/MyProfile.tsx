@@ -125,7 +125,23 @@ export default function MyProfile() {
         .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      if (!data) return null;
+      
+      // Fetch team names for this employee
+      const { data: teamMemberships } = await supabase
+        .from("team_members")
+        .select("team:teams(name)")
+        .eq("employee_id", data.id);
+      
+      const teamNames = (teamMemberships || [])
+        .map((tm: { team: { name: string } | null }) => tm.team?.name)
+        .filter(Boolean)
+        .join(", ");
+      
+      return {
+        ...data,
+        department: teamNames || data.department, // Use team names, fallback to department
+      };
     },
   });
 

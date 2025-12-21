@@ -205,11 +205,28 @@ export function useAbsenceRequests(status?: "pending" | "approved" | "rejected",
   return useQuery({
     queryKey: ["absence-requests", status, employeeId],
     queryFn: async () => {
+      // Fetch team memberships for enriching employee data
+      const { data: teamMemberships } = await supabase
+        .from("team_members")
+        .select("employee_id, team:teams(name)");
+      
+      const employeeTeamMap = new Map<string, string>();
+      (teamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
+        if (tm.team?.name) {
+          const existing = employeeTeamMap.get(tm.employee_id);
+          if (existing) {
+            employeeTeamMap.set(tm.employee_id, `${existing}, ${tm.team.name}`);
+          } else {
+            employeeTeamMap.set(tm.employee_id, tm.team.name);
+          }
+        }
+      });
+
       let query = supabase
         .from("absence_request_v2")
         .select(`
           *,
-          employee:employee_master_data(id, first_name, last_name, department)
+          employee:employee_master_data(id, first_name, last_name)
         `)
         .order("created_at", { ascending: false });
 
@@ -222,7 +239,15 @@ export function useAbsenceRequests(status?: "pending" | "approved" | "rejected",
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as AbsenceRequest[];
+      
+      // Enrich with team names
+      return (data || []).map(req => ({
+        ...req,
+        employee: req.employee ? {
+          ...req.employee,
+          department: employeeTeamMap.get(req.employee.id) || null,
+        } : null,
+      })) as AbsenceRequest[];
     },
   });
 }
@@ -232,18 +257,43 @@ export function useAbsencesForDateRange(startDate: string, endDate: string) {
   return useQuery({
     queryKey: ["absences-date-range", startDate, endDate],
     queryFn: async () => {
+      // Fetch team memberships for enriching employee data
+      const { data: teamMemberships } = await supabase
+        .from("team_members")
+        .select("employee_id, team:teams(name)");
+      
+      const employeeTeamMap = new Map<string, string>();
+      (teamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
+        if (tm.team?.name) {
+          const existing = employeeTeamMap.get(tm.employee_id);
+          if (existing) {
+            employeeTeamMap.set(tm.employee_id, `${existing}, ${tm.team.name}`);
+          } else {
+            employeeTeamMap.set(tm.employee_id, tm.team.name);
+          }
+        }
+      });
+
       const { data, error } = await supabase
         .from("absence_request_v2")
         .select(`
           *,
-          employee:employee_master_data(id, first_name, last_name, department)
+          employee:employee_master_data(id, first_name, last_name)
         `)
         .eq("status", "approved")
         .lte("start_date", endDate)
         .gte("end_date", startDate);
 
       if (error) throw error;
-      return data as AbsenceRequest[];
+      
+      // Enrich with team names
+      return (data || []).map(req => ({
+        ...req,
+        employee: req.employee ? {
+          ...req.employee,
+          department: employeeTeamMap.get(req.employee.id) || null,
+        } : null,
+      })) as AbsenceRequest[];
     },
   });
 }
@@ -455,17 +505,39 @@ export function useEmployeesForShifts(teamId?: string) {
       // Get current employee id
       const { data: currentEmployeeId } = await supabase.rpc("get_current_employee_id");
       
-      // Helper to fetch employees by IDs
+      // Fetch all team memberships with team names for enriching employee data
+      const { data: allTeamMemberships } = await supabase
+        .from("team_members")
+        .select("employee_id, team:teams(name)");
+      
+      // Create a map of employee_id to team names (comma-separated if multiple)
+      const employeeTeamMap = new Map<string, string>();
+      (allTeamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
+        if (tm.team?.name) {
+          const existing = employeeTeamMap.get(tm.employee_id);
+          if (existing) {
+            employeeTeamMap.set(tm.employee_id, `${existing}, ${tm.team.name}`);
+          } else {
+            employeeTeamMap.set(tm.employee_id, tm.team.name);
+          }
+        }
+      });
+      
+      // Helper to fetch employees by IDs and enrich with team names
       const fetchEmployeesByIds = async (employeeIds: string[]) => {
         if (employeeIds.length === 0) return [];
         const { data, error } = await supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
+          .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
           .in("id", employeeIds)
           .eq("is_active", true)
           .order("first_name");
         if (error) throw error;
-        return data || [];
+        // Enrich with team names from team_members
+        return (data || []).map(emp => ({
+          ...emp,
+          department: employeeTeamMap.get(emp.id) || null,
+        }));
       };
       
       // If a specific team is selected, get employees from team_members
@@ -512,25 +584,33 @@ export function useEmployeesForShifts(teamId?: string) {
         // Fallback: filter by manager_id if no teams led
         const { data, error } = await supabase
           .from("employee_master_data")
-          .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
+          .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
           .eq("is_active", true)
           .eq("manager_id", currentEmployeeId)
           .neq("id", currentEmployeeId)
           .order("first_name");
         
         if (error) throw error;
-        return data;
+        // Enrich with team names
+        return (data || []).map(emp => ({
+          ...emp,
+          department: employeeTeamMap.get(emp.id) || null,
+        }));
       }
       
       // Owner - get all active employees
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
+        .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
         .eq("is_active", true)
         .order("first_name");
 
       if (error) throw error;
-      return data;
+      // Enrich with team names
+      return (data || []).map(emp => ({
+        ...emp,
+        department: employeeTeamMap.get(emp.id) || null,
+      }));
     },
     enabled: !!user?.id,
   });

@@ -45,18 +45,34 @@ export function CapacityPanel({ selectedDate, weekNumber, year }: CapacityPanelP
   const { data: allEmployees } = useQuery({
     queryKey: ["vagt-active-employees-capacity-master"],
     queryFn: async () => {
+      // Fetch team memberships with team names
+      const { data: teamMemberships } = await supabase
+        .from("team_members")
+        .select("employee_id, team:teams(name)");
+      
+      const employeeTeamMap = new Map<string, string>();
+      (teamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
+        if (tm.team?.name) {
+          const existing = employeeTeamMap.get(tm.employee_id);
+          if (existing) {
+            employeeTeamMap.set(tm.employee_id, `${existing}, ${tm.team.name}`);
+          } else {
+            employeeTeamMap.set(tm.employee_id, tm.team.name);
+          }
+        }
+      });
+
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, department")
+        .select("id, first_name, last_name")
         .eq("job_title", "Fieldmarketing")
-        .eq("is_active", true)
-        .not("department", "is", null);
+        .eq("is_active", true);
 
       if (error) throw error;
-      return data?.map(e => ({
+      return data?.filter(e => employeeTeamMap.has(e.id)).map(e => ({
         id: e.id,
         full_name: `${e.first_name} ${e.last_name}`,
-        team: e.department,
+        team: employeeTeamMap.get(e.id) || null,
         is_active: true,
       }));
     },

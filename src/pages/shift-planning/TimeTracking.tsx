@@ -46,6 +46,23 @@ export default function TimeTracking() {
   const { data: timeEntries, isLoading } = useQuery({
     queryKey: ["all-time-entries", monthStart, monthEnd, selectedDepartment],
     queryFn: async () => {
+      // Fetch team memberships for enriching employee data
+      const { data: teamMemberships } = await supabase
+        .from("team_members")
+        .select("employee_id, team:teams(name)");
+      
+      const employeeTeamMap = new Map<string, string>();
+      (teamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
+        if (tm.team?.name) {
+          const existing = employeeTeamMap.get(tm.employee_id);
+          if (existing) {
+            employeeTeamMap.set(tm.employee_id, `${existing}, ${tm.team.name}`);
+          } else {
+            employeeTeamMap.set(tm.employee_id, tm.team.name);
+          }
+        }
+      });
+
       // If team is selected, first get team member IDs
       let teamMemberIds: string[] | null = null;
       if (selectedDepartment && selectedDepartment !== "all") {
@@ -63,7 +80,7 @@ export default function TimeTracking() {
         .select(`
           *,
           shift(*),
-          employee:employee_master_data(id, first_name, last_name, department)
+          employee:employee_master_data(id, first_name, last_name)
         `)
         .gte("date", monthStart)
         .lte("date", monthEnd)
@@ -72,8 +89,15 @@ export default function TimeTracking() {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Filter by team membership
-      let filtered = data as TimeEntryWithDetails[];
+      // Filter by team membership and enrich with team names
+      let filtered = (data || []).map(entry => ({
+        ...entry,
+        employee: entry.employee ? {
+          ...entry.employee,
+          department: employeeTeamMap.get(entry.employee.id) || null,
+        } : null,
+      })) as TimeEntryWithDetails[];
+      
       if (teamMemberIds !== null) {
         filtered = filtered.filter(e => teamMemberIds!.includes(e.employee_id));
       }
