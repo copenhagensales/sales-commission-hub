@@ -3389,6 +3389,7 @@ export type Database = {
           coaching_focus_only: boolean | null
           coaching_required: boolean | null
           coaching_reviews_per_rep: number | null
+          coaching_schedule_tag: string | null
           created_at: string
           daily_message: string | null
           day: number
@@ -3402,6 +3403,7 @@ export type Database = {
           leader_course_duration_min: number | null
           leader_course_ppt_id: string | null
           leader_course_title: string | null
+          leader_script: string | null
           quiz_pass_score: number | null
           quiz_questions: number | null
           updated_at: string
@@ -3415,6 +3417,7 @@ export type Database = {
           coaching_focus_only?: boolean | null
           coaching_required?: boolean | null
           coaching_reviews_per_rep?: number | null
+          coaching_schedule_tag?: string | null
           created_at?: string
           daily_message?: string | null
           day: number
@@ -3428,6 +3431,7 @@ export type Database = {
           leader_course_duration_min?: number | null
           leader_course_ppt_id?: string | null
           leader_course_title?: string | null
+          leader_script?: string | null
           quiz_pass_score?: number | null
           quiz_questions?: number | null
           updated_at?: string
@@ -3441,6 +3445,7 @@ export type Database = {
           coaching_focus_only?: boolean | null
           coaching_required?: boolean | null
           coaching_reviews_per_rep?: number | null
+          coaching_schedule_tag?: string | null
           created_at?: string
           daily_message?: string | null
           day?: number
@@ -3454,6 +3459,7 @@ export type Database = {
           leader_course_duration_min?: number | null
           leader_course_ppt_id?: string | null
           leader_course_title?: string | null
+          leader_script?: string | null
           quiz_pass_score?: number | null
           quiz_questions?: number | null
           updated_at?: string
