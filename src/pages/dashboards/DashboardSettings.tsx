@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle, TrendingUp, Phone, Users, Award, PartyPopper, Flame, Star, Zap, Heart, Clock, Play, Target } from "lucide-react";
+import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle, TrendingUp, Phone, Users, Award, PartyPopper, Flame, Star, Zap, Heart, Clock, Play, Target, LayoutGrid } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
+import { WidgetSettingsTab } from "@/components/dashboard/WidgetSettingsTab";
 
 interface DashboardKpi {
   id: string;
@@ -507,7 +508,14 @@ const DashboardSettings = () => {
               <BarChart3 className="h-4 w-4" />
               KPI'er
             </TabsTrigger>
-            <TabsTrigger value="design">Design</TabsTrigger>
+            <TabsTrigger value="widgets" className="flex items-center gap-2">
+              <LayoutGrid className="h-4 w-4" />
+              Widgets
+            </TabsTrigger>
+            <TabsTrigger value="design" className="flex items-center gap-2">
+              <Palette className="h-4 w-4" />
+              Design
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="kpis" className="mt-6">
@@ -608,6 +616,10 @@ const DashboardSettings = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="widgets" className="mt-6">
+            <WidgetSettingsTab />
           </TabsContent>
 
           <TabsContent value="design" className="mt-6 space-y-6">
