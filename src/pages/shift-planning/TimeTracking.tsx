@@ -46,6 +46,18 @@ export default function TimeTracking() {
   const { data: timeEntries, isLoading } = useQuery({
     queryKey: ["all-time-entries", monthStart, monthEnd, selectedDepartment],
     queryFn: async () => {
+      // If team is selected, first get team member IDs
+      let teamMemberIds: string[] | null = null;
+      if (selectedDepartment && selectedDepartment !== "all") {
+        const { data: teamMembers, error: tmError } = await supabase
+          .from("team_members")
+          .select("employee_id")
+          .eq("team_id", selectedDepartment);
+        
+        if (tmError) throw tmError;
+        teamMemberIds = teamMembers?.map(tm => tm.employee_id) || [];
+      }
+
       let query = supabase
         .from("time_entry")
         .select(`
@@ -60,10 +72,10 @@ export default function TimeTracking() {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Filter by department
+      // Filter by team membership
       let filtered = data as TimeEntryWithDetails[];
-      if (selectedDepartment !== "all") {
-        filtered = filtered.filter(e => e.employee?.department === selectedDepartment);
+      if (teamMemberIds !== null) {
+        filtered = filtered.filter(e => teamMemberIds!.includes(e.employee_id));
       }
       return filtered;
     },

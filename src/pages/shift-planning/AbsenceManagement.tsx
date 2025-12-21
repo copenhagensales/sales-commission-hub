@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Check, X, Clock, Filter, Thermometer, Umbrella, UserPlus } from "lucide-react";
@@ -41,12 +43,27 @@ export default function AbsenceManagement() {
   const { data: currentEmployee } = useCurrentEmployee();
   const updateRequest = useUpdateAbsenceRequest();
 
-  const filterByDepartment = (requests: AbsenceRequest[] | undefined) => {
+  // Fetch team members for filtering
+  const { data: teamMemberIds } = useQuery({
+    queryKey: ["team-member-ids", selectedDepartment],
+    queryFn: async () => {
+      if (selectedDepartment === "all") return null;
+      const { data, error } = await supabase
+        .from("team_members")
+        .select("employee_id")
+        .eq("team_id", selectedDepartment);
+      if (error) throw error;
+      return data?.map(tm => tm.employee_id) || [];
+    },
+    enabled: selectedDepartment !== "all",
+  });
+
+  const filterByTeam = (requests: AbsenceRequest[] | undefined) => {
     if (!requests) return [];
     // Filter out current user's own requests (can't approve your own)
     let filtered = requests.filter(r => r.employee_id !== currentEmployee?.id);
-    if (selectedDepartment === "all") return filtered;
-    return filtered.filter(r => r.employee?.department === selectedDepartment);
+    if (selectedDepartment === "all" || !teamMemberIds) return filtered;
+    return filtered.filter(r => teamMemberIds.includes(r.employee_id));
   };
 
   const handleApprove = (request: AbsenceRequest) => {
@@ -176,7 +193,7 @@ export default function AbsenceManagement() {
                 <Clock className="h-5 w-5 text-yellow-500" />
                 <div>
                   <p className="text-sm text-muted-foreground">Afventer</p>
-                  <p className="text-2xl font-bold">{filterByDepartment(pendingRequests).length}</p>
+                  <p className="text-2xl font-bold">{filterByTeam(pendingRequests).length}</p>
                 </div>
               </div>
             </CardContent>
@@ -187,7 +204,7 @@ export default function AbsenceManagement() {
                 <Check className="h-5 w-5 text-green-500" />
                 <div>
                   <p className="text-sm text-muted-foreground">Godkendt (denne måned)</p>
-                  <p className="text-2xl font-bold">{filterByDepartment(approvedRequests).length}</p>
+                  <p className="text-2xl font-bold">{filterByTeam(approvedRequests).length}</p>
                 </div>
               </div>
             </CardContent>
@@ -198,7 +215,7 @@ export default function AbsenceManagement() {
                 <X className="h-5 w-5 text-red-500" />
                 <div>
                   <p className="text-sm text-muted-foreground">Afvist (denne måned)</p>
-                  <p className="text-2xl font-bold">{filterByDepartment(rejectedRequests).length}</p>
+                  <p className="text-2xl font-bold">{filterByTeam(rejectedRequests).length}</p>
                 </div>
               </div>
             </CardContent>
@@ -210,8 +227,8 @@ export default function AbsenceManagement() {
           <TabsList>
             <TabsTrigger value="pending" className="flex items-center gap-2">
               Afventer
-              {filterByDepartment(pendingRequests).length > 0 && (
-                <Badge variant="secondary">{filterByDepartment(pendingRequests).length}</Badge>
+              {filterByTeam(pendingRequests).length > 0 && (
+                <Badge variant="secondary">{filterByTeam(pendingRequests).length}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="approved">Godkendt</TabsTrigger>
@@ -219,42 +236,42 @@ export default function AbsenceManagement() {
           </TabsList>
 
           <TabsContent value="pending" className="space-y-4 mt-4">
-            {filterByDepartment(pendingRequests).length === 0 ? (
+            {filterByTeam(pendingRequests).length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
                   Ingen ventende anmodninger
                 </CardContent>
               </Card>
             ) : (
-              filterByDepartment(pendingRequests).map(request => (
+              filterByTeam(pendingRequests).map(request => (
                 <RequestCard key={request.id} request={request} showActions />
               ))
             )}
           </TabsContent>
 
           <TabsContent value="approved" className="space-y-4 mt-4">
-            {filterByDepartment(approvedRequests).length === 0 ? (
+            {filterByTeam(approvedRequests).length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
                   Ingen godkendte anmodninger
                 </CardContent>
               </Card>
             ) : (
-              filterByDepartment(approvedRequests).map(request => (
+              filterByTeam(approvedRequests).map(request => (
                 <RequestCard key={request.id} request={request} />
               ))
             )}
           </TabsContent>
 
           <TabsContent value="rejected" className="space-y-4 mt-4">
-            {filterByDepartment(rejectedRequests).length === 0 ? (
+            {filterByTeam(rejectedRequests).length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
                   Ingen afviste anmodninger
                 </CardContent>
               </Card>
             ) : (
-              filterByDepartment(rejectedRequests).map(request => (
+              filterByTeam(rejectedRequests).map(request => (
                 <RequestCard key={request.id} request={request} />
               ))
             )}

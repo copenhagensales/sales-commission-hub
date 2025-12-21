@@ -66,11 +66,23 @@ export interface DanishHoliday {
   year: number;
 }
 
-// Fetch shifts for a date range
-export function useShifts(startDate: string, endDate: string, department?: string) {
+// Fetch shifts for a date range - filter by team membership when team is selected
+export function useShifts(startDate: string, endDate: string, teamId?: string) {
   return useQuery({
-    queryKey: ["shifts", startDate, endDate, department],
+    queryKey: ["shifts", startDate, endDate, teamId],
     queryFn: async () => {
+      // If team is selected, first get team member IDs
+      let teamMemberIds: string[] | null = null;
+      if (teamId && teamId !== "all") {
+        const { data: teamMembers, error: tmError } = await supabase
+          .from("team_members")
+          .select("employee_id")
+          .eq("team_id", teamId);
+        
+        if (tmError) throw tmError;
+        teamMemberIds = teamMembers?.map(tm => tm.employee_id) || [];
+      }
+
       let query = supabase
         .from("shift")
         .select(`
@@ -85,9 +97,9 @@ export function useShifts(startDate: string, endDate: string, department?: strin
       const { data, error } = await query;
       if (error) throw error;
       
-      // Filter by department if specified
-      if (department && department !== "all") {
-        return (data as Shift[]).filter(s => s.employee?.department === department);
+      // Filter by team membership if specified
+      if (teamMemberIds !== null) {
+        return (data as Shift[]).filter(s => teamMemberIds!.includes(s.employee_id));
       }
       return data as Shift[];
     },
