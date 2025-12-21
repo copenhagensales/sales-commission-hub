@@ -51,7 +51,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [mgOpen, setMgOpen] = useState(
     ["/payroll", "/tdc-erhverv", "/tdc-erhverv-dashboard", "/relatel-dashboard", "/tryg-dashboard", "/ase-dashboard", "/codan", "/mg-test", "/mg-test-dashboard", "/dialer-data", "/adversus-data", "/calls-data", "/team-overview"].includes(location.pathname)
   );
-  const [boardsOpen, setBoardsOpen] = useState(location.pathname.startsWith("/boards"));
   const [dashboardsOpen, setDashboardsOpen] = useState(location.pathname.startsWith("/dashboards"));
   const [testOpen, setTestOpen] = useState(
     ["/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results"].includes(location.pathname)
@@ -282,9 +281,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                                p.canViewSmsTemplates || p.canViewEmailTemplates || p.canViewWinback ||
                                p.canViewUpcomingInterviews || p.canViewUpcomingHires;
   
-  // Check if any Boards items are visible
-  const showBoardsMenu = p.canViewBoardsTest || p.canViewBoardsEconomic || p.canViewBoardsSales;
-
   return (
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
@@ -911,32 +907,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             </Collapsible>
           )}
 
-          {/* Boards menu */}
-          {showBoardsMenu && (
-            <Collapsible open={boardsOpen} onOpenChange={setBoardsOpen}>
-              <CollapsibleTrigger className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname.startsWith("/boards") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}>
-                <div className="flex items-center gap-3">
-                  <Monitor className="h-5 w-5" />
-                  {t("sidebar.boards")}
-                </div>
-                {boardsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewBoardsEconomic && (
-                  <NavLink to="/boards/economic" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/boards/economic" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Wallet className="h-4 w-4" />
-                    {t("sidebar.economic")}
-                  </NavLink>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
 
           {/* Dashboards menu - Always visible */}
           <Collapsible open={dashboardsOpen} onOpenChange={setDashboardsOpen}>
