@@ -123,6 +123,7 @@ export default function EmployeeMasterData() {
   const [autoSaving, setAutoSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [deleteEmployeeId, setDeleteEmployeeId] = useState<string | null>(null);
+  const [moveToStaffId, setMoveToStaffId] = useState<string | null>(null);
   const [sendingResetTo, setSendingResetTo] = useState<string | null>(null);
   const { canEditEmployees } = usePermissions();
 
@@ -1087,7 +1088,7 @@ export default function EmployeeMasterData() {
                                 variant="ghost" 
                                 size="icon" 
                                 className="h-8 w-8"
-                                onClick={(e) => { e.stopPropagation(); moveToStaffMutation.mutate(employee.id); }}
+                                onClick={(e) => { e.stopPropagation(); setMoveToStaffId(employee.id); }}
                                 disabled={moveToStaffMutation.isPending}
                               >
                                 <ArrowRightLeft className="h-3.5 w-3.5" />
@@ -1159,6 +1160,31 @@ export default function EmployeeMasterData() {
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 {t("employees.delete.confirm")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Move to staff confirmation dialog */}
+        <AlertDialog open={!!moveToStaffId} onOpenChange={(open) => !open && setMoveToStaffId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Flyt til stab</AlertDialogTitle>
+              <AlertDialogDescription>
+                Er du sikker på at du vil flytte denne medarbejder til stabsmedarbejdere?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuller</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => {
+                  if (moveToStaffId) {
+                    moveToStaffMutation.mutate(moveToStaffId);
+                    setMoveToStaffId(null);
+                  }
+                }}
+              >
+                Flyt medarbejder
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

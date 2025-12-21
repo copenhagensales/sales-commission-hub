@@ -29,6 +29,7 @@ export function StaffEmployeesTab() {
   const [creatingEmployee, setCreatingEmployee] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [deleteEmployeeId, setDeleteEmployeeId] = useState<string | null>(null);
+  const [moveToRegularId, setMoveToRegularId] = useState<string | null>(null);
   const [sendingResetTo, setSendingResetTo] = useState<string | null>(null);
   const { canEditEmployees } = usePermissions();
 
@@ -538,7 +539,7 @@ export function StaffEmployeesTab() {
                               variant="ghost" 
                               size="icon" 
                               className="h-8 w-8"
-                              onClick={(e) => { e.stopPropagation(); moveToRegularMutation.mutate(employee.id); }}
+                              onClick={(e) => { e.stopPropagation(); setMoveToRegularId(employee.id); }}
                               disabled={moveToRegularMutation.isPending}
                             >
                               <ArrowRightLeft className="h-3.5 w-3.5" />
@@ -591,6 +592,30 @@ export function StaffEmployeesTab() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {t("employees.delete.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!moveToRegularId} onOpenChange={(open) => !open && setMoveToRegularId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Flyt til medarbejdere</AlertDialogTitle>
+            <AlertDialogDescription>
+              Er du sikker på at du vil flytte denne stabsmedarbejder til almindelige medarbejdere?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (moveToRegularId) {
+                  moveToRegularMutation.mutate(moveToRegularId);
+                  setMoveToRegularId(null);
+                }
+              }}
+            >
+              Flyt medarbejder
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
