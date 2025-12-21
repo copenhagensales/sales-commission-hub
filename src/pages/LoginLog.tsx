@@ -90,9 +90,9 @@ export default function LoginLog() {
       {/* Login Stats per User */}
       <Card>
         <CardHeader>
-          <CardTitle>Brugere med logins (24 timer)</CardTitle>
+          <CardTitle>Logins de sidste 24 timer</CardTitle>
           <CardDescription>
-            Antal gange hver bruger har logget ind de sidste 24 timer
+            Oversigt over brugere der har logget ind
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -101,8 +101,8 @@ export default function LoginLog() {
               <TableRow>
                 <TableHead>Bruger</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead className="text-center">Antal logins</TableHead>
                 <TableHead>Seneste login</TableHead>
+                <TableHead className="text-center">Antal logins</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -121,61 +121,13 @@ export default function LoginLog() {
                     <TableCell className="text-muted-foreground">
                       {stat.user_email}
                     </TableCell>
+                    <TableCell>
+                      {format(new Date(stat.last_login), "dd. MMM HH:mm", { locale: da })}
+                    </TableCell>
                     <TableCell className="text-center">
                       <Badge variant={stat.login_count > 5 ? "default" : "secondary"}>
                         {stat.login_count}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(stat.last_login), "dd. MMM HH:mm", { locale: da })}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Recent Login Events */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Seneste logins</CardTitle>
-          <CardDescription>
-            Alle login events de sidste 24 timer i kronologisk rækkefølge
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Bruger</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Tidspunkt</TableHead>
-                <TableHead>IP Adresse</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentLogins.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">
-                    Ingen logins de sidste 24 timer
-                  </TableCell>
-                </TableRow>
-              ) : (
-                recentLogins.slice(0, 50).map((event) => (
-                  <TableRow key={event.id}>
-                    <TableCell className="font-medium">
-                      {event.user_name || "Ukendt"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {event.user_email}
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(event.logged_in_at), "dd. MMM HH:mm:ss", { locale: da })}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {event.ip_address || "-"}
                     </TableCell>
                   </TableRow>
                 ))
