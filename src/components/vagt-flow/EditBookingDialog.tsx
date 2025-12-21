@@ -99,9 +99,17 @@ export function EditBookingDialog({ open, onOpenChange, booking }: EditBookingDi
   });
 
   const handleSave = () => {
+    if (!clientId) {
+      toast.error("Vælg venligst en kunde");
+      return;
+    }
+    if (!campaignId) {
+      toast.error("Vælg venligst en kampagne");
+      return;
+    }
     updateBookingMutation.mutate({
-      client_id: clientId || null,
-      campaign_id: campaignId || null,
+      client_id: clientId,
+      campaign_id: campaignId,
       status: status as "Planlagt" | "Bekræftet" | "Afsluttet" | "Aflyst",
     });
   };
@@ -121,12 +129,12 @@ export function EditBookingDialog({ open, onOpenChange, booking }: EditBookingDi
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="client">Kunde</Label>
+            <Label htmlFor="client">Kunde *</Label>
             <Select value={clientId} onValueChange={(v) => {
               setClientId(v);
               setCampaignId(""); // Reset campaign when client changes
             }}>
-              <SelectTrigger>
+              <SelectTrigger className={!clientId ? "border-destructive" : ""}>
                 <SelectValue placeholder="Vælg kunde" />
               </SelectTrigger>
               <SelectContent>
@@ -140,13 +148,12 @@ export function EditBookingDialog({ open, onOpenChange, booking }: EditBookingDi
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="campaign">Kampagne</Label>
+            <Label htmlFor="campaign">Kampagne *</Label>
             <Select value={campaignId || "none"} onValueChange={(v) => setCampaignId(v === "none" ? "" : v)} disabled={!clientId}>
-              <SelectTrigger>
+              <SelectTrigger className={clientId && !campaignId ? "border-destructive" : ""}>
                 <SelectValue placeholder={clientId ? "Vælg kampagne" : "Vælg først kunde"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Ingen kampagne</SelectItem>
                 {campaigns?.map((campaign: any) => (
                   <SelectItem key={campaign.id} value={campaign.id}>
                     {campaign.name}
