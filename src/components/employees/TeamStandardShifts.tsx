@@ -672,7 +672,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                               <Badge 
                                 key={day} 
                                 variant="secondary" 
-                                className="text-xs"
+                                className="text-xs whitespace-nowrap px-2 py-1"
                                 title={`${formatTime(dayConfig.start_time)}-${formatTime(dayConfig.end_time)}${breakText}`}
                               >
                                 {DAY_NAMES[day]} {formatTime(dayConfig.start_time)}-{formatTime(dayConfig.end_time)}
