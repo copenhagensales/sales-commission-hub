@@ -81,14 +81,8 @@ export function AddEmployeeDialog({
   const [selectedEmployees, setSelectedEmployees] = useState<(string | null)[]>([null]);
   const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set());
 
-  // Filter employees by client/department match (department contains client name)
-  const clientName = booking?.clients?.name?.toLowerCase();
-  const filteredEmployees = employees.filter((emp) => {
-    if (!clientName) return true;
-    const empTeam = emp.team?.toLowerCase() || "";
-    // Match if employee's department/team contains the client name
-    return empTeam.includes(clientName);
-  });
+  // Show all employees passed to this dialog (already filtered by job_title = Fieldmarketing in useVagtEmployees)
+  const filteredEmployees = employees;
 
   // Fetch absences for the week period from absence_request_v2
   const weekEnd = addDays(weekStart, 6);
