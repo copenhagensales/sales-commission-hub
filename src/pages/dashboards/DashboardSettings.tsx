@@ -1416,14 +1416,22 @@ const DashboardSettings = () => {
                                 ) : (
                                   <p className="text-sm text-muted-foreground italic">Ingen tekst angivet</p>
                                 )}
-                                <div className="flex items-center justify-center gap-2 mt-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    {effect.label}
-                                  </Badge>
-                                  <Badge variant="outline" className="text-xs">
-                                    {themeFormData.celebrationDuration}s
-                                  </Badge>
-                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="mt-3 gap-2"
+                                  onClick={() => {
+                                    toast({
+                                      title: exampleText || "🎉 Fejring!",
+                                      description: `${effect.label} effekt i ${themeFormData.celebrationDuration} sekunder`,
+                                      duration: themeFormData.celebrationDuration * 1000,
+                                    });
+                                  }}
+                                >
+                                  <IconComponent className="h-4 w-4" />
+                                  Test effekt
+                                </Button>
                               </div>
                             );
                           })()}
