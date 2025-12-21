@@ -225,6 +225,7 @@ export function usePermissions() {
     canEditEmployees: canEdit("menu_employees"),
     canViewTeams: canView("menu_teams"),
     canEditTeams: canEdit("menu_teams"),
+    canViewLoginLog: canView("menu_login_log"),
     // Management menu
     canViewContracts: canView("menu_contracts"),
     canEditContracts: canEdit("menu_contracts"),

@@ -44,7 +44,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [ledelseOpen, setLedelseOpen] = useState(
     ["/contracts", "/permissions", "/career-wishes-overview"].some(path => location.pathname.startsWith(path))
   );
-  const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees"));
+  const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log");
   const [mgOpen, setMgOpen] = useState(
     ["/payroll", "/tdc-erhverv", "/tdc-erhverv-dashboard", "/relatel-dashboard", "/tryg-dashboard", "/ase-dashboard", "/codan", "/mg-test", "/mg-test-dashboard", "/dialer-data", "/adversus-data", "/calls-data", "/team-overview"].includes(location.pathname)
   );
@@ -207,7 +207,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   if (p.canViewExtraWork) mainNavigation.push({ name: t("sidebar.extraWork"), href: "/extra-work", icon: HeartHandshake });
 
   // Check if any Personnel menu items are visible
-  const showPersonnelMenu = p.canViewEmployees || p.canViewTeams;
+  const showPersonnelMenu = p.canViewEmployees || p.canViewTeams || p.canViewLoginLog;
   
   // Check if any Ledelse menu items are visible
   const showLedelseMenu = p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview;
@@ -295,7 +295,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             <Collapsible open={personnelOpen} onOpenChange={setPersonnelOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname.startsWith("/employees") 
+                location.pathname.startsWith("/employees") || location.pathname === "/login-log"
                   ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
@@ -317,6 +317,19 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   >
                     <Users className="h-4 w-4" />
                     {t("sidebar.employees")}
+                  </NavLink>
+                )}
+                {p.canViewLoginLog && (
+                  <NavLink
+                    to="/login-log"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                      location.pathname === "/login-log" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <Clock className="h-4 w-4" />
+                    {t("sidebar.loginLog")}
                   </NavLink>
                 )}
               </CollapsibleContent>

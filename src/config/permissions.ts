@@ -39,6 +39,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     permissions: [
       { key: "menu_employees", label: "Medarbejdere", description: "Adgang til medarbejdersiden", hasEditOption: true, scopeKey: "scope_employees" },
       { key: "menu_teams", label: "Teams", description: "Adgang til teams", hasEditOption: true },
+      { key: "menu_login_log", label: "Login Log", description: "Adgang til login log", hasEditOption: false },
     ],
   },
   {

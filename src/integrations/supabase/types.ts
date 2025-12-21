@@ -2777,6 +2777,39 @@ export type Database = {
         }
         Relationships: []
       }
+      login_events: {
+        Row: {
+          id: string
+          ip_address: string | null
+          logged_in_at: string
+          session_id: string | null
+          user_agent: string | null
+          user_email: string
+          user_id: string
+          user_name: string | null
+        }
+        Insert: {
+          id?: string
+          ip_address?: string | null
+          logged_in_at?: string
+          session_id?: string | null
+          user_agent?: string | null
+          user_email: string
+          user_id: string
+          user_name?: string | null
+        }
+        Update: {
+          id?: string
+          ip_address?: string | null
+          logged_in_at?: string
+          session_id?: string | null
+          user_agent?: string | null
+          user_email?: string
+          user_id?: string
+          user_name?: string | null
+        }
+        Relationships: []
+      }
       market_application: {
         Row: {
           applied_at: string
