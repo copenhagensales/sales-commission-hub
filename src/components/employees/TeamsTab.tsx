@@ -64,18 +64,18 @@ export function TeamsTab() {
     },
   });
 
-  // Fetch team leaders (employees with Teamleder job_title)
+  // Fetch team leaders (employees with Teamleder job_title or staff employees)
   const { data: teamLeaders = [] } = useQuery({
     queryKey: ["team-leaders-list"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, job_title")
+        .select("id, first_name, last_name, job_title, is_staff_employee")
         .eq("is_active", true)
-        .in("job_title", ["Teamleder", "Assisterende Teamleder"])
+        .or("job_title.in.(Teamleder,Assisterende Teamleder),is_staff_employee.eq.true")
         .order("first_name");
       if (error) throw error;
-      return data as Employee[];
+      return data as (Employee & { is_staff_employee?: boolean })[];
     },
   });
 
