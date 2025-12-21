@@ -439,171 +439,287 @@ export function TeamsTab() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingTeam ? "Rediger team" : "Opret nyt team"}</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden">
+          {/* Sticky Header */}
+          <div className="sticky top-0 z-10 bg-background border-b px-6 py-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg">{editingTeam ? "Rediger team" : "Opret nyt team"}</DialogTitle>
+                {editingTeam && (
+                  <p className="text-sm text-muted-foreground">{formData.name || "Team"}</p>
+                )}
+              </div>
+            </div>
+          </div>
           
-          <Tabs defaultValue="team" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="team">Team</TabsTrigger>
-              <TabsTrigger value="clients">Kunder</TabsTrigger>
-              <TabsTrigger value="employees">Medarbejdere</TabsTrigger>
-              <TabsTrigger value="schedule">Vagtplan</TabsTrigger>
-            </TabsList>
-
-            {/* Team Tab */}
-            <TabsContent value="team" className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Navn *</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Teamnavn"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Beskrivelse</Label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Valgfri beskrivelse..."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Teamleder</Label>
-                <Select
-                  value={formData.team_leader_id || "__none__"}
-                  onValueChange={(value) => setFormData({ ...formData, team_leader_id: value === "__none__" ? "" : value })}
+          <Tabs defaultValue="team" className="w-full flex flex-col">
+            {/* Tab Navigation */}
+            <div className="px-6 pt-4 pb-2 border-b bg-muted/30">
+              <TabsList className="h-auto p-1 bg-transparent gap-1">
+                <TabsTrigger 
+                  value="team" 
+                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 py-2 text-sm font-medium"
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg teamleder" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Ingen</SelectItem>
-                    {teamLeaders.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.first_name} {emp.last_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Kun stabsmedarbejdere vises her.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label>Assisterende Teamleder</Label>
-                <Select
-                  value={formData.assistant_team_leader_id || "__none__"}
-                  onValueChange={(value) => setFormData({ ...formData, assistant_team_leader_id: value === "__none__" ? "" : value })}
+                  <Users className="h-4 w-4 mr-2" />
+                  Team info
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="clients"
+                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 py-2 text-sm font-medium"
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg assisterende teamleder" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Ingen</SelectItem>
-                    {teamLeaders.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.first_name} {emp.last_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </TabsContent>
-
-            {/* Clients Tab */}
-            <TabsContent value="clients" className="py-4">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <Label>Kunder</Label>
-                  <Badge variant="secondary" className="ml-auto">
-                    {formData.client_ids.length} valgt
-                  </Badge>
-                </div>
-                <Input
-                  placeholder="Søg efter kunde..."
-                  value={clientSearch}
-                  onChange={(e) => setClientSearch(e.target.value)}
-                  className="mb-2"
-                />
-                <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto border rounded-md p-3">
-                  {filteredClients.length === 0 ? (
-                    <p className="text-sm text-muted-foreground col-span-2">Ingen kunder fundet</p>
-                  ) : (
-                    filteredClients.map((client) => (
-                      <div key={client.id} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`client-${client.id}`}
-                          checked={formData.client_ids.includes(client.id)}
-                          onCheckedChange={() => toggleClient(client.id)}
-                        />
-                        <label htmlFor={`client-${client.id}`} className="text-sm cursor-pointer">
-                          {client.name}
-                        </label>
-                      </div>
-                    ))
+                  <Building2 className="h-4 w-4 mr-2" />
+                  Kunder
+                  {formData.client_ids.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">
+                      {formData.client_ids.length}
+                    </Badge>
                   )}
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Employees Tab */}
-            <TabsContent value="employees" className="py-4">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="h-4 w-4 text-muted-foreground" />
-                  <Label>Medarbejdere</Label>
-                  <Badge variant="secondary" className="ml-auto">
-                    {formData.employee_ids.length} valgt
-                  </Badge>
-                </div>
-                <Input
-                  placeholder="Søg efter medarbejder..."
-                  value={employeeSearch}
-                  onChange={(e) => setEmployeeSearch(e.target.value)}
-                  className="mb-2"
-                />
-                <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto border rounded-md p-3">
-                  {filteredEmployees.length === 0 ? (
-                    <p className="text-sm text-muted-foreground col-span-2">Ingen medarbejdere fundet</p>
-                  ) : (
-                    filteredEmployees.map((emp) => (
-                      <div key={emp.id} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`emp-${emp.id}`}
-                          checked={formData.employee_ids.includes(emp.id)}
-                          onCheckedChange={() => toggleEmployee(emp.id)}
-                        />
-                        <label htmlFor={`emp-${emp.id}`} className="text-sm cursor-pointer">
-                          {emp.first_name} {emp.last_name}
-                        </label>
-                      </div>
-                    ))
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="employees"
+                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 py-2 text-sm font-medium"
+                >
+                  <UserCheck className="h-4 w-4 mr-2" />
+                  Medarbejdere
+                  {formData.employee_ids.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">
+                      {formData.employee_ids.length}
+                    </Badge>
                   )}
-                </div>
-              </div>
-            </TabsContent>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="schedule"
+                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 py-2 text-sm font-medium"
+                >
+                  <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <path d="M16 2v4M8 2v4M3 10h18" />
+                  </svg>
+                  Vagtplan
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-            {/* Schedule Tab */}
-            <TabsContent value="schedule" className="py-4">
-              <TeamStandardShifts teamId={editingTeam?.id || null} />
-            </TabsContent>
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto max-h-[calc(80vh-200px)] px-6">
+              {/* Team Tab */}
+              <TabsContent value="team" className="mt-0 py-6">
+                <div className="grid gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Teamnavn *</Label>
+                    <Input
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Indtast teamnavn..."
+                      className="h-11"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Beskrivelse</Label>
+                    <Textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Valgfri beskrivelse af teamet..."
+                      className="min-h-[100px] resize-none"
+                    />
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Teamleder</Label>
+                      <Select
+                        value={formData.team_leader_id || "__none__"}
+                        onValueChange={(value) => setFormData({ ...formData, team_leader_id: value === "__none__" ? "" : value })}
+                      >
+                        <SelectTrigger className="h-11">
+                          <SelectValue placeholder="Vælg teamleder" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Ingen</SelectItem>
+                          {teamLeaders.map((emp) => (
+                            <SelectItem key={emp.id} value={emp.id}>
+                              {emp.first_name} {emp.last_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Kun stabsmedarbejdere vises her
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Ass. Teamleder</Label>
+                      <Select
+                        value={formData.assistant_team_leader_id || "__none__"}
+                        onValueChange={(value) => setFormData({ ...formData, assistant_team_leader_id: value === "__none__" ? "" : value })}
+                      >
+                        <SelectTrigger className="h-11">
+                          <SelectValue placeholder="Vælg assisterende teamleder" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Ingen</SelectItem>
+                          {teamLeaders.map((emp) => (
+                            <SelectItem key={emp.id} value={emp.id}>
+                              {emp.first_name} {emp.last_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Clients Tab */}
+              <TabsContent value="clients" className="mt-0 py-6">
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Input
+                      placeholder="Søg efter kunde..."
+                      value={clientSearch}
+                      onChange={(e) => setClientSearch(e.target.value)}
+                      className="h-11 pl-10"
+                    />
+                    <Building2 className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                  
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {filteredClients.length === 0 ? (
+                      <div className="col-span-2 py-8 text-center text-muted-foreground">
+                        Ingen kunder fundet
+                      </div>
+                    ) : (
+                      filteredClients.map((client) => {
+                        const isSelected = formData.client_ids.includes(client.id);
+                        return (
+                          <div 
+                            key={client.id} 
+                            onClick={() => toggleClient(client.id)}
+                            className={`
+                              flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all
+                              ${isSelected 
+                                ? 'bg-primary/5 border-primary/30 ring-1 ring-primary/20' 
+                                : 'hover:bg-muted/50 border-border'
+                              }
+                            `}
+                          >
+                            <Checkbox
+                              id={`client-${client.id}`}
+                              checked={isSelected}
+                              onCheckedChange={() => toggleClient(client.id)}
+                              className="pointer-events-none"
+                            />
+                            {client.logo_url ? (
+                              <img
+                                src={client.logo_url}
+                                alt=""
+                                className="h-6 w-6 object-contain rounded"
+                              />
+                            ) : (
+                              <div className="h-6 w-6 rounded bg-muted flex items-center justify-center">
+                                <Building2 className="h-3 w-3 text-muted-foreground" />
+                              </div>
+                            )}
+                            <span className="text-sm font-medium">{client.name}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Employees Tab */}
+              <TabsContent value="employees" className="mt-0 py-6">
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Input
+                      placeholder="Søg efter medarbejder..."
+                      value={employeeSearch}
+                      onChange={(e) => setEmployeeSearch(e.target.value)}
+                      className="h-11 pl-10"
+                    />
+                    <UserCheck className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                  
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {filteredEmployees.length === 0 ? (
+                      <div className="col-span-2 py-8 text-center text-muted-foreground">
+                        Ingen medarbejdere fundet
+                      </div>
+                    ) : (
+                      filteredEmployees.map((emp) => {
+                        const isSelected = formData.employee_ids.includes(emp.id);
+                        return (
+                          <div 
+                            key={emp.id} 
+                            onClick={() => toggleEmployee(emp.id)}
+                            className={`
+                              flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all
+                              ${isSelected 
+                                ? 'bg-primary/5 border-primary/30 ring-1 ring-primary/20' 
+                                : 'hover:bg-muted/50 border-border'
+                              }
+                            `}
+                          >
+                            <Checkbox
+                              id={`emp-${emp.id}`}
+                              checked={isSelected}
+                              onCheckedChange={() => toggleEmployee(emp.id)}
+                              className="pointer-events-none"
+                            />
+                            <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                              {emp.first_name.charAt(0)}{emp.last_name.charAt(0)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium block truncate">
+                                {emp.first_name} {emp.last_name}
+                              </span>
+                              {emp.job_title && (
+                                <span className="text-xs text-muted-foreground truncate block">
+                                  {emp.job_title}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Schedule Tab */}
+              <TabsContent value="schedule" className="mt-0 py-6">
+                <TeamStandardShifts teamId={editingTeam?.id || null} />
+              </TabsContent>
+            </div>
           </Tabs>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Annuller
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
-              {createMutation.isPending || updateMutation.isPending ? "Gemmer..." : "Gem"}
-            </Button>
-          </DialogFooter>
+          {/* Sticky Footer */}
+          <div className="sticky bottom-0 z-10 bg-background border-t px-6 py-4">
+            <div className="flex items-center justify-end gap-3">
+              <Button 
+                variant="ghost" 
+                onClick={() => setDialogOpen(false)}
+                className="px-6"
+              >
+                Annuller
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={createMutation.isPending || updateMutation.isPending}
+                className="px-6"
+              >
+                {createMutation.isPending || updateMutation.isPending ? "Gemmer..." : "Gem ændringer"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
