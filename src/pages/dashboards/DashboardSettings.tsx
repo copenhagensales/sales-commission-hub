@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle, TrendingUp, Phone, Users, Award, PartyPopper, Flame, Star, Zap, Heart, Clock, Play } from "lucide-react";
+import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle, TrendingUp, Phone, Users, Award, PartyPopper, Flame, Star, Zap, Heart, Clock, Play, Target } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -49,7 +49,9 @@ interface DashboardTheme {
   celebrationEnabled: boolean;
   celebrationEffect: "fireworks" | "confetti" | "stars" | "hearts" | "flames" | "sparkles";
   celebrationDuration: number; // seconds
-  celebrationTrigger: "any_update" | "increase_only" | "goal_reached";
+  celebrationTriggerKpiId: string | null; // Which KPI triggers celebration
+  celebrationTriggerCondition: "any_update" | "increase" | "decrease" | "reaches_goal" | "exceeds_value";
+  celebrationTriggerValue: number | null; // Custom threshold value
   celebrationText: string;
   celebrationDataFields: string[];
 }
@@ -72,10 +74,12 @@ const CELEBRATION_EFFECTS = [
   { value: "sparkles", label: "Gnister", icon: Zap, description: "Elektriske gnister" },
 ];
 
-const CELEBRATION_TRIGGERS = [
-  { value: "any_update", label: "Ved enhver opdatering" },
-  { value: "increase_only", label: "Kun ved stigning" },
-  { value: "goal_reached", label: "Når mål er nået" },
+const CELEBRATION_TRIGGER_CONDITIONS = [
+  { value: "any_update", label: "Ved enhver opdatering", description: "Vises hver gang KPI'en ændres" },
+  { value: "increase", label: "Ved stigning", description: "Vises kun når værdien stiger" },
+  { value: "decrease", label: "Ved fald", description: "Vises kun når værdien falder" },
+  { value: "reaches_goal", label: "Når mål nås", description: "Vises når KPI'en når sin målværdi" },
+  { value: "exceeds_value", label: "Når værdi overskrides", description: "Vises når værdi overstiger en grænse" },
 ];
 
 const DURATION_OPTIONS = [
@@ -120,7 +124,9 @@ const PRESET_THEMES: DashboardTheme[] = [
     celebrationEnabled: true,
     celebrationEffect: "fireworks",
     celebrationDuration: 5,
-    celebrationTrigger: "increase_only",
+    celebrationTriggerKpiId: null,
+    celebrationTriggerCondition: "increase",
+    celebrationTriggerValue: null,
     celebrationText: "🎉 {{medarbejder}} har lige lavet salg nummer {{salg_nummer}}!",
     celebrationDataFields: ["employee_name", "sale_number"],
   },
@@ -138,7 +144,9 @@ const PRESET_THEMES: DashboardTheme[] = [
     celebrationEnabled: false,
     celebrationEffect: "confetti",
     celebrationDuration: 3,
-    celebrationTrigger: "goal_reached",
+    celebrationTriggerKpiId: null,
+    celebrationTriggerCondition: "reaches_goal",
+    celebrationTriggerValue: null,
     celebrationText: "",
     celebrationDataFields: [],
   },
@@ -156,7 +164,9 @@ const PRESET_THEMES: DashboardTheme[] = [
     celebrationEnabled: true,
     celebrationEffect: "stars",
     celebrationDuration: 5,
-    celebrationTrigger: "any_update",
+    celebrationTriggerKpiId: null,
+    celebrationTriggerCondition: "any_update",
+    celebrationTriggerValue: null,
     celebrationText: "⭐ {{medarbejder}} er on fire! Salg #{{salg_nummer}}",
     celebrationDataFields: ["employee_name", "sale_number"],
   },
@@ -174,7 +184,9 @@ const PRESET_THEMES: DashboardTheme[] = [
     celebrationEnabled: false,
     celebrationEffect: "sparkles",
     celebrationDuration: 2,
-    celebrationTrigger: "goal_reached",
+    celebrationTriggerKpiId: null,
+    celebrationTriggerCondition: "reaches_goal",
+    celebrationTriggerValue: null,
     celebrationText: "",
     celebrationDataFields: [],
   },
@@ -226,7 +238,9 @@ const DashboardSettings = () => {
     celebrationEnabled: false,
     celebrationEffect: "fireworks",
     celebrationDuration: 5,
-    celebrationTrigger: "increase_only",
+    celebrationTriggerKpiId: null,
+    celebrationTriggerCondition: "increase",
+    celebrationTriggerValue: null,
     celebrationText: "",
     celebrationDataFields: [],
   });
@@ -403,7 +417,9 @@ const DashboardSettings = () => {
         celebrationEnabled: false,
         celebrationEffect: "fireworks",
         celebrationDuration: 5,
-        celebrationTrigger: "increase_only",
+        celebrationTriggerKpiId: null,
+        celebrationTriggerCondition: "increase",
+        celebrationTriggerValue: null,
         celebrationText: "",
         celebrationDataFields: [],
       });
@@ -1287,30 +1303,87 @@ const DashboardSettings = () => {
                         </div>
                       </div>
 
-                      {/* Trigger Selection */}
+                      {/* KPI Trigger Selection */}
                       <div className="space-y-2">
-                        <Label className="text-sm">Hvornår skal popup vises?</Label>
+                        <Label className="text-sm font-medium">Vælg udløsende KPI</Label>
                         <Select
-                          value={themeFormData.celebrationTrigger}
+                          value={themeFormData.celebrationTriggerKpiId || ""}
                           onValueChange={(value) =>
                             setThemeFormData((prev) => ({
                               ...prev,
-                              celebrationTrigger: value as DashboardTheme["celebrationTrigger"],
+                              celebrationTriggerKpiId: value || null,
                             }))
                           }
                         >
                           <SelectTrigger>
-                            <SelectValue />
+                            <SelectValue placeholder="Vælg en KPI..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {CELEBRATION_TRIGGERS.map((trigger) => (
-                              <SelectItem key={trigger.value} value={trigger.value}>
-                                {trigger.label}
+                            {kpis.filter(k => k.is_active).map((kpi) => (
+                              <SelectItem key={kpi.id} value={kpi.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{kpi.name}</span>
+                                  {kpi.unit && (
+                                    <span className="text-muted-foreground text-xs">({kpi.unit})</span>
+                                  )}
+                                </div>
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
+                        {kpis.filter(k => k.is_active).length === 0 && (
+                          <p className="text-xs text-amber-500">
+                            Opret først en aktiv KPI i KPI-fanen for at kunne vælge en trigger
+                          </p>
+                        )}
                       </div>
+
+                      {/* Trigger Condition Selection */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Betingelse for udløsning</Label>
+                        <div className="grid grid-cols-1 gap-2">
+                          {CELEBRATION_TRIGGER_CONDITIONS.map((condition) => (
+                            <div
+                              key={condition.value}
+                              className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                                themeFormData.celebrationTriggerCondition === condition.value
+                                  ? "border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/50"
+                                  : "hover:border-muted-foreground hover:bg-muted/50"
+                              }`}
+                              onClick={() =>
+                                setThemeFormData((prev) => ({
+                                  ...prev,
+                                  celebrationTriggerCondition: condition.value as DashboardTheme["celebrationTriggerCondition"],
+                                }))
+                              }
+                            >
+                              <p className="text-sm font-medium">{condition.label}</p>
+                              <p className="text-xs text-muted-foreground">{condition.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Custom threshold value for "exceeds_value" condition */}
+                      {themeFormData.celebrationTriggerCondition === "exceeds_value" && (
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">Grænseværdi</Label>
+                          <Input
+                            type="number"
+                            value={themeFormData.celebrationTriggerValue ?? ""}
+                            onChange={(e) =>
+                              setThemeFormData((prev) => ({
+                                ...prev,
+                                celebrationTriggerValue: e.target.value ? parseFloat(e.target.value) : null,
+                              }))
+                            }
+                            placeholder="F.eks. 100"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Fejring vises når KPI'en overstiger denne værdi
+                          </p>
+                        </div>
+                      )}
 
                       {/* Duration Selection */}
                       <div className="space-y-2">
@@ -1398,6 +1471,8 @@ const DashboardSettings = () => {
                         <div className="flex flex-col items-center gap-3">
                           {(() => {
                             const effect = CELEBRATION_EFFECTS.find(e => e.value === themeFormData.celebrationEffect);
+                            const selectedKpi = kpis.find(k => k.id === themeFormData.celebrationTriggerKpiId);
+                            const selectedCondition = CELEBRATION_TRIGGER_CONDITIONS.find(c => c.value === themeFormData.celebrationTriggerCondition);
                             if (!effect) return null;
                             const IconComponent = effect.icon;
                             
@@ -1411,8 +1486,27 @@ const DashboardSettings = () => {
                               .replace("{{mål}}", "100 salg");
                             
                             return (
-                              <div className="w-full p-4 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-center">
-                                <IconComponent className="h-8 w-8 mx-auto mb-2 text-purple-500 animate-pulse" />
+                              <div className="w-full p-4 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-center space-y-3">
+                                {/* Trigger summary */}
+                                <div className="flex items-center justify-center gap-2 text-xs">
+                                  <Target className="h-3.5 w-3.5 text-purple-400" />
+                                  <span className="text-muted-foreground">
+                                    {selectedKpi ? (
+                                      <>
+                                        <span className="text-purple-400 font-medium">{selectedKpi.name}</span>
+                                        {" → "}
+                                        <span className="text-foreground">{selectedCondition?.label}</span>
+                                        {themeFormData.celebrationTriggerCondition === "exceeds_value" && themeFormData.celebrationTriggerValue && (
+                                          <span className="text-purple-400 font-medium"> ({themeFormData.celebrationTriggerValue})</span>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <span className="text-amber-500">Ingen KPI valgt</span>
+                                    )}
+                                  </span>
+                                </div>
+
+                                <IconComponent className="h-8 w-8 mx-auto text-purple-500 animate-pulse" />
                                 {themeFormData.celebrationText ? (
                                   <p className="text-sm font-medium">{exampleText}</p>
                                 ) : (
@@ -1421,7 +1515,7 @@ const DashboardSettings = () => {
                                 <Button
                                   type="button"
                                   size="sm"
-                                  className="mt-3 gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0"
+                                  className="mt-2 gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0"
                                   onClick={() => setShowCelebration(true)}
                                 >
                                   <Play className="h-4 w-4" />
