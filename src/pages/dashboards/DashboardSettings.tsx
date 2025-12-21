@@ -28,12 +28,28 @@ interface DashboardKpi {
   dashboard_slugs: string[];
   display_order: number;
   is_active: boolean;
+  data_source: string | null;
+  formula: string | null;
+  base_metric: string | null;
 }
 
 const KPI_TYPES = [
   { value: "number", label: "Antal" },
   { value: "percentage", label: "Procent" },
   { value: "currency", label: "Beløb (DKK)" },
+];
+
+const DATA_SOURCE_OPTIONS = [
+  { value: "manual", label: "Manuel (ingen datakilde)" },
+  { value: "base", label: "Basis-metrik" },
+  { value: "formula", label: "Formel (beregnet)" },
+];
+
+const BASE_METRICS = [
+  { value: "antal_salg", label: "Antal salg", description: "Antal produktlinjer solgt" },
+  { value: "antal_kunder", label: "Antal kunder", description: "Antal unikke salg" },
+  { value: "timer", label: "Timer", description: "Timer fra vagtplan" },
+  { value: "antal_medarbejdere", label: "Antal medarbejdere", description: "Unikke sælgere med data" },
 ];
 
 const DashboardSettings = () => {
@@ -51,6 +67,9 @@ const DashboardSettings = () => {
     unit: "",
     dashboard_slugs: [] as string[],
     is_active: true,
+    data_source: "manual",
+    formula: "",
+    base_metric: "",
   });
 
   // Fetch KPIs
@@ -80,6 +99,9 @@ const DashboardSettings = () => {
         unit: data.unit || null,
         dashboard_slugs: data.dashboard_slugs,
         is_active: data.is_active,
+        data_source: data.data_source,
+        formula: data.data_source === "formula" ? data.formula : null,
+        base_metric: data.data_source === "base" ? data.base_metric : null,
       };
 
       if (data.id) {
@@ -143,6 +165,9 @@ const DashboardSettings = () => {
       unit: "",
       dashboard_slugs: [],
       is_active: true,
+      data_source: "manual",
+      formula: "",
+      base_metric: "",
     });
     setEditingKpi(null);
   };
@@ -164,6 +189,9 @@ const DashboardSettings = () => {
       unit: kpi.unit || "",
       dashboard_slugs: kpi.dashboard_slugs || [],
       is_active: kpi.is_active,
+      data_source: kpi.data_source || "manual",
+      formula: kpi.formula || "",
+      base_metric: kpi.base_metric || "",
     });
     setIsDialogOpen(true);
   };
@@ -247,10 +275,20 @@ const DashboardSettings = () => {
                                 {kpi.description}
                               </p>
                             )}
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <Badge variant="outline">
                                 {KPI_TYPES.find((t) => t.value === kpi.kpi_type)?.label}
                               </Badge>
+                              {kpi.data_source === "base" && kpi.base_metric && (
+                                <Badge variant="secondary">
+                                  {BASE_METRICS.find((m) => m.value === kpi.base_metric)?.label}
+                                </Badge>
+                              )}
+                              {kpi.data_source === "formula" && kpi.formula && (
+                                <Badge variant="secondary" className="font-mono text-xs">
+                                  {kpi.formula}
+                                </Badge>
+                              )}
                               {kpi.target_value && (
                                 <Badge variant="outline">
                                   Mål: {kpi.target_value}
@@ -329,6 +367,104 @@ const DashboardSettings = () => {
                     placeholder="Kort beskrivelse af KPI'en"
                     rows={2}
                   />
+                </div>
+
+                {/* Data Source Section */}
+                <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+                  <div className="grid gap-2">
+                    <Label htmlFor="data_source">Datakilde</Label>
+                    <Select
+                      value={formData.data_source}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({ 
+                          ...prev, 
+                          data_source: value,
+                          formula: value !== "formula" ? "" : prev.formula,
+                          base_metric: value !== "base" ? "" : prev.base_metric,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DATA_SOURCE_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {formData.data_source === "base" && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="base_metric">Basis-metrik</Label>
+                      <Select
+                        value={formData.base_metric}
+                        onValueChange={(value) =>
+                          setFormData((prev) => ({ ...prev, base_metric: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Vælg metrik..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {BASE_METRICS.map((metric) => (
+                            <SelectItem key={metric.value} value={metric.value}>
+                              <div>
+                                <span>{metric.label}</span>
+                                <span className="text-muted-foreground text-xs ml-2">
+                                  ({metric.description})
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {formData.data_source === "formula" && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="formula">Formel</Label>
+                      <div className="space-y-2">
+                        <Input
+                          id="formula"
+                          value={formData.formula}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, formula: e.target.value }))
+                          }
+                          placeholder="F.eks. antal_salg / timer"
+                        />
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <p>Tilgængelige variabler:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {BASE_METRICS.map((metric) => (
+                              <Badge 
+                                key={metric.value} 
+                                variant="outline" 
+                                className="cursor-pointer hover:bg-accent"
+                                onClick={() => {
+                                  const currentFormula = formData.formula;
+                                  const newFormula = currentFormula 
+                                    ? `${currentFormula} ${metric.value}` 
+                                    : metric.value;
+                                  setFormData((prev) => ({ ...prev, formula: newFormula }));
+                                }}
+                              >
+                                {metric.value}
+                              </Badge>
+                            ))}
+                          </div>
+                          <p className="mt-2">Operatorer: + - * / ( )</p>
+                          <p className="text-muted-foreground/70">
+                            Eksempler: "antal_salg / timer", "(antal_salg / antal_medarbejdere) * 100"
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
