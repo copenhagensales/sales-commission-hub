@@ -1,7 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useOnboardingDrills } from "@/hooks/useOnboarding";
-import { Dumbbell, Clock, Target } from "lucide-react";
+import { Dumbbell, Clock, Target, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 const focusColors: Record<string, string> = {
   "B": "bg-blue-500",
@@ -14,20 +17,33 @@ const focusColors: Record<string, string> = {
 };
 
 export default function DrillLibrary() {
+  const navigate = useNavigate();
   const { data: drills = [], isLoading } = useOnboardingDrills();
 
   if (isLoading) {
-    return <div className="text-muted-foreground py-8 text-center">Indlæser drill-bibliotek...</div>;
+    return (
+      <MainLayout>
+        <div className="text-muted-foreground py-8 text-center">Indlæser drill-bibliotek...</div>
+      </MainLayout>
+    );
   }
 
   if (drills.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Dumbbell className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">Ingen drills oprettet endnu.</p>
-        </CardContent>
-      </Card>
+      <MainLayout>
+        <div className="space-y-4">
+          <Button variant="ghost" onClick={() => navigate("/")} className="mb-2">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Tilbage til menu
+          </Button>
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Dumbbell className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Ingen drills oprettet endnu.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
     );
   }
 
@@ -40,8 +56,14 @@ export default function DrillLibrary() {
   }, {} as Record<string, typeof drills>);
 
   return (
-    <div className="space-y-6">
-      <Card>
+    <MainLayout>
+      <div className="space-y-6">
+        <Button variant="ghost" onClick={() => navigate("/")} className="mb-2">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Tilbage til menu
+        </Button>
+
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Dumbbell className="h-5 w-5" />
@@ -121,6 +143,7 @@ export default function DrillLibrary() {
           </Card>
         ))}
       </div>
-    </div>
+      </div>
+    </MainLayout>
   );
 }
