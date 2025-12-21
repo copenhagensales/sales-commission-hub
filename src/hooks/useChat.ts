@@ -184,3 +184,36 @@ export function useEmployeesForChat() {
     },
   });
 }
+
+export function useTeamsForChat() {
+  return useQuery({
+    queryKey: ["teams-for-chat"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, name")
+        .order("name") as any;
+
+      if (error) throw error;
+      return data || [];
+    },
+  });
+}
+
+export function useTeamMembers(teamId: string | null) {
+  return useQuery({
+    queryKey: ["team-members", teamId],
+    queryFn: async () => {
+      if (!teamId) return [];
+      
+      const { data, error } = await supabase
+        .from("team_members")
+        .select("employee_id")
+        .eq("team_id", teamId) as any;
+
+      if (error) throw error;
+      return (data || []).map((m: any) => m.employee_id) as string[];
+    },
+    enabled: !!teamId,
+  });
+}
