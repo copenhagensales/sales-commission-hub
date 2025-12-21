@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, Loader2, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, Send } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, Loader2, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, Send, ArrowRightLeft } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -104,6 +104,24 @@ export function StaffEmployeesTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff-employees"] });
       toast({ title: t("employees.toast.statusUpdated") });
+    },
+    onError: (error) => {
+      toast({ title: t("employees.toast.error"), description: error.message, variant: "destructive" });
+    },
+  });
+
+  const moveToRegularMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("employee_master_data")
+        .update({ is_staff_employee: false })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staff-employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+      toast({ title: "Medarbejder flyttet", description: "Medarbejderen er nu en almindelig medarbejder" });
     },
     onError: (error) => {
       toast({ title: t("employees.toast.error"), description: error.message, variant: "destructive" });
@@ -513,6 +531,20 @@ export function StaffEmployeesTab() {
                               ? t("employees.actions.resendInvitation")
                               : t("employees.actions.sendInvitation")}
                           </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={(e) => { e.stopPropagation(); moveToRegularMutation.mutate(employee.id); }}
+                              disabled={moveToRegularMutation.isPending}
+                            >
+                              <ArrowRightLeft className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Flyt til medarbejdere</TooltipContent>
                         </Tooltip>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); navigate(`/employees/${employee.id}`); }}>
                           <Pencil className="h-3.5 w-3.5" />
