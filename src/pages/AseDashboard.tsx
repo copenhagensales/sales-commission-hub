@@ -4,7 +4,6 @@ import { format, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TrendingUp, Users, Package, DollarSign, CalendarIcon } from "lucide-react";
@@ -12,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 
 interface SaleItem {
   id: string;
@@ -133,52 +133,55 @@ const AseDashboard = () => {
     return new Intl.NumberFormat('da-DK', { style: 'currency', currency: 'DKK' }).format(value);
   };
 
+  const datePickerContent = (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "w-[240px] justify-start text-left font-normal",
+            !selectedDate && "text-muted-foreground"
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="end">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          onSelect={(date) => date && setSelectedDate(date)}
+          initialFocus
+          className="pointer-events-auto"
+          locale={da}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+
   if (isLoading) {
     return (
-      <MainLayout>
-        <div className="p-6 space-y-6">
+      <div className="min-h-screen bg-background p-6">
+        <DashboardHeader title="ASE – Dagsoverblik" subtitle="Salgsdata baseret på produkt mapping" />
+        <div className="space-y-6">
           <Skeleton className="h-8 w-64" />
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32" />)}
           </div>
         </div>
-      </MainLayout>
+      </div>
     );
   }
 
   return (
-    <MainLayout>
-      <div className="p-6 space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">ASE - Dagsoverblik</h1>
-            <p className="text-muted-foreground">Salgsdata baseret på produkt mapping</p>
-          </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-[240px] justify-start text-left font-normal",
-                  !selectedDate && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => date && setSelectedDate(date)}
-                initialFocus
-                className="pointer-events-auto"
-                locale={da}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+    <div className="min-h-screen bg-background p-6">
+      <DashboardHeader 
+        title="ASE – Dagsoverblik" 
+        subtitle="Salgsdata baseret på produkt mapping"
+        rightContent={datePickerContent}
+      />
+      <div className="space-y-6">
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -296,10 +299,10 @@ const AseDashboard = () => {
                 </TableBody>
               </Table>
             </CardContent>
-          </Card>
+        </Card>
         </div>
       </div>
-    </MainLayout>
+    </div>
   );
 };
 

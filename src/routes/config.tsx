@@ -111,10 +111,6 @@ export const routes: RouteConfig[] = [
   { path: "/sales", component: Sales, access: "role", positionPermission: "menu_sales" },
   { path: "/codan", component: Codan, access: "role", positionPermission: "menu_codan" },
   { path: "/tdc-erhverv", component: TdcErhverv, access: "role", positionPermission: "menu_tdc_erhverv" },
-  { path: "/tdc-erhverv-dashboard", component: TdcErhvervDashboard, access: "role", positionPermission: "menu_tdc_erhverv" },
-  { path: "/relatel-dashboard", component: RelatelDashboard, access: "role", positionPermission: "menu_mg_test" },
-  { path: "/tryg-dashboard", component: TrygDashboard, access: "role", positionPermission: "menu_mg_test" },
-  { path: "/ase-dashboard", component: AseDashboard, access: "role", positionPermission: "menu_mg_test" },
   { path: "/team-overview", component: TeamOverview, access: "role", positionPermission: "menu_mg_test" },
   
   { path: "/payroll", component: Payroll, access: "role", positionPermission: "menu_payroll" },
@@ -174,6 +170,11 @@ export const routes: RouteConfig[] = [
   // Team Dashboards (full screen, no sidebar) - public access for TV displays
   { path: "/dashboards/cph-sales", component: CphSalesDashboard, access: "public" },
   { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "public" },
+  { path: "/dashboards/tdc-erhverv", component: TdcErhvervDashboard, access: "public" },
+  { path: "/dashboards/relatel", component: RelatelDashboard, access: "public" },
+  { path: "/dashboards/tryg", component: TrygDashboard, access: "public" },
+  { path: "/dashboards/ase", component: AseDashboard, access: "public" },
+  { path: "/dashboards/mg-test", component: MgTestDashboard, access: "public" },
   { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "public" },
   
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
