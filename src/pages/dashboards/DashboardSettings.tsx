@@ -57,12 +57,12 @@ interface DashboardTheme {
 }
 
 const CELEBRATION_DATA_FIELDS = [
-  { id: "employee_name", label: "Medarbejder navn", placeholder: "{{medarbejder}}" },
-  { id: "sale_number", label: "Salg nummer", placeholder: "{{salg_nummer}}" },
-  { id: "product_name", label: "Produkt navn", placeholder: "{{produkt}}" },
-  { id: "team_name", label: "Hold navn", placeholder: "{{hold}}" },
-  { id: "current_value", label: "Nuværende værdi", placeholder: "{{værdi}}" },
-  { id: "goal_value", label: "Mål værdi", placeholder: "{{mål}}" },
+  { id: "employee_name", label: "Udløsende medarbejder", placeholder: "{{medarbejder}}", description: "Navnet på medarbejderen der udløste fejringen" },
+  { id: "team_name", label: "Udløsende hold", placeholder: "{{hold}}", description: "Holdet som medarbejderen tilhører" },
+  { id: "sale_number", label: "Salg nummer", placeholder: "{{salg_nummer}}", description: "Nummer på det seneste salg" },
+  { id: "product_name", label: "Produkt navn", placeholder: "{{produkt}}", description: "Navnet på det solgte produkt" },
+  { id: "current_value", label: "KPI værdi", placeholder: "{{værdi}}", description: "Den aktuelle værdi af KPI'en" },
+  { id: "goal_value", label: "Mål værdi", placeholder: "{{mål}}", description: "Målværdien for KPI'en" },
 ];
 
 const CELEBRATION_EFFECTS = [
@@ -1439,15 +1439,17 @@ const DashboardSettings = () => {
 
                       {/* Data Fields Selection */}
                       <div className="space-y-2">
-                        <Label className="text-sm">Tilgængelige data-felter</Label>
-                        <div className="flex flex-wrap gap-2">
+                        <Label className="text-sm">Tilgængelige data-felter (fra udløsende medarbejder/hold)</Label>
+                        <div className="grid grid-cols-2 gap-2">
                           {CELEBRATION_DATA_FIELDS.map((field) => (
-                            <Badge
+                            <div
                               key={field.id}
-                              variant={themeFormData.celebrationDataFields.includes(field.id) ? "default" : "outline"}
-                              className="cursor-pointer hover:bg-purple-500/20 transition-colors"
+                              className={`p-2 border rounded-lg cursor-pointer transition-all ${
+                                themeFormData.celebrationDataFields.includes(field.id)
+                                  ? "border-purple-500 bg-purple-500/10"
+                                  : "hover:border-muted-foreground hover:bg-muted/50"
+                              }`}
                               onClick={() => {
-                                // Insert placeholder at cursor or append to text
                                 const newText = themeFormData.celebrationText
                                   ? `${themeFormData.celebrationText} ${field.placeholder}`
                                   : field.placeholder;
@@ -1460,11 +1462,14 @@ const DashboardSettings = () => {
                                 }));
                               }}
                             >
-                              {field.label}
-                              <span className="ml-1 text-muted-foreground text-[10px]">
-                                {field.placeholder}
-                              </span>
-                            </Badge>
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium">{field.label}</span>
+                                <code className="text-[10px] text-purple-400 bg-purple-500/10 px-1 rounded">
+                                  {field.placeholder}
+                                </code>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">{field.description}</p>
+                            </div>
                           ))}
                         </div>
                       </div>
