@@ -3,10 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useOnboardingDays, useEmployeeOnboardingProgress, useCurrentEmployeeId, useUpdateProgress } from "@/hooks/useOnboarding";
+import { useOnboardingDays, useEmployeeOnboardingProgress, useCurrentEmployeeId, useUpdateProgress, OnboardingVideo } from "@/hooks/useOnboarding";
 import { Play, CheckCircle2, Clock, Target, BookOpen, Dumbbell, PhoneCall } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { VideoPlayerDialog } from "@/components/onboarding/VideoPlayerDialog";
 
 export default function EmployeeOnboardingView() {
   const { data: employeeId } = useCurrentEmployeeId();
@@ -15,6 +16,7 @@ export default function EmployeeOnboardingView() {
   const updateProgress = useUpdateProgress();
   
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [playingVideo, setPlayingVideo] = useState<OnboardingVideo | null>(null);
 
   if (daysLoading || progressLoading) {
     return <div className="text-muted-foreground py-8 text-center">Indlæser onboarding...</div>;
@@ -198,7 +200,11 @@ export default function EmployeeOnboardingView() {
                           </p>
                         </div>
                       </div>
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setPlayingVideo(video)}
+                      >
                         <Play className="h-4 w-4 mr-1" />
                         Se video
                       </Button>
@@ -307,6 +313,14 @@ export default function EmployeeOnboardingView() {
           </Card>
         )}
       </div>
+
+      {/* Video Player Dialog */}
+      <VideoPlayerDialog
+        open={!!playingVideo}
+        onOpenChange={(open) => !open && setPlayingVideo(null)}
+        videoTitle={playingVideo?.title || ""}
+        videoUrl={playingVideo?.video_url}
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 export interface OnboardingVideo {
   title: string;
   duration_min: number;
+  video_url?: string;
 }
 
 export interface OnboardingDay {

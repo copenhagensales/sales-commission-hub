@@ -1,13 +1,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useOnboardingDays, useOnboardingDrills } from "@/hooks/useOnboarding";
+import { useOnboardingDays, useOnboardingDrills, OnboardingVideo } from "@/hooks/useOnboarding";
 import { supabase } from "@/integrations/supabase/client";
-import { Settings, Database, RefreshCcw, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Settings, Database, RefreshCcw, CheckCircle2, ArrowLeft, Video, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { VideoUploadDialog } from "@/components/onboarding/VideoUploadDialog";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Seed data - the 15 onboarding days
 const SEED_DAYS = [
@@ -47,11 +49,20 @@ const SEED_DRILLS = [
   { id: "STRUCTURED_OPENING", title: "Struktureret åbning", focus: "Flow", duration_min: 10 },
 ];
 
+interface VideoUploadState {
+  dayId: string;
+  videoIndex: number;
+  videoTitle: string;
+  currentUrl?: string;
+}
+
 export default function OnboardingAdmin() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: days = [], refetch: refetchDays } = useOnboardingDays();
   const { data: drills = [], refetch: refetchDrills } = useOnboardingDrills();
   const [seeding, setSeeding] = useState(false);
+  const [videoUpload, setVideoUpload] = useState<VideoUploadState | null>(null);
 
   const handleSeedData = async () => {
     setSeeding(true);
@@ -104,6 +115,41 @@ export default function OnboardingAdmin() {
     }
   };
 
+  const handleVideoUploadComplete = async (url: string) => {
+    if (!videoUpload) return;
+
+    const day = days.find(d => d.id === videoUpload.dayId);
+    if (!day) return;
+
+    // Update the videos array with the new URL
+    const updatedVideos = day.videos.map((v, idx) =>
+      idx === videoUpload.videoIndex
+        ? { title: v.title, duration_min: v.duration_min, video_url: url || undefined }
+        : { title: v.title, duration_min: v.duration_min, video_url: v.video_url }
+    );
+
+    try {
+      // Cast to any to satisfy Supabase's Json type
+      const { error } = await supabase
+        .from("onboarding_days")
+        .update({ videos: updatedVideos as any })
+        .eq("id", day.id);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ["onboarding-days"] });
+    } catch (error: any) {
+      console.error("Update error:", error);
+      toast.error("Kunne ikke opdatere video");
+    }
+  };
+
+  const totalVideos = days.reduce((acc, day) => acc + day.videos.length, 0);
+  const videosWithUrl = days.reduce(
+    (acc, day) => acc + day.videos.filter(v => v.video_url).length,
+    0
+  );
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -113,99 +159,176 @@ export default function OnboardingAdmin() {
         </Button>
 
         <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Onboarding Administration
-          </CardTitle>
-          <CardDescription>
-            Administrer onboarding-dage, drills og indhold
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Onboarding Dage</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <span className="text-2xl font-bold">{days.length}</span>
-                  {days.length === 15 && (
-                    <Badge className="bg-green-500">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Komplet
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Drills</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <span className="text-2xl font-bold">{drills.length}</span>
-                  {drills.length === 15 && (
-                    <Badge className="bg-green-500">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Komplet
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="h-5 w-5" />
-            Seed Standard Data
-          </CardTitle>
-          <CardDescription>
-            Indsæt de 15 standard onboarding-dage og 15 drills
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Dette vil indsætte eller opdatere alle standard onboarding-dage (Uge 1-3) og drill-biblioteket.
-              Eksisterende data vil blive overskrevet.
-            </p>
-            <Button onClick={handleSeedData} disabled={seeding}>
-              <RefreshCcw className={`h-4 w-4 mr-2 ${seeding ? "animate-spin" : ""}`} />
-              {seeding ? "Seeder..." : "Seed Data"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Current Days Overview */}
-      {days.length > 0 && (
-        <Card>
           <CardHeader>
-            <CardTitle>Nuværende Onboarding-dage</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Onboarding Administration
+            </CardTitle>
+            <CardDescription>
+              Administrer onboarding-dage, drills og indhold
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {days.map(day => (
-                <div key={day.id} className="flex items-center justify-between p-2 border rounded">
-                  <div>
-                    <span className="font-medium">Uge {day.week}, Dag {day.day}:</span>
-                    <span className="ml-2">{day.focus_title}</span>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Onboarding Dage</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl font-bold">{days.length}</span>
+                    {days.length === 15 && (
+                      <Badge className="bg-green-500">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Komplet
+                      </Badge>
+                    )}
                   </div>
-                  <Badge variant="outline">{day.focus_id}</Badge>
-                </div>
-              ))}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Drills</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl font-bold">{drills.length}</span>
+                    {drills.length === 15 && (
+                      <Badge className="bg-green-500">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Komplet
+                      </Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Videoer</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl font-bold">
+                      {videosWithUrl} / {totalVideos}
+                    </span>
+                    {videosWithUrl === totalVideos && totalVideos > 0 && (
+                      <Badge className="bg-green-500">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Komplet
+                      </Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </CardContent>
         </Card>
-      )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Seed Standard Data
+            </CardTitle>
+            <CardDescription>
+              Indsæt de 15 standard onboarding-dage og 15 drills
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Dette vil indsætte eller opdatere alle standard onboarding-dage (Uge 1-3) og drill-biblioteket.
+                Eksisterende data vil blive overskrevet.
+              </p>
+              <Button onClick={handleSeedData} disabled={seeding}>
+                <RefreshCcw className={`h-4 w-4 mr-2 ${seeding ? "animate-spin" : ""}`} />
+                {seeding ? "Seeder..." : "Seed Data"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Video Management */}
+        {days.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Video className="h-5 w-5" />
+                Video Administration
+              </CardTitle>
+              <CardDescription>
+                Upload videoer til hver onboarding-dag
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {days.map(day => (
+                <div key={day.id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium">
+                      Uge {day.week}, Dag {day.day}: {day.focus_title}
+                    </h4>
+                    <Badge variant="outline">
+                      {day.videos.filter(v => v.video_url).length} / {day.videos.length} videoer
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    {day.videos.map((video, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Video className={`h-5 w-5 ${video.video_url ? "text-green-500" : "text-muted-foreground"}`} />
+                          <div>
+                            <p className="font-medium text-sm">{video.title}</p>
+                            <p className="text-xs text-muted-foreground">{video.duration_min} min</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {video.video_url && (
+                            <Badge variant="secondary" className="text-xs">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Uploadet
+                            </Badge>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setVideoUpload({
+                                dayId: day.id,
+                                videoIndex: idx,
+                                videoTitle: video.title,
+                                currentUrl: video.video_url,
+                              })
+                            }
+                          >
+                            <Upload className="h-4 w-4 mr-1" />
+                            {video.video_url ? "Erstat" : "Upload"}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* Video Upload Dialog */}
+      {videoUpload && (
+        <VideoUploadDialog
+          open={!!videoUpload}
+          onOpenChange={(open) => !open && setVideoUpload(null)}
+          dayId={videoUpload.dayId}
+          videoIndex={videoUpload.videoIndex}
+          videoTitle={videoUpload.videoTitle}
+          currentUrl={videoUpload.currentUrl}
+          onUploadComplete={handleVideoUploadComplete}
+        />
+      )}
     </MainLayout>
   );
 }
