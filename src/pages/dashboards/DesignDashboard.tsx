@@ -525,46 +525,6 @@ export default function DesignDashboard() {
                 </CardContent>
               </Card>
 
-              {activeWidgetTypes.length === 0 ? (
-                <Card className="border-dashed">
-                  <CardContent className="flex flex-col items-center justify-center py-6 text-center">
-                    <LayoutGrid className="h-8 w-8 text-muted-foreground mb-2" />
-                    <h3 className="font-semibold text-sm mb-1">Ingen aktive widget typer</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Gå til Dashboard Indstillinger → Widgets
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardHeader className="pb-2 px-3 pt-3">
-                    <CardTitle className="text-sm">Widget Typer</CardTitle>
-                    <CardDescription className="text-xs">Klik for at tilføje</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-1 px-3 pb-3 max-h-[300px] overflow-y-auto">
-                    {activeWidgetTypes.map((widget) => (
-                      <div
-                        key={widget.value}
-                        onClick={() => {
-                          resetForm();
-                          setSelectedWidgetType(widget.value);
-                          setEditingWidget(null);
-                          setIsConfigDialogOpen(true);
-                        }}
-                        className="flex items-center gap-2 p-2 rounded-lg border border-border bg-card hover:bg-accent cursor-pointer transition-colors"
-                      >
-                        <div className="p-1.5 rounded-md bg-primary/10 text-primary">
-                          {getWidgetIcon(widget.iconName)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-xs">{widget.label}</p>
-                        </div>
-                        <Plus className="h-3 w-3 text-muted-foreground" />
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
             </div>
           </div>
         )}
