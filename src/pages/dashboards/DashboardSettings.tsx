@@ -1047,8 +1047,17 @@ const DashboardSettings = () => {
         </Dialog>
 
         {/* Design Theme Dialog */}
-        <Dialog open={isDesignDialogOpen} onOpenChange={setIsDesignDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <Dialog open={isDesignDialogOpen} onOpenChange={(open) => {
+          // Don't close dialog if celebration overlay is showing
+          if (!open && showCelebration) return;
+          setIsDesignDialogOpen(open);
+        }}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => {
+            // Prevent closing when clicking on celebration overlay
+            if (showCelebration) {
+              e.preventDefault();
+            }
+          }}>
             <DialogHeader>
               <DialogTitle>
                 {editingTheme ? "Rediger tema" : "Opret nyt tema"}
