@@ -28,115 +28,57 @@ const generateTimeOptions = () => {
 
 const timeOptions = generateTimeOptions();
 
-// Validate time format (HH:MM)
-const isValidTime = (time: string): boolean => {
-  const regex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/;
-  return regex.test(time);
-};
-
-// Format time to HH:MM
-const formatTimeInput = (input: string): string => {
-  // Remove non-digit and non-colon characters
-  let cleaned = input.replace(/[^\d:]/g, "");
-  
-  // Auto-add colon after 2 digits if not present
-  if (cleaned.length >= 2 && !cleaned.includes(":")) {
-    cleaned = cleaned.slice(0, 2) + ":" + cleaned.slice(2);
-  }
-  
-  // Limit to 5 characters (HH:MM)
-  return cleaned.slice(0, 5);
-};
-
-export function TimeSelect({ value, onChange, placeholder = "Vælg tid", className }: TimeSelectProps) {
+export function TimeSelect({ value, onChange, placeholder = "HH:MM", className }: TimeSelectProps) {
   const [open, setOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(value || "");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setInputValue(value || "");
-  }, [value]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatTimeInput(e.target.value);
-    setInputValue(formatted);
-    
-    if (isValidTime(formatted)) {
-      onChange(formatted);
-    }
-  };
-
-  const handleInputBlur = () => {
-    // On blur, validate and format
-    if (inputValue && isValidTime(inputValue)) {
-      // Ensure proper format (pad with zeros)
-      const [h, m] = inputValue.split(":");
-      const formatted = `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
-      setInputValue(formatted);
-      onChange(formatted);
-    } else if (inputValue && !isValidTime(inputValue)) {
-      // Reset to previous valid value
-      setInputValue(value || "");
-    }
-  };
 
   const handleOptionClick = (time: string) => {
-    setInputValue(time);
     onChange(time);
     setOpen(false);
   };
 
-  // Filter options based on input
-  const filteredOptions = inputValue
-    ? timeOptions.filter((t) => t.startsWith(inputValue.split(":")[0] || ""))
-    : timeOptions;
-
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <div className={cn("relative", className)}>
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <Input
-            ref={inputRef}
-            value={inputValue}
-            onChange={handleInputChange}
-            onBlur={handleInputBlur}
-            onFocus={() => setOpen(true)}
-            placeholder={placeholder}
-            className="pl-9 pr-8"
-          />
+    <div className={cn("flex gap-1", className)}>
+      <div className="relative flex-1">
+        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="pl-9"
+          maxLength={5}
+        />
+      </div>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="icon"
-            className="absolute right-0 top-0 h-full w-8 hover:bg-transparent"
-            onClick={() => setOpen(!open)}
+            className="shrink-0"
           >
-            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")} />
+            <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
           </Button>
-        </div>
-      </PopoverTrigger>
-      <PopoverContent className="w-[120px] p-0" align="start">
-        <ScrollArea className="h-60">
-          <div className="p-1">
-            {filteredOptions.map((time) => (
-              <button
-                key={time}
-                type="button"
-                onClick={() => handleOptionClick(time)}
-                className={cn(
-                  "w-full text-left px-3 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors",
-                  value === time && "bg-accent text-accent-foreground font-medium"
-                )}
-              >
-                {time}
-              </button>
-            ))}
-          </div>
-        </ScrollArea>
-      </PopoverContent>
-    </Popover>
+        </PopoverTrigger>
+        <PopoverContent className="w-[100px] p-0" align="end">
+          <ScrollArea className="h-60">
+            <div className="p-1">
+              {timeOptions.map((time) => (
+                <button
+                  key={time}
+                  type="button"
+                  onClick={() => handleOptionClick(time)}
+                  className={cn(
+                    "w-full text-left px-3 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors",
+                    value === time && "bg-accent text-accent-foreground font-medium"
+                  )}
+                >
+                  {time}
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }
