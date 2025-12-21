@@ -41,7 +41,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [mitHjemOpen, setMitHjemOpen] = useState(
     ["/home", "/messages", "/my-schedule", "/my-profile", "/my-contracts", "/career-wishes"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
-  const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp");
+  const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp" || location.pathname === "/closing-shifts");
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const [ledelseOpen, setLedelseOpen] = useState(
@@ -251,7 +251,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   // Non-personal menu items
   if (p.canViewSales) mainNavigation.push({ name: t("sidebar.sales"), href: "/sales", icon: ShoppingCart });
   if (p.canViewLogics) mainNavigation.push({ name: t("sidebar.logics"), href: "/logikker", icon: ListChecks });
-  if (p.canViewClosingShifts) mainNavigation.push({ name: t("sidebar.closingShifts"), href: "/closing-shifts", icon: Lock });
 
   // Check if SOME menu should be visible
   const showSomeMenu = p.canViewSome || p.canViewExtraWork;
@@ -273,7 +272,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                                   p.canViewFmBilling || p.canViewFmTimeOff || p.canViewFmSalesRegistration;
   
   // Check if any Shift Planning items are visible
-  const showShiftPlanningMenu = p.canViewShiftOverview || p.canViewAbsence || p.canViewTimeTracking || p.canViewTimeStamp;
+  const showShiftPlanningMenu = p.canViewShiftOverview || p.canViewAbsence || p.canViewTimeTracking || p.canViewTimeStamp || p.canViewClosingShifts;
   
   // Check if any Test menu items are visible
   const showTestMenu = p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey;
@@ -629,7 +628,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             <Collapsible open={shiftPlanningOpen} onOpenChange={setShiftPlanningOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                (location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                (location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp" || location.pathname === "/closing-shifts") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
                 <div className="flex items-center gap-3">
                   <ClipboardList className="h-5 w-5" />
@@ -677,6 +676,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   )}>
                     <Clock className="h-4 w-4" />
                     {t("sidebar.timeClock")}
+                  </NavLink>
+                )}
+                {p.canViewClosingShifts && (
+                  <NavLink to="/closing-shifts" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/closing-shifts" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Lock className="h-4 w-4" />
+                    {t("sidebar.closingShifts")}
                   </NavLink>
                 )}
               </CollapsibleContent>
