@@ -366,7 +366,7 @@ export default function BookingsContent() {
                       <div className="flex items-center justify-between mb-3">
                         <div 
                           className="cursor-pointer"
-                          onClick={() => navigate(`/vagt-flow/locations/${booking.location_id}`)}
+                          onClick={() => navigate(`/vagt-flow/locations/${booking.location_id}?week=${selectedWeek}&year=${selectedYear}`)}
                         >
                           <p className="font-medium hover:underline">{booking.location?.name}</p>
                           <p className="text-sm text-muted-foreground">
