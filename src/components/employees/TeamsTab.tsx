@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Users, Building2, UserCheck, Calendar } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Building2, UserCheck } from "lucide-react";
+import { TeamStandardShifts } from "./TeamStandardShifts";
 
 interface Team {
   id: string;
@@ -588,13 +589,7 @@ export function TeamsTab() {
 
             {/* Schedule Tab */}
             <TabsContent value="schedule" className="py-4">
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Vagtplan</h3>
-                <p className="text-sm text-muted-foreground max-w-sm">
-                  Administrer vagtplaner for dette team. Funktionen kommer snart.
-                </p>
-              </div>
+              <TeamStandardShifts teamId={editingTeam?.id || null} />
             </TabsContent>
           </Tabs>
 
