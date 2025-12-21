@@ -16,6 +16,7 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
   { slug: "relatel", name: "Relatel", path: "/dashboards/relatel" },
   { slug: "tryg", name: "Tryg", path: "/dashboards/tryg" },
   { slug: "ase", name: "ASE", path: "/dashboards/ase" },
-  { slug: "mg-test", name: "Test Dashboard", path: "/dashboards/mg-test" },
+  { slug: "mg-test", name: "MG Test", path: "/dashboards/mg-test" },
   { slug: "united", name: "United", path: "/dashboards/united" },
+  { slug: "test", name: "Test Dashboard", path: "/dashboards/test" },
 ];
