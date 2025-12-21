@@ -721,32 +721,65 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                 placeholder="F.eks. Dagvagt, Aftenvagt..."
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Standard start tid *</Label>
-                <TimeSelect
-                  value={formData.start_time}
-                  onChange={(value) => setFormData({ ...formData, start_time: value })}
-                  placeholder="Vælg start"
-                />
+
+            {/* Toggle for same/different times - at the top */}
+            <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setUseDifferentTimes(false)}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    !useDifferentTimes 
+                      ? "bg-primary text-primary-foreground" 
+                      : "bg-background hover:bg-muted"
+                  }`}
+                >
+                  Samme tider
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUseDifferentTimes(true)}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    useDifferentTimes 
+                      ? "bg-primary text-primary-foreground" 
+                      : "bg-background hover:bg-muted"
+                  }`}
+                >
+                  Forskellige tider
+                </button>
               </div>
-              <div className="space-y-2">
-                <Label>Standard slut tid *</Label>
-                <TimeSelect
-                  value={formData.end_time}
-                  onChange={(value) => setFormData({ ...formData, end_time: value })}
-                  placeholder="Vælg slut"
-                />
-              </div>
+              <span className="text-xs text-muted-foreground">
+                {useDifferentTimes ? "Angiv tid pr. dag" : "Alle dage har samme tid"}
+              </span>
             </div>
+
+            {/* Standard times - only show when "Samme tider" */}
+            {!useDifferentTimes && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start tid *</Label>
+                  <TimeSelect
+                    value={formData.start_time}
+                    onChange={(value) => setFormData({ ...formData, start_time: value })}
+                    placeholder="Vælg start"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Slut tid *</Label>
+                  <TimeSelect
+                    value={formData.end_time}
+                    onChange={(value) => setFormData({ ...formData, end_time: value })}
+                    placeholder="Vælg slut"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Day selection */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <Label>Vælg dage (valgfrit)</Label>
-                </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Label>Vælg dage (valgfrit)</Label>
               </div>
 
               {/* Day checkboxes - always visible */}
@@ -773,41 +806,8 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                 })}
               </div>
 
-              {/* Toggle for different times - only show when days are selected */}
-              {enabledDaysCount > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setUseDifferentTimes(false)}
-                        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                          !useDifferentTimes 
-                            ? "bg-primary text-primary-foreground" 
-                            : "bg-background hover:bg-muted"
-                        }`}
-                      >
-                        Samme tider
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setUseDifferentTimes(true)}
-                        className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                          useDifferentTimes 
-                            ? "bg-primary text-primary-foreground" 
-                            : "bg-background hover:bg-muted"
-                        }`}
-                      >
-                        Forskellige tider
-                      </button>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {useDifferentTimes ? "Angiv tid pr. dag" : "Bruger standard tidspunkter"}
-                    </span>
-                  </div>
-
-                  {/* Individual day times and breaks - only show when "Forskellige tider" is selected */}
-                  {useDifferentTimes && (
+              {/* Individual day times and breaks - only show when "Forskellige tider" is selected and days are enabled */}
+              {useDifferentTimes && enabledDaysCount > 0 && (
                     <div className="space-y-4 p-3 border rounded-lg bg-background">
                       {WEEKDAY_ORDER.filter(day => dayConfigs[day].enabled).map(day => {
                         const config = dayConfigs[day];
@@ -875,8 +875,6 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                       })}
                     </div>
                   )}
-                </div>
-              )}
 
               <p className="text-xs text-muted-foreground">
                 {enabledDaysCount === 0 
