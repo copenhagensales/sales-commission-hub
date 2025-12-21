@@ -472,28 +472,50 @@ export default function DesignDashboard() {
                   <CardDescription>Dine widgets vises her - klik på en widget for at redigere</CardDescription>
                 </CardHeader>
                 <CardContent className="p-6">
-                  {placedWidgets.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-[500px] text-center">
-                      <div className="p-4 rounded-full bg-muted mb-4">
-                        <Plus className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <h3 className="font-semibold text-lg mb-2">Ingen widgets endnu</h3>
-                      <p className="text-muted-foreground max-w-sm mb-4">
-                        Klik på en widget type til venstre eller "Tilføj ny widget"
-                      </p>
-                      <Button onClick={openAddWidgetDialog}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Tilføj første widget
-                      </Button>
-                    </div>
-                  ) : (
+                  {/* Grid background overlay */}
+                  <div 
+                    className="relative rounded-lg overflow-hidden"
+                    style={{ minHeight: `${CELL_HEIGHT * 4}px` }}
+                  >
+                    {/* Grid cells background */}
                     <div 
-                      className="grid gap-4"
+                      className="absolute inset-0 grid gap-1 pointer-events-none"
                       style={{ 
                         gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-                        minHeight: `${CELL_HEIGHT * 2}px`
+                        gridTemplateRows: `repeat(4, ${CELL_HEIGHT}px)`,
                       }}
                     >
+                      {Array.from({ length: GRID_COLS * 4 }).map((_, i) => (
+                        <div 
+                          key={i} 
+                          className="border border-dashed border-border/40 rounded-md bg-muted/20"
+                        />
+                      ))}
+                    </div>
+
+                    {/* Content layer */}
+                    {placedWidgets.length === 0 ? (
+                      <div className="relative flex flex-col items-center justify-center h-[480px] text-center z-10">
+                        <div className="p-4 rounded-full bg-background/80 backdrop-blur mb-4">
+                          <Plus className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                        <h3 className="font-semibold text-lg mb-2">Ingen widgets endnu</h3>
+                        <p className="text-muted-foreground max-w-sm mb-4">
+                          Klik på en widget type til venstre eller "Tilføj ny widget"
+                        </p>
+                        <Button onClick={openAddWidgetDialog}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Tilføj første widget
+                        </Button>
+                      </div>
+                    ) : (
+                      <div 
+                        className="relative grid gap-2 z-10"
+                        style={{ 
+                          gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+                          gridAutoRows: `${CELL_HEIGHT}px`
+                        }}
+                      >
                       {placedWidgets.map((widget) => {
                         const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
                         const design = activeDesignTypes.find(d => d.id === globalDesign);
@@ -526,7 +548,8 @@ export default function DesignDashboard() {
                         );
                       })}
                     </div>
-                  )}
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
