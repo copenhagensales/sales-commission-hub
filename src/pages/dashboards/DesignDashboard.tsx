@@ -36,8 +36,10 @@ import {
   Target,
   ArrowUpDown,
   Palette,
-  Users
+  Users,
+  X
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useWidgetTypes, WidgetTypeConfig } from "@/hooks/useWidgetTypes";
 import { useKpiTypes } from "@/hooks/useKpiTypes";
@@ -146,6 +148,7 @@ const getWidgetIcon = (iconName: string) => {
 
 export default function DesignDashboard() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { activeWidgetTypes } = useWidgetTypes();
   const { activeKpiTypes } = useKpiTypes();
   const { activeDesignTypes } = useDesignTypes();
@@ -153,6 +156,10 @@ export default function DesignDashboard() {
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<PlacedWidget | null>(null);
+
+  const handleClose = () => {
+    navigate(-1); // Go back to previous page
+  };
   
   // Global dashboard design state - default to first active design
   const [globalDesign, setGlobalDesign] = useState<string>(() => {
@@ -354,14 +361,15 @@ export default function DesignDashboard() {
   };
 
   return (
-    <MainLayout>
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
+    <div className="fixed inset-0 z-50 bg-background overflow-auto">
+      {/* Header with close button */}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Design Dashboard</h1>
-            <p className="text-muted-foreground">Design dit eget dashboard med widgets fra indstillinger</p>
+            <h1 className="text-2xl font-bold">Design Dashboard</h1>
+            <p className="text-sm text-muted-foreground">Design dit eget dashboard med widgets fra indstillinger</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
             <Button variant="outline" onClick={() => setIsPreviewOpen(true)}>
               <Eye className="h-4 w-4 mr-2" />
               Forhåndsvis
@@ -370,8 +378,19 @@ export default function DesignDashboard() {
               <Save className="h-4 w-4 mr-2" />
               Gem Dashboard
             </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleClose}
+              className="h-10 w-10 rounded-full hover:bg-destructive/10"
+            >
+              <X className="h-5 w-5" />
+            </Button>
           </div>
         </div>
+      </div>
+
+      <div className="container mx-auto p-6 space-y-6">
 
         {/* Global Design Selector */}
         <Card>
@@ -986,6 +1005,6 @@ export default function DesignDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </MainLayout>
+    </div>
   );
 }
