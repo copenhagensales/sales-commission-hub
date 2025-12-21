@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { TrendingUp, Users, Calendar, Package, Trophy } from "lucide-react";
-import { ScreenResolutionIndicator } from "@/components/dashboard/ScreenResolutionIndicator";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 
 const TAB_TO_CLIENT_ID: Record<string, string> = {
   "eesy-fm": FIELDMARKETING_CLIENTS.EESY_FM,
@@ -354,57 +353,46 @@ const FieldmarketingDashboardFull = () => {
   const activeClient = clients?.find(c => c.id === activeClientId);
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Fieldmarketing Dashboard
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                Oversigt over salg fra fieldmarketing events
-              </p>
-            </div>
-            <ScreenResolutionIndicator />
-          </div>
-          <div className="h-16 w-40 flex items-center justify-end">
+    <div className="min-h-screen bg-background p-6">
+      <DashboardHeader 
+        title="Fieldmarketing Dashboard" 
+        subtitle="Oversigt over salg fra fieldmarketing events"
+        rightContent={
+          <div className="h-10 flex items-center">
             {activeClient?.logo_url ? (
               <img 
                 src={activeClient.logo_url} 
                 alt={activeClient.name} 
-                className="max-h-16 max-w-40 object-contain"
+                className="max-h-10 max-w-32 object-contain"
               />
             ) : (
-              <div className="h-16 px-6 bg-muted rounded-lg flex items-center justify-center">
-                <span className="text-xl font-bold text-muted-foreground">{activeClient?.name || "..."}</span>
-              </div>
+              <span className="text-sm font-medium text-muted-foreground">{activeClient?.name || "..."}</span>
             )}
           </div>
-        </div>
+        }
+      />
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="eesy-fm">Eesy FM</TabsTrigger>
-            <TabsTrigger value="yousee">Yousee</TabsTrigger>
-          </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="eesy-fm">Eesy FM</TabsTrigger>
+          <TabsTrigger value="yousee">Yousee</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="eesy-fm" className="mt-6">
-            <ClientDashboard 
-              clientId={FIELDMARKETING_CLIENTS.EESY_FM} 
-              clientName="Eesy FM" 
-            />
-          </TabsContent>
+        <TabsContent value="eesy-fm" className="mt-6">
+          <ClientDashboard 
+            clientId={FIELDMARKETING_CLIENTS.EESY_FM} 
+            clientName="Eesy FM" 
+          />
+        </TabsContent>
 
-          <TabsContent value="yousee" className="mt-6">
-            <ClientDashboard 
-              clientId={FIELDMARKETING_CLIENTS.YOUSEE} 
-              clientName="Yousee" 
-            />
-          </TabsContent>
-        </Tabs>
-      </div>
-    </DashboardLayout>
+        <TabsContent value="yousee" className="mt-6">
+          <ClientDashboard 
+            clientId={FIELDMARKETING_CLIENTS.YOUSEE} 
+            clientName="Yousee" 
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 };
 
