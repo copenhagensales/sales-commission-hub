@@ -925,15 +925,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 {boardsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                {p.canViewBoardsTest && (
-                  <NavLink to="/boards/test" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    location.pathname === "/boards/test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                  )}>
-                    <Monitor className="h-4 w-4" />
-                    {t("sidebar.test")}
-                  </NavLink>
-                )}
                 {p.canViewBoardsEconomic && (
                   <NavLink to="/boards/economic" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
@@ -995,6 +986,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   <BarChart3 className="h-4 w-4" />
                   United
                 </NavLink>
+                {p.canViewBoardsTest && (
+                  <NavLink to="/boards/test" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/boards/test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Monitor className="h-4 w-4" />
+                    {t("sidebar.test")}
+                  </NavLink>
+                )}
             </CollapsibleContent>
           </Collapsible>
 
