@@ -1680,21 +1680,23 @@ const DashboardSettings = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Celebration Overlay */}
-        <CelebrationOverlay
-          isOpen={showCelebration}
-          onClose={() => setShowCelebration(false)}
-          effect={themeFormData.celebrationEffect}
-          duration={themeFormData.celebrationDuration}
-          text={themeFormData.celebrationText
-            .replace("{{medarbejder}}", "Anders Jensen")
-            .replace("{{salg_nummer}}", "42")
-            .replace("{{produkt}}", "Premium Abonnement")
-            .replace("{{hold}}", "Team Alpha")
-            .replace("{{værdi}}", "1.250 kr")
-            .replace("{{mål}}", "100 salg")}
-          primaryColor={themeFormData.primaryColor}
-        />
+        {/* Celebration Overlay - rendered outside dialog to avoid closing it */}
+        {showCelebration && (
+          <CelebrationOverlay
+            isOpen={showCelebration}
+            onClose={() => setShowCelebration(false)}
+            effect={themeFormData.celebrationEffect}
+            duration={themeFormData.celebrationDuration}
+            text={themeFormData.celebrationText
+              .replace("{{medarbejder}}", "Anders Jensen")
+              .replace("{{salg_nummer}}", "42")
+              .replace("{{produkt}}", "Premium Abonnement")
+              .replace("{{hold}}", "Team Alpha")
+              .replace("{{værdi}}", "1.250 kr")
+              .replace("{{mål}}", "100 salg")}
+            primaryColor={themeFormData.primaryColor}
+          />
+        )}
       </div>
     </MainLayout>
   );
