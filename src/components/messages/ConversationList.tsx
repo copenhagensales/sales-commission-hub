@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useConversations, useOnlineStatus, useDeleteConversation, Conversation } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
@@ -23,7 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, User, MoreVertical, Trash2, LogOut, Loader2 } from "lucide-react";
+import { Users, MoreVertical, Trash2, LogOut, Loader2 } from "lucide-react";
 import { OnlineIndicator } from "./OnlineIndicator";
 import { toast } from "sonner";
 
@@ -96,13 +96,6 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
         ?.map((m) => m.employee?.full_name)
         .join(", ") || "Samtale";
 
-  const initials = displayName
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
   // For direct messages, check if the other person is online
   const otherMember = !conversation.is_group 
     ? conversation.members?.find(m => m.employee)
@@ -138,27 +131,19 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
         )}
         onClick={onClick}
       >
-        {/* Avatar with online indicator */}
-        <div className="relative flex-shrink-0">
-          <Avatar className={cn(
-            "h-12 w-12 transition-transform",
-            isSelected ? "ring-2 ring-primary-foreground/30" : ""
-          )}>
-            <AvatarFallback className={cn(
-              "text-sm font-medium",
-              isSelected ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary"
+        {/* Online indicator for direct messages */}
+        <div className="flex-shrink-0">
+          {conversation.is_group ? (
+            <div className={cn(
+              "h-8 w-8 rounded-full flex items-center justify-center",
+              isSelected ? "bg-primary-foreground/20" : "bg-primary/10"
             )}>
-              {conversation.is_group ? (
-                <Users className="h-5 w-5" />
-              ) : (
-                initials || <User className="h-5 w-5" />
-              )}
-            </AvatarFallback>
-          </Avatar>
-          {!conversation.is_group && (
+              <Users className={cn("h-4 w-4", isSelected ? "text-primary-foreground" : "text-primary")} />
+            </div>
+          ) : (
             <OnlineIndicator 
               isOnline={isOtherOnline} 
-              className="absolute -bottom-0.5 -right-0.5 ring-2 ring-background"
+              className="h-3 w-3"
             />
           )}
         </div>
