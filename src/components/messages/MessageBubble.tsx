@@ -84,11 +84,11 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
 
   return (
     <div className={cn("flex group", isOwn ? "justify-end" : "justify-start")}>
-      <div className="flex flex-col max-w-[70%]">
+      <div className="flex flex-col max-w-[85%] md:max-w-[70%]">
         {/* Reply reference */}
         {message.reply_to && (
           <div className={cn(
-            "text-xs px-3 py-1 rounded-t-lg border-l-2 mb-1",
+            "text-xs px-2 md:px-3 py-1 rounded-t-lg border-l-2 mb-1",
             isOwn ? "bg-primary/10 border-primary ml-auto" : "bg-muted border-muted-foreground"
           )}>
             <span className="font-medium">{message.reply_to.sender?.full_name}</span>
@@ -98,7 +98,7 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
 
         <div
           className={cn(
-            "rounded-lg px-4 py-2 relative",
+            "rounded-lg px-3 md:px-4 py-2 relative",
             isOwn
               ? "bg-primary text-primary-foreground"
               : "bg-muted"
@@ -182,27 +182,29 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
             </>
           )}
 
-          {/* Actions menu */}
+          {/* Actions menu - always visible on mobile via long-press or inline buttons */}
           {!isEditing && (
             <div className={cn(
-              "absolute top-1 opacity-0 group-hover:opacity-100 transition-opacity",
+              "absolute top-1 transition-opacity",
+              // Always visible on mobile, hover on desktop
+              "opacity-100 md:opacity-0 md:group-hover:opacity-100",
               isOwn ? "left-0 -translate-x-full pr-1" : "right-0 translate-x-full pl-1"
             )}>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5 md:gap-1 bg-background/80 backdrop-blur-sm rounded-lg p-0.5 shadow-sm border">
                 {/* Quick reaction */}
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6">
-                      <SmilePlus className="h-3 w-3" />
+                    <Button variant="ghost" size="icon" className="h-7 w-7 md:h-6 md:w-6">
+                      <SmilePlus className="h-3.5 w-3.5 md:h-3 md:w-3" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-2">
-                    <div className="flex gap-1">
+                  <PopoverContent className="w-auto p-2" side={isOwn ? "left" : "right"}>
+                    <div className="flex gap-1 flex-wrap max-w-[200px]">
                       {EMOJI_OPTIONS.map((emoji) => (
                         <button
                           key={emoji}
                           onClick={() => handleReaction(emoji)}
-                          className="text-lg hover:scale-125 transition-transform p-1"
+                          className="text-xl md:text-lg hover:scale-125 active:scale-110 transition-transform p-1.5 md:p-1"
                         >
                           {emoji}
                         </button>
@@ -212,19 +214,19 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
                 </Popover>
 
                 {/* Reply */}
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onReply(message)}>
-                  <Reply className="h-3 w-3" />
+                <Button variant="ghost" size="icon" className="h-7 w-7 md:h-6 md:w-6" onClick={() => onReply(message)}>
+                  <Reply className="h-3.5 w-3.5 md:h-3 md:w-3" />
                 </Button>
 
                 {/* More options (edit/delete for own messages) */}
                 {isOwn && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6">
-                        <MoreVertical className="h-3 w-3" />
+                      <Button variant="ghost" size="icon" className="h-7 w-7 md:h-6 md:w-6">
+                        <MoreVertical className="h-3.5 w-3.5 md:h-3 md:w-3" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent>
+                    <DropdownMenuContent align={isOwn ? "start" : "end"}>
                       <DropdownMenuItem onClick={() => setIsEditing(true)}>
                         <Pencil className="h-4 w-4 mr-2" />
                         Rediger
