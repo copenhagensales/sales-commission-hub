@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Message, useEditMessage, useDeleteMessage, useToggleReaction } from "@/hooks/useChat";
+import { useState, useEffect } from "react";
+import { Message, useEditMessage, useDeleteMessage, useToggleReaction, useMarkMessageAsRead } from "@/hooks/useChat";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MoreVertical, Reply, Pencil, Trash2, SmilePlus, Check, X, FileIcon, ImageIcon } from "lucide-react";
+import { MoreVertical, Reply, Pencil, Trash2, SmilePlus, Check, X, FileIcon } from "lucide-react";
+import { ReadReceipts } from "./ReadReceipts";
+import { MessageWithLinks } from "./LinkPreview";
+import { renderMentions } from "./MentionInput";
 
 interface MessageBubbleProps {
   message: Message;
@@ -26,6 +29,17 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
   const editMessage = useEditMessage();
   const deleteMessage = useDeleteMessage();
   const toggleReaction = useToggleReaction();
+  const markAsRead = useMarkMessageAsRead();
+
+  // Mark message as read when viewed (only for messages from others)
+  useEffect(() => {
+    if (!isOwn && currentEmployeeId) {
+      const hasRead = message.read_receipts?.some(r => r.employee_id === currentEmployeeId);
+      if (!hasRead) {
+        markAsRead.mutate({ messageId: message.id, conversationId });
+      }
+    }
+  }, [message.id, isOwn, currentEmployeeId]);
 
   const handleSaveEdit = async () => {
     if (!editContent.trim()) return;
@@ -60,7 +74,13 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
     return acc;
   }, {} as Record<string, { count: number; users: string[]; hasOwn: boolean }>);
 
+  // Filter read receipts to exclude the sender
+  const otherReadReceipts = (message.read_receipts || []).filter(r => r.employee_id !== message.sender_id);
+
   const isImage = message.attachment_type?.startsWith("image/");
+
+  // Check if message contains URLs
+  const hasUrls = /https?:\/\/[^\s]+/.test(message.content);
 
   return (
     <div className={cn("flex group", isOwn ? "justify-end" : "justify-start")}>
@@ -138,7 +158,14 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
                 </div>
               )}
 
-              <div className="whitespace-pre-wrap break-words">{message.content}</div>
+              {/* Message content with links and mentions */}
+              {hasUrls ? (
+                <MessageWithLinks content={message.content} />
+              ) : (
+                <div className="whitespace-pre-wrap break-words">
+                  {renderMentions(message.content)}
+                </div>
+              )}
               
               <div className={cn(
                 "text-xs mt-1 flex items-center gap-1",
@@ -147,6 +174,11 @@ export function MessageBubble({ message, isOwn, currentEmployeeId, conversationI
                 {format(new Date(message.created_at), "HH:mm", { locale: da })}
                 {message.edited_at && <span>(redigeret)</span>}
               </div>
+
+              {/* Read receipts for own messages */}
+              {isOwn && otherReadReceipts.length > 0 && (
+                <ReadReceipts receipts={otherReadReceipts} isOwn={isOwn} />
+              )}
             </>
           )}
 
