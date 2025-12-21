@@ -23,6 +23,7 @@ import { EmployeeExcelImport } from "@/components/employees/EmployeeExcelImport"
 import { DialerMappingTab } from "@/components/employees/DialerMappingTab";
 import { TeamsTab } from "@/components/employees/TeamsTab";
 import { PositionsTab } from "@/components/employees/PositionsTab";
+import { StaffEmployeesTab } from "@/components/employees/StaffEmployeesTab";
 
 
 interface EmployeeMasterDataRecord {
@@ -760,6 +761,7 @@ export default function EmployeeMasterData() {
         <Tabs defaultValue="all-employees" className="space-y-6">
           <TabsList>
             <TabsTrigger value="all-employees">{t("employees.tabs.allEmployees")}</TabsTrigger>
+            <TabsTrigger value="staff-employees">Stabs medarbejdere</TabsTrigger>
             <TabsTrigger value="teams">{t("employees.tabs.teams")}</TabsTrigger>
             <TabsTrigger value="positions">{t("employees.tabs.positions")}</TabsTrigger>
             <TabsTrigger value="dialer-mapping">{t("employees.tabs.dialerMapping")}</TabsTrigger>
@@ -1090,6 +1092,10 @@ export default function EmployeeMasterData() {
             )}
           </div>
         </div>
+          </TabsContent>
+
+          <TabsContent value="staff-employees" className="space-y-6">
+            <StaffEmployeesTab />
           </TabsContent>
 
           <TabsContent value="teams" className="space-y-6">
