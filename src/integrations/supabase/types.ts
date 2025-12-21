@@ -4601,10 +4601,40 @@ export type Database = {
           },
         ]
       }
+      team_shift_breaks: {
+        Row: {
+          break_end: string
+          break_start: string
+          created_at: string
+          id: string
+          shift_id: string
+        }
+        Insert: {
+          break_end: string
+          break_start: string
+          created_at?: string
+          id?: string
+          shift_id: string
+        }
+        Update: {
+          break_end?: string
+          break_start?: string
+          created_at?: string
+          id?: string
+          shift_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_shift_breaks_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "team_standard_shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_standard_shifts: {
         Row: {
-          break_end: string | null
-          break_start: string | null
           created_at: string
           end_time: string
           id: string
@@ -4614,8 +4644,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          break_end?: string | null
-          break_start?: string | null
           created_at?: string
           end_time: string
           id?: string
@@ -4625,8 +4653,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          break_end?: string | null
-          break_start?: string | null
           created_at?: string
           end_time?: string
           id?: string

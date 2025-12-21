@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Clock } from "lucide-react";
+import { Plus, Pencil, Trash2, Clock, X } from "lucide-react";
 
 interface StandardShift {
   id: string;
@@ -15,13 +16,55 @@ interface StandardShift {
   name: string;
   start_time: string;
   end_time: string;
-  break_start: string | null;
-  break_end: string | null;
+}
+
+interface ShiftBreak {
+  id: string;
+  shift_id: string;
+  break_start: string;
+  break_end: string;
+}
+
+interface BreakInput {
+  break_start: string;
+  break_end: string;
 }
 
 interface TeamStandardShiftsProps {
   teamId: string | null;
 }
+
+// Helper to calculate minutes from time string
+const timeToMinutes = (time: string): number => {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+
+// Helper to format minutes to hours and minutes
+const formatDuration = (totalMinutes: number): string => {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) return `${hours}t`;
+  return `${hours}t ${minutes}m`;
+};
+
+// Calculate working time excluding breaks
+const calculateWorkingTime = (
+  startTime: string,
+  endTime: string,
+  breaks: BreakInput[]
+): number => {
+  const totalMinutes = timeToMinutes(endTime) - timeToMinutes(startTime);
+  
+  const breakMinutes = breaks.reduce((sum, b) => {
+    if (b.break_start && b.break_end) {
+      return sum + (timeToMinutes(b.break_end) - timeToMinutes(b.break_start));
+    }
+    return sum;
+  }, 0);
+  
+  return Math.max(0, totalMinutes - breakMinutes);
+};
 
 export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
   const { toast } = useToast();
@@ -32,9 +75,8 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     name: "",
     start_time: "08:00",
     end_time: "16:00",
-    break_start: "",
-    break_end: "",
   });
+  const [breaks, setBreaks] = useState<BreakInput[]>([]);
 
   // Fetch standard shifts for this team
   const { data: shifts = [], isLoading } = useQuery({
@@ -52,21 +94,61 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     enabled: !!teamId,
   });
 
+  // Fetch all breaks for all shifts
+  const { data: allBreaks = [] } = useQuery({
+    queryKey: ["team-shift-breaks", teamId],
+    queryFn: async () => {
+      if (!teamId) return [];
+      const shiftIds = shifts.map((s) => s.id);
+      if (shiftIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("team_shift_breaks")
+        .select("*")
+        .in("shift_id", shiftIds)
+        .order("break_start");
+      if (error) throw error;
+      return data as ShiftBreak[];
+    },
+    enabled: !!teamId && shifts.length > 0,
+  });
+
+  // Get breaks for a specific shift
+  const getShiftBreaks = (shiftId: string): ShiftBreak[] => {
+    return allBreaks.filter((b) => b.shift_id === shiftId);
+  };
+
   // Create shift mutation
   const createMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase.from("team_standard_shifts").insert({
-        team_id: teamId,
-        name: data.name,
-        start_time: data.start_time,
-        end_time: data.end_time,
-        break_start: data.break_start || null,
-        break_end: data.break_end || null,
-      });
-      if (error) throw error;
+    mutationFn: async (data: { name: string; start_time: string; end_time: string; breaks: BreakInput[] }) => {
+      // Create shift
+      const { data: newShift, error: shiftError } = await supabase
+        .from("team_standard_shifts")
+        .insert({
+          team_id: teamId,
+          name: data.name,
+          start_time: data.start_time,
+          end_time: data.end_time,
+        })
+        .select()
+        .single();
+      if (shiftError) throw shiftError;
+
+      // Create breaks
+      const validBreaks = data.breaks.filter((b) => b.break_start && b.break_end);
+      if (validBreaks.length > 0) {
+        const { error: breaksError } = await supabase.from("team_shift_breaks").insert(
+          validBreaks.map((b) => ({
+            shift_id: newShift.id,
+            break_start: b.break_start,
+            break_end: b.break_end,
+          }))
+        );
+        if (breaksError) throw breaksError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team-standard-shifts", teamId] });
+      queryClient.invalidateQueries({ queryKey: ["team-shift-breaks", teamId] });
       setDialogOpen(false);
       resetForm();
       toast({ title: "Standard vagt oprettet" });
@@ -78,21 +160,36 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
 
   // Update shift mutation
   const updateMutation = useMutation({
-    mutationFn: async (data: typeof formData & { id: string }) => {
-      const { error } = await supabase
+    mutationFn: async (data: { id: string; name: string; start_time: string; end_time: string; breaks: BreakInput[] }) => {
+      // Update shift
+      const { error: shiftError } = await supabase
         .from("team_standard_shifts")
         .update({
           name: data.name,
           start_time: data.start_time,
           end_time: data.end_time,
-          break_start: data.break_start || null,
-          break_end: data.break_end || null,
         })
         .eq("id", data.id);
-      if (error) throw error;
+      if (shiftError) throw shiftError;
+
+      // Delete existing breaks and re-add
+      await supabase.from("team_shift_breaks").delete().eq("shift_id", data.id);
+      
+      const validBreaks = data.breaks.filter((b) => b.break_start && b.break_end);
+      if (validBreaks.length > 0) {
+        const { error: breaksError } = await supabase.from("team_shift_breaks").insert(
+          validBreaks.map((b) => ({
+            shift_id: data.id,
+            break_start: b.break_start,
+            break_end: b.break_end,
+          }))
+        );
+        if (breaksError) throw breaksError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team-standard-shifts", teamId] });
+      queryClient.invalidateQueries({ queryKey: ["team-shift-breaks", teamId] });
       setDialogOpen(false);
       setEditingShift(null);
       resetForm();
@@ -111,6 +208,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team-standard-shifts", teamId] });
+      queryClient.invalidateQueries({ queryKey: ["team-shift-breaks", teamId] });
       toast({ title: "Standard vagt slettet" });
     },
     onError: (error) => {
@@ -123,9 +221,8 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       name: "",
       start_time: "08:00",
       end_time: "16:00",
-      break_start: "",
-      break_end: "",
     });
+    setBreaks([]);
   };
 
   const openCreate = () => {
@@ -136,13 +233,18 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
 
   const openEdit = (shift: StandardShift) => {
     setEditingShift(shift);
+    const shiftBreaks = getShiftBreaks(shift.id);
     setFormData({
       name: shift.name,
       start_time: shift.start_time.slice(0, 5),
       end_time: shift.end_time.slice(0, 5),
-      break_start: shift.break_start?.slice(0, 5) || "",
-      break_end: shift.break_end?.slice(0, 5) || "",
     });
+    setBreaks(
+      shiftBreaks.map((b) => ({
+        break_start: b.break_start.slice(0, 5),
+        break_end: b.break_end.slice(0, 5),
+      }))
+    );
     setDialogOpen(true);
   };
 
@@ -152,16 +254,31 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       return;
     }
     if (editingShift) {
-      updateMutation.mutate({ ...formData, id: editingShift.id });
+      updateMutation.mutate({ ...formData, id: editingShift.id, breaks });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate({ ...formData, breaks });
     }
+  };
+
+  const addBreak = () => {
+    setBreaks([...breaks, { break_start: "12:00", break_end: "12:30" }]);
+  };
+
+  const removeBreak = (index: number) => {
+    setBreaks(breaks.filter((_, i) => i !== index));
+  };
+
+  const updateBreak = (index: number, field: "break_start" | "break_end", value: string) => {
+    setBreaks(breaks.map((b, i) => (i === index ? { ...b, [field]: value } : b)));
   };
 
   const formatTime = (time: string | null) => {
     if (!time) return "-";
     return time.slice(0, 5);
   };
+
+  // Calculate working time for display
+  const workingMinutes = calculateWorkingTime(formData.start_time, formData.end_time, breaks);
 
   if (!teamId) {
     return (
@@ -202,39 +319,60 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                 <TableHead className="text-xs">Navn</TableHead>
                 <TableHead className="text-xs">Start</TableHead>
                 <TableHead className="text-xs">Slut</TableHead>
-                <TableHead className="text-xs">Pause</TableHead>
+                <TableHead className="text-xs">Pauser</TableHead>
+                <TableHead className="text-xs">Arbejdstid</TableHead>
                 <TableHead className="w-20"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {shifts.map((shift) => (
-                <TableRow key={shift.id}>
-                  <TableCell className="font-medium">{shift.name}</TableCell>
-                  <TableCell>{formatTime(shift.start_time)}</TableCell>
-                  <TableCell>{formatTime(shift.end_time)}</TableCell>
-                  <TableCell>
-                    {shift.break_start && shift.break_end
-                      ? `${formatTime(shift.break_start)} - ${formatTime(shift.break_end)}`
-                      : "-"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-0.5">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(shift)}>
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={() => deleteMutation.mutate(shift.id)}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {shifts.map((shift) => {
+                const shiftBreaks = getShiftBreaks(shift.id);
+                const breakInputs = shiftBreaks.map((b) => ({
+                  break_start: b.break_start,
+                  break_end: b.break_end,
+                }));
+                const workTime = calculateWorkingTime(shift.start_time, shift.end_time, breakInputs);
+                
+                return (
+                  <TableRow key={shift.id}>
+                    <TableCell className="font-medium">{shift.name}</TableCell>
+                    <TableCell>{formatTime(shift.start_time)}</TableCell>
+                    <TableCell>{formatTime(shift.end_time)}</TableCell>
+                    <TableCell>
+                      {shiftBreaks.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {shiftBreaks.map((b, i) => (
+                            <Badge key={i} variant="secondary" className="text-xs">
+                              {formatTime(b.break_start)}-{formatTime(b.break_end)}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{formatDuration(workTime)}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-0.5">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(shift)}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => deleteMutation.mutate(shift.id)}
+                          disabled={deleteMutation.isPending}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -272,27 +410,55 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Pause start</Label>
-                <Input
-                  type="time"
-                  value={formData.break_start}
-                  onChange={(e) => setFormData({ ...formData, break_start: e.target.value })}
-                />
+
+            {/* Breaks */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Pauser</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addBreak}>
+                  <Plus className="h-3 w-3 mr-1" />
+                  Tilføj pause
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label>Pause slut</Label>
-                <Input
-                  type="time"
-                  value={formData.break_end}
-                  onChange={(e) => setFormData({ ...formData, break_end: e.target.value })}
-                />
-              </div>
+              {breaks.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Ingen pauser tilføjet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {breaks.map((b, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        type="time"
+                        value={b.break_start}
+                        onChange={(e) => updateBreak(index, "break_start", e.target.value)}
+                        className="flex-1"
+                      />
+                      <span className="text-muted-foreground">-</span>
+                      <Input
+                        type="time"
+                        value={b.break_end}
+                        onChange={(e) => updateBreak(index, "break_end", e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => removeBreak(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Pausetidspunkter er valgfrie.
-            </p>
+
+            {/* Working time summary */}
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
+              <span className="text-sm font-medium">Samlet arbejdstid (ekskl. pause)</span>
+              <Badge variant="default">{formatDuration(workingMinutes)}</Badge>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
