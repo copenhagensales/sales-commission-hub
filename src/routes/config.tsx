@@ -82,6 +82,11 @@ import {
   CphSalesDashboard,
   TestDashboard,
   Messages,
+  OnboardingDashboard,
+  EmployeeOnboardingView,
+  LeaderOnboardingView,
+  DrillLibrary,
+  OnboardingAdmin,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -185,5 +190,13 @@ export const routes: RouteConfig[] = [
 
   { path: "/permissions", component: Permissions, access: "role", positionPermission: "menu_permissions" },
   { path: "/role-preview/:id", component: RolePreview, access: "role", positionPermission: "menu_permissions" },
+
+  // Onboarding
+  { path: "/onboarding-program", component: OnboardingDashboard, access: "role", positionPermission: "menu_onboarding" },
+  { path: "/onboarding-program/employee", component: EmployeeOnboardingView, access: "protected" },
+  { path: "/onboarding-program/leader", component: LeaderOnboardingView, access: "role", positionPermission: "menu_onboarding_leader" },
+  { path: "/onboarding-program/drills", component: DrillLibrary, access: "protected" },
+  { path: "/onboarding-program/admin", component: OnboardingAdmin, access: "role", positionPermission: "menu_onboarding_admin" },
+
   { path: "*", component: NotFound, access: "public" },
 ];

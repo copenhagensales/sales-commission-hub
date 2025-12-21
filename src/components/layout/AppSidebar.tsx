@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,6 +57,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   );
   const [someOpen, setSomeOpen] = useState(
     ["/some", "/extra-work"].includes(location.pathname)
+  );
+  const [onboardingOpen, setOnboardingOpen] = useState(
+    location.pathname.startsWith("/onboarding-program")
   );
 
   // Fetch employee name and pending contracts count
@@ -278,6 +281,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const showRecruitmentMenu = p.canViewRecruitmentDashboard || p.canViewCandidates || p.canViewMessages ||
                                p.canViewSmsTemplates || p.canViewEmailTemplates || p.canViewWinback ||
                                p.canViewUpcomingInterviews || p.canViewUpcomingHires;
+  
+  // Check if any Onboarding items are visible
+  const showOnboardingMenu = p.canViewOnboarding || p.canViewOnboardingLeader || p.canViewOnboardingAdmin;
   
   return (
     <aside className={sidebarClasses}>
@@ -1033,6 +1039,65 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   )}>
                     <BarChart3 className="h-4 w-4" />
                     {t("sidebar.pulseSurveyResults")}
+                  </NavLink>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Onboarding menu */}
+          {showOnboardingMenu && (
+            <Collapsible open={onboardingOpen} onOpenChange={setOnboardingOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname.startsWith("/onboarding-program") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <GraduationCap className="h-5 w-5" />
+                  Onboarding
+                </div>
+                {onboardingOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {p.canViewOnboarding && (
+                  <NavLink to="/onboarding-program" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/onboarding-program" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <LayoutDashboard className="h-4 w-4" />
+                    Oversigt
+                  </NavLink>
+                )}
+                <NavLink to="/onboarding-program/employee" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/onboarding-program/employee" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <User className="h-4 w-4" />
+                  Min Onboarding
+                </NavLink>
+                {p.canViewOnboardingLeader && (
+                  <NavLink to="/onboarding-program/leader" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/onboarding-program/leader" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Crown className="h-4 w-4" />
+                    Leder Onboarding
+                  </NavLink>
+                )}
+                <NavLink to="/onboarding-program/drills" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/onboarding-program/drills" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <ListChecks className="h-4 w-4" />
+                  Drill Bibliotek
+                </NavLink>
+                {p.canViewOnboardingAdmin && (
+                  <NavLink to="/onboarding-program/admin" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/onboarding-program/admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Settings className="h-4 w-4" />
+                    Administration
                   </NavLink>
                 )}
               </CollapsibleContent>
