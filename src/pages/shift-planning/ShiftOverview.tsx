@@ -551,10 +551,7 @@ export default function ShiftOverview() {
                 </Button>
               </div>
               <div>
-                <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-                  Uge {format(currentDate, "w", { locale: da })}
-                </h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
+                <p className="text-lg font-medium text-muted-foreground">
                   {format(weekStart, "d. MMMM", { locale: da })} – {format(weekEnd, "d. MMMM yyyy", { locale: da })}
                 </p>
               </div>
