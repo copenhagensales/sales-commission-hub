@@ -249,7 +249,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const mainNavigation: NavItem[] = [];
 
   // Non-personal menu items
-  if (p.canViewDashboard) mainNavigation.push({ name: t("sidebar.dashboard"), href: "/dashboard", icon: LayoutDashboard });
   if (p.canViewSales) mainNavigation.push({ name: t("sidebar.sales"), href: "/sales", icon: ShoppingCart });
   if (p.canViewLogics) mainNavigation.push({ name: t("sidebar.logics"), href: "/logikker", icon: ListChecks });
   if (p.canViewClosingShifts) mainNavigation.push({ name: t("sidebar.closingShifts"), href: "/closing-shifts", icon: Lock });
