@@ -40,6 +40,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useWidgetTypes, WidgetTypeConfig } from "@/hooks/useWidgetTypes";
 import { useKpiTypes } from "@/hooks/useKpiTypes";
+import { useDesignTypes } from "@/hooks/useDesignTypes";
 
 interface TimePeriod {
   id: string;
@@ -47,12 +48,7 @@ interface TimePeriod {
   description: string;
 }
 
-interface DesignOption {
-  id: string;
-  name: string;
-  description: string;
-  preview: string;
-}
+// DesignOption interface removed - now using useDesignTypes hook
 
 interface ColorTheme {
   id: string;
@@ -103,14 +99,7 @@ const COMPARISON_PERIODS: TimePeriod[] = [
   { id: "last-month", name: "Sidste måned", description: "Sammenlign med sidste måned" },
 ];
 
-const DESIGN_OPTIONS: DesignOption[] = [
-  { id: "minimal", name: "Minimal", description: "Rent og simpelt design", preview: "bg-card border" },
-  { id: "gradient", name: "Gradient", description: "Gradient baggrund", preview: "bg-gradient-to-br from-primary/20 to-primary/5" },
-  { id: "dark", name: "Mørk", description: "Mørk baggrund", preview: "bg-zinc-900 text-white" },
-  { id: "accent", name: "Accent", description: "Med accent farve", preview: "bg-primary/10 border-primary/30" },
-  { id: "glass", name: "Glas", description: "Glasmorfisme effekt", preview: "bg-white/10 backdrop-blur-sm border-white/20" },
-  { id: "outline", name: "Kontur", description: "Kun kontur", preview: "bg-transparent border-2" },
-];
+// DESIGN_OPTIONS moved to useDesignTypes hook
 
 const COLOR_THEMES: ColorTheme[] = [
   { id: "default", name: "Standard", primary: "hsl(var(--primary))", secondary: "hsl(var(--secondary))" },
@@ -142,12 +131,15 @@ export default function DesignDashboard() {
   const { toast } = useToast();
   const { activeWidgetTypes } = useWidgetTypes();
   const { activeKpiTypes } = useKpiTypes();
+  const { activeDesignTypes } = useDesignTypes();
   const [placedWidgets, setPlacedWidgets] = useState<PlacedWidget[]>([]);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<PlacedWidget | null>(null);
   
-  // Global dashboard design state
-  const [globalDesign, setGlobalDesign] = useState<string>("minimal");
+  // Global dashboard design state - default to first active design
+  const [globalDesign, setGlobalDesign] = useState<string>(() => {
+    return activeDesignTypes[0]?.id || "minimal";
+  });
   
   // Config form state
   const [selectedWidgetType, setSelectedWidgetType] = useState<string>("");
@@ -282,7 +274,7 @@ export default function DesignDashboard() {
   };
 
   const getDesignClasses = (designId: string) => {
-    const design = DESIGN_OPTIONS.find(d => d.id === designId);
+    const design = activeDesignTypes.find(d => d.id === designId);
     return design?.preview || "bg-card border";
   };
 
@@ -342,8 +334,8 @@ export default function DesignDashboard() {
             <CardDescription>Dette design anvendes på alle widgets</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-6 gap-3">
-              {DESIGN_OPTIONS.map((design) => (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {activeDesignTypes.map((design) => (
                 <div
                   key={design.id}
                   onClick={() => setGlobalDesign(design.id)}
@@ -449,7 +441,7 @@ export default function DesignDashboard() {
                     <div className="grid grid-cols-3 gap-4">
                       {placedWidgets.map((widget) => {
                         const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
-                        const design = DESIGN_OPTIONS.find(d => d.id === globalDesign);
+                        const design = activeDesignTypes.find(d => d.id === globalDesign);
                         const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
                         const widgetConfig = activeWidgetTypes.find(w => w.value === widget.widgetTypeId);
                         
