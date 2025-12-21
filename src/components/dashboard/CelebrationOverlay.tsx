@@ -259,10 +259,16 @@ export const CelebrationOverlay = ({
     }
   };
 
+  const handleClose = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+  }, [onClose]);
+
   return (
     <div 
       className="fixed inset-0 z-[9999] overflow-hidden cursor-pointer"
-      onClick={onClose}
+      onClick={handleClose}
     >
       {/* Backdrop */}
       <div 
