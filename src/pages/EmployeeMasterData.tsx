@@ -142,6 +142,7 @@ export default function EmployeeMasterData() {
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("*")
+        .eq("is_staff_employee", false)
         .order("last_name", { ascending: true });
       if (error) throw error;
       return data as EmployeeMasterDataRecord[];
