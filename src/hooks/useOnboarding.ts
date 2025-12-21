@@ -41,6 +41,14 @@ export interface OnboardingDrill {
   focus: string;
   description: string | null;
   duration_min: number;
+  when_to_use: string | null;
+  setup: string | null;
+  steps: string[];
+  reps: number | null;
+  script_snippets: string[];
+  success_criteria: string[];
+  common_mistakes: string[];
+  variants: string[];
   created_at: string;
 }
 
