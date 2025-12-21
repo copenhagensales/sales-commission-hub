@@ -150,6 +150,7 @@ export default function DesignDashboard() {
   const { activeDesignTypes } = useDesignTypes();
   const [placedWidgets, setPlacedWidgets] = useState<PlacedWidget[]>([]);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<PlacedWidget | null>(null);
   
   // Global dashboard design state - default to first active design
@@ -333,7 +334,7 @@ export default function DesignDashboard() {
             <p className="text-muted-foreground">Design dit eget dashboard med widgets fra indstillinger</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => setIsPreviewOpen(true)}>
               <Eye className="h-4 w-4 mr-2" />
               Forhåndsvis
             </Button>
@@ -871,6 +872,85 @@ export default function DesignDashboard() {
             </Button>
             <Button onClick={handleSaveWidget}>
               {editingWidget ? "Gem ændringer" : "Tilføj widget"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Dashboard Forhåndsvisning</DialogTitle>
+            <DialogDescription>Sådan vil dit dashboard se ud</DialogDescription>
+          </DialogHeader>
+          
+          <div className="p-4 bg-muted/30 rounded-lg min-h-[400px]">
+            {placedWidgets.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-[300px] text-center">
+                <LayoutGrid className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="font-semibold text-lg mb-2">Ingen widgets at vise</h3>
+                <p className="text-muted-foreground">Tilføj widgets for at se en forhåndsvisning</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-4">
+                {placedWidgets.map((widget) => {
+                  const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
+                  const trackingScope = TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId);
+                  
+                  return (
+                    <Card 
+                      key={widget.id} 
+                      className={getDesignClasses(globalDesign)}
+                      style={colorTheme && colorTheme.id !== "default" ? { 
+                        borderColor: colorTheme.primary,
+                        borderWidth: '2px'
+                      } : undefined}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div 
+                            className="p-1.5 rounded-md"
+                            style={{ 
+                              backgroundColor: colorTheme?.primary ? `${colorTheme.primary}20` : 'hsl(var(--primary) / 0.1)',
+                              color: colorTheme?.primary || 'hsl(var(--primary))'
+                            }}
+                          >
+                            {getWidgetTypeIcon(widget.widgetTypeId)}
+                          </div>
+                          <span className="font-medium text-sm">
+                            {widget.title || getWidgetTypeName(widget.widgetTypeId)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          {getDisplayLabel(widget)}
+                        </p>
+                        <p className="text-3xl font-bold" style={{ color: colorTheme?.primary }}>
+                          {getDisplayValue(widget)}
+                        </p>
+                        {widget.targetValue && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                            <Target className="h-3 w-3" />
+                            <span>Mål: {widget.targetValue}</span>
+                          </div>
+                        )}
+                        {trackingScope && trackingScope.id !== "all" && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                            <Users className="h-3 w-3" />
+                            <span>{trackingScope.name}</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>
+              Luk
             </Button>
           </DialogFooter>
         </DialogContent>
