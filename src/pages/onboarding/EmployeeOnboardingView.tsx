@@ -3,15 +3,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOnboardingDays, useEmployeeOnboardingProgress, useCurrentEmployeeId, useUpdateProgress, OnboardingVideo } from "@/hooks/useOnboarding";
 import { Play, CheckCircle2, Clock, Target, BookOpen, Dumbbell, PhoneCall } from "lucide-react";
 import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { VideoPlayerDialog } from "@/components/onboarding/VideoPlayerDialog";
 import { DailyMessage } from "@/components/onboarding/DailyMessage";
 import { MyProgression } from "@/components/onboarding/MyProgression";
 
 export default function EmployeeOnboardingView() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { data: employeeId } = useCurrentEmployeeId();
   const { data: days = [], isLoading: daysLoading } = useOnboardingDays();
   const { data: progress = [], isLoading: progressLoading } = useEmployeeOnboardingProgress(employeeId || undefined);
@@ -19,6 +23,9 @@ export default function EmployeeOnboardingView() {
   
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [playingVideo, setPlayingVideo] = useState<OnboardingVideo | null>(null);
+
+  const currentTab = location.pathname.includes("/expectations") ? "expectations" : 
+                     location.pathname.includes("/drills") ? "drills" : "employee";
 
   if (daysLoading || progressLoading) {
     return <div className="text-muted-foreground py-8 text-center">Indlæser onboarding...</div>;
@@ -104,7 +111,23 @@ export default function EmployeeOnboardingView() {
   }, {} as Record<number, typeof days>);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
+    <div className="space-y-4">
+      {/* Navigation Tabs */}
+      <Tabs value={currentTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
+          <TabsTrigger value="employee" onClick={() => navigate("/onboarding-program/employee")}>
+            Min Onboarding
+          </TabsTrigger>
+          <TabsTrigger value="expectations" onClick={() => navigate("/onboarding-program/expectations")}>
+            Forventninger
+          </TabsTrigger>
+          <TabsTrigger value="drills" onClick={() => navigate("/onboarding-program/drills")}>
+            Drill-bibliotek
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div className="grid gap-6 lg:grid-cols-3">
       {/* Timeline Sidebar */}
       <Card className="lg:col-span-1">
         <CardHeader>
