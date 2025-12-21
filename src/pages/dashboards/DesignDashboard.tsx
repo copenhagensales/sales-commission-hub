@@ -3,6 +3,9 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   BarChart3, 
   LineChart, 
@@ -20,7 +23,8 @@ import {
   Save,
   Eye,
   Trash2,
-  GripVertical
+  GripVertical,
+  Settings2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -32,9 +36,24 @@ interface WidgetType {
   isActive: boolean;
 }
 
+interface KpiType {
+  id: string;
+  name: string;
+  description: string;
+}
+
+interface DesignOption {
+  id: string;
+  name: string;
+  description: string;
+  preview: string;
+}
+
 interface PlacedWidget {
   id: string;
-  typeId: string;
+  widgetTypeId: string;
+  kpiTypeId: string;
+  designId: string;
   x: number;
   y: number;
   width: number;
@@ -54,6 +73,32 @@ const INITIAL_WIDGET_TYPES: WidgetType[] = [
   { id: "calendar-widget", name: "Kalender", description: "Vis kommende events", icon: "calendar", isActive: true },
   { id: "task-list", name: "Opgaveliste", description: "Vis opgaver", icon: "list", isActive: true },
   { id: "activity-feed", name: "Aktivitetsfeed", description: "Seneste aktiviteter", icon: "activity", isActive: true },
+];
+
+const KPI_TYPES: KpiType[] = [
+  { id: "sales-today", name: "Salg i dag", description: "Antal salg i dag" },
+  { id: "sales-week", name: "Salg denne uge", description: "Antal salg denne uge" },
+  { id: "sales-month", name: "Salg denne måned", description: "Antal salg denne måned" },
+  { id: "revenue-today", name: "Omsætning i dag", description: "Omsætning i dag" },
+  { id: "revenue-month", name: "Omsætning måned", description: "Omsætning denne måned" },
+  { id: "conversion-rate", name: "Konverteringsrate", description: "Konverteringsrate %" },
+  { id: "calls-today", name: "Opkald i dag", description: "Antal opkald i dag" },
+  { id: "calls-week", name: "Opkald denne uge", description: "Antal opkald denne uge" },
+  { id: "avg-call-duration", name: "Gns. opkaldstid", description: "Gennemsnitlig opkaldstid" },
+  { id: "team-target", name: "Team mål", description: "Fremskridt mod team mål" },
+  { id: "individual-target", name: "Individuelt mål", description: "Fremskridt mod individuelt mål" },
+  { id: "leads-generated", name: "Leads genereret", description: "Antal nye leads" },
+  { id: "appointments-booked", name: "Aftaler booket", description: "Antal bookede aftaler" },
+  { id: "customer-satisfaction", name: "Kundetilfredshed", description: "Kundetilfredshedsscore" },
+];
+
+const DESIGN_OPTIONS: DesignOption[] = [
+  { id: "minimal", name: "Minimal", description: "Rent og simpelt design", preview: "bg-card border" },
+  { id: "gradient", name: "Gradient", description: "Gradient baggrund", preview: "bg-gradient-to-br from-primary/20 to-primary/5" },
+  { id: "dark", name: "Mørk", description: "Mørk baggrund", preview: "bg-zinc-900 text-white" },
+  { id: "accent", name: "Accent", description: "Med accent farve", preview: "bg-primary/10 border-primary/30" },
+  { id: "glass", name: "Glas", description: "Glasmorfisme effekt", preview: "bg-white/10 backdrop-blur-sm border-white/20" },
+  { id: "outline", name: "Kontur", description: "Kun kontur", preview: "bg-transparent border-2" },
 ];
 
 const getWidgetIcon = (iconName: string) => {
@@ -77,35 +122,70 @@ const getWidgetIcon = (iconName: string) => {
 
 export default function DesignDashboard() {
   const { toast } = useToast();
-  const [widgetTypes, setWidgetTypes] = useState<WidgetType[]>(INITIAL_WIDGET_TYPES);
+  const [widgetTypes] = useState<WidgetType[]>(INITIAL_WIDGET_TYPES);
   const [placedWidgets, setPlacedWidgets] = useState<PlacedWidget[]>([]);
-  const [selectedWidgetType, setSelectedWidgetType] = useState<string | null>(null);
+  const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
+  const [editingWidget, setEditingWidget] = useState<PlacedWidget | null>(null);
+  
+  // Config form state
+  const [selectedWidgetType, setSelectedWidgetType] = useState<string>("");
+  const [selectedKpiType, setSelectedKpiType] = useState<string>("");
+  const [selectedDesign, setSelectedDesign] = useState<string>("minimal");
 
-  const toggleWidgetType = (id: string) => {
-    setWidgetTypes(prev => prev.map(type => 
-      type.id === id ? { ...type, isActive: !type.isActive } : type
-    ));
-    const widget = widgetTypes.find(w => w.id === id);
-    toast({
-      title: widget?.isActive ? "Widget deaktiveret" : "Widget aktiveret",
-      description: `${widget?.name} er nu ${widget?.isActive ? "inaktiv" : "aktiv"}`,
-    });
+  const openAddWidgetDialog = () => {
+    setEditingWidget(null);
+    setSelectedWidgetType("");
+    setSelectedKpiType("");
+    setSelectedDesign("minimal");
+    setIsConfigDialogOpen(true);
   };
 
-  const addWidgetToCanvas = (typeId: string) => {
-    const newWidget: PlacedWidget = {
-      id: `widget-${Date.now()}`,
-      typeId,
-      x: placedWidgets.length % 3,
-      y: Math.floor(placedWidgets.length / 3),
-      width: 1,
-      height: 1,
-    };
-    setPlacedWidgets(prev => [...prev, newWidget]);
-    toast({
-      title: "Widget tilføjet",
-      description: "Widget er tilføjet til dit dashboard",
-    });
+  const openEditWidgetDialog = (widget: PlacedWidget) => {
+    setEditingWidget(widget);
+    setSelectedWidgetType(widget.widgetTypeId);
+    setSelectedKpiType(widget.kpiTypeId);
+    setSelectedDesign(widget.designId);
+    setIsConfigDialogOpen(true);
+  };
+
+  const handleSaveWidget = () => {
+    if (!selectedWidgetType || !selectedKpiType) {
+      toast({
+        title: "Manglende valg",
+        description: "Vælg venligst widget type og KPI type",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (editingWidget) {
+      setPlacedWidgets(prev => prev.map(w => 
+        w.id === editingWidget.id 
+          ? { ...w, widgetTypeId: selectedWidgetType, kpiTypeId: selectedKpiType, designId: selectedDesign }
+          : w
+      ));
+      toast({
+        title: "Widget opdateret",
+        description: "Widget er blevet opdateret",
+      });
+    } else {
+      const newWidget: PlacedWidget = {
+        id: `widget-${Date.now()}`,
+        widgetTypeId: selectedWidgetType,
+        kpiTypeId: selectedKpiType,
+        designId: selectedDesign,
+        x: placedWidgets.length % 3,
+        y: Math.floor(placedWidgets.length / 3),
+        width: 1,
+        height: 1,
+      };
+      setPlacedWidgets(prev => [...prev, newWidget]);
+      toast({
+        title: "Widget tilføjet",
+        description: "Widget er tilføjet til dit dashboard",
+      });
+    }
+    setIsConfigDialogOpen(false);
   };
 
   const removeWidget = (widgetId: string) => {
@@ -114,6 +194,11 @@ export default function DesignDashboard() {
       title: "Widget fjernet",
       description: "Widget er fjernet fra dit dashboard",
     });
+  };
+
+  const getDesignClasses = (designId: string) => {
+    const design = DESIGN_OPTIONS.find(d => d.id === designId);
+    return design?.preview || "bg-card border";
   };
 
   const activeWidgetTypes = widgetTypes.filter(w => w.isActive);
@@ -143,14 +228,34 @@ export default function DesignDashboard() {
           <div className="lg:col-span-1 space-y-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Tilgængelige Widgets</CardTitle>
-                <CardDescription>Klik for at tilføje til dashboard</CardDescription>
+                <CardTitle className="text-lg">Tilføj Widget</CardTitle>
+                <CardDescription>Konfigurer og tilføj widgets</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {activeWidgetTypes.map((widget) => (
+              <CardContent>
+                <Button onClick={openAddWidgetDialog} className="w-full">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Tilføj ny widget
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Quick add from active types */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Hurtig tilføj</CardTitle>
+                <CardDescription>Klik for at konfigurere</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 max-h-[400px] overflow-y-auto">
+                {activeWidgetTypes.slice(0, 6).map((widget) => (
                   <div
                     key={widget.id}
-                    onClick={() => addWidgetToCanvas(widget.id)}
+                    onClick={() => {
+                      setSelectedWidgetType(widget.id);
+                      setSelectedKpiType("");
+                      setSelectedDesign("minimal");
+                      setEditingWidget(null);
+                      setIsConfigDialogOpen(true);
+                    }}
                     className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card hover:bg-accent cursor-pointer transition-colors"
                   >
                     <div className="p-2 rounded-md bg-primary/10 text-primary">
@@ -165,35 +270,6 @@ export default function DesignDashboard() {
                 ))}
               </CardContent>
             </Card>
-
-            {/* All Widget Types with Toggle */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Widget Typer</CardTitle>
-                <CardDescription>Aktiver/deaktiver widget typer</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {widgetTypes.map((widget) => (
-                  <div
-                    key={widget.id}
-                    onClick={() => toggleWidgetType(widget.id)}
-                    className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-all ${
-                      widget.isActive 
-                        ? "border-primary/50 bg-primary/5" 
-                        : "border-border bg-muted/30 opacity-60"
-                    }`}
-                  >
-                    <div className={`p-1.5 rounded-md ${widget.isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                      {getWidgetIcon(widget.icon)}
-                    </div>
-                    <span className="flex-1 text-sm font-medium">{widget.name}</span>
-                    <Badge variant={widget.isActive ? "default" : "secondary"} className="text-xs">
-                      {widget.isActive ? "Aktiv" : "Inaktiv"}
-                    </Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
           </div>
 
           {/* Dashboard Canvas */}
@@ -201,7 +277,7 @@ export default function DesignDashboard() {
             <Card className="min-h-[600px]">
               <CardHeader className="pb-3 border-b">
                 <CardTitle className="text-lg">Dashboard Canvas</CardTitle>
-                <CardDescription>Træk og slip widgets for at arrangere dit dashboard</CardDescription>
+                <CardDescription>Dine widgets vises her - klik på en widget for at redigere</CardDescription>
               </CardHeader>
               <CardContent className="p-6">
                 {placedWidgets.length === 0 ? (
@@ -210,16 +286,27 @@ export default function DesignDashboard() {
                       <Plus className="h-8 w-8 text-muted-foreground" />
                     </div>
                     <h3 className="font-semibold text-lg mb-2">Ingen widgets endnu</h3>
-                    <p className="text-muted-foreground max-w-sm">
-                      Klik på en widget i panelet til venstre for at tilføje den til dit dashboard
+                    <p className="text-muted-foreground max-w-sm mb-4">
+                      Klik på "Tilføj ny widget" for at komme i gang
                     </p>
+                    <Button onClick={openAddWidgetDialog}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Tilføj første widget
+                    </Button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 gap-4">
                     {placedWidgets.map((widget) => {
-                      const widgetType = widgetTypes.find(w => w.id === widget.typeId);
+                      const widgetType = widgetTypes.find(w => w.id === widget.widgetTypeId);
+                      const kpiType = KPI_TYPES.find(k => k.id === widget.kpiTypeId);
+                      const design = DESIGN_OPTIONS.find(d => d.id === widget.designId);
+                      
                       return (
-                        <Card key={widget.id} className="relative group">
+                        <Card 
+                          key={widget.id} 
+                          className={`relative group cursor-pointer transition-all hover:shadow-lg ${getDesignClasses(widget.designId)}`}
+                          onClick={() => openEditWidgetDialog(widget)}
+                        >
                           <CardContent className="p-4">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-2">
@@ -227,19 +314,38 @@ export default function DesignDashboard() {
                                 <div className="p-1.5 rounded-md bg-primary/10 text-primary">
                                   {widgetType && getWidgetIcon(widgetType.icon)}
                                 </div>
-                                <span className="font-medium text-sm">{widgetType?.name}</span>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => removeWidget(widget.id)}
-                              >
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditWidgetDialog(widget);
+                                  }}
+                                >
+                                  <Settings2 className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeWidget(widget.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </Button>
+                              </div>
                             </div>
-                            <div className="h-32 bg-muted/30 rounded-md flex items-center justify-center">
-                              <span className="text-sm text-muted-foreground">Widget Preview</span>
+                            <div className="space-y-1 mb-3">
+                              <p className="font-medium text-sm">{widgetType?.name}</p>
+                              <p className="text-xs text-muted-foreground">{kpiType?.name}</p>
+                            </div>
+                            <div className="h-24 bg-muted/30 rounded-md flex items-center justify-center">
+                              <span className="text-xs text-muted-foreground">{design?.name} design</span>
                             </div>
                           </CardContent>
                         </Card>
@@ -252,6 +358,90 @@ export default function DesignDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Widget Configuration Dialog */}
+      <Dialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{editingWidget ? "Rediger Widget" : "Tilføj Widget"}</DialogTitle>
+            <DialogDescription>
+              Vælg widget type, KPI og design for din widget
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Widget Type Selection */}
+            <div className="space-y-2">
+              <Label>Widget Type</Label>
+              <Select value={selectedWidgetType} onValueChange={setSelectedWidgetType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Vælg widget type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeWidgetTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      <div className="flex items-center gap-2">
+                        {getWidgetIcon(type.icon)}
+                        <span>{type.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* KPI Type Selection */}
+            <div className="space-y-2">
+              <Label>KPI Type</Label>
+              <Select value={selectedKpiType} onValueChange={setSelectedKpiType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Vælg KPI type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {KPI_TYPES.map((kpi) => (
+                    <SelectItem key={kpi.id} value={kpi.id}>
+                      <div className="flex flex-col">
+                        <span>{kpi.name}</span>
+                        <span className="text-xs text-muted-foreground">{kpi.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Design Selection */}
+            <div className="space-y-2">
+              <Label>Design</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {DESIGN_OPTIONS.map((design) => (
+                  <div
+                    key={design.id}
+                    onClick={() => setSelectedDesign(design.id)}
+                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                      selectedDesign === design.id 
+                        ? "border-primary bg-primary/5" 
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <div className={`h-12 rounded-md mb-2 ${design.preview}`} />
+                    <p className="text-xs font-medium text-center">{design.name}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfigDialogOpen(false)}>
+              Annuller
+            </Button>
+            <Button onClick={handleSaveWidget}>
+              {editingWidget ? "Gem ændringer" : "Tilføj widget"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
