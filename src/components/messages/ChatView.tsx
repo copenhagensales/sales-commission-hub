@@ -158,15 +158,16 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Search toggle */}
+      {/* Search toggle - more compact on mobile */}
       <div className="border-b p-2 flex justify-end">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setShowSearch(!showSearch)}
+          className="h-8 px-2 md:px-3"
         >
-          <Search className="h-4 w-4 mr-1" />
-          Søg
+          <Search className="h-4 w-4 md:mr-1" />
+          <span className="hidden md:inline">Søg</span>
         </Button>
       </div>
 
@@ -174,14 +175,13 @@ export function ChatView({ conversationId }: ChatViewProps) {
         <MessageSearch 
           onClose={() => setShowSearch(false)}
           onSelectMessage={(msg) => {
-            // Could scroll to message
             setShowSearch(false);
           }}
         />
       )}
 
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="space-y-4">
+      <ScrollArea className="flex-1 p-2 md:p-4" ref={scrollRef}>
+        <div className="space-y-3 md:space-y-4">
           {messages?.map((msg) => (
             <MessageBubble
               key={msg.id}
@@ -202,15 +202,15 @@ export function ChatView({ conversationId }: ChatViewProps) {
         <TypingIndicator users={otherTypingUsers} />
       </ScrollArea>
 
-      {/* Reply preview */}
+      {/* Reply preview - more compact on mobile */}
       {replyTo && (
-        <div className="px-4 py-2 bg-muted/50 border-t flex items-center justify-between">
-          <div className="text-sm">
+        <div className="px-2 md:px-4 py-2 bg-muted/50 border-t flex items-center justify-between gap-2">
+          <div className="text-sm min-w-0 flex-1">
             <span className="text-muted-foreground">Svarer på: </span>
             <span className="font-medium">{replyTo.sender?.full_name}</span>
-            <p className="text-muted-foreground truncate max-w-xs">{replyTo.content}</p>
+            <p className="text-muted-foreground truncate">{replyTo.content}</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => setReplyTo(null)}>
+          <Button variant="ghost" size="sm" onClick={() => setReplyTo(null)} className="flex-shrink-0 h-8 w-8 p-0">
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -224,8 +224,9 @@ export function ChatView({ conversationId }: ChatViewProps) {
         />
       )}
 
-      <div className="p-4 border-t">
-        <div className="flex gap-2">
+      {/* Input area - optimized for mobile */}
+      <div className="p-2 md:p-4 border-t safe-area-bottom">
+        <div className="flex gap-1 md:gap-2 items-end">
           <input
             type="file"
             ref={fileInputRef}
@@ -238,6 +239,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
             size="icon"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
+            className="h-10 w-10 flex-shrink-0"
           >
             {isUploading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -245,17 +247,20 @@ export function ChatView({ conversationId }: ChatViewProps) {
               <Paperclip className="h-4 w-4" />
             )}
           </Button>
-          <MentionInput
-            value={message}
-            onChange={setMessage}
-            onKeyDown={handleKeyDown}
-            placeholder="Skriv en besked... (brug @ for at nævne)"
-            onTyping={handleTyping}
-          />
+          <div className="flex-1 min-w-0">
+            <MentionInput
+              value={message}
+              onChange={setMessage}
+              onKeyDown={handleKeyDown}
+              placeholder="Skriv en besked..."
+              onTyping={handleTyping}
+            />
+          </div>
           <Button
             onClick={handleSend}
             disabled={(!message.trim() && !attachment) || sendMessage.isPending}
-            className="self-end"
+            size="icon"
+            className="h-10 w-10 flex-shrink-0"
           >
             {sendMessage.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
