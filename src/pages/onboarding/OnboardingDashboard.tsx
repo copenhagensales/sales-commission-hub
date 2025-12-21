@@ -1,8 +1,9 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Suspense, lazy } from "react";
-import { Loader2, GraduationCap } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const EmployeeOnboardingView = lazy(() => import("./EmployeeOnboardingView"));
 const LeaderOnboardingView = lazy(() => import("./LeaderOnboardingView"));
@@ -10,6 +11,7 @@ const DrillLibrary = lazy(() => import("./DrillLibrary"));
 const OnboardingAdmin = lazy(() => import("./OnboardingAdmin"));
 
 export default function OnboardingDashboard() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "employee";
 
@@ -19,7 +21,17 @@ export default function OnboardingDashboard() {
 
   return (
     <MainLayout>
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
+      <div className="space-y-4">
+        <Button 
+          variant="ghost" 
+          onClick={() => navigate("/")} 
+          className="mb-2"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Tilbage til menu
+        </Button>
+        
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
           <TabsTrigger value="employee">Min Onboarding</TabsTrigger>
           <TabsTrigger value="leader">Leder</TabsTrigger>
@@ -44,7 +56,8 @@ export default function OnboardingDashboard() {
             <OnboardingAdmin />
           </TabsContent>
         </Suspense>
-      </Tabs>
+        </Tabs>
+      </div>
     </MainLayout>
   );
 }
