@@ -38,7 +38,10 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const { data: isSalgskonsulent } = useIsSalgskonsulent();
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
   
-  const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning"));
+  const [mitHjemOpen, setMitHjemOpen] = useState(
+    ["/home", "/messages", "/my-schedule", "/my-profile", "/my-contracts", "/career-wishes"].some(path => location.pathname === path || location.pathname.startsWith(path))
+  );
+  const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp");
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const [ledelseOpen, setLedelseOpen] = useState(
@@ -239,15 +242,10 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     );
   }
 
-  // Build main navigation based on position permissions
+  // Build main navigation based on position permissions (items NOT in "Mit Hjem" menu)
   const mainNavigation: NavItem[] = [];
 
-  // Personal menu items - check each permission
-  if (p.canViewMySchedule) mainNavigation.push({ name: t("sidebar.myCalendar"), href: "/my-schedule", icon: UserCheck });
-  if (p.canViewMyProfile) mainNavigation.push({ name: t("sidebar.myProfile"), href: "/my-profile", icon: User });
-  if (p.canViewMyContracts) mainNavigation.push({ name: t("sidebar.myContracts"), href: "/my-contracts", icon: FileText });
-  if (p.canViewCareerWishes) mainNavigation.push({ name: t("sidebar.teamWishesCareer"), href: "/career-wishes", icon: Sparkles });
-  if (p.canViewTimeStamp) mainNavigation.push({ name: t("sidebar.timeClock"), href: "/time-stamp", icon: Clock });
+  // Non-personal menu items
   if (p.canViewDashboard) mainNavigation.push({ name: t("sidebar.dashboard"), href: "/dashboard", icon: LayoutDashboard });
   if (p.canViewSome) mainNavigation.push({ name: t("sidebar.some"), href: "/some", icon: Video });
   if (p.canViewSales) mainNavigation.push({ name: t("sidebar.sales"), href: "/sales", icon: ShoppingCart });
@@ -272,7 +270,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                                   p.canViewFmBilling || p.canViewFmTimeOff || p.canViewFmSalesRegistration;
   
   // Check if any Shift Planning items are visible
-  const showShiftPlanningMenu = p.canViewShiftOverview || p.canViewAbsence || p.canViewTimeTracking;
+  const showShiftPlanningMenu = p.canViewShiftOverview || p.canViewAbsence || p.canViewTimeTracking || p.canViewTimeStamp;
   
   // Check if any Test menu items are visible
   const showTestMenu = p.canViewCarQuizAdmin || p.canViewCocAdmin || p.canViewPulseSurvey;
@@ -299,43 +297,133 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
           </div>
         )}
         <nav className="flex-1 space-y-1 p-4 pt-6">
-          {/* Home link - always visible */}
-          <NavLink
-            to="/home"
-            onClick={handleNavClick}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              location.pathname === "/home" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-            )}
-          >
-            <Home className="h-5 w-5" />
-            {t("sidebar.home")}
-          </NavLink>
-          
-          {/* Messages link - always visible for authenticated users */}
-          <NavLink
-            to="/messages"
-            onClick={handleNavClick}
-            className={cn(
-              "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              location.pathname === "/messages" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <MessageSquare className="h-5 w-5" />
-              {t("sidebar.messages", "Beskeder")}
-            </div>
-            {unreadMessagesCount > 0 && (
-              <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
-              </Badge>
-            )}
-          </NavLink>
+          {/* Mit Hjem (My Home) menu */}
+          <Collapsible open={mitHjemOpen} onOpenChange={setMitHjemOpen}>
+            <CollapsibleTrigger className={cn(
+              "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              ["/home", "/messages", "/my-schedule", "/my-profile", "/my-contracts", "/career-wishes"].some(path => location.pathname === path || location.pathname.startsWith(path))
+                ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            )}>
+              <div className="flex items-center gap-3">
+                <Home className="h-5 w-5" />
+                {t("sidebar.myHome", "Mit Hjem")}
+              </div>
+              <div className="flex items-center gap-1">
+                {(unreadMessagesCount > 0 || pendingContractsCount > 0) && (
+                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                    {(unreadMessagesCount + pendingContractsCount) > 99 ? "99+" : (unreadMessagesCount + pendingContractsCount)}
+                  </Badge>
+                )}
+                {mitHjemOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pl-4 space-y-1 mt-1">
+              {/* Hjem */}
+              <NavLink
+                to="/home"
+                onClick={handleNavClick}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/home" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}
+              >
+                <Home className="h-4 w-4" />
+                {t("sidebar.home")}
+              </NavLink>
+              
+              {/* Beskeder */}
+              <NavLink
+                to="/messages"
+                onClick={handleNavClick}
+                className={cn(
+                  "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/messages" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <MessageSquare className="h-4 w-4" />
+                  {t("sidebar.messages", "Beskeder")}
+                </div>
+                {unreadMessagesCount > 0 && (
+                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                    {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
+                  </Badge>
+                )}
+              </NavLink>
+              
+              {/* Min Kalender */}
+              {p.canViewMySchedule && (
+                <NavLink
+                  to="/my-schedule"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/my-schedule" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <UserCheck className="h-4 w-4" />
+                  {t("sidebar.myCalendar")}
+                </NavLink>
+              )}
+              
+              {/* Min Profil */}
+              {p.canViewMyProfile && (
+                <NavLink
+                  to="/my-profile"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/my-profile" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <User className="h-4 w-4" />
+                  {t("sidebar.myProfile")}
+                </NavLink>
+              )}
+              
+              {/* Mine Kontrakter */}
+              {p.canViewMyContracts && (
+                <NavLink
+                  to="/my-contracts"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/my-contracts" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-4 w-4" />
+                    {t("sidebar.myContracts")}
+                  </div>
+                  {pendingContractsCount > 0 && (
+                    <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
+                      {pendingContractsCount}
+                    </Badge>
+                  )}
+                </NavLink>
+              )}
+              
+              {/* Teamønsker og Karriere */}
+              {p.canViewCareerWishes && (
+                <NavLink
+                  to="/career-wishes"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/career-wishes" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {t("sidebar.teamWishesCareer")}
+                </NavLink>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
           
           {/* Main navigation items */}
           {mainNavigation.map((item) => {
             const isActive = location.pathname === item.href;
-            const showBadge = item.href === "/my-contracts" && pendingContractsCount > 0;
             return (
               <NavLink
                 key={item.name}
@@ -350,11 +438,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   <item.icon className="h-5 w-5" />
                   {item.name}
                 </div>
-                {showBadge && (
-                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
-                    {pendingContractsCount}
-                  </Badge>
-                )}
               </NavLink>
             );
           })}
@@ -497,7 +580,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             <Collapsible open={shiftPlanningOpen} onOpenChange={setShiftPlanningOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname.startsWith("/shift-planning") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                (location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
                 <div className="flex items-center gap-3">
                   <ClipboardList className="h-5 w-5" />
@@ -536,6 +619,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   )}>
                     <Timer className="h-4 w-4" />
                     {t("sidebar.timeTracking")}
+                  </NavLink>
+                )}
+                {p.canViewTimeStamp && (
+                  <NavLink to="/time-stamp" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/time-stamp" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Clock className="h-4 w-4" />
+                    {t("sidebar.timeClock")}
                   </NavLink>
                 )}
               </CollapsibleContent>
