@@ -124,10 +124,10 @@ function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineU
     <>
       <div
         className={cn(
-          "group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
+          "group relative flex items-center gap-3 p-3 md:p-3 rounded-xl cursor-pointer transition-all duration-200 active:scale-[0.98] touch-manipulation",
           isSelected 
             ? "bg-primary text-primary-foreground shadow-md" 
-            : "hover:bg-accent/60"
+            : "hover:bg-accent/60 active:bg-accent/80"
         )}
         onClick={onClick}
       >

@@ -4,7 +4,7 @@ import { ConversationList } from "@/components/messages/ConversationList";
 import { ChatView } from "@/components/messages/ChatView";
 import { NewConversationDialog } from "@/components/messages/NewConversationDialog";
 import { Button } from "@/components/ui/button";
-import { Plus, MessageSquare, PenSquare } from "lucide-react";
+import { Plus, MessageSquare, PenSquare, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function Messages() {
@@ -13,28 +13,37 @@ export default function Messages() {
 
   return (
     <MainLayout>
-      <div className="flex flex-col h-[calc(100vh-6rem)]">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col h-[calc(100vh-4rem)] md:h-[calc(100vh-6rem)]">
+        {/* Header - simplified on mobile */}
+        <div className={cn(
+          "flex items-center justify-between mb-2 md:mb-4 px-2 md:px-0",
+          selectedConversationId && "hidden md:flex"
+        )}>
           <div>
-            <h1 className="text-2xl font-bold">Beskeder</h1>
-            <p className="text-sm text-muted-foreground">Kommuniker med dine kollegaer</p>
+            <h1 className="text-xl md:text-2xl font-bold">Beskeder</h1>
+            <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">
+              Kommuniker med dine kollegaer
+            </p>
           </div>
-          <Button onClick={() => setShowNewDialog(true)} className="gap-2">
+          <Button 
+            onClick={() => setShowNewDialog(true)} 
+            size="sm"
+            className="gap-2"
+          >
             <PenSquare className="h-4 w-4" />
-            Ny samtale
+            <span className="hidden sm:inline">Ny samtale</span>
           </Button>
         </div>
 
-        {/* Main content */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0">
-          {/* Conversation list - sidebar style */}
+        {/* Main content - full screen on mobile */}
+        <div className="flex-1 flex flex-col md:grid md:grid-cols-12 gap-0 md:gap-4 min-h-0">
+          {/* Conversation list - full width on mobile when no conversation selected */}
           <div className={cn(
-            "lg:col-span-4 xl:col-span-3 border rounded-xl bg-card overflow-hidden flex flex-col",
-            selectedConversationId ? "hidden lg:flex" : "flex"
+            "md:col-span-4 xl:col-span-3 border-0 md:border rounded-none md:rounded-xl bg-card overflow-hidden flex flex-col h-full",
+            selectedConversationId ? "hidden md:flex" : "flex"
           )}>
-            <div className="p-4 border-b bg-muted/30">
-              <h2 className="font-semibold text-lg">Samtaler</h2>
+            <div className="p-3 md:p-4 border-b bg-muted/30">
+              <h2 className="font-semibold text-base md:text-lg">Samtaler</h2>
             </div>
             <div className="flex-1 overflow-hidden">
               <ConversationList
@@ -44,21 +53,23 @@ export default function Messages() {
             </div>
           </div>
 
-          {/* Chat view - main area */}
+          {/* Chat view - full screen on mobile when conversation selected */}
           <div className={cn(
-            "lg:col-span-8 xl:col-span-9 border rounded-xl bg-card overflow-hidden flex flex-col",
-            !selectedConversationId ? "hidden lg:flex" : "flex"
+            "md:col-span-8 xl:col-span-9 border-0 md:border rounded-none md:rounded-xl bg-card overflow-hidden flex flex-col h-full",
+            !selectedConversationId ? "hidden md:flex" : "flex"
           )}>
             {selectedConversationId ? (
               <>
-                {/* Mobile back button */}
-                <div className="lg:hidden p-2 border-b">
+                {/* Mobile back button - sticky header */}
+                <div className="md:hidden p-2 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 sticky top-0 z-10">
                   <Button 
                     variant="ghost" 
                     size="sm"
                     onClick={() => setSelectedConversationId(null)}
+                    className="gap-2"
                   >
-                    ← Tilbage
+                    <ArrowLeft className="h-4 w-4" />
+                    Tilbage
                   </Button>
                 </div>
                 <div className="flex-1 overflow-hidden">
