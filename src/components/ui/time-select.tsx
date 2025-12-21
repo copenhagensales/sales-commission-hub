@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,10 +28,36 @@ const generateTimeOptions = () => {
 
 const timeOptions = generateTimeOptions();
 
+// Auto-format time input
+const formatTimeInput = (input: string): string => {
+  // Remove everything except digits
+  const digits = input.replace(/\D/g, "");
+  
+  if (digits.length === 0) return "";
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) {
+    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+  }
+  return `${digits.slice(0, 2)}:${digits.slice(2, 4)}`;
+};
+
 export function TimeSelect({ value, onChange, placeholder = "HH:MM", className }: TimeSelectProps) {
   const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(value || "");
+
+  useEffect(() => {
+    setInputValue(value || "");
+  }, [value]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const formatted = formatTimeInput(raw);
+    setInputValue(formatted);
+    onChange(formatted);
+  };
 
   const handleOptionClick = (time: string) => {
+    setInputValue(time);
     onChange(time);
     setOpen(false);
   };
@@ -41,11 +67,10 @@ export function TimeSelect({ value, onChange, placeholder = "HH:MM", className }
       <div className="relative flex-1">
         <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={inputValue}
+          onChange={handleInputChange}
           placeholder={placeholder}
           className="pl-9"
-          maxLength={5}
         />
       </div>
       <Popover open={open} onOpenChange={setOpen}>
