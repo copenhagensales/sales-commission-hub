@@ -144,7 +144,7 @@ export default function BookingsContent() {
       // First get the Fieldmarketing team ID
       const { data: teamData, error: teamError } = await supabase
         .from("teams")
-        .select("id")
+        .select("id, name")
         .ilike("name", "Fieldmarketing")
         .maybeSingle();
 
@@ -160,8 +160,7 @@ export default function BookingsContent() {
             id,
             first_name,
             last_name,
-            is_active,
-            department
+            is_active
           )
         `)
         .eq("team_id", teamData.id);
@@ -173,7 +172,7 @@ export default function BookingsContent() {
         .map((tm: any) => ({
           id: tm.employee.id,
           full_name: `${tm.employee.first_name} ${tm.employee.last_name}`,
-          team: tm.employee.department,
+          team: teamData.name,
         })) || [];
     },
   });

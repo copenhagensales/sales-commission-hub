@@ -23,7 +23,7 @@ export function useVagtEmployee() {
       const lowerEmail = user.email.toLowerCase();
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, private_email, private_phone, is_active, department, job_title")
+        .select("id, first_name, last_name, private_email, private_phone, is_active, job_title")
         .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
         .eq("is_active", true)
         .maybeSingle();
@@ -31,13 +31,24 @@ export function useVagtEmployee() {
       if (error) throw error;
       if (!data) return null;
       
+      // Fetch team name for this employee
+      const { data: teamMemberships } = await supabase
+        .from("team_members")
+        .select("team:teams(name)")
+        .eq("employee_id", data.id);
+      
+      const teamNames = (teamMemberships || [])
+        .map((tm: { team: { name: string } | null }) => tm.team?.name)
+        .filter(Boolean)
+        .join(", ");
+      
       return {
         id: data.id,
         full_name: `${data.first_name} ${data.last_name}`,
         email: data.private_email,
         phone: data.private_phone,
         is_active: data.is_active ?? true,
-        team: data.department, // Use department as team
+        team: teamNames || null,
         job_title: data.job_title,
       } as VagtEmployee;
     },
@@ -52,7 +63,7 @@ export function useVagtEmployees() {
       // First get the Fieldmarketing team ID
       const { data: teamData, error: teamError } = await supabase
         .from("teams")
-        .select("id")
+        .select("id, name")
         .ilike("name", "Fieldmarketing")
         .maybeSingle();
 
@@ -70,8 +81,7 @@ export function useVagtEmployees() {
             last_name,
             private_email,
             private_phone,
-            is_active,
-            department
+            is_active
           )
         `)
         .eq("team_id", teamData.id);
@@ -86,7 +96,7 @@ export function useVagtEmployees() {
           email: tm.employee.private_email,
           phone: tm.employee.private_phone,
           is_active: tm.employee.is_active ?? true,
-          team: tm.employee.department,
+          team: teamData.name,
         })) as VagtEmployee[];
     },
   });
