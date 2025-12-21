@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { 
   BarChart3, 
@@ -30,10 +32,13 @@ import {
   Settings2,
   Table2,
   Award,
-  LayoutGrid
+  LayoutGrid,
+  Target,
+  ArrowUpDown,
+  Palette
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useWidgetTypes } from "@/hooks/useWidgetTypes";
+import { useWidgetTypes, WidgetTypeConfig } from "@/hooks/useWidgetTypes";
 import { useKpiTypes } from "@/hooks/useKpiTypes";
 
 interface TimePeriod {
@@ -49,16 +54,30 @@ interface DesignOption {
   preview: string;
 }
 
+interface ColorTheme {
+  id: string;
+  name: string;
+  primary: string;
+  secondary: string;
+}
+
 interface PlacedWidget {
   id: string;
   widgetTypeId: string;
   dataSource: "kpi" | "custom";
-  kpiTypeId?: string;
+  kpiTypeIds: string[];  // Now supports multiple KPIs
   customValue?: string;
   customLabel?: string;
   timePeriodId: string;
   customFromDate?: Date;
   designId: string;
+  // New optional fields
+  title?: string;  // Custom title override
+  targetValue?: number;  // Target value for progress widgets
+  showComparison?: boolean;  // Show comparison with previous period
+  comparisonPeriodId?: string;  // Which period to compare against
+  colorThemeId?: string;  // Color theme for the widget
+  showTrend?: boolean;  // Show trend indicator
   x: number;
   y: number;
   width: number;
@@ -77,6 +96,14 @@ const TIME_PERIODS: TimePeriod[] = [
   { id: "custom-from", name: "Fra dato til nu", description: "Vælg startdato" },
 ];
 
+const COMPARISON_PERIODS: TimePeriod[] = [
+  { id: "previous-period", name: "Forrige periode", description: "Sammenlign med forrige periode" },
+  { id: "same-period-last-year", name: "Samme periode sidste år", description: "Sammenlign med samme periode sidste år" },
+  { id: "yesterday", name: "I går", description: "Sammenlign med i går" },
+  { id: "last-week", name: "Sidste uge", description: "Sammenlign med sidste uge" },
+  { id: "last-month", name: "Sidste måned", description: "Sammenlign med sidste måned" },
+];
+
 const DESIGN_OPTIONS: DesignOption[] = [
   { id: "minimal", name: "Minimal", description: "Rent og simpelt design", preview: "bg-card border" },
   { id: "gradient", name: "Gradient", description: "Gradient baggrund", preview: "bg-gradient-to-br from-primary/20 to-primary/5" },
@@ -84,6 +111,15 @@ const DESIGN_OPTIONS: DesignOption[] = [
   { id: "accent", name: "Accent", description: "Med accent farve", preview: "bg-primary/10 border-primary/30" },
   { id: "glass", name: "Glas", description: "Glasmorfisme effekt", preview: "bg-white/10 backdrop-blur-sm border-white/20" },
   { id: "outline", name: "Kontur", description: "Kun kontur", preview: "bg-transparent border-2" },
+];
+
+const COLOR_THEMES: ColorTheme[] = [
+  { id: "default", name: "Standard", primary: "hsl(var(--primary))", secondary: "hsl(var(--secondary))" },
+  { id: "green", name: "Grøn", primary: "#22c55e", secondary: "#86efac" },
+  { id: "blue", name: "Blå", primary: "#3b82f6", secondary: "#93c5fd" },
+  { id: "purple", name: "Lilla", primary: "#8b5cf6", secondary: "#c4b5fd" },
+  { id: "orange", name: "Orange", primary: "#f97316", secondary: "#fdba74" },
+  { id: "red", name: "Rød", primary: "#ef4444", secondary: "#fca5a5" },
 ];
 
 const getWidgetIcon = (iconName: string) => {
@@ -114,22 +150,40 @@ export default function DesignDashboard() {
   // Config form state
   const [selectedWidgetType, setSelectedWidgetType] = useState<string>("");
   const [dataSource, setDataSource] = useState<"kpi" | "custom">("kpi");
-  const [selectedKpiType, setSelectedKpiType] = useState<string>("");
+  const [selectedKpiTypes, setSelectedKpiTypes] = useState<string[]>([]);
   const [customValue, setCustomValue] = useState<string>("");
   const [customLabel, setCustomLabel] = useState<string>("");
   const [selectedTimePeriod, setSelectedTimePeriod] = useState<string>("today");
   const [customFromDate, setCustomFromDate] = useState<Date | undefined>();
   const [selectedDesign, setSelectedDesign] = useState<string>("minimal");
+  // New config state
+  const [customTitle, setCustomTitle] = useState<string>("");
+  const [targetValue, setTargetValue] = useState<string>("");
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparisonPeriodId, setComparisonPeriodId] = useState<string>("previous-period");
+  const [colorThemeId, setColorThemeId] = useState<string>("default");
+  const [showTrend, setShowTrend] = useState(true);
+
+  const currentWidgetConfig = activeWidgetTypes.find(w => w.value === selectedWidgetType);
+  const supportsMultiKpi = currentWidgetConfig?.supportsMultiKpi || false;
+  const supportsComparison = currentWidgetConfig?.supportsComparison || false;
+  const supportsTarget = currentWidgetConfig?.supportsTarget || false;
 
   const resetForm = () => {
     setSelectedWidgetType("");
     setDataSource("kpi");
-    setSelectedKpiType("");
+    setSelectedKpiTypes([]);
     setCustomValue("");
     setCustomLabel("");
     setSelectedTimePeriod("today");
     setCustomFromDate(undefined);
     setSelectedDesign("minimal");
+    setCustomTitle("");
+    setTargetValue("");
+    setShowComparison(false);
+    setComparisonPeriodId("previous-period");
+    setColorThemeId("default");
+    setShowTrend(true);
   };
 
   const openAddWidgetDialog = () => {
@@ -142,13 +196,31 @@ export default function DesignDashboard() {
     setEditingWidget(widget);
     setSelectedWidgetType(widget.widgetTypeId);
     setDataSource(widget.dataSource);
-    setSelectedKpiType(widget.kpiTypeId || "");
+    setSelectedKpiTypes(widget.kpiTypeIds || []);
     setCustomValue(widget.customValue || "");
     setCustomLabel(widget.customLabel || "");
     setSelectedTimePeriod(widget.timePeriodId);
     setCustomFromDate(widget.customFromDate);
     setSelectedDesign(widget.designId);
+    setCustomTitle(widget.title || "");
+    setTargetValue(widget.targetValue?.toString() || "");
+    setShowComparison(widget.showComparison || false);
+    setComparisonPeriodId(widget.comparisonPeriodId || "previous-period");
+    setColorThemeId(widget.colorThemeId || "default");
+    setShowTrend(widget.showTrend ?? true);
     setIsConfigDialogOpen(true);
+  };
+
+  const toggleKpiSelection = (kpiId: string) => {
+    if (supportsMultiKpi) {
+      setSelectedKpiTypes(prev => 
+        prev.includes(kpiId) 
+          ? prev.filter(id => id !== kpiId)
+          : [...prev, kpiId]
+      );
+    } else {
+      setSelectedKpiTypes([kpiId]);
+    }
   };
 
   const handleSaveWidget = () => {
@@ -156,8 +228,8 @@ export default function DesignDashboard() {
       toast({ title: "Vælg widget type", variant: "destructive" });
       return;
     }
-    if (dataSource === "kpi" && !selectedKpiType) {
-      toast({ title: "Vælg KPI type", variant: "destructive" });
+    if (dataSource === "kpi" && selectedKpiTypes.length === 0) {
+      toast({ title: "Vælg mindst én KPI", variant: "destructive" });
       return;
     }
     if (dataSource === "custom" && !customValue) {
@@ -172,12 +244,18 @@ export default function DesignDashboard() {
     const widgetData: Omit<PlacedWidget, "id" | "x" | "y" | "width" | "height"> = {
       widgetTypeId: selectedWidgetType,
       dataSource,
-      kpiTypeId: dataSource === "kpi" ? selectedKpiType : undefined,
+      kpiTypeIds: dataSource === "kpi" ? selectedKpiTypes : [],
       customValue: dataSource === "custom" ? customValue : undefined,
       customLabel: dataSource === "custom" ? customLabel : undefined,
       timePeriodId: selectedTimePeriod,
       customFromDate: selectedTimePeriod === "custom-from" ? customFromDate : undefined,
       designId: selectedDesign,
+      title: customTitle || undefined,
+      targetValue: targetValue ? parseFloat(targetValue) : undefined,
+      showComparison: supportsComparison ? showComparison : undefined,
+      comparisonPeriodId: showComparison ? comparisonPeriodId : undefined,
+      colorThemeId: colorThemeId !== "default" ? colorThemeId : undefined,
+      showTrend,
     };
 
     if (editingWidget) {
@@ -214,7 +292,10 @@ export default function DesignDashboard() {
     if (widget.dataSource === "custom") {
       return widget.customLabel || "Brugerdefineret";
     }
-    return activeKpiTypes.find(k => k.id === widget.kpiTypeId)?.name || "";
+    const kpiNames = widget.kpiTypeIds
+      .map(id => activeKpiTypes.find(k => k.id === id)?.name)
+      .filter(Boolean);
+    return kpiNames.join(", ") || "";
   };
 
   const getDisplayValue = (widget: PlacedWidget) => {
@@ -340,18 +421,30 @@ export default function DesignDashboard() {
                       {placedWidgets.map((widget) => {
                         const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
                         const design = DESIGN_OPTIONS.find(d => d.id === widget.designId);
+                        const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
+                        const widgetConfig = activeWidgetTypes.find(w => w.value === widget.widgetTypeId);
                         
                         return (
                           <Card 
                             key={widget.id} 
                             className={`relative group cursor-pointer transition-all hover:shadow-lg ${getDesignClasses(widget.designId)}`}
                             onClick={() => openEditWidgetDialog(widget)}
+                            style={colorTheme && colorTheme.id !== "default" ? { 
+                              borderColor: colorTheme.primary,
+                              borderWidth: '2px'
+                            } : undefined}
                           >
                             <CardContent className="p-4">
                               <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
                                   <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                                  <div className="p-1.5 rounded-md bg-primary/10 text-primary">
+                                  <div 
+                                    className="p-1.5 rounded-md"
+                                    style={{ 
+                                      backgroundColor: colorTheme?.primary ? `${colorTheme.primary}20` : undefined,
+                                      color: colorTheme?.primary
+                                    }}
+                                  >
                                     {getWidgetTypeIcon(widget.widgetTypeId)}
                                   </div>
                                 </div>
@@ -375,13 +468,53 @@ export default function DesignDashboard() {
                                 </div>
                               </div>
                               <div className="space-y-1 mb-3">
-                                <p className="font-medium text-sm">{getWidgetTypeName(widget.widgetTypeId)}</p>
-                                <p className="text-xs text-muted-foreground">{getDisplayLabel(widget)}</p>
-                                <p className="text-2xl font-bold">{getDisplayValue(widget)}</p>
+                                <p className="font-medium text-sm">
+                                  {widget.title || getWidgetTypeName(widget.widgetTypeId)}
+                                </p>
+                                <p className="text-xs text-muted-foreground line-clamp-2">
+                                  {getDisplayLabel(widget)}
+                                  {widget.kpiTypeIds.length > 1 && (
+                                    <span className="ml-1 text-primary">
+                                      ({widget.kpiTypeIds.length} KPI'er)
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-2xl font-bold" style={{ color: colorTheme?.primary }}>
+                                  {getDisplayValue(widget)}
+                                </p>
+                                {widget.targetValue && (
+                                  <div className="flex items-center gap-1 text-xs">
+                                    <Target className="h-3 w-3 text-muted-foreground" />
+                                    <span className="text-muted-foreground">Mål: {widget.targetValue}</span>
+                                  </div>
+                                )}
                               </div>
                               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span>{timePeriod?.name}</span>
+                                <span className="flex items-center gap-1">
+                                  {timePeriod?.name}
+                                  {widget.showComparison && (
+                                    <ArrowUpDown className="h-3 w-3 text-primary" />
+                                  )}
+                                </span>
                                 <span>{design?.name}</span>
+                              </div>
+                              {/* Feature badges */}
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {widgetConfig?.supportsMultiKpi && widget.kpiTypeIds.length > 1 && (
+                                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                                    Multi-KPI
+                                  </span>
+                                )}
+                                {widget.showComparison && (
+                                  <span className="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded">
+                                    Sammenligning
+                                  </span>
+                                )}
+                                {widget.targetValue && (
+                                  <span className="text-[10px] bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded">
+                                    Mål
+                                  </span>
+                                )}
                               </div>
                             </CardContent>
                           </Card>
@@ -431,7 +564,7 @@ export default function DesignDashboard() {
               <RadioGroup value={dataSource} onValueChange={(v) => setDataSource(v as "kpi" | "custom")} className="flex gap-4">
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="kpi" id="kpi" />
-                  <Label htmlFor="kpi" className="cursor-pointer">Vælg KPI</Label>
+                  <Label htmlFor="kpi" className="cursor-pointer">Vælg KPI{supportsMultiKpi && "(er)"}</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="custom" id="custom" />
@@ -440,21 +573,44 @@ export default function DesignDashboard() {
               </RadioGroup>
 
               {dataSource === "kpi" ? (
-                <Select value={selectedKpiType} onValueChange={setSelectedKpiType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg KPI" />
-                  </SelectTrigger>
-                  <SelectContent>
+                <div className="space-y-2">
+                  {supportsMultiKpi && (
+                    <p className="text-xs text-muted-foreground">
+                      Vælg flere KPI'er til denne widget (klik for at vælge/fravælge)
+                    </p>
+                  )}
+                  <div className="max-h-[200px] overflow-y-auto space-y-1 border rounded-md p-2">
                     {activeKpiTypes.map((kpi) => (
-                      <SelectItem key={kpi.id} value={kpi.id}>
-                        <div className="flex flex-col">
-                          <span>{kpi.name}</span>
-                          <span className="text-xs text-muted-foreground">{kpi.description}</span>
+                      <div
+                        key={kpi.id}
+                        onClick={() => toggleKpiSelection(kpi.id)}
+                        className={cn(
+                          "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors",
+                          selectedKpiTypes.includes(kpi.id)
+                            ? "bg-primary/10 border border-primary/30"
+                            : "hover:bg-accent"
+                        )}
+                      >
+                        <Checkbox
+                          checked={selectedKpiTypes.includes(kpi.id)}
+                          className="pointer-events-none"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">{kpi.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{kpi.description}</p>
                         </div>
-                      </SelectItem>
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                          {kpi.category}
+                        </span>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                  {selectedKpiTypes.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedKpiTypes.length} KPI{selectedKpiTypes.length > 1 && "'er"} valgt
+                    </p>
+                  )}
+                </div>
               ) : (
                 <div className="space-y-3">
                   <div>
@@ -522,9 +678,120 @@ export default function DesignDashboard() {
               )}
             </div>
 
-            {/* 4. Design */}
-            <div className="space-y-2">
-              <Label className="text-base font-semibold">4. Design</Label>
+            {/* 4. Advanced Options - Comparison, Target, Trend */}
+            {(supportsComparison || supportsTarget) && (
+              <div className="space-y-4 border-t pt-4">
+                <Label className="text-base font-semibold">4. Avancerede indstillinger</Label>
+                
+                {/* Custom Title */}
+                <div className="space-y-2">
+                  <Label htmlFor="customTitle" className="text-sm flex items-center gap-2">
+                    <Settings2 className="h-4 w-4" />
+                    Tilpasset titel (valgfrit)
+                  </Label>
+                  <Input
+                    id="customTitle"
+                    placeholder="Automatisk baseret på KPI'er"
+                    value={customTitle}
+                    onChange={(e) => setCustomTitle(e.target.value)}
+                  />
+                </div>
+
+                {/* Target Value */}
+                {supportsTarget && (
+                  <div className="space-y-2">
+                    <Label htmlFor="targetValue" className="text-sm flex items-center gap-2">
+                      <Target className="h-4 w-4" />
+                      Målværdi (valgfrit)
+                    </Label>
+                    <Input
+                      id="targetValue"
+                      type="number"
+                      placeholder="f.eks. 100"
+                      value={targetValue}
+                      onChange={(e) => setTargetValue(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Vis fremgang mod et mål
+                    </p>
+                  </div>
+                )}
+
+                {/* Comparison Period */}
+                {supportsComparison && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm flex items-center gap-2">
+                        <ArrowUpDown className="h-4 w-4" />
+                        Vis sammenligning
+                      </Label>
+                      <Switch
+                        checked={showComparison}
+                        onCheckedChange={setShowComparison}
+                      />
+                    </div>
+                    {showComparison && (
+                      <Select value={comparisonPeriodId} onValueChange={setComparisonPeriodId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sammenlign med..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COMPARISON_PERIODS.map((period) => (
+                            <SelectItem key={period.id} value={period.id}>
+                              {period.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                )}
+
+                {/* Show Trend */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Vis trend-indikator
+                  </Label>
+                  <Switch
+                    checked={showTrend}
+                    onCheckedChange={setShowTrend}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 5. Color Theme */}
+            <div className="space-y-2 border-t pt-4">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <Palette className="h-4 w-4" />
+                5. Farvetema
+              </Label>
+              <div className="grid grid-cols-6 gap-2">
+                {COLOR_THEMES.map((theme) => (
+                  <div
+                    key={theme.id}
+                    onClick={() => setColorThemeId(theme.id)}
+                    className={cn(
+                      "aspect-square rounded-lg cursor-pointer transition-all border-2 flex items-center justify-center",
+                      colorThemeId === theme.id 
+                        ? "border-primary ring-2 ring-primary/20" 
+                        : "border-border hover:border-primary/50"
+                    )}
+                    style={{ backgroundColor: theme.primary }}
+                    title={theme.name}
+                  >
+                    {colorThemeId === theme.id && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 6. Design */}
+            <div className="space-y-2 border-t pt-4">
+              <Label className="text-base font-semibold">6. Design</Label>
               <div className="grid grid-cols-3 gap-2">
                 {DESIGN_OPTIONS.map((design) => (
                   <div
