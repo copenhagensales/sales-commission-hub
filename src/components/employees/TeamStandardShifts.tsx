@@ -8,8 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { TimeSelect } from "@/components/ui/time-select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Clock, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Clock, X, Star } from "lucide-react";
 
 interface StandardShift {
   id: string;
@@ -17,6 +18,7 @@ interface StandardShift {
   name: string;
   start_time: string;
   end_time: string;
+  is_primary: boolean;
 }
 
 interface ShiftBreak {
@@ -217,6 +219,31 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     },
   });
 
+  // Toggle primary mutation
+  const togglePrimaryMutation = useMutation({
+    mutationFn: async ({ shiftId, isPrimary }: { shiftId: string; isPrimary: boolean }) => {
+      // If setting as primary, first unset all others for this team
+      if (isPrimary) {
+        await supabase
+          .from("team_standard_shifts")
+          .update({ is_primary: false })
+          .eq("team_id", teamId);
+      }
+      // Then set/unset this one
+      const { error } = await supabase
+        .from("team_standard_shifts")
+        .update({ is_primary: isPrimary })
+        .eq("id", shiftId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["team-standard-shifts", teamId] });
+    },
+    onError: (error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -317,6 +344,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="text-xs w-16">Primær</TableHead>
                 <TableHead className="text-xs">Navn</TableHead>
                 <TableHead className="text-xs">Start</TableHead>
                 <TableHead className="text-xs">Slut</TableHead>
@@ -336,7 +364,23 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                 
                 return (
                   <TableRow key={shift.id}>
-                    <TableCell className="font-medium">{shift.name}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-center">
+                        <Checkbox
+                          checked={shift.is_primary}
+                          onCheckedChange={(checked) => 
+                            togglePrimaryMutation.mutate({ shiftId: shift.id, isPrimary: !!checked })
+                          }
+                          disabled={togglePrimaryMutation.isPending}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-1.5">
+                        {shift.is_primary && <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />}
+                        {shift.name}
+                      </div>
+                    </TableCell>
                     <TableCell>{formatTime(shift.start_time)}</TableCell>
                     <TableCell>{formatTime(shift.end_time)}</TableCell>
                     <TableCell>
