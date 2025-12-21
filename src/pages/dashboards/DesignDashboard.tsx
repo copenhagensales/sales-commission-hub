@@ -17,30 +17,23 @@ import {
   LineChart, 
   PieChart, 
   TrendingUp, 
-  Users, 
-  Target, 
   Clock, 
   Trophy,
   Gauge,
   Calendar as CalendarIcon,
-  List,
   Activity,
   Plus,
   Save,
   Eye,
   Trash2,
   GripVertical,
-  Settings2
+  Settings2,
+  Table2,
+  Award,
+  LayoutGrid
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-interface WidgetType {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  isActive: boolean;
-}
+import { useWidgetTypes } from "@/hooks/useWidgetTypes";
 
 interface KpiType {
   id: string;
@@ -76,21 +69,6 @@ interface PlacedWidget {
   width: number;
   height: number;
 }
-
-const INITIAL_WIDGET_TYPES: WidgetType[] = [
-  { id: "bar-chart", name: "Søjlediagram", description: "Vis data som søjler", icon: "bar-chart", isActive: true },
-  { id: "line-chart", name: "Linjediagram", description: "Vis trends over tid", icon: "line-chart", isActive: true },
-  { id: "pie-chart", name: "Cirkeldiagram", description: "Vis fordelinger", icon: "pie-chart", isActive: true },
-  { id: "kpi-card", name: "KPI Kort", description: "Vis nøgletal", icon: "trending-up", isActive: true },
-  { id: "leaderboard", name: "Leaderboard", description: "Top performere", icon: "trophy", isActive: true },
-  { id: "gauge", name: "Måler", description: "Vis fremskridt mod mål", icon: "gauge", isActive: true },
-  { id: "team-stats", name: "Team Statistik", description: "Team performance", icon: "users", isActive: true },
-  { id: "target-progress", name: "Mål Fremskridt", description: "Vis målstatus", icon: "target", isActive: true },
-  { id: "time-tracker", name: "Tidstracker", description: "Vis tidsforbrug", icon: "clock", isActive: true },
-  { id: "calendar-widget", name: "Kalender", description: "Vis kommende events", icon: "calendar", isActive: true },
-  { id: "task-list", name: "Opgaveliste", description: "Vis opgaver", icon: "list", isActive: true },
-  { id: "activity-feed", name: "Aktivitetsfeed", description: "Seneste aktiviteter", icon: "activity", isActive: true },
-];
 
 const KPI_TYPES: KpiType[] = [
   { id: "sales", name: "Salg", description: "Antal salg" },
@@ -128,26 +106,24 @@ const DESIGN_OPTIONS: DesignOption[] = [
 
 const getWidgetIcon = (iconName: string) => {
   const icons: Record<string, React.ComponentType<{ className?: string }>> = {
+    "gauge": Gauge,
     "bar-chart": BarChart3,
     "line-chart": LineChart,
     "pie-chart": PieChart,
-    "trending-up": TrendingUp,
-    "trophy": Trophy,
-    "gauge": Gauge,
-    "users": Users,
-    "target": Target,
+    "table": Table2,
+    "award": Award,
     "clock": Clock,
-    "calendar": CalendarIcon,
-    "list": List,
+    "trending-up": TrendingUp,
     "activity": Activity,
+    "trophy": Trophy,
   };
-  const IconComponent = icons[iconName] || BarChart3;
+  const IconComponent = icons[iconName] || LayoutGrid;
   return <IconComponent className="h-5 w-5" />;
 };
 
 export default function DesignDashboard() {
   const { toast } = useToast();
-  const [widgetTypes] = useState<WidgetType[]>(INITIAL_WIDGET_TYPES);
+  const { activeWidgetTypes } = useWidgetTypes();
   const [placedWidgets, setPlacedWidgets] = useState<PlacedWidget[]>([]);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<PlacedWidget | null>(null);
@@ -262,10 +238,17 @@ export default function DesignDashboard() {
     if (widget.dataSource === "custom") {
       return widget.customValue || "0";
     }
-    return "—"; // KPI data ville hentes fra database
+    return "—";
   };
 
-  const activeWidgetTypes = widgetTypes.filter(w => w.isActive);
+  const getWidgetTypeName = (widgetTypeId: string) => {
+    return activeWidgetTypes.find(w => w.value === widgetTypeId)?.label || widgetTypeId;
+  };
+
+  const getWidgetTypeIcon = (widgetTypeId: string) => {
+    const type = activeWidgetTypes.find(w => w.value === widgetTypeId);
+    return type ? getWidgetIcon(type.iconName) : <LayoutGrid className="h-5 w-5" />;
+  };
 
   return (
     <MainLayout>
@@ -273,7 +256,7 @@ export default function DesignDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Design Dashboard</h1>
-            <p className="text-muted-foreground">Design dit eget dashboard med widgets</p>
+            <p className="text-muted-foreground">Design dit eget dashboard med widgets fra indstillinger</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline">
@@ -287,134 +270,147 @@ export default function DesignDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Widget Palette */}
-          <div className="lg:col-span-1 space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Tilføj Widget</CardTitle>
-                <CardDescription>Konfigurer og tilføj widgets</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button onClick={openAddWidgetDialog} className="w-full">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Tilføj ny widget
-                </Button>
-              </CardContent>
-            </Card>
+        {activeWidgetTypes.length === 0 && (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+              <LayoutGrid className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="font-semibold text-lg mb-2">Ingen aktive widget typer</h3>
+              <p className="text-muted-foreground max-w-sm">
+                Gå til Dashboard Indstillinger → Widgets for at aktivere widget typer.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Hurtig tilføj</CardTitle>
-                <CardDescription>Klik for at konfigurere</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 max-h-[400px] overflow-y-auto">
-                {activeWidgetTypes.slice(0, 6).map((widget) => (
-                  <div
-                    key={widget.id}
-                    onClick={() => {
-                      resetForm();
-                      setSelectedWidgetType(widget.id);
-                      setEditingWidget(null);
-                      setIsConfigDialogOpen(true);
-                    }}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card hover:bg-accent cursor-pointer transition-colors"
-                  >
-                    <div className="p-2 rounded-md bg-primary/10 text-primary">
-                      {getWidgetIcon(widget.icon)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{widget.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{widget.description}</p>
-                    </div>
-                    <Plus className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+        {activeWidgetTypes.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Widget Palette */}
+            <div className="lg:col-span-1 space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Tilføj Widget</CardTitle>
+                  <CardDescription>Konfigurer og tilføj widgets</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button onClick={openAddWidgetDialog} className="w-full">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Tilføj ny widget
+                  </Button>
+                </CardContent>
+              </Card>
 
-          {/* Dashboard Canvas */}
-          <div className="lg:col-span-3">
-            <Card className="min-h-[600px]">
-              <CardHeader className="pb-3 border-b">
-                <CardTitle className="text-lg">Dashboard Canvas</CardTitle>
-                <CardDescription>Dine widgets vises her - klik på en widget for at redigere</CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                {placedWidgets.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-[500px] text-center">
-                    <div className="p-4 rounded-full bg-muted mb-4">
-                      <Plus className="h-8 w-8 text-muted-foreground" />
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Aktive Widget Typer</CardTitle>
+                  <CardDescription>Fra dashboard indstillinger</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {activeWidgetTypes.map((widget) => (
+                    <div
+                      key={widget.value}
+                      onClick={() => {
+                        resetForm();
+                        setSelectedWidgetType(widget.value);
+                        setEditingWidget(null);
+                        setIsConfigDialogOpen(true);
+                      }}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card hover:bg-accent cursor-pointer transition-colors"
+                    >
+                      <div className="p-2 rounded-md bg-primary/10 text-primary">
+                        {getWidgetIcon(widget.iconName)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm">{widget.label}</p>
+                        <p className="text-xs text-muted-foreground truncate">{widget.description}</p>
+                      </div>
+                      <Plus className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <h3 className="font-semibold text-lg mb-2">Ingen widgets endnu</h3>
-                    <p className="text-muted-foreground max-w-sm mb-4">
-                      Klik på "Tilføj ny widget" for at komme i gang
-                    </p>
-                    <Button onClick={openAddWidgetDialog}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Tilføj første widget
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-3 gap-4">
-                    {placedWidgets.map((widget) => {
-                      const widgetType = widgetTypes.find(w => w.id === widget.widgetTypeId);
-                      const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
-                      const design = DESIGN_OPTIONS.find(d => d.id === widget.designId);
-                      
-                      return (
-                        <Card 
-                          key={widget.id} 
-                          className={`relative group cursor-pointer transition-all hover:shadow-lg ${getDesignClasses(widget.designId)}`}
-                          onClick={() => openEditWidgetDialog(widget)}
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-2">
-                                <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                                <div className="p-1.5 rounded-md bg-primary/10 text-primary">
-                                  {widgetType && getWidgetIcon(widgetType.icon)}
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Dashboard Canvas */}
+            <div className="lg:col-span-3">
+              <Card className="min-h-[600px]">
+                <CardHeader className="pb-3 border-b">
+                  <CardTitle className="text-lg">Dashboard Canvas</CardTitle>
+                  <CardDescription>Dine widgets vises her - klik på en widget for at redigere</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6">
+                  {placedWidgets.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-[500px] text-center">
+                      <div className="p-4 rounded-full bg-muted mb-4">
+                        <Plus className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                      <h3 className="font-semibold text-lg mb-2">Ingen widgets endnu</h3>
+                      <p className="text-muted-foreground max-w-sm mb-4">
+                        Klik på en widget type til venstre eller "Tilføj ny widget"
+                      </p>
+                      <Button onClick={openAddWidgetDialog}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Tilføj første widget
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-4">
+                      {placedWidgets.map((widget) => {
+                        const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
+                        const design = DESIGN_OPTIONS.find(d => d.id === widget.designId);
+                        
+                        return (
+                          <Card 
+                            key={widget.id} 
+                            className={`relative group cursor-pointer transition-all hover:shadow-lg ${getDesignClasses(widget.designId)}`}
+                            onClick={() => openEditWidgetDialog(widget)}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                                  <div className="p-1.5 rounded-md bg-primary/10 text-primary">
+                                    {getWidgetTypeIcon(widget.widgetTypeId)}
+                                  </div>
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => { e.stopPropagation(); openEditWidgetDialog(widget); }}
+                                  >
+                                    <Settings2 className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => { e.stopPropagation(); removeWidget(widget.id); }}
+                                  >
+                                    <Trash2 className="h-3 w-3 text-destructive" />
+                                  </Button>
                                 </div>
                               </div>
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={(e) => { e.stopPropagation(); openEditWidgetDialog(widget); }}
-                                >
-                                  <Settings2 className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={(e) => { e.stopPropagation(); removeWidget(widget.id); }}
-                                >
-                                  <Trash2 className="h-3 w-3 text-destructive" />
-                                </Button>
+                              <div className="space-y-1 mb-3">
+                                <p className="font-medium text-sm">{getWidgetTypeName(widget.widgetTypeId)}</p>
+                                <p className="text-xs text-muted-foreground">{getDisplayLabel(widget)}</p>
+                                <p className="text-2xl font-bold">{getDisplayValue(widget)}</p>
                               </div>
-                            </div>
-                            <div className="space-y-1 mb-3">
-                              <p className="font-medium text-sm">{widgetType?.name}</p>
-                              <p className="text-xs text-muted-foreground">{getDisplayLabel(widget)}</p>
-                              <p className="text-2xl font-bold">{getDisplayValue(widget)}</p>
-                            </div>
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>{timePeriod?.name}</span>
-                              <span>{design?.name}</span>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>{timePeriod?.name}</span>
+                                <span>{design?.name}</span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Widget Configuration Dialog */}
@@ -435,10 +431,10 @@ export default function DesignDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   {activeWidgetTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id}>
+                    <SelectItem key={type.value} value={type.value}>
                       <div className="flex items-center gap-2">
-                        {getWidgetIcon(type.icon)}
-                        <span>{type.name}</span>
+                        {getWidgetIcon(type.iconName)}
+                        <span>{type.label}</span>
                       </div>
                     </SelectItem>
                   ))}
