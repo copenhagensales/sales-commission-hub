@@ -1011,36 +1011,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             </Collapsible>
           )}
 
-          {/* Salg - near bottom */}
-          {p.canViewSales && (
-            <NavLink
-              to="/sales"
-              onClick={handleNavClick}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname === "/sales" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}
-            >
-              <ShoppingCart className="h-5 w-5" />
-              {t("sidebar.sales")}
-            </NavLink>
-          )}
-
-          {/* Logikker - near bottom */}
-          {p.canViewLogics && (
-            <NavLink
-              to="/logikker"
-              onClick={handleNavClick}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname === "/logikker" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}
-            >
-              <ListChecks className="h-5 w-5" />
-              {t("sidebar.logics")}
-            </NavLink>
-          )}
-
           {/* Rekruttering menu */}
           {showRecruitmentMenu && (
             <Collapsible open={recruitmentOpen} onOpenChange={setRecruitmentOpen}>
@@ -1134,6 +1104,36 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 )}
               </CollapsibleContent>
             </Collapsible>
+          )}
+
+          {/* Salg - near bottom */}
+          {p.canViewSales && (
+            <NavLink
+              to="/sales"
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/sales" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {t("sidebar.sales")}
+            </NavLink>
+          )}
+
+          {/* Logikker - near bottom */}
+          {p.canViewLogics && (
+            <NavLink
+              to="/logikker"
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/logikker" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <ListChecks className="h-5 w-5" />
+              {t("sidebar.logics")}
+            </NavLink>
           )}
 
           {/* Settings */}
