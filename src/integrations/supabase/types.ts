@@ -3461,28 +3461,52 @@ export type Database = {
       }
       onboarding_drills: {
         Row: {
+          common_mistakes: Json | null
           created_at: string
           description: string | null
           duration_min: number | null
           focus: string
           id: string
+          reps: number | null
+          script_snippets: Json | null
+          setup: string | null
+          steps: Json | null
+          success_criteria: Json | null
           title: string
+          variants: Json | null
+          when_to_use: string | null
         }
         Insert: {
+          common_mistakes?: Json | null
           created_at?: string
           description?: string | null
           duration_min?: number | null
           focus: string
           id: string
+          reps?: number | null
+          script_snippets?: Json | null
+          setup?: string | null
+          steps?: Json | null
+          success_criteria?: Json | null
           title: string
+          variants?: Json | null
+          when_to_use?: string | null
         }
         Update: {
+          common_mistakes?: Json | null
           created_at?: string
           description?: string | null
           duration_min?: number | null
           focus?: string
           id?: string
+          reps?: number | null
+          script_snippets?: Json | null
+          setup?: string | null
+          steps?: Json | null
+          success_criteria?: Json | null
           title?: string
+          variants?: Json | null
+          when_to_use?: string | null
         }
         Relationships: []
       }
