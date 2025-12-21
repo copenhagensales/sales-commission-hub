@@ -136,7 +136,7 @@ export function useEmployeeOnboardingProgress(employeeId?: string) {
   });
 }
 
-export function useCoachingTasks(filters?: { employeeId?: string; leaderId?: string; status?: string }) {
+export function useCoachingTasks(filters?: { employeeId?: string; leaderId?: string; status?: string; includeAll?: boolean }) {
   return useQuery({
     queryKey: ["coaching-tasks", filters],
     queryFn: async () => {
@@ -148,14 +148,44 @@ export function useCoachingTasks(filters?: { employeeId?: string; leaderId?: str
       if (filters?.leaderId) {
         query = query.eq("leader_id", filters.leaderId);
       }
-      if (filters?.status) {
+      if (filters?.status && !filters.includeAll) {
         query = query.eq("status", filters.status);
       }
+      if (!filters?.status && !filters?.includeAll) {
+        // Default: show open and overdue
+        query = query.in("status", ["open", "overdue"]);
+      }
       
-      const { data, error } = await query.order("created_at", { ascending: false });
+      const { data, error } = await query.order("due_date", { ascending: true });
 
       if (error) throw error;
       return data as CoachingTask[];
+    },
+  });
+}
+
+export interface CoachingCoverageStats {
+  employee_id: string;
+  employee_name: string;
+  leader_id: string | null;
+  leader_name: string;
+  total_tasks: number;
+  completed_tasks: number;
+  open_tasks: number;
+  overdue_tasks: number;
+  completion_rate: number;
+}
+
+export function useCoachingCoverageStats(leaderId?: string) {
+  return useQuery({
+    queryKey: ["coaching-coverage-stats", leaderId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_coaching_coverage_stats", {
+        p_leader_id: leaderId || null,
+      });
+
+      if (error) throw error;
+      return (data || []) as CoachingCoverageStats[];
     },
   });
 }

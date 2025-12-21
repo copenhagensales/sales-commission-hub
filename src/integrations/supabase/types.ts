@@ -5054,6 +5054,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_onboarding_coaching_tasks_for_employee: {
+        Args: { p_employee_id: string; p_start_date?: string }
+        Returns: number
+      }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_aggregated_product_types: {
         Args: never
@@ -5088,6 +5092,20 @@ export type Database = {
           sales_month: number
           sales_today: number
           top_sellers: Json
+        }[]
+      }
+      get_coaching_coverage_stats: {
+        Args: { p_leader_id?: string }
+        Returns: {
+          completed_tasks: number
+          completion_rate: number
+          employee_id: string
+          employee_name: string
+          leader_id: string
+          leader_name: string
+          open_tasks: number
+          overdue_tasks: number
+          total_tasks: number
         }[]
       }
       get_current_employee_id: { Args: never; Returns: string }
@@ -5287,6 +5305,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_overdue_coaching_tasks: { Args: never; Returns: number }
       validate_password_reset_token: {
         Args: { _token_hash: string }
         Returns: {
