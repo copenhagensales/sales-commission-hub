@@ -1,7 +1,7 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,9 @@ import { usePermissions } from "@/hooks/usePositionPermissions";
 export default function LocationDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const weekParam = searchParams.get("week");
+  const yearParam = searchParams.get("year");
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [formData, setFormData] = useState<any>(null);
@@ -148,7 +151,10 @@ export default function LocationDetail() {
       <MainLayout>
         <div className="flex flex-col items-center justify-center h-64 gap-4">
           <p className="text-muted-foreground">Lokation ikke fundet</p>
-          <Button variant="outline" onClick={() => navigate("/vagt-flow/locations")}>
+          <Button variant="outline" onClick={() => {
+            const params = weekParam && yearParam ? `?week=${weekParam}&year=${yearParam}` : "";
+            navigate(`/vagt-flow/locations${params}`);
+          }}>
             <ArrowLeft className="h-4 w-4 mr-2" /> Tilbage til lokationer
           </Button>
         </div>
@@ -166,7 +172,10 @@ export default function LocationDetail() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/vagt-flow/locations")}>
+            <Button variant="ghost" size="icon" onClick={() => {
+              const params = weekParam && yearParam ? `?week=${weekParam}&year=${yearParam}` : "";
+              navigate(`/vagt-flow/locations${params}`);
+            }}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>

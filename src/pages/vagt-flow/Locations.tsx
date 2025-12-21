@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { MapPin, Search, Plus, Trash2, Star, Upload } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +46,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 
 export default function VagtLocations() {
+  const [searchParams] = useSearchParams();
+  const weekParam = searchParams.get("week");
+  const yearParam = searchParams.get("year");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
@@ -340,7 +343,10 @@ export default function VagtLocations() {
                     <TableRow 
                       key={loc.id} 
                       className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => navigate(`/vagt-flow/locations/${loc.id}`)}
+                      onClick={() => {
+                        const params = weekParam && yearParam ? `?week=${weekParam}&year=${yearParam}` : "";
+                        navigate(`/vagt-flow/locations/${loc.id}${params}`);
+                      }}
                     >
                       <TableCell>
                         <Button

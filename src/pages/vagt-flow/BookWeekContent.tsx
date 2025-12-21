@@ -395,7 +395,7 @@ export default function BookWeekContent() {
                     <TableRow 
                       key={loc.id} 
                       className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => navigate(`/vagt-flow/locations/${loc.id}`)}
+                      onClick={() => navigate(`/vagt-flow/locations/${loc.id}?week=${selectedWeek}&year=${selectedYear}`)}
                     >
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">

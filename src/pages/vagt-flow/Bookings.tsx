@@ -4,13 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronUp, ChevronDown, Trash2, Plus, Calendar, Car, AlertTriangle, Users, FileText, X } from "lucide-react";
 import { format, addDays, getWeek, getYear } from "date-fns";
 import { getWeekStartDate } from "@/lib/vagt-flow-date-utils";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -45,9 +45,18 @@ export default function VagtBookings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const now = new Date();
-  const [selectedWeek, setSelectedWeek] = useState(getWeek(now, { weekStartsOn: 1 }));
-  const [selectedYear, setSelectedYear] = useState(getYear(now));
+  
+  // Initialize from URL params or current date
+  const weekParam = searchParams.get("week");
+  const yearParam = searchParams.get("year");
+  const [selectedWeek, setSelectedWeek] = useState(
+    weekParam ? parseInt(weekParam) : getWeek(now, { weekStartsOn: 1 })
+  );
+  const [selectedYear, setSelectedYear] = useState(
+    yearParam ? parseInt(yearParam) : getYear(now)
+  );
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteBookingId, setDeleteBookingId] = useState<string | null>(null);
@@ -56,6 +65,11 @@ export default function VagtBookings() {
   const [openAssignPopover, setOpenAssignPopover] = useState<string | null>(null);
   const [addEmployeeDialogBooking, setAddEmployeeDialogBooking] = useState<any>(null);
   const [addVehicleDialogBooking, setAddVehicleDialogBooking] = useState<any>(null);
+
+  // Update URL when week/year changes
+  useEffect(() => {
+    setSearchParams({ week: selectedWeek.toString(), year: selectedYear.toString() });
+  }, [selectedWeek, selectedYear, setSearchParams]);
 
   const weekStart = getWeekStartDate(selectedYear, selectedWeek);
   const DAYS = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"];
