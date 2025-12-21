@@ -1859,12 +1859,15 @@ export type Database = {
       }
       dashboard_kpis: {
         Row: {
+          base_metric: string | null
           created_at: string
           created_by: string | null
           critical_threshold: number | null
           dashboard_slugs: string[] | null
+          data_source: string | null
           description: string | null
           display_order: number | null
+          formula: string | null
           id: string
           is_active: boolean | null
           kpi_type: string
@@ -1875,12 +1878,15 @@ export type Database = {
           warning_threshold: number | null
         }
         Insert: {
+          base_metric?: string | null
           created_at?: string
           created_by?: string | null
           critical_threshold?: number | null
           dashboard_slugs?: string[] | null
+          data_source?: string | null
           description?: string | null
           display_order?: number | null
+          formula?: string | null
           id?: string
           is_active?: boolean | null
           kpi_type?: string
@@ -1891,12 +1897,15 @@ export type Database = {
           warning_threshold?: number | null
         }
         Update: {
+          base_metric?: string | null
           created_at?: string
           created_by?: string | null
           critical_threshold?: number | null
           dashboard_slugs?: string[] | null
+          data_source?: string | null
           description?: string | null
           display_order?: number | null
+          formula?: string | null
           id?: string
           is_active?: boolean | null
           kpi_type?: string
