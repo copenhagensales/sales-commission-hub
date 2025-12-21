@@ -23,10 +23,12 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
   const navigate = useNavigate();
   const location = useLocation();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
   const handleFullscreenChange = useCallback(() => {
     const isCurrentlyFullscreen = !!document.fullscreenElement;
     setIsFullscreen(isCurrentlyFullscreen);
+    setIsHeaderVisible(!isCurrentlyFullscreen);
     onFullscreenChange?.(isCurrentlyFullscreen);
   }, [onFullscreenChange]);
 
@@ -34,6 +36,27 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, [handleFullscreenChange]);
+
+  // Handle mouse movement for showing/hiding header in fullscreen
+  useEffect(() => {
+    if (!isFullscreen) {
+      setIsHeaderVisible(true);
+      return;
+    }
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // Show header when mouse is in the top 60px of the screen
+      if (e.clientY <= 60) {
+        setIsHeaderVisible(true);
+      } else if (e.clientY > 100) {
+        // Hide when mouse moves below 100px (gives some buffer)
+        setIsHeaderVisible(false);
+      }
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    return () => document.removeEventListener("mousemove", handleMouseMove);
+  }, [isFullscreen]);
 
   const toggleFullscreen = async () => {
     try {
@@ -52,7 +75,13 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
   };
 
   return (
-    <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
+    <div 
+      className={`flex items-center justify-between mb-6 pb-4 border-b border-border bg-background transition-all duration-300 ${
+        isFullscreen 
+          ? `fixed top-0 left-0 right-0 z-50 px-6 py-4 mb-0 ${isHeaderVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}` 
+          : ''
+      }`}
+    >
       {/* Left side - Logo and title */}
       <div className="flex items-center gap-4">
         <img 
