@@ -4,10 +4,12 @@ import { usePermissions } from "@/hooks/usePositionPermissions";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
   positionPermission?: string; // Position-based permission key to check
+  withLayout?: boolean; // Whether to wrap with MainLayout
 }
 
 /**
@@ -18,6 +20,7 @@ interface RoleProtectedRouteProps {
 export function RoleProtectedRoute({ 
   children, 
   positionPermission,
+  withLayout = true,
 }: RoleProtectedRouteProps) {
   const { user, loading: authLoading } = useAuth();
   const { isLoading: permLoading, canView, permissions, position } = usePermissions();
@@ -63,7 +66,7 @@ export function RoleProtectedRoute({
   // If no specific permission required, grant access (authenticated route)
   if (!positionPermission) {
     console.log("RoleProtectedRoute: GRANTED - no specific permission required");
-    return <>{children}</>;
+    return withLayout ? <MainLayout>{children}</MainLayout> : <>{children}</>;
   }
 
   // Check position permission
@@ -77,7 +80,7 @@ export function RoleProtectedRoute({
   
   if (hasAccess) {
     console.log("RoleProtectedRoute: GRANTED via position permission");
-    return <>{children}</>;
+    return withLayout ? <MainLayout>{children}</MainLayout> : <>{children}</>;
   }
 
   console.log("RoleProtectedRoute: DENIED - permission not granted");
@@ -85,7 +88,7 @@ export function RoleProtectedRoute({
 }
 
 // Simple protected route that just checks auth (for employee-accessible pages)
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+export function ProtectedRoute({ children, withLayout = true }: { children: React.ReactNode; withLayout?: boolean }) {
   const { user, loading } = useAuth();
   
   if (loading) {
@@ -100,5 +103,5 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/auth" replace />;
   }
   
-  return <>{children}</>;
+  return withLayout ? <MainLayout>{children}</MainLayout> : <>{children}</>;
 }
