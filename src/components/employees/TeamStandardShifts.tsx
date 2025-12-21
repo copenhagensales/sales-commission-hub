@@ -883,48 +883,50 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               </p>
             </div>
 
-            {/* Breaks */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Pauser</Label>
-                <Button type="button" variant="outline" size="sm" onClick={addBreak}>
-                  <Plus className="h-3 w-3 mr-1" />
-                  Tilføj pause
-                </Button>
-              </div>
-              {breaks.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Ingen pauser tilføjet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {breaks.map((b, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <TimeSelect
-                        value={b.break_start}
-                        onChange={(value) => updateBreak(index, "break_start", value)}
-                        placeholder="Start"
-                        className="flex-1"
-                      />
-                      <span className="text-muted-foreground">-</span>
-                      <TimeSelect
-                        value={b.break_end}
-                        onChange={(value) => updateBreak(index, "break_end", value)}
-                        placeholder="Slut"
-                        className="flex-1"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
-                        onClick={() => removeBreak(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+            {/* Breaks - only show when "Samme tider" is selected */}
+            {!useDifferentTimes && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Pauser</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addBreak}>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Tilføj pause
+                  </Button>
                 </div>
-              )}
-            </div>
+                {breaks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Ingen pauser tilføjet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {breaks.map((b, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <TimeSelect
+                          value={b.break_start}
+                          onChange={(value) => updateBreak(index, "break_start", value)}
+                          placeholder="Start"
+                          className="flex-1"
+                        />
+                        <span className="text-muted-foreground">-</span>
+                        <TimeSelect
+                          value={b.break_end}
+                          onChange={(value) => updateBreak(index, "break_end", value)}
+                          placeholder="Slut"
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
+                          onClick={() => removeBreak(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Working time summary */}
             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
