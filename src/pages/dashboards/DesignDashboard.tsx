@@ -35,7 +35,8 @@ import {
   LayoutGrid,
   Target,
   ArrowUpDown,
-  Palette
+  Palette,
+  Users
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useWidgetTypes, WidgetTypeConfig } from "@/hooks/useWidgetTypes";
@@ -57,6 +58,12 @@ interface ColorTheme {
   secondary: string;
 }
 
+interface TrackingScope {
+  id: string;
+  name: string;
+  description: string;
+}
+
 interface PlacedWidget {
   id: string;
   widgetTypeId: string;
@@ -73,6 +80,7 @@ interface PlacedWidget {
   comparisonPeriodId?: string;  // Which period to compare against
   colorThemeId?: string;  // Color theme for the widget
   showTrend?: boolean;  // Show trend indicator
+  trackingScopeId?: string;  // Who/what the KPI tracks
   x: number;
   y: number;
   width: number;
@@ -108,6 +116,14 @@ const COLOR_THEMES: ColorTheme[] = [
   { id: "purple", name: "Lilla", primary: "#8b5cf6", secondary: "#c4b5fd" },
   { id: "orange", name: "Orange", primary: "#f97316", secondary: "#fdba74" },
   { id: "red", name: "Rød", primary: "#ef4444", secondary: "#fca5a5" },
+];
+
+const TRACKING_SCOPES: TrackingScope[] = [
+  { id: "all", name: "Alle", description: "Samlet data for hele virksomheden" },
+  { id: "team", name: "Team", description: "Data for et specifikt team" },
+  { id: "employee", name: "Medarbejder", description: "Data for en enkelt medarbejder" },
+  { id: "client", name: "Kunde", description: "Data for en specifik kunde" },
+  { id: "campaign", name: "Kampagne", description: "Data for en specifik kampagne" },
 ];
 
 const getWidgetIcon = (iconName: string) => {
@@ -156,6 +172,7 @@ export default function DesignDashboard() {
   const [comparisonPeriodId, setComparisonPeriodId] = useState<string>("previous-period");
   const [colorThemeId, setColorThemeId] = useState<string>("default");
   const [showTrend, setShowTrend] = useState(true);
+  const [trackingScopeId, setTrackingScopeId] = useState<string>("all");
 
   const currentWidgetConfig = activeWidgetTypes.find(w => w.value === selectedWidgetType);
   const supportsMultiKpi = currentWidgetConfig?.supportsMultiKpi || false;
@@ -176,6 +193,7 @@ export default function DesignDashboard() {
     setComparisonPeriodId("previous-period");
     setColorThemeId("default");
     setShowTrend(true);
+    setTrackingScopeId("all");
   };
 
   const openAddWidgetDialog = () => {
@@ -199,6 +217,7 @@ export default function DesignDashboard() {
     setComparisonPeriodId(widget.comparisonPeriodId || "previous-period");
     setColorThemeId(widget.colorThemeId || "default");
     setShowTrend(widget.showTrend ?? true);
+    setTrackingScopeId(widget.trackingScopeId || "all");
     setIsConfigDialogOpen(true);
   };
 
@@ -246,6 +265,7 @@ export default function DesignDashboard() {
       comparisonPeriodId: showComparison ? comparisonPeriodId : undefined,
       colorThemeId: colorThemeId !== "default" ? colorThemeId : undefined,
       showTrend,
+      trackingScopeId: trackingScopeId !== "all" ? trackingScopeId : undefined,
     };
 
     if (editingWidget) {
@@ -521,6 +541,12 @@ export default function DesignDashboard() {
                               </div>
                               {/* Feature badges */}
                               <div className="flex flex-wrap gap-1 mt-2">
+                                {widget.trackingScopeId && widget.trackingScopeId !== "all" && (
+                                  <span className="text-[10px] bg-violet-500/10 text-violet-500 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                    <Users className="h-2.5 w-2.5" />
+                                    {TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId)?.name}
+                                  </span>
+                                )}
                                 {widgetConfig?.supportsMultiKpi && widget.kpiTypeIds.length > 1 && (
                                   <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
                                     Multi-KPI
@@ -656,9 +682,37 @@ export default function DesignDashboard() {
               )}
             </div>
 
-            {/* 3. Time Period */}
+            {/* 3. Tracking Scope - Who/what to track */}
+            {dataSource === "kpi" && (
+              <div className="space-y-2">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  3. Hvem skal trackes?
+                </Label>
+                <Select value={trackingScopeId} onValueChange={setTrackingScopeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg tracking scope" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRACKING_SCOPES.map((scope) => (
+                      <SelectItem key={scope.id} value={scope.id}>
+                        <div className="flex flex-col">
+                          <span>{scope.name}</span>
+                          <span className="text-xs text-muted-foreground">{scope.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Vælg om KPI'en skal vise data for alle, et team, en medarbejder osv.
+                </p>
+              </div>
+            )}
+
+            {/* 4. Time Period */}
             <div className="space-y-2">
-              <Label className="text-base font-semibold">3. Tidsperiode</Label>
+              <Label className="text-base font-semibold">4. Tidsperiode</Label>
               <Select value={selectedTimePeriod} onValueChange={setSelectedTimePeriod}>
                 <SelectTrigger>
                   <SelectValue placeholder="Vælg tidsperiode" />
@@ -699,10 +753,10 @@ export default function DesignDashboard() {
               )}
             </div>
 
-            {/* 4. Advanced Options - Comparison, Target, Trend */}
+            {/* 5. Advanced Options - Comparison, Target, Trend */}
             {(supportsComparison || supportsTarget) && (
               <div className="space-y-4 border-t pt-4">
-                <Label className="text-base font-semibold">4. Avancerede indstillinger</Label>
+                <Label className="text-base font-semibold">5. Avancerede indstillinger</Label>
                 
                 {/* Custom Title */}
                 <div className="space-y-2">
@@ -782,11 +836,11 @@ export default function DesignDashboard() {
               </div>
             )}
 
-            {/* Color Theme - renumbered to 4 */}
+            {/* 6. Color Theme */}
             <div className="space-y-2 border-t pt-4">
               <Label className="text-base font-semibold flex items-center gap-2">
                 <Palette className="h-4 w-4" />
-                4. Farvetema
+                6. Farvetema
               </Label>
               <div className="grid grid-cols-6 gap-2">
                 {COLOR_THEMES.map((theme) => (
