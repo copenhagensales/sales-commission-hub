@@ -79,6 +79,7 @@ import {
   LoginLog,
   TeamDashboard,
   FieldmarketingDashboardFull,
+  Messages,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -99,6 +100,7 @@ export const routes: RouteConfig[] = [
   { path: "/time-stamp", component: TimeStamp, access: "protected" },
   { path: "/extra-work", component: ExtraWork, access: "protected" },
   { path: "/some", component: Some, access: "protected" },
+  { path: "/messages", component: Messages, access: "protected" },
 
   { path: "/contract/:id", component: ContractSign, access: "public" },
   { path: "/contract/sign/:id", component: ContractSign, access: "public" },
