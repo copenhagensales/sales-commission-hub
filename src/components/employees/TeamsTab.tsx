@@ -504,7 +504,7 @@ export function TeamsTab() {
             </div>
 
             {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-y-auto max-h-[calc(80vh-200px)] px-6">
+            <div className="flex-1 overflow-y-auto max-h-[calc(80vh-200px)] px-6 scrollbar-thin">
               {/* Team Tab */}
               <TabsContent value="team" className="mt-0 py-6">
                 <div className="grid gap-6">
