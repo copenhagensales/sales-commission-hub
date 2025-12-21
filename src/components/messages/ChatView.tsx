@@ -14,6 +14,21 @@ interface ChatViewProps {
   conversationId: string;
 }
 
+async function fetchCurrentEmployee(): Promise<{ id: string; full_name: string } | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  
+  // Using any to avoid TypeScript deep instantiation issues
+  const client = supabase as any;
+  const { data } = await client
+    .from("employee_master_data")
+    .select("id, first_name, last_name")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  
+  return data ? { id: data.id, full_name: `${data.first_name || ''} ${data.last_name || ''}`.trim() } : null;
+}
+
 export function ChatView({ conversationId }: ChatViewProps) {
   const [message, setMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -24,18 +39,7 @@ export function ChatView({ conversationId }: ChatViewProps) {
 
   const { data: currentEmployee } = useQuery({
     queryKey: ["current-employee"],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      
-      const { data } = await (supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name")
-        .eq("user_id", user.id)
-        .maybeSingle() as Promise<any>);
-      
-      return data ? { id: data.id, full_name: `${data.first_name || ''} ${data.last_name || ''}`.trim() } : null;
-    },
+    queryFn: fetchCurrentEmployee,
   });
 
   useEffect(() => {
