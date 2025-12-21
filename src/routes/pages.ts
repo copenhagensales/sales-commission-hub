@@ -86,6 +86,7 @@ export const ClosingShifts = lazyPage(() => import("@/pages/ClosingShifts"));
 export const Permissions = lazyPage(() => import("@/pages/Permissions"));
 
 export const RolePreview = lazyPage(() => import("@/pages/RolePreview"));
+export const LoginLog = lazyPage(() => import("@/pages/LoginLog"));
 
 // Team Dashboards
 export const TeamDashboard = lazyPage(() => import("@/pages/dashboards/TeamDashboard"));

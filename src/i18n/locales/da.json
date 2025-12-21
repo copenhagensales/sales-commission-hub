@@ -72,7 +72,8 @@
     "timeOff": "Fraværsanmodninger",
     "permissions": "Rettigheder",
     "management": "Ledelse",
-    "personnel": "Personale"
+    "personnel": "Personale",
+    "loginLog": "Login Log"
   },
   "dialerIntegrations": {
     "title": "Dialer Integrationer",

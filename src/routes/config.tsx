@@ -76,6 +76,7 @@ import {
   ClosingShifts,
   Permissions,
   RolePreview,
+  LoginLog,
   TeamDashboard,
   FieldmarketingDashboardFull,
 } from "./pages";
@@ -123,6 +124,7 @@ export const routes: RouteConfig[] = [
   { path: "/logikker", component: Logikker, access: "role", positionPermission: "menu_logics" },
   { path: "/employees", component: EmployeeMasterData, access: "role", positionPermission: "menu_employees" },
   { path: "/employees/:id", component: EmployeeDetail, access: "role", positionPermission: "menu_employees" },
+  { path: "/login-log", component: LoginLog, access: "role", positionPermission: "menu_login_log" },
   
   { path: "/settings", component: Settings, access: "role", positionPermission: "menu_settings" },
 

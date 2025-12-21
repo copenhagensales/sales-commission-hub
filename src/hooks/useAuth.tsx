@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -7,6 +7,7 @@ export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const loggedSessionsRef = useRef<Set<string>>(new Set());
 
   const checkMustChangePassword = useCallback(async (userEmail: string | undefined) => {
     if (!userEmail) {
@@ -37,6 +38,43 @@ export function useAuth() {
     setMustChangePassword(false);
   }, [user?.email]);
 
+  const logLoginEvent = useCallback(async (currentSession: Session) => {
+    const sessionKey = `${currentSession.user.id}-${currentSession.access_token.substring(0, 20)}`;
+    
+    // Only log once per unique session
+    if (loggedSessionsRef.current.has(sessionKey)) {
+      return;
+    }
+    loggedSessionsRef.current.add(sessionKey);
+
+    try {
+      // Get user's name from employee_master_data
+      const lowerEmail = currentSession.user.email?.toLowerCase() || "";
+      const { data: employee } = await supabase
+        .from("employee_master_data")
+        .select("first_name, last_name")
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      const userName = employee 
+        ? `${employee.first_name || ""} ${employee.last_name || ""}`.trim() 
+        : null;
+
+      // Call edge function to log the event
+      await supabase.functions.invoke("log-login-event", {
+        body: {
+          user_id: currentSession.user.id,
+          user_email: currentSession.user.email,
+          user_name: userName,
+          session_id: currentSession.access_token.substring(0, 20),
+        },
+      });
+    } catch (error) {
+      console.error("Failed to log login event:", error);
+    }
+  }, []);
+
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -44,6 +82,11 @@ export function useAuth() {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Log login event for new sessions
+        if (session && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")) {
+          logLoginEvent(session);
+        }
         
         // Defer the must_change_password check
         if (session?.user?.email) {
@@ -63,6 +106,7 @@ export function useAuth() {
       setLoading(false);
       
       if (session?.user?.email) {
+        logLoginEvent(session);
         setTimeout(() => {
           checkMustChangePassword(session.user.email);
         }, 0);
@@ -70,7 +114,7 @@ export function useAuth() {
     });
 
     return () => subscription.unsubscribe();
-  }, [checkMustChangePassword]);
+  }, [checkMustChangePassword, logLoginEvent]);
 
   return { user, session, loading, mustChangePassword, clearMustChangePassword };
 }
