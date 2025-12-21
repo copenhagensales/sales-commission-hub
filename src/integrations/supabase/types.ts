@@ -1857,6 +1857,57 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_kpis: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          critical_threshold: number | null
+          dashboard_slugs: string[] | null
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          kpi_type: string
+          name: string
+          target_value: number | null
+          unit: string | null
+          updated_at: string
+          warning_threshold: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          critical_threshold?: number | null
+          dashboard_slugs?: string[] | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          kpi_type?: string
+          name: string
+          target_value?: number | null
+          unit?: string | null
+          updated_at?: string
+          warning_threshold?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          critical_threshold?: number | null
+          dashboard_slugs?: string[] | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          kpi_type?: string
+          name?: string
+          target_value?: number | null
+          unit?: string | null
+          updated_at?: string
+          warning_threshold?: number | null
+        }
+        Relationships: []
+      }
       dialer_calls: {
         Row: {
           agent_external_id: string
