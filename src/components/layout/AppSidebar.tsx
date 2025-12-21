@@ -134,6 +134,55 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     refetchOnWindowFocus: true,
   });
 
+  // Fetch unread messages count
+  const { data: unreadMessagesCount = 0 } = useQuery({
+    queryKey: ["unread-messages-count", user?.email],
+    queryFn: async () => {
+      if (!user?.email) return 0;
+
+      const lowerEmail = user.email.toLowerCase();
+      const { data: currentEmployee } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+        .maybeSingle();
+
+      if (!currentEmployee) return 0;
+
+      // Get all conversations the user is a member of
+      const { data: memberships } = await supabase
+        .from("chat_conversation_members")
+        .select("conversation_id, last_read_at")
+        .eq("employee_id", currentEmployee.id);
+
+      if (!memberships?.length) return 0;
+
+      let totalUnread = 0;
+
+      for (const membership of memberships) {
+        const query = supabase
+          .from("chat_messages")
+          .select("*", { count: "exact", head: true })
+          .eq("conversation_id", membership.conversation_id)
+          .neq("sender_id", currentEmployee.id)
+          .is("deleted_at", null);
+
+        if (membership.last_read_at) {
+          query.gt("created_at", membership.last_read_at);
+        }
+
+        const { count } = await query;
+        totalUnread += count || 0;
+      }
+
+      return totalUnread;
+    },
+    enabled: !!user?.email,
+    staleTime: 10000, // Refresh every 10 seconds
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
+  });
+
   const pendingContractsCount = employeeData?.pendingContracts ?? 0;
   const employeeName = employeeData?.name;
 
@@ -268,12 +317,19 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             to="/messages"
             onClick={handleNavClick}
             className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
               location.pathname === "/messages" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}
           >
-            <MessageSquare className="h-5 w-5" />
-            {t("sidebar.messages", "Beskeder")}
+            <div className="flex items-center gap-3">
+              <MessageSquare className="h-5 w-5" />
+              {t("sidebar.messages", "Beskeder")}
+            </div>
+            {unreadMessagesCount > 0 && (
+              <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
+              </Badge>
+            )}
           </NavLink>
           
           {/* Main navigation items */}
