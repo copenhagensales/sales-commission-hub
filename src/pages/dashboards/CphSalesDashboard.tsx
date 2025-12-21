@@ -4,9 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, TrendingUp, Phone, Target, Calendar, Clock, Award, Activity } from "lucide-react";
-import { ScreenResolutionIndicator } from "@/components/dashboard/ScreenResolutionIndicator";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Users, TrendingUp, Phone, Target, Award, Activity } from "lucide-react";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 
 export default function CphSalesDashboard() {
   const today = new Date();
@@ -121,30 +120,13 @@ export default function CphSalesDashboard() {
   const pendingSales = todaySales.filter((s: any) => s.status === "pending").length;
 
   return (
-    <DashboardLayout>
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-6">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-                Dagsboard CPH Sales
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                {format(today, "EEEE d. MMMM yyyy", { locale: da })}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <ScreenResolutionIndicator />
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                <span>Opdateres automatisk</span>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-6">
+      <DashboardHeader 
+        title="Dagsboard CPH Sales" 
+        subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
+      />
 
-        {/* KPI Cards */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -279,7 +261,6 @@ export default function CphSalesDashboard() {
       <div className="text-center text-sm text-muted-foreground">
         <p>CPH Sales Dashboard • {format(today, "HH:mm", { locale: da })}</p>
       </div>
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }

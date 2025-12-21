@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,7 @@ import { format, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { Users, Trophy, Building2, CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ScreenResolutionIndicator } from "@/components/dashboard/ScreenResolutionIndicator";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 
 // Helper function to shorten names: "John Doe" -> "John D."
 const shortenName = (name: string): string => {
@@ -417,45 +416,38 @@ const TeamDashboardContent = ({ teamSlug, teamName, multiClient }: TeamDashboard
     const recentSales = allRecentSales || [];
 
     return (
-      <div className="space-y-4 md:space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold text-foreground">
-                {teamName} Dashboard
-              </h1>
-              <p className="text-sm md:text-base text-muted-foreground mt-1">
-                Oversigt over salg på tværs af kunder
-              </p>
-            </div>
-            <ScreenResolutionIndicator />
-          </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-full sm:w-[240px] justify-start text-left font-normal text-sm md:text-base",
-                  !selectedDate && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                <span className="truncate">{format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => date && setSelectedDate(date)}
-                initialFocus
-                className="pointer-events-auto"
-                locale={da}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+      <div className="min-h-screen bg-background p-6">
+        <DashboardHeader 
+          title={`${teamName} Dashboard`}
+          subtitle="Oversigt over salg på tværs af kunder"
+          rightContent={
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "justify-start text-left font-normal text-sm",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline truncate">{format(selectedDate, "d. MMM yyyy", { locale: da })}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  initialFocus
+                  className="pointer-events-auto"
+                  locale={da}
+                />
+              </PopoverContent>
+            </Popover>
+          }
+        />
 
         {/* Client cards grid */}
         {clientsWithSales.length > 0 ? (
@@ -1097,22 +1089,21 @@ const TeamDashboard = () => {
   
   if (!config) {
     return (
-      <DashboardLayout>
+      <div className="min-h-screen bg-background p-6">
+        <DashboardHeader title="Dashboard ikke fundet" />
         <div className="flex items-center justify-center h-64">
           <p className="text-muted-foreground">Dashboard ikke fundet</p>
         </div>
-      </DashboardLayout>
+      </div>
     );
   }
 
   return (
-    <DashboardLayout>
-      <TeamDashboardContent 
-        teamSlug={teamSlug!} 
-        teamName={config.name}
-        multiClient={config.multiClient}
-      />
-    </DashboardLayout>
+    <TeamDashboardContent 
+      teamSlug={teamSlug!} 
+      teamName={config.name}
+      multiClient={config.multiClient}
+    />
   );
 };
 
