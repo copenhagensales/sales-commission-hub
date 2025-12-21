@@ -25,16 +25,16 @@ interface Widget {
   isActive: boolean;
 }
 
-const WIDGET_TYPES = [
-  { value: "kpi_card", label: "KPI Kort", icon: Gauge, description: "Vis en enkelt KPI værdi" },
-  { value: "bar_chart", label: "Søjlediagram", icon: BarChart3, description: "Sammenlign værdier" },
-  { value: "line_chart", label: "Linjediagram", icon: LineChart, description: "Vis trends over tid" },
-  { value: "pie_chart", label: "Cirkeldiagram", icon: PieChart, description: "Vis fordeling" },
-  { value: "table", label: "Tabel", icon: Table2, description: "Vis detaljerede data" },
-  { value: "leaderboard", label: "Leaderboard", icon: Award, description: "Top performere" },
-  { value: "clock", label: "Ur/Dato", icon: Clock, description: "Vis tid og dato" },
-  { value: "goal_progress", label: "Mål fremgang", icon: TrendingUp, description: "Vis fremgang mod mål" },
-  { value: "activity_feed", label: "Aktivitetsfeed", icon: Activity, description: "Seneste aktivitet" },
+const INITIAL_WIDGET_TYPES = [
+  { value: "kpi_card", label: "KPI Kort", icon: Gauge, description: "Vis en enkelt KPI værdi", isActive: true },
+  { value: "bar_chart", label: "Søjlediagram", icon: BarChart3, description: "Sammenlign værdier", isActive: true },
+  { value: "line_chart", label: "Linjediagram", icon: LineChart, description: "Vis trends over tid", isActive: true },
+  { value: "pie_chart", label: "Cirkeldiagram", icon: PieChart, description: "Vis fordeling", isActive: true },
+  { value: "table", label: "Tabel", icon: Table2, description: "Vis detaljerede data", isActive: true },
+  { value: "leaderboard", label: "Leaderboard", icon: Award, description: "Top performere", isActive: true },
+  { value: "clock", label: "Ur/Dato", icon: Clock, description: "Vis tid og dato", isActive: true },
+  { value: "goal_progress", label: "Mål fremgang", icon: TrendingUp, description: "Vis fremgang mod mål", isActive: true },
+  { value: "activity_feed", label: "Aktivitetsfeed", icon: Activity, description: "Seneste aktivitet", isActive: true },
 ];
 
 const WIDGET_SIZES = [
@@ -100,6 +100,18 @@ export const WidgetSettingsTab = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<Widget | null>(null);
   const [savedWidgets, setSavedWidgets] = useState<Widget[]>([]);
+  const [widgetTypes, setWidgetTypes] = useState(INITIAL_WIDGET_TYPES);
+
+  const toggleWidgetType = (value: string) => {
+    setWidgetTypes(prev => prev.map(type => 
+      type.value === value ? { ...type, isActive: !type.isActive } : type
+    ));
+    const type = widgetTypes.find(t => t.value === value);
+    toast({
+      title: type?.isActive ? "Widget type deaktiveret" : "Widget type aktiveret",
+      description: `${type?.label} er nu ${type?.isActive ? "deaktiveret" : "aktiveret"}.`,
+    });
+  };
   
   const [formData, setFormData] = useState({
     name: "",
@@ -201,7 +213,7 @@ export const WidgetSettingsTab = () => {
   };
 
   const getWidgetIcon = (type: Widget["type"]) => {
-    const widgetType = WIDGET_TYPES.find(w => w.value === type);
+    const widgetType = widgetTypes.find(w => w.value === type);
     return widgetType?.icon || LayoutGrid;
   };
 
@@ -259,7 +271,7 @@ export const WidgetSettingsTab = () => {
                         )}
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <Badge variant="outline">
-                            {WIDGET_TYPES.find(t => t.value === widget.type)?.label}
+                            {widgetTypes.find(t => t.value === widget.type)?.label}
                           </Badge>
                           <Badge variant="secondary">
                             {WIDGET_SIZES.find(s => s.value === widget.size)?.label}
@@ -318,7 +330,7 @@ export const WidgetSettingsTab = () => {
                       <p className="text-sm text-muted-foreground">{preset.description}</p>
                       <div className="flex gap-1 mt-2">
                         <Badge variant="outline" className="text-xs">
-                          {WIDGET_TYPES.find(t => t.value === preset.type)?.label}
+                          {widgetTypes.find(t => t.value === preset.type)?.label}
                         </Badge>
                         <Badge variant="secondary" className="text-xs">
                           {WIDGET_SIZES.find(s => s.value === preset.size)?.label}
@@ -344,21 +356,32 @@ export const WidgetSettingsTab = () => {
         <CardHeader>
           <CardTitle>Widget typer</CardTitle>
           <CardDescription>
-            Oversigt over tilgængelige widget typer
+            Klik på en widget type for at aktivere/deaktivere den
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-            {WIDGET_TYPES.map((type) => {
+            {widgetTypes.map((type) => {
               const IconComponent = type.icon;
               return (
                 <div
                   key={type.value}
-                  className="p-3 border rounded-lg text-center hover:bg-accent/50 transition-colors"
+                  onClick={() => toggleWidgetType(type.value)}
+                  className={`p-3 border rounded-lg text-center cursor-pointer transition-all ${
+                    type.isActive 
+                      ? "bg-primary/10 border-primary hover:bg-primary/20" 
+                      : "bg-muted/50 border-muted opacity-60 hover:opacity-80"
+                  }`}
                 >
-                  <IconComponent className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <p className="font-medium text-sm">{type.label}</p>
+                  <IconComponent className={`h-8 w-8 mx-auto mb-2 ${type.isActive ? "text-primary" : "text-muted-foreground"}`} />
+                  <p className={`font-medium text-sm ${type.isActive ? "" : "text-muted-foreground"}`}>{type.label}</p>
                   <p className="text-xs text-muted-foreground">{type.description}</p>
+                  <Badge 
+                    variant={type.isActive ? "default" : "secondary"} 
+                    className="mt-2 text-xs"
+                  >
+                    {type.isActive ? "Aktiv" : "Inaktiv"}
+                  </Badge>
                 </div>
               );
             })}
@@ -413,7 +436,7 @@ export const WidgetSettingsTab = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {WIDGET_TYPES.map((type) => (
+                    {widgetTypes.filter(t => t.isActive).map((type) => (
                       <SelectItem key={type.value} value={type.value}>
                         <div className="flex items-center gap-2">
                           <type.icon className="h-4 w-4" />
