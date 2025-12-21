@@ -126,15 +126,15 @@ export default function VagtFlowIndex() {
               <CardTitle>Hurtige handlinger</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button className="w-full justify-start" variant="outline" onClick={() => navigate("/vagt-flow/book-week")}>
+              <Button className="w-full justify-start" variant="outline" onClick={() => navigate(`/vagt-flow/book-week?week=${currentWeek}&year=${currentYear}`)}>
                 <Calendar className="h-4 w-4 mr-2" />
                 Book uge
               </Button>
-              <Button className="w-full justify-start" variant="outline" onClick={() => navigate("/vagt-flow/locations")}>
+              <Button className="w-full justify-start" variant="outline" onClick={() => navigate(`/vagt-flow/locations?week=${currentWeek}&year=${currentYear}`)}>
                 <MapPin className="h-4 w-4 mr-2" />
                 Administrer lokationer
               </Button>
-              <Button className="w-full justify-start" variant="outline" onClick={() => navigate("/vagt-flow/bookings")}>
+              <Button className="w-full justify-start" variant="outline" onClick={() => navigate(`/vagt-flow/bookings?week=${currentWeek}&year=${currentYear}`)}>
                 <Calendar className="h-4 w-4 mr-2" />
                 Se alle bookinger
               </Button>
@@ -162,7 +162,7 @@ export default function VagtFlowIndex() {
                     </div>
                   ))}
                   {thisWeekBookings.length > 5 && (
-                    <Button variant="link" className="p-0 h-auto" onClick={() => navigate("/vagt-flow/bookings")}>
+                    <Button variant="link" className="p-0 h-auto" onClick={() => navigate(`/vagt-flow/bookings?week=${currentWeek}&year=${currentYear}`)}>
                       Se alle {thisWeekBookings.length} bookinger
                     </Button>
                   )}

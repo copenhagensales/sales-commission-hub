@@ -14,9 +14,15 @@ export default function BookingManagement() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "book-week";
+  const weekParam = searchParams.get("week");
+  const yearParam = searchParams.get("year");
 
   const handleTabChange = (value: string) => {
-    setSearchParams({ tab: value });
+    // Preserve week/year params when changing tabs
+    const params: Record<string, string> = { tab: value };
+    if (weekParam) params.week = weekParam;
+    if (yearParam) params.year = yearParam;
+    setSearchParams(params);
   };
 
   return (
