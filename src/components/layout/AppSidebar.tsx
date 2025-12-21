@@ -56,6 +56,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [testOpen, setTestOpen] = useState(
     ["/car-quiz-admin", "/code-of-conduct-admin", "/pulse-survey-results"].includes(location.pathname)
   );
+  const [someOpen, setSomeOpen] = useState(
+    ["/some", "/extra-work"].includes(location.pathname)
+  );
 
   // Fetch employee name and pending contracts count
   const { data: employeeData } = useQuery({
@@ -247,11 +250,12 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
 
   // Non-personal menu items
   if (p.canViewDashboard) mainNavigation.push({ name: t("sidebar.dashboard"), href: "/dashboard", icon: LayoutDashboard });
-  if (p.canViewSome) mainNavigation.push({ name: t("sidebar.some"), href: "/some", icon: Video });
   if (p.canViewSales) mainNavigation.push({ name: t("sidebar.sales"), href: "/sales", icon: ShoppingCart });
   if (p.canViewLogics) mainNavigation.push({ name: t("sidebar.logics"), href: "/logikker", icon: ListChecks });
   if (p.canViewClosingShifts) mainNavigation.push({ name: t("sidebar.closingShifts"), href: "/closing-shifts", icon: Lock });
-  if (p.canViewExtraWork) mainNavigation.push({ name: t("sidebar.extraWork"), href: "/extra-work", icon: HeartHandshake });
+
+  // Check if SOME menu should be visible
+  const showSomeMenu = p.canViewSome || p.canViewExtraWork;
 
   // Check if any Personnel menu items are visible
   const showPersonnelMenu = p.canViewEmployees || p.canViewTeams || p.canViewLoginLog;
@@ -441,6 +445,52 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               </NavLink>
             );
           })}
+
+          {/* SOME menu */}
+          {showSomeMenu && (
+            <Collapsible open={someOpen} onOpenChange={setSomeOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                ["/some", "/extra-work"].includes(location.pathname)
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <Video className="h-5 w-5" />
+                  SOME
+                </div>
+                {someOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {p.canViewSome && (
+                  <NavLink
+                    to="/some"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                      location.pathname === "/some" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <Video className="h-4 w-4" />
+                    SOME
+                  </NavLink>
+                )}
+                {p.canViewExtraWork && (
+                  <NavLink
+                    to="/extra-work"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                      location.pathname === "/extra-work" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <HeartHandshake className="h-4 w-4" />
+                    {t("sidebar.extraWork")}
+                  </NavLink>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           {/* Personale (Personnel) menu */}
           {showPersonnelMenu && (
