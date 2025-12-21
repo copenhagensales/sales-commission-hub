@@ -137,22 +137,44 @@ export default function BookingsContent() {
     },
   });
 
-  // Fetch Fieldmarketing employees from employee_master_data
+  // Fetch Fieldmarketing employees via team_members (has public RLS for authenticated users)
   const { data: employees = [] } = useQuery({
     queryKey: ["vagt-employees-for-booking-fieldmarketing"],
     queryFn: async () => {
+      // First get the Fieldmarketing team ID
+      const { data: teamData, error: teamError } = await supabase
+        .from("teams")
+        .select("id")
+        .ilike("name", "Fieldmarketing")
+        .maybeSingle();
+
+      if (teamError) throw teamError;
+      if (!teamData) return [];
+
+      // Get all employees who are members of the Fieldmarketing team via team_members
       const { data, error } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name, department")
-        .eq("job_title", "Fieldmarketing")
-        .eq("is_active", true)
-        .order("first_name");
+        .from("team_members")
+        .select(`
+          employee_id,
+          employee:employee_id(
+            id,
+            first_name,
+            last_name,
+            is_active,
+            department
+          )
+        `)
+        .eq("team_id", teamData.id);
+
       if (error) throw error;
-      return data?.map(e => ({
-        id: e.id,
-        full_name: `${e.first_name} ${e.last_name}`,
-        team: e.department,
-      })) || [];
+      
+      return (data || [])
+        .filter((tm: any) => tm.employee && tm.employee.is_active)
+        .map((tm: any) => ({
+          id: tm.employee.id,
+          full_name: `${tm.employee.first_name} ${tm.employee.last_name}`,
+          team: tm.employee.department,
+        })) || [];
     },
   });
 
