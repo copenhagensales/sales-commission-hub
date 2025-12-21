@@ -486,42 +486,47 @@ export default function DesignDashboard() {
         {isDesignPanelOpen && (
           <div className="w-80 shrink-0 border-l bg-background overflow-y-auto">
             <div className="p-4 space-y-4">
-              {/* Global Design Selector */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Palette className="h-4 w-4" />
-                  <h3 className="font-semibold text-sm">Vælg Design</h3>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {activeDesignTypes.map((design) => (
-                    <div
-                      key={design.id}
-                      onClick={() => setGlobalDesign(design.id)}
-                      className={cn(
-                        "p-2 rounded-lg border-2 cursor-pointer transition-all",
-                        globalDesign === design.id 
-                          ? "border-primary bg-primary/5 ring-2 ring-primary/20" 
-                          : "border-border hover:border-primary/50"
-                      )}
-                    >
-                      <div className={cn("h-8 rounded-md mb-1", design.preview)} />
-                      <p className="text-xs font-medium text-center">{design.name}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* Add Widget Section */}
               <Card>
                 <CardHeader className="pb-2 px-3 pt-3">
                   <CardTitle className="text-sm">Tilføj Widget</CardTitle>
                   <CardDescription className="text-xs">Konfigurer og tilføj widgets</CardDescription>
                 </CardHeader>
-                <CardContent className="px-3 pb-3">
+                <CardContent className="px-3 pb-3 space-y-2">
                   <Button onClick={openAddWidgetDialog} className="w-full" size="sm">
                     <Plus className="h-4 w-4 mr-2" />
                     Tilføj ny widget
                   </Button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full" size="sm">
+                        <Palette className="h-4 w-4 mr-2" />
+                        Vælg Design
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64" align="start">
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-sm">Vælg Design</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {activeDesignTypes.map((design) => (
+                            <div
+                              key={design.id}
+                              onClick={() => setGlobalDesign(design.id)}
+                              className={cn(
+                                "p-2 rounded-lg border-2 cursor-pointer transition-all",
+                                globalDesign === design.id 
+                                  ? "border-primary bg-primary/5 ring-2 ring-primary/20" 
+                                  : "border-border hover:border-primary/50"
+                              )}
+                            >
+                              <div className={cn("h-6 rounded-md mb-1", design.preview)} />
+                              <p className="text-xs font-medium text-center">{design.name}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </CardContent>
               </Card>
 
