@@ -430,12 +430,12 @@ export function useCurrentEmployee() {
   });
 }
 
-// Get employees for manager view - teamledere see their team, owners see all
-export function useEmployeesForShifts(department?: string) {
+// Get employees for manager view - filter by team membership when team is selected
+export function useEmployeesForShifts(teamId?: string) {
   const { user } = useAuth();
   
   return useQuery({
-    queryKey: ["employees-for-shifts", department, user?.id],
+    queryKey: ["employees-for-shifts", teamId, user?.id],
     queryFn: async () => {
       // First check if user is owner
       const { data: isOwner } = await supabase.rpc("is_owner", { _user_id: user?.id });
@@ -443,58 +443,75 @@ export function useEmployeesForShifts(department?: string) {
       // Get current employee id
       const { data: currentEmployeeId } = await supabase.rpc("get_current_employee_id");
       
-      console.log("useEmployeesForShifts - isOwner:", isOwner, "currentEmployeeId:", currentEmployeeId);
+      // If a specific team is selected, get employees from team_members
+      if (teamId && teamId !== "all") {
+        const { data: teamMembers, error: tmError } = await supabase
+          .from("team_members")
+          .select(`
+            employee_id,
+            employee:employee_id(
+              id, first_name, last_name, department, standard_start_time, 
+              weekly_hours, manager_id, salary_type, salary_amount
+            )
+          `)
+          .eq("team_id", teamId);
+
+        if (tmError) throw tmError;
+        
+        const employees = (teamMembers || [])
+          .filter(tm => tm.employee)
+          .map(tm => tm.employee);
+        
+        // If not owner, filter to team members managed by current user
+        if (!isOwner && currentEmployeeId) {
+          return employees.filter(emp => 
+            emp.manager_id === currentEmployeeId && emp.id !== currentEmployeeId
+          );
+        }
+        
+        return employees;
+      }
       
+      // No team selected - use existing logic
       let query = supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, department, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount")
         .eq("is_active", true)
         .order("first_name");
 
-      if (department && department !== "all") {
-        query = query.eq("department", department);
-      }
-
       const { data, error } = await query;
       if (error) throw error;
       
       // If owner, return all employees
       if (isOwner) {
-        console.log("Owner - returning all employees:", data?.length);
         return data;
       }
       
-      // If teamleder, filter to only show team members (where manager_id = current user's employee id)
-      // and exclude themselves
+      // If teamleder, filter to only show team members
       if (currentEmployeeId) {
-        const filtered = data.filter(emp => 
+        return data.filter(emp => 
           emp.manager_id === currentEmployeeId && emp.id !== currentEmployeeId
         );
-        console.log("Teamleder - filtered employees:", filtered.length, "from", data?.length);
-        return filtered;
       }
       
-      console.log("No filtering applied - returning all:", data?.length);
       return data;
     },
     enabled: !!user?.id,
   });
 }
 
-// Get unique departments
+// Get teams for dropdown
 export function useDepartments() {
   return useQuery({
-    queryKey: ["departments"],
+    queryKey: ["teams-for-shifts"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("employee_master_data")
-        .select("department")
-        .eq("is_active", true)
-        .not("department", "is", null);
+        .from("teams")
+        .select("id, name")
+        .order("name");
 
       if (error) throw error;
-      const unique = [...new Set(data.map(d => d.department).filter(Boolean))];
-      return unique as string[];
+      return data as { id: string; name: string }[];
     },
   });
 }
