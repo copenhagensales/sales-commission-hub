@@ -671,15 +671,23 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                             const hasCustomTime = 
                               dayConfig.start_time.slice(0, 5) !== shift.start_time.slice(0, 5) ||
                               dayConfig.end_time.slice(0, 5) !== shift.end_time.slice(0, 5);
+                            const dayBreaks = shiftBreaks.filter(b => b.day_of_week === day);
+                            const breakText = dayBreaks.length > 0 
+                              ? ` (pause: ${dayBreaks.map(b => `${formatTime(b.break_start)}-${formatTime(b.break_end)}`).join(', ')})`
+                              : '';
                             return (
                               <Badge 
                                 key={day} 
                                 variant={hasCustomTime ? "default" : "secondary"} 
                                 className="text-xs"
-                                title={hasCustomTime ? `${formatTime(dayConfig.start_time)}-${formatTime(dayConfig.end_time)}` : undefined}
+                                title={`${formatTime(dayConfig.start_time)}-${formatTime(dayConfig.end_time)}${breakText}`}
                               >
                                 {DAY_NAMES[day]}
-                                {hasCustomTime && ` (${formatTime(dayConfig.start_time)}-${formatTime(dayConfig.end_time)})`}
+                                {hasCustomTime && (
+                                  <span className="opacity-70 ml-1">
+                                    {formatTime(dayConfig.start_time)}-{formatTime(dayConfig.end_time)}
+                                  </span>
+                                )}
                               </Badge>
                             );
                           })}
@@ -689,20 +697,39 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
                       )}
                     </TableCell>
                     <TableCell>
-                      {shiftBreaks.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {shiftBreaks.map((b, i) => (
-                            <Badge key={i} variant="secondary" className="text-xs">
-                              {formatTime(b.break_start)}-{formatTime(b.break_end)}
+                      {(() => {
+                        // Only show general breaks (not day-specific) or one summary
+                        const generalBreaks = shiftBreaks.filter(b => b.day_of_week === null);
+                        const uniqueBreakTimes = [...new Set(shiftBreaks.map(b => `${formatTime(b.break_start)}-${formatTime(b.break_end)}`))];
+                        
+                        if (generalBreaks.length > 0) {
+                          return (
+                            <div className="flex flex-wrap gap-1">
+                              {generalBreaks.map((b, i) => (
+                                <Badge key={i} variant="secondary" className="text-xs">
+                                  {formatTime(b.break_start)}-{formatTime(b.break_end)}
+                                </Badge>
+                              ))}
+                            </div>
+                          );
+                        } else if (uniqueBreakTimes.length === 1) {
+                          return (
+                            <Badge variant="secondary" className="text-xs">
+                              {uniqueBreakTimes[0]}
                             </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        "-"
-                      )}
+                          );
+                        } else if (uniqueBreakTimes.length > 1) {
+                          return (
+                            <span className="text-muted-foreground text-xs" title={uniqueBreakTimes.join(', ')}>
+                              Varierende
+                            </span>
+                          );
+                        }
+                        return "-";
+                      })()}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{formatDuration(workTime)}</Badge>
+                      <Badge variant="outline">{formatDuration(workTime)}/uge</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-0.5">
