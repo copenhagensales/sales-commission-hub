@@ -236,13 +236,15 @@ export default function BookWeekContent() {
   const handlePrevWeek = () => {
     const newWeek = selectedWeek - 1;
     setSelectedWeek(newWeek);
-    setSearchParams({ week: newWeek.toString(), year: selectedYear.toString() });
+    const currentTab = searchParams.get("tab") || "book-week";
+    setSearchParams({ tab: currentTab, week: newWeek.toString(), year: selectedYear.toString() });
   };
 
   const handleNextWeek = () => {
     const newWeek = selectedWeek + 1;
     setSelectedWeek(newWeek);
-    setSearchParams({ week: newWeek.toString(), year: selectedYear.toString() });
+    const currentTab = searchParams.get("tab") || "book-week";
+    setSearchParams({ tab: currentTab, week: newWeek.toString(), year: selectedYear.toString() });
   };
 
   const toggleDay = (dayValue: number) => {
