@@ -1341,27 +1341,31 @@ const DashboardSettings = () => {
                       {/* Trigger Condition Selection */}
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Betingelse for udløsning</Label>
-                        <div className="grid grid-cols-1 gap-2">
-                          {CELEBRATION_TRIGGER_CONDITIONS.map((condition) => (
-                            <div
-                              key={condition.value}
-                              className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                                themeFormData.celebrationTriggerCondition === condition.value
-                                  ? "border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/50"
-                                  : "hover:border-muted-foreground hover:bg-muted/50"
-                              }`}
-                              onClick={() =>
-                                setThemeFormData((prev) => ({
-                                  ...prev,
-                                  celebrationTriggerCondition: condition.value as DashboardTheme["celebrationTriggerCondition"],
-                                }))
-                              }
-                            >
-                              <p className="text-sm font-medium">{condition.label}</p>
-                              <p className="text-xs text-muted-foreground">{condition.description}</p>
-                            </div>
-                          ))}
-                        </div>
+                        <Select
+                          value={themeFormData.celebrationTriggerCondition}
+                          onValueChange={(value) =>
+                            setThemeFormData((prev) => ({
+                              ...prev,
+                              celebrationTriggerCondition: value as DashboardTheme["celebrationTriggerCondition"],
+                            }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CELEBRATION_TRIGGER_CONDITIONS.map((condition) => (
+                              <SelectItem key={condition.value} value={condition.value}>
+                                <div>
+                                  <span>{condition.label}</span>
+                                  <span className="text-muted-foreground text-xs ml-2">
+                                    ({condition.description})
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       {/* Custom threshold value for "exceeds_value" condition */}
@@ -1476,19 +1480,19 @@ const DashboardSettings = () => {
                             if (!effect) return null;
                             const IconComponent = effect.icon;
                             
-                            // Replace placeholders with example data
+                            // Replace placeholders with example data - use triggering employee/team context
                             const exampleText = themeFormData.celebrationText
                               .replace("{{medarbejder}}", "Anders Jensen")
-                              .replace("{{salg_nummer}}", "42")
+                              .replace("{{salg_nummer}}", selectedKpi ? "42" : "#")
                               .replace("{{produkt}}", "Premium Abonnement")
                               .replace("{{hold}}", "Team Alpha")
-                              .replace("{{værdi}}", "1.250 kr")
-                              .replace("{{mål}}", "100 salg");
+                              .replace("{{værdi}}", selectedKpi?.target_value ? `${selectedKpi.target_value}` : "100")
+                              .replace("{{mål}}", selectedKpi?.target_value ? `${selectedKpi.target_value} ${selectedKpi.unit || ""}`.trim() : "100");
                             
                             return (
                               <div className="w-full p-4 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-center space-y-3">
                                 {/* Trigger summary */}
-                                <div className="flex items-center justify-center gap-2 text-xs">
+                                <div className="flex items-center justify-center gap-2 text-xs bg-background/50 rounded-md py-1.5 px-3">
                                   <Target className="h-3.5 w-3.5 text-purple-400" />
                                   <span className="text-muted-foreground">
                                     {selectedKpi ? (
@@ -1501,7 +1505,7 @@ const DashboardSettings = () => {
                                         )}
                                       </>
                                     ) : (
-                                      <span className="text-amber-500">Ingen KPI valgt</span>
+                                      <span className="text-amber-500">Vælg en KPI ovenfor</span>
                                     )}
                                   </span>
                                 </div>
@@ -1510,7 +1514,7 @@ const DashboardSettings = () => {
                                 {themeFormData.celebrationText ? (
                                   <p className="text-sm font-medium">{exampleText}</p>
                                 ) : (
-                                  <p className="text-sm text-muted-foreground italic">Ingen tekst angivet</p>
+                                  <p className="text-sm text-muted-foreground italic">Tilføj fejringstekst med data-felter ovenfor</p>
                                 )}
                                 <Button
                                   type="button"
