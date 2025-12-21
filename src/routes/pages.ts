@@ -96,3 +96,10 @@ export const TestDashboard = lazyPage(() => import("@/pages/dashboards/TestDashb
 
 export const Messages = lazyPage(() => import("@/pages/Messages"));
 
+// Onboarding
+export const OnboardingDashboard = lazyPage(() => import("@/pages/onboarding/OnboardingDashboard"));
+export const EmployeeOnboardingView = lazyPage(() => import("@/pages/onboarding/EmployeeOnboardingView"));
+export const LeaderOnboardingView = lazyPage(() => import("@/pages/onboarding/LeaderOnboardingView"));
+export const DrillLibrary = lazyPage(() => import("@/pages/onboarding/DrillLibrary"));
+export const OnboardingAdmin = lazyPage(() => import("@/pages/onboarding/OnboardingAdmin"));
+

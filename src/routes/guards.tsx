@@ -36,11 +36,7 @@ export function SmartRedirect() {
         const lowerEmail = user.email?.toLowerCase() || '';
         const { data: employee } = await supabase
           .from("employee_master_data")
-          .select(`
-            default_landing_page,
-            job_title,
-            job_positions!employee_master_data_job_title_fkey(default_landing_page)
-          `)
+          .select("default_landing_page, job_title")
           .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
           .eq("is_active", true)
           .maybeSingle();
@@ -51,10 +47,18 @@ export function SmartRedirect() {
           return;
         }
         
-        const positionDefault = (employee?.job_positions as any)?.default_landing_page;
-        if (positionDefault) {
-          setRedirectPath(positionDefault);
-          return;
+        // Get position default landing page if employee has job_title
+        if (employee?.job_title) {
+          const { data: position } = await supabase
+            .from("job_positions")
+            .select("default_landing_page")
+            .eq("name", employee.job_title)
+            .maybeSingle();
+          
+          if (position?.default_landing_page) {
+            setRedirectPath(position.default_landing_page);
+            return;
+          }
         }
         
         setRedirectPath("/home");
@@ -70,15 +74,14 @@ export function SmartRedirect() {
 }
 
 export function wrapWithGuard(
-  Component: React.ComponentType<any> | React.LazyExoticComponent<React.ComponentType<any>>,
+  Component: React.ComponentType,
   meta: RouteConfig
-) {
+): React.ReactElement {
   const element = React.createElement(Component);
   if (meta.access === "public") return element;
   if (meta.access === "auth") return <AuthRoute>{element}</AuthRoute>;
   if (meta.access === "protected") return <ProtectedRoute>{element}</ProtectedRoute>;
   if (meta.access === "role") {
-    // Only use position permissions - system roles are no longer used
     return <RoleProtectedRoute positionPermission={meta.positionPermission}>{element}</RoleProtectedRoute>;
   }
   return element;

@@ -222,6 +222,16 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       { key: "tab_settings_excel_crm", label: "Excel CRM Import", description: "Adgang til Excel CRM import fane", hasEditOption: true },
     ],
   },
+  {
+    key: "menu_onboarding",
+    label: "Onboarding menu",
+    icon: "🎓",
+    permissions: [
+      { key: "menu_onboarding", label: "Onboarding", description: "Adgang til onboarding oversigt", hasEditOption: true },
+      { key: "menu_onboarding_leader", label: "Leder onboarding", description: "Adgang til leder onboarding", hasEditOption: true },
+      { key: "menu_onboarding_admin", label: "Onboarding admin", description: "Adgang til onboarding administration", hasEditOption: true },
+    ],
+  },
 ];
 
 // Generate all permissions with full access

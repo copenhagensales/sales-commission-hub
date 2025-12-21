@@ -292,5 +292,10 @@ export function usePermissions() {
     // System menu
     canViewSettings: canView("menu_settings"),
     canEditSettings: canEdit("menu_settings"),
+    // Onboarding menu
+    canViewOnboarding: canView("menu_onboarding"),
+    canEditOnboarding: canEdit("menu_onboarding"),
+    canViewOnboardingLeader: canView("menu_onboarding_leader"),
+    canViewOnboardingAdmin: canView("menu_onboarding_admin"),
   };
 }
