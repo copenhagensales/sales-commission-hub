@@ -640,35 +640,67 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
               </div>
             </div>
 
-            {/* Day selection - simple checkboxes */}
+            {/* Day selection with optional custom times */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <Label>Vælg dage (valgfrit)</Label>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {WEEKDAY_ORDER.map(day => (
-                  <label
-                    key={day}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
-                      dayConfigs[day].enabled 
-                        ? "bg-primary/10 border-primary text-primary" 
-                        : "bg-muted/30 border-border hover:bg-muted/50"
-                    }`}
-                  >
-                    <Checkbox
-                      checked={dayConfigs[day].enabled}
-                      onCheckedChange={() => toggleDay(day)}
-                      className="sr-only"
-                    />
-                    <span className="text-sm font-medium">{DAY_NAMES[day]}</span>
-                  </label>
-                ))}
+              <div className="space-y-2">
+                {WEEKDAY_ORDER.map(day => {
+                  const config = dayConfigs[day];
+                  const hasCustomTime = config.enabled && 
+                    (config.start_time !== formData.start_time || config.end_time !== formData.end_time);
+                  
+                  return (
+                    <div key={day} className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <label
+                          className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors min-w-[70px] justify-center ${
+                            config.enabled 
+                              ? "bg-primary/10 border-primary text-primary" 
+                              : "bg-muted/30 border-border hover:bg-muted/50"
+                          }`}
+                        >
+                          <Checkbox
+                            checked={config.enabled}
+                            onCheckedChange={() => toggleDay(day)}
+                            className="sr-only"
+                          />
+                          <span className="text-sm font-medium">{DAY_NAMES[day]}</span>
+                        </label>
+                        
+                        {config.enabled && (
+                          <div className="flex items-center gap-2 flex-1">
+                            <TimeSelect
+                              value={config.start_time}
+                              onChange={(value) => updateDayTime(day, "start_time", value)}
+                              placeholder="Start"
+                              className="flex-1 max-w-[100px]"
+                            />
+                            <span className="text-muted-foreground text-sm">-</span>
+                            <TimeSelect
+                              value={config.end_time}
+                              onChange={(value) => updateDayTime(day, "end_time", value)}
+                              placeholder="Slut"
+                              className="flex-1 max-w-[100px]"
+                            />
+                            {hasCustomTime && (
+                              <Badge variant="secondary" className="text-xs">
+                                Anden tid
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               <p className="text-xs text-muted-foreground">
                 {enabledDaysCount === 0 
-                  ? "Ingen dage valgt = gælder alle dage" 
-                  : `${enabledDaysCount} dag(e) valgt`}
+                  ? "Ingen dage valgt = gælder alle dage med standard tidspunkter" 
+                  : `${enabledDaysCount} dag(e) valgt - du kan ændre tider pr. dag`}
               </p>
             </div>
 
