@@ -18,6 +18,7 @@ import { DASHBOARD_LIST } from "@/config/dashboards";
 import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
 import { WidgetSettingsTab } from "@/components/dashboard/WidgetSettingsTab";
 import { KpiSettingsTab } from "@/components/dashboard/KpiSettingsTab";
+import { DesignSettingsTab } from "@/components/dashboard/DesignSettingsTab";
 
 interface DashboardKpi {
   id: string;
@@ -517,9 +518,13 @@ const DashboardSettings = () => {
               <LayoutGrid className="h-4 w-4" />
               Widgets
             </TabsTrigger>
+            <TabsTrigger value="widget-designs" className="flex items-center gap-2">
+              <Layout className="h-4 w-4" />
+              Widget Designs
+            </TabsTrigger>
             <TabsTrigger value="design" className="flex items-center gap-2">
               <Palette className="h-4 w-4" />
-              Design
+              Tema
             </TabsTrigger>
           </TabsList>
 
@@ -629,6 +634,10 @@ const DashboardSettings = () => {
 
           <TabsContent value="widgets" className="mt-6">
             <WidgetSettingsTab />
+          </TabsContent>
+
+          <TabsContent value="widget-designs" className="mt-6">
+            <DesignSettingsTab />
           </TabsContent>
 
           <TabsContent value="design" className="mt-6 space-y-6">
