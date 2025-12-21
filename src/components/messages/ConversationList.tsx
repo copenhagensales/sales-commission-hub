@@ -1,16 +1,35 @@
-import { useConversations, useOnlineStatus, Conversation } from "@/hooks/useChat";
+import { useState } from "react";
+import { useConversations, useOnlineStatus, useDeleteConversation, Conversation } from "@/hooks/useChat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, User } from "lucide-react";
+import { Users, User, MoreVertical, Trash2, LogOut, Loader2 } from "lucide-react";
 import { OnlineIndicator } from "./OnlineIndicator";
+import { toast } from "sonner";
 
 interface ConversationListProps {
   selectedId: string | null;
-  onSelect: (id: string) => void;
+  onSelect: (id: string | null) => void;
 }
 
 export function ConversationList({ selectedId, onSelect }: ConversationListProps) {
@@ -19,29 +38,37 @@ export function ConversationList({ selectedId, onSelect }: ConversationListProps
 
   if (isLoading) {
     return (
-      <div className="p-4 text-center text-muted-foreground">
-        Indlæser samtaler...
+      <div className="h-full flex items-center justify-center text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+        Indlæser...
       </div>
     );
   }
 
   if (!conversations?.length) {
     return (
-      <div className="p-4 text-center text-muted-foreground">
-        Ingen samtaler endnu
+      <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-6">
+        <Users className="h-12 w-12 mb-4 opacity-50" />
+        <p className="text-center">Ingen samtaler endnu</p>
+        <p className="text-sm text-center mt-1">Start en ny samtale for at komme i gang</p>
       </div>
     );
   }
 
   return (
     <ScrollArea className="h-full">
-      <div className="divide-y">
+      <div className="p-2 space-y-1">
         {conversations.map((conversation) => (
           <ConversationItem
             key={conversation.id}
             conversation={conversation}
             isSelected={selectedId === conversation.id}
             onClick={() => onSelect(conversation.id)}
+            onDelete={() => {
+              if (selectedId === conversation.id) {
+                onSelect(null);
+              }
+            }}
             onlineUsers={onlineUsers}
           />
         ))}
@@ -54,10 +81,14 @@ interface ConversationItemProps {
   conversation: Conversation;
   isSelected: boolean;
   onClick: () => void;
+  onDelete: () => void;
   onlineUsers: Set<string>;
 }
 
-function ConversationItem({ conversation, isSelected, onClick, onlineUsers }: ConversationItemProps) {
+function ConversationItem({ conversation, isSelected, onClick, onDelete, onlineUsers }: ConversationItemProps) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const deleteConversation = useDeleteConversation();
+
   const displayName = conversation.is_group
     ? conversation.name || "Gruppe"
     : conversation.members
@@ -85,59 +116,163 @@ function ConversationItem({ conversation, isSelected, onClick, onlineUsers }: Co
 
   const unreadCount = conversation.unread_count || 0;
 
+  const handleDelete = async () => {
+    try {
+      await deleteConversation.mutateAsync(conversation.id);
+      onDelete();
+      toast.success(conversation.is_group ? "Du har forladt gruppen" : "Samtalen er slettet");
+    } catch (error) {
+      toast.error("Kunne ikke slette samtalen");
+    }
+    setShowDeleteDialog(false);
+  };
+
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "w-full p-4 flex items-center gap-3 text-left hover:bg-accent/50 transition-colors",
-        isSelected && "bg-accent"
-      )}
-    >
-      <div className="relative">
-        <Avatar>
-          <AvatarFallback className="bg-primary/10">
-            {conversation.is_group ? (
-              <Users className="h-4 w-4" />
-            ) : (
-              initials || <User className="h-4 w-4" />
-            )}
-          </AvatarFallback>
-        </Avatar>
-        {!conversation.is_group && (
-          <OnlineIndicator 
-            isOnline={isOtherOnline} 
-            className="absolute -bottom-0.5 -right-0.5"
-          />
+    <>
+      <div
+        className={cn(
+          "group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200",
+          isSelected 
+            ? "bg-primary text-primary-foreground shadow-md" 
+            : "hover:bg-accent/60"
         )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <span className={cn(
-            "font-medium truncate",
-            unreadCount > 0 && "font-bold"
+        onClick={onClick}
+      >
+        {/* Avatar with online indicator */}
+        <div className="relative flex-shrink-0">
+          <Avatar className={cn(
+            "h-12 w-12 transition-transform",
+            isSelected ? "ring-2 ring-primary-foreground/30" : ""
           )}>
-            {displayName}
-          </span>
-          {unreadCount > 0 && (
-            <Badge variant="default" className="shrink-0 h-5 min-w-5 flex items-center justify-center">
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </Badge>
+            <AvatarFallback className={cn(
+              "text-sm font-medium",
+              isSelected ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary"
+            )}>
+              {conversation.is_group ? (
+                <Users className="h-5 w-5" />
+              ) : (
+                initials || <User className="h-5 w-5" />
+              )}
+            </AvatarFallback>
+          </Avatar>
+          {!conversation.is_group && (
+            <OnlineIndicator 
+              isOnline={isOtherOnline} 
+              className="absolute -bottom-0.5 -right-0.5 ring-2 ring-background"
+            />
           )}
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span>
-            {formatDistanceToNow(new Date(conversation.updated_at), {
-              addSuffix: true,
-              locale: da,
-            })}
-          </span>
-          {conversation.is_group && onlineMemberCount > 0 && (
-            <span className="text-green-600">
-              • {onlineMemberCount} online
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className={cn(
+              "font-medium truncate",
+              unreadCount > 0 && !isSelected && "font-bold"
+            )}>
+              {displayName}
             </span>
-          )}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {unreadCount > 0 && !isSelected && (
+                <Badge 
+                  variant="default" 
+                  className="h-5 min-w-5 flex items-center justify-center text-xs px-1.5 animate-in zoom-in-50"
+                >
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          <div className={cn(
+            "flex items-center gap-2 text-sm mt-0.5",
+            isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
+          )}>
+            <span className="truncate">
+              {formatDistanceToNow(new Date(conversation.updated_at), {
+                addSuffix: true,
+                locale: da,
+              })}
+            </span>
+            {conversation.is_group && onlineMemberCount > 0 && (
+              <span className={cn(
+                "flex items-center gap-1",
+                isSelected ? "text-primary-foreground/70" : "text-green-600"
+              )}>
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                {onlineMemberCount}
+              </span>
+            )}
+          </div>
         </div>
+
+        {/* Delete/Leave button - shows on hover */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0",
+                isSelected ? "hover:bg-primary-foreground/20 text-primary-foreground" : "hover:bg-accent"
+              )}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem 
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDeleteDialog(true);
+              }}
+              className="text-destructive focus:text-destructive"
+            >
+              {conversation.is_group ? (
+                <>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Forlad gruppe
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Slet samtale
+                </>
+              )}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-    </button>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {conversation.is_group ? "Forlad gruppe?" : "Slet samtale?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {conversation.is_group 
+                ? "Du vil ikke længere modtage beskeder fra denne gruppe. Du kan blive tilføjet igen af en administrator."
+                : "Denne handling vil slette hele samtalen og kan ikke fortrydes."
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteConversation.isPending}
+            >
+              {deleteConversation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              {conversation.is_group ? "Forlad" : "Slet"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
