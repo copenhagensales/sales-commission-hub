@@ -6,6 +6,7 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const EmployeeOnboardingView = lazy(() => import("./EmployeeOnboardingView"));
+const ExpectationsRamp = lazy(() => import("./ExpectationsRamp"));
 const LeaderOnboardingView = lazy(() => import("./LeaderOnboardingView"));
 const DrillLibrary = lazy(() => import("./DrillLibrary"));
 const OnboardingAdmin = lazy(() => import("./OnboardingAdmin"));
@@ -32,8 +33,9 @@ export default function OnboardingDashboard() {
         </Button>
         
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
           <TabsTrigger value="employee">Min Onboarding</TabsTrigger>
+          <TabsTrigger value="ramp">Forventninger</TabsTrigger>
           <TabsTrigger value="leader">Leder</TabsTrigger>
           <TabsTrigger value="drills">Drill-bibliotek</TabsTrigger>
           <TabsTrigger value="admin">Admin</TabsTrigger>
@@ -42,6 +44,10 @@ export default function OnboardingDashboard() {
         <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
           <TabsContent value="employee" className="space-y-4">
             <EmployeeOnboardingView />
+          </TabsContent>
+
+          <TabsContent value="ramp" className="space-y-4">
+            <ExpectationsRamp />
           </TabsContent>
 
           <TabsContent value="leader" className="space-y-4">
