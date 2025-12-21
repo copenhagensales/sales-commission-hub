@@ -97,8 +97,8 @@ export default function TimeTracking() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle afdelinger</SelectItem>
-              {departments?.map(dept => (
-                <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+              {departments?.map(team => (
+                <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
