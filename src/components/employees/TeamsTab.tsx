@@ -40,6 +40,8 @@ export function TeamsTab() {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [clientSearch, setClientSearch] = useState("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -262,7 +264,18 @@ export function TeamsTab() {
       client_ids: [],
       employee_ids: [],
     });
+    setClientSearch("");
+    setEmployeeSearch("");
   };
+
+  // Filtered lists for search
+  const filteredClients = clients.filter((client) =>
+    client.name.toLowerCase().includes(clientSearch.toLowerCase())
+  );
+
+  const filteredEmployees = employees.filter((emp) =>
+    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(employeeSearch.toLowerCase())
+  );
 
   const openCreate = () => {
     setEditingTeam(null);
@@ -509,11 +522,17 @@ export function TeamsTab() {
                     {formData.client_ids.length} valgt
                   </Badge>
                 </div>
+                <Input
+                  placeholder="Søg efter kunde..."
+                  value={clientSearch}
+                  onChange={(e) => setClientSearch(e.target.value)}
+                  className="mb-2"
+                />
                 <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto border rounded-md p-3">
-                  {clients.length === 0 ? (
+                  {filteredClients.length === 0 ? (
                     <p className="text-sm text-muted-foreground col-span-2">Ingen kunder fundet</p>
                   ) : (
-                    clients.map((client) => (
+                    filteredClients.map((client) => (
                       <div key={client.id} className="flex items-center gap-2">
                         <Checkbox
                           id={`client-${client.id}`}
@@ -540,11 +559,17 @@ export function TeamsTab() {
                     {formData.employee_ids.length} valgt
                   </Badge>
                 </div>
+                <Input
+                  placeholder="Søg efter medarbejder..."
+                  value={employeeSearch}
+                  onChange={(e) => setEmployeeSearch(e.target.value)}
+                  className="mb-2"
+                />
                 <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto border rounded-md p-3">
-                  {employees.length === 0 ? (
+                  {filteredEmployees.length === 0 ? (
                     <p className="text-sm text-muted-foreground col-span-2">Ingen medarbejdere fundet</p>
                   ) : (
-                    employees.map((emp) => (
+                    filteredEmployees.map((emp) => (
                       <div key={emp.id} className="flex items-center gap-2">
                         <Checkbox
                           id={`emp-${emp.id}`}
