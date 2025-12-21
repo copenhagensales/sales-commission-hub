@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, Plus, Pencil, Trash2, GripVertical } from "lucide-react";
+import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -329,18 +329,234 @@ const DashboardSettings = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="design" className="mt-6">
+          <TabsContent value="design" className="mt-6 space-y-6">
+            {/* Farvetema */}
             <Card>
               <CardHeader>
-                <CardTitle>Design</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Palette className="h-5 w-5" />
+                  Farvetema
+                </CardTitle>
                 <CardDescription>
-                  Tilpas udseendet af dine dashboards
+                  Vælg farvepaletten for dit dashboard
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Designindstillinger kommer snart...</p>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { name: "Standard", colors: ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"] },
+                    { name: "Mørk", colors: ["#6366f1", "#8b5cf6", "#ec4899", "#14b8a6"] },
+                    { name: "Professionel", colors: ["#1e40af", "#0f766e", "#b45309", "#991b1b"] },
+                    { name: "Pastel", colors: ["#93c5fd", "#86efac", "#fcd34d", "#fca5a5"] },
+                  ].map((theme) => (
+                    <div
+                      key={theme.name}
+                      className="border rounded-lg p-3 cursor-pointer hover:border-primary transition-colors"
+                    >
+                      <div className="flex gap-1 mb-2">
+                        {theme.colors.map((color, i) => (
+                          <div
+                            key={i}
+                            className="h-6 flex-1 rounded"
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-sm font-medium text-center">{theme.name}</p>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
+
+            {/* Layout */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Layout className="h-5 w-5" />
+                  Layout
+                </CardTitle>
+                <CardDescription>
+                  Konfigurer layoutet og spacing
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Antal kolonner</Label>
+                    <Select defaultValue="4">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="2">2 kolonner</SelectItem>
+                        <SelectItem value="3">3 kolonner</SelectItem>
+                        <SelectItem value="4">4 kolonner</SelectItem>
+                        <SelectItem value="6">6 kolonner</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Afstand mellem kort</Label>
+                    <Select defaultValue="medium">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="small">Lille (8px)</SelectItem>
+                        <SelectItem value="medium">Medium (16px)</SelectItem>
+                        <SelectItem value="large">Stor (24px)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Typografi */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Type className="h-5 w-5" />
+                  Typografi
+                </CardTitle>
+                <CardDescription>
+                  Vælg skrifttyper og størrelser
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Overskrift font</Label>
+                    <Select defaultValue="inter">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="inter">Inter</SelectItem>
+                        <SelectItem value="roboto">Roboto</SelectItem>
+                        <SelectItem value="poppins">Poppins</SelectItem>
+                        <SelectItem value="montserrat">Montserrat</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>KPI værdi størrelse</Label>
+                    <Select defaultValue="large">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="small">Lille (24px)</SelectItem>
+                        <SelectItem value="medium">Medium (32px)</SelectItem>
+                        <SelectItem value="large">Stor (48px)</SelectItem>
+                        <SelectItem value="xlarge">Ekstra stor (64px)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Kort styling */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Square className="h-5 w-5" />
+                  Kort styling
+                </CardTitle>
+                <CardDescription>
+                  Tilpas udseendet af KPI-kortene
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Hjørner</Label>
+                    <Select defaultValue="rounded">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Ingen</SelectItem>
+                        <SelectItem value="small">Små (4px)</SelectItem>
+                        <SelectItem value="rounded">Runde (8px)</SelectItem>
+                        <SelectItem value="large">Store (16px)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Skygge</Label>
+                    <Select defaultValue="medium">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Ingen</SelectItem>
+                        <SelectItem value="small">Let</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="large">Kraftig</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Border</Label>
+                    <Select defaultValue="thin">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Ingen</SelectItem>
+                        <SelectItem value="thin">Tynd (1px)</SelectItem>
+                        <SelectItem value="medium">Medium (2px)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Animationer */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  Animationer
+                </CardTitle>
+                <CardDescription>
+                  Konfigurer animationer og overgange
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Fade-in animation</p>
+                    <p className="text-sm text-muted-foreground">Kort fader ind ved indlæsning</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Tal animation</p>
+                    <p className="text-sm text-muted-foreground">KPI-værdier tæller op</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Hover effekter</p>
+                    <p className="text-sm text-muted-foreground">Kort løfter sig ved hover</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-end">
+              <Button disabled>
+                Gem designindstillinger
+              </Button>
+            </div>
           </TabsContent>
         </Tabs>
 
