@@ -4601,6 +4601,50 @@ export type Database = {
           },
         ]
       }
+      team_standard_shifts: {
+        Row: {
+          break_end: string | null
+          break_start: string | null
+          created_at: string
+          end_time: string
+          id: string
+          name: string
+          start_time: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          break_end?: string | null
+          break_start?: string | null
+          created_at?: string
+          end_time: string
+          id?: string
+          name: string
+          start_time: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          break_end?: string | null
+          break_start?: string | null
+          created_at?: string
+          end_time?: string
+          id?: string
+          name?: string
+          start_time?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_standard_shifts_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
           assistant_team_leader_id: string | null
