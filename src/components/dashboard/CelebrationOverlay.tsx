@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { PartyPopper, Sparkles, Star, Heart, Flame, Zap } from "lucide-react";
 
 interface CelebrationOverlayProps {
@@ -266,10 +267,11 @@ export const CelebrationOverlay = ({
   };
 
 
-  return (
+  return createPortal(
     <div 
       className="fixed inset-0 z-[9999] overflow-hidden cursor-pointer"
       onClick={handleClose}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Backdrop */}
       <div 
@@ -414,6 +416,7 @@ export const CelebrationOverlay = ({
           50% { opacity: 1; }
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 };
