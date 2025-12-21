@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle, TrendingUp, Phone, Users, Award } from "lucide-react";
+import { BarChart3, Plus, Pencil, Trash2, GripVertical, Palette, Layout, Type, Sparkles, Square, Circle, TrendingUp, Phone, Users, Award, PartyPopper, Flame, Star, Zap, Heart, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,7 +44,35 @@ interface DashboardTheme {
   borderRadius: "none" | "small" | "medium" | "large";
   fontSize: "small" | "medium" | "large" | "xlarge";
   animations: boolean;
+  // Celebration popup settings
+  celebrationEnabled: boolean;
+  celebrationEffect: "fireworks" | "confetti" | "stars" | "hearts" | "flames" | "sparkles";
+  celebrationDuration: number; // seconds
+  celebrationTrigger: "any_update" | "increase_only" | "goal_reached";
 }
+
+const CELEBRATION_EFFECTS = [
+  { value: "fireworks", label: "Fyrværkeri", icon: PartyPopper, description: "Eksplosive farver" },
+  { value: "confetti", label: "Konfetti", icon: Sparkles, description: "Festlige papirstykker" },
+  { value: "stars", label: "Stjerner", icon: Star, description: "Glitrende stjerner" },
+  { value: "hearts", label: "Hjerter", icon: Heart, description: "Flyvende hjerter" },
+  { value: "flames", label: "Flammer", icon: Flame, description: "Brændende succes" },
+  { value: "sparkles", label: "Gnister", icon: Zap, description: "Elektriske gnister" },
+];
+
+const CELEBRATION_TRIGGERS = [
+  { value: "any_update", label: "Ved enhver opdatering" },
+  { value: "increase_only", label: "Kun ved stigning" },
+  { value: "goal_reached", label: "Når mål er nået" },
+];
+
+const DURATION_OPTIONS = [
+  { value: 2, label: "2 sekunder" },
+  { value: 3, label: "3 sekunder" },
+  { value: 5, label: "5 sekunder" },
+  { value: 8, label: "8 sekunder" },
+  { value: 10, label: "10 sekunder" },
+];
 
 const KPI_TYPES = [
   { value: "number", label: "Antal" },
@@ -77,6 +105,10 @@ const PRESET_THEMES: DashboardTheme[] = [
     borderRadius: "large",
     fontSize: "large",
     animations: true,
+    celebrationEnabled: true,
+    celebrationEffect: "fireworks",
+    celebrationDuration: 5,
+    celebrationTrigger: "increase_only",
   },
   {
     id: "corporate",
@@ -89,6 +121,10 @@ const PRESET_THEMES: DashboardTheme[] = [
     borderRadius: "small",
     fontSize: "medium",
     animations: false,
+    celebrationEnabled: false,
+    celebrationEffect: "confetti",
+    celebrationDuration: 3,
+    celebrationTrigger: "goal_reached",
   },
   {
     id: "vibrant",
@@ -101,6 +137,10 @@ const PRESET_THEMES: DashboardTheme[] = [
     borderRadius: "large",
     fontSize: "xlarge",
     animations: true,
+    celebrationEnabled: true,
+    celebrationEffect: "stars",
+    celebrationDuration: 5,
+    celebrationTrigger: "any_update",
   },
   {
     id: "minimal",
@@ -113,6 +153,10 @@ const PRESET_THEMES: DashboardTheme[] = [
     borderRadius: "medium",
     fontSize: "medium",
     animations: false,
+    celebrationEnabled: false,
+    celebrationEffect: "sparkles",
+    celebrationDuration: 2,
+    celebrationTrigger: "goal_reached",
   },
 ];
 
@@ -158,6 +202,10 @@ const DashboardSettings = () => {
     borderRadius: "medium",
     fontSize: "large",
     animations: true,
+    celebrationEnabled: false,
+    celebrationEffect: "fireworks",
+    celebrationDuration: 5,
+    celebrationTrigger: "increase_only",
   });
 
   const [formData, setFormData] = useState({
@@ -329,6 +377,10 @@ const DashboardSettings = () => {
         borderRadius: "medium",
         fontSize: "large",
         animations: true,
+        celebrationEnabled: false,
+        celebrationEffect: "fireworks",
+        celebrationDuration: 5,
+        celebrationTrigger: "increase_only",
       });
     }
     setEditingTheme(null);
@@ -1155,6 +1207,140 @@ const DashboardSettings = () => {
                       setThemeFormData((prev) => ({ ...prev, animations: checked }))
                     }
                   />
+                </div>
+
+                {/* Celebration Popup Section */}
+                <div className="border rounded-lg p-4 space-y-4 bg-gradient-to-br from-purple-500/5 to-pink-500/5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <PartyPopper className="h-5 w-5 text-purple-500" />
+                      <div>
+                        <p className="font-semibold">Fejrings-popup</p>
+                        <p className="text-xs text-muted-foreground">Vis effekter når tal opdateres</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={themeFormData.celebrationEnabled}
+                      onCheckedChange={(checked) =>
+                        setThemeFormData((prev) => ({ ...prev, celebrationEnabled: checked }))
+                      }
+                    />
+                  </div>
+
+                  {themeFormData.celebrationEnabled && (
+                    <div className="space-y-4 pt-2 animate-fade-in">
+                      {/* Effect Selection */}
+                      <div className="space-y-2">
+                        <Label className="text-sm">Visuel effekt</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {CELEBRATION_EFFECTS.map((effect) => {
+                            const IconComponent = effect.icon;
+                            return (
+                              <div
+                                key={effect.value}
+                                className={`p-3 border rounded-lg cursor-pointer transition-all text-center ${
+                                  themeFormData.celebrationEffect === effect.value
+                                    ? "border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/50"
+                                    : "hover:border-muted-foreground hover:bg-muted/50"
+                                }`}
+                                onClick={() =>
+                                  setThemeFormData((prev) => ({
+                                    ...prev,
+                                    celebrationEffect: effect.value as DashboardTheme["celebrationEffect"],
+                                  }))
+                                }
+                              >
+                                <IconComponent className={`h-5 w-5 mx-auto mb-1 ${
+                                  themeFormData.celebrationEffect === effect.value 
+                                    ? "text-purple-500" 
+                                    : "text-muted-foreground"
+                                }`} />
+                                <p className="text-xs font-medium">{effect.label}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Trigger Selection */}
+                      <div className="space-y-2">
+                        <Label className="text-sm">Hvornår skal popup vises?</Label>
+                        <Select
+                          value={themeFormData.celebrationTrigger}
+                          onValueChange={(value) =>
+                            setThemeFormData((prev) => ({
+                              ...prev,
+                              celebrationTrigger: value as DashboardTheme["celebrationTrigger"],
+                            }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CELEBRATION_TRIGGERS.map((trigger) => (
+                              <SelectItem key={trigger.value} value={trigger.value}>
+                                {trigger.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Duration Selection */}
+                      <div className="space-y-2">
+                        <Label className="text-sm flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Varighed
+                        </Label>
+                        <div className="flex gap-2">
+                          {DURATION_OPTIONS.map((duration) => (
+                            <button
+                              key={duration.value}
+                              type="button"
+                              className={`flex-1 py-2 px-3 text-sm rounded-lg border transition-all ${
+                                themeFormData.celebrationDuration === duration.value
+                                  ? "border-purple-500 bg-purple-500/10 text-purple-600 font-medium"
+                                  : "hover:border-muted-foreground hover:bg-muted/50"
+                              }`}
+                              onClick={() =>
+                                setThemeFormData((prev) => ({
+                                  ...prev,
+                                  celebrationDuration: duration.value,
+                                }))
+                              }
+                            >
+                              {duration.value}s
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Preview */}
+                      <div className="p-3 rounded-lg bg-muted/30 border border-dashed">
+                        <p className="text-xs text-muted-foreground text-center mb-2">Preview af valgt effekt</p>
+                        <div className="flex items-center justify-center gap-3">
+                          {(() => {
+                            const effect = CELEBRATION_EFFECTS.find(e => e.value === themeFormData.celebrationEffect);
+                            if (!effect) return null;
+                            const IconComponent = effect.icon;
+                            return (
+                              <div className="flex items-center gap-2 p-2 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20">
+                                <IconComponent className="h-6 w-6 text-purple-500 animate-pulse" />
+                                <div>
+                                  <p className="text-sm font-medium">{effect.label}</p>
+                                  <p className="text-xs text-muted-foreground">{effect.description}</p>
+                                </div>
+                                <Badge variant="outline" className="ml-2">
+                                  {themeFormData.celebrationDuration}s
+                                </Badge>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
