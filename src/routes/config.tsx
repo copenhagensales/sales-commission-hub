@@ -79,6 +79,7 @@ import {
   LoginLog,
   TeamDashboard,
   FieldmarketingDashboardFull,
+  CphSalesDashboard,
   Messages,
 } from "./pages";
 import { SmartRedirect } from "./guards";
@@ -171,6 +172,7 @@ export const routes: RouteConfig[] = [
   { path: "/boards/sales", component: SalesDashboard, access: "public" },
   
   // Team Dashboards (full screen, no sidebar) - public access for TV displays
+  { path: "/dashboards/cph-sales", component: CphSalesDashboard, access: "public" },
   { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "public" },
   { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "public" },
   

@@ -91,6 +91,7 @@ export const LoginLog = lazyPage(() => import("@/pages/LoginLog"));
 // Team Dashboards
 export const TeamDashboard = lazyPage(() => import("@/pages/dashboards/TeamDashboard"));
 export const FieldmarketingDashboardFull = lazyPage(() => import("@/pages/dashboards/FieldmarketingDashboardFull"));
+export const CphSalesDashboard = lazyPage(() => import("@/pages/dashboards/CphSalesDashboard"));
 
 export const Messages = lazyPage(() => import("@/pages/Messages"));
 

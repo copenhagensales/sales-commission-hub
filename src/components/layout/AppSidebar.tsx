@@ -919,6 +919,13 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               {dashboardsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                <NavLink to="/dashboards/cph-sales" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/dashboards/cph-sales" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <BarChart3 className="h-4 w-4" />
+                  Dagsboard CPH Sales
+                </NavLink>
                 <NavLink to="/dashboards/fieldmarketing" onClick={handleNavClick} className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                   location.pathname === "/dashboards/fieldmarketing" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
