@@ -1,4 +1,3 @@
-import { MainLayout } from "@/components/layout/MainLayout";
 import { FinancialKpiCard } from "@/components/km-test/FinancialKpiCard";
 import { CostBreakdownChart } from "@/components/km-test/CostBreakdownChart";
 import { YearComparisonChart } from "@/components/km-test/YearComparisonChart";
@@ -8,21 +7,19 @@ import { PerformanceChart } from "@/components/km-test/PerformanceChart";
 import { MonthlyFixedCostsCard } from "@/components/km-test/MonthlyFixedCostsCard";
 import { summaryData, totalFixedCosts, totalFixedCostsPreviousYear, monthlyFixedCosts } from "@/data/financialData";
 import { TrendingUp, Wallet, PiggyBank, BarChart3 } from "lucide-react";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 
 export default function KmTest() {
   const contributionMarginPct = (summaryData.contributionMargin / summaryData.revenue) * 100;
   const profitMarginPct = (summaryData.resultBeforeTax / summaryData.revenue) * 100;
 
   return (
-    <MainLayout>
-      <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-        {/* Header */}
-        <div className="animate-fade-in">
-          <h1 className="text-3xl font-bold tracking-tight">Økonomi Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            {summaryData.period} • Copenhagen Sales ApS
-          </p>
-        </div>
+    <div className="min-h-screen bg-background p-6">
+      <DashboardHeader 
+        title="Økonomi Dashboard" 
+        subtitle={`${summaryData.period} • Copenhagen Sales ApS`}
+      />
+      <div className="space-y-6 max-w-[1600px] mx-auto">
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -77,6 +74,6 @@ export default function KmTest() {
         {/* Cost Details */}
         <CostDetailsTable />
       </div>
-    </MainLayout>
+    </div>
   );
 }
