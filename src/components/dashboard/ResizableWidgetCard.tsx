@@ -416,122 +416,26 @@ export function ResizableWidgetCard({
     >
       {/* Resize handle - bottom right corner */}
       <div 
-        className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center justify-center"
+        className="absolute bottom-1 right-1 w-5 h-5 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center justify-center"
         onMouseDown={handleResizeStart}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="w-3 h-3 border-r-2 border-b-2 border-muted-foreground/50 hover:border-primary" />
+        <div className="w-2.5 h-2.5 border-r-2 border-b-2 border-muted-foreground/50 hover:border-primary" />
       </div>
-      <CardContent className={cn("p-4 h-full flex flex-col", isLarge && "p-6")}>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-            <div 
-              className={cn("p-1.5 rounded-md", isLarge && "p-2")}
-              style={{ 
-                backgroundColor: colorTheme?.primary ? `${colorTheme.primary}20` : 'hsl(var(--primary) / 0.1)',
-                color: colorTheme?.primary || 'hsl(var(--primary))'
-              }}
-            >
-              {icon}
-            </div>
-          </div>
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {/* Size selector button */}
-            <div className="relative">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={handleSizeClick}
-              >
-                <span className="text-[10px] font-bold">{size.width}×{size.height}</span>
-              </Button>
-              {showSizeSelector && (
-                <div 
-                  className="absolute right-0 top-7 z-50 bg-popover border rounded-md shadow-lg p-2 min-w-[120px]"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <p className="text-xs text-muted-foreground mb-2 px-1">Størrelse</p>
-                  <div className="grid grid-cols-2 gap-1">
-                    {SIZE_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.label}
-                        onClick={() => handleSizeSelect(opt.cols, opt.rows)}
-                        className={cn(
-                          "text-xs px-2 py-1 rounded hover:bg-accent transition-colors",
-                          size.width === opt.cols && size.height === opt.rows && "bg-primary text-primary-foreground"
-                        )}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            >
-              <Settings2 className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            >
-              <Trash2 className="h-3 w-3 text-destructive" />
-            </Button>
-          </div>
-        </div>
 
-        {/* Content - grows to fill space */}
+      {/* Edit button - top right corner, faded until hover */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-2 right-2 h-7 w-7 opacity-30 group-hover:opacity-100 transition-opacity z-10 bg-background/50 hover:bg-background/80"
+        onClick={(e) => { e.stopPropagation(); onEdit(); }}
+      >
+        <Settings2 className="h-4 w-4" />
+      </Button>
+
+      <CardContent className="p-3 h-full flex flex-col">
+        {/* Content - full size */}
         {renderWidgetContent()}
-
-        {/* Footer */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground mt-auto pt-2">
-          <span className="flex items-center gap-1">
-            {timePeriodName}
-            {showComparison && <ArrowUpDown className="h-3 w-3 text-primary" />}
-          </span>
-          <span>{designName}</span>
-        </div>
-
-        {/* Feature badges */}
-        <div className="flex flex-wrap gap-1 mt-2">
-          {teamName && (
-            <span className="text-[10px] bg-orange-500/10 text-orange-500 px-1.5 py-0.5 rounded flex items-center gap-1">
-              <Users className="h-2.5 w-2.5" />
-              {teamName}
-            </span>
-          )}
-          {trackingScopeName && (
-            <span className="text-[10px] bg-violet-500/10 text-violet-500 px-1.5 py-0.5 rounded flex items-center gap-1">
-              <Users className="h-2.5 w-2.5" />
-              {trackingScopeName}
-            </span>
-          )}
-          {multiKpiCount && multiKpiCount > 1 && (
-            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-              Multi-KPI
-            </span>
-          )}
-          {showComparison && (
-            <span className="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded">
-              Sammenligning
-            </span>
-          )}
-          {targetValue && (
-            <span className="text-[10px] bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded">
-              Mål
-            </span>
-          )}
-        </div>
       </CardContent>
     </Card>
   );
