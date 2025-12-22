@@ -317,7 +317,7 @@ export function StaffEmployeesTab() {
                 onClick={() => setStatusFilter("inactive")}
                 className="h-7 px-3 text-xs"
               >
-                Inaktive ({inactiveCount})
+                Inaktive
               </Button>
               <Button
                 variant={statusFilter === "all" ? "default" : "ghost"}
