@@ -155,6 +155,8 @@ export default function ContractSign() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contract", id] });
       toast.success("Kontrakten er underskrevet");
+      // Scroll to top so user can see the "GODKENDT" badge
+      window.scrollTo({ top: 0, behavior: "smooth" });
     },
     onError: (err: any) => {
       console.error("Sign error:", err);
