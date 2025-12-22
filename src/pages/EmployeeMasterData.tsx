@@ -490,7 +490,12 @@ export default function EmployeeMasterData() {
         `${e.first_name} ${e.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.private_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.department?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    )
+    .sort((a, b) => {
+      const nameA = `${a.first_name} ${a.last_name}`.toLowerCase();
+      const nameB = `${b.first_name} ${b.last_name}`.toLowerCase();
+      return nameA.localeCompare(nameB, 'da');
+    });
 
   const activeCount = employees.filter((e) => e.is_active).length;
   const inactiveCount = employees.length - activeCount;
