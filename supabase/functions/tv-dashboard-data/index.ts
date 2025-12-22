@@ -143,23 +143,17 @@ Deno.serve(async (req) => {
         clientName = clientMap[clientId] || "Ukendt";
       }
 
-      // Count sale items where counts_as_sale = true
+      // Count sale items where product is mapped AND counts_as_sale = true
       let saleItemCount = 0;
       const saleItems = (sale as any).sale_items || [];
       
-      if (saleItems.length > 0) {
-        for (const item of saleItems) {
-          const product = item.products;
-          // Only count if product exists and counts_as_sale is true (default true if null)
-          const countsAsSale = product?.counts_as_sale !== false;
-          if (countsAsSale) {
-            const qty = item.quantity || 1;
-            saleItemCount += qty;
-          }
+      for (const item of saleItems) {
+        const product = item.products;
+        // Only count if product is mapped (product_id exists) AND counts_as_sale is explicitly true
+        if (product && product.id && product.counts_as_sale === true) {
+          const qty = item.quantity || 1;
+          saleItemCount += qty;
         }
-      } else {
-        // No sale items - count as 1 sale (backwards compatibility)
-        saleItemCount = 1;
       }
 
       if (saleItemCount > 0) {
