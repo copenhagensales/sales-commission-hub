@@ -1,4 +1,4 @@
-import { useState, useCallback, MouseEvent } from "react";
+import { useState, useCallback, MouseEvent, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -11,7 +11,8 @@ import {
   Users,
   TrendingUp,
   TrendingDown,
-  Minus
+  Minus,
+  GripHorizontal
 } from "lucide-react";
 
 // Grid configuration
@@ -82,6 +83,8 @@ export function ResizableWidgetCard({
   onResize,
 }: ResizableWidgetCardProps) {
   const [showSizeSelector, setShowSizeSelector] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const handleSizeClick = (e: MouseEvent) => {
     e.stopPropagation();
@@ -91,6 +94,45 @@ export function ResizableWidgetCard({
   const handleSizeSelect = (cols: number, rows: number) => {
     onResize({ width: cols, height: rows });
     setShowSizeSelector(false);
+  };
+
+  // Drag resize handler
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsResizing(true);
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = size.width;
+    const startHeight = size.height;
+    
+    // Calculate cell width based on grid
+    const gridElement = cardRef.current?.parentElement;
+    if (!gridElement) return;
+    const cellWidth = gridElement.clientWidth / GRID_COLS;
+    
+    const handleMouseMove = (moveEvent: globalThis.MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+      
+      // Calculate new size in grid units
+      const newWidth = Math.max(1, Math.min(GRID_COLS, Math.round(startWidth + deltaX / cellWidth)));
+      const newHeight = Math.max(1, Math.min(GRID_ROWS, Math.round(startHeight + deltaY / CELL_HEIGHT)));
+      
+      if (newWidth !== size.width || newHeight !== size.height) {
+        onResize({ width: newWidth, height: newHeight });
+      }
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   // Calculate trend display
@@ -130,21 +172,52 @@ export function ResizableWidgetCard({
         );
       
       case "leaderboard":
+        const leaderboardData = [
+          { name: "Martina Cubranovic", sales: 4, provision: "0 kr" },
+          { name: "Josefine Marie Eckerl Kaaring", sales: 13, provision: "0 kr" },
+          { name: "Oscar Jørgensen", sales: 12, provision: "0 kr" },
+          { name: "Noa Tejdell Raba", sales: 9, provision: "0 kr" },
+          { name: "Melissa Ol Child", sales: 9, provision: "0 kr" },
+          { name: "Marcus Bonde Tuxen", sales: 2, provision: "0 kr" },
+          { name: "Jonathan Goldschmidt", sales: 1, provision: "0 kr" },
+          { name: "Martin Lind Arlaud", sales: 45, provision: "0 kr" },
+        ];
+        const visibleRows = isLarge ? (size.height >= 3 ? 8 : 5) : 3;
+        
         return (
-          <div className="flex-1 flex flex-col">
-            <p className={cn("font-medium mb-1", isLarge ? "text-base" : "text-sm")}>{title}</p>
-            <p className={cn("text-muted-foreground mb-2", isLarge ? "text-sm" : "text-xs")}>{kpiLabel}</p>
-            <div className="flex-1 flex flex-col gap-1.5">
-              {[1, 2, 3].slice(0, isLarge ? 3 : 2).map((i) => (
-                <div key={i} className="flex items-center gap-2 p-1.5 rounded bg-muted/30">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex items-center gap-2 mb-3">
+              {icon}
+              <p className={cn("font-medium", isLarge ? "text-base" : "text-sm")}>{title}</p>
+            </div>
+            
+            {/* Table header */}
+            <div className="grid grid-cols-[40px_1fr_60px_80px] text-xs text-muted-foreground border-b border-border/50 pb-2 mb-1">
+              <span>#</span>
+              <span>Sælger</span>
+              <span className="text-center">Salg</span>
+              <span className="text-right">Provision</span>
+            </div>
+            
+            {/* Table rows */}
+            <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
+              {leaderboardData.slice(0, visibleRows).map((person, i) => (
+                <div 
+                  key={i} 
+                  className={cn(
+                    "grid grid-cols-[40px_1fr_60px_80px] items-center py-2 text-sm",
+                    i % 2 === 0 ? "bg-muted/20" : ""
+                  )}
+                >
                   <span className={cn(
-                    "w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold",
-                    i === 1 ? "bg-yellow-500/20 text-yellow-500" : 
-                    i === 2 ? "bg-gray-400/20 text-gray-400" : 
-                    "bg-orange-500/20 text-orange-500"
-                  )}>{i}</span>
-                  <span className="flex-1 text-xs truncate">Sælger {i}</span>
-                  <span className="text-xs font-medium">{(100 - i * 15)}</span>
+                    "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                    i === 0 ? "bg-green-500 text-white" : "text-muted-foreground"
+                  )}>
+                    {i + 1}
+                  </span>
+                  <span className="truncate pr-2">{person.name}</span>
+                  <span className="text-center font-medium">{person.sales}</span>
+                  <span className="text-right text-muted-foreground">{person.provision}</span>
                 </div>
               ))}
             </div>
@@ -324,11 +397,13 @@ export function ResizableWidgetCard({
 
   return (
     <Card 
+      ref={cardRef}
       className={cn(
         "relative group cursor-pointer transition-all hover:shadow-lg",
-        designClasses
+        designClasses,
+        isResizing && "select-none"
       )}
-      onClick={onEdit}
+      onClick={isResizing ? undefined : onEdit}
       style={{
         gridColumn: `span ${size.width}`,
         gridRow: `span ${size.height}`,
@@ -339,6 +414,14 @@ export function ResizableWidgetCard({
         } : {})
       }}
     >
+      {/* Resize handle - bottom right corner */}
+      <div 
+        className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center justify-center"
+        onMouseDown={handleResizeStart}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-3 h-3 border-r-2 border-b-2 border-muted-foreground/50 hover:border-primary" />
+      </div>
       <CardContent className={cn("p-4 h-full flex flex-col", isLarge && "p-6")}>
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
