@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { VideoPlayerDialog } from "@/components/onboarding/VideoPlayerDialog";
 import { DailyMessage } from "@/components/onboarding/DailyMessage";
 import { MyProgression } from "@/components/onboarding/MyProgression";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 export default function EmployeeOnboardingView() {
   const navigate = useNavigate();
@@ -111,7 +112,8 @@ export default function EmployeeOnboardingView() {
   }, {} as Record<number, typeof days>);
 
   return (
-    <div className="space-y-4">
+    <MainLayout>
+    <div className="space-y-4 p-6">
       {/* Navigation Tabs */}
       <Tabs value={currentTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
@@ -360,6 +362,7 @@ export default function EmployeeOnboardingView() {
       videoTitle={playingVideo?.title || ""}
       videoUrl={playingVideo?.video_url}
     />
-  </div>
+    </div>
+    </MainLayout>
   );
 }
