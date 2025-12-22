@@ -886,50 +886,50 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
     enabled: !!activeClientId,
   });
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{teamName} Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Oversigt over salg og performance</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-[240px] justify-start text-left font-normal",
-                  !selectedDate && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => date && setSelectedDate(date)}
-                initialFocus
-                className="pointer-events-auto"
-                locale={da}
-              />
-            </PopoverContent>
-          </Popover>
-          <div className="h-16 w-40 flex items-center justify-end">
-            {activeClient?.logo_url ? (
-              <img src={activeClient.logo_url} alt={activeClient.name} className="max-h-16 max-w-40 object-contain" />
-            ) : (
-              <div className="h-16 px-6 bg-muted rounded-lg flex items-center justify-center">
-                <span className="text-xl font-bold text-muted-foreground">{activeClient?.name || teamName}</span>
-              </div>
+  const datePickerContent = (
+    <div className="flex items-center gap-4">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              "w-[240px] justify-start text-left font-normal",
+              !selectedDate && "text-muted-foreground"
             )}
-          </div>
-        </div>
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="end">
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={(date) => date && setSelectedDate(date)}
+            initialFocus
+            className="pointer-events-auto"
+            locale={da}
+          />
+        </PopoverContent>
+      </Popover>
+      <div className="h-10 w-32 flex items-center justify-end">
+        {activeClient?.logo_url ? (
+          <img src={activeClient.logo_url} alt={activeClient.name} className="max-h-10 max-w-32 object-contain" />
+        ) : (
+          <span className="text-sm font-medium text-muted-foreground">{activeClient?.name || teamName}</span>
+        )}
       </div>
+    </div>
+  );
 
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <DashboardHeader 
+        title={`${teamName} Dashboard`}
+        subtitle="Oversigt over salg og performance"
+        rightContent={datePickerContent}
+      />
+      <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -1078,6 +1078,7 @@ const SingleClientDashboard = ({ clients, teamName }: { clients: TeamClient[]; t
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };
