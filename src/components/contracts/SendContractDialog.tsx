@@ -42,13 +42,11 @@ const employmentRequiredFields: RequiredField[] = [
   { key: "standard_start_time", label: "Arbejdstid", check: (e) => !!e.standard_start_time },
 ];
 
-// Amendment requires identity + salary info
+// Amendment requires identity info (salary no longer required)
 const amendmentRequiredFields: RequiredField[] = [
   ...baseRequiredFields,
   { key: "cpr_number", label: "CPR-nummer", check: (e) => !!e.cpr_number },
   { key: "job_title", label: "Stilling", check: (e) => !!e.job_title },
-  { key: "salary_type", label: "Løntype", check: (e) => !!e.salary_type },
-  { key: "salary_amount", label: "Lønbeløb", check: (e) => e.salary_amount !== null && e.salary_amount !== undefined },
 ];
 
 // Company car requires identity + address
