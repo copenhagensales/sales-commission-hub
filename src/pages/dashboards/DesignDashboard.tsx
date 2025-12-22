@@ -369,13 +369,6 @@ export default function DesignDashboard() {
             <h1 className="text-xl font-bold">Design Dashboard</h1>
           </div>
           <div className="flex items-center gap-3">
-            <Button 
-              variant={isDesignPanelOpen ? "default" : "outline"} 
-              onClick={() => setIsDesignPanelOpen(!isDesignPanelOpen)}
-            >
-              <Palette className="h-4 w-4 mr-2" />
-              Design
-            </Button>
             <Button>
               <Save className="h-4 w-4 mr-2" />
               Gem Dashboard
@@ -393,14 +386,11 @@ export default function DesignDashboard() {
       </div>
 
       {/* Main content area - Dashboard Canvas as main view */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 overflow-hidden relative">
         {/* Dashboard Canvas - Full size view */}
-        <div className={cn(
-          "flex-1 overflow-auto p-6 transition-all",
-          isDesignPanelOpen ? "pr-0" : ""
-        )}>
+        <div className="absolute inset-0 overflow-auto">
           <div 
-            className="relative rounded-lg overflow-hidden bg-muted/10 p-4"
+            className="relative min-h-full p-4"
             style={{ minHeight: `${CELL_HEIGHT * 4}px` }}
           >
             {/* Grid cells background - only show when design panel is open */}
@@ -429,14 +419,8 @@ export default function DesignDashboard() {
                 </div>
                 <h3 className="font-semibold text-lg mb-2">Ingen widgets endnu</h3>
                 <p className="text-muted-foreground max-w-sm mb-4">
-                  Åbn Design panelet og tilføj widgets
+                  Brug knapperne i højre hjørne for at tilføje widgets
                 </p>
-                {!isDesignPanelOpen && (
-                  <Button onClick={() => setIsDesignPanelOpen(true)}>
-                    <Palette className="h-4 w-4 mr-2" />
-                    Åbn Design
-                  </Button>
-                )}
               </div>
             ) : (
               <div 
@@ -482,57 +466,43 @@ export default function DesignDashboard() {
           </div>
         </div>
 
-        {/* Design Panel - Sidebar */}
-        {isDesignPanelOpen && (
-          <div className="w-80 shrink-0 border-l bg-background overflow-y-auto">
-            <div className="p-4 space-y-4">
-              {/* Add Widget Section */}
-              <Card>
-                <CardHeader className="pb-2 px-3 pt-3">
-                  <CardTitle className="text-sm">Tilføj Widget</CardTitle>
-                  <CardDescription className="text-xs">Konfigurer og tilføj widgets</CardDescription>
-                </CardHeader>
-                <CardContent className="px-3 pb-3 space-y-2">
-                  <Button onClick={openAddWidgetDialog} className="w-full" size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Tilføj ny widget
-                  </Button>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full" size="sm">
-                        <Palette className="h-4 w-4 mr-2" />
-                        Vælg Design
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-64" align="start">
-                      <div className="space-y-2">
-                        <h4 className="font-medium text-sm">Vælg Design</h4>
-                        <div className="grid grid-cols-2 gap-2">
-                          {activeDesignTypes.map((design) => (
-                            <div
-                              key={design.id}
-                              onClick={() => setGlobalDesign(design.id)}
-                              className={cn(
-                                "p-2 rounded-lg border-2 cursor-pointer transition-all",
-                                globalDesign === design.id 
-                                  ? "border-primary bg-primary/5 ring-2 ring-primary/20" 
-                                  : "border-border hover:border-primary/50"
-                              )}
-                            >
-                              <div className={cn("h-6 rounded-md mb-1", design.preview)} />
-                              <p className="text-xs font-medium text-center">{design.name}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </CardContent>
-              </Card>
-
-            </div>
-          </div>
-        )}
+        {/* Floating action buttons - bottom right */}
+        <div className="absolute bottom-6 right-6 flex flex-col gap-2 z-20 opacity-40 hover:opacity-100 transition-opacity duration-300">
+          <Button onClick={openAddWidgetDialog} size="sm" className="shadow-lg">
+            <Plus className="h-4 w-4 mr-2" />
+            Tilføj widget
+          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button size="sm" className="shadow-lg">
+                <Palette className="h-4 w-4 mr-2" />
+                Vælg Design
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64" align="end" side="top">
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">Vælg Design</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {activeDesignTypes.map((design) => (
+                    <div
+                      key={design.id}
+                      onClick={() => setGlobalDesign(design.id)}
+                      className={cn(
+                        "p-2 rounded-lg border-2 cursor-pointer transition-all",
+                        globalDesign === design.id 
+                          ? "border-primary bg-primary/5 ring-2 ring-primary/20" 
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      <div className={cn("h-6 rounded-md mb-1", design.preview)} />
+                      <p className="text-xs font-medium text-center">{design.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {/* Widget Configuration Dialog */}
