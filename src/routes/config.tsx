@@ -69,8 +69,6 @@ import {
   UpcomingHires,
   Some,
   TimeStamp,
-  TestBoard,
-  EconomicBoard,
   ClientSalesOverview,
   SalesDashboard,
   ClosingShifts,
@@ -174,8 +172,6 @@ export const routes: RouteConfig[] = [
   { path: "/recruitment/upcoming-interviews", component: UpcomingInterviews, access: "role", positionPermission: "menu_upcoming_interviews" },
   { path: "/recruitment/upcoming-hires", component: UpcomingHires, access: "role", positionPermission: "menu_upcoming_hires" },
 
-  { path: "/boards/test", component: TestBoard, access: "public" },
-  { path: "/boards/economic", component: EconomicBoard, access: "public" },
   { path: "/client-sales-overview", component: ClientSalesOverview, access: "role", positionPermission: "menu_sales" },
   { path: "/boards/sales", component: SalesDashboard, access: "public" },
   
