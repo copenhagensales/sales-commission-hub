@@ -435,10 +435,10 @@ export default function DesignDashboard() {
                   gap: '1rem'
                 }}
               >
-                {Array.from({ length: GRID_COLS * 4 }).map((_, i) => (
+                {Array.from({ length: GRID_COLS * 8 }).map((_, i) => (
                   <div 
                     key={i} 
-                    className="border border-dashed border-muted-foreground/20 rounded-lg"
+                    className="border border-dashed border-muted-foreground/20 rounded"
                   />
                 ))}
               </div>

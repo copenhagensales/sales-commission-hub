@@ -16,9 +16,9 @@ import {
 } from "lucide-react";
 
 // Grid configuration
-export const GRID_COLS = 6;
-export const GRID_ROWS = 4;
-export const CELL_HEIGHT = 120; // pixels per row
+export const GRID_COLS = 12;
+export const GRID_ROWS = 8;
+export const CELL_HEIGHT = 80; // pixels per row
 
 interface WidgetSize {
   width: number;  // in grid units (1-6)
