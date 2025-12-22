@@ -424,47 +424,68 @@ export default function DesignDashboard() {
               </p>
             </div>
           ) : (
-            <div 
-              className="grid gap-4"
-              style={{ 
-                gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-                gridAutoRows: `${CELL_HEIGHT}px`
-              }}
-            >
-              {placedWidgets.map((widget) => {
-                const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
-                const design = activeDesignTypes.find(d => d.id === globalDesign);
-                const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
-                const trackingScope = TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId);
-                const teamName = widget.limitToTeam && widget.teamId ? getTeamName(widget.teamId) : undefined;
-                
-                return (
-                  <ResizableWidgetCard
-                    key={widget.id}
-                    id={widget.id}
-                    title={widget.title || getWidgetTypeName(widget.widgetTypeId)}
-                    widgetType={widget.widgetTypeId}
-                    kpiLabel={getDisplayLabel(widget)}
-                    value={getExampleValue(widget)}
-                    size={{ width: widget.width, height: widget.height }}
-                    designClasses={getDesignClasses(globalDesign)}
-                    colorTheme={colorTheme}
-                    timePeriodName={timePeriod?.name}
-                    designName={design?.name}
-                    targetValue={widget.targetValue}
-                    showComparison={widget.showComparison}
-                    trackingScopeName={trackingScope?.id !== "all" ? trackingScope?.name : undefined}
-                    showTrend={widget.showTrend}
-                    trendValue={widget.showTrend ? getExampleTrend() : undefined}
-                    multiKpiCount={widget.kpiTypeIds.length > 1 ? widget.kpiTypeIds.length : undefined}
-                    icon={getWidgetTypeIcon(widget.widgetTypeId)}
-                    teamName={teamName}
-                    onEdit={() => openEditWidgetDialog(widget)}
-                    onRemove={() => removeWidget(widget.id)}
-                    onResize={(newSize) => resizeWidget(widget.id, newSize)}
+            <div className="relative">
+              {/* Grid overlay */}
+              <div 
+                className="absolute inset-0 pointer-events-none"
+                style={{ 
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+                  gridAutoRows: `${CELL_HEIGHT}px`,
+                  gap: '1rem'
+                }}
+              >
+                {Array.from({ length: GRID_COLS * 4 }).map((_, i) => (
+                  <div 
+                    key={i} 
+                    className="border border-dashed border-muted-foreground/20 rounded-lg"
                   />
-                );
-              })}
+                ))}
+              </div>
+              
+              {/* Widgets grid */}
+              <div 
+                className="grid gap-4 relative z-10"
+                style={{ 
+                  gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+                  gridAutoRows: `${CELL_HEIGHT}px`
+                }}
+              >
+                {placedWidgets.map((widget) => {
+                  const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
+                  const design = activeDesignTypes.find(d => d.id === globalDesign);
+                  const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
+                  const trackingScope = TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId);
+                  const teamName = widget.limitToTeam && widget.teamId ? getTeamName(widget.teamId) : undefined;
+                  
+                  return (
+                    <ResizableWidgetCard
+                      key={widget.id}
+                      id={widget.id}
+                      title={widget.title || getWidgetTypeName(widget.widgetTypeId)}
+                      widgetType={widget.widgetTypeId}
+                      kpiLabel={getDisplayLabel(widget)}
+                      value={getExampleValue(widget)}
+                      size={{ width: widget.width, height: widget.height }}
+                      designClasses={getDesignClasses(globalDesign)}
+                      colorTheme={colorTheme}
+                      timePeriodName={timePeriod?.name}
+                      designName={design?.name}
+                      targetValue={widget.targetValue}
+                      showComparison={widget.showComparison}
+                      trackingScopeName={trackingScope?.id !== "all" ? trackingScope?.name : undefined}
+                      showTrend={widget.showTrend}
+                      trendValue={widget.showTrend ? getExampleTrend() : undefined}
+                      multiKpiCount={widget.kpiTypeIds.length > 1 ? widget.kpiTypeIds.length : undefined}
+                      icon={getWidgetTypeIcon(widget.widgetTypeId)}
+                      teamName={teamName}
+                      onEdit={() => openEditWidgetDialog(widget)}
+                      onRemove={() => removeWidget(widget.id)}
+                      onResize={(newSize) => resizeWidget(widget.id, newSize)}
+                    />
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
