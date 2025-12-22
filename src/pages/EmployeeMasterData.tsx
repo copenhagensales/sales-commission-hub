@@ -829,7 +829,7 @@ export default function EmployeeMasterData() {
               <span className="text-sm text-muted-foreground">{t("employees.stats.total")}</span>
               <Users className="h-4 w-4 text-muted-foreground" />
             </div>
-            <div className="text-2xl font-bold">{employees.length}</div>
+            <div className="text-2xl font-bold">{activeCount + staffCount}</div>
           </div>
         </div>
 
