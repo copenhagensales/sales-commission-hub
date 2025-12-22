@@ -131,3 +131,6 @@ verify_jwt = true
 
 [functions.send-weekend-cleanup]
 verify_jwt = true
+
+[functions.tv-dashboard-data]
+verify_jwt = false
