@@ -5070,6 +5070,42 @@ export type Database = {
         }
         Relationships: []
       }
+      tv_board_access: {
+        Row: {
+          access_code: string
+          access_count: number | null
+          created_at: string | null
+          created_by: string | null
+          dashboard_slug: string
+          id: string
+          is_active: boolean | null
+          last_accessed_at: string | null
+          name: string | null
+        }
+        Insert: {
+          access_code: string
+          access_count?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          dashboard_slug: string
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          name?: string | null
+        }
+        Update: {
+          access_code?: string
+          access_count?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          dashboard_slug?: string
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          name?: string | null
+        }
+        Relationships: []
+      }
       user_menu_permissions: {
         Row: {
           created_at: string | null
@@ -5356,6 +5392,7 @@ export type Database = {
         Args: { p_employee_id: string; p_start_date?: string }
         Returns: number
       }
+      generate_access_code: { Args: never; Returns: string }
       get_agent_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_aggregated_product_types: {
         Args: never
