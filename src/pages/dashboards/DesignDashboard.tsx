@@ -386,88 +386,67 @@ export default function DesignDashboard() {
       </div>
 
       {/* Main content area - Dashboard Canvas as main view */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-auto relative">
         {/* Dashboard Canvas - Full size view */}
-        <div className="absolute inset-0 overflow-auto">
-          <div 
-            className="relative min-h-full p-4"
-            style={{ minHeight: `${CELL_HEIGHT * 4}px` }}
-          >
-            {/* Grid cells background - only show when design panel is open */}
-            {isDesignPanelOpen && (
-              <div 
-                className="absolute inset-4 grid gap-1 pointer-events-none"
-                style={{ 
-                  gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-                  gridTemplateRows: `repeat(4, ${CELL_HEIGHT}px)`,
-                }}
-              >
-                {Array.from({ length: GRID_COLS * 4 }).map((_, i) => (
-                  <div 
-                    key={i} 
-                    className="border border-dashed border-border/40 rounded-md bg-muted/20"
+        <div 
+          className="min-h-full w-full p-4"
+        >
+          {/* Content layer */}
+          {placedWidgets.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
+              <div className="p-4 rounded-full bg-muted/30 mb-4">
+                <Plus className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2">Ingen widgets endnu</h3>
+              <p className="text-muted-foreground max-w-sm mb-4">
+                Brug knapperne i højre hjørne for at tilføje widgets
+              </p>
+            </div>
+          ) : (
+            <div 
+              className="grid gap-4"
+              style={{ 
+                gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+                gridAutoRows: `${CELL_HEIGHT}px`
+              }}
+            >
+              {placedWidgets.map((widget) => {
+                const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
+                const design = activeDesignTypes.find(d => d.id === globalDesign);
+                const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
+                const trackingScope = TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId);
+                
+                return (
+                  <ResizableWidgetCard
+                    key={widget.id}
+                    id={widget.id}
+                    title={widget.title || getWidgetTypeName(widget.widgetTypeId)}
+                    kpiLabel={getDisplayLabel(widget)}
+                    value={getExampleValue(widget)}
+                    size={{ width: widget.width, height: widget.height }}
+                    designClasses={getDesignClasses(globalDesign)}
+                    colorTheme={colorTheme}
+                    timePeriodName={timePeriod?.name}
+                    designName={design?.name}
+                    targetValue={widget.targetValue}
+                    showComparison={widget.showComparison}
+                    trackingScopeName={trackingScope?.id !== "all" ? trackingScope?.name : undefined}
+                    showTrend={widget.showTrend}
+                    trendValue={widget.showTrend ? getExampleTrend() : undefined}
+                    multiKpiCount={widget.kpiTypeIds.length > 1 ? widget.kpiTypeIds.length : undefined}
+                    icon={getWidgetTypeIcon(widget.widgetTypeId)}
+                    onEdit={() => openEditWidgetDialog(widget)}
+                    onRemove={() => removeWidget(widget.id)}
+                    onResize={(newSize) => resizeWidget(widget.id, newSize)}
                   />
-                ))}
-              </div>
-            )}
-
-            {/* Content layer */}
-            {placedWidgets.length === 0 ? (
-              <div className="relative flex flex-col items-center justify-center h-[480px] text-center z-10">
-                <div className="p-4 rounded-full bg-background/80 backdrop-blur mb-4">
-                  <Plus className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h3 className="font-semibold text-lg mb-2">Ingen widgets endnu</h3>
-                <p className="text-muted-foreground max-w-sm mb-4">
-                  Brug knapperne i højre hjørne for at tilføje widgets
-                </p>
-              </div>
-            ) : (
-              <div 
-                className="relative grid gap-4 z-10"
-                style={{ 
-                  gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-                  gridAutoRows: `${CELL_HEIGHT}px`
-                }}
-              >
-                {placedWidgets.map((widget) => {
-                  const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
-                  const design = activeDesignTypes.find(d => d.id === globalDesign);
-                  const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
-                  const trackingScope = TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId);
-                  
-                  return (
-                    <ResizableWidgetCard
-                      key={widget.id}
-                      id={widget.id}
-                      title={widget.title || getWidgetTypeName(widget.widgetTypeId)}
-                      kpiLabel={getDisplayLabel(widget)}
-                      value={getExampleValue(widget)}
-                      size={{ width: widget.width, height: widget.height }}
-                      designClasses={getDesignClasses(globalDesign)}
-                      colorTheme={colorTheme}
-                      timePeriodName={timePeriod?.name}
-                      designName={design?.name}
-                      targetValue={widget.targetValue}
-                      showComparison={widget.showComparison}
-                      trackingScopeName={trackingScope?.id !== "all" ? trackingScope?.name : undefined}
-                      showTrend={widget.showTrend}
-                      trendValue={widget.showTrend ? getExampleTrend() : undefined}
-                      multiKpiCount={widget.kpiTypeIds.length > 1 ? widget.kpiTypeIds.length : undefined}
-                      icon={getWidgetTypeIcon(widget.widgetTypeId)}
-                      onEdit={() => openEditWidgetDialog(widget)}
-                      onRemove={() => removeWidget(widget.id)}
-                      onResize={(newSize) => resizeWidget(widget.id, newSize)}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Floating action buttons - bottom right */}
-        <div className="absolute bottom-6 right-6 flex flex-col gap-2 z-20 opacity-40 hover:opacity-100 transition-opacity duration-300">
+        {/* Floating action buttons - bottom right, always on top */}
+        <div className="fixed bottom-6 right-6 flex flex-col gap-2 z-50 opacity-40 hover:opacity-100 transition-opacity duration-300">
           <Button onClick={openAddWidgetDialog} size="sm" className="shadow-lg">
             <Plus className="h-4 w-4 mr-2" />
             Tilføj widget
