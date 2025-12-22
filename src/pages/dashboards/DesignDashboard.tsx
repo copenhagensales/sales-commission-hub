@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,10 +87,22 @@ interface PlacedWidget {
   trackingScopeId?: string;  // Who/what the KPI tracks
   limitToTeam?: boolean;  // Limit data to selected team only
   teamId?: string;  // The team to limit data to
+  limitToClient?: boolean;  // Limit data to selected client only
+  clientId?: string;  // The client to limit data to
   x: number;
   y: number;
   width: number;
   height: number;
+}
+
+interface DbTeam {
+  id: string;
+  name: string;
+}
+
+interface DbClient {
+  id: string;
+  name: string;
 }
 
 const TIME_PERIODS: TimePeriod[] = [
@@ -158,6 +171,24 @@ export default function DesignDashboard() {
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [isDesignPanelOpen, setIsDesignPanelOpen] = useState(true);
   const [editingWidget, setEditingWidget] = useState<PlacedWidget | null>(null);
+  
+  // Database data
+  const [teams, setTeams] = useState<DbTeam[]>([]);
+  const [clients, setClients] = useState<DbClient[]>([]);
+
+  // Fetch teams and clients from database
+  useEffect(() => {
+    const fetchData = async () => {
+      const [teamsResult, clientsResult] = await Promise.all([
+        supabase.from('teams').select('id, name').order('name'),
+        supabase.from('clients').select('id, name').order('name')
+      ]);
+      
+      if (teamsResult.data) setTeams(teamsResult.data);
+      if (clientsResult.data) setClients(clientsResult.data);
+    };
+    fetchData();
+  }, []);
 
   const handleClose = () => {
     navigate(-1); // Go back to previous page
@@ -186,6 +217,8 @@ export default function DesignDashboard() {
   const [trackingScopeId, setTrackingScopeId] = useState<string>("all");
   const [limitToTeam, setLimitToTeam] = useState(false);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
+  const [limitToClient, setLimitToClient] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
 
   const currentWidgetConfig = activeWidgetTypes.find(w => w.value === selectedWidgetType);
   const supportsMultiKpi = currentWidgetConfig?.supportsMultiKpi || false;
@@ -209,6 +242,8 @@ export default function DesignDashboard() {
     setTrackingScopeId("all");
     setLimitToTeam(false);
     setSelectedTeamId("");
+    setLimitToClient(false);
+    setSelectedClientId("");
   };
 
   const openAddWidgetDialog = () => {
@@ -235,6 +270,8 @@ export default function DesignDashboard() {
     setTrackingScopeId(widget.trackingScopeId || "all");
     setLimitToTeam(widget.limitToTeam || false);
     setSelectedTeamId(widget.teamId || "");
+    setLimitToClient(widget.limitToClient || false);
+    setSelectedClientId(widget.clientId || "");
     setIsConfigDialogOpen(true);
   };
 
@@ -285,6 +322,8 @@ export default function DesignDashboard() {
       trackingScopeId: trackingScopeId !== "all" ? trackingScopeId : undefined,
       limitToTeam: limitToTeam || undefined,
       teamId: limitToTeam && selectedTeamId ? selectedTeamId : undefined,
+      limitToClient: limitToClient || undefined,
+      clientId: limitToClient && selectedClientId ? selectedClientId : undefined,
     };
 
     if (editingWidget) {
@@ -668,7 +707,10 @@ export default function DesignDashboard() {
                   </div>
                   <Switch
                     checked={limitToTeam}
-                    onCheckedChange={setLimitToTeam}
+                    onCheckedChange={(checked) => {
+                      setLimitToTeam(checked);
+                      if (checked) setLimitToClient(false);
+                    }}
                   />
                 </div>
                 
@@ -678,11 +720,43 @@ export default function DesignDashboard() {
                       <SelectValue placeholder="Vælg team" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="team-1">Team Alpha</SelectItem>
-                      <SelectItem value="team-2">Team Beta</SelectItem>
-                      <SelectItem value="team-3">Team Gamma</SelectItem>
-                      <SelectItem value="team-4">Salg København</SelectItem>
-                      <SelectItem value="team-5">Salg Aarhus</SelectItem>
+                      {teams.map((team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {/* Client filter option */}
+                <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">Begræns til kunde</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Vis kun data fra en specifik kunde
+                    </p>
+                  </div>
+                  <Switch
+                    checked={limitToClient}
+                    onCheckedChange={(checked) => {
+                      setLimitToClient(checked);
+                      if (checked) setLimitToTeam(false);
+                    }}
+                  />
+                </div>
+                
+                {limitToClient && (
+                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vælg kunde" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}
