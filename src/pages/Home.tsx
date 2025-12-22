@@ -748,10 +748,10 @@ const Home = () => {
 
         {/* Celebrations - Birthdays & Anniversaries */}
         {celebrations.length > 0 && (
-          <Card className="border-0 shadow-lg bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-950/20 dark:to-purple-950/20">
+          <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                <PartyPopper className="w-5 h-5 text-pink-500" />
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <PartyPopper className="w-5 h-5 text-primary" />
                 Fødselsdage & Jubilæer
               </CardTitle>
             </CardHeader>
@@ -760,14 +760,14 @@ const Home = () => {
                 {celebrations.map((celebration, idx) => (
                   <div 
                     key={idx}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl ${
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
                       celebration.isToday 
-                        ? "bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/40 dark:to-orange-900/40 ring-2 ring-amber-400" 
-                        : "bg-background/80"
+                        ? "bg-primary/10 border-primary/30 ring-2 ring-primary/50" 
+                        : "bg-muted/50 border-border"
                     }`}
                   >
                     {celebration.type === 'birthday' ? (
-                      <Cake className="w-5 h-5 text-pink-500" />
+                      <Cake className="w-5 h-5 text-primary" />
                     ) : (
                       <Award className="w-5 h-5 text-amber-500" />
                     )}
@@ -779,7 +779,7 @@ const Home = () => {
                           : `Fylder ${celebration.years} år`
                         }
                         {" • "}
-                        <span className={celebration.isToday ? "font-semibold text-amber-600 dark:text-amber-400" : ""}>
+                        <span className={celebration.isToday ? "font-semibold text-primary" : ""}>
                           {formatCelebrationDate(celebration.date, celebration.isToday)}
                         </span>
                       </p>
