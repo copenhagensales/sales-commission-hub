@@ -401,19 +401,18 @@ export default function EmployeeMasterData() {
         throw new Error(t("employees.toast.couldNotCreate"));
       }
 
-      // Create the employee record
-      const { error: createError } = await supabase
+      // Update the employee record that was created by the edge function with job_title and employment_start_date
+      const { error: updateError } = await supabase
         .from("employee_master_data")
-        .insert({
-          first_name: createData.first_name,
-          last_name: createData.last_name || "",
-          private_email: createData.email,
+        .update({
           job_title: createData.job_title,
-          is_active: true,
           employment_start_date: new Date().toISOString().split("T")[0],
-        });
+        })
+        .eq("private_email", createData.email);
 
-      if (createError) throw createError;
+      if (updateError) {
+        console.warn("Could not update job_title:", updateError);
+      }
 
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
       toast({ 
