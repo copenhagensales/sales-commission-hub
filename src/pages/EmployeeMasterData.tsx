@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -163,21 +163,25 @@ export default function EmployeeMasterData() {
     },
   });
 
-  // Fetch contracts to check signed status
+  // Fetch contracts to check status
   const { data: contracts = [] } = useQuery({
     queryKey: ["employee-contracts-status"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contracts")
-        .select("employee_id, status")
-        .eq("status", "signed");
+        .select("employee_id, status");
       if (error) throw error;
       return data;
     },
   });
 
-  const hasSignedContract = (employeeId: string) => {
-    return contracts.some(c => c.employee_id === employeeId);
+  // Get contract status for an employee (prioritized: signed > pending > rejected > none)
+  const getContractStatus = (employeeId: string): 'signed' | 'pending' | 'rejected' | 'none' => {
+    const employeeContracts = contracts.filter(c => c.employee_id === employeeId);
+    if (employeeContracts.some(c => c.status === 'signed')) return 'signed';
+    if (employeeContracts.some(c => c.status === 'pending_employee')) return 'pending';
+    if (employeeContracts.some(c => c.status === 'rejected')) return 'rejected';
+    return 'none';
   };
 
   const saveMutation = useMutation({
@@ -986,10 +990,35 @@ export default function EmployeeMasterData() {
                           <div className="flex items-center gap-2">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <FileText className={`h-3.5 w-3.5 ${hasSignedContract(employee.id) ? "text-green-500" : "text-muted-foreground/30"}`} />
+                                <div className="relative">
+                                  {getContractStatus(employee.id) === 'signed' ? (
+                                    <div className="flex items-center">
+                                      <FileText className="h-3.5 w-3.5 text-green-500" />
+                                      <Check className="h-2.5 w-2.5 text-green-500 absolute -right-1 -bottom-0.5" />
+                                    </div>
+                                  ) : getContractStatus(employee.id) === 'pending' ? (
+                                    <div className="flex items-center">
+                                      <FileText className="h-3.5 w-3.5 text-amber-500" />
+                                      <Clock className="h-2.5 w-2.5 text-amber-500 absolute -right-1 -bottom-0.5" />
+                                    </div>
+                                  ) : getContractStatus(employee.id) === 'rejected' ? (
+                                    <div className="flex items-center">
+                                      <FileText className="h-3.5 w-3.5 text-red-500" />
+                                      <X className="h-2.5 w-2.5 text-red-500 absolute -right-1 -bottom-0.5" />
+                                    </div>
+                                  ) : (
+                                    <FileText className="h-3.5 w-3.5 text-muted-foreground/30" />
+                                  )}
+                                </div>
                               </TooltipTrigger>
                               <TooltipContent>
-                                {hasSignedContract(employee.id) ? t("employees.table.contractSigned") : t("employees.table.noContractSigned")}
+                                {getContractStatus(employee.id) === 'signed' 
+                                  ? t("employees.table.contractSigned")
+                                  : getContractStatus(employee.id) === 'pending'
+                                  ? "Afventer underskrift"
+                                  : getContractStatus(employee.id) === 'rejected'
+                                  ? "Kontrakt afvist"
+                                  : t("employees.table.noContractSigned")}
                               </TooltipContent>
                             </Tooltip>
                             <span>{employee.first_name} {employee.last_name}</span>
