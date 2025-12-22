@@ -25,7 +25,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Shield, Eye, Edit, Lock, Play, Info, Layers, Database, User, Users, Globe, Search, Settings, Check, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Shield, Eye, Edit, Lock, Play, Info, Layers, Database, User, Users, Globe, Search, Settings, Check, X, ChevronDown } from "lucide-react";
 import { Json } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -555,9 +555,9 @@ export function PositionsTab() {
             </TabsContent>
 
             <TabsContent value="permissions" className="flex-1 flex flex-col min-h-0 overflow-hidden px-6 py-4">
-              {/* Search and category selector */}
+              {/* Search */}
               <div className="flex gap-4 mb-4 flex-shrink-0">
-                <div className="relative flex-1 max-w-xs">
+                <div className="relative flex-1 max-w-md">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Søg i rettigheder..."
@@ -567,89 +567,86 @@ export function PositionsTab() {
                     disabled={editingPosition && isOwnerPosition(editingPosition.name)}
                   />
                 </div>
-                <Select 
-                  value={activeCategory || "all"} 
-                  onValueChange={(v) => setActiveCategory(v === "all" ? null : v)}
-                >
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Alle kategorier" />
-                  </SelectTrigger>
-                  <SelectContent className="z-50 bg-popover">
-                    <SelectItem value="all">Alle kategorier</SelectItem>
-                    {PERMISSION_CATEGORIES.filter(c => !c.key.startsWith("tabs_")).map(cat => (
-                      <SelectItem key={cat.key} value={cat.key}>
-                        {cat.icon} {cat.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
 
-              {/* Categories grid */}
+              {/* Categories accordion */}
               <ScrollArea className="flex-1 min-h-0 -mx-2 px-2">
                 <TooltipProvider delayDuration={200}>
-                  <div className="grid grid-cols-2 gap-4 pb-4">
-                    {(activeCategory 
-                      ? filteredCategories.filter(c => c.key === activeCategory || c.key.startsWith(`tabs_${activeCategory.replace("menu_", "")}`))
-                      : filteredCategories
-                    ).filter(c => !c.key.startsWith("tabs_")).map((category) => {
+                  <div className="space-y-2 pb-4">
+                    {filteredCategories.filter(c => !c.key.startsWith("tabs_")).map((category) => {
                       const isOwnerLocked = editingPosition && isOwnerPosition(editingPosition.name);
                       const activeCount = isOwnerLocked 
                         ? category.permissions.length
                         : category.permissions.filter(p => getPermissionValue(p.key)).length;
                       
-                      // Find associated tab category
-                      const tabCategory = filteredCategories.find(c => 
+                      // Find associated tab categories for this menu
+                      const tabCategories = filteredCategories.filter(c => 
                         c.key.startsWith("tabs_") && 
                         c.key.replace("tabs_", "menu_").replace(/_.*$/, "") === category.key.replace("menu_", "").replace(/_.*$/, "")
                       );
+                      
+                      // Calculate total tabs count
+                      const totalTabsCount = tabCategories.reduce((sum, tc) => sum + tc.permissions.length, 0);
+                      const activeTabsCount = isOwnerLocked 
+                        ? totalTabsCount 
+                        : tabCategories.reduce((sum, tc) => sum + tc.permissions.filter(p => getPermissionValue(p.key)).length, 0);
+
+                      const isExpanded = activeCategory === category.key;
+                      const hasAllPermissions = activeCount === category.permissions.length && (totalTabsCount === 0 || activeTabsCount === totalTabsCount);
 
                       return (
                         <Card key={category.key} className={cn(
-                          "overflow-hidden",
-                          activeCount === category.permissions.length && !isOwnerLocked && "border-green-500/30"
+                          "overflow-hidden transition-colors",
+                          hasAllPermissions && !isOwnerLocked && "border-green-500/50",
+                          isExpanded && "ring-1 ring-primary/30"
                         )}>
-                          <CardHeader className="py-3 px-4 bg-muted/30">
-                            <CardTitle className="text-sm font-medium flex items-center justify-between">
-                              <span className="flex items-center gap-2">
-                                <span className="text-base">{category.icon}</span>
-                                {category.label}
-                              </span>
+                          {/* Clickable header */}
+                          <button
+                            type="button"
+                            onClick={() => setActiveCategory(isExpanded ? null : category.key)}
+                            className={cn(
+                              "w-full py-3 px-4 flex items-center justify-between gap-3 transition-colors text-left",
+                              isExpanded ? "bg-primary/10" : "bg-muted/30 hover:bg-muted/50"
+                            )}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="text-xl">{category.icon}</span>
+                              <div className="text-left">
+                                <div className="text-sm font-medium">{category.label}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {category.permissions.length} menupunkter
+                                  {totalTabsCount > 0 && ` • ${totalTabsCount} faner`}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
                               <Badge 
-                                variant={activeCount === category.permissions.length ? "default" : "secondary"}
+                                variant={hasAllPermissions ? "default" : "secondary"}
                                 className={cn(
                                   "text-xs",
-                                  activeCount === category.permissions.length && "bg-green-600"
+                                  hasAllPermissions && !isOwnerLocked && "bg-green-600"
                                 )}
                               >
-                                {activeCount}/{category.permissions.length}
+                                {activeCount + activeTabsCount}/{category.permissions.length + totalTabsCount}
                               </Badge>
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="p-0">
-                            <div className="divide-y">
-                              {category.permissions.map((permission) => (
-                                <PermissionRow
-                                  key={permission.key}
-                                  permission={permission}
-                                  isOwnerLocked={!!isOwnerLocked}
-                                  getPermissionValue={getPermissionValue}
-                                  handlePermissionChange={handlePermissionChange}
-                                  getScopeValue={getScopeValue}
-                                  handleScopeChange={handleScopeChange}
-                                />
-                              ))}
+                              <ChevronDown className={cn(
+                                "h-4 w-4 text-muted-foreground transition-transform",
+                                isExpanded && "rotate-180"
+                              )} />
                             </div>
-                            
-                            {/* Associated tabs */}
-                            {tabCategory && tabCategory.permissions.length > 0 && (
-                              <div className="border-t bg-muted/20">
-                                <div className="px-3 py-2 text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                                  <Layers className="h-3.5 w-3.5" />
-                                  Under-faner
+                          </button>
+                          
+                          {/* Expandable content */}
+                          {isExpanded && (
+                            <CardContent className="p-0">
+                              {/* Menu permissions */}
+                              <div className="border-t">
+                                <div className="px-4 py-2 bg-muted/20 text-xs font-medium text-muted-foreground flex items-center gap-1.5 border-b">
+                                  <Shield className="h-3.5 w-3.5" />
+                                  Menupunkter
                                 </div>
                                 <div className="divide-y">
-                                  {tabCategory.permissions.map((permission) => (
+                                  {category.permissions.map((permission) => (
                                     <PermissionRow
                                       key={permission.key}
                                       permission={permission}
@@ -658,13 +655,38 @@ export function PositionsTab() {
                                       handlePermissionChange={handlePermissionChange}
                                       getScopeValue={getScopeValue}
                                       handleScopeChange={handleScopeChange}
-                                      isSubItem
                                     />
                                   ))}
                                 </div>
                               </div>
-                            )}
-                          </CardContent>
+                              
+                              {/* Associated tabs - grouped by category */}
+                              {tabCategories.map((tabCategory) => (
+                                tabCategory.permissions.length > 0 && (
+                                  <div key={tabCategory.key} className="border-t bg-muted/10">
+                                    <div className="px-4 py-2 bg-muted/20 text-xs font-medium text-muted-foreground flex items-center gap-1.5 border-b">
+                                      <Layers className="h-3.5 w-3.5" />
+                                      {tabCategory.label}
+                                    </div>
+                                    <div className="divide-y">
+                                      {tabCategory.permissions.map((permission) => (
+                                        <PermissionRow
+                                          key={permission.key}
+                                          permission={permission}
+                                          isOwnerLocked={!!isOwnerLocked}
+                                          getPermissionValue={getPermissionValue}
+                                          handlePermissionChange={handlePermissionChange}
+                                          getScopeValue={getScopeValue}
+                                          handleScopeChange={handleScopeChange}
+                                          isSubItem
+                                        />
+                                      ))}
+                                    </div>
+                                  </div>
+                                )
+                              ))}
+                            </CardContent>
+                          )}
                         </Card>
                       );
                     })}
