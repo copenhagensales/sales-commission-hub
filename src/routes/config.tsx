@@ -90,6 +90,7 @@ import {
   DrillLibrary,
   OnboardingAdmin,
   ExpectationsRamp,
+  ExcelFieldMatcher,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -203,6 +204,8 @@ export const routes: RouteConfig[] = [
   { path: "/onboarding-program/leader", component: LeaderOnboardingView, access: "role", positionPermission: "menu_onboarding_leader" },
   { path: "/onboarding-program/drills", component: DrillLibrary, access: "protected" },
   { path: "/onboarding-program/admin", component: OnboardingAdmin, access: "role", positionPermission: "menu_onboarding_admin" },
+
+  { path: "/excel-field-matcher", component: ExcelFieldMatcher, access: "protected" },
 
   { path: "*", component: NotFound, access: "public" },
 ];
