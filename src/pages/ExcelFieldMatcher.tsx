@@ -81,7 +81,7 @@ export default function ExcelFieldMatcher() {
   useEffect(() => {
     const loadExcelFile = async () => {
       try {
-        const response = await fetch("/temp/employee-import.xlsx");
+        const response = await fetch(`/temp/employee-import.xlsx?t=${Date.now()}`);
         const arrayBuffer = await response.arrayBuffer();
         const data = new Uint8Array(arrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
