@@ -55,10 +55,29 @@ Deno.serve(async (req) => {
 
     console.log(`Fetching TV dashboard data for ${dashboard}, date: ${todayStr}`);
 
-    // Fetch today's sales
-    const { data: salesData, error: salesError } = await supabase
+    // Fetch sales with sale_items to calculate correct counts using product mapping
+    // This matches the logic in MG Test / product mapping
+    const { data: salesWithItems, error: salesError } = await supabase
       .from("sales")
-      .select("id, agent_name, sale_datetime, status, client_campaign_id")
+      .select(`
+        id, 
+        agent_name, 
+        sale_datetime, 
+        status, 
+        client_campaign_id,
+        dialer_campaign_id,
+        sale_items (
+          id,
+          quantity,
+          product_id,
+          products (
+            id,
+            name,
+            counts_as_sale,
+            client_campaign_id
+          )
+        )
+      `)
       .gte("sale_datetime", startOfDay)
       .lte("sale_datetime", endOfDay)
       .order("sale_datetime", { ascending: false });
@@ -67,39 +86,102 @@ Deno.serve(async (req) => {
       console.error("Sales error:", salesError);
     }
 
-    const sales = salesData || [];
-    console.log(`Found ${sales.length} sales`);
+    const sales = salesWithItems || [];
+    console.log(`Found ${sales.length} sales with items`);
 
-    // Fetch campaign and client names
-    const campaignIds = [...new Set(sales.map(s => s.client_campaign_id).filter(Boolean))] as string[];
-    let salesWithClients = sales;
+    // Fetch all clients
+    const { data: allClients } = await supabase
+      .from("clients")
+      .select("id, name");
+    
+    const clientMap: Record<string, string> = Object.fromEntries(
+      (allClients || []).map(c => [c.id, c.name])
+    );
 
-    if (campaignIds.length > 0) {
-      const { data: campaigns } = await supabase
-        .from("client_campaigns")
-        .select("id, name, client_id")
-        .in("id", campaignIds);
+    // Fetch campaign mappings (adversus -> client_campaign)
+    const { data: campaignMappings } = await supabase
+      .from("adversus_campaign_mappings")
+      .select("adversus_campaign_id, client_campaign_id");
+    
+    const adversusToCampaignMap: Record<string, string> = Object.fromEntries(
+      (campaignMappings || []).filter(m => m.client_campaign_id).map(m => [m.adversus_campaign_id, m.client_campaign_id!])
+    );
 
-      const clientIds = [...new Set((campaigns || []).map(c => c.client_id).filter(Boolean))];
-      let clientMap: Record<string, string> = {};
+    // Fetch client campaigns
+    const { data: clientCampaigns } = await supabase
+      .from("client_campaigns")
+      .select("id, name, client_id");
+    
+    const campaignToClientMap: Record<string, string> = Object.fromEntries(
+      (clientCampaigns || []).map(c => [c.id, c.client_id])
+    );
 
-      if (clientIds.length > 0) {
-        const { data: clients } = await supabase
-          .from("clients")
-          .select("id, name")
-          .in("id", clientIds);
-        clientMap = Object.fromEntries((clients || []).map(c => [c.id, c.name]));
+    // Calculate sales by client using product mapping and counts_as_sale flag
+    const salesByClient: Record<string, number> = {};
+    let totalCountedSales = 0;
+    const recentSales: any[] = [];
+
+    for (const sale of sales) {
+      // Determine client from sale
+      let clientId: string | null = null;
+      let clientName = "Ukendt";
+
+      // Try getting client from sale's client_campaign_id
+      if (sale.client_campaign_id) {
+        clientId = campaignToClientMap[sale.client_campaign_id] || null;
+      }
+      
+      // Fallback: try dialer_campaign_id -> adversus_campaign_mappings -> client_campaign -> client
+      if (!clientId && sale.dialer_campaign_id) {
+        const mappedCampaignId = adversusToCampaignMap[sale.dialer_campaign_id];
+        if (mappedCampaignId) {
+          clientId = campaignToClientMap[mappedCampaignId] || null;
+        }
       }
 
-      const campaignClientMap = Object.fromEntries(
-        (campaigns || []).map(c => [c.id, clientMap[c.client_id] || "Ukendt"])
-      );
+      if (clientId) {
+        clientName = clientMap[clientId] || "Ukendt";
+      }
 
-      salesWithClients = sales.map(s => ({
-        ...s,
-        client_name: s.client_campaign_id ? campaignClientMap[s.client_campaign_id] || "Ukendt" : "Ukendt"
-      }));
+      // Count sale items where counts_as_sale = true
+      let saleItemCount = 0;
+      const saleItems = (sale as any).sale_items || [];
+      
+      if (saleItems.length > 0) {
+        for (const item of saleItems) {
+          const product = item.products;
+          // Only count if product exists and counts_as_sale is true (default true if null)
+          const countsAsSale = product?.counts_as_sale !== false;
+          if (countsAsSale) {
+            const qty = item.quantity || 1;
+            saleItemCount += qty;
+          }
+        }
+      } else {
+        // No sale items - count as 1 sale (backwards compatibility)
+        saleItemCount = 1;
+      }
+
+      if (saleItemCount > 0) {
+        salesByClient[clientName] = (salesByClient[clientName] || 0) + saleItemCount;
+        totalCountedSales += saleItemCount;
+      }
+
+      // Add to recent sales
+      if (recentSales.length < 10) {
+        recentSales.push({
+          id: sale.id,
+          agent_name: sale.agent_name,
+          sale_datetime: sale.sale_datetime,
+          status: sale.status,
+          client_name: clientName,
+          items_count: saleItemCount
+        });
+      }
     }
+
+    console.log(`Sales by client:`, salesByClient);
+    console.log(`Total counted sales: ${totalCountedSales}`);
 
     // Fetch employee counts
     const { count: activeEmployees } = await supabase
@@ -121,25 +203,18 @@ Deno.serve(async (req) => {
       .gte("start_time", startOfDay)
       .lte("start_time", endOfDay);
 
-    // Calculate sales by client
-    const salesByClient = salesWithClients.reduce((acc: Record<string, number>, sale: any) => {
-      const clientName = sale.client_name || "Ukendt";
-      acc[clientName] = (acc[clientName] || 0) + 1;
-      return acc;
-    }, {});
-
-    const confirmedSales = salesWithClients.filter((s: any) => s.status === "confirmed").length;
-    const pendingSales = salesWithClients.filter((s: any) => s.status === "pending").length;
+    const confirmedSales = sales.filter((s: any) => s.status === "confirmed").length;
+    const pendingSales = sales.filter((s: any) => s.status === "pending").length;
 
     const response = {
       date: todayStr,
       timestamp: new Date().toISOString(),
       sales: {
-        total: salesWithClients.length,
+        total: totalCountedSales,
         confirmed: confirmedSales,
         pending: pendingSales,
         byClient: salesByClient,
-        recent: salesWithClients.slice(0, 10),
+        recent: recentSales,
       },
       employees: {
         active: activeEmployees || 0,
@@ -151,7 +226,8 @@ Deno.serve(async (req) => {
     };
 
     console.log("Response prepared:", JSON.stringify({
-      salesCount: response.sales.total,
+      salesTotal: response.sales.total,
+      salesByClient: response.sales.byClient,
       employeesActive: response.employees.active,
       calls: response.calls.today
     }));
