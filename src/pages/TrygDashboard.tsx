@@ -186,14 +186,13 @@ const TrygDashboard = () => {
                   <TableRow>
                     <TableHead>Sælger</TableHead>
                     <TableHead className="text-right">Antal</TableHead>
-                    <TableHead className="text-right">Omsætning</TableHead>
                     <TableHead className="text-right">Provision</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {agentList.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      <TableCell colSpan={3} className="text-center text-muted-foreground">
                         Ingen salg i dag
                       </TableCell>
                     </TableRow>
@@ -202,7 +201,6 @@ const TrygDashboard = () => {
                       <TableRow key={agent.name}>
                         <TableCell className="font-medium">{agent.name}</TableCell>
                         <TableCell className="text-right">{agent.salesCount}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(agent.revenue)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(agent.commission)}</TableCell>
                       </TableRow>
                     ))
@@ -223,14 +221,13 @@ const TrygDashboard = () => {
                   <TableRow>
                     <TableHead>Produkt</TableHead>
                     <TableHead className="text-right">Antal</TableHead>
-                    <TableHead className="text-right">Omsætning</TableHead>
                     <TableHead className="text-right">Provision</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {productList.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      <TableCell colSpan={3} className="text-center text-muted-foreground">
                         Ingen produkter solgt i dag
                       </TableCell>
                     </TableRow>
@@ -239,7 +236,6 @@ const TrygDashboard = () => {
                       <TableRow key={product.name}>
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell className="text-right">{product.quantity}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(product.revenue)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(product.commission)}</TableCell>
                       </TableRow>
                     ))
