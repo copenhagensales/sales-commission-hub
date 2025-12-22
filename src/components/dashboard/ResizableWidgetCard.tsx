@@ -27,6 +27,7 @@ interface WidgetSize {
 interface ResizableWidgetCardProps {
   id: string;
   title: string;
+  widgetType: string;  // Widget type for correct preview
   kpiLabel: string;
   value: string;
   size: WidgetSize;
@@ -60,6 +61,7 @@ const SIZE_OPTIONS: { cols: number; rows: number; label: string }[] = [
 export function ResizableWidgetCard({
   id,
   title,
+  widgetType,
   kpiLabel,
   value,
   size,
@@ -101,6 +103,224 @@ export function ResizableWidgetCard({
 
   const isLarge = size.width >= 3 || size.height >= 2;
   const isWide = size.width >= 4;
+
+  // Render different content based on widget type
+  const renderWidgetContent = () => {
+    switch (widgetType) {
+      case "table":
+        return (
+          <div className="flex-1 flex flex-col">
+            <p className={cn("font-medium mb-1", isLarge ? "text-base" : "text-sm")}>{title}</p>
+            <p className={cn("text-muted-foreground mb-2", isLarge ? "text-sm" : "text-xs")}>{kpiLabel}</p>
+            <div className="flex-1 border border-border/50 rounded-md overflow-hidden">
+              <div className="grid grid-cols-3 bg-muted/50 text-xs font-medium">
+                <div className="p-1.5 border-r border-border/50">Navn</div>
+                <div className="p-1.5 border-r border-border/50 text-right">Værdi</div>
+                <div className="p-1.5 text-right">%</div>
+              </div>
+              {[1, 2, 3].slice(0, isLarge ? 3 : 2).map((i) => (
+                <div key={i} className="grid grid-cols-3 text-xs border-t border-border/30">
+                  <div className="p-1.5 border-r border-border/30 text-muted-foreground">Sælger {i}</div>
+                  <div className="p-1.5 border-r border-border/30 text-right">{(Math.random() * 100).toFixed(0)}</div>
+                  <div className="p-1.5 text-right text-green-500">+{(Math.random() * 20).toFixed(1)}%</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      
+      case "leaderboard":
+        return (
+          <div className="flex-1 flex flex-col">
+            <p className={cn("font-medium mb-1", isLarge ? "text-base" : "text-sm")}>{title}</p>
+            <p className={cn("text-muted-foreground mb-2", isLarge ? "text-sm" : "text-xs")}>{kpiLabel}</p>
+            <div className="flex-1 flex flex-col gap-1.5">
+              {[1, 2, 3].slice(0, isLarge ? 3 : 2).map((i) => (
+                <div key={i} className="flex items-center gap-2 p-1.5 rounded bg-muted/30">
+                  <span className={cn(
+                    "w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold",
+                    i === 1 ? "bg-yellow-500/20 text-yellow-500" : 
+                    i === 2 ? "bg-gray-400/20 text-gray-400" : 
+                    "bg-orange-500/20 text-orange-500"
+                  )}>{i}</span>
+                  <span className="flex-1 text-xs truncate">Sælger {i}</span>
+                  <span className="text-xs font-medium">{(100 - i * 15)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      
+      case "bar_chart":
+        return (
+          <div className="flex-1 flex flex-col">
+            <p className={cn("font-medium mb-1", isLarge ? "text-base" : "text-sm")}>{title}</p>
+            <p className={cn("text-muted-foreground mb-2", isLarge ? "text-sm" : "text-xs")}>{kpiLabel}</p>
+            <div className="flex-1 flex items-end gap-1 px-2">
+              {[65, 80, 45, 90, 60, 75].slice(0, isWide ? 6 : 4).map((h, i) => (
+                <div 
+                  key={i} 
+                  className="flex-1 rounded-t transition-all"
+                  style={{ 
+                    height: `${h}%`, 
+                    backgroundColor: colorTheme?.primary || 'hsl(var(--primary))',
+                    opacity: 0.7 + (i * 0.05)
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      
+      case "line_chart":
+        return (
+          <div className="flex-1 flex flex-col">
+            <p className={cn("font-medium mb-1", isLarge ? "text-base" : "text-sm")}>{title}</p>
+            <p className={cn("text-muted-foreground mb-2", isLarge ? "text-sm" : "text-xs")}>{kpiLabel}</p>
+            <div className="flex-1 flex items-center justify-center">
+              <svg viewBox="0 0 100 40" className="w-full h-full max-h-16" preserveAspectRatio="none">
+                <path 
+                  d="M0,30 Q20,25 30,20 T50,15 T70,10 T100,5" 
+                  fill="none" 
+                  stroke={colorTheme?.primary || 'hsl(var(--primary))'} 
+                  strokeWidth="2"
+                />
+                <path 
+                  d="M0,30 Q20,25 30,20 T50,15 T70,10 T100,5 L100,40 L0,40 Z" 
+                  fill={colorTheme?.primary || 'hsl(var(--primary))'} 
+                  opacity="0.1"
+                />
+              </svg>
+            </div>
+          </div>
+        );
+      
+      case "pie_chart":
+        return (
+          <div className="flex-1 flex flex-col">
+            <p className={cn("font-medium mb-1", isLarge ? "text-base" : "text-sm")}>{title}</p>
+            <p className={cn("text-muted-foreground mb-2", isLarge ? "text-sm" : "text-xs")}>{kpiLabel}</p>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="relative w-12 h-12">
+                <svg viewBox="0 0 32 32" className="w-full h-full -rotate-90">
+                  <circle cx="16" cy="16" r="12" fill="none" stroke="hsl(var(--muted))" strokeWidth="6" />
+                  <circle 
+                    cx="16" cy="16" r="12" fill="none" 
+                    stroke={colorTheme?.primary || 'hsl(var(--primary))'} 
+                    strokeWidth="6" 
+                    strokeDasharray="50 75" 
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">67%</span>
+              </div>
+            </div>
+          </div>
+        );
+      
+      case "clock":
+        return (
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <p className={cn("font-bold", isWide ? "text-4xl" : isLarge ? "text-3xl" : "text-xl")}>
+              {new Date().toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+            <p className="text-muted-foreground text-sm mt-1">
+              {new Date().toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+          </div>
+        );
+      
+      case "goal_progress":
+        return (
+          <div className="flex-1 flex flex-col">
+            <p className={cn("font-medium mb-1", isLarge ? "text-base" : "text-sm")}>{title}</p>
+            <p className={cn("text-muted-foreground mb-2", isLarge ? "text-sm" : "text-xs")}>{kpiLabel}</p>
+            <div className="flex-1 flex flex-col justify-center gap-2">
+              <div className="flex justify-between text-xs">
+                <span>Fremgang</span>
+                <span className="font-medium">72%</span>
+              </div>
+              <div className="h-3 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full rounded-full transition-all"
+                  style={{ 
+                    width: '72%',
+                    backgroundColor: colorTheme?.primary || 'hsl(var(--primary))'
+                  }}
+                />
+              </div>
+              {targetValue && (
+                <p className="text-xs text-muted-foreground">Mål: {targetValue}</p>
+              )}
+            </div>
+          </div>
+        );
+      
+      case "activity_feed":
+        return (
+          <div className="flex-1 flex flex-col">
+            <p className={cn("font-medium mb-1", isLarge ? "text-base" : "text-sm")}>{title}</p>
+            <div className="flex-1 flex flex-col gap-1.5 overflow-hidden">
+              {['Nyt salg: 1.200 kr', 'Opkald afsluttet', 'Meeting kl. 14:00'].slice(0, isLarge ? 3 : 2).map((activity, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs p-1 rounded bg-muted/30">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                  <span className="truncate">{activity}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      
+      // Default: KPI card style (kpi_card, comparison_card, multi_kpi_card)
+      default:
+        return (
+          <div className="flex-1 flex flex-col justify-center">
+            <p className={cn("font-medium", isLarge ? "text-base" : "text-sm")}>{title}</p>
+            <p className={cn("text-muted-foreground line-clamp-2", isLarge ? "text-sm" : "text-xs")}>
+              {kpiLabel}
+              {multiKpiCount && multiKpiCount > 1 && (
+                <span className="ml-1 text-primary">({multiKpiCount} KPI'er)</span>
+              )}
+            </p>
+            
+            <div className="flex items-end gap-2 mt-2">
+              <p 
+                className={cn("font-bold", isWide ? "text-5xl" : isLarge ? "text-4xl" : "text-2xl")}
+                style={{ color: colorTheme?.primary }}
+              >
+                {value}
+              </p>
+              {getTrendIcon()}
+              {showTrend && trendValue !== undefined && (
+                <span className={cn(
+                  "text-sm font-medium",
+                  trendValue > 0 ? "text-green-500" : trendValue < 0 ? "text-red-500" : "text-muted-foreground"
+                )}>
+                  {trendValue > 0 ? "+" : ""}{trendValue}%
+                </span>
+              )}
+            </div>
+
+            {targetValue && (
+              <div className="flex items-center gap-1 text-xs mt-2">
+                <Target className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Mål: {targetValue}</span>
+                {isLarge && (
+                  <div className="flex-1 ml-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full rounded-full transition-all"
+                      style={{ 
+                        width: `${Math.min(100, (parseFloat(value.replace(/[^0-9.-]/g, '')) / targetValue) * 100)}%`,
+                        backgroundColor: colorTheme?.primary || 'hsl(var(--primary))'
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+    }
+  };
 
   return (
     <Card 
@@ -188,54 +408,7 @@ export function ResizableWidgetCard({
         </div>
 
         {/* Content - grows to fill space */}
-        <div className="flex-1 flex flex-col justify-center">
-          <p className={cn("font-medium", isLarge ? "text-base" : "text-sm")}>
-            {title}
-          </p>
-          <p className={cn("text-muted-foreground line-clamp-2", isLarge ? "text-sm" : "text-xs")}>
-            {kpiLabel}
-            {multiKpiCount && multiKpiCount > 1 && (
-              <span className="ml-1 text-primary">({multiKpiCount} KPI'er)</span>
-            )}
-          </p>
-          
-          <div className="flex items-end gap-2 mt-2">
-            <p 
-              className={cn("font-bold", isWide ? "text-5xl" : isLarge ? "text-4xl" : "text-2xl")}
-              style={{ color: colorTheme?.primary }}
-            >
-              {value}
-            </p>
-            {getTrendIcon()}
-            {showTrend && trendValue !== undefined && (
-              <span className={cn(
-                "text-sm font-medium",
-                trendValue > 0 ? "text-green-500" : trendValue < 0 ? "text-red-500" : "text-muted-foreground"
-              )}>
-                {trendValue > 0 ? "+" : ""}{trendValue}%
-              </span>
-            )}
-          </div>
-
-          {targetValue && (
-            <div className="flex items-center gap-1 text-xs mt-2">
-              <Target className="h-3 w-3 text-muted-foreground" />
-              <span className="text-muted-foreground">Mål: {targetValue}</span>
-              {/* Progress bar for large widgets */}
-              {isLarge && (
-                <div className="flex-1 ml-2 h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full rounded-full transition-all"
-                    style={{ 
-                      width: `${Math.min(100, (parseFloat(value.replace(/[^0-9.-]/g, '')) / targetValue) * 100)}%`,
-                      backgroundColor: colorTheme?.primary || 'hsl(var(--primary))'
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        {renderWidgetContent()}
 
         {/* Footer */}
         <div className="flex items-center justify-between text-xs text-muted-foreground mt-auto pt-2">
