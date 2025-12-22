@@ -224,7 +224,6 @@ export default function RelatelDashboard() {
                     <TableRow>
                       <TableHead>Sælger</TableHead>
                       <TableHead className="text-right">Salg</TableHead>
-                      <TableHead className="text-right">Omsætning</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -233,14 +232,12 @@ export default function RelatelDashboard() {
                       <TableRow key={agent.name}>
                         <TableCell className="font-medium">{agent.name}</TableCell>
                         <TableCell className="text-right tabular-nums">{agent.salesCount}</TableCell>
-                        <TableCell className="text-right tabular-nums">{formatCurrency(agent.revenue)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatCurrency(agent.commission)}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="bg-muted/50 font-semibold">
                       <TableCell>Total</TableCell>
                       <TableCell className="text-right tabular-nums">{totalSales}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatCurrency(totalRevenue)}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatCurrency(totalCommission)}</TableCell>
                     </TableRow>
                   </TableBody>
@@ -267,7 +264,6 @@ export default function RelatelDashboard() {
                     <TableRow>
                       <TableHead>Produkt</TableHead>
                       <TableHead className="text-right">Antal</TableHead>
-                      <TableHead className="text-right">Omsætning</TableHead>
                       <TableHead className="text-right">Provision</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -276,14 +272,12 @@ export default function RelatelDashboard() {
                       <TableRow key={product.name}>
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell className="text-right tabular-nums">{product.quantity}</TableCell>
-                        <TableCell className="text-right tabular-nums">{formatCurrency(product.revenue)}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatCurrency(product.commission)}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="bg-muted/50 font-semibold">
                       <TableCell>Total</TableCell>
                       <TableCell className="text-right tabular-nums">{totalSales}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatCurrency(totalRevenue)}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatCurrency(totalCommission)}</TableCell>
                     </TableRow>
                   </TableBody>
