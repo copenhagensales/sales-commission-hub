@@ -2343,6 +2343,7 @@ export type Database = {
           must_change_password: boolean | null
           parking_monthly_cost: number | null
           parking_spot_id: string | null
+          position_id: string | null
           private_email: string | null
           private_phone: string | null
           referral_bonus: number | null
@@ -2393,6 +2394,7 @@ export type Database = {
           must_change_password?: boolean | null
           parking_monthly_cost?: number | null
           parking_spot_id?: string | null
+          position_id?: string | null
           private_email?: string | null
           private_phone?: string | null
           referral_bonus?: number | null
@@ -2443,6 +2445,7 @@ export type Database = {
           must_change_password?: boolean | null
           parking_monthly_cost?: number | null
           parking_spot_id?: string | null
+          position_id?: string | null
           private_email?: string | null
           private_phone?: string | null
           referral_bonus?: number | null
@@ -2467,6 +2470,13 @@ export type Database = {
             columns: ["manager_id"]
             isOneToOne: false
             referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_master_data_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
             referencedColumns: ["id"]
           },
           {
@@ -3708,6 +3718,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      positions: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       product_campaign_overrides: {
         Row: {
