@@ -91,6 +91,9 @@ import {
   OnboardingAdmin,
   ExpectationsRamp,
   ExcelFieldMatcher,
+  TvBoardLogin,
+  TvBoardView,
+  TvBoardAdmin,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -206,6 +209,11 @@ export const routes: RouteConfig[] = [
   { path: "/onboarding-program/admin", component: OnboardingAdmin, access: "role", positionPermission: "menu_onboarding_admin" },
 
   { path: "/excel-field-matcher", component: ExcelFieldMatcher, access: "protected" },
+
+  // TV Board routes
+  { path: "/tv", component: TvBoardLogin, access: "public" },
+  { path: "/tv/:slug", component: TvBoardView, access: "public" },
+  { path: "/tv-board-admin", component: TvBoardAdmin, access: "role", positionPermission: "menu_settings" },
 
   { path: "*", component: NotFound, access: "public" },
 ];

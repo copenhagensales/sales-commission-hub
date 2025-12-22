@@ -108,3 +108,8 @@ export const ExpectationsRamp = lazyPage(() => import("@/pages/onboarding/Expect
 
 export const ExcelFieldMatcher = lazyPage(() => import("@/pages/ExcelFieldMatcher"));
 
+// TV Board
+export const TvBoardLogin = lazyPage(() => import("@/pages/tv-board/TvBoardLogin"));
+export const TvBoardView = lazyPage(() => import("@/pages/tv-board/TvBoardView"));
+export const TvBoardAdmin = lazyPage(() => import("@/pages/tv-board/TvBoardAdmin"));
+
