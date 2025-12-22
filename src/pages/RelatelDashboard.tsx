@@ -181,7 +181,7 @@ export default function RelatelDashboard() {
       />
       <div className="space-y-6">
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Antal salg</CardTitle>
@@ -190,17 +190,6 @@ export default function RelatelDashboard() {
             <CardContent>
               <div className="text-3xl font-bold text-primary">{totalSales}</div>
               <p className="text-xs text-muted-foreground mt-1">Kun produkter markeret som salg</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Omsætning</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{formatCurrency(totalRevenue)}</div>
-              <p className="text-xs text-muted-foreground mt-1">Fra mappede produkter</p>
             </CardContent>
           </Card>
 
