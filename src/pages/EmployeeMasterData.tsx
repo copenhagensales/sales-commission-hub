@@ -834,7 +834,7 @@ export default function EmployeeMasterData() {
                   onClick={() => setStatusFilter("inactive")}
                   className="h-7 px-3 text-xs"
                 >
-                  {t("employees.filters.inactive")} ({inactiveCount})
+                  {t("employees.filters.inactive")}
                 </Button>
                 <Button
                   variant={statusFilter === "all" ? "default" : "ghost"}
