@@ -149,6 +149,20 @@ export default function EmployeeMasterData() {
     },
   });
 
+  // Fetch staff employee count
+  const { data: staffCount = 0 } = useQuery({
+    queryKey: ["staff-employee-count"],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("employee_master_data")
+        .select("*", { count: "exact", head: true })
+        .eq("is_staff_employee", true)
+        .eq("is_active", true);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
   // Fetch job positions from database
   const { data: jobPositions = [] } = useQuery({
     queryKey: ["job-positions"],
@@ -498,7 +512,6 @@ export default function EmployeeMasterData() {
     });
 
   const activeCount = employees.filter((e) => e.is_active).length;
-  const inactiveCount = employees.length - activeCount;
 
   return (
     <MainLayout>
@@ -806,10 +819,10 @@ export default function EmployeeMasterData() {
           </div>
           <div className="rounded-xl bg-card/50 p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">{t("employees.stats.inactiveEmployees")}</span>
+              <span className="text-sm text-muted-foreground">Stabs medarbejdere</span>
               <Users className="h-4 w-4 text-muted-foreground" />
             </div>
-            <div className="text-2xl font-bold">{employees.length - activeCount}</div>
+            <div className="text-2xl font-bold">{staffCount}</div>
           </div>
           <div className="rounded-xl bg-card/50 p-4">
             <div className="flex items-center justify-between mb-2">
