@@ -7,11 +7,60 @@ import { da } from "date-fns/locale";
 import { Users, TrendingUp, Phone, Target, Award, Activity } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 
+interface TvDashboardData {
+  date: string;
+  timestamp: string;
+  sales: {
+    total: number;
+    confirmed: number;
+    pending: number;
+    byClient: Record<string, number>;
+    recent: Array<{
+      id: string;
+      agent_name: string;
+      sale_datetime: string;
+      status: string | null;
+      client_name: string;
+    }>;
+  };
+  employees: {
+    active: number;
+    staff: number;
+  };
+  calls: {
+    today: number;
+  };
+}
+
+// Check if we're in TV mode (accessed via /tv route with sessionStorage code)
+const isTvMode = () => {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname.startsWith('/tv/') || sessionStorage.getItem('tv_board_code') !== null;
+};
+
 export default function CphSalesDashboard() {
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
+  const tvMode = isTvMode();
 
-  // Fetch today's sales
+  // Use edge function for TV mode (bypasses RLS)
+  const { data: tvData } = useQuery<TvDashboardData>({
+    queryKey: ["tv-dashboard-data", todayStr],
+    queryFn: async () => {
+      const code = sessionStorage.getItem('tv_board_code') || '';
+      const response = await supabase.functions.invoke('tv-dashboard-data', {
+        body: null,
+        method: 'GET',
+      });
+      
+      if (response.error) throw response.error;
+      return response.data;
+    },
+    enabled: tvMode,
+    refetchInterval: 30000,
+  });
+
+  // Regular authenticated queries for non-TV mode
   const { data: todaySales = [] } = useQuery({
     queryKey: ["cph-dashboard-today-sales", todayStr],
     queryFn: async () => {
@@ -26,7 +75,6 @@ export default function CphSalesDashboard() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       
-      // Fetch campaign and client names separately
       const campaignIds = [...new Set((data || []).map(s => s.client_campaign_id).filter(Boolean))] as string[];
       let campaignClientMap: Record<string, string> = {};
       
@@ -57,10 +105,10 @@ export default function CphSalesDashboard() {
         client_name: s.client_campaign_id ? campaignClientMap[s.client_campaign_id] || "Ukendt" : "Ukendt"
       }));
     },
+    enabled: !tvMode,
     refetchInterval: 30000,
   });
 
-  // Fetch active employees count
   const { data: activeEmployees = 0 } = useQuery({
     queryKey: ["cph-dashboard-active-employees"],
     queryFn: async () => {
@@ -72,10 +120,10 @@ export default function CphSalesDashboard() {
       if (error) throw error;
       return count || 0;
     },
+    enabled: !tvMode,
     refetchInterval: 60000,
   });
 
-  // Fetch staff employees count
   const { data: staffEmployees = 0 } = useQuery({
     queryKey: ["cph-dashboard-staff-employees"],
     queryFn: async () => {
@@ -87,10 +135,10 @@ export default function CphSalesDashboard() {
       if (error) throw error;
       return count || 0;
     },
+    enabled: !tvMode,
     refetchInterval: 60000,
   });
 
-  // Fetch today's calls
   const { data: todayCalls = 0 } = useQuery({
     queryKey: ["cph-dashboard-today-calls", todayStr],
     queryFn: async () => {
@@ -105,19 +153,23 @@ export default function CphSalesDashboard() {
       if (error) throw error;
       return count || 0;
     },
+    enabled: !tvMode,
     refetchInterval: 30000,
   });
 
-  // Get sales by client
-  const salesByClient = todaySales.reduce((acc: Record<string, number>, sale: any) => {
+  // Use TV data if in TV mode, otherwise use regular queries
+  const displaySales = tvMode && tvData ? tvData.sales.recent : todaySales;
+  const displaySalesTotal = tvMode && tvData ? tvData.sales.total : todaySales.length;
+  const displaySalesByClient = tvMode && tvData ? tvData.sales.byClient : todaySales.reduce((acc: Record<string, number>, sale: any) => {
     const clientName = sale.client_name || "Ukendt";
     acc[clientName] = (acc[clientName] || 0) + 1;
     return acc;
   }, {});
-
-  // Get confirmed sales
-  const confirmedSales = todaySales.filter((s: any) => s.status === "confirmed").length;
-  const pendingSales = todaySales.filter((s: any) => s.status === "pending").length;
+  const displayConfirmed = tvMode && tvData ? tvData.sales.confirmed : todaySales.filter((s: any) => s.status === "confirmed").length;
+  const displayPending = tvMode && tvData ? tvData.sales.pending : todaySales.filter((s: any) => s.status === "pending").length;
+  const displayActiveEmployees = tvMode && tvData ? tvData.employees.active : activeEmployees;
+  const displayStaffEmployees = tvMode && tvData ? tvData.employees.staff : staffEmployees;
+  const displayCalls = tvMode && tvData ? tvData.calls.today : todayCalls;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-6">
@@ -134,14 +186,14 @@ export default function CphSalesDashboard() {
             <TrendingUp className="h-5 w-5 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold text-emerald-500">{todaySales.length}</div>
+            <div className="text-4xl font-bold text-emerald-500">{displaySalesTotal}</div>
             <div className="flex gap-2 mt-2">
               <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-600">
-                {confirmedSales} bekræftet
+                {displayConfirmed} bekræftet
               </Badge>
-              {pendingSales > 0 && (
+              {displayPending > 0 && (
                 <Badge variant="secondary" className="bg-amber-500/20 text-amber-600">
-                  {pendingSales} afventer
+                  {displayPending} afventer
                 </Badge>
               )}
             </div>
@@ -154,7 +206,7 @@ export default function CphSalesDashboard() {
             <Phone className="h-5 w-5 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold text-blue-500">{todayCalls}</div>
+            <div className="text-4xl font-bold text-blue-500">{displayCalls}</div>
             <p className="text-xs text-muted-foreground mt-2">
               Registrerede opkald
             </p>
@@ -167,7 +219,7 @@ export default function CphSalesDashboard() {
             <Users className="h-5 w-5 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold text-purple-500">{activeEmployees}</div>
+            <div className="text-4xl font-bold text-purple-500">{displayActiveEmployees}</div>
             <p className="text-xs text-muted-foreground mt-2">
               Sælgere
             </p>
@@ -180,7 +232,7 @@ export default function CphSalesDashboard() {
             <Award className="h-5 w-5 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold text-orange-500">{staffEmployees}</div>
+            <div className="text-4xl font-bold text-orange-500">{displayStaffEmployees}</div>
             <p className="text-xs text-muted-foreground mt-2">
               Aktive stabsmedarbejdere
             </p>
@@ -198,11 +250,11 @@ export default function CphSalesDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {Object.keys(salesByClient).length === 0 ? (
+            {Object.keys(displaySalesByClient).length === 0 ? (
               <p className="text-muted-foreground text-center py-8">Ingen salg registreret i dag</p>
             ) : (
               <div className="space-y-4">
-                {Object.entries(salesByClient)
+                {Object.entries(displaySalesByClient)
                   .sort(([, a], [, b]) => (b as number) - (a as number))
                   .map(([client, count]) => (
                     <div key={client} className="flex items-center justify-between">
@@ -211,7 +263,7 @@ export default function CphSalesDashboard() {
                         <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-primary rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min(((count as number) / todaySales.length) * 100, 100)}%` }}
+                            style={{ width: `${Math.min(((count as number) / displaySalesTotal) * 100, 100)}%` }}
                           />
                         </div>
                         <Badge variant="secondary" className="min-w-[40px] justify-center">
@@ -233,11 +285,11 @@ export default function CphSalesDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {todaySales.length === 0 ? (
+            {displaySales.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">Ingen salg registreret i dag</p>
             ) : (
               <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                {todaySales.slice(0, 10).map((sale: any) => (
+                {displaySales.slice(0, 10).map((sale: any) => (
                   <div key={sale.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                     <div>
                       <p className="font-medium">{sale.agent_name}</p>
@@ -247,7 +299,7 @@ export default function CphSalesDashboard() {
                       variant={sale.status === "confirmed" ? "default" : "secondary"}
                       className={sale.status === "confirmed" ? "bg-emerald-500" : ""}
                     >
-                      {sale.status === "confirmed" ? "Bekræftet" : sale.status === "pending" ? "Afventer" : sale.status}
+                      {sale.status === "confirmed" ? "Bekræftet" : sale.status === "pending" ? "Afventer" : sale.status || "-"}
                     </Badge>
                   </div>
                 ))}
