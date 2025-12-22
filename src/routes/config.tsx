@@ -173,20 +173,20 @@ export const routes: RouteConfig[] = [
   { path: "/recruitment/upcoming-hires", component: UpcomingHires, access: "role", positionPermission: "menu_upcoming_hires" },
 
   { path: "/client-sales-overview", component: ClientSalesOverview, access: "role", positionPermission: "menu_sales" },
-  { path: "/boards/sales", component: SalesDashboard, access: "role", positionPermission: "menu_dashboards" },
+  { path: "/boards/sales", component: SalesDashboard, access: "protected" },
   
-  // Team Dashboards (full screen, no sidebar) - require dashboard permission
-  { path: "/dashboards/cph-sales", component: CphSalesDashboard, access: "role", positionPermission: "menu_dashboards" },
-  { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "role", positionPermission: "menu_dashboards" },
-  { path: "/dashboards/tdc-erhverv", component: TdcErhvervDashboard, access: "role", positionPermission: "menu_dashboards" },
-  { path: "/dashboards/relatel", component: RelatelDashboard, access: "role", positionPermission: "menu_dashboards" },
-  { path: "/dashboards/tryg", component: TrygDashboard, access: "role", positionPermission: "menu_dashboards" },
-  { path: "/dashboards/ase", component: AseDashboard, access: "role", positionPermission: "menu_dashboards" },
-  { path: "/dashboards/mg-test", component: MgTestDashboard, access: "role", positionPermission: "menu_dashboards" },
+  // Team Dashboards (full screen, no sidebar) - accessible to all authenticated users
+  { path: "/dashboards/cph-sales", component: CphSalesDashboard, access: "protected" },
+  { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "protected" },
+  { path: "/dashboards/tdc-erhverv", component: TdcErhvervDashboard, access: "protected" },
+  { path: "/dashboards/relatel", component: RelatelDashboard, access: "protected" },
+  { path: "/dashboards/tryg", component: TrygDashboard, access: "protected" },
+  { path: "/dashboards/ase", component: AseDashboard, access: "protected" },
+  { path: "/dashboards/mg-test", component: MgTestDashboard, access: "protected" },
   
-  { path: "/dashboards/settings", component: DashboardSettings, access: "role", positionPermission: "menu_dashboards" },
-  { path: "/dashboards/design", component: DesignDashboard, access: "role", positionPermission: "menu_dashboards" },
-  { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "role", positionPermission: "menu_dashboards" },
+  { path: "/dashboards/settings", component: DashboardSettings, access: "protected" },
+  { path: "/dashboards/design", component: DesignDashboard, access: "protected" },
+  { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "protected" },
   
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
 
