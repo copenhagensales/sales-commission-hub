@@ -142,7 +142,7 @@ const TrygDashboard = () => {
       <DashboardHeader title="Tryg – Dagsoverblik" subtitle="Salgsdata for i dag baseret på produkt mapping" />
       <div className="space-y-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Salg i dag</CardTitle>
@@ -160,16 +160,6 @@ const TrygDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{agentList.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Omsætning</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
             </CardContent>
           </Card>
 
