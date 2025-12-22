@@ -35,7 +35,7 @@ const suggestMapping = (columnName: string): string | null => {
   const normalized = columnName.toLowerCase().trim();
   
   const mappings: Record<string, string> = {
-    "fornavn": "first_name", "fornavne": "first_name", "first_name": "first_name", "firstname": "first_name", "navn": "first_name",
+    "fornavn": "first_name", "first_name": "first_name", "firstname": "first_name", "navn": "first_name",
     "efternavn": "last_name", "last_name": "last_name", "lastname": "last_name",
     "email": "private_email", "e-mail": "private_email", "mail": "private_email",
     "telefon": "private_phone", "tlf": "private_phone", "mobil": "private_phone", "phone": "private_phone",
@@ -69,8 +69,7 @@ export default function ExcelFieldMatcher() {
   useEffect(() => {
     const loadExcelFile = async () => {
       try {
-        // Add cache-busting timestamp
-        const response = await fetch(`/temp/employee-import.xlsx?t=${Date.now()}`);
+        const response = await fetch("/temp/employee-import.xlsx");
         const arrayBuffer = await response.arrayBuffer();
         const data = new Uint8Array(arrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
