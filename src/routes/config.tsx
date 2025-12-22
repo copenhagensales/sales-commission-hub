@@ -173,20 +173,20 @@ export const routes: RouteConfig[] = [
   { path: "/recruitment/upcoming-hires", component: UpcomingHires, access: "role", positionPermission: "menu_upcoming_hires" },
 
   { path: "/client-sales-overview", component: ClientSalesOverview, access: "role", positionPermission: "menu_sales" },
-  { path: "/boards/sales", component: SalesDashboard, access: "public" },
+  { path: "/boards/sales", component: SalesDashboard, access: "role", positionPermission: "menu_dashboards" },
   
-  // Team Dashboards (full screen, no sidebar) - public access for TV displays
-  { path: "/dashboards/cph-sales", component: CphSalesDashboard, access: "public" },
-  { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "public" },
-  { path: "/dashboards/tdc-erhverv", component: TdcErhvervDashboard, access: "public" },
-  { path: "/dashboards/relatel", component: RelatelDashboard, access: "public" },
-  { path: "/dashboards/tryg", component: TrygDashboard, access: "public" },
-  { path: "/dashboards/ase", component: AseDashboard, access: "public" },
-  { path: "/dashboards/mg-test", component: MgTestDashboard, access: "public" },
+  // Team Dashboards (full screen, no sidebar) - require dashboard permission
+  { path: "/dashboards/cph-sales", component: CphSalesDashboard, access: "role", positionPermission: "menu_dashboards" },
+  { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "role", positionPermission: "menu_dashboards" },
+  { path: "/dashboards/tdc-erhverv", component: TdcErhvervDashboard, access: "role", positionPermission: "menu_dashboards" },
+  { path: "/dashboards/relatel", component: RelatelDashboard, access: "role", positionPermission: "menu_dashboards" },
+  { path: "/dashboards/tryg", component: TrygDashboard, access: "role", positionPermission: "menu_dashboards" },
+  { path: "/dashboards/ase", component: AseDashboard, access: "role", positionPermission: "menu_dashboards" },
+  { path: "/dashboards/mg-test", component: MgTestDashboard, access: "role", positionPermission: "menu_dashboards" },
   
-  { path: "/dashboards/settings", component: DashboardSettings, access: "public" },
-  { path: "/dashboards/design", component: DesignDashboard, access: "protected" },
-  { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "public" },
+  { path: "/dashboards/settings", component: DashboardSettings, access: "role", positionPermission: "menu_dashboards" },
+  { path: "/dashboards/design", component: DesignDashboard, access: "role", positionPermission: "menu_dashboards" },
+  { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "role", positionPermission: "menu_dashboards" },
   
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
 
