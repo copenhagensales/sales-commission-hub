@@ -106,3 +106,5 @@ export const DrillLibrary = lazyPage(() => import("@/pages/onboarding/DrillLibra
 export const OnboardingAdmin = lazyPage(() => import("@/pages/onboarding/OnboardingAdmin"));
 export const ExpectationsRamp = lazyPage(() => import("@/pages/onboarding/ExpectationsRamp"));
 
+export const ExcelFieldMatcher = lazyPage(() => import("@/pages/ExcelFieldMatcher"));
+
