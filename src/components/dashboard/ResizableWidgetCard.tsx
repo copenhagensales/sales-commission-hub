@@ -41,6 +41,7 @@ interface ResizableWidgetCardProps {
   trendValue?: number;
   multiKpiCount?: number;
   icon: React.ReactNode;
+  teamName?: string;  // Team filter name
   onEdit: () => void;
   onRemove: () => void;
   onResize: (newSize: WidgetSize) => void;
@@ -73,6 +74,7 @@ export function ResizableWidgetCard({
   trendValue,
   multiKpiCount,
   icon,
+  teamName,
   onEdit,
   onRemove,
   onResize,
@@ -246,6 +248,12 @@ export function ResizableWidgetCard({
 
         {/* Feature badges */}
         <div className="flex flex-wrap gap-1 mt-2">
+          {teamName && (
+            <span className="text-[10px] bg-orange-500/10 text-orange-500 px-1.5 py-0.5 rounded flex items-center gap-1">
+              <Users className="h-2.5 w-2.5" />
+              {teamName}
+            </span>
+          )}
           {trackingScopeName && (
             <span className="text-[10px] bg-violet-500/10 text-violet-500 px-1.5 py-0.5 rounded flex items-center gap-1">
               <Users className="h-2.5 w-2.5" />

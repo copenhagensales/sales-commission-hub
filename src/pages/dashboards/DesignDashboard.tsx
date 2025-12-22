@@ -84,6 +84,8 @@ interface PlacedWidget {
   colorThemeId?: string;  // Color theme for the widget
   showTrend?: boolean;  // Show trend indicator
   trackingScopeId?: string;  // Who/what the KPI tracks
+  limitToTeam?: boolean;  // Limit data to selected team only
+  teamId?: string;  // The team to limit data to
   x: number;
   y: number;
   width: number;
@@ -182,6 +184,8 @@ export default function DesignDashboard() {
   const [colorThemeId, setColorThemeId] = useState<string>("default");
   const [showTrend, setShowTrend] = useState(true);
   const [trackingScopeId, setTrackingScopeId] = useState<string>("all");
+  const [limitToTeam, setLimitToTeam] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
 
   const currentWidgetConfig = activeWidgetTypes.find(w => w.value === selectedWidgetType);
   const supportsMultiKpi = currentWidgetConfig?.supportsMultiKpi || false;
@@ -203,6 +207,8 @@ export default function DesignDashboard() {
     setColorThemeId("default");
     setShowTrend(true);
     setTrackingScopeId("all");
+    setLimitToTeam(false);
+    setSelectedTeamId("");
   };
 
   const openAddWidgetDialog = () => {
@@ -227,6 +233,8 @@ export default function DesignDashboard() {
     setColorThemeId(widget.colorThemeId || "default");
     setShowTrend(widget.showTrend ?? true);
     setTrackingScopeId(widget.trackingScopeId || "all");
+    setLimitToTeam(widget.limitToTeam || false);
+    setSelectedTeamId(widget.teamId || "");
     setIsConfigDialogOpen(true);
   };
 
@@ -275,6 +283,8 @@ export default function DesignDashboard() {
       colorThemeId: colorThemeId !== "default" ? colorThemeId : undefined,
       showTrend,
       trackingScopeId: trackingScopeId !== "all" ? trackingScopeId : undefined,
+      limitToTeam: limitToTeam || undefined,
+      teamId: limitToTeam && selectedTeamId ? selectedTeamId : undefined,
     };
 
     if (editingWidget) {
@@ -351,6 +361,17 @@ export default function DesignDashboard() {
     return "—";
   };
 
+  const getTeamName = (teamId: string) => {
+    const teamNames: Record<string, string> = {
+      "team-1": "Team Alpha",
+      "team-2": "Team Beta",
+      "team-3": "Team Gamma",
+      "team-4": "Salg København",
+      "team-5": "Salg Aarhus",
+    };
+    return teamNames[teamId] || teamId;
+  };
+
   const getWidgetTypeName = (widgetTypeId: string) => {
     return activeWidgetTypes.find(w => w.value === widgetTypeId)?.label || widgetTypeId;
   };
@@ -415,6 +436,7 @@ export default function DesignDashboard() {
                 const design = activeDesignTypes.find(d => d.id === globalDesign);
                 const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
                 const trackingScope = TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId);
+                const teamName = widget.limitToTeam && widget.teamId ? getTeamName(widget.teamId) : undefined;
                 
                 return (
                   <ResizableWidgetCard
@@ -435,6 +457,7 @@ export default function DesignDashboard() {
                     trendValue={widget.showTrend ? getExampleTrend() : undefined}
                     multiKpiCount={widget.kpiTypeIds.length > 1 ? widget.kpiTypeIds.length : undefined}
                     icon={getWidgetTypeIcon(widget.widgetTypeId)}
+                    teamName={teamName}
                     onEdit={() => openEditWidgetDialog(widget)}
                     onRemove={() => removeWidget(widget.id)}
                     onResize={(newSize) => resizeWidget(widget.id, newSize)}
@@ -592,7 +615,7 @@ export default function DesignDashboard() {
 
             {/* 3. Tracking Scope - Who/what to track */}
             {dataSource === "kpi" && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label className="text-base font-semibold flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   3. Hvem skal trackes?
@@ -612,9 +635,35 @@ export default function DesignDashboard() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Vælg om KPI'en skal vise data for alle, et team, en medarbejder osv.
-                </p>
+                
+                {/* Team filter option */}
+                <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">Begræns til team</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Vis kun data fra medarbejdere i et specifikt team
+                    </p>
+                  </div>
+                  <Switch
+                    checked={limitToTeam}
+                    onCheckedChange={setLimitToTeam}
+                  />
+                </div>
+                
+                {limitToTeam && (
+                  <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vælg team" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="team-1">Team Alpha</SelectItem>
+                      <SelectItem value="team-2">Team Beta</SelectItem>
+                      <SelectItem value="team-3">Team Gamma</SelectItem>
+                      <SelectItem value="team-4">Salg København</SelectItem>
+                      <SelectItem value="team-5">Salg Aarhus</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             )}
 
