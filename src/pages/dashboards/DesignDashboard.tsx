@@ -443,6 +443,7 @@ export default function DesignDashboard() {
                     key={widget.id}
                     id={widget.id}
                     title={widget.title || getWidgetTypeName(widget.widgetTypeId)}
+                    widgetType={widget.widgetTypeId}
                     kpiLabel={getDisplayLabel(widget)}
                     value={getExampleValue(widget)}
                     size={{ width: widget.width, height: widget.height }}
