@@ -35,21 +35,33 @@ const suggestMapping = (columnName: string): string | null => {
   const normalized = columnName.toLowerCase().trim();
   
   const mappings: Record<string, string> = {
+    // Fornavn/Efternavn
     "fornavn": "first_name", "first_name": "first_name", "firstname": "first_name", "navn": "first_name",
     "efternavn": "last_name", "last_name": "last_name", "lastname": "last_name",
+    // Email
     "email": "private_email", "e-mail": "private_email", "mail": "private_email",
+    // Telefon
     "telefon": "private_phone", "tlf": "private_phone", "mobil": "private_phone", "phone": "private_phone",
+    "mobiltelefon": "private_phone",
+    // CPR
     "cpr": "cpr_number", "cpr-nummer": "cpr_number", "cpr nummer": "cpr_number", "personnummer": "cpr_number",
-    "reg": "bank_reg_number", "reg.": "bank_reg_number", "reg. nr.": "bank_reg_number", "regnr": "bank_reg_number", "reg nr": "bank_reg_number",
-    "konto": "bank_account_number", "kontonummer": "bank_account_number", "konto nr": "bank_account_number", "kontonr": "bank_account_number",
+    // Bank
+    "reg": "bank_reg_number", "reg.": "bank_reg_number", "reg. nr.": "bank_reg_number", "regnr": "bank_reg_number", 
+    "reg nr": "bank_reg_number", "registrerings nr.": "bank_reg_number",
+    "konto": "bank_account_number", "kontonummer": "bank_account_number", "konto nr": "bank_account_number", 
+    "kontonr": "bank_account_number", "konto nr.": "bank_account_number",
+    // Stilling
     "stilling": "job_title", "titel": "job_title", "jobtitel": "job_title", "rolle": "job_title",
     "afdeling": "department", "department": "department", "team": "department",
+    // Startdato
     "startdato": "employment_start_date", "ansættelsesdato": "employment_start_date",
+    // Løn
     "løntype": "salary_type", "lønform": "salary_type",
     "løn": "salary_amount", "timeløn": "salary_amount", "månedsløn": "salary_amount",
     "timer": "weekly_hours", "timer/uge": "weekly_hours",
     "arbejdstid": "standard_start_time", "mødetid": "standard_start_time",
     "arbejdssted": "work_location", "lokation": "work_location", "kontor": "work_location",
+    // Adresse
     "adresse": "address_street", "gade": "address_street",
     "postnummer": "address_postal_code", "postnr": "address_postal_code",
     "by": "address_city", "city": "address_city",
