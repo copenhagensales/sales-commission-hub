@@ -5616,6 +5616,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_chat_conversation_member: {
+        Args: { _conversation_id: string }
+        Returns: boolean
+      }
       is_conversation_member: {
         Args: { p_conversation_id: string; p_employee_id: string }
         Returns: boolean
