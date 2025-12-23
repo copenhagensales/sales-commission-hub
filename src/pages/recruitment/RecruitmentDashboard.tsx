@@ -94,11 +94,47 @@ export default function RecruitmentDashboard() {
     return acc;
   }, {} as Record<string, number>);
 
-  const newThisWeek = candidates.filter(c => {
-    const created = new Date(c.created_at);
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    return created > weekAgo;
-  }).length;
+  // KPI calculations with trends
+  const kpiStats = useMemo(() => {
+    const now = new Date();
+    
+    // Last 24 hours
+    const last24h = candidates.filter(c => new Date(c.created_at) >= subDays(now, 1)).length;
+    const prev24h = candidates.filter(c => {
+      const created = new Date(c.created_at);
+      return created >= subDays(now, 2) && created < subDays(now, 1);
+    }).length;
+    const trend24h = prev24h > 0 ? Math.round(((last24h - prev24h) / prev24h) * 100) : last24h > 0 ? 100 : 0;
+
+    // Last 7 days
+    const last7d = candidates.filter(c => new Date(c.created_at) >= subDays(now, 7)).length;
+    const prev7d = candidates.filter(c => {
+      const created = new Date(c.created_at);
+      return created >= subDays(now, 14) && created < subDays(now, 7);
+    }).length;
+    const trend7d = prev7d > 0 ? Math.round(((last7d - prev7d) / prev7d) * 100) : last7d > 0 ? 100 : 0;
+
+    // Last 30 days
+    const last30d = candidates.filter(c => new Date(c.created_at) >= subDays(now, 30)).length;
+    const prev30d = candidates.filter(c => {
+      const created = new Date(c.created_at);
+      return created >= subDays(now, 60) && created < subDays(now, 30);
+    }).length;
+    const trend30d = prev30d > 0 ? Math.round(((last30d - prev30d) / prev30d) * 100) : last30d > 0 ? 100 : 0;
+
+    // Scheduled interviews
+    const scheduledInterviews = candidates.filter(c => c.status === 'interview_scheduled').length;
+    
+    return {
+      last24h,
+      trend24h,
+      last7d,
+      trend7d,
+      last30d,
+      trend30d,
+      scheduledInterviews,
+    };
+  }, [candidates]);
 
   const chartData = useMemo(() => {
     const endDate = startOfDay(new Date());
@@ -131,25 +167,55 @@ export default function RecruitmentDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total kandidater</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Sidste 24 timer</CardTitle>
+            <UserPlus className="h-4 w-4 text-blue-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{candidates.length}</div>
-            <p className="text-xs text-muted-foreground">
-              +{newThisWeek} denne uge
-            </p>
+            <div className="text-2xl font-bold text-blue-400">{kpiStats.last24h}</div>
+            <div className="flex items-center gap-1 text-xs">
+              {kpiStats.trend24h !== 0 && (
+                <span className={kpiStats.trend24h > 0 ? "text-green-500" : "text-red-500"}>
+                  {kpiStats.trend24h > 0 ? "+" : ""}{kpiStats.trend24h}%
+                </span>
+              )}
+              <span className="text-muted-foreground">vs. forrige 24t</span>
+            </div>
           </CardContent>
         </Card>
 
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Nye ansøgninger</CardTitle>
-            <UserPlus className="h-4 w-4 text-blue-400" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Sidste 7 dage</CardTitle>
+            <Users className="h-4 w-4 text-cyan-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-400">{statusCounts.new || 0}</div>
-            <p className="text-xs text-muted-foreground">Afventer kontakt</p>
+            <div className="text-2xl font-bold text-cyan-400">{kpiStats.last7d}</div>
+            <div className="flex items-center gap-1 text-xs">
+              {kpiStats.trend7d !== 0 && (
+                <span className={kpiStats.trend7d > 0 ? "text-green-500" : "text-red-500"}>
+                  {kpiStats.trend7d > 0 ? "+" : ""}{kpiStats.trend7d}%
+                </span>
+              )}
+              <span className="text-muted-foreground">vs. forrige uge</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Sidste 30 dage</CardTitle>
+            <TrendingUp className="h-4 w-4 text-orange-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-400">{kpiStats.last30d}</div>
+            <div className="flex items-center gap-1 text-xs">
+              {kpiStats.trend30d !== 0 && (
+                <span className={kpiStats.trend30d > 0 ? "text-green-500" : "text-red-500"}>
+                  {kpiStats.trend30d > 0 ? "+" : ""}{kpiStats.trend30d}%
+                </span>
+              )}
+              <span className="text-muted-foreground">vs. forrige måned</span>
+            </div>
           </CardContent>
         </Card>
 
@@ -159,19 +225,8 @@ export default function RecruitmentDashboard() {
             <Calendar className="h-4 w-4 text-purple-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-400">{statusCounts.interview_scheduled || 0}</div>
+            <div className="text-2xl font-bold text-purple-400">{kpiStats.scheduledInterviews}</div>
             <p className="text-xs text-muted-foreground">Kommende interviews</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Ansat i år</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-400">{statusCounts.hired || 0}</div>
-            <p className="text-xs text-muted-foreground">Succesfulde ansættelser</p>
           </CardContent>
         </Card>
       </div>
