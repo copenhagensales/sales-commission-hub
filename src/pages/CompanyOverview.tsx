@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, TrendingUp, TrendingDown, Minus, Building2, Target, FileText } from "lucide-react";
-import { subDays, format } from "date-fns";
+import { Users, TrendingUp, TrendingDown, Minus, Building2, Target, FileText, Clock } from "lucide-react";
+import { subDays, format, differenceInMonths } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { TeamTenureChart } from "@/components/company-overview/TeamTenureChart";
 import { TeamAvgTenureChart } from "@/components/company-overview/TeamAvgTenureChart";
@@ -94,6 +94,83 @@ export default function CompanyOverview() {
     },
   });
 
+  // Fetch average tenure for all employees (excluding Stab)
+  const { data: tenureStats, isLoading: isLoadingTenure } = useQuery({
+    queryKey: ["company-overview-tenure-stats"],
+    queryFn: async () => {
+      const { data: teamMembers, error } = await supabase
+        .from("team_members")
+        .select(`
+          employee_id,
+          teams(name),
+          employee_master_data(employment_start_date, is_active)
+        `);
+      
+      if (error) throw error;
+      
+      // Filter active employees not in "Stab" team, get unique by employee_id
+      const uniqueEmployees = new Map<string, { startDate: string }>();
+      
+      teamMembers.forEach((tm: any) => {
+        const teamName = tm.teams?.name?.toLowerCase() || "";
+        const employee = tm.employee_master_data;
+        
+        if (teamName === "stab" || !employee?.is_active || !employee?.employment_start_date) return;
+        
+        // Keep earliest start date for employees in multiple teams
+        if (!uniqueEmployees.has(tm.employee_id) || 
+            employee.employment_start_date < uniqueEmployees.get(tm.employee_id)!.startDate) {
+          uniqueEmployees.set(tm.employee_id, { startDate: employee.employment_start_date });
+        }
+      });
+      
+      // Calculate current average tenure in months
+      const now = new Date();
+      const thirtyDaysAgoDate = subDays(now, 30);
+      
+      let totalMonthsNow = 0;
+      let totalMonthsThirtyDaysAgo = 0;
+      let countNow = 0;
+      let countThirtyDaysAgo = 0;
+      
+      uniqueEmployees.forEach(({ startDate }) => {
+        const start = new Date(startDate);
+        
+        // Current average
+        const monthsNow = differenceInMonths(now, start);
+        totalMonthsNow += monthsNow;
+        countNow++;
+        
+        // 30 days ago - only count employees who were employed then
+        if (start <= thirtyDaysAgoDate) {
+          const monthsThirtyDaysAgo = differenceInMonths(thirtyDaysAgoDate, start);
+          totalMonthsThirtyDaysAgo += monthsThirtyDaysAgo;
+          countThirtyDaysAgo++;
+        }
+      });
+      
+      const avgMonthsNow = countNow > 0 ? totalMonthsNow / countNow : 0;
+      const avgMonthsThirtyDaysAgo = countThirtyDaysAgo > 0 ? totalMonthsThirtyDaysAgo / countThirtyDaysAgo : 0;
+      
+      const changeMonths = avgMonthsNow - avgMonthsThirtyDaysAgo;
+      
+      let percentageChange = 0;
+      if (avgMonthsThirtyDaysAgo !== 0) {
+        percentageChange = ((avgMonthsNow - avgMonthsThirtyDaysAgo) / avgMonthsThirtyDaysAgo) * 100;
+      }
+      
+      return { avgMonths: Math.round(avgMonthsNow * 10) / 10, changeMonths: Math.round(changeMonths * 10) / 10, percentageChange };
+    },
+  });
+
+  const formatTenure = (months: number) => {
+    if (months < 12) return `${months.toFixed(1)} mdr`;
+    const years = Math.floor(months / 12);
+    const remainingMonths = Math.round(months % 12);
+    if (remainingMonths === 0) return `${years} år`;
+    return `${years} år ${remainingMonths} mdr`;
+  };
+
   const getTrendIcon = (change: number) => {
     if (change > 0) return TrendingUp;
     if (change < 0) return TrendingDown;
@@ -132,13 +209,17 @@ export default function CompanyOverview() {
       } : null
     },
     {
-      title: "KPI 3",
-      value: "-",
-      icon: Building2,
-      description: "Kommer snart",
-      color: "text-muted-foreground",
-      bgColor: "bg-muted",
-      trend: null
+      title: "Gns. anciennitet",
+      value: isLoadingTenure ? "..." : tenureStats ? formatTenure(tenureStats.avgMonths) : "-",
+      icon: Clock,
+      description: "Gennemsnitlig anciennitet (ekskl. Stab)",
+      color: "text-primary",
+      bgColor: "bg-primary/10",
+      trend: tenureStats ? {
+        change: tenureStats.changeMonths,
+        percentage: tenureStats.percentageChange,
+        suffix: " mdr"
+      } : null
     },
     {
       title: "KPI 4",
@@ -180,7 +261,7 @@ export default function CompanyOverview() {
                       return <TrendIcon className="h-4 w-4" />;
                     })()}
                     <span>
-                      {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change} ift. forrige periode
+                      {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change}{kpi.trend.suffix || ""} ift. forrige periode
                     </span>
                     <span className="text-muted-foreground ml-1">
                       ({kpi.trend.percentage > 0 ? "+" : ""}{kpi.trend.percentage.toFixed(0)}%)
