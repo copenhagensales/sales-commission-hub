@@ -87,30 +87,57 @@ export const useDashboardKpiData = () => {
       // Handle different KPI types
       switch (kpiTypeId) {
         case "sales-count": {
-          // Query both telesales and fieldmarketing
+          // Query telesales via sale_items (same logic as TeamOverview)
           let telesalesCount = 0;
           let fieldmarketingCount = 0;
           
+          // Get campaign IDs for client filter
+          let campaignIds: string[] = [];
           if (clientId) {
-            // Check for telesales campaigns
             const { data: campaigns } = await supabase
               .from("client_campaigns")
               .select("id")
               .eq("client_id", clientId);
+            campaignIds = (campaigns || []).map(c => c.id);
+          } else {
+            const { data: allCampaigns } = await supabase
+              .from("client_campaigns")
+              .select("id");
+            campaignIds = (allCampaigns || []).map(c => c.id);
+          }
+          
+          if (campaignIds.length > 0) {
+            // Fetch sales with sale_items to count properly (like TeamOverview)
+            const { data: salesData, error } = await supabase
+              .from("sales")
+              .select(`
+                id,
+                sale_items (
+                  quantity,
+                  products (
+                    counts_as_sale
+                  )
+                )
+              `)
+              .in("client_campaign_id", campaignIds)
+              .gte("sale_datetime", startISO)
+              .lte("sale_datetime", endISO);
             
-            if (campaigns && campaigns.length > 0) {
-              const campaignIds = campaigns.map(c => c.id);
-              const { count, error } = await supabase
-                .from("sales")
-                .select("id", { count: "exact", head: true })
-                .gte("sale_datetime", startISO)
-                .lte("sale_datetime", endISO)
-                .in("client_campaign_id", campaignIds);
-              if (error) throw error;
-              telesalesCount = count || 0;
-            }
+            if (error) throw error;
             
-            // Also check fieldmarketing_sales for this client
+            // Count sales from sale_items where counts_as_sale !== false
+            (salesData || []).forEach((sale: any) => {
+              (sale.sale_items || []).forEach((item: any) => {
+                const countsAsSale = item.products?.counts_as_sale !== false;
+                if (countsAsSale) {
+                  telesalesCount += Number(item.quantity) || 1;
+                }
+              });
+            });
+          }
+          
+          // Also count fieldmarketing_sales
+          if (clientId) {
             const { count: fmCount, error: fmError } = await supabase
               .from("fieldmarketing_sales")
               .select("id", { count: "exact", head: true })
@@ -120,23 +147,13 @@ export const useDashboardKpiData = () => {
             if (fmError) throw fmError;
             fieldmarketingCount = fmCount || 0;
           } else {
-            // No client filter - get all sales from both tables
-            const [telesalesResult, fmResult] = await Promise.all([
-              supabase
-                .from("sales")
-                .select("id", { count: "exact", head: true })
-                .gte("sale_datetime", startISO)
-                .lte("sale_datetime", endISO),
-              supabase
-                .from("fieldmarketing_sales")
-                .select("id", { count: "exact", head: true })
-                .gte("registered_at", startISO)
-                .lte("registered_at", endISO)
-            ]);
-            if (telesalesResult.error) throw telesalesResult.error;
-            if (fmResult.error) throw fmResult.error;
-            telesalesCount = telesalesResult.count || 0;
-            fieldmarketingCount = fmResult.count || 0;
+            const { count: fmCount, error: fmError } = await supabase
+              .from("fieldmarketing_sales")
+              .select("id", { count: "exact", head: true })
+              .gte("registered_at", startISO)
+              .lte("registered_at", endISO);
+            if (fmError) throw fmError;
+            fieldmarketingCount = fmCount || 0;
           }
           
           value = telesalesCount + fieldmarketingCount;
@@ -439,29 +456,57 @@ export const useWidgetKpiData = (widgets: Array<{
             
             switch (kpiTypeId) {
               case "sales-count": {
-                // Query telesales (sales table)
+                // Query telesales via sale_items (same logic as TeamOverview)
                 let telesalesCount = 0;
                 let fieldmarketingCount = 0;
                 
+                // Get campaign IDs for client filter
+                let campaignIds: string[] = [];
                 if (widget.clientId) {
-                  // Check for telesales campaigns
                   const { data: campaigns } = await supabase
                     .from("client_campaigns")
                     .select("id")
                     .eq("client_id", widget.clientId);
+                  campaignIds = (campaigns || []).map(c => c.id);
+                } else {
+                  const { data: allCampaigns } = await supabase
+                    .from("client_campaigns")
+                    .select("id");
+                  campaignIds = (allCampaigns || []).map(c => c.id);
+                }
+                
+                if (campaignIds.length > 0) {
+                  // Fetch sales with sale_items to count properly (like TeamOverview)
+                  const { data: salesData, error } = await supabase
+                    .from("sales")
+                    .select(`
+                      id,
+                      sale_items (
+                        quantity,
+                        products (
+                          counts_as_sale
+                        )
+                      )
+                    `)
+                    .in("client_campaign_id", campaignIds)
+                    .gte("sale_datetime", startISO)
+                    .lte("sale_datetime", endISO);
                   
-                  if (campaigns && campaigns.length > 0) {
-                    const campaignIds = campaigns.map(c => c.id);
-                    const { count } = await supabase
-                      .from("sales")
-                      .select("id", { count: "exact", head: true })
-                      .gte("sale_datetime", startISO)
-                      .lte("sale_datetime", endISO)
-                      .in("client_campaign_id", campaignIds);
-                    telesalesCount = count || 0;
+                  if (!error) {
+                    // Count sales from sale_items where counts_as_sale !== false
+                    (salesData || []).forEach((sale: any) => {
+                      (sale.sale_items || []).forEach((item: any) => {
+                        const countsAsSale = item.products?.counts_as_sale !== false;
+                        if (countsAsSale) {
+                          telesalesCount += Number(item.quantity) || 1;
+                        }
+                      });
+                    });
                   }
-                  
-                  // Also check fieldmarketing_sales for this client
+                }
+                
+                // Also count fieldmarketing_sales
+                if (widget.clientId) {
                   const { count: fmCount } = await supabase
                     .from("fieldmarketing_sales")
                     .select("id", { count: "exact", head: true })
@@ -470,21 +515,12 @@ export const useWidgetKpiData = (widgets: Array<{
                     .eq("client_id", widget.clientId);
                   fieldmarketingCount = fmCount || 0;
                 } else {
-                  // No client filter - get all sales from both tables
-                  const [telesalesResult, fmResult] = await Promise.all([
-                    supabase
-                      .from("sales")
-                      .select("id", { count: "exact", head: true })
-                      .gte("sale_datetime", startISO)
-                      .lte("sale_datetime", endISO),
-                    supabase
-                      .from("fieldmarketing_sales")
-                      .select("id", { count: "exact", head: true })
-                      .gte("registered_at", startISO)
-                      .lte("registered_at", endISO)
-                  ]);
-                  telesalesCount = telesalesResult.count || 0;
-                  fieldmarketingCount = fmResult.count || 0;
+                  const { count: fmCount } = await supabase
+                    .from("fieldmarketing_sales")
+                    .select("id", { count: "exact", head: true })
+                    .gte("registered_at", startISO)
+                    .lte("registered_at", endISO);
+                  fieldmarketingCount = fmCount || 0;
                 }
                 
                 value = telesalesCount + fieldmarketingCount;
