@@ -453,9 +453,6 @@ export default function CandidateDetail() {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg">Ansøgning</CardTitle>
-                <CardDescription>
-                  {notesArray.length} {notesArray.length === 1 ? "note" : "noter"}
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 {notesArray.length === 0 ? <div className="text-center py-8">
