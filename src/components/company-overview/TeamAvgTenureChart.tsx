@@ -9,7 +9,8 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 const normalizeTeamName = (name: string | null): string => {
   if (!name) return "Ukendt";
   const lower = name.toLowerCase().trim();
-  if (lower.includes("eesy fm") || lower === "eesy fm") return "Eesy FM";
+  // Merge "Eesy FM" into "Fieldmarketing"
+  if (lower.includes("eesy fm") || lower === "eesy fm") return "Fieldmarketing";
   if (lower.includes("eesy tm") || lower === "eesy tm") return "Eesy TM";
   if (lower.includes("fieldmarketing")) return "Fieldmarketing";
   if (lower.includes("relatel")) return "Relatel";
