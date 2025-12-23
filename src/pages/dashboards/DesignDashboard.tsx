@@ -421,20 +421,60 @@ export default function DesignDashboard() {
     ));
   };
 
-  // Generate example values for preview
+  // Generate example values for preview based on KPI type
   const getExampleValue = (widget: PlacedWidget) => {
     if (widget.dataSource === "custom") {
       return widget.customValue || "0";
     }
-    // Generate realistic example based on KPI type
+    // Generate realistic example based on specific KPI type ID
     const firstKpi = widget.kpiTypeIds[0];
-    if (firstKpi?.includes("sales") || firstKpi?.includes("revenue")) return "847.520 kr";
-    if (firstKpi?.includes("calls")) return "1.247";
-    if (firstKpi?.includes("conversion") || firstKpi?.includes("rate")) return "23,4%";
-    if (firstKpi?.includes("target") || firstKpi?.includes("progress")) return "78%";
-    if (firstKpi?.includes("avg")) return "4.320 kr";
-    if (firstKpi?.includes("time") || firstKpi?.includes("duration")) return "3:45";
-    return Math.floor(Math.random() * 1000 + 100).toString();
+    
+    // Match specific KPI IDs first for accuracy
+    switch (firstKpi) {
+      case "sales-count":
+        return "127";
+      case "sales-revenue":
+        return "847.520 kr";
+      case "avg-order-value":
+        return "6.674 kr";
+      case "conversion-rate":
+        return "23,4%";
+      case "calls-total":
+        return "1.247";
+      case "calls-answered":
+        return "892";
+      case "avg-call-duration":
+        return "4:32";
+      case "talk-time":
+        return "67:45";
+      case "team-target-progress":
+      case "individual-target":
+        return "78%";
+      case "team-sales-rank":
+        return "#3";
+      case "leads-generated":
+        return "342";
+      case "appointments-booked":
+        return "89";
+      case "customer-satisfaction":
+        return "4,7";
+      case "nps-score":
+        return "+47";
+      case "active-agents":
+        return "24";
+      case "avg-handle-time":
+        return "3:45";
+      case "first-call-resolution":
+        return "68%";
+      default:
+        // Fallback patterns for custom KPIs
+        if (firstKpi?.includes("count") || firstKpi?.includes("antal")) return "127";
+        if (firstKpi?.includes("revenue") || firstKpi?.includes("omsætning")) return "847.520 kr";
+        if (firstKpi?.includes("rate") || firstKpi?.includes("%")) return "23,4%";
+        if (firstKpi?.includes("time") || firstKpi?.includes("tid")) return "3:45";
+        if (firstKpi?.includes("avg") || firstKpi?.includes("gns")) return "4.320 kr";
+        return "—";
+    }
   };
 
   const getExampleTrend = () => {
