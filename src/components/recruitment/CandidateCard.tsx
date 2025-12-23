@@ -74,7 +74,6 @@ const statusLabels: Record<string, string> = {
   contacted: "Kontaktet",
   interview_scheduled: "Samtale planlagt",
   interviewed: "Samtale afholdt",
-  offer_sent: "Tilbud sendt",
   hired: "Ansat",
   rejected: "Afvist",
 };
@@ -246,7 +245,6 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
                           <SelectItem value="contacted">Kontaktet</SelectItem>
                           <SelectItem value="interview_scheduled">Samtale planlagt</SelectItem>
                           <SelectItem value="interviewed">Samtale afholdt</SelectItem>
-                          <SelectItem value="offer_sent">Tilbud sendt</SelectItem>
                           <SelectItem value="hired">Ansat</SelectItem>
                           <SelectItem value="rejected">Afvist</SelectItem>
                           <SelectItem value="ghostet">Ghostet</SelectItem>
