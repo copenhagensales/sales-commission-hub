@@ -85,19 +85,36 @@ export const useDashboardKpiData = () => {
       let value = 0;
 
       // Handle different KPI types
+      // Helper: Get client IDs for team filter
+      const getClientIdsForTeam = async (teamId: string): Promise<string[]> => {
+        const { data: teamClients } = await supabase
+          .from("team_clients")
+          .select("client_id")
+          .eq("team_id", teamId);
+        return (teamClients || []).map(tc => tc.client_id);
+      };
+
       switch (kpiTypeId) {
         case "sales-count": {
           // Query telesales via sale_items (same logic as TeamOverview)
           let telesalesCount = 0;
           let fieldmarketingCount = 0;
           
-          // Get campaign IDs for client filter
+          // Get client IDs based on team or client filter
+          let targetClientIds: string[] = [];
+          if (teamId) {
+            targetClientIds = await getClientIdsForTeam(teamId);
+          } else if (clientId) {
+            targetClientIds = [clientId];
+          }
+          
+          // Get campaign IDs for the target clients
           let campaignIds: string[] = [];
-          if (clientId) {
+          if (targetClientIds.length > 0) {
             const { data: campaigns } = await supabase
               .from("client_campaigns")
               .select("id")
-              .eq("client_id", clientId);
+              .in("client_id", targetClientIds);
             campaignIds = (campaigns || []).map(c => c.id);
           } else {
             const { data: allCampaigns } = await supabase
@@ -137,13 +154,13 @@ export const useDashboardKpiData = () => {
           }
           
           // Also count fieldmarketing_sales
-          if (clientId) {
+          if (targetClientIds.length > 0) {
             const { count: fmCount, error: fmError } = await supabase
               .from("fieldmarketing_sales")
               .select("id", { count: "exact", head: true })
               .gte("registered_at", startISO)
               .lte("registered_at", endISO)
-              .eq("client_id", clientId);
+              .in("client_id", targetClientIds);
             if (fmError) throw fmError;
             fieldmarketingCount = fmCount || 0;
           } else {
@@ -460,13 +477,25 @@ export const useWidgetKpiData = (widgets: Array<{
                 let telesalesCount = 0;
                 let fieldmarketingCount = 0;
                 
-                // Get campaign IDs for client filter
+                // Get client IDs based on team or client filter
+                let targetClientIds: string[] = [];
+                if (widget.teamId) {
+                  const { data: teamClients } = await supabase
+                    .from("team_clients")
+                    .select("client_id")
+                    .eq("team_id", widget.teamId);
+                  targetClientIds = (teamClients || []).map(tc => tc.client_id);
+                } else if (widget.clientId) {
+                  targetClientIds = [widget.clientId];
+                }
+                
+                // Get campaign IDs for the target clients
                 let campaignIds: string[] = [];
-                if (widget.clientId) {
+                if (targetClientIds.length > 0) {
                   const { data: campaigns } = await supabase
                     .from("client_campaigns")
                     .select("id")
-                    .eq("client_id", widget.clientId);
+                    .in("client_id", targetClientIds);
                   campaignIds = (campaigns || []).map(c => c.id);
                 } else {
                   const { data: allCampaigns } = await supabase
@@ -506,13 +535,13 @@ export const useWidgetKpiData = (widgets: Array<{
                 }
                 
                 // Also count fieldmarketing_sales
-                if (widget.clientId) {
+                if (targetClientIds.length > 0) {
                   const { count: fmCount } = await supabase
                     .from("fieldmarketing_sales")
                     .select("id", { count: "exact", head: true })
                     .gte("registered_at", startISO)
                     .lte("registered_at", endISO)
-                    .eq("client_id", widget.clientId);
+                    .in("client_id", targetClientIds);
                   fieldmarketingCount = fmCount || 0;
                 } else {
                   const { count: fmCount } = await supabase
