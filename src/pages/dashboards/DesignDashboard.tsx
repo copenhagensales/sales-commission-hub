@@ -189,25 +189,31 @@ export default function DesignDashboard() {
   const [teams, setTeams] = useState<DbTeam[]>([]);
   const [clients, setClients] = useState<DbClient[]>([]);
 
-  // Load dashboard from URL param
+  // Load dashboard from URL param or auto-load the most recent one
   useEffect(() => {
     const dashboardId = searchParams.get('id');
+    
+    const loadDashboardData = async (id: string) => {
+      const dashboard = await loadDashboard(id);
+      if (dashboard) {
+        setCurrentDashboardId(dashboard.id);
+        setDashboardName(dashboard.name);
+        setGlobalDesign(dashboard.design_id);
+        const widgets: PlacedWidget[] = dashboard.widgets.map(w => ({
+          ...w,
+          customFromDate: w.customFromDate ? new Date(w.customFromDate) : undefined
+        }));
+        setPlacedWidgets(widgets);
+      }
+    };
+    
     if (dashboardId) {
-      loadDashboard(dashboardId).then(dashboard => {
-        if (dashboard) {
-          setCurrentDashboardId(dashboard.id);
-          setDashboardName(dashboard.name);
-          setGlobalDesign(dashboard.design_id);
-          // Convert stored widgets to PlacedWidget format
-          const widgets: PlacedWidget[] = dashboard.widgets.map(w => ({
-            ...w,
-            customFromDate: w.customFromDate ? new Date(w.customFromDate) : undefined
-          }));
-          setPlacedWidgets(widgets);
-        }
-      });
+      loadDashboardData(dashboardId);
+    } else if (dashboards.length > 0 && !currentDashboardId) {
+      // Auto-load the most recent dashboard (first in list, ordered by created_at DESC)
+      loadDashboardData(dashboards[0].id);
     }
-  }, [searchParams]);
+  }, [searchParams, dashboards]);
 
   // Fetch teams and clients from database
   useEffect(() => {
