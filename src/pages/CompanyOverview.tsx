@@ -202,17 +202,24 @@ export default function CompanyOverview() {
     },
   });
 
-  // Fetch 60-day churn (combined) with cohort-based trend
+  // Fetch 60-day churn using ALL employees (current + historical) - matches team table calculation
   const { data: churnStats, isLoading: isLoadingChurn } = useQuery({
-    queryKey: ["company-overview-combined-churn-stats"],
+    queryKey: ["company-overview-all-employees-churn-stats"],
     queryFn: async () => {
-      // Team memberships for filtering
+      // Team memberships for filtering current employees
       const { data: teamMemberships, error: tmError } = await supabase
         .from("team_members")
         .select("employee_id, team:teams(name)");
       if (tmError) throw tmError;
       
-      // Historical employees with end_date and start info
+      // Current active employees
+      const { data: currentEmployees, error: currError } = await supabase
+        .from("employee_master_data")
+        .select("id, employment_start_date")
+        .eq("is_active", true);
+      if (currError) throw currError;
+      
+      // Historical employees (those who left)
       const { data: historicalData, error: histError } = await supabase
         .from("historical_employment")
         .select("id, team_name, tenure_days, end_date, start_date");
@@ -226,69 +233,40 @@ export default function CompanyOverview() {
         }
       });
       
-      const now = new Date();
-      const thirtyDaysAgo = subDays(now, 30);
-      const sixtyDaysAgo = subDays(now, 60);
-      const ninetyDaysAgo = subDays(now, 90);
+      // Count current employees (excluding Stab/Ledelse)
+      let currentCount = 0;
+      (currentEmployees || []).forEach(emp => {
+        const teamName = normalizeTeamName(employeeTeamMap.get(emp.id) || null);
+        if (EXCLUDED_TEAMS.includes(teamName)) return;
+        currentCount++;
+      });
       
-      // Calculate overall churn rate (all historical employees)
-      let totalCount = 0;
+      // Count historical employees and 60-day exits (excluding Stab/Ledelse)
+      let historicalCount = 0;
       let exits60Days = 0;
-      
-      // For cohort comparison:
-      // Current cohort: employees who started 30-90 days ago (they've had 30-90 days, enough time to potentially churn within 60 days)
-      // Previous cohort: employees who started 60-120 days ago
-      let currentCohortTotal = 0;
-      let currentCohortExits = 0;
-      let prevCohortTotal = 0;
-      let prevCohortExits = 0;
       
       (historicalData || []).forEach(emp => {
         const teamName = normalizeTeamName(emp.team_name);
         if (EXCLUDED_TEAMS.includes(teamName)) return;
         
-        totalCount++;
+        historicalCount++;
         if (emp.tenure_days <= 60) {
           exits60Days++;
         }
-        
-        // Cohort analysis based on start_date
-        const startDate = emp.start_date ? parseISO(emp.start_date) : null;
-        if (startDate) {
-          // Current cohort: started 30-90 days ago
-          if (startDate >= ninetyDaysAgo && startDate < thirtyDaysAgo) {
-            currentCohortTotal++;
-            if (emp.tenure_days <= 60) {
-              currentCohortExits++;
-            }
-          }
-          // Previous cohort: started 90-150 days ago
-          const oneFiftyDaysAgo = subDays(now, 150);
-          if (startDate >= oneFiftyDaysAgo && startDate < ninetyDaysAgo) {
-            prevCohortTotal++;
-            if (emp.tenure_days <= 60) {
-              prevCohortExits++;
-            }
-          }
-        }
       });
       
+      // Total = current + historical (same as team table)
+      const totalCount = currentCount + historicalCount;
+      
+      // Churn rate = exits60Days / totalCount (all employees)
       const churnRate = totalCount > 0 ? (exits60Days / totalCount) * 100 : 0;
-      
-      // Cohort churn rates
-      const currentCohortChurn = currentCohortTotal > 0 ? (currentCohortExits / currentCohortTotal) * 100 : 0;
-      const prevCohortChurn = prevCohortTotal > 0 ? (prevCohortExits / prevCohortTotal) * 100 : 0;
-      
-      // Change in churn rate between cohorts (percentage points)
-      const churnChange = currentCohortChurn - prevCohortChurn;
       
       return { 
         churnRate: Math.round(churnRate * 10) / 10, 
         totalCount,
         exits60Days,
-        churnChange: Math.round(churnChange * 10) / 10,
-        currentCohortTotal,
-        prevCohortTotal
+        currentCount,
+        historicalCount
       };
     },
   });
@@ -363,12 +341,7 @@ export default function CompanyOverview() {
       description: `${churnStats?.exits60Days ?? 0} af ${churnStats?.totalCount ?? 0} stoppede inden 60 dage`,
       color: "text-primary",
       bgColor: "bg-primary/10",
-      trend: churnStats ? {
-        change: churnStats.churnChange,
-        percentage: null, // Show as percentage points change between cohorts
-        unit: "pp",
-        invertColors: true // For churn, lower is better
-      } : null
+      trend: null // No trend - using all employees (current + historical) calculation
     },
   ];
 
@@ -395,13 +368,13 @@ export default function CompanyOverview() {
                 <div className="text-3xl font-bold text-foreground">{kpi.value}</div>
                 <p className="text-xs text-muted-foreground mt-1">{kpi.description}</p>
                 {kpi.trend && (
-                  <div className={`flex items-center gap-1 mt-2 text-sm ${getTrendColor(kpi.trend.change, kpi.trend.invertColors)}`}>
+                  <div className={`flex items-center gap-1 mt-2 text-sm ${getTrendColor(kpi.trend.change, 'invertColors' in kpi.trend ? Boolean(kpi.trend.invertColors) : false)}`}>
                     {(() => {
                       const TrendIcon = getTrendIcon(kpi.trend.change);
                       return <TrendIcon className="h-4 w-4" />;
                     })()}
                     <span>
-                      {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change.toFixed(1)}{kpi.trend.unit ? ` ${kpi.trend.unit}` : ""} ift. forrige 30 dage
+                      {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change.toFixed(1)}{'unit' in kpi.trend && kpi.trend.unit ? ` ${String(kpi.trend.unit)}` : ""} ift. forrige 30 dage
                     </span>
                     {kpi.trend.percentage !== null && kpi.trend.percentage !== 0 && (
                       <span className="text-muted-foreground ml-1">
