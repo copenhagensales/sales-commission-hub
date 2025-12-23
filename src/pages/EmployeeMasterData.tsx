@@ -1176,38 +1176,6 @@ export default function EmployeeMasterData() {
           </div>
         </div>
 
-        {/* Employees without team */}
-        {(() => {
-          const employeesWithoutTeam = employees.filter(
-            (emp) => !emp.team_id && emp.is_active
-          );
-          
-          if (employeesWithoutTeam.length === 0) return null;
-          
-          return (
-            <div className="rounded-xl border border-border bg-card/50 p-4 mt-6">
-              <div className="flex items-center gap-2 mb-4">
-                <UserX className="h-4 w-4 text-muted-foreground" />
-                <h3 className="font-semibold text-foreground">
-                  Medarbejdere uden team ({employeesWithoutTeam.length})
-                </h3>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {employeesWithoutTeam.map((emp) => (
-                  <div
-                    key={emp.id}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
-                    onClick={() => navigate(`/employees/${emp.id}`)}
-                  >
-                    <span className="text-sm text-foreground">
-                      {emp.first_name} {emp.last_name}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
           </TabsContent>
 
           <TabsContent value="staff-employees" className="space-y-6">
