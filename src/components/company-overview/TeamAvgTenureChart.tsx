@@ -55,8 +55,9 @@ export function TeamAvgTenureChart() {
       teamData.count++;
     });
 
-    // Convert to array with average
+    // Convert to array with average, exclude "Stab"
     return Array.from(teamMap.entries())
+      .filter(([name]) => name.toLowerCase() !== "stab")
       .map(([name, data]) => ({
         name,
         avgMonths: data.count > 0 ? Math.round(data.totalMonths / data.count) : 0,
