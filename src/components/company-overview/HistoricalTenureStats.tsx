@@ -180,8 +180,8 @@ export function HistoricalTenureStats() {
       currentCount: stats.currentCount,
       leftCount: stats.leftCount,
       churned60: stats.churned60,
-      // Churn rate: % of those who left that did so within 60 days
-      churnRate60: stats.leftCount > 0 ? Math.round((stats.churned60 / stats.leftCount) * 100 * 10) / 10 : 0,
+      // Churn rate: % of ALL employees (current + left) who left within 60 days
+      churnRate60: stats.count > 0 ? Math.round((stats.churned60 / stats.count) * 100 * 10) / 10 : 0,
     })).sort((a, b) => b.avgTenureDays - a.avgTenureDays);
 
   // Overall stats
@@ -192,7 +192,8 @@ export function HistoricalTenureStats() {
   const avgTenureDays = Math.round(totalDays / totalEmployees);
   const avgTenureMonths = Math.round((avgTenureDays / 30) * 10) / 10;
   const churned60 = historicalOnly.filter(e => e.tenure_days <= 60).length;
-  const churnRate60 = totalLeft > 0 ? Math.round((churned60 / totalLeft) * 100 * 10) / 10 : 0;
+  // Churn rate: % of ALL employees who left within 60 days
+  const churnRate60 = totalEmployees > 0 ? Math.round((churned60 / totalEmployees) * 100 * 10) / 10 : 0;
 
   // 60-day churn comparison chart
   const churnChartData = teamChartData
