@@ -5,6 +5,7 @@ import { Users, TrendingUp, TrendingDown, Minus, Building2, Target, FileText } f
 import { subDays, format } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { TeamTenureChart } from "@/components/company-overview/TeamTenureChart";
+import { TeamAvgTenureChart } from "@/components/company-overview/TeamAvgTenureChart";
 
 export default function CompanyOverview() {
   const today = new Date();
@@ -191,8 +192,11 @@ export default function CompanyOverview() {
           ))}
         </div>
 
-        {/* Team Tenure Chart */}
-        <TeamTenureChart />
+        {/* Team Tenure Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TeamAvgTenureChart />
+          <TeamTenureChart />
+        </div>
       </div>
     </MainLayout>
   );
