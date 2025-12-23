@@ -17,6 +17,7 @@ export const SUGGESTED_KPIS: Omit<KpiTypeConfig, "isActive">[] = [
   { id: "sales-revenue", name: "Omsætning", description: "Total omsætning i kr.", category: "Salg", isSuggested: true },
   { id: "avg-order-value", name: "Gns. ordreværdi", description: "Gennemsnitlig ordreværdi", category: "Salg", isSuggested: true },
   { id: "conversion-rate", name: "Konverteringsrate", description: "Konverteringsrate i %", category: "Salg", isSuggested: true },
+  { id: "conversion-rate", name: "Konverteringsrate", description: "Konverteringsrate i %", category: "Salg", isSuggested: true }
   
   // Opkald
   { id: "calls-total", name: "Antal opkald", description: "Totalt antal opkald", category: "Opkald", isSuggested: true },
