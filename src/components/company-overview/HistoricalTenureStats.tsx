@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { differenceInDays, parseISO } from "date-fns";
+import { differenceInDays, parseISO, subDays } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 interface CombinedEmployee {
   id: string;
@@ -139,7 +140,12 @@ export function HistoricalTenureStats() {
   const historicalOnly = allEmployees.filter(e => !e.is_current);
   const currentOnly = allEmployees.filter(e => e.is_current);
 
-  // Group by normalized team - ALL employees
+  // Date boundaries for trend calculation (last 90 days vs previous 90 days)
+  const now = new Date();
+  const ninetyDaysAgo = subDays(now, 90);
+  const oneEightyDaysAgo = subDays(now, 180);
+
+  // Group by normalized team - ALL employees with trend data
   const teamStats = new Map<string, { 
     totalDays: number; 
     count: number; 
@@ -147,11 +153,21 @@ export function HistoricalTenureStats() {
     churned60: number;
     currentCount: number;
     leftCount: number;
+    // Trend: exits in last 90 days vs previous 90 days
+    exits60Last90d: number;
+    exits60Prev90d: number;
+    leaversLast90d: number;
+    leaversPrev90d: number;
   }>();
   
   allEmployees.forEach(emp => {
     if (!teamStats.has(emp.team_name)) {
-      teamStats.set(emp.team_name, { totalDays: 0, count: 0, churned30: 0, churned60: 0, currentCount: 0, leftCount: 0 });
+      teamStats.set(emp.team_name, { 
+        totalDays: 0, count: 0, churned30: 0, churned60: 0, 
+        currentCount: 0, leftCount: 0,
+        exits60Last90d: 0, exits60Prev90d: 0,
+        leaversLast90d: 0, leaversPrev90d: 0
+      });
     }
     const stats = teamStats.get(emp.team_name)!;
     stats.totalDays += emp.tenure_days;
@@ -167,28 +183,61 @@ export function HistoricalTenureStats() {
       if (emp.tenure_days <= 60) {
         stats.churned60++;
       }
+      
+      // Track trend data based on end_date
+      if (emp.end_date) {
+        const endDate = parseISO(emp.end_date);
+        if (endDate >= ninetyDaysAgo) {
+          stats.leaversLast90d++;
+          if (emp.tenure_days <= 60) {
+            stats.exits60Last90d++;
+          }
+        } else if (endDate >= oneEightyDaysAgo) {
+          stats.leaversPrev90d++;
+          if (emp.tenure_days <= 60) {
+            stats.exits60Prev90d++;
+          }
+        }
+      }
     }
   });
 
   // Teams to exclude from the overview
   const excludedTeams = ["Stab", "Ukendt"];
 
-  // Calculate averages and churn rates
+  // Calculate averages and churn rates with trends
   const teamChartData = Array.from(teamStats.entries())
     .filter(([team]) => !excludedTeams.includes(team))
-    .map(([team, stats]) => ({
-      team,
-      avgTenureDays: Math.round(stats.totalDays / stats.count),
-      avgTenureMonths: Math.round((stats.totalDays / stats.count / 30) * 10) / 10,
-      count: stats.count,
-      currentCount: stats.currentCount,
-      leftCount: stats.leftCount,
-      churned30: stats.churned30,
-      churned60: stats.churned60,
-      // Churn rate: % of ALL employees (current + left) who left within 30/60 days
-      churnRate30: stats.count > 0 ? Math.round((stats.churned30 / stats.count) * 100 * 10) / 10 : 0,
-      churnRate60: stats.count > 0 ? Math.round((stats.churned60 / stats.count) * 100 * 10) / 10 : 0,
-    })).sort((a, b) => b.avgTenureDays - a.avgTenureDays);
+    .map(([team, stats]) => {
+      // Calculate trend: compare 60-day churn rate between periods
+      const churnLast90d = stats.leaversLast90d > 0 
+        ? (stats.exits60Last90d / stats.leaversLast90d) * 100 
+        : 0;
+      const churnPrev90d = stats.leaversPrev90d > 0 
+        ? (stats.exits60Prev90d / stats.leaversPrev90d) * 100 
+        : 0;
+      const churnTrend = churnLast90d - churnPrev90d; // Negative = improvement
+      
+      return {
+        team,
+        avgTenureDays: Math.round(stats.totalDays / stats.count),
+        avgTenureMonths: Math.round((stats.totalDays / stats.count / 30) * 10) / 10,
+        count: stats.count,
+        currentCount: stats.currentCount,
+        leftCount: stats.leftCount,
+        churned30: stats.churned30,
+        churned60: stats.churned60,
+        // Churn rate: % of ALL employees (current + left) who left within 30/60 days
+        churnRate30: stats.count > 0 ? Math.round((stats.churned30 / stats.count) * 100 * 10) / 10 : 0,
+        churnRate60: stats.count > 0 ? Math.round((stats.churned60 / stats.count) * 100 * 10) / 10 : 0,
+        // Trend data
+        churnTrend: Math.round(churnTrend * 10) / 10,
+        exits60Last90d: stats.exits60Last90d,
+        exits60Prev90d: stats.exits60Prev90d,
+        leaversLast90d: stats.leaversLast90d,
+        leaversPrev90d: stats.leaversPrev90d,
+      };
+    }).sort((a, b) => b.avgTenureDays - a.avgTenureDays);
 
   // Overall stats
   const totalEmployees = allEmployees.length;
@@ -202,6 +251,15 @@ export function HistoricalTenureStats() {
   // Churn rate: % of ALL employees who left within 30/60 days
   const churnRate30 = totalEmployees > 0 ? Math.round((churned30 / totalEmployees) * 100 * 10) / 10 : 0;
   const churnRate60 = totalEmployees > 0 ? Math.round((churned60 / totalEmployees) * 100 * 10) / 10 : 0;
+  
+  // Overall trend
+  const totalExits60Last90d = teamChartData.reduce((sum, t) => sum + t.exits60Last90d, 0);
+  const totalExits60Prev90d = teamChartData.reduce((sum, t) => sum + t.exits60Prev90d, 0);
+  const totalLeaversLast90d = teamChartData.reduce((sum, t) => sum + t.leaversLast90d, 0);
+  const totalLeaversPrev90d = teamChartData.reduce((sum, t) => sum + t.leaversPrev90d, 0);
+  const overallChurnLast90d = totalLeaversLast90d > 0 ? (totalExits60Last90d / totalLeaversLast90d) * 100 : 0;
+  const overallChurnPrev90d = totalLeaversPrev90d > 0 ? (totalExits60Prev90d / totalLeaversPrev90d) * 100 : 0;
+  const overallChurnTrend = Math.round((overallChurnLast90d - overallChurnPrev90d) * 10) / 10;
 
   // 60-day churn comparison chart
   const churnChartData = teamChartData
@@ -358,7 +416,12 @@ export function HistoricalTenureStats() {
       {/* Team breakdown table */}
       <Card>
         <CardHeader>
-          <CardTitle>Detaljeret teamoversigt (alle ansatte)</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Detaljeret teamoversigt (alle ansatte)</span>
+            <span className="text-sm font-normal text-muted-foreground">
+              Trend: sidste 90 dage vs. forrige 90 dage
+            </span>
+          </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table className="min-w-[900px]">
@@ -371,6 +434,7 @@ export function HistoricalTenureStats() {
                 <TableHead className="text-right">Gns. anciennitet</TableHead>
                 <TableHead className="text-right">30-dages churn</TableHead>
                 <TableHead className="text-right">60-dages churn</TableHead>
+                <TableHead className="text-right">Trend (60d)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -407,6 +471,28 @@ export function HistoricalTenureStats() {
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {(team.leaversLast90d > 0 || team.leaversPrev90d > 0) ? (
+                      <div className={`flex items-center justify-end gap-1 ${
+                        team.churnTrend < 0 ? 'text-green-600' : 
+                        team.churnTrend > 0 ? 'text-red-600' : 
+                        'text-muted-foreground'
+                      }`}>
+                        {team.churnTrend < 0 ? (
+                          <TrendingDown className="h-4 w-4" />
+                        ) : team.churnTrend > 0 ? (
+                          <TrendingUp className="h-4 w-4" />
+                        ) : (
+                          <Minus className="h-4 w-4" />
+                        )}
+                        <span className="text-sm">
+                          {team.churnTrend > 0 ? '+' : ''}{team.churnTrend}pp
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
               <TableRow className="font-bold bg-muted/50">
@@ -420,6 +506,24 @@ export function HistoricalTenureStats() {
                 </TableCell>
                 <TableCell className="text-right">
                   <Badge variant="destructive">{churnRate60}%</Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className={`flex items-center justify-end gap-1 ${
+                    overallChurnTrend < 0 ? 'text-green-600' : 
+                    overallChurnTrend > 0 ? 'text-red-600' : 
+                    'text-muted-foreground'
+                  }`}>
+                    {overallChurnTrend < 0 ? (
+                      <TrendingDown className="h-4 w-4" />
+                    ) : overallChurnTrend > 0 ? (
+                      <TrendingUp className="h-4 w-4" />
+                    ) : (
+                      <Minus className="h-4 w-4" />
+                    )}
+                    <span className="text-sm">
+                      {overallChurnTrend > 0 ? '+' : ''}{overallChurnTrend}pp
+                    </span>
+                  </div>
                 </TableCell>
               </TableRow>
             </TableBody>
