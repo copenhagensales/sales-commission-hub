@@ -177,18 +177,20 @@ export const routes: RouteConfig[] = [
   { path: "/client-sales-overview", component: ClientSalesOverview, access: "role", positionPermission: "menu_sales" },
   { path: "/boards/sales", component: SalesDashboard, access: "protected" },
   
-  // Team Dashboards (full screen, no sidebar) - accessible to all authenticated users
-  { path: "/dashboards/cph-sales", component: CphSalesDashboard, access: "protected" },
-  { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "protected" },
-  { path: "/dashboards/tdc-erhverv", component: TdcErhvervDashboard, access: "protected" },
-  { path: "/dashboards/relatel", component: RelatelDashboard, access: "protected" },
-  { path: "/dashboards/tryg", component: TrygDashboard, access: "protected" },
-  { path: "/dashboards/ase", component: AseDashboard, access: "protected" },
-  { path: "/dashboards/mg-test", component: MgTestDashboard, access: "protected" },
+  // Team Dashboards (full screen, no sidebar) - with role-based permissions
+  { path: "/dashboards/cph-sales", component: CphSalesDashboard, access: "role", positionPermission: "menu_dashboard_cph_sales" },
+  { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "role", positionPermission: "menu_dashboard_fieldmarketing" },
+  { path: "/dashboards/tdc-erhverv", component: TdcErhvervDashboard, access: "role", positionPermission: "menu_dashboard_tdc_erhverv" },
+  { path: "/dashboards/relatel", component: RelatelDashboard, access: "role", positionPermission: "menu_dashboard_relatel" },
+  { path: "/dashboards/tryg", component: TrygDashboard, access: "role", positionPermission: "menu_dashboard_tryg" },
+  { path: "/dashboards/ase", component: AseDashboard, access: "role", positionPermission: "menu_dashboard_ase" },
+  { path: "/dashboards/mg-test", component: MgTestDashboard, access: "role", positionPermission: "menu_dashboard_test" },
+  { path: "/dashboards/eesy-tm", component: TeamDashboard, access: "role", positionPermission: "menu_dashboard_eesy_tm" },
+  { path: "/dashboards/united", component: TeamDashboard, access: "role", positionPermission: "menu_dashboard_united" },
   
-  { path: "/dashboards/settings", component: DashboardSettings, access: "protected" },
-  { path: "/dashboards/design", component: DesignDashboard, access: "protected" },
-  { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "protected" },
+  { path: "/dashboards/settings", component: DashboardSettings, access: "role", positionPermission: "menu_dashboard_settings" },
+  { path: "/dashboards/design", component: DesignDashboard, access: "role", positionPermission: "menu_dashboard_design" },
+  { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "role", positionPermission: "menu_dashboards" },
   
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
 
