@@ -166,18 +166,23 @@ export function HistoricalTenureStats() {
     }
   });
 
+  // Teams to exclude from the overview
+  const excludedTeams = ["Stab", "Ukendt"];
+
   // Calculate averages and churn rates
-  const teamChartData = Array.from(teamStats.entries()).map(([team, stats]) => ({
-    team,
-    avgTenureDays: Math.round(stats.totalDays / stats.count),
-    avgTenureMonths: Math.round((stats.totalDays / stats.count / 30) * 10) / 10,
-    count: stats.count,
-    currentCount: stats.currentCount,
-    leftCount: stats.leftCount,
-    churned60: stats.churned60,
-    // Churn rate: % of those who left that did so within 60 days
-    churnRate60: stats.leftCount > 0 ? Math.round((stats.churned60 / stats.leftCount) * 100 * 10) / 10 : 0,
-  })).sort((a, b) => b.avgTenureDays - a.avgTenureDays);
+  const teamChartData = Array.from(teamStats.entries())
+    .filter(([team]) => !excludedTeams.includes(team))
+    .map(([team, stats]) => ({
+      team,
+      avgTenureDays: Math.round(stats.totalDays / stats.count),
+      avgTenureMonths: Math.round((stats.totalDays / stats.count / 30) * 10) / 10,
+      count: stats.count,
+      currentCount: stats.currentCount,
+      leftCount: stats.leftCount,
+      churned60: stats.churned60,
+      // Churn rate: % of those who left that did so within 60 days
+      churnRate60: stats.leftCount > 0 ? Math.round((stats.churned60 / stats.leftCount) * 100 * 10) / 10 : 0,
+    })).sort((a, b) => b.avgTenureDays - a.avgTenureDays);
 
   // Overall stats
   const totalEmployees = allEmployees.length;
