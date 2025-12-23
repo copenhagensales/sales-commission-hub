@@ -38,14 +38,17 @@ import {
   ArrowUpDown,
   Palette,
   Users,
-  X
+  X,
+  FolderOpen,
+  Loader2
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useWidgetTypes, WidgetTypeConfig } from "@/hooks/useWidgetTypes";
 import { useKpiTypes } from "@/hooks/useKpiTypes";
 import { useDesignTypes } from "@/hooks/useDesignTypes";
 import { ResizableWidgetCard, GRID_COLS, CELL_HEIGHT } from "@/components/dashboard/ResizableWidgetCard";
+import { useEmployeeDashboards, DashboardWidget } from "@/hooks/useEmployeeDashboards";
 
 interface TimePeriod {
   id: string;
@@ -164,17 +167,47 @@ const getWidgetIcon = (iconName: string) => {
 export default function DesignDashboard() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { activeWidgetTypes } = useWidgetTypes();
   const { activeKpiTypes } = useKpiTypes();
   const { activeDesignTypes } = useDesignTypes();
+  const { dashboards, saving, saveDashboard, loadDashboard } = useEmployeeDashboards();
+  
   const [placedWidgets, setPlacedWidgets] = useState<PlacedWidget[]>([]);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [isDesignPanelOpen, setIsDesignPanelOpen] = useState(true);
   const [editingWidget, setEditingWidget] = useState<PlacedWidget | null>(null);
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+  const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
+  const [dashboardName, setDashboardName] = useState("Mit Dashboard");
+  const [currentDashboardId, setCurrentDashboardId] = useState<string | null>(null);
+  const [globalDesign, setGlobalDesign] = useState<string>(() => {
+    return activeDesignTypes[0]?.id || "minimal";
+  });
   
   // Database data
   const [teams, setTeams] = useState<DbTeam[]>([]);
   const [clients, setClients] = useState<DbClient[]>([]);
+
+  // Load dashboard from URL param
+  useEffect(() => {
+    const dashboardId = searchParams.get('id');
+    if (dashboardId) {
+      loadDashboard(dashboardId).then(dashboard => {
+        if (dashboard) {
+          setCurrentDashboardId(dashboard.id);
+          setDashboardName(dashboard.name);
+          setGlobalDesign(dashboard.design_id);
+          // Convert stored widgets to PlacedWidget format
+          const widgets: PlacedWidget[] = dashboard.widgets.map(w => ({
+            ...w,
+            customFromDate: w.customFromDate ? new Date(w.customFromDate) : undefined
+          }));
+          setPlacedWidgets(widgets);
+        }
+      });
+    }
+  }, [searchParams]);
 
   // Fetch teams and clients from database
   useEffect(() => {
@@ -193,11 +226,36 @@ export default function DesignDashboard() {
   const handleClose = () => {
     navigate(-1); // Go back to previous page
   };
-  
-  // Global dashboard design state - default to first active design
-  const [globalDesign, setGlobalDesign] = useState<string>(() => {
-    return activeDesignTypes[0]?.id || "minimal";
-  });
+
+  const handleSaveDashboard = async () => {
+    // Convert widgets to storage format
+    const widgetsToSave: DashboardWidget[] = placedWidgets.map(w => ({
+      ...w,
+      customFromDate: w.customFromDate?.toISOString()
+    }));
+    
+    const savedId = await saveDashboard(dashboardName, globalDesign, widgetsToSave, currentDashboardId || undefined);
+    if (savedId) {
+      setCurrentDashboardId(savedId);
+      setIsSaveDialogOpen(false);
+    }
+  };
+
+  const handleLoadDashboard = async (dashboardId: string) => {
+    const dashboard = await loadDashboard(dashboardId);
+    if (dashboard) {
+      setCurrentDashboardId(dashboard.id);
+      setDashboardName(dashboard.name);
+      setGlobalDesign(dashboard.design_id);
+      const widgets: PlacedWidget[] = dashboard.widgets.map(w => ({
+        ...w,
+        customFromDate: w.customFromDate ? new Date(w.customFromDate) : undefined
+      }));
+      setPlacedWidgets(widgets);
+      setIsLoadDialogOpen(false);
+      toast({ title: `Dashboard "${dashboard.name}" indlæst` });
+    }
+  };
   
   // Config form state
   const [selectedWidgetType, setSelectedWidgetType] = useState<string>("");
@@ -425,12 +483,27 @@ export default function DesignDashboard() {
       {/* Header with close button */}
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b shrink-0">
         <div className="px-6 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Design Dashboard</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold">
+              {currentDashboardId ? dashboardName : "Design Dashboard"}
+            </h1>
+            {currentDashboardId && (
+              <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                Gemt
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
-            <Button>
-              <Save className="h-4 w-4 mr-2" />
+            <Button variant="outline" onClick={() => setIsLoadDialogOpen(true)}>
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Indlæs
+            </Button>
+            <Button onClick={() => setIsSaveDialogOpen(true)} disabled={saving || placedWidgets.length === 0}>
+              {saving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
               Gem Dashboard
             </Button>
             <Button 
@@ -924,6 +997,98 @@ export default function DesignDashboard() {
             </Button>
             <Button onClick={handleSaveWidget}>
               {editingWidget ? "Gem ændringer" : "Tilføj widget"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Save Dashboard Dialog */}
+      <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Gem Dashboard</DialogTitle>
+            <DialogDescription>
+              Giv dit dashboard et navn for at gemme det.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="dashboard-name">Dashboard navn</Label>
+              <Input
+                id="dashboard-name"
+                value={dashboardName}
+                onChange={(e) => setDashboardName(e.target.value)}
+                placeholder="Mit Dashboard"
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {placedWidgets.length} widget{placedWidgets.length !== 1 ? 's' : ''} vil blive gemt
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSaveDialogOpen(false)}>
+              Annuller
+            </Button>
+            <Button onClick={handleSaveDashboard} disabled={saving || !dashboardName.trim()}>
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Gemmer...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  {currentDashboardId ? 'Opdater' : 'Gem'}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Load Dashboard Dialog */}
+      <Dialog open={isLoadDialogOpen} onOpenChange={setIsLoadDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Indlæs Dashboard</DialogTitle>
+            <DialogDescription>
+              Vælg et af dine gemte dashboards.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4 max-h-[400px] overflow-y-auto">
+            {dashboards.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <FolderOpen className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>Du har ingen gemte dashboards endnu</p>
+              </div>
+            ) : (
+              dashboards.map((dashboard) => (
+                <div
+                  key={dashboard.id}
+                  className={cn(
+                    "p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors",
+                    currentDashboardId === dashboard.id && "border-primary bg-primary/5"
+                  )}
+                  onClick={() => handleLoadDashboard(dashboard.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">{dashboard.name}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {dashboard.widgets.length} widget{dashboard.widgets.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(dashboard.updated_at), "d. MMM yyyy", { locale: da })}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsLoadDialogOpen(false)}>
+              Luk
             </Button>
           </DialogFooter>
         </DialogContent>

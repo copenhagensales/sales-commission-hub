@@ -2225,6 +2225,47 @@ export type Database = {
           },
         ]
       }
+      employee_dashboards: {
+        Row: {
+          created_at: string
+          design_id: string | null
+          employee_id: string
+          id: string
+          is_default: boolean | null
+          name: string
+          updated_at: string
+          widgets: Json
+        }
+        Insert: {
+          created_at?: string
+          design_id?: string | null
+          employee_id: string
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          updated_at?: string
+          widgets?: Json
+        }
+        Update: {
+          created_at?: string
+          design_id?: string | null
+          employee_id?: string
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          updated_at?: string
+          widgets?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_dashboards_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_identity: {
         Row: {
           created_at: string | null
