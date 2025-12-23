@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Users, Building2, UserCheck, UserX, GripVertical } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Building2, UserCheck, UserX, GripVertical, UserPlus, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TeamStandardShifts } from "./TeamStandardShifts";
 import {
@@ -671,16 +671,23 @@ export function TeamsTab() {
                   )}
                 </TabsTrigger>
                 <TabsTrigger 
-                  value="employees"
+                  value="team-members"
                   className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 py-2 text-sm font-medium"
                 >
-                  <UserCheck className="h-4 w-4 mr-2" />
+                  <Users className="h-4 w-4 mr-2" />
                   Medarbejdere
                   {formData.employee_ids.length > 0 && (
                     <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">
                       {formData.employee_ids.length}
                     </Badge>
                   )}
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="add-employees"
+                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 py-2 text-sm font-medium"
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Tilføj medarbejdere
                 </TabsTrigger>
                 <TabsTrigger 
                   value="schedule"
@@ -826,8 +833,56 @@ export function TeamsTab() {
                 </div>
               </TabsContent>
 
-              {/* Employees Tab */}
-              <TabsContent value="employees" className="mt-0 py-6">
+              {/* Team Members Tab - Shows selected employees */}
+              <TabsContent value="team-members" className="mt-0 py-6">
+                <div className="space-y-4">
+                  {formData.employee_ids.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <UserX className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                      <p className="text-muted-foreground">Ingen medarbejdere på dette team</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Gå til "Tilføj medarbejdere" for at tilføje
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {employees
+                        .filter(emp => formData.employee_ids.includes(emp.id))
+                        .map((emp) => (
+                          <div 
+                            key={emp.id} 
+                            className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-all group"
+                          >
+                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                              {emp.first_name.charAt(0)}{emp.last_name.charAt(0)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium block truncate">
+                                {emp.first_name} {emp.last_name}
+                              </span>
+                              {emp.job_title && (
+                                <span className="text-xs text-muted-foreground truncate block">
+                                  {emp.job_title}
+                                </span>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                              onClick={() => toggleEmployee(emp.id)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* Add Employees Tab */}
+              <TabsContent value="add-employees" className="mt-0 py-6">
                 <div className="space-y-4">
                   <div className="relative">
                     <Input
