@@ -443,7 +443,13 @@ export function TeamsTab() {
 
       {/* Employees without team */}
       {(() => {
-        const employeesWithoutTeam = employees.filter((emp) => !emp.team_id);
+        // Get all employee IDs that are in at least one team
+        const employeeIdsWithTeam = new Set(teamMembers.map((tm) => tm.employee_id));
+        
+        // Filter employees who are NOT in any team
+        const employeesWithoutTeam = employees.filter(
+          (emp) => !employeeIdsWithTeam.has(emp.id)
+        );
         
         if (employeesWithoutTeam.length === 0) return null;
         
