@@ -230,8 +230,10 @@ export function HistoricalTenureStats() {
         // Churn rate: % of ALL employees (current + left) who left within 30/60 days
         churnRate30: stats.count > 0 ? Math.round((stats.churned30 / stats.count) * 100 * 10) / 10 : 0,
         churnRate60: stats.count > 0 ? Math.round((stats.churned60 / stats.count) * 100 * 10) / 10 : 0,
-        // Trend data
+        // Trend data - actual rates for both periods
         churnTrend: Math.round(churnTrend * 10) / 10,
+        churnLast90d: Math.round(churnLast90d * 10) / 10,
+        churnPrev90d: Math.round(churnPrev90d * 10) / 10,
         exits60Last90d: stats.exits60Last90d,
         exits60Prev90d: stats.exits60Prev90d,
         leaversLast90d: stats.leaversLast90d,
@@ -260,6 +262,8 @@ export function HistoricalTenureStats() {
   const overallChurnLast90d = totalLeaversLast90d > 0 ? (totalExits60Last90d / totalLeaversLast90d) * 100 : 0;
   const overallChurnPrev90d = totalLeaversPrev90d > 0 ? (totalExits60Prev90d / totalLeaversPrev90d) * 100 : 0;
   const overallChurnTrend = Math.round((overallChurnLast90d - overallChurnPrev90d) * 10) / 10;
+  const overallChurnLast90dRounded = Math.round(overallChurnLast90d * 10) / 10;
+  const overallChurnPrev90dRounded = Math.round(overallChurnPrev90d * 10) / 10;
 
   // 60-day churn comparison chart
   const churnChartData = teamChartData
@@ -473,20 +477,20 @@ export function HistoricalTenureStats() {
                   </TableCell>
                   <TableCell className="text-right">
                     {(team.leaversLast90d > 0 || team.leaversPrev90d > 0) ? (
-                      <div className={`flex items-center justify-end gap-1 ${
+                      <div className={`flex items-center justify-end gap-1 text-sm ${
                         team.churnTrend < 0 ? 'text-green-600' : 
                         team.churnTrend > 0 ? 'text-red-600' : 
                         'text-muted-foreground'
                       }`}>
                         {team.churnTrend < 0 ? (
-                          <TrendingDown className="h-4 w-4" />
+                          <TrendingDown className="h-4 w-4 shrink-0" />
                         ) : team.churnTrend > 0 ? (
-                          <TrendingUp className="h-4 w-4" />
+                          <TrendingUp className="h-4 w-4 shrink-0" />
                         ) : (
-                          <Minus className="h-4 w-4" />
+                          <Minus className="h-4 w-4 shrink-0" />
                         )}
-                        <span className="text-sm">
-                          {team.churnTrend > 0 ? '+' : ''}{team.churnTrend}pp
+                        <span>
+                          {team.churnPrev90d}% → {team.churnLast90d}%
                         </span>
                       </div>
                     ) : (
@@ -508,20 +512,20 @@ export function HistoricalTenureStats() {
                   <Badge variant="destructive">{churnRate60}%</Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className={`flex items-center justify-end gap-1 ${
+                  <div className={`flex items-center justify-end gap-1 text-sm ${
                     overallChurnTrend < 0 ? 'text-green-600' : 
                     overallChurnTrend > 0 ? 'text-red-600' : 
                     'text-muted-foreground'
                   }`}>
                     {overallChurnTrend < 0 ? (
-                      <TrendingDown className="h-4 w-4" />
+                      <TrendingDown className="h-4 w-4 shrink-0" />
                     ) : overallChurnTrend > 0 ? (
-                      <TrendingUp className="h-4 w-4" />
+                      <TrendingUp className="h-4 w-4 shrink-0" />
                     ) : (
-                      <Minus className="h-4 w-4" />
+                      <Minus className="h-4 w-4 shrink-0" />
                     )}
-                    <span className="text-sm">
-                      {overallChurnTrend > 0 ? '+' : ''}{overallChurnTrend}pp
+                    <span>
+                      {overallChurnPrev90dRounded}% → {overallChurnLast90dRounded}%
                     </span>
                   </div>
                 </TableCell>
