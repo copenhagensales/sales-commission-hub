@@ -131,10 +131,24 @@ export function TeamAvgTenureChart() {
               }}
               labelStyle={{ color: "hsl(var(--foreground))" }}
               formatter={(value: number) => [formatMonths(value), "Gns. anciennitet"]}
+              cursor={{ fill: "hsl(var(--primary) / 0.2)" }}
             />
-            <Bar dataKey="avgMonths" name="Gns. anciennitet">
+            <Bar 
+              dataKey="avgMonths" 
+              name="Gns. anciennitet"
+              style={{ cursor: "pointer" }}
+            >
               {chartData.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={COLORS[index % COLORS.length]}
+                  style={{ 
+                    filter: "brightness(1)",
+                    transition: "filter 0.2s ease"
+                  }}
+                  onMouseEnter={(e: any) => e.target.style.filter = "brightness(1.3)"}
+                  onMouseLeave={(e: any) => e.target.style.filter = "brightness(1)"}
+                />
               ))}
             </Bar>
           </BarChart>
