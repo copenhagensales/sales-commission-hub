@@ -6,7 +6,7 @@ import { subDays, subMonths, format, differenceInMonths, differenceInDays } from
 import { MainLayout } from "@/components/layout/MainLayout";
 import { TeamAvgTenureChart } from "@/components/company-overview/TeamAvgTenureChart";
 import { NewHireChurnKpi } from "@/components/company-overview/NewHireChurnKpi";
-
+import { HistoricalTenureStats } from "@/components/company-overview/HistoricalTenureStats";
 export default function CompanyOverview() {
   const today = new Date();
   const thirtyDaysAgo = subDays(today, 30);
@@ -354,6 +354,7 @@ export default function CompanyOverview() {
         <div className="space-y-6">
           <TeamAvgTenureChart />
           <NewHireChurnKpi />
+          <HistoricalTenureStats />
         </div>
       </div>
     </MainLayout>
