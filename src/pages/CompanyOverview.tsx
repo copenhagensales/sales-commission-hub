@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, TrendingUp, TrendingDown, Minus, Building2, Target, FileText, Clock } from "lucide-react";
+import { Users, TrendingUp, TrendingDown, Minus, FileText, Clock } from "lucide-react";
 import { subDays, format, differenceInMonths } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { TeamAvgTenureChart } from "@/components/company-overview/TeamAvgTenureChart";
+import { NewHireChurnKpi } from "@/components/company-overview/NewHireChurnKpi";
 
 export default function CompanyOverview() {
   const today = new Date();
@@ -220,15 +221,6 @@ export default function CompanyOverview() {
         suffix: " mdr"
       } : null
     },
-    {
-      title: "KPI 4",
-      value: "-",
-      icon: Target,
-      description: "Kommer snart",
-      color: "text-muted-foreground",
-      bgColor: "bg-muted",
-      trend: null
-    },
   ];
 
   return (
@@ -239,7 +231,7 @@ export default function CompanyOverview() {
           <p className="text-muted-foreground">Overblik over virksomhedens nøgletal</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {kpiCards.map((kpi, index) => (
             <Card key={index} className="relative overflow-hidden">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -272,8 +264,11 @@ export default function CompanyOverview() {
           ))}
         </div>
 
-        {/* Team Tenure Chart */}
-        <TeamAvgTenureChart />
+        {/* Charts and detailed KPIs */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TeamAvgTenureChart />
+          <NewHireChurnKpi />
+        </div>
       </div>
     </MainLayout>
   );
