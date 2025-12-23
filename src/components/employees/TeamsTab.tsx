@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Users, Building2, UserCheck } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Building2, UserCheck, UserX } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { TeamStandardShifts } from "./TeamStandardShifts";
 
 interface Team {
@@ -28,6 +29,7 @@ interface Employee {
   first_name: string;
   last_name: string;
   job_title: string | null;
+  team_id: string | null;
 }
 
 interface Client {
@@ -37,6 +39,7 @@ interface Client {
 }
 
 export function TeamsTab() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -86,7 +89,7 @@ export function TeamsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, job_title")
+        .select("id, first_name, last_name, job_title, team_id")
         .eq("is_active", true)
         .order("first_name");
       if (error) throw error;
@@ -437,6 +440,37 @@ export function TeamsTab() {
           </Table>
         )}
       </div>
+
+      {/* Employees without team */}
+      {(() => {
+        const employeesWithoutTeam = employees.filter((emp) => !emp.team_id);
+        
+        if (employeesWithoutTeam.length === 0) return null;
+        
+        return (
+          <div className="rounded-xl border border-border bg-card/50 p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <UserX className="h-4 w-4 text-muted-foreground" />
+              <h3 className="font-semibold text-foreground">
+                Medarbejdere uden team ({employeesWithoutTeam.length})
+              </h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {employeesWithoutTeam.map((emp) => (
+                <div
+                  key={emp.id}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
+                  onClick={() => navigate(`/employees/${emp.id}`)}
+                >
+                  <span className="text-sm text-foreground">
+                    {emp.first_name} {emp.last_name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden">
