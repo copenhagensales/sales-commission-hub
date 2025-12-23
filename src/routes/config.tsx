@@ -73,6 +73,7 @@ import {
   SalesDashboard,
   ClosingShifts,
   Permissions,
+  CompanyOverview,
   RolePreview,
   LoginLog,
   TeamDashboard,
@@ -157,6 +158,7 @@ export const routes: RouteConfig[] = [
 
   { path: "/extra-work-admin", component: ExtraWorkAdmin, access: "role", positionPermission: "menu_extra_work_admin" },
   { path: "/contracts", component: Contracts, access: "role", positionPermission: "menu_contracts" },
+  { path: "/company-overview", component: CompanyOverview, access: "role", positionPermission: "menu_contracts" },
   { path: "/pulse-survey-results", component: PulseSurveyResults, access: "role", positionPermission: "menu_pulse_survey" },
   { path: "/career-wishes-overview", component: CareerWishesOverview, access: "role", positionPermission: "menu_career_wishes_overview" },
   { path: "/car-quiz-admin", component: CarQuizAdmin, access: "role", positionPermission: "menu_car_quiz_admin" },
