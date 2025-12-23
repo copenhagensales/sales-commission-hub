@@ -151,11 +151,11 @@ export default function CompanyOverview() {
     },
   });
 
-  // Fetch average tenure for all employees (current + historical) with trend
+  // Fetch average tenure for current employees only (no trend - it's not meaningful for tenure)
   const { data: tenureStats, isLoading: isLoadingTenure } = useQuery({
-    queryKey: ["company-overview-combined-tenure-stats"],
+    queryKey: ["company-overview-current-tenure-stats"],
     queryFn: async () => {
-      // Current employees
+      // Current employees only
       const { data: employees, error: empError } = await supabase
         .from("employee_master_data")
         .select("id, employment_start_date")
@@ -169,12 +169,6 @@ export default function CompanyOverview() {
         .select("employee_id, team:teams(name)");
       if (tmError) throw tmError;
       
-      // Historical employees with end_date for trend calculation
-      const { data: historicalData, error: histError } = await supabase
-        .from("historical_employment")
-        .select("id, team_name, tenure_days, end_date");
-      if (histError) throw histError;
-      
       // Map employee_id to team name
       const employeeTeamMap = new Map<string, string>();
       (teamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
@@ -184,11 +178,10 @@ export default function CompanyOverview() {
       });
       
       const now = new Date();
-      const thirtyDaysAgo = subDays(now, 30);
       let totalDays = 0;
       let count = 0;
       
-      // Current employees tenure
+      // Current employees tenure only
       (employees || []).forEach(emp => {
         const teamName = normalizeTeamName(employeeTeamMap.get(emp.id) || null);
         if (EXCLUDED_TEAMS.includes(teamName)) return;
@@ -199,58 +192,12 @@ export default function CompanyOverview() {
         count++;
       });
       
-      // Historical employees tenure
-      (historicalData || []).forEach(emp => {
-        const teamName = normalizeTeamName(emp.team_name);
-        if (EXCLUDED_TEAMS.includes(teamName)) return;
-        
-        totalDays += emp.tenure_days;
-        count++;
-      });
-      
       const avgDays = count > 0 ? totalDays / count : 0;
       const avgMonths = avgDays / 30;
       
-      // Calculate what avg tenure was 30 days ago (exclude employees who left in last 30 days)
-      let prevTotalDays = 0;
-      let prevCount = 0;
-      
-      (employees || []).forEach(emp => {
-        const teamName = normalizeTeamName(employeeTeamMap.get(emp.id) || null);
-        if (EXCLUDED_TEAMS.includes(teamName)) return;
-        
-        const startDate = emp.employment_start_date ? parseISO(emp.employment_start_date) : now;
-        // Only count if they were employed 30 days ago
-        if (startDate <= thirtyDaysAgo) {
-          const tenureDays = differenceInDays(thirtyDaysAgo, startDate);
-          prevTotalDays += Math.max(0, tenureDays);
-          prevCount++;
-        }
-      });
-      
-      (historicalData || []).forEach(emp => {
-        const teamName = normalizeTeamName(emp.team_name);
-        if (EXCLUDED_TEAMS.includes(teamName)) return;
-        
-        // Include historical employees who were still employed 30 days ago
-        const endDate = emp.end_date ? parseISO(emp.end_date) : null;
-        if (!endDate || endDate > thirtyDaysAgo) {
-          prevTotalDays += Math.max(0, emp.tenure_days - 30);
-          prevCount++;
-        }
-      });
-      
-      const prevAvgDays = prevCount > 0 ? prevTotalDays / prevCount : 0;
-      const prevAvgMonths = prevAvgDays / 30;
-      
-      const monthsChange = avgMonths - prevAvgMonths;
-      const percentageChange = prevAvgMonths > 0 ? ((avgMonths - prevAvgMonths) / prevAvgMonths) * 100 : 0;
-      
       return { 
         avgMonths: Math.round(avgMonths * 10) / 10, 
-        totalCount: count,
-        monthsChange: Math.round(monthsChange * 10) / 10,
-        percentageChange: Math.round(percentageChange * 10) / 10
+        totalCount: count
       };
     },
   });
@@ -404,14 +351,10 @@ export default function CompanyOverview() {
       title: "Gns. anciennitet",
       value: isLoadingTenure ? "..." : tenureStats ? formatTenure(tenureStats.avgMonths) : "-",
       icon: Clock,
-      description: `Baseret på ${tenureStats?.totalCount ?? 0} ansatte (ekskl. Stab)`,
+      description: `Baseret på ${tenureStats?.totalCount ?? 0} nuværende ansatte (ekskl. Stab)`,
       color: "text-primary",
       bgColor: "bg-primary/10",
-      trend: tenureStats ? {
-        change: tenureStats.monthsChange,
-        percentage: null, // Don't show percentage for tenure - months change is more meaningful
-        unit: "mdr"
-      } : null
+      trend: null // No trend for tenure - it naturally increases over time
     },
     {
       title: "60-dages Churn",
