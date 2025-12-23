@@ -405,7 +405,8 @@ export default function CompanyOverview() {
       bgColor: "bg-primary/10",
       trend: tenureStats ? {
         change: tenureStats.monthsChange,
-        percentage: tenureStats.percentageChange
+        percentage: null, // Don't show percentage for tenure - months change is more meaningful
+        unit: "mdr"
       } : null
     },
     {
@@ -452,9 +453,9 @@ export default function CompanyOverview() {
                       return <TrendIcon className="h-4 w-4" />;
                     })()}
                     <span>
-                      {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change.toFixed(1)} ift. forrige 30 dage
+                      {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change.toFixed(1)}{kpi.trend.unit ? ` ${kpi.trend.unit}` : ""} ift. forrige 30 dage
                     </span>
-                    {kpi.trend.percentage !== 0 && (
+                    {kpi.trend.percentage !== null && kpi.trend.percentage !== 0 && (
                       <span className="text-muted-foreground ml-1">
                         ({kpi.trend.percentage > 0 ? "+" : ""}{kpi.trend.percentage.toFixed(1)}%)
                       </span>
