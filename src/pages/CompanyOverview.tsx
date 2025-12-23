@@ -1,50 +1,43 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, TrendingUp, TrendingDown, Minus, Building2, Target } from "lucide-react";
+import { Users, TrendingUp, TrendingDown, Minus, Building2, Target, FileText } from "lucide-react";
 import { subDays, format } from "date-fns";
 
 export default function CompanyOverview() {
   const today = new Date();
   const thirtyDaysAgo = subDays(today, 30);
   const sixtyDaysAgo = subDays(today, 60);
+  const thirtyDaysAgoStr = format(thirtyDaysAgo, "yyyy-MM-dd");
+  const sixtyDaysAgoStr = format(sixtyDaysAgo, "yyyy-MM-dd");
+  const todayStr = format(today, "yyyy-MM-dd");
 
   // Fetch employee counts with 30-day comparison
-  const { data: employeeStats, isLoading } = useQuery({
+  const { data: employeeStats, isLoading: isLoadingEmployees } = useQuery({
     queryKey: ["company-overview-employee-stats"],
     queryFn: async () => {
-      // Get all team members with their created_at dates
       const { data, error } = await supabase
         .from("team_members")
         .select("employee_id, created_at");
       
       if (error) throw error;
       
-      // Current unique employees
       const currentUniqueIds = new Set(data.map(tm => tm.employee_id));
       const currentCount = currentUniqueIds.size;
       
-      // Employees 30 days ago (only those created before 30 days ago)
-      const thirtyDaysAgoStr = format(thirtyDaysAgo, "yyyy-MM-dd");
       const employeesThirtyDaysAgo = data.filter(tm => 
         tm.created_at && tm.created_at < thirtyDaysAgoStr
       );
-      const uniqueThirtyDaysAgo = new Set(employeesThirtyDaysAgo.map(tm => tm.employee_id));
-      const countThirtyDaysAgo = uniqueThirtyDaysAgo.size;
+      const countThirtyDaysAgo = new Set(employeesThirtyDaysAgo.map(tm => tm.employee_id)).size;
       
-      // Employees 60 days ago (for previous period comparison)
-      const sixtyDaysAgoStr = format(sixtyDaysAgo, "yyyy-MM-dd");
       const employeesSixtyDaysAgo = data.filter(tm => 
         tm.created_at && tm.created_at < sixtyDaysAgoStr
       );
-      const uniqueSixtyDaysAgo = new Set(employeesSixtyDaysAgo.map(tm => tm.employee_id));
-      const countSixtyDaysAgo = uniqueSixtyDaysAgo.size;
+      const countSixtyDaysAgo = new Set(employeesSixtyDaysAgo.map(tm => tm.employee_id)).size;
       
-      // Calculate changes
       const changeLastThirtyDays = currentCount - countThirtyDaysAgo;
       const changePreviousThirtyDays = countThirtyDaysAgo - countSixtyDaysAgo;
       
-      // Calculate percentage change comparing the two periods
       let percentageChange = 0;
       if (changePreviousThirtyDays !== 0) {
         percentageChange = ((changeLastThirtyDays - changePreviousThirtyDays) / Math.abs(changePreviousThirtyDays)) * 100;
@@ -52,11 +45,43 @@ export default function CompanyOverview() {
         percentageChange = changeLastThirtyDays > 0 ? 100 : -100;
       }
       
-      return {
-        currentCount,
-        changeLastThirtyDays,
-        percentageChange
-      };
+      return { currentCount, changeLastThirtyDays, percentageChange };
+    },
+  });
+
+  // Fetch application counts with 30-day comparison
+  const { data: applicationStats, isLoading: isLoadingApplications } = useQuery({
+    queryKey: ["company-overview-application-stats"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("applications")
+        .select("id, application_date");
+      
+      if (error) throw error;
+      
+      // Applications in the last 30 days
+      const lastThirtyDays = data.filter(app => 
+        app.application_date && app.application_date >= thirtyDaysAgoStr && app.application_date <= todayStr
+      );
+      const countLastThirtyDays = lastThirtyDays.length;
+      
+      // Applications in the previous 30 days (30-60 days ago)
+      const previousThirtyDays = data.filter(app => 
+        app.application_date && app.application_date >= sixtyDaysAgoStr && app.application_date < thirtyDaysAgoStr
+      );
+      const countPreviousThirtyDays = previousThirtyDays.length;
+      
+      // Calculate percentage change
+      let percentageChange = 0;
+      if (countPreviousThirtyDays !== 0) {
+        percentageChange = ((countLastThirtyDays - countPreviousThirtyDays) / countPreviousThirtyDays) * 100;
+      } else if (countLastThirtyDays !== 0) {
+        percentageChange = 100;
+      }
+      
+      const change = countLastThirtyDays - countPreviousThirtyDays;
+      
+      return { currentCount: countLastThirtyDays, change, percentageChange };
     },
   });
 
@@ -75,7 +100,7 @@ export default function CompanyOverview() {
   const kpiCards = [
     {
       title: "Antal medarbejdere",
-      value: isLoading ? "..." : employeeStats?.currentCount ?? 0,
+      value: isLoadingEmployees ? "..." : employeeStats?.currentCount ?? 0,
       icon: Users,
       description: "Unikke medarbejdere på tværs af teams",
       color: "text-primary",
@@ -86,13 +111,16 @@ export default function CompanyOverview() {
       } : null
     },
     {
-      title: "KPI 2",
-      value: "-",
-      icon: TrendingUp,
-      description: "Kommer snart",
-      color: "text-muted-foreground",
-      bgColor: "bg-muted",
-      trend: null
+      title: "Ansøgninger",
+      value: isLoadingApplications ? "..." : applicationStats?.currentCount ?? 0,
+      icon: FileText,
+      description: "Ansøgninger de sidste 30 dage",
+      color: "text-primary",
+      bgColor: "bg-primary/10",
+      trend: applicationStats ? {
+        change: applicationStats.change,
+        percentage: applicationStats.percentageChange
+      } : null
     },
     {
       title: "KPI 3",
@@ -142,7 +170,7 @@ export default function CompanyOverview() {
                     return <TrendIcon className="h-4 w-4" />;
                   })()}
                   <span>
-                    {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change} sidste 30 dage
+                    {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change} ift. forrige periode
                   </span>
                   <span className="text-muted-foreground ml-1">
                     ({kpi.trend.percentage > 0 ? "+" : ""}{kpi.trend.percentage.toFixed(0)}%)
