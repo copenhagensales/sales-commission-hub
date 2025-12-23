@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { da } from "date-fns/locale";
+import { useQuery } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -229,6 +230,66 @@ export default function DesignDashboard() {
     fetchData();
   }, []);
 
+  // Fetch real KPI data for preview
+  const { data: realKpiData } = useQuery({
+    queryKey: ["design-dashboard-kpis"],
+    queryFn: async () => {
+      const now = new Date();
+      const todayStart = startOfDay(now).toISOString();
+      const todayEnd = endOfDay(now).toISOString();
+      const weekStart = startOfWeek(now, { weekStartsOn: 1 }).toISOString();
+      const weekEnd = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
+      const monthStart = startOfMonth(now).toISOString();
+      const monthEnd = endOfMonth(now).toISOString();
+
+      // Fetch fieldmarketing sales
+      const [fmTodayRes, fmWeekRes, fmMonthRes] = await Promise.all([
+        supabase.from("fieldmarketing_sales").select("id").gte("registered_at", todayStart).lte("registered_at", todayEnd),
+        supabase.from("fieldmarketing_sales").select("id").gte("registered_at", weekStart).lte("registered_at", weekEnd),
+        supabase.from("fieldmarketing_sales").select("id").gte("registered_at", monthStart).lte("registered_at", monthEnd),
+      ]);
+
+      // Fetch telesales
+      const [teleTodayRes, teleWeekRes, teleMonthRes] = await Promise.all([
+        supabase.from("sales").select("id").gte("sale_datetime", todayStart).lte("sale_datetime", todayEnd),
+        supabase.from("sales").select("id").gte("sale_datetime", weekStart).lte("sale_datetime", weekEnd),
+        supabase.from("sales").select("id").gte("sale_datetime", monthStart).lte("sale_datetime", monthEnd),
+      ]);
+
+      // Fetch sale_items for revenue (month only to limit queries)
+      const teleMonthSaleIds = (teleMonthRes.data || []).map(s => s.id);
+      const { data: saleItems } = teleMonthSaleIds.length > 0 
+        ? await supabase.from("sale_items").select("sale_id, total_price").in("sale_id", teleMonthSaleIds)
+        : { data: [] };
+
+      // Calculate totals
+      const fmToday = fmTodayRes.data?.length || 0;
+      const fmWeek = fmWeekRes.data?.length || 0;
+      const fmMonth = fmMonthRes.data?.length || 0;
+      
+      const teleToday = teleTodayRes.data?.length || 0;
+      const teleWeek = teleWeekRes.data?.length || 0;
+      const teleMonth = teleMonthRes.data?.length || 0;
+
+      // Calculate revenue from sale_items
+      const totalRevenue = (saleItems || []).reduce((sum, item) => sum + (item.total_price || 0), 0);
+
+      return {
+        salesCountToday: fmToday + teleToday,
+        salesCountWeek: fmWeek + teleWeek,
+        salesCountMonth: fmMonth + teleMonth,
+        revenueMonth: totalRevenue,
+        fmSalesToday: fmToday,
+        fmSalesWeek: fmWeek,
+        fmSalesMonth: fmMonth,
+        teleSalesToday: teleToday,
+        teleSalesWeek: teleWeek,
+        teleSalesMonth: teleMonth,
+      };
+    },
+    staleTime: 60000, // 1 minute
+  });
+
   const handleClose = () => {
     navigate(-1); // Go back to previous page
   };
@@ -421,58 +482,85 @@ export default function DesignDashboard() {
     ));
   };
 
-  // Generate example values for preview based on KPI type
+  // Generate real values for preview based on KPI type and time period
   const getExampleValue = (widget: PlacedWidget) => {
     if (widget.dataSource === "custom") {
       return widget.customValue || "0";
     }
-    // Generate realistic example based on specific KPI type ID
-    const firstKpi = widget.kpiTypeIds[0];
     
-    // Match specific KPI IDs first for accuracy
+    const firstKpi = widget.kpiTypeIds[0];
+    const timePeriod = widget.timePeriodId || "today";
+    
+    // Helper to format numbers
+    const formatNumber = (n: number) => n.toLocaleString("da-DK");
+    const formatCurrency = (n: number) => `${n.toLocaleString("da-DK")} kr`;
+    
+    // Get real sales count based on time period
+    const getSalesCount = () => {
+      if (!realKpiData) return "—";
+      switch (timePeriod) {
+        case "today": return formatNumber(realKpiData.salesCountToday);
+        case "this-week": return formatNumber(realKpiData.salesCountWeek);
+        case "this-month": return formatNumber(realKpiData.salesCountMonth);
+        default: return formatNumber(realKpiData.salesCountToday);
+      }
+    };
+    
+    // Get real revenue based on time period
+    const getRevenue = () => {
+      if (!realKpiData) return "—";
+      // We only have month revenue calculated
+      return formatCurrency(realKpiData.revenueMonth);
+    };
+    
+    // Match specific KPI IDs with real data
     switch (firstKpi) {
       case "sales-count":
-        return "127";
+        return getSalesCount();
       case "sales-revenue":
-        return "847.520 kr";
+        return getRevenue();
       case "avg-order-value":
-        return "6.674 kr";
+        if (!realKpiData || realKpiData.salesCountMonth === 0) return "—";
+        return formatCurrency(Math.round(realKpiData.revenueMonth / realKpiData.salesCountMonth));
       case "conversion-rate":
-        return "23,4%";
+        return "23,4%"; // Would need calls data
       case "calls-total":
-        return "1.247";
+        return "1.247"; // Would need calls data
       case "calls-answered":
-        return "892";
+        return "892"; // Would need calls data
       case "avg-call-duration":
-        return "4:32";
+        return "4:32"; // Would need calls data
       case "talk-time":
-        return "67:45";
+        return "67:45"; // Would need calls data
       case "team-target-progress":
       case "individual-target":
-        return "78%";
+        return "78%"; // Would need target data
       case "team-sales-rank":
-        return "#3";
+        return "#3"; // Would need ranking calculation
       case "leads-generated":
-        return "342";
+        return "342"; // Would need leads data
       case "appointments-booked":
-        return "89";
+        return "89"; // Would need appointments data
       case "customer-satisfaction":
-        return "4,7";
+        return "4,7"; // Would need survey data
       case "nps-score":
-        return "+47";
+        return "+47"; // Would need NPS data
       case "active-agents":
-        return "24";
+        return "24"; // Would need agent data
       case "avg-handle-time":
-        return "3:45";
+        return "3:45"; // Would need calls data
       case "first-call-resolution":
-        return "68%";
+        return "68%"; // Would need calls data
       default:
-        // Fallback patterns for custom KPIs
-        if (firstKpi?.includes("count") || firstKpi?.includes("antal")) return "127";
-        if (firstKpi?.includes("revenue") || firstKpi?.includes("omsætning")) return "847.520 kr";
+        // Fallback patterns for custom KPIs using real data where possible
+        if (firstKpi?.includes("count") || firstKpi?.includes("antal")) return getSalesCount();
+        if (firstKpi?.includes("revenue") || firstKpi?.includes("omsætning")) return getRevenue();
         if (firstKpi?.includes("rate") || firstKpi?.includes("%")) return "23,4%";
         if (firstKpi?.includes("time") || firstKpi?.includes("tid")) return "3:45";
-        if (firstKpi?.includes("avg") || firstKpi?.includes("gns")) return "4.320 kr";
+        if (firstKpi?.includes("avg") || firstKpi?.includes("gns")) {
+          if (!realKpiData || realKpiData.salesCountMonth === 0) return "—";
+          return formatCurrency(Math.round(realKpiData.revenueMonth / realKpiData.salesCountMonth));
+        }
         return "—";
     }
   };
