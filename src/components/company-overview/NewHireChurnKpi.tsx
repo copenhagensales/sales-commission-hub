@@ -93,18 +93,18 @@ export function NewHireChurnKpi() {
         return daysEmployed <= 60;
       });
 
-      // Calculate by team
+      // Calculate by team (only employees with a team assigned)
       const teamStats = new Map<string, { name: string; hires: number; exits: number }>();
-      currentPeriodHires.forEach(e => {
-        const teamId = e.team_id || "unknown";
-        const teamName = (e.teams as any)?.name || "Ukendt team";
+      currentPeriodHires.filter(e => e.team_id && (e.teams as any)?.name).forEach(e => {
+        const teamId = e.team_id!;
+        const teamName = (e.teams as any)?.name;
         if (!teamStats.has(teamId)) {
           teamStats.set(teamId, { name: teamName, hires: 0, exits: 0 });
         }
         teamStats.get(teamId)!.hires++;
       });
-      currentPeriodExits.forEach(e => {
-        const teamId = e.team_id || "unknown";
+      currentPeriodExits.filter(e => e.team_id && (e.teams as any)?.name).forEach(e => {
+        const teamId = e.team_id!;
         if (teamStats.has(teamId)) {
           teamStats.get(teamId)!.exits++;
         }
