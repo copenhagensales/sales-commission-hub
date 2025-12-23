@@ -52,37 +52,40 @@ export function useEmployeeDashboards() {
     const fetchEmployeeId = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.log('No authenticated user found');
+        console.log("No authenticated user found");
         setLoading(false);
         return;
       }
 
-      // First try by auth_user_id
-      let { data: employee } = await supabase
-        .from('employee_master_data')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
+      // Use backend helper to reliably resolve + auto-link employee record
+      const { data: employeeId, error } = await supabase.rpc("get_current_employee_id");
 
-      // Fallback: try by email
-      if (!employee) {
-        const { data: employeeByEmail } = await supabase
-          .from('employee_master_data')
-          .select('id')
-          .eq('private_email', user.email)
-          .single();
-        employee = employeeByEmail;
+      if (error) {
+        console.error("Could not resolve employee id:", error);
+        toast({
+          title: "Fejl",
+          description: "Kunne ikke finde din medarbejderprofil",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
       }
 
-      if (employee) {
-        setCurrentEmployeeId(employee.id);
+      if (employeeId) {
+        setCurrentEmployeeId(employeeId);
       } else {
-        console.log('No employee record found for user:', user.id, user.email);
+        console.log("Could not get employee id: null");
+        toast({
+          title: "Fejl",
+          description: "Kunne ikke finde din medarbejderprofil",
+          variant: "destructive",
+        });
         setLoading(false);
       }
     };
+
     fetchEmployeeId();
-  }, []);
+  }, [toast]);
 
   // Fetch dashboards
   useEffect(() => {
