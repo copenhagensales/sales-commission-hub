@@ -7,6 +7,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { TeamAvgTenureChart } from "@/components/company-overview/TeamAvgTenureChart";
 import { NewHireChurnKpi } from "@/components/company-overview/NewHireChurnKpi";
 import { HistoricalTenureStats } from "@/components/company-overview/HistoricalTenureStats";
+import { ChurnTrendChart } from "@/components/company-overview/ChurnTrendChart";
 
 // Normalize team names to handle variations
 const normalizeTeamName = (name: string | null): string => {
@@ -393,6 +394,7 @@ export default function CompanyOverview() {
           <TeamAvgTenureChart />
           <NewHireChurnKpi />
           <HistoricalTenureStats />
+          <ChurnTrendChart />
         </div>
       </div>
     </MainLayout>
