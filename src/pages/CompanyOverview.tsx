@@ -42,11 +42,11 @@ export default function CompanyOverview() {
         .select("employee_id, team:teams(name)");
       if (tmError) throw tmError;
       
-      // Count unique current employees (excluding Stab)
+      // Count unique current employees (including Stab, only excluding Ukendt)
       const currentEmployees = new Set<string>();
       (teamMembers || []).forEach(tm => {
         const teamName = normalizeTeamName((tm.team as any)?.name || null);
-        if (!EXCLUDED_TEAMS.includes(teamName)) {
+        if (teamName !== "Ukendt") {
           currentEmployees.add(tm.employee_id);
         }
       });
