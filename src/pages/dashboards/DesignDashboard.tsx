@@ -189,25 +189,37 @@ export default function DesignDashboard() {
   const [teams, setTeams] = useState<DbTeam[]>([]);
   const [clients, setClients] = useState<DbClient[]>([]);
 
-  // Load dashboard from URL param
+  // Load dashboard from URL param (or last opened dashboard)
   useEffect(() => {
-    const dashboardId = searchParams.get('id');
-    if (dashboardId) {
-      loadDashboard(dashboardId).then(dashboard => {
-        if (dashboard) {
-          setCurrentDashboardId(dashboard.id);
-          setDashboardName(dashboard.name);
-          setGlobalDesign(dashboard.design_id);
-          // Convert stored widgets to PlacedWidget format
-          const widgets: PlacedWidget[] = dashboard.widgets.map(w => ({
-            ...w,
-            customFromDate: w.customFromDate ? new Date(w.customFromDate) : undefined
-          }));
-          setPlacedWidgets(widgets);
-        }
-      });
-    }
-  }, [searchParams]);
+    const dashboardIdFromUrl = searchParams.get("id");
+    const dashboardIdFromStorage = localStorage.getItem("designDashboard:lastId");
+    const dashboardId = dashboardIdFromUrl || dashboardIdFromStorage;
+
+    if (!dashboardId) return;
+
+    loadDashboard(dashboardId).then((dashboard) => {
+      if (!dashboard) return;
+
+      setCurrentDashboardId(dashboard.id);
+      setDashboardName(dashboard.name);
+      setGlobalDesign(dashboard.design_id);
+
+      // Convert stored widgets to PlacedWidget format
+      const widgets: PlacedWidget[] = dashboard.widgets.map((w) => ({
+        ...w,
+        customFromDate: w.customFromDate ? new Date(w.customFromDate) : undefined,
+      }));
+      setPlacedWidgets(widgets);
+
+      // Keep URL in sync so refresh/back/forward works
+      if (!dashboardIdFromUrl) {
+        navigate({ search: `?id=${dashboard.id}` }, { replace: true });
+      }
+
+      // Remember last opened dashboard
+      localStorage.setItem("designDashboard:lastId", dashboard.id);
+    });
+  }, [searchParams, loadDashboard, navigate]);
 
   // Fetch teams and clients from database
   useEffect(() => {
@@ -229,14 +241,22 @@ export default function DesignDashboard() {
 
   const handleSaveDashboard = async () => {
     // Convert widgets to storage format
-    const widgetsToSave: DashboardWidget[] = placedWidgets.map(w => ({
+    const widgetsToSave: DashboardWidget[] = placedWidgets.map((w) => ({
       ...w,
-      customFromDate: w.customFromDate?.toISOString()
+      customFromDate: w.customFromDate?.toISOString(),
     }));
-    
-    const savedId = await saveDashboard(dashboardName, globalDesign, widgetsToSave, currentDashboardId || undefined);
+
+    const savedId = await saveDashboard(
+      dashboardName,
+      globalDesign,
+      widgetsToSave,
+      currentDashboardId || undefined
+    );
+
     if (savedId) {
       setCurrentDashboardId(savedId);
+      localStorage.setItem("designDashboard:lastId", savedId);
+      navigate({ search: `?id=${savedId}` }, { replace: true });
       setIsSaveDialogOpen(false);
     }
   };
@@ -247,12 +267,16 @@ export default function DesignDashboard() {
       setCurrentDashboardId(dashboard.id);
       setDashboardName(dashboard.name);
       setGlobalDesign(dashboard.design_id);
-      const widgets: PlacedWidget[] = dashboard.widgets.map(w => ({
+      const widgets: PlacedWidget[] = dashboard.widgets.map((w) => ({
         ...w,
-        customFromDate: w.customFromDate ? new Date(w.customFromDate) : undefined
+        customFromDate: w.customFromDate ? new Date(w.customFromDate) : undefined,
       }));
       setPlacedWidgets(widgets);
       setIsLoadDialogOpen(false);
+
+      localStorage.setItem("designDashboard:lastId", dashboard.id);
+      navigate({ search: `?id=${dashboard.id}` }, { replace: true });
+
       toast({ title: `Dashboard "${dashboard.name}" indlæst` });
     }
   };
