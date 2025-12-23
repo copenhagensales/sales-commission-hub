@@ -151,7 +151,7 @@ export default function CompanyOverview() {
     },
   });
 
-  // Fetch average tenure for all employees (current + historical)
+  // Fetch average tenure for all employees (current + historical) with trend
   const { data: tenureStats, isLoading: isLoadingTenure } = useQuery({
     queryKey: ["company-overview-combined-tenure-stats"],
     queryFn: async () => {
@@ -169,10 +169,10 @@ export default function CompanyOverview() {
         .select("employee_id, team:teams(name)");
       if (tmError) throw tmError;
       
-      // Historical employees
+      // Historical employees with end_date for trend calculation
       const { data: historicalData, error: histError } = await supabase
         .from("historical_employment")
-        .select("id, team_name, tenure_days");
+        .select("id, team_name, tenure_days, end_date");
       if (histError) throw histError;
       
       // Map employee_id to team name
@@ -184,6 +184,7 @@ export default function CompanyOverview() {
       });
       
       const now = new Date();
+      const thirtyDaysAgo = subDays(now, 30);
       let totalDays = 0;
       let count = 0;
       
@@ -210,11 +211,51 @@ export default function CompanyOverview() {
       const avgDays = count > 0 ? totalDays / count : 0;
       const avgMonths = avgDays / 30;
       
-      return { avgMonths: Math.round(avgMonths * 10) / 10, totalCount: count };
+      // Calculate what avg tenure was 30 days ago (exclude employees who left in last 30 days)
+      let prevTotalDays = 0;
+      let prevCount = 0;
+      
+      (employees || []).forEach(emp => {
+        const teamName = normalizeTeamName(employeeTeamMap.get(emp.id) || null);
+        if (EXCLUDED_TEAMS.includes(teamName)) return;
+        
+        const startDate = emp.employment_start_date ? parseISO(emp.employment_start_date) : now;
+        // Only count if they were employed 30 days ago
+        if (startDate <= thirtyDaysAgo) {
+          const tenureDays = differenceInDays(thirtyDaysAgo, startDate);
+          prevTotalDays += Math.max(0, tenureDays);
+          prevCount++;
+        }
+      });
+      
+      (historicalData || []).forEach(emp => {
+        const teamName = normalizeTeamName(emp.team_name);
+        if (EXCLUDED_TEAMS.includes(teamName)) return;
+        
+        // Include historical employees who were still employed 30 days ago
+        const endDate = emp.end_date ? parseISO(emp.end_date) : null;
+        if (!endDate || endDate > thirtyDaysAgo) {
+          prevTotalDays += Math.max(0, emp.tenure_days - 30);
+          prevCount++;
+        }
+      });
+      
+      const prevAvgDays = prevCount > 0 ? prevTotalDays / prevCount : 0;
+      const prevAvgMonths = prevAvgDays / 30;
+      
+      const monthsChange = avgMonths - prevAvgMonths;
+      const percentageChange = prevAvgMonths > 0 ? ((avgMonths - prevAvgMonths) / prevAvgMonths) * 100 : 0;
+      
+      return { 
+        avgMonths: Math.round(avgMonths * 10) / 10, 
+        totalCount: count,
+        monthsChange: Math.round(monthsChange * 10) / 10,
+        percentageChange: Math.round(percentageChange * 10) / 10
+      };
     },
   });
 
-  // Fetch 60-day churn (combined)
+  // Fetch 60-day churn (combined) with trend
   const { data: churnStats, isLoading: isLoadingChurn } = useQuery({
     queryKey: ["company-overview-combined-churn-stats"],
     queryFn: async () => {
@@ -232,10 +273,10 @@ export default function CompanyOverview() {
         .select("employee_id, team:teams(name)");
       if (tmError) throw tmError;
       
-      // Historical employees
+      // Historical employees with end_date
       const { data: historicalData, error: histError } = await supabase
         .from("historical_employment")
-        .select("id, team_name, tenure_days");
+        .select("id, team_name, tenure_days, end_date");
       if (histError) throw histError;
       
       // Map employee_id to team name
@@ -246,14 +287,25 @@ export default function CompanyOverview() {
         }
       });
       
+      const now = new Date();
+      const thirtyDaysAgo = subDays(now, 30);
+      
       let totalCount = 0;
       let exits60Days = 0;
+      let prevTotalCount = 0;
+      let prevExits60Days = 0;
       
       // Current employees (none have left within 60 days since they're still active)
       (employees || []).forEach(emp => {
         const teamName = normalizeTeamName(employeeTeamMap.get(emp.id) || null);
         if (EXCLUDED_TEAMS.includes(teamName)) return;
         totalCount++;
+        
+        // For prev calculation, only count if hired before 30 days ago
+        const startDate = emp.employment_start_date ? parseISO(emp.employment_start_date) : now;
+        if (startDate <= thirtyDaysAgo) {
+          prevTotalCount++;
+        }
       });
       
       // Historical employees
@@ -265,14 +317,27 @@ export default function CompanyOverview() {
         if (emp.tenure_days <= 60) {
           exits60Days++;
         }
+        
+        // For prev calculation - employees who left before 30 days ago
+        const endDate = emp.end_date ? parseISO(emp.end_date) : null;
+        if (endDate && endDate <= thirtyDaysAgo) {
+          prevTotalCount++;
+          if (emp.tenure_days <= 60) {
+            prevExits60Days++;
+          }
+        }
       });
       
       const churnRate = totalCount > 0 ? (exits60Days / totalCount) * 100 : 0;
+      const prevChurnRate = prevTotalCount > 0 ? (prevExits60Days / prevTotalCount) * 100 : 0;
+      
+      const churnChange = churnRate - prevChurnRate;
       
       return { 
         churnRate: Math.round(churnRate * 10) / 10, 
         totalCount,
-        exits60Days
+        exits60Days,
+        churnChange: Math.round(churnChange * 10) / 10
       };
     },
   });
@@ -291,9 +356,15 @@ export default function CompanyOverview() {
     return Minus;
   };
 
-  const getTrendColor = (change: number) => {
-    if (change > 0) return "text-green-600";
-    if (change < 0) return "text-red-600";
+  const getTrendColor = (change: number, invertColors = false) => {
+    if (invertColors) {
+      // For metrics where lower is better (like churn)
+      if (change > 0) return "text-red-600";
+      if (change < 0) return "text-green-600";
+    } else {
+      if (change > 0) return "text-green-600";
+      if (change < 0) return "text-red-600";
+    }
     return "text-muted-foreground";
   };
 
@@ -332,7 +403,10 @@ export default function CompanyOverview() {
       description: `Baseret på ${tenureStats?.totalCount ?? 0} ansatte (ekskl. Stab)`,
       color: "text-primary",
       bgColor: "bg-primary/10",
-      trend: null
+      trend: tenureStats ? {
+        change: tenureStats.monthsChange,
+        percentage: tenureStats.percentageChange
+      } : null
     },
     {
       title: "60-dages Churn",
@@ -341,7 +415,11 @@ export default function CompanyOverview() {
       description: `${churnStats?.exits60Days ?? 0} af ${churnStats?.totalCount ?? 0} stoppede inden 60 dage`,
       color: "text-primary",
       bgColor: "bg-primary/10",
-      trend: null
+      trend: churnStats ? {
+        change: churnStats.churnChange,
+        percentage: churnStats.churnChange,
+        invertColors: true // For churn, lower is better
+      } : null
     },
   ];
 
@@ -368,17 +446,17 @@ export default function CompanyOverview() {
                 <div className="text-3xl font-bold text-foreground">{kpi.value}</div>
                 <p className="text-xs text-muted-foreground mt-1">{kpi.description}</p>
                 {kpi.trend && (
-                  <div className={`flex items-center gap-1 mt-2 text-sm ${getTrendColor(kpi.trend.change)}`}>
+                  <div className={`flex items-center gap-1 mt-2 text-sm ${getTrendColor(kpi.trend.change, kpi.trend.invertColors)}`}>
                     {(() => {
                       const TrendIcon = getTrendIcon(kpi.trend.change);
                       return <TrendIcon className="h-4 w-4" />;
                     })()}
                     <span>
-                      {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change} ift. forrige periode
+                      {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change.toFixed(1)} ift. forrige 30 dage
                     </span>
                     {kpi.trend.percentage !== 0 && (
                       <span className="text-muted-foreground ml-1">
-                        ({kpi.trend.percentage > 0 ? "+" : ""}{kpi.trend.percentage.toFixed(0)}%)
+                        ({kpi.trend.percentage > 0 ? "+" : ""}{kpi.trend.percentage.toFixed(1)}%)
                       </span>
                     )}
                   </div>
