@@ -12,9 +12,20 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Users, Building2, UserCheck, UserX } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Building2, UserCheck, UserX, GripVertical } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TeamStandardShifts } from "./TeamStandardShifts";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  useDraggable,
+  useDroppable,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 
 interface Team {
   id: string;
@@ -38,6 +49,144 @@ interface Client {
   logo_url: string | null;
 }
 
+// Draggable employee chip component
+function DraggableEmployeeChip({ employee }: { employee: Employee }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `employee-${employee.id}`,
+    data: { employee },
+  });
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+      }
+    : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 cursor-grab active:cursor-grabbing transition-all ${
+        isDragging ? "opacity-50 scale-105 shadow-lg" : "hover:bg-primary/20 hover:border-primary/30"
+      }`}
+    >
+      <GripVertical className="h-3 w-3 text-primary/50" />
+      <span className="text-sm font-medium text-foreground">
+        {employee.first_name} {employee.last_name}
+      </span>
+    </div>
+  );
+}
+
+// Droppable team row component
+function DroppableTeamRow({ 
+  team, 
+  memberCount, 
+  employeeMap, 
+  clients, 
+  teamClientIds,
+  onEdit,
+  onDelete,
+  isDeleting
+}: { 
+  team: Team;
+  memberCount: number;
+  employeeMap: Record<string, string>;
+  clients: Client[];
+  teamClientIds: string[];
+  onEdit: () => void;
+  onDelete: () => void;
+  isDeleting: boolean;
+}) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `team-${team.id}`,
+    data: { team },
+  });
+
+  return (
+    <TableRow 
+      ref={setNodeRef}
+      className={`border-b border-border/30 transition-colors ${
+        isOver ? "bg-primary/10 border-primary/30" : ""
+      }`}
+    >
+      <TableCell className="font-medium py-3">
+        <div className="flex items-center gap-2">
+          {isOver && <Badge variant="default" className="text-xs animate-pulse">Slip her</Badge>}
+          {team.name}
+        </div>
+      </TableCell>
+      <TableCell className="text-muted-foreground py-3">
+        {team.description || "-"}
+      </TableCell>
+      <TableCell className="py-3">
+        {team.team_leader_id && employeeMap[team.team_leader_id]
+          ? employeeMap[team.team_leader_id]
+          : "-"}
+      </TableCell>
+      <TableCell className="py-3">
+        {team.assistant_team_leader_id && employeeMap[team.assistant_team_leader_id]
+          ? employeeMap[team.assistant_team_leader_id]
+          : "-"}
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="flex flex-wrap gap-1.5">
+          {teamClientIds.length > 0 ? (
+            teamClientIds.slice(0, 3).map((clientId) => {
+              const client = clients.find((c) => c.id === clientId);
+              return client ? (
+                <Badge key={clientId} variant="secondary" className="text-xs flex items-center gap-1.5 pr-2">
+                  {client.logo_url ? (
+                    <img
+                      src={client.logo_url}
+                      alt=""
+                      className="h-4 w-4 object-contain rounded-sm"
+                    />
+                  ) : (
+                    <Building2 className="h-3 w-3" />
+                  )}
+                  {client.name}
+                </Badge>
+              ) : null;
+            })
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+          {teamClientIds.length > 3 && (
+            <Badge variant="outline" className="text-xs">
+              +{teamClientIds.length - 3}
+            </Badge>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="flex items-center gap-1">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <span>{memberCount}</span>
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="flex items-center gap-0.5">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-destructive hover:text-destructive"
+            onClick={onDelete}
+            disabled={isDeleting}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 export function TeamsTab() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -46,6 +195,7 @@ export function TeamsTab() {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [clientSearch, setClientSearch] = useState("");
   const [employeeSearch, setEmployeeSearch] = useState("");
+  const [activeEmployee, setActiveEmployee] = useState<Employee | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -259,6 +409,55 @@ export function TeamsTab() {
     },
   });
 
+  // Add employee to team mutation (for drag and drop)
+  const addEmployeeToTeamMutation = useMutation({
+    mutationFn: async ({ employeeId, teamId }: { employeeId: string; teamId: string }) => {
+      const { error } = await supabase
+        .from("team_members")
+        .insert({ employee_id: employeeId, team_id: teamId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["team-members-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["all-employees-for-teams"] });
+      toast({ title: "Medarbejder tilføjet til team" });
+    },
+    onError: (error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const employee = active.data.current?.employee as Employee;
+    if (employee) {
+      setActiveEmployee(employee);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveEmployee(null);
+
+    if (!over) return;
+
+    const employeeId = (active.data.current?.employee as Employee)?.id;
+    const teamId = (over.data.current?.team as Team)?.id;
+
+    if (employeeId && teamId) {
+      addEmployeeToTeamMutation.mutate({ employeeId, teamId });
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -330,153 +529,106 @@ export function TeamsTab() {
     }));
   };
 
+  // Calculate employees without team
+  const employeeIdsWithTeam = new Set(teamMembers.map((tm) => tm.employee_id));
+  const employeesWithoutTeam = employees.filter(
+    (emp) => !employeeIdsWithTeam.has(emp.id)
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Teams</h2>
-          <p className="text-sm text-muted-foreground">Administrer teams, teamledere og medarbejdere</p>
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Teams</h2>
+            <p className="text-sm text-muted-foreground">
+              Administrer teams, teamledere og medarbejdere
+              {employeesWithoutTeam.length > 0 && " • Træk medarbejdere op til et team for at tilføje dem"}
+            </p>
+          </div>
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-2" />
+            Opret team
+          </Button>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          Opret team
-        </Button>
-      </div>
 
-      <div className="rounded-xl bg-card/50 overflow-hidden">
-        {isLoading ? (
-          <p className="text-muted-foreground p-6">Indlæser...</p>
-        ) : teams.length === 0 ? (
-          <p className="text-muted-foreground p-6">Ingen teams oprettet endnu.</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent border-b border-border/50">
-                <TableHead className="text-xs font-medium text-muted-foreground">Navn</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Beskrivelse</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Teamleder</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Ass. Teamleder</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Kunder</TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground">Medarbejdere</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {teams.map((team) => {
-                const teamClientIds = getTeamClients(team.id);
-                const teamMemberIds = getTeamMembers(team.id);
-                return (
-                  <TableRow key={team.id} className="border-b border-border/30">
-                    <TableCell className="font-medium py-3">{team.name}</TableCell>
-                    <TableCell className="text-muted-foreground py-3">
-                      {team.description || "-"}
-                    </TableCell>
-                    <TableCell className="py-3">
-                      {team.team_leader_id && employeeMap[team.team_leader_id]
-                        ? employeeMap[team.team_leader_id]
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="py-3">
-                      {team.assistant_team_leader_id && employeeMap[team.assistant_team_leader_id]
-                        ? employeeMap[team.assistant_team_leader_id]
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <div className="flex flex-wrap gap-1.5">
-                        {teamClientIds.length > 0 ? (
-                          teamClientIds.slice(0, 3).map((clientId) => {
-                            const client = clients.find((c) => c.id === clientId);
-                            return client ? (
-                              <Badge key={clientId} variant="secondary" className="text-xs flex items-center gap-1.5 pr-2">
-                                {client.logo_url ? (
-                                  <img
-                                    src={client.logo_url}
-                                    alt=""
-                                    className="h-4 w-4 object-contain rounded-sm"
-                                  />
-                                ) : (
-                                  <Building2 className="h-3 w-3" />
-                                )}
-                                {client.name}
-                              </Badge>
-                            ) : null;
-                          })
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                        {teamClientIds.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{teamClientIds.length - 3}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        <span>{teamMemberIds.length}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <div className="flex items-center gap-0.5">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(team)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => deleteMutation.mutate(team.id)}
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </div>
+        {/* Teams table with droppable rows */}
+        <div className="rounded-xl bg-card/50 overflow-hidden border border-border">
+          {isLoading ? (
+            <p className="text-muted-foreground p-6">Indlæser...</p>
+          ) : teams.length === 0 ? (
+            <p className="text-muted-foreground p-6">Ingen teams oprettet endnu.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent border-b border-border/50">
+                  <TableHead className="text-xs font-medium text-muted-foreground">Navn</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Beskrivelse</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Teamleder</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Ass. Teamleder</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Kunder</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Medarbejdere</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {teams.map((team) => {
+                  const teamClientIds = getTeamClients(team.id);
+                  const teamMemberIds = getTeamMembers(team.id);
+                  return (
+                    <DroppableTeamRow
+                      key={team.id}
+                      team={team}
+                      memberCount={teamMemberIds.length}
+                      employeeMap={employeeMap}
+                      clients={clients}
+                      teamClientIds={teamClientIds}
+                      onEdit={() => openEdit(team)}
+                      onDelete={() => deleteMutation.mutate(team.id)}
+                      isDeleting={deleteMutation.isPending}
+                    />
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </div>
 
-      {/* Employees without team */}
-      {(() => {
-        // Get all employee IDs that are in at least one team
-        const employeeIdsWithTeam = new Set(teamMembers.map((tm) => tm.employee_id));
-        
-        // Filter employees who are NOT in any team
-        const employeesWithoutTeam = employees.filter(
-          (emp) => !employeeIdsWithTeam.has(emp.id)
-        );
-        
-        if (employeesWithoutTeam.length === 0) return null;
-        
-        return (
-          <div className="rounded-xl border border-border bg-card/50 p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <UserX className="h-4 w-4 text-muted-foreground" />
-              <h3 className="font-semibold text-foreground">
-                Medarbejdere uden team ({employeesWithoutTeam.length})
-              </h3>
+        {/* Employees without team - draggable */}
+        {employeesWithoutTeam.length > 0 && (
+          <div className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <UserX className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">
+                  Medarbejdere uden team ({employeesWithoutTeam.length})
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Træk en medarbejder op til et team i tabellen ovenfor
+                </p>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {employeesWithoutTeam.map((emp) => (
-                <div
-                  key={emp.id}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
-                  onClick={() => navigate(`/employees/${emp.id}`)}
-                >
-                  <span className="text-sm text-foreground">
-                    {emp.first_name} {emp.last_name}
-                  </span>
-                </div>
+                <DraggableEmployeeChip key={emp.id} employee={emp} />
               ))}
             </div>
           </div>
-        );
-      })()}
+        )}
+
+        {/* Drag overlay */}
+        <DragOverlay>
+          {activeEmployee && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground shadow-lg">
+              <GripVertical className="h-3 w-3" />
+              <span className="text-sm font-medium">
+                {activeEmployee.first_name} {activeEmployee.last_name}
+              </span>
+            </div>
+          )}
+        </DragOverlay>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden">
@@ -762,6 +914,7 @@ export function TeamsTab() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </DndContext>
   );
 }
