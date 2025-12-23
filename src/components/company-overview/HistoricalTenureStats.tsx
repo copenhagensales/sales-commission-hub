@@ -62,25 +62,43 @@ export function HistoricalTenureStats() {
     },
   });
 
-  // Fetch current employees
+  // Fetch current employees with team memberships via team_members junction table
   const { data: currentData, isLoading: loadingCurrent } = useQuery({
     queryKey: ["current-employees-tenure"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get all active employees
+      const { data: employees, error: empError } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, team_id, employment_start_date, teams(name)")
+        .select("id, first_name, last_name, employment_start_date")
         .eq("is_active", true)
         .not("employment_start_date", "is", null);
-      if (error) throw error;
+      if (empError) throw empError;
+      
+      // Then get team memberships
+      const { data: teamMemberships, error: tmError } = await supabase
+        .from("team_members")
+        .select("employee_id, team:teams(name)");
+      if (tmError) throw tmError;
+      
+      // Create a map of employee_id to team name
+      const employeeTeamMap = new Map<string, string>();
+      (teamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
+        if (tm.team?.name) {
+          // Take first team if multiple
+          if (!employeeTeamMap.has(tm.employee_id)) {
+            employeeTeamMap.set(tm.employee_id, tm.team.name);
+          }
+        }
+      });
       
       const today = new Date();
-      return (data || []).map(emp => {
+      return (employees || []).map(emp => {
         const hireDate = emp.employment_start_date ? parseISO(emp.employment_start_date) : today;
         const tenureDays = differenceInDays(today, hireDate);
         return {
           id: emp.id,
           full_name: `${emp.first_name} ${emp.last_name}`.trim(),
-          team_name: normalizeTeamName(emp.teams?.name || null),
+          team_name: normalizeTeamName(employeeTeamMap.get(emp.id) || null),
           hire_date: emp.employment_start_date || "",
           end_date: null,
           tenure_days: Math.max(0, tenureDays),
