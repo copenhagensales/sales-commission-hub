@@ -168,10 +168,10 @@ export default function RecruitmentDashboard() {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Sidste 24 timer</CardTitle>
-            <UserPlus className="h-4 w-4 text-blue-400" />
+            <UserPlus className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-400">{kpiStats.last24h}</div>
+            <div className="text-2xl font-bold text-foreground">{kpiStats.last24h}</div>
             <div className="flex items-center gap-1 text-xs">
               {kpiStats.trend24h !== 0 && (
                 <span className={kpiStats.trend24h > 0 ? "text-green-500" : "text-red-500"}>
@@ -186,10 +186,10 @@ export default function RecruitmentDashboard() {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Sidste 7 dage</CardTitle>
-            <Users className="h-4 w-4 text-cyan-400" />
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-cyan-400">{kpiStats.last7d}</div>
+            <div className="text-2xl font-bold text-foreground">{kpiStats.last7d}</div>
             <div className="flex items-center gap-1 text-xs">
               {kpiStats.trend7d !== 0 && (
                 <span className={kpiStats.trend7d > 0 ? "text-green-500" : "text-red-500"}>
@@ -204,10 +204,10 @@ export default function RecruitmentDashboard() {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Sidste 30 dage</CardTitle>
-            <TrendingUp className="h-4 w-4 text-orange-400" />
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-400">{kpiStats.last30d}</div>
+            <div className="text-2xl font-bold text-foreground">{kpiStats.last30d}</div>
             <div className="flex items-center gap-1 text-xs">
               {kpiStats.trend30d !== 0 && (
                 <span className={kpiStats.trend30d > 0 ? "text-green-500" : "text-red-500"}>
@@ -222,10 +222,10 @@ export default function RecruitmentDashboard() {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Planlagte samtaler</CardTitle>
-            <Calendar className="h-4 w-4 text-purple-400" />
+            <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-400">{kpiStats.scheduledInterviews}</div>
+            <div className="text-2xl font-bold text-foreground">{kpiStats.scheduledInterviews}</div>
             <p className="text-xs text-muted-foreground">Kommende interviews</p>
           </CardContent>
         </Card>
@@ -246,19 +246,19 @@ export default function RecruitmentDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                <MessageSquare className="h-6 w-6 text-blue-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-blue-400">{communicationStats?.sms || 0}</div>
+              <div className="text-center p-4 rounded-lg bg-muted/50 border border-border">
+                <MessageSquare className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+                <div className="text-2xl font-bold text-foreground">{communicationStats?.sms || 0}</div>
                 <p className="text-xs text-muted-foreground">SMS</p>
               </div>
-              <div className="text-center p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                <Mail className="h-6 w-6 text-purple-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-purple-400">{communicationStats?.email || 0}</div>
+              <div className="text-center p-4 rounded-lg bg-muted/50 border border-border">
+                <Mail className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+                <div className="text-2xl font-bold text-foreground">{communicationStats?.email || 0}</div>
                 <p className="text-xs text-muted-foreground">Emails</p>
               </div>
-              <div className="text-center p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                <Phone className="h-6 w-6 text-green-400 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-green-400">{communicationStats?.call || 0}</div>
+              <div className="text-center p-4 rounded-lg bg-muted/50 border border-border">
+                <Phone className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+                <div className="text-2xl font-bold text-foreground">{communicationStats?.call || 0}</div>
                 <p className="text-xs text-muted-foreground">Opkald</p>
               </div>
             </div>
