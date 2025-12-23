@@ -451,6 +451,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     icon: "📺",
     permissions: [
       {
+        key: "menu_dashboards",
+        label: "Dashboards (generelt)",
+        description: "Generel adgang til dashboards menu",
+        hasEditOption: false,
+      },
+      {
         key: "menu_dashboard_cph_sales",
         label: "CPH Sales Dashboard",
         description: "Adgang til CPH Sales dashboard",

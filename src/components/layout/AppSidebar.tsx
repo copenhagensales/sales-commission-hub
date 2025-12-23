@@ -921,82 +921,104 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
           )}
 
 
-          {/* Dashboards menu - Always visible */}
-          <Collapsible open={dashboardsOpen} onOpenChange={setDashboardsOpen}>
-            <CollapsibleTrigger className={cn(
-              "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              location.pathname.startsWith("/dashboards") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-            )}>
-              <div className="flex items-center gap-3">
-                <Monitor className="h-5 w-5" />
-                Dashboards
-              </div>
-              {dashboardsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </CollapsibleTrigger>
+          {/* Dashboards menu - Show only if user has permission for any dashboard */}
+          {(p.canViewDashboardCphSales || p.canViewDashboardFieldmarketing || p.canViewDashboardEesyTm || 
+            p.canViewDashboardTdcErhverv || p.canViewDashboardRelatel || p.canViewDashboardTryg || 
+            p.canViewDashboardAse || p.canViewDashboardTest || p.canViewDashboardUnited || 
+            p.canViewDashboardDesign || p.canViewDashboardSettings || p.canViewBoardsTest) && (
+            <Collapsible open={dashboardsOpen} onOpenChange={setDashboardsOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname.startsWith("/dashboards") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <Monitor className="h-5 w-5" />
+                  Dashboards
+                </div>
+                {dashboardsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                <NavLink to="/dashboards/cph-sales" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/dashboards/cph-sales" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <BarChart3 className="h-4 w-4" />
-                  Dagsboard CPH Sales
-                </NavLink>
-                <NavLink to="/dashboards/fieldmarketing" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/dashboards/fieldmarketing" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <BarChart3 className="h-4 w-4" />
-                  Fieldmarketing
-                </NavLink>
-                <NavLink to="/dashboards/eesy-tm" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/dashboards/eesy-tm" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <BarChart3 className="h-4 w-4" />
-                  Eesy TM
-                </NavLink>
-                <NavLink to="/dashboards/tdc-erhverv" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/dashboards/tdc-erhverv" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <BarChart3 className="h-4 w-4" />
-                  TDC Erhverv
-                </NavLink>
-                <NavLink to="/dashboards/relatel" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/dashboards/relatel" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <BarChart3 className="h-4 w-4" />
-                  Relatel
-                </NavLink>
-                <NavLink to="/dashboards/tryg" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/dashboards/tryg" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <BarChart3 className="h-4 w-4" />
-                  Tryg
-                </NavLink>
-                <NavLink to="/dashboards/ase" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/dashboards/ase" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <BarChart3 className="h-4 w-4" />
-                  ASE
-                </NavLink>
-                <NavLink to="/dashboards/mg-test" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/dashboards/mg-test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <BarChart3 className="h-4 w-4" />
-                  Test Dashboard
-                </NavLink>
-                <NavLink to="/dashboards/united" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/dashboards/united" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <BarChart3 className="h-4 w-4" />
-                  United
-                </NavLink>
+                {p.canViewDashboardCphSales && (
+                  <NavLink to="/dashboards/cph-sales" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/cph-sales" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <BarChart3 className="h-4 w-4" />
+                    Dagsboard CPH Sales
+                  </NavLink>
+                )}
+                {p.canViewDashboardFieldmarketing && (
+                  <NavLink to="/dashboards/fieldmarketing" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/fieldmarketing" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <BarChart3 className="h-4 w-4" />
+                    Fieldmarketing
+                  </NavLink>
+                )}
+                {p.canViewDashboardEesyTm && (
+                  <NavLink to="/dashboards/eesy-tm" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/eesy-tm" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <BarChart3 className="h-4 w-4" />
+                    Eesy TM
+                  </NavLink>
+                )}
+                {p.canViewDashboardTdcErhverv && (
+                  <NavLink to="/dashboards/tdc-erhverv" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/tdc-erhverv" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <BarChart3 className="h-4 w-4" />
+                    TDC Erhverv
+                  </NavLink>
+                )}
+                {p.canViewDashboardRelatel && (
+                  <NavLink to="/dashboards/relatel" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/relatel" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <BarChart3 className="h-4 w-4" />
+                    Relatel
+                  </NavLink>
+                )}
+                {p.canViewDashboardTryg && (
+                  <NavLink to="/dashboards/tryg" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/tryg" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <BarChart3 className="h-4 w-4" />
+                    Tryg
+                  </NavLink>
+                )}
+                {p.canViewDashboardAse && (
+                  <NavLink to="/dashboards/ase" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/ase" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <BarChart3 className="h-4 w-4" />
+                    ASE
+                  </NavLink>
+                )}
+                {p.canViewDashboardTest && (
+                  <NavLink to="/dashboards/mg-test" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/mg-test" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <BarChart3 className="h-4 w-4" />
+                    Test Dashboard
+                  </NavLink>
+                )}
+                {p.canViewDashboardUnited && (
+                  <NavLink to="/dashboards/united" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/united" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <BarChart3 className="h-4 w-4" />
+                    United
+                  </NavLink>
+                )}
                 {p.canViewBoardsTest && (
                   <NavLink to="/boards/test" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
@@ -1006,22 +1028,27 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     {t("sidebar.test")}
                   </NavLink>
                 )}
-                <NavLink to="/dashboards/design" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/dashboards/design" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <Palette className="h-4 w-4" />
-                  Design dashboard
-                </NavLink>
-                <NavLink to="/dashboards/settings" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/dashboards/settings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <Settings className="h-4 w-4" />
-                  Indstilling dashboard
-                </NavLink>
-            </CollapsibleContent>
-          </Collapsible>
+                {p.canViewDashboardDesign && (
+                  <NavLink to="/dashboards/design" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/design" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Palette className="h-4 w-4" />
+                    Design dashboard
+                  </NavLink>
+                )}
+                {p.canViewDashboardSettings && (
+                  <NavLink to="/dashboards/settings" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/settings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Settings className="h-4 w-4" />
+                    Indstilling dashboard
+                  </NavLink>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           {/* Test menu */}
           {showTestMenu && (
