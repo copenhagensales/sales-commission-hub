@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { da } from "date-fns/locale";
@@ -56,6 +56,7 @@ import { useKpiTypes } from "@/hooks/useKpiTypes";
 import { useDesignTypes } from "@/hooks/useDesignTypes";
 import { ResizableWidgetCard, GRID_COLS, CELL_HEIGHT } from "@/components/dashboard/ResizableWidgetCard";
 import { useEmployeeDashboards, DashboardWidget } from "@/hooks/useEmployeeDashboards";
+import { useWidgetKpiData } from "@/hooks/useDashboardKpiData";
 
 interface TimePeriod {
   id: string;
@@ -199,6 +200,24 @@ export default function DesignDashboard() {
   // Database data
   const [teams, setTeams] = useState<DbTeam[]>([]);
   const [clients, setClients] = useState<DbClient[]>([]);
+
+  // Memoize widgets array for the KPI data hook
+  const widgetsForKpiData = useMemo(() => 
+    placedWidgets.map(w => ({
+      id: w.id,
+      dataSource: w.dataSource,
+      kpiTypeIds: w.kpiTypeIds,
+      customValue: w.customValue,
+      timePeriodId: w.timePeriodId,
+      customFromDate: w.customFromDate,
+      clientId: w.clientId,
+      teamId: w.teamId,
+    })),
+    [placedWidgets]
+  );
+
+  // Fetch real KPI data from database
+  const { getValue: getRealValue, loading: kpiDataLoading } = useWidgetKpiData(widgetsForKpiData);
 
   // Load dashboard from URL param
   useEffect(() => {
@@ -420,20 +439,14 @@ export default function DesignDashboard() {
     );
   };
 
-  // Generate example values for preview
-  const getExampleValue = (widget: PlacedWidget) => {
+  // Get widget value - use real database value or custom value
+  const getWidgetValue = (widget: PlacedWidget) => {
     if (widget.dataSource === "custom") {
       return widget.customValue || "0";
     }
-    // Generate realistic example based on KPI type
-    const firstKpi = widget.kpiTypeIds[0];
-    if (firstKpi?.includes("sales") || firstKpi?.includes("revenue")) return "847.520 kr";
-    if (firstKpi?.includes("calls")) return "1.247";
-    if (firstKpi?.includes("conversion") || firstKpi?.includes("rate")) return "23,4%";
-    if (firstKpi?.includes("target") || firstKpi?.includes("progress")) return "78%";
-    if (firstKpi?.includes("avg")) return "4.320 kr";
-    if (firstKpi?.includes("time") || firstKpi?.includes("duration")) return "3:45";
-    return Math.floor(Math.random() * 1000 + 100).toString();
+    // Get real value from the KPI data hook
+    const realValue = getRealValue(widget.id);
+    return kpiDataLoading ? "..." : realValue;
   };
 
   const getExampleTrend = () => {
@@ -567,7 +580,7 @@ export default function DesignDashboard() {
                       title={widget.title || getWidgetTypeName(widget.widgetTypeId)}
                       widgetType={widget.widgetTypeId}
                       kpiLabel={getDisplayLabel(widget)}
-                      value={getExampleValue(widget)}
+                      value={getWidgetValue(widget)}
                       size={{ width: widget.width, height: widget.height }}
                       designClasses={getDesignClasses(globalDesign)}
                       colorTheme={colorTheme}
