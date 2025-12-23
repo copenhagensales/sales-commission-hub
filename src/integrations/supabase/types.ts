@@ -2994,6 +2994,36 @@ export type Database = {
           },
         ]
       }
+      historical_employment: {
+        Row: {
+          created_at: string | null
+          employee_name: string
+          end_date: string
+          id: string
+          start_date: string
+          team_name: string
+          tenure_days: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          employee_name: string
+          end_date: string
+          id?: string
+          start_date: string
+          team_name: string
+          tenure_days?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          employee_name?: string
+          end_date?: string
+          id?: string
+          start_date?: string
+          team_name?: string
+          tenure_days?: number | null
+        }
+        Relationships: []
+      }
       integration_logs: {
         Row: {
           created_at: string
