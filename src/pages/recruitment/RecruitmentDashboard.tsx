@@ -281,42 +281,21 @@ export default function RecruitmentDashboard() {
             {candidates.length === 0 ? (
               <p className="text-muted-foreground text-center py-4">Ingen ansøgninger endnu</p>
             ) : (
-              <div className="space-y-1">
-                {candidates.slice(0, 10).map((candidate, index) => (
+              <div className="space-y-0.5">
+                {candidates.slice(0, 10).map((candidate) => (
                   <Link 
                     key={candidate.id} 
                     to={`/recruitment/candidates/${candidate.id}`}
-                    className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors group"
+                    className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 transition-colors group"
                   >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary text-sm font-medium shrink-0">
-                      {candidate.first_name?.charAt(0)}{candidate.last_name?.charAt(0)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium text-foreground truncate group-hover:text-primary transition-colors text-sm">
                         {candidate.first_name} {candidate.last_name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(candidate.created_at), "d. MMM 'kl.' HH:mm", { locale: da })}
-                      </p>
+                      </span>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {format(new Date(candidate.created_at), "d. MMM", { locale: da })}
+                      </span>
                     </div>
-                    <Badge 
-                      variant="outline" 
-                      className={`text-xs shrink-0 ${
-                        candidate.status === 'new' ? 'border-blue-500/30 text-blue-500 bg-blue-500/10' :
-                        candidate.status === 'contacted' ? 'border-yellow-500/30 text-yellow-500 bg-yellow-500/10' :
-                        candidate.status === 'interview_scheduled' ? 'border-purple-500/30 text-purple-500 bg-purple-500/10' :
-                        candidate.status === 'interviewed' ? 'border-cyan-500/30 text-cyan-500 bg-cyan-500/10' :
-                        candidate.status === 'hired' ? 'border-green-500/30 text-green-500 bg-green-500/10' :
-                        'border-muted-foreground/30 text-muted-foreground'
-                      }`}
-                    >
-                      {candidate.status === 'new' ? 'Ny' :
-                       candidate.status === 'contacted' ? 'Kontaktet' :
-                       candidate.status === 'interview_scheduled' ? 'Samtale' :
-                       candidate.status === 'interviewed' ? 'Afholdt' :
-                       candidate.status === 'hired' ? 'Ansat' :
-                       candidate.status}
-                    </Badge>
                   </Link>
                 ))}
               </div>
