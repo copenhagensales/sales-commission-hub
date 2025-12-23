@@ -21,7 +21,8 @@ interface CombinedEmployee {
 const normalizeTeamName = (name: string | null): string => {
   if (!name) return "Ukendt";
   const lower = name.toLowerCase().trim();
-  if (lower.includes("eesy fm") || lower === "eesy fm") return "Eesy FM";
+  // Map "Eesy FM" to Fieldmarketing
+  if (lower.includes("eesy fm") || lower === "eesy fm") return "Fieldmarketing";
   if (lower.includes("eesy tm") || lower === "eesy tm") return "Eesy TM";
   if (lower.includes("fieldmarketing")) return "Fieldmarketing";
   if (lower.includes("relatel")) return "Relatel";
@@ -32,7 +33,6 @@ const normalizeTeamName = (name: string | null): string => {
 
 // Colors for teams
 const TEAM_COLORS: Record<string, string> = {
-  "Eesy FM": "#3b82f6",
   "Eesy TM": "#8b5cf6",
   "Fieldmarketing": "#10b981",
   "Relatel": "#f59e0b",
