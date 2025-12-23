@@ -56,45 +56,45 @@ export function ChurnTrendChart() {
         });
       }
 
-      // Calculate churn for each month
-      // For each month, we calculate: employees who started before end of month and left within 60 days
+      // Calculate cohort-based churn for each month
+      // For each month: employees who STARTED in that month, and what % left within 60 days
       const chartPoints = months.map(({ month, label }) => {
         const monthEnd = endOfMonth(month);
         const monthStart = startOfMonth(month);
 
-        // Get all employees who had left by the end of this month
-        const leaversUpToMonth = (historicalData || []).filter(emp => {
+        // Find employees who STARTED in this specific month (from historical data - they've left)
+        const historicalStartedInMonth = (historicalData || []).filter(emp => {
           const teamName = normalizeTeamName(emp.team_name);
           if (EXCLUDED_TEAMS.includes(teamName)) return false;
-          if (!emp.end_date) return false;
-          const endDate = parseISO(emp.end_date);
-          return endDate <= monthEnd;
+          if (!emp.start_date) return false;
+          const startDate = parseISO(emp.start_date);
+          return startDate >= monthStart && startDate <= monthEnd;
         });
 
-        // Count total employees who had started by end of month (and subsequently left)
-        const totalLeaversUpToMonth = leaversUpToMonth.length;
-
-        // Count those who left within 60 days
-        const exits60Days = leaversUpToMonth.filter(emp => emp.tenure_days <= 60).length;
-
-        // Also include current employees who started before this month for total count
-        const currentStartedBefore = (currentEmployees || []).filter(emp => {
+        // Find current employees who STARTED in this specific month (still active)
+        const currentStartedInMonth = (currentEmployees || []).filter(emp => {
           if (!emp.is_active) return false;
           const teamName = normalizeTeamName(employeeTeamMap.get(emp.id) || null);
           if (EXCLUDED_TEAMS.includes(teamName)) return false;
           if (!emp.employment_start_date) return false;
           const startDate = parseISO(emp.employment_start_date);
-          return startDate <= monthEnd;
-        }).length;
+          return startDate >= monthStart && startDate <= monthEnd;
+        });
 
-        const totalEmployees = totalLeaversUpToMonth + currentStartedBefore;
-        const churnRate = totalEmployees > 0 ? (exits60Days / totalEmployees) * 100 : 0;
+        // Total employees who started in this month (cohort size)
+        const cohortSize = historicalStartedInMonth.length + currentStartedInMonth.length;
+
+        // Count those from historical who left within 60 days
+        const exits60Days = historicalStartedInMonth.filter(emp => emp.tenure_days <= 60).length;
+
+        // Calculate churn rate for this cohort
+        const churnRate = cohortSize > 0 ? (exits60Days / cohortSize) * 100 : 0;
 
         return {
           month: label,
           churnRate: Math.round(churnRate * 10) / 10,
           exits60Days,
-          totalEmployees
+          cohortSize
         };
       });
 
@@ -123,9 +123,9 @@ export function ChurnTrendChart() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>60-dages Churn Udvikling</CardTitle>
+        <CardTitle>60-dages Churn Udvikling (Kohorte)</CardTitle>
         <CardDescription>
-          Andel af medarbejdere der stoppede inden for de første 60 dage — over de sidste 12 måneder
+          Andel af nye medarbejdere i hver måned der stoppede inden for de første 60 dage
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -160,7 +160,7 @@ export function ChurnTrendChart() {
                         Churn: <span className="font-semibold">{data.churnRate}%</span>
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {data.exits60Days} af {data.totalEmployees} stoppede inden 60 dage
+                        {data.exits60Days} af {data.cohortSize} nye stoppede inden 60 dage
                       </p>
                     </div>
                   );
