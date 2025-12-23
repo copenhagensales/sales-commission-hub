@@ -231,78 +231,44 @@ export default function RecruitmentDashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Communication Stats */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-foreground flex items-center justify-between">
-              Kommunikation (7 dage)
-              <Link to="/recruitment/messages">
-                <Button variant="ghost" size="sm">
-                  Se alle <ArrowRight className="ml-1 h-4 w-4" />
-                </Button>
-              </Link>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-4 rounded-lg bg-muted/50 border border-border">
-                <MessageSquare className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-                <div className="text-2xl font-bold text-foreground">{communicationStats?.sms || 0}</div>
-                <p className="text-xs text-muted-foreground">SMS</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-muted/50 border border-border">
-                <Mail className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-                <div className="text-2xl font-bold text-foreground">{communicationStats?.email || 0}</div>
-                <p className="text-xs text-muted-foreground">Emails</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-muted/50 border border-border">
-                <Phone className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-                <div className="text-2xl font-bold text-foreground">{communicationStats?.call || 0}</div>
-                <p className="text-xs text-muted-foreground">Opkald</p>
-              </div>
+      {/* Recent Applications - compact inline list */}
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg font-semibold text-foreground flex items-center justify-between">
+            Seneste ansøgninger
+            <Link to="/recruitment/candidates">
+              <Button variant="ghost" size="sm">
+                Se alle <ArrowRight className="ml-1 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {candidates.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">Ingen ansøgninger endnu</p>
+          ) : (
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {candidates.slice(0, 10).map((candidate, index) => (
+                <Link 
+                  key={candidate.id} 
+                  to={`/recruitment/candidates/${candidate.id}`}
+                  className="inline-flex items-center gap-1.5 py-1 hover:text-primary transition-colors group text-sm"
+                >
+                  <span className="font-medium text-foreground group-hover:text-primary transition-colors">
+                    {candidate.first_name}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {format(new Date(candidate.created_at), "d/M", { locale: da })}
+                  </span>
+                  {index < Math.min(candidates.length - 1, 9) && (
+                    <span className="text-muted-foreground/50 ml-1">•</span>
+                  )}
+                </Link>
+              ))}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Applications */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold text-foreground flex items-center justify-between">
-              Seneste ansøgninger
-              <Link to="/recruitment/candidates">
-                <Button variant="ghost" size="sm">
-                  Se alle <ArrowRight className="ml-1 h-4 w-4" />
-                </Button>
-              </Link>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {candidates.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">Ingen ansøgninger endnu</p>
-            ) : (
-              <div className="space-y-0.5">
-                {candidates.slice(0, 10).map((candidate) => (
-                  <Link 
-                    key={candidate.id} 
-                    to={`/recruitment/candidates/${candidate.id}`}
-                    className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 transition-colors group"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-medium text-foreground truncate group-hover:text-primary transition-colors text-sm">
-                        {candidate.first_name}
-                      </span>
-                      <span className="text-xs text-muted-foreground shrink-0">
-                        {format(new Date(candidate.created_at), "d. MMM", { locale: da })}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Pipeline Overview */}
       <Card className="bg-card border-border">
