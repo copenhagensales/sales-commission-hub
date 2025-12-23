@@ -52,7 +52,7 @@ export default function CompanyOverview() {
 
   // Fetch candidate/application counts with 30-day comparison (matching recruitment dashboard logic)
   const { data: applicationStats, isLoading: isLoadingApplications } = useQuery({
-    queryKey: ["company-overview-application-stats"],
+    queryKey: ["company-overview-candidate-stats"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("candidates")
@@ -61,15 +61,22 @@ export default function CompanyOverview() {
       if (error) throw error;
       
       const now = new Date();
+      const thirtyDaysAgoDate = subDays(now, 30);
+      const sixtyDaysAgoDate = subDays(now, 60);
       
       // Candidates in the last 30 days
-      const last30d = data.filter(c => new Date(c.created_at) >= subDays(now, 30)).length;
+      const last30d = data.filter(c => {
+        const created = new Date(c.created_at);
+        return created >= thirtyDaysAgoDate;
+      }).length;
       
       // Candidates in the previous 30 days (30-60 days ago)
       const prev30d = data.filter(c => {
         const created = new Date(c.created_at);
-        return created >= subDays(now, 60) && created < subDays(now, 30);
+        return created >= sixtyDaysAgoDate && created < thirtyDaysAgoDate;
       }).length;
+      
+      console.log("Candidate stats:", { total: data.length, last30d, prev30d, thirtyDaysAgoDate });
       
       // Calculate percentage change
       let percentageChange = 0;
