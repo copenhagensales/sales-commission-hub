@@ -51,16 +51,34 @@ export function useEmployeeDashboards() {
   useEffect(() => {
     const fetchEmployeeId = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('No authenticated user found');
+        setLoading(false);
+        return;
+      }
 
-      const { data: employee } = await supabase
+      // First try by auth_user_id
+      let { data: employee } = await supabase
         .from('employee_master_data')
         .select('id')
         .eq('auth_user_id', user.id)
         .single();
 
+      // Fallback: try by email
+      if (!employee) {
+        const { data: employeeByEmail } = await supabase
+          .from('employee_master_data')
+          .select('id')
+          .eq('private_email', user.email)
+          .single();
+        employee = employeeByEmail;
+      }
+
       if (employee) {
         setCurrentEmployeeId(employee.id);
+      } else {
+        console.log('No employee record found for user:', user.id, user.email);
+        setLoading(false);
       }
     };
     fetchEmployeeId();
