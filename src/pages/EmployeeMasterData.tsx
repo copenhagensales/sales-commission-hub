@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X, UserX } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -44,6 +44,7 @@ interface EmployeeMasterDataRecord {
   department: string | null;
   work_location: string | null;
   manager_id: string | null;
+  team_id: string | null;
   contract_id: string | null;
   contract_version: string | null;
   salary_type: "provision" | "fixed" | "hourly" | null;
@@ -85,6 +86,7 @@ const defaultEmployee: NewEmployee = {
   department: null,
   work_location: "København V",
   manager_id: null,
+  team_id: null,
   contract_id: null,
   contract_version: null,
   salary_type: "provision",
@@ -242,6 +244,7 @@ export default function EmployeeMasterData() {
       department: employee.department,
       work_location: employee.work_location,
       manager_id: employee.manager_id,
+      team_id: employee.team_id,
       contract_id: employee.contract_id,
       contract_version: employee.contract_version,
       salary_type: employee.salary_type,
@@ -1172,6 +1175,39 @@ export default function EmployeeMasterData() {
             )}
           </div>
         </div>
+
+        {/* Employees without team */}
+        {(() => {
+          const employeesWithoutTeam = employees.filter(
+            (emp) => !emp.team_id && emp.is_active
+          );
+          
+          if (employeesWithoutTeam.length === 0) return null;
+          
+          return (
+            <div className="rounded-xl border border-border bg-card/50 p-4 mt-6">
+              <div className="flex items-center gap-2 mb-4">
+                <UserX className="h-4 w-4 text-muted-foreground" />
+                <h3 className="font-semibold text-foreground">
+                  Medarbejdere uden team ({employeesWithoutTeam.length})
+                </h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {employeesWithoutTeam.map((emp) => (
+                  <div
+                    key={emp.id}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
+                    onClick={() => navigate(`/employees/${emp.id}`)}
+                  >
+                    <span className="text-sm text-foreground">
+                      {emp.first_name} {emp.last_name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
           </TabsContent>
 
           <TabsContent value="staff-employees" className="space-y-6">
