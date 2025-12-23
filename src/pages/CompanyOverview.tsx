@@ -255,28 +255,20 @@ export default function CompanyOverview() {
     },
   });
 
-  // Fetch 60-day churn (combined) with trend
+  // Fetch 60-day churn (combined) with cohort-based trend
   const { data: churnStats, isLoading: isLoadingChurn } = useQuery({
     queryKey: ["company-overview-combined-churn-stats"],
     queryFn: async () => {
-      // Current employees
-      const { data: employees, error: empError } = await supabase
-        .from("employee_master_data")
-        .select("id, employment_start_date")
-        .eq("is_active", true)
-        .not("employment_start_date", "is", null);
-      if (empError) throw empError;
-      
-      // Team memberships
+      // Team memberships for filtering
       const { data: teamMemberships, error: tmError } = await supabase
         .from("team_members")
         .select("employee_id, team:teams(name)");
       if (tmError) throw tmError;
       
-      // Historical employees with end_date
+      // Historical employees with end_date and start info
       const { data: historicalData, error: histError } = await supabase
         .from("historical_employment")
-        .select("id, team_name, tenure_days, end_date");
+        .select("id, team_name, tenure_days, end_date, start_date");
       if (histError) throw histError;
       
       // Map employee_id to team name
@@ -289,26 +281,21 @@ export default function CompanyOverview() {
       
       const now = new Date();
       const thirtyDaysAgo = subDays(now, 30);
+      const sixtyDaysAgo = subDays(now, 60);
+      const ninetyDaysAgo = subDays(now, 90);
       
+      // Calculate overall churn rate (all historical employees)
       let totalCount = 0;
       let exits60Days = 0;
-      let prevTotalCount = 0;
-      let prevExits60Days = 0;
       
-      // Current employees (none have left within 60 days since they're still active)
-      (employees || []).forEach(emp => {
-        const teamName = normalizeTeamName(employeeTeamMap.get(emp.id) || null);
-        if (EXCLUDED_TEAMS.includes(teamName)) return;
-        totalCount++;
-        
-        // For prev calculation, only count if hired before 30 days ago
-        const startDate = emp.employment_start_date ? parseISO(emp.employment_start_date) : now;
-        if (startDate <= thirtyDaysAgo) {
-          prevTotalCount++;
-        }
-      });
+      // For cohort comparison:
+      // Current cohort: employees who started 30-90 days ago (they've had 30-90 days, enough time to potentially churn within 60 days)
+      // Previous cohort: employees who started 60-120 days ago
+      let currentCohortTotal = 0;
+      let currentCohortExits = 0;
+      let prevCohortTotal = 0;
+      let prevCohortExits = 0;
       
-      // Historical employees
       (historicalData || []).forEach(emp => {
         const teamName = normalizeTeamName(emp.team_name);
         if (EXCLUDED_TEAMS.includes(teamName)) return;
@@ -318,26 +305,43 @@ export default function CompanyOverview() {
           exits60Days++;
         }
         
-        // For prev calculation - employees who left before 30 days ago
-        const endDate = emp.end_date ? parseISO(emp.end_date) : null;
-        if (endDate && endDate <= thirtyDaysAgo) {
-          prevTotalCount++;
-          if (emp.tenure_days <= 60) {
-            prevExits60Days++;
+        // Cohort analysis based on start_date
+        const startDate = emp.start_date ? parseISO(emp.start_date) : null;
+        if (startDate) {
+          // Current cohort: started 30-90 days ago
+          if (startDate >= ninetyDaysAgo && startDate < thirtyDaysAgo) {
+            currentCohortTotal++;
+            if (emp.tenure_days <= 60) {
+              currentCohortExits++;
+            }
+          }
+          // Previous cohort: started 90-150 days ago
+          const oneFiftyDaysAgo = subDays(now, 150);
+          if (startDate >= oneFiftyDaysAgo && startDate < ninetyDaysAgo) {
+            prevCohortTotal++;
+            if (emp.tenure_days <= 60) {
+              prevCohortExits++;
+            }
           }
         }
       });
       
       const churnRate = totalCount > 0 ? (exits60Days / totalCount) * 100 : 0;
-      const prevChurnRate = prevTotalCount > 0 ? (prevExits60Days / prevTotalCount) * 100 : 0;
       
-      const churnChange = churnRate - prevChurnRate;
+      // Cohort churn rates
+      const currentCohortChurn = currentCohortTotal > 0 ? (currentCohortExits / currentCohortTotal) * 100 : 0;
+      const prevCohortChurn = prevCohortTotal > 0 ? (prevCohortExits / prevCohortTotal) * 100 : 0;
+      
+      // Change in churn rate between cohorts (percentage points)
+      const churnChange = currentCohortChurn - prevCohortChurn;
       
       return { 
         churnRate: Math.round(churnRate * 10) / 10, 
         totalCount,
         exits60Days,
-        churnChange: Math.round(churnChange * 10) / 10
+        churnChange: Math.round(churnChange * 10) / 10,
+        currentCohortTotal,
+        prevCohortTotal
       };
     },
   });
@@ -418,7 +422,8 @@ export default function CompanyOverview() {
       bgColor: "bg-primary/10",
       trend: churnStats ? {
         change: churnStats.churnChange,
-        percentage: churnStats.churnChange,
+        percentage: null, // Show as percentage points change between cohorts
+        unit: "pp",
         invertColors: true // For churn, lower is better
       } : null
     },
