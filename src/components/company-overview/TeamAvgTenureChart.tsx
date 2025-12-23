@@ -127,9 +127,11 @@ export function TeamAvgTenureChart() {
               contentStyle={{ 
                 backgroundColor: "hsl(var(--card))", 
                 border: "1px solid hsl(var(--border))",
-                borderRadius: "8px"
+                borderRadius: "8px",
+                color: "hsl(var(--card-foreground))"
               }}
-              labelStyle={{ color: "hsl(var(--foreground))" }}
+              labelStyle={{ color: "hsl(var(--card-foreground))" }}
+              itemStyle={{ color: "hsl(var(--card-foreground))" }}
               formatter={(value: number) => [formatMonths(value), "Gns. anciennitet"]}
               cursor={{ fill: "hsl(var(--primary) / 0.2)" }}
             />
