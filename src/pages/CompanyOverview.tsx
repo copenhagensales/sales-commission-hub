@@ -32,21 +32,15 @@ export default function CompanyOverview() {
   const thirtyDaysAgoStr = format(thirtyDaysAgo, "yyyy-MM-dd");
   const sixtyDaysAgoStr = format(sixtyDaysAgo, "yyyy-MM-dd");
 
-  // Fetch combined employee stats (current + historical)
+  // Fetch current employee stats with 30-day comparison for growth trend
   const { data: employeeStats, isLoading: isLoadingEmployees } = useQuery({
-    queryKey: ["company-overview-combined-employee-stats"],
+    queryKey: ["company-overview-employee-growth-stats"],
     queryFn: async () => {
       // Current employees from team_members
       const { data: teamMembers, error: tmError } = await supabase
         .from("team_members")
         .select("employee_id, team:teams(name)");
       if (tmError) throw tmError;
-      
-      // Historical employees
-      const { data: historicalData, error: histError } = await supabase
-        .from("historical_employment")
-        .select("id, team_name");
-      if (histError) throw histError;
       
       // Count unique current employees (excluding Stab)
       const currentEmployees = new Set<string>();
@@ -57,16 +51,66 @@ export default function CompanyOverview() {
         }
       });
       
-      // Count historical employees (excluding Stab)
-      const historicalCount = (historicalData || []).filter(emp => {
+      const currentCount = currentEmployees.size;
+      
+      // Get employees who left in the last 30 days (from historical_employment)
+      const thirtyDaysAgoDate = subDays(today, 30);
+      const sixtyDaysAgoDate = subDays(today, 60);
+      
+      const { data: historicalData, error: histError } = await supabase
+        .from("historical_employment")
+        .select("id, team_name, end_date");
+      if (histError) throw histError;
+      
+      // Get employees hired in last 30 days
+      const { data: recentHires, error: hiresError } = await supabase
+        .from("employee_master_data")
+        .select("id, employment_start_date")
+        .eq("is_active", true)
+        .gte("employment_start_date", format(thirtyDaysAgoDate, "yyyy-MM-dd"));
+      if (hiresError) throw hiresError;
+      
+      // Get employees hired 30-60 days ago
+      const { data: prevHires, error: prevHiresError } = await supabase
+        .from("employee_master_data")
+        .select("id, employment_start_date")
+        .eq("is_active", true)
+        .gte("employment_start_date", format(sixtyDaysAgoDate, "yyyy-MM-dd"))
+        .lt("employment_start_date", format(thirtyDaysAgoDate, "yyyy-MM-dd"));
+      if (prevHiresError) throw prevHiresError;
+      
+      // Count leavers in last 30 days
+      const leaversLast30 = (historicalData || []).filter(emp => {
         const teamName = normalizeTeamName(emp.team_name);
-        return !EXCLUDED_TEAMS.includes(teamName);
+        if (EXCLUDED_TEAMS.includes(teamName)) return false;
+        if (!emp.end_date) return false;
+        const endDate = parseISO(emp.end_date);
+        return endDate >= thirtyDaysAgoDate;
       }).length;
       
-      const currentCount = currentEmployees.size;
-      const totalCount = currentCount + historicalCount;
+      // Count leavers 30-60 days ago
+      const leavers30to60 = (historicalData || []).filter(emp => {
+        const teamName = normalizeTeamName(emp.team_name);
+        if (EXCLUDED_TEAMS.includes(teamName)) return false;
+        if (!emp.end_date) return false;
+        const endDate = parseISO(emp.end_date);
+        return endDate >= sixtyDaysAgoDate && endDate < thirtyDaysAgoDate;
+      }).length;
       
-      return { currentCount, historicalCount, totalCount };
+      // Net change in last 30 days = hires - leavers
+      const hiresLast30 = (recentHires || []).length;
+      const hiresPrev30 = (prevHires || []).length;
+      
+      const netChangeLast30 = hiresLast30 - leaversLast30;
+      const netChangePrev30 = hiresPrev30 - leavers30to60;
+      
+      return { 
+        currentCount, 
+        netChange: netChangeLast30,
+        prevNetChange: netChangePrev30,
+        hiresLast30,
+        leaversLast30
+      };
     },
   });
 
@@ -255,13 +299,18 @@ export default function CompanyOverview() {
 
   const kpiCards = [
     {
-      title: "Total ansatte",
-      value: isLoadingEmployees ? "..." : employeeStats?.totalCount ?? 0,
+      title: "Nuværende ansatte",
+      value: isLoadingEmployees ? "..." : employeeStats?.currentCount ?? 0,
       icon: Users,
-      description: `${employeeStats?.currentCount ?? 0} nuværende + ${employeeStats?.historicalCount ?? 0} tidligere`,
+      description: employeeStats ? `${employeeStats.hiresLast30} ansat, ${employeeStats.leaversLast30} stoppet (30 dage)` : "Indlæser...",
       color: "text-primary",
       bgColor: "bg-primary/10",
-      trend: null
+      trend: employeeStats ? {
+        change: employeeStats.netChange,
+        percentage: employeeStats.prevNetChange !== 0 
+          ? ((employeeStats.netChange - employeeStats.prevNetChange) / Math.abs(employeeStats.prevNetChange)) * 100
+          : (employeeStats.netChange !== 0 ? 100 : 0)
+      } : null
     },
     {
       title: "Ansøgninger",
