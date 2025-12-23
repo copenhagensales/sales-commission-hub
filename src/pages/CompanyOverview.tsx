@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, TrendingUp, TrendingDown, Minus, Building2, Target, FileText } from "lucide-react";
 import { subDays, format } from "date-fns";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 export default function CompanyOverview() {
   const today = new Date();
@@ -143,44 +144,46 @@ export default function CompanyOverview() {
   ];
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Virksomhedsoverblik</h1>
-        <p className="text-muted-foreground">Overblik over virksomhedens nøgletal</p>
-      </div>
+    <MainLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Virksomhedsoverblik</h1>
+          <p className="text-muted-foreground">Overblik over virksomhedens nøgletal</p>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpiCards.map((kpi, index) => (
-          <Card key={index} className="relative overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {kpi.title}
-              </CardTitle>
-              <div className={`h-8 w-8 rounded-lg ${kpi.bgColor} flex items-center justify-center`}>
-                <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">{kpi.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">{kpi.description}</p>
-              {kpi.trend && (
-                <div className={`flex items-center gap-1 mt-2 text-sm ${getTrendColor(kpi.trend.change)}`}>
-                  {(() => {
-                    const TrendIcon = getTrendIcon(kpi.trend.change);
-                    return <TrendIcon className="h-4 w-4" />;
-                  })()}
-                  <span>
-                    {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change} ift. forrige periode
-                  </span>
-                  <span className="text-muted-foreground ml-1">
-                    ({kpi.trend.percentage > 0 ? "+" : ""}{kpi.trend.percentage.toFixed(0)}%)
-                  </span>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {kpiCards.map((kpi, index) => (
+            <Card key={index} className="relative overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {kpi.title}
+                </CardTitle>
+                <div className={`h-8 w-8 rounded-lg ${kpi.bgColor} flex items-center justify-center`}>
+                  <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-foreground">{kpi.value}</div>
+                <p className="text-xs text-muted-foreground mt-1">{kpi.description}</p>
+                {kpi.trend && (
+                  <div className={`flex items-center gap-1 mt-2 text-sm ${getTrendColor(kpi.trend.change)}`}>
+                    {(() => {
+                      const TrendIcon = getTrendIcon(kpi.trend.change);
+                      return <TrendIcon className="h-4 w-4" />;
+                    })()}
+                    <span>
+                      {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change} ift. forrige periode
+                    </span>
+                    <span className="text-muted-foreground ml-1">
+                      ({kpi.trend.percentage > 0 ? "+" : ""}{kpi.trend.percentage.toFixed(0)}%)
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
-    </div>
+    </MainLayout>
   );
 }
