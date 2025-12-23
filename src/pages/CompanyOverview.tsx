@@ -50,39 +50,38 @@ export default function CompanyOverview() {
     },
   });
 
-  // Fetch application counts with 30-day comparison
+  // Fetch candidate/application counts with 30-day comparison (matching recruitment dashboard logic)
   const { data: applicationStats, isLoading: isLoadingApplications } = useQuery({
     queryKey: ["company-overview-application-stats"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("applications")
-        .select("id, application_date");
+        .from("candidates")
+        .select("id, created_at");
       
       if (error) throw error;
       
-      // Applications in the last 30 days
-      const lastThirtyDays = data.filter(app => 
-        app.application_date && app.application_date >= thirtyDaysAgoStr && app.application_date <= todayStr
-      );
-      const countLastThirtyDays = lastThirtyDays.length;
+      const now = new Date();
       
-      // Applications in the previous 30 days (30-60 days ago)
-      const previousThirtyDays = data.filter(app => 
-        app.application_date && app.application_date >= sixtyDaysAgoStr && app.application_date < thirtyDaysAgoStr
-      );
-      const countPreviousThirtyDays = previousThirtyDays.length;
+      // Candidates in the last 30 days
+      const last30d = data.filter(c => new Date(c.created_at) >= subDays(now, 30)).length;
+      
+      // Candidates in the previous 30 days (30-60 days ago)
+      const prev30d = data.filter(c => {
+        const created = new Date(c.created_at);
+        return created >= subDays(now, 60) && created < subDays(now, 30);
+      }).length;
       
       // Calculate percentage change
       let percentageChange = 0;
-      if (countPreviousThirtyDays !== 0) {
-        percentageChange = ((countLastThirtyDays - countPreviousThirtyDays) / countPreviousThirtyDays) * 100;
-      } else if (countLastThirtyDays !== 0) {
+      if (prev30d !== 0) {
+        percentageChange = ((last30d - prev30d) / prev30d) * 100;
+      } else if (last30d !== 0) {
         percentageChange = 100;
       }
       
-      const change = countLastThirtyDays - countPreviousThirtyDays;
+      const change = last30d - prev30d;
       
-      return { currentCount: countLastThirtyDays, change, percentageChange };
+      return { currentCount: last30d, change, percentageChange };
     },
   });
 
