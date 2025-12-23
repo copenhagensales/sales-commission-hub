@@ -1,23 +1,25 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { differenceInDays } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell, PieChart, Pie } from "recharts";
+import { differenceInDays, parseISO } from "date-fns";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
-interface HistoricalEmployee {
+interface CombinedEmployee {
   id: string;
-  employee_name: string;
-  start_date: string;
-  end_date: string;
+  full_name: string;
   team_name: string;
+  hire_date: string;
+  end_date: string | null;
   tenure_days: number;
+  is_current: boolean;
 }
 
 // Normalize team names
-const normalizeTeamName = (name: string): string => {
+const normalizeTeamName = (name: string | null): string => {
+  if (!name) return "Ukendt";
   const lower = name.toLowerCase().trim();
   if (lower.includes("eesy fm") || lower === "eesy fm") return "Eesy FM";
   if (lower.includes("eesy tm") || lower === "eesy tm") return "Eesy TM";
@@ -36,26 +38,65 @@ const TEAM_COLORS: Record<string, string> = {
   "Relatel": "#f59e0b",
   "TDC Erhverv": "#ef4444",
   "United": "#6366f1",
+  "Ukendt": "#888888",
 };
 
 export function HistoricalTenureStats() {
-  const { data, isLoading } = useQuery({
+  // Fetch historical employees (those who left)
+  const { data: historicalData, isLoading: loadingHistorical } = useQuery({
     queryKey: ["historical-employment-stats"],
     queryFn: async () => {
-      const { data: historicalData, error } = await supabase
+      const { data, error } = await supabase
         .from("historical_employment")
         .select("*");
-
       if (error) throw error;
-      return historicalData as HistoricalEmployee[];
+      return (data || []).map(emp => ({
+        id: emp.id,
+        full_name: emp.employee_name,
+        team_name: normalizeTeamName(emp.team_name),
+        hire_date: emp.start_date,
+        end_date: emp.end_date,
+        tenure_days: emp.tenure_days,
+        is_current: false
+      })) as CombinedEmployee[];
     },
   });
+
+  // Fetch current employees
+  const { data: currentData, isLoading: loadingCurrent } = useQuery({
+    queryKey: ["current-employees-tenure"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, team_id, employment_start_date, teams(name)")
+        .eq("is_active", true)
+        .not("employment_start_date", "is", null);
+      if (error) throw error;
+      
+      const today = new Date();
+      return (data || []).map(emp => {
+        const hireDate = emp.employment_start_date ? parseISO(emp.employment_start_date) : today;
+        const tenureDays = differenceInDays(today, hireDate);
+        return {
+          id: emp.id,
+          full_name: `${emp.first_name} ${emp.last_name}`.trim(),
+          team_name: normalizeTeamName(emp.teams?.name || null),
+          hire_date: emp.employment_start_date || "",
+          end_date: null,
+          tenure_days: Math.max(0, tenureDays),
+          is_current: true
+        };
+      }) as CombinedEmployee[];
+    },
+  });
+
+  const isLoading = loadingHistorical || loadingCurrent;
 
   if (isLoading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Historisk data</CardTitle>
+          <CardTitle>Samlet anciennitetsdata</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-4">
@@ -67,23 +108,43 @@ export function HistoricalTenureStats() {
     );
   }
 
-  if (!data || data.length === 0) {
+  // Combine both datasets
+  const allEmployees: CombinedEmployee[] = [
+    ...(historicalData || []),
+    ...(currentData || [])
+  ];
+
+  if (allEmployees.length === 0) {
     return null;
   }
 
-  // Group by normalized team
-  const teamStats = new Map<string, { totalDays: number; count: number; churned60: number }>();
+  const historicalOnly = allEmployees.filter(e => !e.is_current);
+  const currentOnly = allEmployees.filter(e => e.is_current);
+
+  // Group by normalized team - ALL employees
+  const teamStats = new Map<string, { 
+    totalDays: number; 
+    count: number; 
+    churned60: number;
+    currentCount: number;
+    leftCount: number;
+  }>();
   
-  data.forEach(emp => {
-    const normalizedTeam = normalizeTeamName(emp.team_name);
-    if (!teamStats.has(normalizedTeam)) {
-      teamStats.set(normalizedTeam, { totalDays: 0, count: 0, churned60: 0 });
+  allEmployees.forEach(emp => {
+    if (!teamStats.has(emp.team_name)) {
+      teamStats.set(emp.team_name, { totalDays: 0, count: 0, churned60: 0, currentCount: 0, leftCount: 0 });
     }
-    const stats = teamStats.get(normalizedTeam)!;
+    const stats = teamStats.get(emp.team_name)!;
     stats.totalDays += emp.tenure_days;
     stats.count++;
-    if (emp.tenure_days <= 60) {
-      stats.churned60++;
+    if (emp.is_current) {
+      stats.currentCount++;
+    } else {
+      stats.leftCount++;
+      // Only count 60-day churn for people who left
+      if (emp.tenure_days <= 60) {
+        stats.churned60++;
+      }
     }
   });
 
@@ -93,32 +154,33 @@ export function HistoricalTenureStats() {
     avgTenureDays: Math.round(stats.totalDays / stats.count),
     avgTenureMonths: Math.round((stats.totalDays / stats.count / 30) * 10) / 10,
     count: stats.count,
+    currentCount: stats.currentCount,
+    leftCount: stats.leftCount,
     churned60: stats.churned60,
-    churnRate60: Math.round((stats.churned60 / stats.count) * 100 * 10) / 10,
+    // Churn rate: % of those who left that did so within 60 days
+    churnRate60: stats.leftCount > 0 ? Math.round((stats.churned60 / stats.leftCount) * 100 * 10) / 10 : 0,
   })).sort((a, b) => b.avgTenureDays - a.avgTenureDays);
 
   // Overall stats
-  const totalEmployees = data.length;
-  const totalDays = data.reduce((sum, e) => sum + e.tenure_days, 0);
+  const totalEmployees = allEmployees.length;
+  const totalCurrent = currentOnly.length;
+  const totalLeft = historicalOnly.length;
+  const totalDays = allEmployees.reduce((sum, e) => sum + e.tenure_days, 0);
   const avgTenureDays = Math.round(totalDays / totalEmployees);
   const avgTenureMonths = Math.round((avgTenureDays / 30) * 10) / 10;
-  const churned60 = data.filter(e => e.tenure_days <= 60).length;
-  const churnRate60 = Math.round((churned60 / totalEmployees) * 100 * 10) / 10;
-
-  // Pie chart data for team distribution
-  const pieData = teamChartData.map(t => ({
-    name: t.team,
-    value: t.count,
-  }));
+  const churned60 = historicalOnly.filter(e => e.tenure_days <= 60).length;
+  const churnRate60 = totalLeft > 0 ? Math.round((churned60 / totalLeft) * 100 * 10) / 10 : 0;
 
   // 60-day churn comparison chart
-  const churnChartData = teamChartData.map(t => ({
-    team: t.team,
-    churnRate: t.churnRate60,
-    count: t.churned60,
-  })).sort((a, b) => b.churnRate - a.churnRate);
+  const churnChartData = teamChartData
+    .filter(t => t.leftCount > 0)
+    .map(t => ({
+      team: t.team,
+      churnRate: t.churnRate60,
+      count: t.churned60,
+    })).sort((a, b) => b.churnRate - a.churnRate);
 
-  // Tenure distribution (buckets)
+  // Tenure distribution (buckets) - all employees
   const tenureBuckets = [
     { label: "0-30 dage", min: 0, max: 30 },
     { label: "31-60 dage", min: 31, max: 60 },
@@ -130,33 +192,39 @@ export function HistoricalTenureStats() {
   
   const tenureDistribution = tenureBuckets.map(bucket => ({
     label: bucket.label,
-    count: data.filter(e => e.tenure_days >= bucket.min && e.tenure_days <= bucket.max).length,
+    count: allEmployees.filter(e => e.tenure_days >= bucket.min && e.tenure_days <= bucket.max).length,
+    current: currentOnly.filter(e => e.tenure_days >= bucket.min && e.tenure_days <= bucket.max).length,
+    left: historicalOnly.filter(e => e.tenure_days >= bucket.min && e.tenure_days <= bucket.max).length,
   }));
 
   return (
     <div className="space-y-6">
-      {/* Overall Historical Stats */}
+      {/* Overall Stats */}
       <Card>
         <CardHeader>
-          <CardTitle>Historisk anciennitet (tidligere ansatte)</CardTitle>
+          <CardTitle>Samlet anciennitet (nuværende + tidligere ansatte)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
             <div className="text-center p-4 bg-muted/50 rounded-lg">
               <div className="text-3xl font-bold">{totalEmployees}</div>
-              <div className="text-sm text-muted-foreground">Total historiske ansatte</div>
+              <div className="text-sm text-muted-foreground">Total ansatte</div>
+            </div>
+            <div className="text-center p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+              <div className="text-3xl font-bold text-green-600">{totalCurrent}</div>
+              <div className="text-sm text-muted-foreground">Nuværende</div>
+            </div>
+            <div className="text-center p-4 bg-muted/50 rounded-lg">
+              <div className="text-3xl font-bold">{totalLeft}</div>
+              <div className="text-sm text-muted-foreground">Stoppet</div>
             </div>
             <div className="text-center p-4 bg-muted/50 rounded-lg">
               <div className="text-3xl font-bold">{avgTenureMonths} mdr</div>
               <div className="text-sm text-muted-foreground">Gns. anciennitet</div>
             </div>
-            <div className="text-center p-4 bg-muted/50 rounded-lg">
+            <div className="text-center p-4 bg-red-500/10 rounded-lg border border-red-500/20">
               <div className="text-3xl font-bold text-red-600">{churnRate60}%</div>
               <div className="text-sm text-muted-foreground">60-dages churn</div>
-            </div>
-            <div className="text-center p-4 bg-muted/50 rounded-lg">
-              <div className="text-3xl font-bold">{churned60}</div>
-              <div className="text-sm text-muted-foreground">Stoppede indenfor 60 dage</div>
             </div>
           </div>
 
@@ -174,7 +242,17 @@ export function HistoricalTenureStats() {
                     <XAxis type="number" unit=" mdr" />
                     <YAxis type="category" dataKey="team" width={100} />
                     <Tooltip 
-                      formatter={(value: number) => [`${value} måneder`, "Gns. anciennitet"]}
+                      formatter={(value: number, name: string) => {
+                        if (name === "avgTenureMonths") return [`${value} måneder`, "Gns. anciennitet"];
+                        return [value, name];
+                      }}
+                      labelFormatter={(label) => {
+                        const team = teamChartData.find(t => t.team === label);
+                        if (team) {
+                          return `${label} (${team.currentCount} nuværende, ${team.leftCount} stoppet)`;
+                        }
+                        return label;
+                      }}
                       labelStyle={{ color: "hsl(var(--foreground))" }}
                       contentStyle={{ 
                         backgroundColor: "hsl(var(--background))",
@@ -212,6 +290,9 @@ export function HistoricalTenureStats() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                * Churn beregnes som andelen af stoppede medarbejdere der forlod inden for 60 dage
+              </p>
             </TabsContent>
 
             <TabsContent value="distribution">
@@ -221,14 +302,19 @@ export function HistoricalTenureStats() {
                     <XAxis dataKey="label" />
                     <YAxis />
                     <Tooltip 
-                      formatter={(value: number) => [value, "Antal"]}
+                      formatter={(value: number, name: string) => {
+                        if (name === "current") return [value, "Nuværende"];
+                        if (name === "left") return [value, "Stoppet"];
+                        return [value, "Total"];
+                      }}
                       labelStyle={{ color: "hsl(var(--foreground))" }}
                       contentStyle={{ 
                         backgroundColor: "hsl(var(--background))",
                         border: "1px solid hsl(var(--border))"
                       }}
                     />
-                    <Bar dataKey="count" fill="#3b82f6" />
+                    <Bar dataKey="current" stackId="a" fill="#22c55e" name="Nuværende" />
+                    <Bar dataKey="left" stackId="a" fill="#94a3b8" name="Stoppet" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -240,14 +326,16 @@ export function HistoricalTenureStats() {
       {/* Team breakdown table */}
       <Card>
         <CardHeader>
-          <CardTitle>Detaljeret teamoversigt (historisk)</CardTitle>
+          <CardTitle>Detaljeret teamoversigt (alle ansatte)</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Team</TableHead>
-                <TableHead className="text-right">Antal</TableHead>
+                <TableHead className="text-right">Nuværende</TableHead>
+                <TableHead className="text-right">Stoppet</TableHead>
+                <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right">Gns. anciennitet</TableHead>
                 <TableHead className="text-right">60-dages exits</TableHead>
                 <TableHead className="text-right">60-dages churn</TableHead>
@@ -265,18 +353,26 @@ export function HistoricalTenureStats() {
                       {team.team}
                     </div>
                   </TableCell>
+                  <TableCell className="text-right text-green-600">{team.currentCount}</TableCell>
+                  <TableCell className="text-right">{team.leftCount}</TableCell>
                   <TableCell className="text-right">{team.count}</TableCell>
                   <TableCell className="text-right">{team.avgTenureMonths} mdr</TableCell>
                   <TableCell className="text-right">{team.churned60}</TableCell>
                   <TableCell className="text-right">
-                    <Badge variant={team.churnRate60 > 30 ? "destructive" : team.churnRate60 > 20 ? "secondary" : "default"}>
-                      {team.churnRate60}%
-                    </Badge>
+                    {team.leftCount > 0 ? (
+                      <Badge variant={team.churnRate60 > 30 ? "destructive" : team.churnRate60 > 20 ? "secondary" : "default"}>
+                        {team.churnRate60}%
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
               <TableRow className="font-bold bg-muted/50">
                 <TableCell>Total</TableCell>
+                <TableCell className="text-right text-green-600">{totalCurrent}</TableCell>
+                <TableCell className="text-right">{totalLeft}</TableCell>
                 <TableCell className="text-right">{totalEmployees}</TableCell>
                 <TableCell className="text-right">{avgTenureMonths} mdr</TableCell>
                 <TableCell className="text-right">{churned60}</TableCell>
