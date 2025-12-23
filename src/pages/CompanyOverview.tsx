@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, TrendingUp, TrendingDown, Minus, Building2, Target, FileText, Clock } from "lucide-react";
 import { subDays, format, differenceInMonths } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { TeamTenureChart } from "@/components/company-overview/TeamTenureChart";
 import { TeamAvgTenureChart } from "@/components/company-overview/TeamAvgTenureChart";
 
 export default function CompanyOverview() {
@@ -273,11 +272,8 @@ export default function CompanyOverview() {
           ))}
         </div>
 
-        {/* Team Tenure Charts */}
-        <div className="space-y-6">
-          <TeamAvgTenureChart />
-          <TeamTenureChart />
-        </div>
+        {/* Team Tenure Chart */}
+        <TeamAvgTenureChart />
       </div>
     </MainLayout>
   );
