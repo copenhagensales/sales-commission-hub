@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { differenceInDays, parseISO, subDays } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { differenceInDays, parseISO, subDays, format } from "date-fns";
+import { da } from "date-fns/locale";
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CombinedEmployee {
   id: string;
@@ -335,7 +337,7 @@ export function HistoricalTenureStats() {
                   <BarChart data={teamChartData} layout="vertical">
                     <XAxis type="number" unit=" mdr" />
                     <YAxis type="category" dataKey="team" width={100} />
-                    <Tooltip 
+                    <RechartsTooltip 
                       formatter={(value: number, name: string) => {
                         if (name === "avgTenureMonths") return [`${value} måneder`, "Gns. anciennitet"];
                         return [value, name];
@@ -369,7 +371,7 @@ export function HistoricalTenureStats() {
                   <BarChart data={churnChartData} layout="vertical">
                     <XAxis type="number" unit="%" />
                     <YAxis type="category" dataKey="team" width={100} />
-                    <Tooltip 
+                    <RechartsTooltip 
                       formatter={(value: number, name: string) => {
                         if (name === "churnRate") return [`${value}%`, "60-dages churn"];
                         return [value, name];
@@ -395,7 +397,7 @@ export function HistoricalTenureStats() {
                   <BarChart data={tenureDistribution}>
                     <XAxis dataKey="label" />
                     <YAxis />
-                    <Tooltip 
+                    <RechartsTooltip 
                       formatter={(value: number, name: string) => {
                         if (name === "current") return [value, "Nuværende"];
                         if (name === "left") return [value, "Stoppet"];
@@ -477,22 +479,40 @@ export function HistoricalTenureStats() {
                   </TableCell>
                   <TableCell className="text-right">
                     {(team.leaversLast90d > 0 || team.leaversPrev90d > 0) ? (
-                      <div className={`flex items-center justify-end gap-1 text-sm ${
-                        team.churnTrend < 0 ? 'text-green-600' : 
-                        team.churnTrend > 0 ? 'text-red-600' : 
-                        'text-muted-foreground'
-                      }`}>
-                        {team.churnTrend < 0 ? (
-                          <TrendingDown className="h-4 w-4 shrink-0" />
-                        ) : team.churnTrend > 0 ? (
-                          <TrendingUp className="h-4 w-4 shrink-0" />
-                        ) : (
-                          <Minus className="h-4 w-4 shrink-0" />
-                        )}
-                        <span>
-                          {team.churnPrev90d}% → {team.churnLast90d}%
-                        </span>
-                      </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className={`flex items-center justify-end gap-1 text-sm cursor-help ${
+                              team.churnTrend < 0 ? 'text-green-600' : 
+                              team.churnTrend > 0 ? 'text-red-600' : 
+                              'text-muted-foreground'
+                            }`}>
+                              {team.churnTrend < 0 ? (
+                                <TrendingDown className="h-4 w-4 shrink-0" />
+                              ) : team.churnTrend > 0 ? (
+                                <TrendingUp className="h-4 w-4 shrink-0" />
+                              ) : (
+                                <Minus className="h-4 w-4 shrink-0" />
+                              )}
+                              <span>
+                                {team.churnPrev90d}% → {team.churnLast90d}%
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="max-w-xs">
+                            <div className="space-y-1 text-xs">
+                              <p className="font-semibold">60-dages churn rate</p>
+                              <p><span className="text-muted-foreground">Forrige periode:</span> {team.churnPrev90d}%</p>
+                              <p className="text-muted-foreground text-[10px]">({format(subDays(new Date(), 180), "d. MMM", { locale: da })} - {format(subDays(new Date(), 91), "d. MMM", { locale: da })})</p>
+                              <p><span className="text-muted-foreground">Sidste 90 dage:</span> {team.churnLast90d}%</p>
+                              <p className="text-muted-foreground text-[10px]">({format(subDays(new Date(), 90), "d. MMM", { locale: da })} - {format(new Date(), "d. MMM", { locale: da })})</p>
+                              <p className="pt-1 border-t text-muted-foreground">
+                                % af stoppede der stoppede inden for 60 dage
+                              </p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
@@ -512,22 +532,40 @@ export function HistoricalTenureStats() {
                   <Badge variant="destructive">{churnRate60}%</Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className={`flex items-center justify-end gap-1 text-sm ${
-                    overallChurnTrend < 0 ? 'text-green-600' : 
-                    overallChurnTrend > 0 ? 'text-red-600' : 
-                    'text-muted-foreground'
-                  }`}>
-                    {overallChurnTrend < 0 ? (
-                      <TrendingDown className="h-4 w-4 shrink-0" />
-                    ) : overallChurnTrend > 0 ? (
-                      <TrendingUp className="h-4 w-4 shrink-0" />
-                    ) : (
-                      <Minus className="h-4 w-4 shrink-0" />
-                    )}
-                    <span>
-                      {overallChurnPrev90dRounded}% → {overallChurnLast90dRounded}%
-                    </span>
-                  </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className={`flex items-center justify-end gap-1 text-sm cursor-help ${
+                          overallChurnTrend < 0 ? 'text-green-600' : 
+                          overallChurnTrend > 0 ? 'text-red-600' : 
+                          'text-muted-foreground'
+                        }`}>
+                          {overallChurnTrend < 0 ? (
+                            <TrendingDown className="h-4 w-4 shrink-0" />
+                          ) : overallChurnTrend > 0 ? (
+                            <TrendingUp className="h-4 w-4 shrink-0" />
+                          ) : (
+                            <Minus className="h-4 w-4 shrink-0" />
+                          )}
+                          <span>
+                            {overallChurnPrev90dRounded}% → {overallChurnLast90dRounded}%
+                          </span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="max-w-xs">
+                        <div className="space-y-1 text-xs">
+                          <p className="font-semibold">60-dages churn rate (samlet)</p>
+                          <p><span className="text-muted-foreground">Forrige periode:</span> {overallChurnPrev90dRounded}%</p>
+                          <p className="text-muted-foreground text-[10px]">({format(subDays(new Date(), 180), "d. MMM", { locale: da })} - {format(subDays(new Date(), 91), "d. MMM", { locale: da })})</p>
+                          <p><span className="text-muted-foreground">Sidste 90 dage:</span> {overallChurnLast90dRounded}%</p>
+                          <p className="text-muted-foreground text-[10px]">({format(subDays(new Date(), 90), "d. MMM", { locale: da })} - {format(new Date(), "d. MMM", { locale: da })})</p>
+                          <p className="pt-1 border-t text-muted-foreground">
+                            % af stoppede der stoppede inden for 60 dage
+                          </p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </TableCell>
               </TableRow>
             </TableBody>
