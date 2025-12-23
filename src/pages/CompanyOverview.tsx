@@ -265,7 +265,7 @@ export default function CompanyOverview() {
         </div>
 
         {/* Charts and detailed KPIs */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
           <TeamAvgTenureChart />
           <NewHireChurnKpi />
         </div>
