@@ -143,6 +143,7 @@ export function HistoricalTenureStats() {
   const teamStats = new Map<string, { 
     totalDays: number; 
     count: number; 
+    churned30: number;
     churned60: number;
     currentCount: number;
     leftCount: number;
@@ -150,7 +151,7 @@ export function HistoricalTenureStats() {
   
   allEmployees.forEach(emp => {
     if (!teamStats.has(emp.team_name)) {
-      teamStats.set(emp.team_name, { totalDays: 0, count: 0, churned60: 0, currentCount: 0, leftCount: 0 });
+      teamStats.set(emp.team_name, { totalDays: 0, count: 0, churned30: 0, churned60: 0, currentCount: 0, leftCount: 0 });
     }
     const stats = teamStats.get(emp.team_name)!;
     stats.totalDays += emp.tenure_days;
@@ -159,7 +160,10 @@ export function HistoricalTenureStats() {
       stats.currentCount++;
     } else {
       stats.leftCount++;
-      // Only count 60-day churn for people who left
+      // Count 30-day and 60-day churn for people who left
+      if (emp.tenure_days <= 30) {
+        stats.churned30++;
+      }
       if (emp.tenure_days <= 60) {
         stats.churned60++;
       }
@@ -179,8 +183,10 @@ export function HistoricalTenureStats() {
       count: stats.count,
       currentCount: stats.currentCount,
       leftCount: stats.leftCount,
+      churned30: stats.churned30,
       churned60: stats.churned60,
-      // Churn rate: % of ALL employees (current + left) who left within 60 days
+      // Churn rate: % of ALL employees (current + left) who left within 30/60 days
+      churnRate30: stats.count > 0 ? Math.round((stats.churned30 / stats.count) * 100 * 10) / 10 : 0,
       churnRate60: stats.count > 0 ? Math.round((stats.churned60 / stats.count) * 100 * 10) / 10 : 0,
     })).sort((a, b) => b.avgTenureDays - a.avgTenureDays);
 
@@ -191,8 +197,10 @@ export function HistoricalTenureStats() {
   const totalDays = allEmployees.reduce((sum, e) => sum + e.tenure_days, 0);
   const avgTenureDays = Math.round(totalDays / totalEmployees);
   const avgTenureMonths = Math.round((avgTenureDays / 30) * 10) / 10;
+  const churned30 = historicalOnly.filter(e => e.tenure_days <= 30).length;
   const churned60 = historicalOnly.filter(e => e.tenure_days <= 60).length;
-  // Churn rate: % of ALL employees who left within 60 days
+  // Churn rate: % of ALL employees who left within 30/60 days
+  const churnRate30 = totalEmployees > 0 ? Math.round((churned30 / totalEmployees) * 100 * 10) / 10 : 0;
   const churnRate60 = totalEmployees > 0 ? Math.round((churned60 / totalEmployees) * 100 * 10) / 10 : 0;
 
   // 60-day churn comparison chart
@@ -361,6 +369,8 @@ export function HistoricalTenureStats() {
                 <TableHead className="text-right">Stoppet</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right">Gns. anciennitet</TableHead>
+                <TableHead className="text-right">30-dages exits</TableHead>
+                <TableHead className="text-right">30-dages churn</TableHead>
                 <TableHead className="text-right">60-dages exits</TableHead>
                 <TableHead className="text-right">60-dages churn</TableHead>
               </TableRow>
@@ -381,6 +391,16 @@ export function HistoricalTenureStats() {
                   <TableCell className="text-right">{team.leftCount}</TableCell>
                   <TableCell className="text-right">{team.count}</TableCell>
                   <TableCell className="text-right">{team.avgTenureMonths} mdr</TableCell>
+                  <TableCell className="text-right">{team.churned30}</TableCell>
+                  <TableCell className="text-right">
+                    {team.leftCount > 0 ? (
+                      <Badge variant={team.churnRate30 > 20 ? "destructive" : team.churnRate30 > 10 ? "secondary" : "default"}>
+                        {team.churnRate30}%
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">{team.churned60}</TableCell>
                   <TableCell className="text-right">
                     {team.leftCount > 0 ? (
@@ -399,6 +419,10 @@ export function HistoricalTenureStats() {
                 <TableCell className="text-right">{totalLeft}</TableCell>
                 <TableCell className="text-right">{totalEmployees}</TableCell>
                 <TableCell className="text-right">{avgTenureMonths} mdr</TableCell>
+                <TableCell className="text-right">{churned30}</TableCell>
+                <TableCell className="text-right">
+                  <Badge variant="destructive">{churnRate30}%</Badge>
+                </TableCell>
                 <TableCell className="text-right">{churned60}</TableCell>
                 <TableCell className="text-right">
                   <Badge variant="destructive">{churnRate60}%</Badge>
