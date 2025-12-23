@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, TrendingUp, TrendingDown, Minus, Building2, Target, FileText } from "lucide-react";
 import { subDays, format } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { TeamTenureChart } from "@/components/company-overview/TeamTenureChart";
 
 export default function CompanyOverview() {
   const today = new Date();
@@ -189,6 +190,9 @@ export default function CompanyOverview() {
             </Card>
           ))}
         </div>
+
+        {/* Team Tenure Chart */}
+        <TeamTenureChart />
       </div>
     </MainLayout>
   );
