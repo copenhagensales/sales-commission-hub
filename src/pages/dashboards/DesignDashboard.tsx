@@ -210,8 +210,8 @@ export default function DesignDashboard() {
       customValue: w.customValue,
       timePeriodId: w.timePeriodId,
       customFromDate: w.customFromDate,
-      clientId: w.clientId,
-      teamId: w.teamId,
+      clientId: w.limitToClient ? w.clientId : undefined,
+      teamId: w.limitToTeam ? w.teamId : undefined,
     })),
     [placedWidgets]
   );

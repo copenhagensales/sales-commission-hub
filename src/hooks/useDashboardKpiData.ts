@@ -372,6 +372,18 @@ export const useWidgetKpiData = (widgets: Array<{
   const [values, setValues] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
 
+  // Create a stable key for tracking changes in widget configuration
+  const widgetsKey = JSON.stringify(widgets.map(w => ({
+    id: w.id,
+    dataSource: w.dataSource,
+    kpiTypeIds: w.kpiTypeIds,
+    customValue: w.customValue,
+    timePeriodId: w.timePeriodId,
+    customFromDate: w.customFromDate?.toISOString(),
+    clientId: w.clientId,
+    teamId: w.teamId,
+  })));
+
   useEffect(() => {
     const fetchAllData = async () => {
       setLoading(true);
@@ -414,7 +426,8 @@ export const useWidgetKpiData = (widgets: Array<{
                   } else {
                     // No campaigns for this client means 0 sales
                     value = 0;
-                    break;
+                    newValues.set(widget.id, formatValue(value, kpiTypeId));
+                    continue;
                   }
                 }
                 
@@ -543,7 +556,7 @@ export const useWidgetKpiData = (widgets: Array<{
     } else {
       setLoading(false);
     }
-  }, [widgets]);
+  }, [widgetsKey]);
 
   const getValue = (widgetId: string): string => {
     return values.get(widgetId) || "—";
