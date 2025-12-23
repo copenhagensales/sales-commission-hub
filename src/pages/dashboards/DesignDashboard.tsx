@@ -1,12 +1,18 @@
 import { useState, useEffect } from "react";
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { da } from "date-fns/locale";
-import { useQuery } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,12 +22,12 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { 
-  BarChart3, 
-  LineChart, 
-  PieChart, 
-  TrendingUp, 
-  Clock, 
+import {
+  BarChart3,
+  LineChart,
+  PieChart,
+  TrendingUp,
+  Clock,
   Trophy,
   Gauge,
   Calendar as CalendarIcon,
@@ -41,7 +47,7 @@ import {
   Users,
   X,
   FolderOpen,
-  Loader2
+  Loader2,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -76,23 +82,23 @@ interface PlacedWidget {
   id: string;
   widgetTypeId: string;
   dataSource: "kpi" | "custom";
-  kpiTypeIds: string[];  // Now supports multiple KPIs
+  kpiTypeIds: string[]; // Now supports multiple KPIs
   customValue?: string;
   customLabel?: string;
   timePeriodId: string;
   customFromDate?: Date;
   // New optional fields
-  title?: string;  // Custom title override
-  targetValue?: number;  // Target value for progress widgets
-  showComparison?: boolean;  // Show comparison with previous period
-  comparisonPeriodId?: string;  // Which period to compare against
-  colorThemeId?: string;  // Color theme for the widget
-  showTrend?: boolean;  // Show trend indicator
-  trackingScopeId?: string;  // Who/what the KPI tracks
-  limitToTeam?: boolean;  // Limit data to selected team only
-  teamId?: string;  // The team to limit data to
-  limitToClient?: boolean;  // Limit data to selected client only
-  clientId?: string;  // The client to limit data to
+  title?: string; // Custom title override
+  targetValue?: number; // Target value for progress widgets
+  showComparison?: boolean; // Show comparison with previous period
+  comparisonPeriodId?: string; // Which period to compare against
+  colorThemeId?: string; // Color theme for the widget
+  showTrend?: boolean; // Show trend indicator
+  trackingScopeId?: string; // Who/what the KPI tracks
+  limitToTeam?: boolean; // Limit data to selected team only
+  teamId?: string; // The team to limit data to
+  limitToClient?: boolean; // Limit data to selected client only
+  clientId?: string; // The client to limit data to
   x: number;
   y: number;
   width: number;
@@ -123,7 +129,11 @@ const TIME_PERIODS: TimePeriod[] = [
 
 const COMPARISON_PERIODS: TimePeriod[] = [
   { id: "previous-period", name: "Forrige periode", description: "Sammenlign med forrige periode" },
-  { id: "same-period-last-year", name: "Samme periode sidste år", description: "Sammenlign med samme periode sidste år" },
+  {
+    id: "same-period-last-year",
+    name: "Samme periode sidste år",
+    description: "Sammenlign med samme periode sidste år",
+  },
   { id: "yesterday", name: "I går", description: "Sammenlign med i går" },
   { id: "last-week", name: "Sidste uge", description: "Sammenlign med sidste uge" },
   { id: "last-month", name: "Sidste måned", description: "Sammenlign med sidste måned" },
@@ -150,16 +160,16 @@ const TRACKING_SCOPES: TrackingScope[] = [
 
 const getWidgetIcon = (iconName: string) => {
   const icons: Record<string, React.ComponentType<{ className?: string }>> = {
-    "gauge": Gauge,
+    gauge: Gauge,
     "bar-chart": BarChart3,
     "line-chart": LineChart,
     "pie-chart": PieChart,
-    "table": Table2,
-    "award": Award,
-    "clock": Clock,
+    table: Table2,
+    award: Award,
+    clock: Clock,
     "trending-up": TrendingUp,
-    "activity": Activity,
-    "trophy": Trophy,
+    activity: Activity,
+    trophy: Trophy,
   };
   const IconComponent = icons[iconName] || LayoutGrid;
   return <IconComponent className="h-5 w-5" />;
@@ -173,7 +183,7 @@ export default function DesignDashboard() {
   const { activeKpiTypes } = useKpiTypes();
   const { activeDesignTypes } = useDesignTypes();
   const { dashboards, saving, saveDashboard, loadDashboard } = useEmployeeDashboards();
-  
+
   const [placedWidgets, setPlacedWidgets] = useState<PlacedWidget[]>([]);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [isDesignPanelOpen, setIsDesignPanelOpen] = useState(true);
@@ -185,110 +195,44 @@ export default function DesignDashboard() {
   const [globalDesign, setGlobalDesign] = useState<string>(() => {
     return activeDesignTypes[0]?.id || "minimal";
   });
-  
+
   // Database data
   const [teams, setTeams] = useState<DbTeam[]>([]);
   const [clients, setClients] = useState<DbClient[]>([]);
 
-  // Load dashboard from URL param or auto-load the most recent one
+  // Load dashboard from URL param
   useEffect(() => {
-    const dashboardId = searchParams.get('id');
-    
-    const loadDashboardData = async (id: string) => {
-      const dashboard = await loadDashboard(id);
-      if (dashboard) {
-        setCurrentDashboardId(dashboard.id);
-        setDashboardName(dashboard.name);
-        setGlobalDesign(dashboard.design_id);
-        const widgets: PlacedWidget[] = dashboard.widgets.map(w => ({
-          ...w,
-          customFromDate: w.customFromDate ? new Date(w.customFromDate) : undefined
-        }));
-        setPlacedWidgets(widgets);
-      }
-    };
-    
+    const dashboardId = searchParams.get("id");
     if (dashboardId) {
-      loadDashboardData(dashboardId);
-    } else if (dashboards.length > 0 && !currentDashboardId) {
-      // Auto-load the most recent dashboard (first in list, ordered by created_at DESC)
-      loadDashboardData(dashboards[0].id);
+      loadDashboard(dashboardId).then((dashboard) => {
+        if (dashboard) {
+          setCurrentDashboardId(dashboard.id);
+          setDashboardName(dashboard.name);
+          setGlobalDesign(dashboard.design_id);
+          // Convert stored widgets to PlacedWidget format
+          const widgets: PlacedWidget[] = dashboard.widgets.map((w) => ({
+            ...w,
+            customFromDate: w.customFromDate ? new Date(w.customFromDate) : undefined,
+          }));
+          setPlacedWidgets(widgets);
+        }
+      });
     }
-  }, [searchParams, dashboards]);
+  }, [searchParams]);
 
   // Fetch teams and clients from database
   useEffect(() => {
     const fetchData = async () => {
       const [teamsResult, clientsResult] = await Promise.all([
-        supabase.from('teams').select('id, name').order('name'),
-        supabase.from('clients').select('id, name').order('name')
+        supabase.from("teams").select("id, name").order("name"),
+        supabase.from("clients").select("id, name").order("name"),
       ]);
-      
+
       if (teamsResult.data) setTeams(teamsResult.data);
       if (clientsResult.data) setClients(clientsResult.data);
     };
     fetchData();
   }, []);
-
-  // Fetch real KPI data for preview
-  const { data: realKpiData } = useQuery({
-    queryKey: ["design-dashboard-kpis"],
-    queryFn: async () => {
-      const now = new Date();
-      const todayStart = startOfDay(now).toISOString();
-      const todayEnd = endOfDay(now).toISOString();
-      const weekStart = startOfWeek(now, { weekStartsOn: 1 }).toISOString();
-      const weekEnd = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
-      const monthStart = startOfMonth(now).toISOString();
-      const monthEnd = endOfMonth(now).toISOString();
-
-      // Fetch fieldmarketing sales
-      const [fmTodayRes, fmWeekRes, fmMonthRes] = await Promise.all([
-        supabase.from("fieldmarketing_sales").select("id").gte("registered_at", todayStart).lte("registered_at", todayEnd),
-        supabase.from("fieldmarketing_sales").select("id").gte("registered_at", weekStart).lte("registered_at", weekEnd),
-        supabase.from("fieldmarketing_sales").select("id").gte("registered_at", monthStart).lte("registered_at", monthEnd),
-      ]);
-
-      // Fetch telesales
-      const [teleTodayRes, teleWeekRes, teleMonthRes] = await Promise.all([
-        supabase.from("sales").select("id").gte("sale_datetime", todayStart).lte("sale_datetime", todayEnd),
-        supabase.from("sales").select("id").gte("sale_datetime", weekStart).lte("sale_datetime", weekEnd),
-        supabase.from("sales").select("id").gte("sale_datetime", monthStart).lte("sale_datetime", monthEnd),
-      ]);
-
-      // Fetch sale_items for revenue (month only to limit queries)
-      const teleMonthSaleIds = (teleMonthRes.data || []).map(s => s.id);
-      const { data: saleItems } = teleMonthSaleIds.length > 0 
-        ? await supabase.from("sale_items").select("sale_id, total_price").in("sale_id", teleMonthSaleIds)
-        : { data: [] };
-
-      // Calculate totals
-      const fmToday = fmTodayRes.data?.length || 0;
-      const fmWeek = fmWeekRes.data?.length || 0;
-      const fmMonth = fmMonthRes.data?.length || 0;
-      
-      const teleToday = teleTodayRes.data?.length || 0;
-      const teleWeek = teleWeekRes.data?.length || 0;
-      const teleMonth = teleMonthRes.data?.length || 0;
-
-      // Calculate revenue from sale_items
-      const totalRevenue = (saleItems || []).reduce((sum, item) => sum + (item.total_price || 0), 0);
-
-      return {
-        salesCountToday: fmToday + teleToday,
-        salesCountWeek: fmWeek + teleWeek,
-        salesCountMonth: fmMonth + teleMonth,
-        revenueMonth: totalRevenue,
-        fmSalesToday: fmToday,
-        fmSalesWeek: fmWeek,
-        fmSalesMonth: fmMonth,
-        teleSalesToday: teleToday,
-        teleSalesWeek: teleWeek,
-        teleSalesMonth: teleMonth,
-      };
-    },
-    staleTime: 60000, // 1 minute
-  });
 
   const handleClose = () => {
     navigate(-1); // Go back to previous page
@@ -296,11 +240,11 @@ export default function DesignDashboard() {
 
   const handleSaveDashboard = async () => {
     // Convert widgets to storage format
-    const widgetsToSave: DashboardWidget[] = placedWidgets.map(w => ({
+    const widgetsToSave: DashboardWidget[] = placedWidgets.map((w) => ({
       ...w,
-      customFromDate: w.customFromDate?.toISOString()
+      customFromDate: w.customFromDate?.toISOString(),
     }));
-    
+
     const savedId = await saveDashboard(dashboardName, globalDesign, widgetsToSave, currentDashboardId || undefined);
     if (savedId) {
       setCurrentDashboardId(savedId);
@@ -314,16 +258,16 @@ export default function DesignDashboard() {
       setCurrentDashboardId(dashboard.id);
       setDashboardName(dashboard.name);
       setGlobalDesign(dashboard.design_id);
-      const widgets: PlacedWidget[] = dashboard.widgets.map(w => ({
+      const widgets: PlacedWidget[] = dashboard.widgets.map((w) => ({
         ...w,
-        customFromDate: w.customFromDate ? new Date(w.customFromDate) : undefined
+        customFromDate: w.customFromDate ? new Date(w.customFromDate) : undefined,
       }));
       setPlacedWidgets(widgets);
       setIsLoadDialogOpen(false);
       toast({ title: `Dashboard "${dashboard.name}" indlæst` });
     }
   };
-  
+
   // Config form state
   const [selectedWidgetType, setSelectedWidgetType] = useState<string>("");
   const [dataSource, setDataSource] = useState<"kpi" | "custom">("kpi");
@@ -345,7 +289,7 @@ export default function DesignDashboard() {
   const [limitToClient, setLimitToClient] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
 
-  const currentWidgetConfig = activeWidgetTypes.find(w => w.value === selectedWidgetType);
+  const currentWidgetConfig = activeWidgetTypes.find((w) => w.value === selectedWidgetType);
   const supportsMultiKpi = currentWidgetConfig?.supportsMultiKpi || false;
   const supportsComparison = currentWidgetConfig?.supportsComparison || false;
   const supportsTarget = currentWidgetConfig?.supportsTarget || false;
@@ -402,11 +346,7 @@ export default function DesignDashboard() {
 
   const toggleKpiSelection = (kpiId: string) => {
     if (supportsMultiKpi) {
-      setSelectedKpiTypes(prev => 
-        prev.includes(kpiId) 
-          ? prev.filter(id => id !== kpiId)
-          : [...prev, kpiId]
-      );
+      setSelectedKpiTypes((prev) => (prev.includes(kpiId) ? prev.filter((id) => id !== kpiId) : [...prev, kpiId]));
     } else {
       setSelectedKpiTypes([kpiId]);
     }
@@ -452,9 +392,7 @@ export default function DesignDashboard() {
     };
 
     if (editingWidget) {
-      setPlacedWidgets(prev => prev.map(w => 
-        w.id === editingWidget.id ? { ...w, ...widgetData } : w
-      ));
+      setPlacedWidgets((prev) => prev.map((w) => (w.id === editingWidget.id ? { ...w, ...widgetData } : w)));
       toast({ title: "Widget opdateret" });
     } else {
       const newWidget: PlacedWidget = {
@@ -465,104 +403,37 @@ export default function DesignDashboard() {
         width: 1,
         height: 1,
       };
-      setPlacedWidgets(prev => [...prev, newWidget]);
+      setPlacedWidgets((prev) => [...prev, newWidget]);
       toast({ title: "Widget tilføjet" });
     }
     setIsConfigDialogOpen(false);
   };
 
   const removeWidget = (widgetId: string) => {
-    setPlacedWidgets(prev => prev.filter(w => w.id !== widgetId));
+    setPlacedWidgets((prev) => prev.filter((w) => w.id !== widgetId));
     toast({ title: "Widget fjernet" });
   };
 
   const resizeWidget = (widgetId: string, newSize: { width: number; height: number }) => {
-    setPlacedWidgets(prev => prev.map(w => 
-      w.id === widgetId ? { ...w, width: newSize.width, height: newSize.height } : w
-    ));
+    setPlacedWidgets((prev) =>
+      prev.map((w) => (w.id === widgetId ? { ...w, width: newSize.width, height: newSize.height } : w)),
+    );
   };
 
-  // Generate real values for preview based on KPI type and time period
+  // Generate example values for preview
   const getExampleValue = (widget: PlacedWidget) => {
     if (widget.dataSource === "custom") {
       return widget.customValue || "0";
     }
-    
+    // Generate realistic example based on KPI type
     const firstKpi = widget.kpiTypeIds[0];
-    const timePeriod = widget.timePeriodId || "today";
-    
-    // Helper to format numbers
-    const formatNumber = (n: number) => n.toLocaleString("da-DK");
-    const formatCurrency = (n: number) => `${n.toLocaleString("da-DK")} kr`;
-    
-    // Get real sales count based on time period
-    const getSalesCount = () => {
-      if (!realKpiData) return "—";
-      switch (timePeriod) {
-        case "today": return formatNumber(realKpiData.salesCountToday);
-        case "this-week": return formatNumber(realKpiData.salesCountWeek);
-        case "this-month": return formatNumber(realKpiData.salesCountMonth);
-        default: return formatNumber(realKpiData.salesCountToday);
-      }
-    };
-    
-    // Get real revenue based on time period
-    const getRevenue = () => {
-      if (!realKpiData) return "—";
-      // We only have month revenue calculated
-      return formatCurrency(realKpiData.revenueMonth);
-    };
-    
-    // Match specific KPI IDs with real data
-    switch (firstKpi) {
-      case "sales-count":
-        return getSalesCount();
-      case "sales-revenue":
-        return getRevenue();
-      case "avg-order-value":
-        if (!realKpiData || realKpiData.salesCountMonth === 0) return "—";
-        return formatCurrency(Math.round(realKpiData.revenueMonth / realKpiData.salesCountMonth));
-      case "conversion-rate":
-        return "23,4%"; // Would need calls data
-      case "calls-total":
-        return "1.247"; // Would need calls data
-      case "calls-answered":
-        return "892"; // Would need calls data
-      case "avg-call-duration":
-        return "4:32"; // Would need calls data
-      case "talk-time":
-        return "67:45"; // Would need calls data
-      case "team-target-progress":
-      case "individual-target":
-        return "78%"; // Would need target data
-      case "team-sales-rank":
-        return "#3"; // Would need ranking calculation
-      case "leads-generated":
-        return "342"; // Would need leads data
-      case "appointments-booked":
-        return "89"; // Would need appointments data
-      case "customer-satisfaction":
-        return "4,7"; // Would need survey data
-      case "nps-score":
-        return "+47"; // Would need NPS data
-      case "active-agents":
-        return "24"; // Would need agent data
-      case "avg-handle-time":
-        return "3:45"; // Would need calls data
-      case "first-call-resolution":
-        return "68%"; // Would need calls data
-      default:
-        // Fallback patterns for custom KPIs using real data where possible
-        if (firstKpi?.includes("count") || firstKpi?.includes("antal")) return getSalesCount();
-        if (firstKpi?.includes("revenue") || firstKpi?.includes("omsætning")) return getRevenue();
-        if (firstKpi?.includes("rate") || firstKpi?.includes("%")) return "23,4%";
-        if (firstKpi?.includes("time") || firstKpi?.includes("tid")) return "3:45";
-        if (firstKpi?.includes("avg") || firstKpi?.includes("gns")) {
-          if (!realKpiData || realKpiData.salesCountMonth === 0) return "—";
-          return formatCurrency(Math.round(realKpiData.revenueMonth / realKpiData.salesCountMonth));
-        }
-        return "—";
-    }
+    if (firstKpi?.includes("sales") || firstKpi?.includes("revenue")) return "847.520 kr";
+    if (firstKpi?.includes("calls")) return "1.247";
+    if (firstKpi?.includes("conversion") || firstKpi?.includes("rate")) return "23,4%";
+    if (firstKpi?.includes("target") || firstKpi?.includes("progress")) return "78%";
+    if (firstKpi?.includes("avg")) return "4.320 kr";
+    if (firstKpi?.includes("time") || firstKpi?.includes("duration")) return "3:45";
+    return Math.floor(Math.random() * 1000 + 100).toString();
   };
 
   const getExampleTrend = () => {
@@ -571,7 +442,7 @@ export default function DesignDashboard() {
   };
 
   const getDesignClasses = (designId: string) => {
-    const design = activeDesignTypes.find(d => d.id === designId);
+    const design = activeDesignTypes.find((d) => d.id === designId);
     return design?.preview || "bg-card border";
   };
 
@@ -579,9 +450,7 @@ export default function DesignDashboard() {
     if (widget.dataSource === "custom") {
       return widget.customLabel || "Brugerdefineret";
     }
-    const kpiNames = widget.kpiTypeIds
-      .map(id => activeKpiTypes.find(k => k.id === id)?.name)
-      .filter(Boolean);
+    const kpiNames = widget.kpiTypeIds.map((id) => activeKpiTypes.find((k) => k.id === id)?.name).filter(Boolean);
     return kpiNames.join(", ") || "";
   };
 
@@ -604,11 +473,11 @@ export default function DesignDashboard() {
   };
 
   const getWidgetTypeName = (widgetTypeId: string) => {
-    return activeWidgetTypes.find(w => w.value === widgetTypeId)?.label || widgetTypeId;
+    return activeWidgetTypes.find((w) => w.value === widgetTypeId)?.label || widgetTypeId;
   };
 
   const getWidgetTypeIcon = (widgetTypeId: string) => {
-    const type = activeWidgetTypes.find(w => w.value === widgetTypeId);
+    const type = activeWidgetTypes.find((w) => w.value === widgetTypeId);
     return type ? getWidgetIcon(type.iconName) : <LayoutGrid className="h-5 w-5" />;
   };
 
@@ -618,13 +487,9 @@ export default function DesignDashboard() {
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b shrink-0">
         <div className="px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold">
-              {currentDashboardId ? dashboardName : "Design Dashboard"}
-            </h1>
+            <h1 className="text-xl font-bold">{currentDashboardId ? dashboardName : "Design Dashboard"}</h1>
             {currentDashboardId && (
-              <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                Gemt
-              </span>
+              <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">Gemt</span>
             )}
           </div>
           <div className="flex items-center gap-3">
@@ -633,16 +498,12 @@ export default function DesignDashboard() {
               Indlæs
             </Button>
             <Button onClick={() => setIsSaveDialogOpen(true)} disabled={saving || placedWidgets.length === 0}>
-              {saving ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
-              )}
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
               Gem Dashboard
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={handleClose}
               className="h-10 w-10 rounded-full hover:bg-destructive/10"
             >
@@ -655,9 +516,7 @@ export default function DesignDashboard() {
       {/* Main content area - Dashboard Canvas as main view */}
       <div className="flex-1 overflow-auto relative">
         {/* Dashboard Canvas - Full size view */}
-        <div 
-          className="min-h-full w-full p-4"
-        >
+        <div className="min-h-full w-full p-4">
           {/* Content layer */}
           {placedWidgets.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
@@ -672,38 +531,35 @@ export default function DesignDashboard() {
           ) : (
             <div className="relative">
               {/* Grid overlay */}
-              <div 
+              <div
                 className="absolute inset-0 pointer-events-none"
-                style={{ 
-                  display: 'grid',
+                style={{
+                  display: "grid",
                   gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
                   gridAutoRows: `${CELL_HEIGHT}px`,
-                  gap: '1rem'
+                  gap: "1rem",
                 }}
               >
                 {Array.from({ length: GRID_COLS * 8 }).map((_, i) => (
-                  <div 
-                    key={i} 
-                    className="border border-dashed border-muted-foreground/20 rounded"
-                  />
+                  <div key={i} className="border border-dashed border-muted-foreground/20 rounded" />
                 ))}
               </div>
-              
+
               {/* Widgets grid */}
-              <div 
+              <div
                 className="grid gap-4 relative z-10"
-                style={{ 
+                style={{
                   gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-                  gridAutoRows: `${CELL_HEIGHT}px`
+                  gridAutoRows: `${CELL_HEIGHT}px`,
                 }}
               >
                 {placedWidgets.map((widget) => {
-                  const timePeriod = TIME_PERIODS.find(t => t.id === widget.timePeriodId);
-                  const design = activeDesignTypes.find(d => d.id === globalDesign);
-                  const colorTheme = COLOR_THEMES.find(c => c.id === widget.colorThemeId);
-                  const trackingScope = TRACKING_SCOPES.find(s => s.id === widget.trackingScopeId);
+                  const timePeriod = TIME_PERIODS.find((t) => t.id === widget.timePeriodId);
+                  const design = activeDesignTypes.find((d) => d.id === globalDesign);
+                  const colorTheme = COLOR_THEMES.find((c) => c.id === widget.colorThemeId);
+                  const trackingScope = TRACKING_SCOPES.find((s) => s.id === widget.trackingScopeId);
                   const teamName = widget.limitToTeam && widget.teamId ? getTeamName(widget.teamId) : undefined;
-                  
+
                   return (
                     <ResizableWidgetCard
                       key={widget.id}
@@ -759,9 +615,9 @@ export default function DesignDashboard() {
                       onClick={() => setGlobalDesign(design.id)}
                       className={cn(
                         "p-2 rounded-lg border-2 cursor-pointer transition-all",
-                        globalDesign === design.id 
-                          ? "border-primary bg-primary/5 ring-2 ring-primary/20" 
-                          : "border-border hover:border-primary/50"
+                        globalDesign === design.id
+                          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                          : "border-border hover:border-primary/50",
                       )}
                     >
                       <div className={cn("h-6 rounded-md mb-1", design.preview)} />
@@ -807,14 +663,22 @@ export default function DesignDashboard() {
             {/* 2. Data Source (KPI or Custom) */}
             <div className="space-y-3">
               <Label className="text-base font-semibold">2. Datakilde</Label>
-              <RadioGroup value={dataSource} onValueChange={(v) => setDataSource(v as "kpi" | "custom")} className="flex gap-4">
+              <RadioGroup
+                value={dataSource}
+                onValueChange={(v) => setDataSource(v as "kpi" | "custom")}
+                className="flex gap-4"
+              >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="kpi" id="kpi" />
-                  <Label htmlFor="kpi" className="cursor-pointer">Vælg KPI{supportsMultiKpi && "(er)"}</Label>
+                  <Label htmlFor="kpi" className="cursor-pointer">
+                    Vælg KPI{supportsMultiKpi && "(er)"}
+                  </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="custom" id="custom" />
-                  <Label htmlFor="custom" className="cursor-pointer">Eget tal</Label>
+                  <Label htmlFor="custom" className="cursor-pointer">
+                    Eget tal
+                  </Label>
                 </div>
               </RadioGroup>
 
@@ -834,13 +698,10 @@ export default function DesignDashboard() {
                           "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors",
                           selectedKpiTypes.includes(kpi.id)
                             ? "bg-primary/10 border border-primary/30"
-                            : "hover:bg-accent"
+                            : "hover:bg-accent",
                         )}
                       >
-                        <Checkbox
-                          checked={selectedKpiTypes.includes(kpi.id)}
-                          className="pointer-events-none"
-                        />
+                        <Checkbox checked={selectedKpiTypes.includes(kpi.id)} className="pointer-events-none" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium">{kpi.name}</p>
                           <p className="text-xs text-muted-foreground truncate">{kpi.description}</p>
@@ -860,7 +721,9 @@ export default function DesignDashboard() {
               ) : (
                 <div className="space-y-3">
                   <div>
-                    <Label htmlFor="customLabel" className="text-sm">Label</Label>
+                    <Label htmlFor="customLabel" className="text-sm">
+                      Label
+                    </Label>
                     <Input
                       id="customLabel"
                       placeholder="f.eks. 'Mål opnået'"
@@ -869,7 +732,9 @@ export default function DesignDashboard() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="customValue" className="text-sm">Værdi</Label>
+                    <Label htmlFor="customValue" className="text-sm">
+                      Værdi
+                    </Label>
                     <Input
                       id="customValue"
                       placeholder="f.eks. '42' eller '85%'"
@@ -903,14 +768,12 @@ export default function DesignDashboard() {
                     ))}
                   </SelectContent>
                 </Select>
-                
+
                 {/* Team filter option */}
                 <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
                   <div className="space-y-0.5">
                     <Label className="text-sm font-medium">Begræns til team</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Vis kun data fra medarbejdere i et specifikt team
-                    </p>
+                    <p className="text-xs text-muted-foreground">Vis kun data fra medarbejdere i et specifikt team</p>
                   </div>
                   <Switch
                     checked={limitToTeam}
@@ -920,7 +783,7 @@ export default function DesignDashboard() {
                     }}
                   />
                 </div>
-                
+
                 {limitToTeam && (
                   <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
                     <SelectTrigger>
@@ -940,9 +803,7 @@ export default function DesignDashboard() {
                 <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
                   <div className="space-y-0.5">
                     <Label className="text-sm font-medium">Begræns til kunde</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Vis kun data fra en specifik kunde
-                    </p>
+                    <p className="text-xs text-muted-foreground">Vis kun data fra en specifik kunde</p>
                   </div>
                   <Switch
                     checked={limitToClient}
@@ -952,7 +813,7 @@ export default function DesignDashboard() {
                     }}
                   />
                 </div>
-                
+
                 {limitToClient && (
                   <Select value={selectedClientId} onValueChange={setSelectedClientId}>
                     <SelectTrigger>
@@ -993,7 +854,7 @@ export default function DesignDashboard() {
                       variant="outline"
                       className={cn(
                         "w-full justify-start text-left font-normal mt-2",
-                        !customFromDate && "text-muted-foreground"
+                        !customFromDate && "text-muted-foreground",
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
@@ -1017,7 +878,7 @@ export default function DesignDashboard() {
             {(supportsComparison || supportsTarget) && (
               <div className="space-y-4 border-t pt-4">
                 <Label className="text-base font-semibold">5. Avancerede indstillinger</Label>
-                
+
                 {/* Custom Title */}
                 <div className="space-y-2">
                   <Label htmlFor="customTitle" className="text-sm flex items-center gap-2">
@@ -1046,9 +907,7 @@ export default function DesignDashboard() {
                       value={targetValue}
                       onChange={(e) => setTargetValue(e.target.value)}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Vis fremgang mod et mål
-                    </p>
+                    <p className="text-xs text-muted-foreground">Vis fremgang mod et mål</p>
                   </div>
                 )}
 
@@ -1060,10 +919,7 @@ export default function DesignDashboard() {
                         <ArrowUpDown className="h-4 w-4" />
                         Vis sammenligning
                       </Label>
-                      <Switch
-                        checked={showComparison}
-                        onCheckedChange={setShowComparison}
-                      />
+                      <Switch checked={showComparison} onCheckedChange={setShowComparison} />
                     </div>
                     {showComparison && (
                       <Select value={comparisonPeriodId} onValueChange={setComparisonPeriodId}>
@@ -1088,10 +944,7 @@ export default function DesignDashboard() {
                     <TrendingUp className="h-4 w-4" />
                     Vis trend-indikator
                   </Label>
-                  <Switch
-                    checked={showTrend}
-                    onCheckedChange={setShowTrend}
-                  />
+                  <Switch checked={showTrend} onCheckedChange={setShowTrend} />
                 </div>
               </div>
             )}
@@ -1109,16 +962,14 @@ export default function DesignDashboard() {
                     onClick={() => setColorThemeId(theme.id)}
                     className={cn(
                       "aspect-square rounded-lg cursor-pointer transition-all border-2 flex items-center justify-center",
-                      colorThemeId === theme.id 
-                        ? "border-primary ring-2 ring-primary/20" 
-                        : "border-border hover:border-primary/50"
+                      colorThemeId === theme.id
+                        ? "border-primary ring-2 ring-primary/20"
+                        : "border-border hover:border-primary/50",
                     )}
                     style={{ backgroundColor: theme.primary }}
                     title={theme.name}
                   >
-                    {colorThemeId === theme.id && (
-                      <div className="w-2 h-2 rounded-full bg-white" />
-                    )}
+                    {colorThemeId === theme.id && <div className="w-2 h-2 rounded-full bg-white" />}
                   </div>
                 ))}
               </div>
@@ -1129,9 +980,7 @@ export default function DesignDashboard() {
             <Button variant="outline" onClick={() => setIsConfigDialogOpen(false)}>
               Annuller
             </Button>
-            <Button onClick={handleSaveWidget}>
-              {editingWidget ? "Gem ændringer" : "Tilføj widget"}
-            </Button>
+            <Button onClick={handleSaveWidget}>{editingWidget ? "Gem ændringer" : "Tilføj widget"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1141,9 +990,7 @@ export default function DesignDashboard() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Gem Dashboard</DialogTitle>
-            <DialogDescription>
-              Giv dit dashboard et navn for at gemme det.
-            </DialogDescription>
+            <DialogDescription>Giv dit dashboard et navn for at gemme det.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1156,7 +1003,7 @@ export default function DesignDashboard() {
               />
             </div>
             <div className="text-sm text-muted-foreground">
-              {placedWidgets.length} widget{placedWidgets.length !== 1 ? 's' : ''} vil blive gemt
+              {placedWidgets.length} widget{placedWidgets.length !== 1 ? "s" : ""} vil blive gemt
             </div>
           </div>
           <DialogFooter>
@@ -1172,7 +1019,7 @@ export default function DesignDashboard() {
               ) : (
                 <>
                   <Save className="h-4 w-4 mr-2" />
-                  {currentDashboardId ? 'Opdater' : 'Gem'}
+                  {currentDashboardId ? "Opdater" : "Gem"}
                 </>
               )}
             </Button>
@@ -1185,9 +1032,7 @@ export default function DesignDashboard() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Indlæs Dashboard</DialogTitle>
-            <DialogDescription>
-              Vælg et af dine gemte dashboards.
-            </DialogDescription>
+            <DialogDescription>Vælg et af dine gemte dashboards.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-4 max-h-[400px] overflow-y-auto">
             {dashboards.length === 0 ? (
@@ -1201,7 +1046,7 @@ export default function DesignDashboard() {
                   key={dashboard.id}
                   className={cn(
                     "p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors",
-                    currentDashboardId === dashboard.id && "border-primary bg-primary/5"
+                    currentDashboardId === dashboard.id && "border-primary bg-primary/5",
                   )}
                   onClick={() => handleLoadDashboard(dashboard.id)}
                 >
@@ -1209,7 +1054,7 @@ export default function DesignDashboard() {
                     <div>
                       <h4 className="font-medium">{dashboard.name}</h4>
                       <p className="text-sm text-muted-foreground">
-                        {dashboard.widgets.length} widget{dashboard.widgets.length !== 1 ? 's' : ''}
+                        {dashboard.widgets.length} widget{dashboard.widgets.length !== 1 ? "s" : ""}
                       </p>
                     </div>
                     <span className="text-xs text-muted-foreground">
