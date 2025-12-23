@@ -307,9 +307,10 @@ export default function CompanyOverview() {
       bgColor: "bg-primary/10",
       trend: employeeStats ? {
         change: employeeStats.netChange,
-        percentage: employeeStats.prevNetChange !== 0 
-          ? ((employeeStats.netChange - employeeStats.prevNetChange) / Math.abs(employeeStats.prevNetChange)) * 100
-          : (employeeStats.netChange !== 0 ? 100 : 0)
+        // Percentage change relative to total current employees
+        percentage: employeeStats.currentCount > 0 
+          ? (employeeStats.netChange / employeeStats.currentCount) * 100
+          : 0
       } : null
     },
     {
