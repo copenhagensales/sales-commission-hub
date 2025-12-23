@@ -318,7 +318,6 @@ export default function RecruitmentDashboard() {
               { status: "contacted", label: "Kontaktet", color: "bg-yellow-500" },
               { status: "interview_scheduled", label: "Samtale planlagt", color: "bg-purple-500" },
               { status: "interviewed", label: "Samtale afholdt", color: "bg-cyan-500" },
-              { status: "offer_sent", label: "Tilbud sendt", color: "bg-orange-500" },
               { status: "hired", label: "Ansat", color: "bg-green-500" },
             ].map((stage, idx) => (
               <div key={stage.status} className="flex-1 text-center">
