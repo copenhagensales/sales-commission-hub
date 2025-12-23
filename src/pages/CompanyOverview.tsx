@@ -2,57 +2,75 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, TrendingUp, TrendingDown, Minus, FileText, Clock, UserMinus } from "lucide-react";
-import { subDays, subMonths, format, differenceInMonths, differenceInDays } from "date-fns";
+import { subDays, format, differenceInDays, parseISO } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { TeamAvgTenureChart } from "@/components/company-overview/TeamAvgTenureChart";
 import { NewHireChurnKpi } from "@/components/company-overview/NewHireChurnKpi";
 import { HistoricalTenureStats } from "@/components/company-overview/HistoricalTenureStats";
+
+// Normalize team names to handle variations
+const normalizeTeamName = (name: string | null): string => {
+  if (!name) return "Ukendt";
+  const lower = name.toLowerCase().trim();
+  if (lower.includes("eesy fm") || lower === "eesy fm") return "Eesy FM";
+  if (lower.includes("eesy tm") || lower === "eesy tm") return "Eesy TM";
+  if (lower.includes("fieldmarketing")) return "Fieldmarketing";
+  if (lower.includes("relatel")) return "Relatel";
+  if (lower.includes("tdc erhverv")) return "TDC Erhverv";
+  if (lower.includes("united")) return "United";
+  if (lower.includes("stab")) return "Stab";
+  return name;
+};
+
+// Teams to exclude
+const EXCLUDED_TEAMS = ["Stab", "Ukendt"];
+
 export default function CompanyOverview() {
   const today = new Date();
   const thirtyDaysAgo = subDays(today, 30);
   const sixtyDaysAgo = subDays(today, 60);
   const thirtyDaysAgoStr = format(thirtyDaysAgo, "yyyy-MM-dd");
   const sixtyDaysAgoStr = format(sixtyDaysAgo, "yyyy-MM-dd");
-  const todayStr = format(today, "yyyy-MM-dd");
 
-  // Fetch employee counts with 30-day comparison
+  // Fetch combined employee stats (current + historical)
   const { data: employeeStats, isLoading: isLoadingEmployees } = useQuery({
-    queryKey: ["company-overview-employee-stats"],
+    queryKey: ["company-overview-combined-employee-stats"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Current employees from team_members
+      const { data: teamMembers, error: tmError } = await supabase
         .from("team_members")
-        .select("employee_id, created_at");
+        .select("employee_id, team:teams(name)");
+      if (tmError) throw tmError;
       
-      if (error) throw error;
+      // Historical employees
+      const { data: historicalData, error: histError } = await supabase
+        .from("historical_employment")
+        .select("id, team_name");
+      if (histError) throw histError;
       
-      const currentUniqueIds = new Set(data.map(tm => tm.employee_id));
-      const currentCount = currentUniqueIds.size;
+      // Count unique current employees (excluding Stab)
+      const currentEmployees = new Set<string>();
+      (teamMembers || []).forEach(tm => {
+        const teamName = normalizeTeamName((tm.team as any)?.name || null);
+        if (!EXCLUDED_TEAMS.includes(teamName)) {
+          currentEmployees.add(tm.employee_id);
+        }
+      });
       
-      const employeesThirtyDaysAgo = data.filter(tm => 
-        tm.created_at && tm.created_at < thirtyDaysAgoStr
-      );
-      const countThirtyDaysAgo = new Set(employeesThirtyDaysAgo.map(tm => tm.employee_id)).size;
+      // Count historical employees (excluding Stab)
+      const historicalCount = (historicalData || []).filter(emp => {
+        const teamName = normalizeTeamName(emp.team_name);
+        return !EXCLUDED_TEAMS.includes(teamName);
+      }).length;
       
-      const employeesSixtyDaysAgo = data.filter(tm => 
-        tm.created_at && tm.created_at < sixtyDaysAgoStr
-      );
-      const countSixtyDaysAgo = new Set(employeesSixtyDaysAgo.map(tm => tm.employee_id)).size;
+      const currentCount = currentEmployees.size;
+      const totalCount = currentCount + historicalCount;
       
-      const changeLastThirtyDays = currentCount - countThirtyDaysAgo;
-      const changePreviousThirtyDays = countThirtyDaysAgo - countSixtyDaysAgo;
-      
-      let percentageChange = 0;
-      if (changePreviousThirtyDays !== 0) {
-        percentageChange = ((changeLastThirtyDays - changePreviousThirtyDays) / Math.abs(changePreviousThirtyDays)) * 100;
-      } else if (changeLastThirtyDays !== 0) {
-        percentageChange = changeLastThirtyDays > 0 ? 100 : -100;
-      }
-      
-      return { currentCount, changeLastThirtyDays, percentageChange };
+      return { currentCount, historicalCount, totalCount };
     },
   });
 
-  // Fetch candidate/application counts with 30-day comparison (matching recruitment dashboard logic)
+  // Fetch candidate/application counts with 30-day comparison
   const { data: applicationStats, isLoading: isLoadingApplications } = useQuery({
     queryKey: ["company-overview-candidate-stats"],
     queryFn: async () => {
@@ -66,21 +84,16 @@ export default function CompanyOverview() {
       const thirtyDaysAgoDate = subDays(now, 30);
       const sixtyDaysAgoDate = subDays(now, 60);
       
-      // Candidates in the last 30 days
       const last30d = data.filter(c => {
         const created = new Date(c.created_at);
         return created >= thirtyDaysAgoDate;
       }).length;
       
-      // Candidates in the previous 30 days (30-60 days ago)
       const prev30d = data.filter(c => {
         const created = new Date(c.created_at);
         return created >= sixtyDaysAgoDate && created < thirtyDaysAgoDate;
       }).length;
       
-      console.log("Candidate stats:", { total: data.length, last30d, prev30d, thirtyDaysAgoDate });
-      
-      // Calculate percentage change
       let percentageChange = 0;
       if (prev30d !== 0) {
         percentageChange = ((last30d - prev30d) / prev30d) * 100;
@@ -94,134 +107,128 @@ export default function CompanyOverview() {
     },
   });
 
-  // Fetch average tenure for all employees (excluding Stab)
+  // Fetch average tenure for all employees (current + historical)
   const { data: tenureStats, isLoading: isLoadingTenure } = useQuery({
-    queryKey: ["company-overview-tenure-stats"],
+    queryKey: ["company-overview-combined-tenure-stats"],
     queryFn: async () => {
-      const { data: teamMembers, error } = await supabase
+      // Current employees
+      const { data: employees, error: empError } = await supabase
+        .from("employee_master_data")
+        .select("id, employment_start_date")
+        .eq("is_active", true)
+        .not("employment_start_date", "is", null);
+      if (empError) throw empError;
+      
+      // Team memberships
+      const { data: teamMemberships, error: tmError } = await supabase
         .from("team_members")
-        .select(`
-          employee_id,
-          teams(name),
-          employee_master_data(employment_start_date, is_active)
-        `);
+        .select("employee_id, team:teams(name)");
+      if (tmError) throw tmError;
       
-      if (error) throw error;
+      // Historical employees
+      const { data: historicalData, error: histError } = await supabase
+        .from("historical_employment")
+        .select("id, team_name, tenure_days");
+      if (histError) throw histError;
       
-      // Filter active employees not in "Stab" team, get unique by employee_id
-      const uniqueEmployees = new Map<string, { startDate: string }>();
-      
-      teamMembers.forEach((tm: any) => {
-        const teamName = tm.teams?.name?.toLowerCase() || "";
-        const employee = tm.employee_master_data;
-        
-        if (teamName === "stab" || !employee?.is_active || !employee?.employment_start_date) return;
-        
-        // Keep earliest start date for employees in multiple teams
-        if (!uniqueEmployees.has(tm.employee_id) || 
-            employee.employment_start_date < uniqueEmployees.get(tm.employee_id)!.startDate) {
-          uniqueEmployees.set(tm.employee_id, { startDate: employee.employment_start_date });
+      // Map employee_id to team name
+      const employeeTeamMap = new Map<string, string>();
+      (teamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
+        if (tm.team?.name && !employeeTeamMap.has(tm.employee_id)) {
+          employeeTeamMap.set(tm.employee_id, tm.team.name);
         }
       });
       
-      // Calculate current average tenure in months
       const now = new Date();
-      const thirtyDaysAgoDate = subDays(now, 30);
+      let totalDays = 0;
+      let count = 0;
       
-      let totalMonthsNow = 0;
-      let totalMonthsThirtyDaysAgo = 0;
-      let countNow = 0;
-      let countThirtyDaysAgo = 0;
-      
-      uniqueEmployees.forEach(({ startDate }) => {
-        const start = new Date(startDate);
+      // Current employees tenure
+      (employees || []).forEach(emp => {
+        const teamName = normalizeTeamName(employeeTeamMap.get(emp.id) || null);
+        if (EXCLUDED_TEAMS.includes(teamName)) return;
         
-        // Current average
-        const monthsNow = differenceInMonths(now, start);
-        totalMonthsNow += monthsNow;
-        countNow++;
-        
-        // 30 days ago - only count employees who were employed then
-        if (start <= thirtyDaysAgoDate) {
-          const monthsThirtyDaysAgo = differenceInMonths(thirtyDaysAgoDate, start);
-          totalMonthsThirtyDaysAgo += monthsThirtyDaysAgo;
-          countThirtyDaysAgo++;
-        }
+        const startDate = emp.employment_start_date ? parseISO(emp.employment_start_date) : now;
+        const tenureDays = differenceInDays(now, startDate);
+        totalDays += Math.max(0, tenureDays);
+        count++;
       });
       
-      const avgMonthsNow = countNow > 0 ? totalMonthsNow / countNow : 0;
-      const avgMonthsThirtyDaysAgo = countThirtyDaysAgo > 0 ? totalMonthsThirtyDaysAgo / countThirtyDaysAgo : 0;
+      // Historical employees tenure
+      (historicalData || []).forEach(emp => {
+        const teamName = normalizeTeamName(emp.team_name);
+        if (EXCLUDED_TEAMS.includes(teamName)) return;
+        
+        totalDays += emp.tenure_days;
+        count++;
+      });
       
-      const changeMonths = avgMonthsNow - avgMonthsThirtyDaysAgo;
+      const avgDays = count > 0 ? totalDays / count : 0;
+      const avgMonths = avgDays / 30;
       
-      let percentageChange = 0;
-      if (avgMonthsThirtyDaysAgo !== 0) {
-        percentageChange = ((avgMonthsNow - avgMonthsThirtyDaysAgo) / avgMonthsThirtyDaysAgo) * 100;
-      }
-      
-      return { avgMonths: Math.round(avgMonthsNow * 10) / 10, changeMonths: Math.round(changeMonths * 10) / 10, percentageChange };
+      return { avgMonths: Math.round(avgMonths * 10) / 10, totalCount: count };
     },
   });
 
-  // Fetch 60-day new-hire churn (overall)
+  // Fetch 60-day churn (combined)
   const { data: churnStats, isLoading: isLoadingChurn } = useQuery({
-    queryKey: ["company-overview-churn-stats"],
+    queryKey: ["company-overview-combined-churn-stats"],
     queryFn: async () => {
-      const now = new Date();
-      const twelveMonthsAgo = subMonths(now, 12);
-      const sixMonthsAgo = subMonths(now, 6);
-
-      const { data: employees, error } = await supabase
+      // Current employees
+      const { data: employees, error: empError } = await supabase
         .from("employee_master_data")
-        .select("id, employment_start_date, employment_end_date, is_active, is_staff_employee, team_id, teams:team_id(name)")
-        .gte("employment_start_date", format(twelveMonthsAgo, "yyyy-MM-dd"));
-
-      if (error) throw error;
-
-      // Filter: exclude Stab employees
-      const relevantEmployees = employees?.filter(e => {
-        const teamName = (e.teams as any)?.name?.toLowerCase() || "";
-        return teamName !== "stab" && !e.is_staff_employee;
-      }) || [];
-
-      // Current period (rolling 12 months)
-      const currentPeriodHires = relevantEmployees;
-      const currentPeriodExits = currentPeriodHires.filter(e => {
-        if (!e.employment_end_date || !e.employment_start_date) return false;
-        const startDate = new Date(e.employment_start_date);
-        const endDate = new Date(e.employment_end_date);
-        const daysEmployed = differenceInDays(endDate, startDate);
-        return daysEmployed <= 60;
-      });
-
-      // Previous period (6-12 months ago)
-      const previousPeriodHires = relevantEmployees.filter(e => {
-        const startDate = new Date(e.employment_start_date!);
-        return startDate >= twelveMonthsAgo && startDate < sixMonthsAgo;
-      });
-      const previousPeriodExits = previousPeriodHires.filter(e => {
-        if (!e.employment_end_date || !e.employment_start_date) return false;
-        const startDate = new Date(e.employment_start_date);
-        const endDate = new Date(e.employment_end_date);
-        const daysEmployed = differenceInDays(endDate, startDate);
-        return daysEmployed <= 60;
-      });
-
-      const overallChurn = currentPeriodHires.length > 0 
-        ? (currentPeriodExits.length / currentPeriodHires.length) * 100 
-        : 0;
+        .select("id, employment_start_date")
+        .eq("is_active", true)
+        .not("employment_start_date", "is", null);
+      if (empError) throw empError;
       
-      const previousPeriodChurn = previousPeriodHires.length > 0 
-        ? (previousPeriodExits.length / previousPeriodHires.length) * 100 
-        : 0;
-
-      const trend = overallChurn - previousPeriodChurn;
-
+      // Team memberships
+      const { data: teamMemberships, error: tmError } = await supabase
+        .from("team_members")
+        .select("employee_id, team:teams(name)");
+      if (tmError) throw tmError;
+      
+      // Historical employees
+      const { data: historicalData, error: histError } = await supabase
+        .from("historical_employment")
+        .select("id, team_name, tenure_days");
+      if (histError) throw histError;
+      
+      // Map employee_id to team name
+      const employeeTeamMap = new Map<string, string>();
+      (teamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
+        if (tm.team?.name && !employeeTeamMap.has(tm.employee_id)) {
+          employeeTeamMap.set(tm.employee_id, tm.team.name);
+        }
+      });
+      
+      let totalCount = 0;
+      let exits60Days = 0;
+      
+      // Current employees (none have left within 60 days since they're still active)
+      (employees || []).forEach(emp => {
+        const teamName = normalizeTeamName(employeeTeamMap.get(emp.id) || null);
+        if (EXCLUDED_TEAMS.includes(teamName)) return;
+        totalCount++;
+      });
+      
+      // Historical employees
+      (historicalData || []).forEach(emp => {
+        const teamName = normalizeTeamName(emp.team_name);
+        if (EXCLUDED_TEAMS.includes(teamName)) return;
+        
+        totalCount++;
+        if (emp.tenure_days <= 60) {
+          exits60Days++;
+        }
+      });
+      
+      const churnRate = totalCount > 0 ? (exits60Days / totalCount) * 100 : 0;
+      
       return { 
-        churnRate: Math.round(overallChurn * 10) / 10, 
-        trend: Math.round(trend * 10) / 10,
-        totalHires: currentPeriodHires.length,
-        totalExits: currentPeriodExits.length
+        churnRate: Math.round(churnRate * 10) / 10, 
+        totalCount,
+        exits60Days
       };
     },
   });
@@ -246,25 +253,15 @@ export default function CompanyOverview() {
     return "text-muted-foreground";
   };
 
-  // For churn, lower is better, so inverted colors
-  const getChurnTrendColor = (change: number) => {
-    if (change > 0) return "text-red-600"; // Increase in churn is bad
-    if (change < 0) return "text-green-600"; // Decrease in churn is good
-    return "text-muted-foreground";
-  };
-
   const kpiCards = [
     {
-      title: "Antal medarbejdere",
-      value: isLoadingEmployees ? "..." : employeeStats?.currentCount ?? 0,
+      title: "Total ansatte",
+      value: isLoadingEmployees ? "..." : employeeStats?.totalCount ?? 0,
       icon: Users,
-      description: "Unikke medarbejdere på tværs af teams",
+      description: `${employeeStats?.currentCount ?? 0} nuværende + ${employeeStats?.historicalCount ?? 0} tidligere`,
       color: "text-primary",
       bgColor: "bg-primary/10",
-      trend: employeeStats ? {
-        change: employeeStats.changeLastThirtyDays,
-        percentage: employeeStats.percentageChange
-      } : null
+      trend: null
     },
     {
       title: "Ansøgninger",
@@ -282,28 +279,19 @@ export default function CompanyOverview() {
       title: "Gns. anciennitet",
       value: isLoadingTenure ? "..." : tenureStats ? formatTenure(tenureStats.avgMonths) : "-",
       icon: Clock,
-      description: "Gennemsnitlig anciennitet (ekskl. Stab)",
+      description: `Baseret på ${tenureStats?.totalCount ?? 0} ansatte (ekskl. Stab)`,
       color: "text-primary",
       bgColor: "bg-primary/10",
-      trend: tenureStats ? {
-        change: tenureStats.changeMonths,
-        percentage: tenureStats.percentageChange,
-        suffix: " mdr"
-      } : null
+      trend: null
     },
     {
       title: "60-dages Churn",
       value: isLoadingChurn ? "..." : churnStats ? `${churnStats.churnRate}%` : "-",
       icon: UserMinus,
-      description: "New-hire churn (rolling 12 mdr)",
+      description: `${churnStats?.exits60Days ?? 0} af ${churnStats?.totalCount ?? 0} stoppede inden 60 dage`,
       color: "text-primary",
       bgColor: "bg-primary/10",
-      trend: churnStats ? {
-        change: churnStats.trend,
-        percentage: 0, // Not showing percentage for this KPI
-        suffix: " pp",
-        invertColors: true // For churn, lower is better
-      } : null
+      trend: null
     },
   ];
 
@@ -312,7 +300,7 @@ export default function CompanyOverview() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Virksomhedsoverblik</h1>
-          <p className="text-muted-foreground">Overblik over virksomhedens nøgletal</p>
+          <p className="text-muted-foreground">Overblik over virksomhedens nøgletal (nuværende + historiske ansatte)</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -330,13 +318,13 @@ export default function CompanyOverview() {
                 <div className="text-3xl font-bold text-foreground">{kpi.value}</div>
                 <p className="text-xs text-muted-foreground mt-1">{kpi.description}</p>
                 {kpi.trend && (
-                  <div className={`flex items-center gap-1 mt-2 text-sm ${kpi.trend.invertColors ? getChurnTrendColor(kpi.trend.change) : getTrendColor(kpi.trend.change)}`}>
+                  <div className={`flex items-center gap-1 mt-2 text-sm ${getTrendColor(kpi.trend.change)}`}>
                     {(() => {
                       const TrendIcon = getTrendIcon(kpi.trend.change);
                       return <TrendIcon className="h-4 w-4" />;
                     })()}
                     <span>
-                      {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change}{kpi.trend.suffix || ""} ift. forrige periode
+                      {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change} ift. forrige periode
                     </span>
                     {kpi.trend.percentage !== 0 && (
                       <span className="text-muted-foreground ml-1">

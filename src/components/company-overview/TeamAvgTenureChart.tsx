@@ -1,87 +1,142 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { differenceInMonths, subDays } from "date-fns";
+import { differenceInMonths, differenceInDays, parseISO } from "date-fns";
 import { useMemo } from "react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
+// Normalize team names to handle variations
+const normalizeTeamName = (name: string | null): string => {
+  if (!name) return "Ukendt";
+  const lower = name.toLowerCase().trim();
+  if (lower.includes("eesy fm") || lower === "eesy fm") return "Eesy FM";
+  if (lower.includes("eesy tm") || lower === "eesy tm") return "Eesy TM";
+  if (lower.includes("fieldmarketing")) return "Fieldmarketing";
+  if (lower.includes("relatel")) return "Relatel";
+  if (lower.includes("tdc erhverv")) return "TDC Erhverv";
+  if (lower.includes("united")) return "United";
+  if (lower.includes("stab")) return "Stab";
+  return name;
+};
+
+// Teams to exclude from the overview
+const EXCLUDED_TEAMS = ["Stab", "Ukendt"];
+
 export function TeamAvgTenureChart() {
-  const { data: tenureData, isLoading } = useQuery({
-    queryKey: ["company-overview-team-avg-tenure"],
+  // Fetch current employees with team memberships
+  const { data: currentData, isLoading: loadingCurrent } = useQuery({
+    queryKey: ["team-tenure-current-employees"],
     queryFn: async () => {
-      const { data: teamMembers, error } = await supabase
+      // Get all active employees
+      const { data: employees, error: empError } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, employment_start_date")
+        .eq("is_active", true)
+        .not("employment_start_date", "is", null);
+      if (empError) throw empError;
+      
+      // Get team memberships
+      const { data: teamMemberships, error: tmError } = await supabase
         .from("team_members")
-        .select(`
-          employee_id,
-          team_id,
-          teams(name),
-          employee_master_data(employment_start_date, is_active)
-        `);
+        .select("employee_id, team:teams(name)");
+      if (tmError) throw tmError;
       
-      if (error) throw error;
+      // Create a map of employee_id to team name
+      const employeeTeamMap = new Map<string, string>();
+      (teamMemberships || []).forEach((tm: { employee_id: string; team: { name: string } | null }) => {
+        if (tm.team?.name && !employeeTeamMap.has(tm.employee_id)) {
+          employeeTeamMap.set(tm.employee_id, tm.team.name);
+        }
+      });
       
-      return teamMembers;
+      const today = new Date();
+      return (employees || []).map(emp => {
+        const startDate = emp.employment_start_date ? parseISO(emp.employment_start_date) : today;
+        const tenureDays = differenceInDays(today, startDate);
+        return {
+          id: emp.id,
+          team_name: normalizeTeamName(employeeTeamMap.get(emp.id) || null),
+          start_date: emp.employment_start_date,
+          tenure_days: Math.max(0, tenureDays),
+          is_current: true
+        };
+      });
     },
   });
 
+  // Fetch historical employees
+  const { data: historicalData, isLoading: loadingHistorical } = useQuery({
+    queryKey: ["team-tenure-historical-employees"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("historical_employment")
+        .select("id, employee_name, team_name, start_date, end_date, tenure_days");
+      if (error) throw error;
+      return (data || []).map(emp => ({
+        id: emp.id,
+        team_name: normalizeTeamName(emp.team_name),
+        start_date: emp.start_date,
+        tenure_days: emp.tenure_days,
+        is_current: false
+      }));
+    },
+  });
+
+  const isLoading = loadingCurrent || loadingHistorical;
+
   const chartData = useMemo(() => {
-    if (!tenureData) return [];
+    if (!currentData && !historicalData) return [];
 
-    const now = new Date();
-    const thirtyDaysAgo = subDays(now, 30);
+    // Combine all employees
+    const allEmployees = [
+      ...(currentData || []),
+      ...(historicalData || [])
+    ];
 
-    // Group by team and calculate average tenure (now and 30 days ago)
+    // Group by team and calculate stats
     const teamMap = new Map<string, { 
-      totalMonthsNow: number; 
-      totalMonthsThen: number; 
-      countNow: number; 
-      countThen: number;
+      totalDays: number; 
+      count: number;
+      currentCount: number;
+      leftCount: number;
     }>();
 
-    tenureData.forEach((tm: any) => {
-      const teamName = tm.teams?.name || "Ukendt team";
-      const employee = tm.employee_master_data;
-      
-      if (!employee?.is_active || !employee?.employment_start_date) return;
-      
-      const startDate = new Date(employee.employment_start_date);
-      const monthsNow = differenceInMonths(now, startDate);
+    allEmployees.forEach(emp => {
+      const teamName = emp.team_name;
       
       if (!teamMap.has(teamName)) {
-        teamMap.set(teamName, { totalMonthsNow: 0, totalMonthsThen: 0, countNow: 0, countThen: 0 });
+        teamMap.set(teamName, { totalDays: 0, count: 0, currentCount: 0, leftCount: 0 });
       }
       
       const teamData = teamMap.get(teamName)!;
-      teamData.totalMonthsNow += monthsNow;
-      teamData.countNow++;
-      
-      // Only count for 30 days ago if employee was employed then
-      if (startDate <= thirtyDaysAgo) {
-        const monthsThen = differenceInMonths(thirtyDaysAgo, startDate);
-        teamData.totalMonthsThen += monthsThen;
-        teamData.countThen++;
+      teamData.totalDays += emp.tenure_days;
+      teamData.count++;
+      if (emp.is_current) {
+        teamData.currentCount++;
+      } else {
+        teamData.leftCount++;
       }
     });
 
-    // Convert to array with average and trend, exclude "Stab"
+    // Convert to array with averages, exclude Stab and Ukendt
     return Array.from(teamMap.entries())
-      .filter(([name]) => name.toLowerCase() !== "stab")
+      .filter(([name]) => !EXCLUDED_TEAMS.includes(name))
       .map(([name, data]) => {
-        const avgMonthsNow = data.countNow > 0 ? data.totalMonthsNow / data.countNow : 0;
-        const avgMonthsThen = data.countThen > 0 ? data.totalMonthsThen / data.countThen : 0;
-        const change = avgMonthsNow - avgMonthsThen;
+        const avgDays = data.count > 0 ? data.totalDays / data.count : 0;
+        const avgMonths = Math.round(avgDays / 30);
         
         return {
           name,
-          avgMonths: Math.round(avgMonthsNow),
-          avgMonthsThen: Math.round(avgMonthsThen),
-          change: Math.round(change * 10) / 10,
-          count: data.countNow,
+          avgMonths,
+          avgDays: Math.round(avgDays),
+          count: data.count,
+          currentCount: data.currentCount,
+          leftCount: data.leftCount,
         };
       })
       .filter(t => t.count > 0)
       .sort((a, b) => b.avgMonths - a.avgMonths);
-  }, [tenureData]);
+  }, [currentData, historicalData]);
 
   const maxMonths = useMemo(() => {
     if (chartData.length === 0) return 100;
@@ -96,22 +151,15 @@ export function TeamAvgTenureChart() {
     return `${years} år ${remainingMonths} mdr`;
   };
 
-  const getTrendIcon = (change: number) => {
-    if (change > 0.5) return TrendingUp;
-    if (change < -0.5) return TrendingDown;
-    return Minus;
-  };
-
-  const getTrendColor = (change: number) => {
-    if (change > 0.5) return "text-green-500";
-    if (change < -0.5) return "text-red-500";
-    return "text-muted-foreground";
-  };
-
-  const getBarColor = (change: number, index: number) => {
-    if (change > 0.5) return "hsl(142 76% 36%)"; // green
-    if (change < -0.5) return "hsl(0 84% 60%)"; // red
-    return `hsl(var(--chart-${(index % 5) + 1}))`;
+  const getBarColor = (index: number) => {
+    const colors = [
+      "hsl(var(--chart-1))",
+      "hsl(var(--chart-2))",
+      "hsl(var(--chart-3))",
+      "hsl(var(--chart-4))",
+      "hsl(var(--chart-5))",
+    ];
+    return colors[index % colors.length];
   };
 
   if (isLoading) {
@@ -146,13 +194,12 @@ export function TeamAvgTenureChart() {
         <CardTitle className="text-lg flex items-center justify-between">
           <span>Gennemsnitlig anciennitet pr. team</span>
           <span className="text-xs font-normal text-muted-foreground">
-            Udvikling: sidste 30 dage
+            Alle ansatte (nuværende + tidligere)
           </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {chartData.map((team, index) => {
-          const TrendIcon = getTrendIcon(team.change);
           const widthPercent = (team.avgMonths / maxMonths) * 100;
           
           return (
@@ -174,7 +221,7 @@ export function TeamAvgTenureChart() {
                       className="h-full rounded-md transition-all duration-300 group-hover:brightness-110"
                       style={{ 
                         width: `${widthPercent}%`,
-                        backgroundColor: getBarColor(team.change, index),
+                        backgroundColor: getBarColor(index),
                       }}
                     />
                   </div>
@@ -192,12 +239,12 @@ export function TeamAvgTenureChart() {
                   </div>
                 </div>
                 
-                {/* Trend indicator */}
-                <div className={`flex items-center gap-1 w-24 shrink-0 justify-end ${getTrendColor(team.change)}`}>
-                  <TrendIcon className="h-4 w-4" />
-                  <span className="text-xs font-medium">
-                    {team.change > 0 ? "+" : ""}{team.change} mdr
-                  </span>
+                {/* Employee counts */}
+                <div className="flex items-center gap-1 w-28 shrink-0 justify-end text-xs text-muted-foreground">
+                  <span className="text-green-600">{team.currentCount}</span>
+                  <span>/</span>
+                  <span>{team.leftCount}</span>
+                  <span className="ml-1">(n={team.count})</span>
                 </div>
               </div>
               
@@ -206,10 +253,10 @@ export function TeamAvgTenureChart() {
                 <div className="text-xs space-y-1">
                   <div className="font-medium">{team.name}</div>
                   <div className="text-muted-foreground">
-                    Nu: {formatMonths(team.avgMonths)} • For 30 dage siden: {formatMonths(team.avgMonthsThen)}
+                    Gns. anciennitet: {formatMonths(team.avgMonths)}
                   </div>
-                  <div className={getTrendColor(team.change)}>
-                    {team.change > 0 ? "↑" : team.change < 0 ? "↓" : "→"} {Math.abs(team.change)} mdr ændring
+                  <div className="text-muted-foreground">
+                    <span className="text-green-600">{team.currentCount} nuværende</span> • {team.leftCount} stoppet
                   </div>
                 </div>
               </div>
@@ -220,16 +267,10 @@ export function TeamAvgTenureChart() {
         {/* Legend */}
         <div className="flex items-center justify-center gap-6 pt-4 border-t border-border mt-4">
           <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: "hsl(142 76% 36%)" }} />
-            <span className="text-muted-foreground">Positiv trend</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: "hsl(0 84% 60%)" }} />
-            <span className="text-muted-foreground">Negativ trend</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <div className="w-3 h-3 rounded-sm bg-muted" />
-            <span className="text-muted-foreground">Stabil</span>
+            <span className="text-green-600 font-medium">Nuværende</span>
+            <span className="text-muted-foreground">/</span>
+            <span className="text-muted-foreground">Stoppet</span>
+            <span className="text-muted-foreground ml-1">(total)</span>
           </div>
         </div>
       </CardContent>
