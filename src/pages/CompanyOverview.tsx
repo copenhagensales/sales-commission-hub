@@ -1,33 +1,89 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, TrendingUp, Building2, Target } from "lucide-react";
+import { Users, TrendingUp, TrendingDown, Minus, Building2, Target } from "lucide-react";
+import { subDays, format } from "date-fns";
 
 export default function CompanyOverview() {
-  // Fetch unique employee count from team_members
-  const { data: uniqueEmployeeCount = 0, isLoading } = useQuery({
-    queryKey: ["company-overview-employee-count"],
+  const today = new Date();
+  const thirtyDaysAgo = subDays(today, 30);
+  const sixtyDaysAgo = subDays(today, 60);
+
+  // Fetch employee counts with 30-day comparison
+  const { data: employeeStats, isLoading } = useQuery({
+    queryKey: ["company-overview-employee-stats"],
     queryFn: async () => {
+      // Get all team members with their created_at dates
       const { data, error } = await supabase
         .from("team_members")
-        .select("employee_id");
+        .select("employee_id, created_at");
       
       if (error) throw error;
       
-      // Count unique employee IDs
-      const uniqueIds = new Set(data.map(tm => tm.employee_id));
-      return uniqueIds.size;
+      // Current unique employees
+      const currentUniqueIds = new Set(data.map(tm => tm.employee_id));
+      const currentCount = currentUniqueIds.size;
+      
+      // Employees 30 days ago (only those created before 30 days ago)
+      const thirtyDaysAgoStr = format(thirtyDaysAgo, "yyyy-MM-dd");
+      const employeesThirtyDaysAgo = data.filter(tm => 
+        tm.created_at && tm.created_at < thirtyDaysAgoStr
+      );
+      const uniqueThirtyDaysAgo = new Set(employeesThirtyDaysAgo.map(tm => tm.employee_id));
+      const countThirtyDaysAgo = uniqueThirtyDaysAgo.size;
+      
+      // Employees 60 days ago (for previous period comparison)
+      const sixtyDaysAgoStr = format(sixtyDaysAgo, "yyyy-MM-dd");
+      const employeesSixtyDaysAgo = data.filter(tm => 
+        tm.created_at && tm.created_at < sixtyDaysAgoStr
+      );
+      const uniqueSixtyDaysAgo = new Set(employeesSixtyDaysAgo.map(tm => tm.employee_id));
+      const countSixtyDaysAgo = uniqueSixtyDaysAgo.size;
+      
+      // Calculate changes
+      const changeLastThirtyDays = currentCount - countThirtyDaysAgo;
+      const changePreviousThirtyDays = countThirtyDaysAgo - countSixtyDaysAgo;
+      
+      // Calculate percentage change comparing the two periods
+      let percentageChange = 0;
+      if (changePreviousThirtyDays !== 0) {
+        percentageChange = ((changeLastThirtyDays - changePreviousThirtyDays) / Math.abs(changePreviousThirtyDays)) * 100;
+      } else if (changeLastThirtyDays !== 0) {
+        percentageChange = changeLastThirtyDays > 0 ? 100 : -100;
+      }
+      
+      return {
+        currentCount,
+        changeLastThirtyDays,
+        percentageChange
+      };
     },
   });
+
+  const getTrendIcon = (change: number) => {
+    if (change > 0) return TrendingUp;
+    if (change < 0) return TrendingDown;
+    return Minus;
+  };
+
+  const getTrendColor = (change: number) => {
+    if (change > 0) return "text-green-600";
+    if (change < 0) return "text-red-600";
+    return "text-muted-foreground";
+  };
 
   const kpiCards = [
     {
       title: "Antal medarbejdere",
-      value: isLoading ? "..." : uniqueEmployeeCount,
+      value: isLoading ? "..." : employeeStats?.currentCount ?? 0,
       icon: Users,
       description: "Unikke medarbejdere på tværs af teams",
       color: "text-primary",
       bgColor: "bg-primary/10",
+      trend: employeeStats ? {
+        change: employeeStats.changeLastThirtyDays,
+        percentage: employeeStats.percentageChange
+      } : null
     },
     {
       title: "KPI 2",
@@ -36,6 +92,7 @@ export default function CompanyOverview() {
       description: "Kommer snart",
       color: "text-muted-foreground",
       bgColor: "bg-muted",
+      trend: null
     },
     {
       title: "KPI 3",
@@ -44,6 +101,7 @@ export default function CompanyOverview() {
       description: "Kommer snart",
       color: "text-muted-foreground",
       bgColor: "bg-muted",
+      trend: null
     },
     {
       title: "KPI 4",
@@ -52,6 +110,7 @@ export default function CompanyOverview() {
       description: "Kommer snart",
       color: "text-muted-foreground",
       bgColor: "bg-muted",
+      trend: null
     },
   ];
 
@@ -76,6 +135,20 @@ export default function CompanyOverview() {
             <CardContent>
               <div className="text-3xl font-bold text-foreground">{kpi.value}</div>
               <p className="text-xs text-muted-foreground mt-1">{kpi.description}</p>
+              {kpi.trend && (
+                <div className={`flex items-center gap-1 mt-2 text-sm ${getTrendColor(kpi.trend.change)}`}>
+                  {(() => {
+                    const TrendIcon = getTrendIcon(kpi.trend.change);
+                    return <TrendIcon className="h-4 w-4" />;
+                  })()}
+                  <span>
+                    {kpi.trend.change > 0 ? "+" : ""}{kpi.trend.change} sidste 30 dage
+                  </span>
+                  <span className="text-muted-foreground ml-1">
+                    ({kpi.trend.percentage > 0 ? "+" : ""}{kpi.trend.percentage.toFixed(0)}%)
+                  </span>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}
