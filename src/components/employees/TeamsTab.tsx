@@ -590,6 +590,22 @@ export function TeamsTab() {
                   );
                 })}
               </TableBody>
+              <tfoot>
+                <tr className="border-t border-border/50 bg-muted/30">
+                  <td colSpan={5} className="py-3 px-4 text-sm font-medium text-muted-foreground text-right">
+                    Samlet antal unikke medarbejdere:
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-1.5">
+                      <Users className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-semibold text-foreground">
+                        {new Set(teamMembers.map(tm => tm.employee_id)).size}
+                      </span>
+                    </div>
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
             </Table>
           )}
         </div>
