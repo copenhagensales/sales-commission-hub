@@ -10,30 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { 
-  ArrowLeft, 
-  Edit2, 
-  Mail, 
-  MessageSquare, 
-  Phone, 
-  Plus, 
-  Calendar,
-  FileText,
-  Clock,
-  User,
-  Briefcase,
-  MapPin,
-  Star,
-  Send,
-  History,
-  TrendingUp
-} from "lucide-react";
+import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { SendSmsDialog } from "@/components/recruitment/SendSmsDialog";
 import { SendEmailDialog } from "@/components/recruitment/SendEmailDialog";
-
 const statusLabels: Record<string, string> = {
   ny_ansoegning: "Ny ansøgning",
   new: "Ny ansøgning",
@@ -44,9 +26,8 @@ const statusLabels: Record<string, string> = {
   hired: "Ansat",
   rejected: "Afvist",
   ghostet: "Ghostet",
-  takket_nej: "Takket nej",
+  takket_nej: "Takket nej"
 };
-
 const statusColors: Record<string, string> = {
   ny_ansoegning: "bg-blue-500/10 text-blue-600 border-blue-500/30",
   new: "bg-blue-500/10 text-blue-600 border-blue-500/30",
@@ -57,139 +38,137 @@ const statusColors: Record<string, string> = {
   hired: "bg-green-500/10 text-green-600 border-green-500/30",
   rejected: "bg-red-500/10 text-red-600 border-red-500/30",
   ghostet: "bg-amber-500/10 text-amber-600 border-amber-500/30",
-  takket_nej: "bg-purple-500/10 text-purple-600 border-purple-500/30",
+  takket_nej: "bg-purple-500/10 text-purple-600 border-purple-500/30"
 };
-
 const roleLabels: Record<string, string> = {
   fieldmarketing: "Fieldmarketing",
   salgskonsulent: "Salgskonsulent",
   Fieldmarketing: "Fieldmarketing",
-  Salgskonsulent: "Salgskonsulent",
+  Salgskonsulent: "Salgskonsulent"
 };
-
 const roleColors: Record<string, string> = {
   fieldmarketing: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
   salgskonsulent: "bg-indigo-500/10 text-indigo-600 border-indigo-500/30",
   Fieldmarketing: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
-  Salgskonsulent: "bg-indigo-500/10 text-indigo-600 border-indigo-500/30",
+  Salgskonsulent: "bg-indigo-500/10 text-indigo-600 border-indigo-500/30"
 };
-
 const sourceLabels: Record<string, string> = {
   hjemmesiden: "Hjemmesiden",
   linkedin: "LinkedIn",
   jobindex: "Jobindex",
   anbefaling: "Anbefaling",
-  andet: "Andet",
+  andet: "Andet"
 };
-
 export default function CandidateDetail() {
-  const { id } = useParams<{ id: string }>();
+  const {
+    id
+  } = useParams<{
+    id: string;
+  }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [newNote, setNewNote] = useState("");
   const [noteType, setNoteType] = useState("Generel observation");
-
-  const { data: candidate, isLoading } = useQuery({
+  const {
+    data: candidate,
+    isLoading
+  } = useQuery({
     queryKey: ["candidate", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("candidates")
-        .select("*, applications(*)")
-        .eq("id", id)
-        .single();
-      
+      const {
+        data,
+        error
+      } = await supabase.from("candidates").select("*, applications(*)").eq("id", id).single();
       if (error) throw error;
       return data;
     },
-    enabled: !!id,
+    enabled: !!id
   });
-
-  const { data: communications = [] } = useQuery({
+  const {
+    data: communications = []
+  } = useQuery({
     queryKey: ["candidate-communications", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("communication_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(20);
-      
+      const {
+        data,
+        error
+      } = await supabase.from("communication_logs").select("*").order("created_at", {
+        ascending: false
+      }).limit(20);
       if (error) throw error;
       return data;
-    },
+    }
   });
-
-  const { data: teams = [] } = useQuery({
+  const {
+    data: teams = []
+  } = useQuery({
     queryKey: ["teams"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("teams")
-        .select("id, name")
-        .order("name");
+      const {
+        data,
+        error
+      } = await supabase.from("teams").select("id, name").order("name");
       if (error) throw error;
       return data;
-    },
+    }
   });
-
   const updateCandidateMutation = useMutation({
     mutationFn: async (updates: Record<string, any>) => {
-      const { error } = await supabase
-        .from("candidates")
-        .update(updates)
-        .eq("id", id);
+      const {
+        error
+      } = await supabase.from("candidates").update(updates).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["candidate", id] });
+      queryClient.invalidateQueries({
+        queryKey: ["candidate", id]
+      });
       toast.success("Kandidat opdateret");
     },
     onError: () => {
       toast.error("Kunne ikke opdatere kandidat");
-    },
+    }
   });
-
   const addNoteMutation = useMutation({
     mutationFn: async () => {
       const existingNotes = candidate?.notes || "";
-      const timestamp = format(new Date(), "d. MMM yyyy HH:mm", { locale: da });
+      const timestamp = format(new Date(), "d. MMM yyyy HH:mm", {
+        locale: da
+      });
       const formattedNote = `[${timestamp}] ${noteType}: ${newNote}`;
-      const updatedNotes = existingNotes 
-        ? `${formattedNote}\n\n${existingNotes}` 
-        : formattedNote;
-      
-      const { error } = await supabase
-        .from("candidates")
-        .update({ notes: updatedNotes })
-        .eq("id", id);
+      const updatedNotes = existingNotes ? `${formattedNote}\n\n${existingNotes}` : formattedNote;
+      const {
+        error
+      } = await supabase.from("candidates").update({
+        notes: updatedNotes
+      }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["candidate", id] });
+      queryClient.invalidateQueries({
+        queryKey: ["candidate", id]
+      });
       setNewNote("");
       toast.success("Note tilføjet");
     },
     onError: () => {
       toast.error("Kunne ikke tilføje note");
-    },
+    }
   });
-
   if (isLoading) {
-    return (
-      <MainLayout>
+    return <MainLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-pulse space-y-4">
             <div className="h-8 w-48 bg-muted rounded" />
             <div className="h-4 w-32 bg-muted rounded" />
           </div>
         </div>
-      </MainLayout>
-    );
+      </MainLayout>;
   }
-
   if (!candidate) {
-    return (
-      <MainLayout>
+    return <MainLayout>
         <div className="flex flex-col items-center justify-center h-64 gap-4">
           <User className="h-12 w-12 text-muted-foreground" />
           <p className="text-muted-foreground">Kandidat ikke fundet</p>
@@ -197,27 +176,22 @@ export default function CandidateDetail() {
             Tilbage til kandidater
           </Button>
         </div>
-      </MainLayout>
-    );
+      </MainLayout>;
   }
-
   const position = candidate.applied_position?.toLowerCase() || "";
   const applications = candidate.applications || [];
   const initials = `${candidate.first_name?.[0] || ""}${candidate.last_name?.[0] || ""}`.toUpperCase();
-  const timeInPipeline = formatDistanceToNow(new Date(candidate.created_at), { locale: da, addSuffix: false });
+  const timeInPipeline = formatDistanceToNow(new Date(candidate.created_at), {
+    locale: da,
+    addSuffix: false
+  });
 
   // Parse notes for display
   const notesArray = candidate.notes?.split('\n\n').filter(Boolean) || [];
-
-  return (
-    <MainLayout>
+  return <MainLayout>
       <div className="space-y-6 max-w-7xl mx-auto">
         {/* Back button */}
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate("/recruitment/candidates")}
-          className="w-fit -ml-2"
-        >
+        <Button variant="ghost" onClick={() => navigate("/recruitment/candidates")} className="w-fit -ml-2">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Tilbage til kandidater
         </Button>
@@ -255,42 +229,19 @@ export default function CandidateDetail() {
 
               {/* Quick Actions */}
               <div className="flex flex-wrap gap-2 sm:ml-auto sm:self-start">
-                <Button 
-                  size="sm"
-                  variant="outline"
-                  onClick={() => candidate.phone && (window.location.href = `tel:${candidate.phone}`)}
-                  disabled={!candidate.phone}
-                  className="bg-background/80"
-                >
+                <Button size="sm" variant="outline" onClick={() => candidate.phone && (window.location.href = `tel:${candidate.phone}`)} disabled={!candidate.phone} className="bg-background/80">
                   <Phone className="h-4 w-4 mr-1.5" />
                   Ring
                 </Button>
-                <Button 
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowSmsDialog(true)}
-                  disabled={!candidate.phone}
-                  className="bg-background/80"
-                >
+                <Button size="sm" variant="outline" onClick={() => setShowSmsDialog(true)} disabled={!candidate.phone} className="bg-background/80">
                   <MessageSquare className="h-4 w-4 mr-1.5" />
                   SMS
                 </Button>
-                <Button 
-                  size="sm"
-                  variant="outline" 
-                  onClick={() => setShowEmailDialog(true)}
-                  disabled={!candidate.email}
-                  className="bg-background/80"
-                >
+                <Button size="sm" variant="outline" onClick={() => setShowEmailDialog(true)} disabled={!candidate.email} className="bg-background/80">
                   <Mail className="h-4 w-4 mr-1.5" />
                   Email
                 </Button>
-                <Button 
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate(`/recruitment/candidates/${id}/edit`)}
-                  className="bg-background/80"
-                >
+                <Button size="sm" variant="outline" onClick={() => navigate(`/recruitment/candidates/${id}/edit`)} className="bg-background/80">
                   <Edit2 className="h-4 w-4 mr-1.5" />
                   Rediger
                 </Button>
@@ -323,7 +274,9 @@ export default function CandidateDetail() {
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider">Ansøgningsdato</p>
                 <p className="text-sm font-medium">
-                  {format(new Date(candidate.created_at), "d. MMM yyyy", { locale: da })}
+                  {format(new Date(candidate.created_at), "d. MMM yyyy", {
+                  locale: da
+                })}
                 </p>
               </div>
             </div>
@@ -347,22 +300,19 @@ export default function CandidateDetail() {
                   {/* Status Selector */}
                   <div className="space-y-3">
                     <label className="text-sm font-medium">Nuværende status</label>
-                    <Select
-                      value={candidate.status}
-                      onValueChange={(value) => updateCandidateMutation.mutate({ status: value })}
-                    >
+                    <Select value={candidate.status} onValueChange={value => updateCandidateMutation.mutate({
+                    status: value
+                  })}>
                       <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.entries(statusLabels).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
+                        {Object.entries(statusLabels).map(([value, label]) => <SelectItem key={value} value={value}>
                             <span className={`inline-flex items-center gap-2`}>
                               <span className={`w-2 h-2 rounded-full ${statusColors[value]?.split(' ')[0] || 'bg-muted'}`} />
                               {label}
                             </span>
-                          </SelectItem>
-                        ))}
+                          </SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -370,24 +320,24 @@ export default function CandidateDetail() {
                   {/* Interview Section */}
                   <div className="space-y-3">
                     <label className="text-sm font-medium">Jobsamtale</label>
-                    {candidate.interview_date ? (
-                      <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    {candidate.interview_date ? <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
                         <Calendar className="h-5 w-5 text-primary" />
                         <div>
                           <p className="font-medium text-sm">
-                            {format(new Date(candidate.interview_date), "EEEE d. MMMM", { locale: da })}
+                            {format(new Date(candidate.interview_date), "EEEE d. MMMM", {
+                          locale: da
+                        })}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            kl. {format(new Date(candidate.interview_date), "HH:mm", { locale: da })}
+                            kl. {format(new Date(candidate.interview_date), "HH:mm", {
+                          locale: da
+                        })}
                           </p>
                         </div>
-                      </div>
-                    ) : (
-                      <Button variant="outline" className="w-full justify-start">
+                      </div> : <Button variant="outline" className="w-full justify-start">
                         <Calendar className="h-4 w-4 mr-2" />
                         Planlæg samtale
-                      </Button>
-                    )}
+                      </Button>}
                   </div>
                 </div>
 
@@ -419,8 +369,7 @@ export default function CandidateDetail() {
                 <CardDescription>Seneste kontakt med kandidaten</CardDescription>
               </CardHeader>
               <CardContent>
-                {communications.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                {communications.length === 0 ? <div className="flex flex-col items-center justify-center py-12 text-center">
                     <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
                       <MessageSquare className="h-6 w-6 text-muted-foreground" />
                     </div>
@@ -436,15 +385,9 @@ export default function CandidateDetail() {
                         Send SMS
                       </Button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {communications.slice(0, 5).map((comm: any) => (
-                      <div key={comm.id} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className={`h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          comm.type === "sms" ? "bg-blue-500/10" : 
-                          comm.type === "email" ? "bg-purple-500/10" : "bg-green-500/10"
-                        }`}>
+                  </div> : <div className="space-y-3">
+                    {communications.slice(0, 5).map((comm: any) => <div key={comm.id} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className={`h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 ${comm.type === "sms" ? "bg-blue-500/10" : comm.type === "email" ? "bg-purple-500/10" : "bg-green-500/10"}`}>
                           {comm.type === "sms" && <MessageSquare className="h-4 w-4 text-blue-600" />}
                           {comm.type === "email" && <Mail className="h-4 w-4 text-purple-600" />}
                           {comm.type === "call" && <Phone className="h-4 w-4 text-green-600" />}
@@ -453,27 +396,23 @@ export default function CandidateDetail() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <Badge variant="outline" className="text-xs capitalize">{comm.type}</Badge>
                             <span className="text-xs text-muted-foreground">
-                              {format(new Date(comm.created_at), "d. MMM yyyy HH:mm", { locale: da })}
+                              {format(new Date(comm.created_at), "d. MMM yyyy HH:mm", {
+                          locale: da
+                        })}
                             </span>
                             <Badge variant="secondary" className="text-xs">
                               {comm.direction === "outgoing" ? "Udgående" : "Indgående"}
                             </Badge>
                           </div>
-                          {comm.content && (
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                          {comm.content && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                               {comm.content}
-                            </p>
-                          )}
+                            </p>}
                         </div>
-                      </div>
-                    ))}
-                    {communications.length > 5 && (
-                      <Button variant="ghost" className="w-full text-muted-foreground">
+                      </div>)}
+                    {communications.length > 5 && <Button variant="ghost" className="w-full text-muted-foreground">
                         Se alle {communications.length} beskeder
-                      </Button>
-                    )}
-                  </div>
-                )}
+                      </Button>}
+                  </div>}
               </CardContent>
             </Card>
           </div>
@@ -501,19 +440,9 @@ export default function CandidateDetail() {
                   </SelectContent>
                 </Select>
 
-                <Textarea
-                  placeholder="Skriv en note om kandidaten..."
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  rows={4}
-                  className="resize-none"
-                />
+                <Textarea placeholder="Skriv en note om kandidaten..." value={newNote} onChange={e => setNewNote(e.target.value)} rows={4} className="resize-none" />
 
-                <Button 
-                  className="w-full" 
-                  onClick={() => addNoteMutation.mutate()}
-                  disabled={!newNote.trim() || addNoteMutation.isPending}
-                >
+                <Button className="w-full" onClick={() => addNoteMutation.mutate()} disabled={!newNote.trim() || addNoteMutation.isPending}>
                   <Send className="h-4 w-4 mr-2" />
                   Gem note
                 </Button>
@@ -523,40 +452,31 @@ export default function CandidateDetail() {
             {/* Notes History */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Noter</CardTitle>
+                <CardTitle className="text-lg">Ansøgning</CardTitle>
                 <CardDescription>
                   {notesArray.length} {notesArray.length === 1 ? "note" : "noter"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {notesArray.length === 0 ? (
-                  <div className="text-center py-8">
+                {notesArray.length === 0 ? <div className="text-center py-8">
                     <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-50" />
                     <p className="text-sm text-muted-foreground">Ingen noter endnu</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                  </div> : <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
                     {notesArray.map((note, index) => {
-                      // Parse note format: [date] type: content
-                      const match = note.match(/^\[(.*?)\]\s*(.*?):\s*(.*)$/s);
-                      const date = match?.[1] || "";
-                      const type = match?.[2] || "";
-                      const content = match?.[3] || note;
-
-                      return (
-                        <div key={index} className="p-3 bg-muted/40 rounded-lg border-l-2 border-primary/30">
-                          {date && (
-                            <div className="flex items-center gap-2 mb-1">
+                  // Parse note format: [date] type: content
+                  const match = note.match(/^\[(.*?)\]\s*(.*?):\s*(.*)$/s);
+                  const date = match?.[1] || "";
+                  const type = match?.[2] || "";
+                  const content = match?.[3] || note;
+                  return <div key={index} className="p-3 bg-muted/40 rounded-lg border-l-2 border-primary/30">
+                          {date && <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs text-muted-foreground">{date}</span>
                               {type && <Badge variant="secondary" className="text-xs">{type}</Badge>}
-                            </div>
-                          )}
+                            </div>}
                           <p className="text-sm whitespace-pre-wrap">{content}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        </div>;
+                })}
+                  </div>}
               </CardContent>
             </Card>
           </div>
@@ -564,28 +484,19 @@ export default function CandidateDetail() {
       </div>
 
       {/* Dialogs */}
-      <SendSmsDialog
-        open={showSmsDialog}
-        onOpenChange={setShowSmsDialog}
-        candidate={{
-          id: candidate.id,
-          first_name: candidate.first_name,
-          last_name: candidate.last_name,
-          phone: candidate.phone,
-          applied_position: candidate.applied_position,
-        }}
-      />
-      <SendEmailDialog
-        open={showEmailDialog}
-        onOpenChange={setShowEmailDialog}
-        candidate={{
-          id: candidate.id,
-          first_name: candidate.first_name,
-          last_name: candidate.last_name,
-          email: candidate.email,
-          applied_position: candidate.applied_position,
-        }}
-      />
-    </MainLayout>
-  );
+      <SendSmsDialog open={showSmsDialog} onOpenChange={setShowSmsDialog} candidate={{
+      id: candidate.id,
+      first_name: candidate.first_name,
+      last_name: candidate.last_name,
+      phone: candidate.phone,
+      applied_position: candidate.applied_position
+    }} />
+      <SendEmailDialog open={showEmailDialog} onOpenChange={setShowEmailDialog} candidate={{
+      id: candidate.id,
+      first_name: candidate.first_name,
+      last_name: candidate.last_name,
+      email: candidate.email,
+      applied_position: candidate.applied_position
+    }} />
+    </MainLayout>;
 }
