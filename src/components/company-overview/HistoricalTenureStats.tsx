@@ -360,8 +360,8 @@ export function HistoricalTenureStats() {
         <CardHeader>
           <CardTitle>Detaljeret teamoversigt (alle ansatte)</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
+        <CardContent className="overflow-x-auto">
+          <Table className="min-w-[900px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Team</TableHead>
