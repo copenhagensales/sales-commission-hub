@@ -369,9 +369,7 @@ export function HistoricalTenureStats() {
                 <TableHead className="text-right">Stoppet</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right">Gns. anciennitet</TableHead>
-                <TableHead className="text-right">30-dages exits</TableHead>
                 <TableHead className="text-right">30-dages churn</TableHead>
-                <TableHead className="text-right">60-dages exits</TableHead>
                 <TableHead className="text-right">60-dages churn</TableHead>
               </TableRow>
             </TableHeader>
@@ -391,7 +389,6 @@ export function HistoricalTenureStats() {
                   <TableCell className="text-right">{team.leftCount}</TableCell>
                   <TableCell className="text-right">{team.count}</TableCell>
                   <TableCell className="text-right">{team.avgTenureMonths} mdr</TableCell>
-                  <TableCell className="text-right">{team.churned30}</TableCell>
                   <TableCell className="text-right">
                     {team.leftCount > 0 ? (
                       <Badge variant={team.churnRate30 > 20 ? "destructive" : team.churnRate30 > 10 ? "secondary" : "default"}>
@@ -401,7 +398,6 @@ export function HistoricalTenureStats() {
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">{team.churned60}</TableCell>
                   <TableCell className="text-right">
                     {team.leftCount > 0 ? (
                       <Badge variant={team.churnRate60 > 30 ? "destructive" : team.churnRate60 > 20 ? "secondary" : "default"}>
@@ -419,11 +415,9 @@ export function HistoricalTenureStats() {
                 <TableCell className="text-right">{totalLeft}</TableCell>
                 <TableCell className="text-right">{totalEmployees}</TableCell>
                 <TableCell className="text-right">{avgTenureMonths} mdr</TableCell>
-                <TableCell className="text-right">{churned30}</TableCell>
                 <TableCell className="text-right">
                   <Badge variant="destructive">{churnRate30}%</Badge>
                 </TableCell>
-                <TableCell className="text-right">{churned60}</TableCell>
                 <TableCell className="text-right">
                   <Badge variant="destructive">{churnRate60}%</Badge>
                 </TableCell>
