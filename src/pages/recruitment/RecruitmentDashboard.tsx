@@ -290,7 +290,7 @@ export default function RecruitmentDashboard() {
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-medium text-foreground truncate group-hover:text-primary transition-colors text-sm">
-                        {candidate.first_name} {candidate.last_name}
+                        {candidate.first_name}
                       </span>
                       <span className="text-xs text-muted-foreground shrink-0">
                         {format(new Date(candidate.created_at), "d. MMM", { locale: da })}
