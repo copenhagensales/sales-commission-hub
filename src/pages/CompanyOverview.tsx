@@ -6,7 +6,6 @@ import { subDays, format } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { TeamTenureChart } from "@/components/company-overview/TeamTenureChart";
 import { TeamAvgTenureChart } from "@/components/company-overview/TeamAvgTenureChart";
-import { TeamEmployeeList } from "@/components/company-overview/TeamEmployeeList";
 
 export default function CompanyOverview() {
   const today = new Date();
@@ -198,9 +197,6 @@ export default function CompanyOverview() {
           <TeamAvgTenureChart />
           <TeamTenureChart />
         </div>
-
-        {/* Eesy TM Employee List */}
-        <TeamEmployeeList teamName="Eesy TM" />
       </div>
     </MainLayout>
   );
