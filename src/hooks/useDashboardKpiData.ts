@@ -53,7 +53,7 @@ const getDateRange = (timePeriodId: string, customFromDate?: Date): DateRange =>
 };
 
 const formatValue = (value: number, kpiTypeId: string): string => {
-  if (kpiTypeId.includes("revenue") || kpiTypeId.includes("order-value")) {
+  if (kpiTypeId.includes("revenue") || kpiTypeId.includes("order-value") || kpiTypeId === "commission") {
     return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(value);
   }
   if (kpiTypeId.includes("rate") || kpiTypeId.includes("conversion")) {
@@ -380,6 +380,48 @@ export const useDashboardKpiData = () => {
           break;
         }
 
+        case "commission": {
+          // Sum commission_dkk from products in sale_items for the date range
+          let targetClientIds: string[] = [];
+          if (teamId) {
+            targetClientIds = await getClientIdsForTeam(teamId);
+          } else if (clientId) {
+            targetClientIds = [clientId];
+          }
+          
+          let campaignIds: string[] = [];
+          if (targetClientIds.length > 0) {
+            const { data: campaigns } = await supabase
+              .from("client_campaigns")
+              .select("id")
+              .in("client_id", targetClientIds);
+            campaignIds = (campaigns || []).map(c => c.id);
+          }
+          
+          let query = supabase
+            .from("sale_items")
+            .select(`
+              quantity,
+              products!inner(commission_dkk),
+              sales!inner(sale_datetime, client_campaign_id)
+            `)
+            .gte("sales.sale_datetime", startISO)
+            .lte("sales.sale_datetime", endISO);
+          
+          if (campaignIds.length > 0) {
+            query = query.in("sales.client_campaign_id", campaignIds);
+          }
+          
+          const { data, error } = await query;
+          if (error) throw error;
+          
+          value = data?.reduce((sum, item) => {
+            const commission = (item.products as any)?.commission_dkk || 0;
+            return sum + (commission * (item.quantity || 1));
+          }, 0) || 0;
+          break;
+        }
+
         default:
           // Return 0 for unknown KPI types
           value = 0;
@@ -693,6 +735,50 @@ export const useWidgetKpiData = (widgets: Array<{
                 }
                 
                 value = totalTarget > 0 ? (salesCount / totalTarget) * 100 : 0;
+                break;
+              }
+
+              case "commission": {
+                // Sum commission_dkk from products in sale_items for the date range
+                let targetClientIds: string[] = [];
+                if (widget.teamId) {
+                  const { data: teamClients } = await supabase
+                    .from("team_clients")
+                    .select("client_id")
+                    .eq("team_id", widget.teamId);
+                  targetClientIds = (teamClients || []).map(tc => tc.client_id);
+                } else if (widget.clientId) {
+                  targetClientIds = [widget.clientId];
+                }
+                
+                let campaignIds: string[] = [];
+                if (targetClientIds.length > 0) {
+                  const { data: campaigns } = await supabase
+                    .from("client_campaigns")
+                    .select("id")
+                    .in("client_id", targetClientIds);
+                  campaignIds = (campaigns || []).map(c => c.id);
+                }
+                
+                let query = supabase
+                  .from("sale_items")
+                  .select(`
+                    quantity,
+                    products!inner(commission_dkk),
+                    sales!inner(sale_datetime, client_campaign_id)
+                  `)
+                  .gte("sales.sale_datetime", startISO)
+                  .lte("sales.sale_datetime", endISO);
+                
+                if (campaignIds.length > 0) {
+                  query = query.in("sales.client_campaign_id", campaignIds);
+                }
+                
+                const { data } = await query;
+                value = data?.reduce((sum, item) => {
+                  const commission = (item.products as any)?.commission_dkk || 0;
+                  return sum + (commission * (item.quantity || 1));
+                }, 0) || 0;
                 break;
               }
               
