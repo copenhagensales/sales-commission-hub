@@ -8,7 +8,7 @@ interface VideoPlayerDialogProps {
   videoUrl?: string;
 }
 
-// Convert YouTube/Vimeo URLs to embeddable format
+// Convert YouTube/Vimeo/SharePoint URLs to embeddable format
 function getEmbedUrl(url: string): { type: 'embed' | 'video'; url: string } {
   // YouTube patterns
   const youtubeMatch = url.match(
@@ -30,6 +30,26 @@ function getEmbedUrl(url: string): { type: 'embed' | 'video'; url: string } {
       type: 'embed',
       url: `https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1`,
     };
+  }
+
+  // SharePoint embed URLs (already in embed format)
+  if (url.includes('sharepoint.com') && url.includes('/_layouts/15/embed.aspx')) {
+    return { type: 'embed', url };
+  }
+
+  // SharePoint stream URLs - convert to embed format if possible
+  if (url.includes('sharepoint.com') && url.includes('/_layouts/15/stream.aspx')) {
+    // Try to extract UniqueId and convert to embed URL
+    const urlObj = new URL(url);
+    const id = urlObj.searchParams.get('id');
+    if (id) {
+      // Extract the base SharePoint URL and construct embed URL
+      const baseUrl = url.split('/_layouts/')[0];
+      return {
+        type: 'embed',
+        url: `${baseUrl}/_layouts/15/embed.aspx?UniqueId=${encodeURIComponent(id)}`,
+      };
+    }
   }
 
   // Direct video file
