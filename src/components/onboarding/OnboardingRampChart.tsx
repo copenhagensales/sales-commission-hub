@@ -1,13 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart, Legend, ReferenceDot } from "recharts";
-import { TrendingUp, Target, Zap, Star, Trophy, Medal } from "lucide-react";
+import { TrendingUp, Target, Zap, Star, Trophy, Medal, Phone, Clock, Percent, ArrowUp, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 
 interface OnboardingRampChartProps {
   currentWeek: number;
   actualRevenue?: number[];
   currentDailyCalls?: number;
+  currentTalkTimeHours?: number;
+  currentHitRate?: number;
   currentMeetingsPerWeek?: number;
   currentOrdersPerWeek?: number;
 }
@@ -15,7 +18,9 @@ interface OnboardingRampChartProps {
 export function OnboardingRampChart({
   currentWeek,
   actualRevenue = [],
-  currentDailyCalls = 40,
+  currentDailyCalls = 36,
+  currentTalkTimeHours = 2,
+  currentHitRate = 3,
   currentMeetingsPerWeek = 3,
   currentOrdersPerWeek = 1,
 }: OnboardingRampChartProps) {
@@ -251,67 +256,101 @@ export function OnboardingRampChart({
           </div>
         </div>
 
-        {/* Motivation message based on tier */}
+        {/* Coaching Section with KPI Comparisons */}
         <div className={cn(
-          "p-4 rounded-xl border",
+          "p-5 rounded-xl border",
           userTier === "top" && "bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/30",
           userTier === "middle" && "bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/30",
           userTier === "developing" && "bg-gradient-to-br from-primary/10 to-primary/5 border-primary/30"
         )}>
-          <div className="flex items-start gap-3">
-            <Zap className={cn(
-              "h-5 w-5 flex-shrink-0 mt-0.5",
-              userTier === "top" && "text-emerald-500",
-              userTier === "middle" && "text-amber-500",
-              userTier === "developing" && "text-primary"
-            )} />
-            <div className="space-y-2">
+          <div className="space-y-4">
+            {/* Header */}
+            <div className="flex items-center gap-2">
+              <Zap className={cn(
+                "h-5 w-5",
+                userTier === "top" && "text-emerald-500",
+                userTier === "middle" && "text-amber-500",
+                userTier === "developing" && "text-primary"
+              )} />
               {userTier === "top" && (
-                <>
-                  <p className="font-medium text-emerald-600 dark:text-emerald-400">
-                    🎯 Du er på top-performer banen!
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Fantastisk arbejde! Bliv ved med det nuværende niveau, og du rammer 70.000+ kr ved måned 4.
-                  </p>
-                </>
+                <p className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  🎯 Du er på top-performer banen!
+                </p>
               )}
               {userTier === "middle" && (
-                <>
-                  <p className="font-medium text-amber-600 dark:text-amber-400">
-                    💪 Du ligger solidt i midten
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Med lidt ekstra fokus på aktivitet kan du rykke op i top-performer kategorien. 
-                    Øg dine daglige kald fra {currentDailyCalls} til 60 for at accelerere.
-                  </p>
-                </>
+                <p className="font-semibold text-amber-600 dark:text-amber-400">
+                  💪 Du ligger solidt i midten – her er hvordan du kommer højere op
+                </p>
               )}
               {userTier === "developing" && (
-                <>
-                  <p className="font-medium text-primary">
-                    📈 Du er i udvikling – det er helt normalt
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Fokuser på at øge din aktivitet gradvist. Fra {currentDailyCalls} til 50 daglige kald 
-                    kan bringe dig op i middel-kategorien på få uger.
-                  </p>
-                </>
+                <p className="font-semibold text-primary">
+                  📈 Du er i udvikling – fokuser på disse områder
+                </p>
               )}
-              
-              {/* Quick action metrics */}
-              <div className="pt-3 border-t border-current/10 grid grid-cols-3 gap-4 mt-3">
-                <div className="text-center">
-                  <p className="text-lg font-bold">{currentDailyCalls}</p>
-                  <p className="text-xs text-muted-foreground">Kald/dag nu</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-lg font-bold text-primary">→ 60</p>
-                  <p className="text-xs text-muted-foreground">Mål kald/dag</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-lg font-bold text-emerald-500">+{60 - currentDailyCalls}</p>
-                  <p className="text-xs text-muted-foreground">Ekstra kald</p>
+            </div>
+
+            {/* Intro text */}
+            <p className="text-sm text-muted-foreground">
+              {userTier === "top" 
+                ? "Fantastisk! Du præsterer på niveau med vores bedste sælgere. Bliv ved!"
+                : "En top-performer adskiller sig på 3 vigtige KPI'er. Her er din sammenligning:"}
+            </p>
+
+            {/* KPI Comparison Cards */}
+            <div className="space-y-3">
+              {/* Calls KPI */}
+              <KpiComparisonCard
+                icon={Phone}
+                label="Daglige kald"
+                yourValue={currentDailyCalls}
+                topValue={60}
+                unit="kald"
+                advice="Top-performere tager typisk 60 kald dagligt. Flere kald = flere chancer for salg."
+              />
+
+              {/* Talk Time KPI */}
+              <KpiComparisonCard
+                icon={Clock}
+                label="Daglig taletid"
+                yourValue={currentTalkTimeHours}
+                topValue={4}
+                unit="timer"
+                advice="Du taler ca. {your} timer dagligt. En top-performer taler typisk 4 timer. Mere taletid = dybere samtaler = flere salg."
+              />
+
+              {/* Hit Rate KPI */}
+              <KpiComparisonCard
+                icon={Percent}
+                label="Konverteringsrate (hit-rate)"
+                yourValue={currentHitRate}
+                topValue={10}
+                unit="%"
+                normalValue={2.5}
+                advice="Normale sælgere ligger på 2-3%. Gode sælgere ligger på 10-12%. Øv dig på indvendingsbehandling og behovsafdækning."
+                isPercentage
+              />
+            </div>
+
+            {/* Action Summary */}
+            <div className="pt-4 border-t border-current/10">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">Din handlingsplan:</p>
+                  <ul className="text-sm text-muted-foreground mt-1 space-y-1">
+                    {currentDailyCalls < 60 && (
+                      <li>• Øg dine kald med {60 - currentDailyCalls} pr. dag (fra {currentDailyCalls} til 60)</li>
+                    )}
+                    {currentTalkTimeHours < 4 && (
+                      <li>• Forlæng dine samtaler – gå fra {currentTalkTimeHours} til 4 timers taletid</li>
+                    )}
+                    {currentHitRate < 10 && (
+                      <li>• Træn dine salgsteknikker for at øge hit-rate fra {currentHitRate}% til 10%+</li>
+                    )}
+                    {currentDailyCalls >= 60 && currentTalkTimeHours >= 4 && currentHitRate >= 10 && (
+                      <li>• Du præsterer fremragende på alle parametre! 🎉</li>
+                    )}
+                  </ul>
                 </div>
               </div>
             </div>
@@ -382,6 +421,104 @@ function PositionCard({
           ← Du er her
         </Badge>
       )}
+    </div>
+  );
+}
+
+// KPI Comparison Card for coaching section
+function KpiComparisonCard({
+  icon: Icon,
+  label,
+  yourValue,
+  topValue,
+  unit,
+  advice,
+  normalValue,
+  isPercentage = false,
+}: {
+  icon: typeof Phone;
+  label: string;
+  yourValue: number;
+  topValue: number;
+  unit: string;
+  advice: string;
+  normalValue?: number;
+  isPercentage?: boolean;
+}) {
+  const percentage = Math.min((yourValue / topValue) * 100, 100);
+  const isAtTarget = yourValue >= topValue;
+  const gap = topValue - yourValue;
+
+  // Replace {your} placeholder in advice
+  const formattedAdvice = advice.replace("{your}", String(yourValue));
+
+  return (
+    <div className="p-3 rounded-lg bg-background/50 border border-border/50">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "w-8 h-8 rounded-lg flex items-center justify-center",
+            isAtTarget ? "bg-emerald-500/20" : "bg-muted"
+          )}>
+            <Icon className={cn(
+              "h-4 w-4",
+              isAtTarget ? "text-emerald-500" : "text-muted-foreground"
+            )} />
+          </div>
+          <span className="font-medium text-sm">{label}</span>
+        </div>
+        {isAtTarget && (
+          <Badge variant="default" className="bg-emerald-500 text-xs">
+            ✓ I mål
+          </Badge>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        <div className="text-center p-2 rounded-md bg-muted/50">
+          <p className="text-lg font-bold">{yourValue}{isPercentage ? "%" : ""}</p>
+          <p className="text-xs text-muted-foreground">Du nu</p>
+        </div>
+        {normalValue !== undefined && (
+          <div className="text-center p-2 rounded-md bg-muted/30">
+            <p className="text-lg font-semibold text-muted-foreground">{normalValue}{isPercentage ? "%" : ""}</p>
+            <p className="text-xs text-muted-foreground">Normal</p>
+          </div>
+        )}
+        <div className={cn(
+          "text-center p-2 rounded-md",
+          normalValue === undefined && "col-span-1",
+          "bg-emerald-500/10"
+        )}>
+          <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{topValue}{isPercentage ? "%" : ""}</p>
+          <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">Top</p>
+        </div>
+        {normalValue === undefined && (
+          <div className="text-center p-2 rounded-md bg-primary/10">
+            <p className="text-lg font-bold text-primary">
+              {isAtTarget ? "✓" : `+${gap}`}
+            </p>
+            <p className="text-xs text-primary/70">{isAtTarget ? "I mål!" : "Gap"}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Progress bar */}
+      <div className="mb-2">
+        <Progress 
+          value={percentage} 
+          className="h-2"
+        />
+        <div className="flex justify-between mt-1">
+          <span className="text-xs text-muted-foreground">0</span>
+          <span className="text-xs text-muted-foreground">{topValue} {unit}</span>
+        </div>
+      </div>
+
+      {/* Advice */}
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        {formattedAdvice}
+      </p>
     </div>
   );
 }
