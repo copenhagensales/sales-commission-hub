@@ -381,7 +381,8 @@ export const useDashboardKpiData = () => {
         }
 
         case "commission": {
-          // Sum commission_dkk from products in sale_items for the date range
+          // Sum mapped_commission from sale_items (same logic as Sales page)
+          // Exclude cancelled/rejected sales
           let targetClientIds: string[] = [];
           if (teamId) {
             targetClientIds = await getClientIdsForTeam(teamId);
@@ -398,15 +399,18 @@ export const useDashboardKpiData = () => {
             campaignIds = (campaigns || []).map(c => c.id);
           }
           
+          // Use mapped_commission from sale_items, matching Sales page logic
           let query = supabase
             .from("sale_items")
             .select(`
               quantity,
-              products!inner(commission_dkk),
-              sales!inner(sale_datetime, client_campaign_id)
+              mapped_commission,
+              sales!inner(sale_datetime, client_campaign_id, validation_status)
             `)
             .gte("sales.sale_datetime", startISO)
-            .lte("sales.sale_datetime", endISO);
+            .lte("sales.sale_datetime", endISO)
+            .not("sales.validation_status", "eq", "cancelled")
+            .not("sales.validation_status", "eq", "rejected");
           
           if (campaignIds.length > 0) {
             query = query.in("sales.client_campaign_id", campaignIds);
@@ -416,8 +420,9 @@ export const useDashboardKpiData = () => {
           if (error) throw error;
           
           value = data?.reduce((sum, item) => {
-            const commission = (item.products as any)?.commission_dkk || 0;
-            return sum + (commission * (item.quantity || 1));
+            const qty = Number((item as any).quantity ?? 1) || 1;
+            const commissionPerUnit = Number((item as any).mapped_commission) || 0;
+            return sum + (qty * commissionPerUnit);
           }, 0) || 0;
           break;
         }
