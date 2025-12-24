@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Area, ComposedChart, Legend } from "recharts";
 import { TrendingUp, Target, Zap } from "lucide-react";
 
 interface OnboardingRampChartProps {
@@ -21,12 +21,12 @@ export function OnboardingRampChart({
 }: OnboardingRampChartProps) {
   // Ramp curve targets over 6 months
   const rampData = [
-    { month: 1, label: "Mdr 1", target: 15000, minExpected: 10000, maxExpected: 25000 },
-    { month: 2, label: "Mdr 2", target: 25000, minExpected: 18000, maxExpected: 35000 },
-    { month: 3, label: "Mdr 3", target: 35000, minExpected: 28000, maxExpected: 45000 },
-    { month: 4, label: "Mdr 4", target: 45000, minExpected: 38000, maxExpected: 55000 },
-    { month: 5, label: "Mdr 5", target: 50000, minExpected: 42000, maxExpected: 60000 },
-    { month: 6, label: "Mdr 6", target: 55000, minExpected: 48000, maxExpected: 65000 },
+    { month: 1, label: "Mdr 1", target: 15000, minExpected: 10000, maxExpected: 25000, topPerformer: 25000, middlePerformer: 12000 },
+    { month: 2, label: "Mdr 2", target: 25000, minExpected: 18000, maxExpected: 35000, topPerformer: 40000, middlePerformer: 20000 },
+    { month: 3, label: "Mdr 3", target: 35000, minExpected: 28000, maxExpected: 45000, topPerformer: 55000, middlePerformer: 28000 },
+    { month: 4, label: "Mdr 4", target: 45000, minExpected: 38000, maxExpected: 55000, topPerformer: 70000, middlePerformer: 35000 },
+    { month: 5, label: "Mdr 5", target: 50000, minExpected: 42000, maxExpected: 60000, topPerformer: 80000, middlePerformer: 40000 },
+    { month: 6, label: "Mdr 6", target: 55000, minExpected: 48000, maxExpected: 65000, topPerformer: 90000, middlePerformer: 45000 },
   ];
 
   // Add actual revenue to chart data
@@ -99,6 +99,24 @@ export function OnboardingRampChart({
                 fill="url(#expectedRange)"
                 fillOpacity={1}
               />
+              {/* Top performer line */}
+              <Line
+                type="monotone"
+                dataKey="topPerformer"
+                stroke="hsl(142, 76%, 36%)"
+                strokeWidth={2}
+                dot={false}
+                name="Top-performer"
+              />
+              {/* Middle performer line */}
+              <Line
+                type="monotone"
+                dataKey="middlePerformer"
+                stroke="hsl(45, 93%, 47%)"
+                strokeWidth={2}
+                dot={false}
+                name="Middel"
+              />
               {/* Target line */}
               <Line
                 type="monotone"
@@ -125,6 +143,12 @@ export function OnboardingRampChart({
                 stroke="hsl(var(--muted-foreground))"
                 strokeDasharray="3 3"
                 opacity={0.5}
+              />
+              <Legend 
+                verticalAlign="bottom"
+                height={36}
+                wrapperStyle={{ paddingTop: '10px' }}
+                formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>}
               />
             </ComposedChart>
           </ResponsiveContainer>
