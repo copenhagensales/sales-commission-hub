@@ -3,11 +3,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useOnboardingDays, useOnboardingDrills, OnboardingVideo, OnboardingDay } from "@/hooks/useOnboarding";
 import { supabase } from "@/integrations/supabase/client";
-import { Settings, Database, RefreshCcw, CheckCircle2, ArrowLeft, Video, Upload, X, Pencil, Plus } from "lucide-react";
+import { Settings, Database, RefreshCcw, CheckCircle2, Video, Upload, X, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { MainLayout } from "@/components/layout/MainLayout";
 import { VideoUploadDialog } from "@/components/onboarding/VideoUploadDialog";
 import { EditDayDialog } from "@/components/onboarding/EditDayDialog";
 import { useQueryClient } from "@tanstack/react-query";
@@ -59,7 +57,6 @@ interface VideoUploadState {
 }
 
 export default function OnboardingAdmin() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: days = [], refetch: refetchDays } = useOnboardingDays();
   const { data: drills = [], refetch: refetchDrills } = useOnboardingDrills();
@@ -167,9 +164,8 @@ export default function OnboardingAdmin() {
   );
 
   return (
-    <MainLayout>
+    <>
       <div className="space-y-6">
-
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -378,6 +374,6 @@ export default function OnboardingAdmin() {
         onOpenChange={(open) => !open && setEditingDay(null)}
         day={editingDay}
       />
-    </MainLayout>
+    </>
   );
 }
