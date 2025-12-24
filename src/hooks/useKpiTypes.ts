@@ -36,6 +36,13 @@ export const SUGGESTED_KPIS: Omit<KpiTypeConfig, "isActive">[] = [
     category: "Salg",
     isSuggested: true,
   },
+  {
+    id: "commission",
+    name: "Commission",
+    description: "Commission fra product mapping",
+    category: "Salg",
+    isSuggested: true,
+  },
 
   // Opkald
   {
