@@ -1,14 +1,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useOnboardingDays, useOnboardingDrills, OnboardingVideo } from "@/hooks/useOnboarding";
+import { useOnboardingDays, useOnboardingDrills, OnboardingVideo, OnboardingDay } from "@/hooks/useOnboarding";
 import { supabase } from "@/integrations/supabase/client";
-import { Settings, Database, RefreshCcw, CheckCircle2, ArrowLeft, Video, Upload, X } from "lucide-react";
+import { Settings, Database, RefreshCcw, CheckCircle2, ArrowLeft, Video, Upload, X, Pencil } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { VideoUploadDialog } from "@/components/onboarding/VideoUploadDialog";
+import { EditDayDialog } from "@/components/onboarding/EditDayDialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { WeekExpectationsEditor } from "@/components/onboarding/WeekExpectationsEditor";
 
@@ -64,6 +65,7 @@ export default function OnboardingAdmin() {
   const { data: drills = [], refetch: refetchDrills } = useOnboardingDrills();
   const [seeding, setSeeding] = useState(false);
   const [videoUpload, setVideoUpload] = useState<VideoUploadState | null>(null);
+  const [editingDay, setEditingDay] = useState<OnboardingDay | null>(null);
 
   const handleSeedData = async () => {
     setSeeding(true);
@@ -265,9 +267,19 @@ export default function OnboardingAdmin() {
               {days.map(day => (
                 <div key={day.id} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium">
-                      Uge {day.week}, Dag {day.day}: {day.focus_title}
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium">
+                        Uge {day.week}, Dag {day.day}: {day.focus_title}
+                      </h4>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => setEditingDay(day)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                     <Badge variant="outline">
                       {day.videos.filter(v => v.video_url).length} / {day.videos.length} videoer
                     </Badge>
@@ -333,6 +345,13 @@ export default function OnboardingAdmin() {
           onUploadComplete={handleVideoUploadComplete}
         />
       )}
+
+      {/* Edit Day Dialog */}
+      <EditDayDialog
+        open={!!editingDay}
+        onOpenChange={(open) => !open && setEditingDay(null)}
+        day={editingDay}
+      />
     </MainLayout>
   );
 }
