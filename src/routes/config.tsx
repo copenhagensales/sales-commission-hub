@@ -84,6 +84,7 @@ import {
   Messages,
   OnboardingAdmin,
   OnboardingDashboard,
+  OnboardingCourse,
   ExcelFieldMatcher,
   TvBoardLogin,
   TvBoardView,
@@ -195,8 +196,9 @@ export const routes: RouteConfig[] = [
   { path: "/permissions", component: Permissions, access: "role", positionPermission: "menu_permissions" },
   { path: "/role-preview/:id", component: RolePreview, access: "role", positionPermission: "menu_permissions" },
 
-  // Onboarding - Single entry point with tabs (all sub-routes redirect to main with tab param)
+  // Onboarding
   { path: "/onboarding-program", component: OnboardingDashboard, access: "role", positionPermission: "menu_onboarding_admin" },
+  { path: "/onboarding-program/kursus", component: OnboardingCourse, access: "protected" },
 
   { path: "/excel-field-matcher", component: ExcelFieldMatcher, access: "protected" },
 
