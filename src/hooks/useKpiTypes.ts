@@ -149,7 +149,13 @@ export const useKpiTypes = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
-        return JSON.parse(stored);
+        const parsedKpis: KpiTypeConfig[] = JSON.parse(stored);
+        // Merge new suggested KPIs that don't exist in stored data
+        const storedIds = new Set(parsedKpis.map(k => k.id));
+        const newKpis = SUGGESTED_KPIS
+          .filter(k => !storedIds.has(k.id))
+          .map(k => ({ ...k, isActive: false }));
+        return [...parsedKpis, ...newKpis];
       } catch {
         return DEFAULT_KPI_TYPES;
       }
