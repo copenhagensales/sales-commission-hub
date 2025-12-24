@@ -30,13 +30,6 @@ export const SUGGESTED_KPIS: Omit<KpiTypeConfig, "isActive">[] = [
     isSuggested: true,
   },
   {
-    id: "provision-value",
-    name: "Provision",
-    description: "Provision",
-    category: "Salg",
-    isSuggested: true,
-  },
-  {
     id: "commission",
     name: "Commission",
     description: "Commission fra product mapping",
