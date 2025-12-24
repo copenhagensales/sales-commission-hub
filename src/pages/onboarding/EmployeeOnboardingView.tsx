@@ -1,19 +1,16 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useOnboardingDays, useEmployeeOnboardingProgress, useCurrentEmployeeId, useUpdateProgress, OnboardingVideo } from "@/hooks/useOnboarding";
-import { Play, CheckCircle2, Clock, Target, BookOpen, Dumbbell, PhoneCall, ArrowLeft } from "lucide-react";
+import { Play, CheckCircle2, Clock, Target, BookOpen, Dumbbell, PhoneCall } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { VideoPlayerDialog } from "@/components/onboarding/VideoPlayerDialog";
 import { DailyMessage } from "@/components/onboarding/DailyMessage";
-import { MyProgression } from "@/components/onboarding/MyProgression";
+import { OnboardingStatusBoard } from "@/components/onboarding/OnboardingStatusBoard";
 
 export default function EmployeeOnboardingView() {
-  const navigate = useNavigate();
   const { data: employeeId } = useCurrentEmployeeId();
   const { data: days = [], isLoading: daysLoading } = useOnboardingDays();
   const { data: progress = [], isLoading: progressLoading } = useEmployeeOnboardingProgress(employeeId || undefined);
@@ -105,17 +102,19 @@ export default function EmployeeOnboardingView() {
     return acc;
   }, {} as Record<number, typeof days>);
 
+  // Determine current week based on progress
+  const currentWeekNumber = currentDayIndex >= 0 ? days[currentDayIndex]?.week || 1 : 1;
+
   return (
-    <div className="space-y-4">
-      <Button 
-        variant="ghost" 
-        onClick={() => navigate("/")} 
-        className="mb-2"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Tilbage til menu
-      </Button>
+    <div className="space-y-8">
+      {/* Status Board - Hero section at top */}
+      <OnboardingStatusBoard 
+        days={days}
+        progress={progress}
+        currentWeek={currentWeekNumber}
+      />
       
+      {/* Existing daily content below */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Timeline Sidebar */}
       <Card className="lg:col-span-1">
@@ -172,11 +171,6 @@ export default function EmployeeOnboardingView() {
             currentWeek={selectedDayData.week} 
             dayMessage={(selectedDayData as any).daily_message}
           />
-        )}
-
-        {/* My Progression */}
-        {selectedDayData && (
-          <MyProgression currentWeek={selectedDayData.week} />
         )}
 
         {selectedDayData ? (
