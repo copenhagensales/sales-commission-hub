@@ -31,8 +31,8 @@ export const SUGGESTED_KPIS: Omit<KpiTypeConfig, "isActive">[] = [
   },
   {
     id: "commission",
-    name: "Commission",
-    description: "Commission fra product mapping",
+    name: "Provision",
+    description: "Provision fra produkter markeret som Provision i MG Test",
     category: "Salg",
     isSuggested: true,
   },
