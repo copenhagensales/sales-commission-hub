@@ -97,6 +97,7 @@ const KPI_TYPES = [
   { value: "number", label: "Antal" },
   { value: "percentage", label: "Procent" },
   { value: "currency", label: "Beløb (DKK)" },
+  { value: "commission", label: "Commission" },
 ];
 
 const DATA_SOURCE_OPTIONS = [
