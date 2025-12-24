@@ -463,8 +463,8 @@ export default function PrivateStats() {
                           }
                         />
                         <Legend />
-                        <Line yAxisId="left" type="monotone" dataKey="sales" stroke="hsl(var(--primary))" name="Sales" />
-                        <Line yAxisId="right" type="monotone" dataKey="commission" stroke="#10b981" name="Commission" />
+                        <Line yAxisId="left" type="monotone" dataKey="sales" stroke="#3b82f6" strokeWidth={2} name="Sales" />
+                        <Line yAxisId="right" type="monotone" dataKey="commission" stroke="#f59e0b" strokeWidth={2} name="Commission" />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
