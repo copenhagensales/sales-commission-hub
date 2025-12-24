@@ -151,12 +151,23 @@ export const useKpiTypes = () => {
     if (stored) {
       try {
         const parsedKpis: KpiTypeConfig[] = JSON.parse(stored);
-        // Merge new suggested KPIs that don't exist in stored data
-        const storedIds = new Set(parsedKpis.map(k => k.id));
+        const suggestedMap = new Map(SUGGESTED_KPIS.map(k => [k.id, k]));
+        
+        // Update existing suggested KPIs with latest name/description
+        const updatedKpis = parsedKpis.map(kpi => {
+          const suggested = suggestedMap.get(kpi.id);
+          if (suggested && kpi.isSuggested) {
+            return { ...kpi, name: suggested.name, description: suggested.description };
+          }
+          return kpi;
+        });
+        
+        // Add new suggested KPIs that don't exist in stored data
+        const storedIds = new Set(updatedKpis.map(k => k.id));
         const newKpis = SUGGESTED_KPIS
           .filter(k => !storedIds.has(k.id))
           .map(k => ({ ...k, isActive: false }));
-        return [...parsedKpis, ...newKpis];
+        return [...updatedKpis, ...newKpis];
       } catch {
         return DEFAULT_KPI_TYPES;
       }
