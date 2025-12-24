@@ -169,10 +169,6 @@ export default function OnboardingAdmin() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => navigate("/")} className="mb-2">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Tilbage til menu
-        </Button>
 
         <Card>
           <CardHeader>
