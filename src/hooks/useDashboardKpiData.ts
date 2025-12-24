@@ -54,7 +54,9 @@ const getDateRange = (timePeriodId: string, customFromDate?: Date): DateRange =>
 
 const formatValue = (value: number, kpiTypeId: string): string => {
   if (kpiTypeId.includes("revenue") || kpiTypeId.includes("order-value") || kpiTypeId === "commission") {
-    return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(value);
+    // Use space as thousands separator for clarity (27 070 instead of 27.070)
+    const formatted = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(value);
+    return `${formatted.replace(/\./g, " ")} kr.`;
   }
   if (kpiTypeId.includes("rate") || kpiTypeId.includes("conversion")) {
     return `${value.toFixed(1)}%`;
@@ -64,7 +66,9 @@ const formatValue = (value: number, kpiTypeId: string): string => {
     const seconds = Math.floor(value % 60);
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   }
-  return new Intl.NumberFormat("da-DK").format(value);
+  // Use space as thousands separator for regular numbers too
+  const formatted = new Intl.NumberFormat("de-DE").format(value);
+  return formatted.replace(/\./g, " ");
 };
 
 export const useDashboardKpiData = () => {
