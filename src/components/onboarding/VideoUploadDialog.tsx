@@ -90,21 +90,38 @@ export function VideoUploadDialog({
     }
   };
 
+  // Extract URL from iframe code if pasted
+  const extractUrlFromInput = (input: string): string => {
+    const trimmed = input.trim();
+    
+    // Check if it's an iframe tag
+    if (trimmed.startsWith('<iframe')) {
+      const srcMatch = trimmed.match(/src=["']([^"']+)["']/);
+      if (srcMatch) {
+        return srcMatch[1];
+      }
+    }
+    
+    return trimmed;
+  };
+
   const handleSaveLink = () => {
     if (!videoUrl.trim()) {
-      toast.error("Indtast venligst et video-link");
+      toast.error("Indtast venligst et video-link eller embed-kode");
       return;
     }
+
+    const extractedUrl = extractUrlFromInput(videoUrl);
 
     // Basic URL validation
     try {
-      new URL(videoUrl);
+      new URL(extractedUrl);
     } catch {
-      toast.error("Indtast venligst et gyldigt URL");
+      toast.error("Kunne ikke finde et gyldigt URL i det indtastede");
       return;
     }
 
-    onUploadComplete(videoUrl.trim());
+    onUploadComplete(extractedUrl);
     toast.success("Video-link gemt!");
     handleClose();
   };
@@ -237,15 +254,15 @@ export function VideoUploadDialog({
 
             <TabsContent value="link" className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="video-url">Video URL</Label>
+                <Label htmlFor="video-url">Video URL eller Embed-kode</Label>
                 <Input
                   id="video-url"
-                  placeholder="https://www.youtube.com/watch?v=... eller andet video-link"
+                  placeholder="Indsæt URL eller hele iframe-koden"
                   value={videoUrl}
                   onChange={(e) => setVideoUrl(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Understøtter YouTube, Vimeo og andre video-links
+                  Understøtter YouTube, Vimeo, SharePoint embed-kode og andre video-links
                 </p>
               </div>
 
