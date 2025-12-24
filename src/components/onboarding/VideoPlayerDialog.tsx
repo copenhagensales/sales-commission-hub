@@ -8,12 +8,42 @@ interface VideoPlayerDialogProps {
   videoUrl?: string;
 }
 
+// Convert YouTube/Vimeo URLs to embeddable format
+function getEmbedUrl(url: string): { type: 'embed' | 'video'; url: string } {
+  // YouTube patterns
+  const youtubeMatch = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+  );
+  if (youtubeMatch) {
+    return {
+      type: 'embed',
+      url: `https://www.youtube.com/embed/${youtubeMatch[1]}?autoplay=1`,
+    };
+  }
+
+  // Vimeo patterns
+  const vimeoMatch = url.match(
+    /(?:vimeo\.com\/)(\d+)/
+  );
+  if (vimeoMatch) {
+    return {
+      type: 'embed',
+      url: `https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1`,
+    };
+  }
+
+  // Direct video file
+  return { type: 'video', url };
+}
+
 export function VideoPlayerDialog({
   open,
   onOpenChange,
   videoTitle,
   videoUrl,
 }: VideoPlayerDialogProps) {
+  const embedInfo = videoUrl ? getEmbedUrl(videoUrl) : null;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl p-0">
@@ -23,15 +53,25 @@ export function VideoPlayerDialog({
 
         <div className="p-4">
           <div className="aspect-video bg-black rounded-lg overflow-hidden">
-            {videoUrl ? (
-              <video
-                src={videoUrl}
-                controls
-                autoPlay
-                className="w-full h-full"
-              >
-                Din browser understøtter ikke video afspilning.
-              </video>
+            {embedInfo ? (
+              embedInfo.type === 'embed' ? (
+                <iframe
+                  src={embedInfo.url}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  title={videoTitle}
+                />
+              ) : (
+                <video
+                  src={embedInfo.url}
+                  controls
+                  autoPlay
+                  className="w-full h-full"
+                >
+                  Din browser understøtter ikke video afspilning.
+                </video>
+              )
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
                 <AlertCircle className="h-12 w-12" />
