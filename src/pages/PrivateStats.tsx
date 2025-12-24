@@ -33,45 +33,61 @@ export default function PrivateStats() {
     },
   });
 
-  // Fetch comprehensive sales data
+  // Fetch comprehensive sales data with pagination to get all rows
   const { data: salesData, isLoading: salesLoading, refetch: refetchSales } = useQuery({
     queryKey: ["stats-sales", dateRange, selectedClient],
     queryFn: async () => {
       const startISO = format(dateRange.from, "yyyy-MM-dd") + "T00:00:00";
       const endISO = format(dateRange.to, "yyyy-MM-dd") + "T23:59:59";
 
-      let query = supabase
-        .from("sales")
-        .select(`
-          id,
-          sale_datetime,
-          validation_status,
-          agent_name,
-          client_campaigns (
-            id,
-            name,
-            client_id,
-            clients (id, name)
-          ),
-          sale_items (
-            id,
-            quantity,
-            mapped_commission,
-            products (id, name, commission_dkk)
-          )
-        `)
-        .gte("sale_datetime", startISO)
-        .lte("sale_datetime", endISO)
-        .order("sale_datetime", { ascending: false });
+      // Fetch all sales using pagination (Supabase default limit is 1000)
+      const allSales: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      const { data, error } = await query;
-      if (error) throw error;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("sales")
+          .select(`
+            id,
+            sale_datetime,
+            validation_status,
+            agent_name,
+            client_campaigns (
+              id,
+              name,
+              client_id,
+              clients (id, name)
+            ),
+            sale_items (
+              id,
+              quantity,
+              mapped_commission,
+              products (id, name, commission_dkk)
+            )
+          `)
+          .gte("sale_datetime", startISO)
+          .lte("sale_datetime", endISO)
+          .order("sale_datetime", { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allSales.push(...data);
+          from += pageSize;
+          hasMore = data.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
 
       // Filter by client if selected
-      let filteredData = data || [];
+      let filteredData = allSales;
       if (selectedClient !== "all") {
         filteredData = filteredData.filter(
-          (s) => (s.client_campaigns as any)?.client_id === selectedClient
+          (s: any) => s.client_campaigns?.client_id === selectedClient
         );
       }
 
@@ -193,13 +209,13 @@ export default function PrivateStats() {
       pendingSales,
       totalCommission,
       salesByAgent: Object.entries(salesByAgent)
-        .map(([name, data]) => ({ name, ...data }))
+        .map(([name, stats]) => ({ name, ...(stats as { sales: number; commission: number; cancelled: number }) }))
         .sort((a, b) => b.commission - a.commission),
       salesByDate: Object.entries(salesByDate)
-        .map(([date, data]) => ({ date, ...data }))
+        .map(([date, stats]) => ({ date, ...(stats as { sales: number; commission: number }) }))
         .sort((a, b) => a.date.localeCompare(b.date)),
       salesByClient: Object.entries(salesByClient)
-        .map(([name, data]) => ({ name, ...data }))
+        .map(([name, stats]) => ({ name, ...(stats as { sales: number; commission: number }) }))
         .sort((a, b) => b.commission - a.commission),
       statusBreakdown,
     };
