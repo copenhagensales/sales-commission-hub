@@ -3,9 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useOnboardingDrills } from "@/hooks/useOnboarding";
-import { Dumbbell, Clock, Target, ArrowLeft, Pencil, ChevronDown, ChevronUp } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { MainLayout } from "@/components/layout/MainLayout";
+import { Dumbbell, Clock, Target, Pencil, ChevronDown, ChevronUp } from "lucide-react";
 import { DrillEditDialog } from "@/components/onboarding/DrillEditDialog";
 import type { OnboardingDrill } from "@/hooks/useOnboarding";
 
@@ -20,35 +18,22 @@ const focusColors: Record<string, string> = {
 };
 
 export default function DrillLibrary() {
-  const navigate = useNavigate();
   const { data: drills = [], isLoading } = useOnboardingDrills();
   const [editingDrill, setEditingDrill] = useState<OnboardingDrill | null>(null);
   const [expandedDrill, setExpandedDrill] = useState<string | null>(null);
 
   if (isLoading) {
-    return (
-      <MainLayout>
-        <div className="text-muted-foreground py-8 text-center">Indlæser drill-bibliotek...</div>
-      </MainLayout>
-    );
+    return <div className="text-muted-foreground py-8 text-center">Indlæser drill-bibliotek...</div>;
   }
 
   if (drills.length === 0) {
     return (
-      <MainLayout>
-        <div className="space-y-4">
-          <Button variant="ghost" onClick={() => navigate("/")} className="mb-2">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Tilbage til menu
-          </Button>
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Dumbbell className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Ingen drills oprettet endnu.</p>
-            </CardContent>
-          </Card>
-        </div>
-      </MainLayout>
+      <Card>
+        <CardContent className="py-12 text-center">
+          <Dumbbell className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <p className="text-muted-foreground">Ingen drills oprettet endnu.</p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -61,13 +46,8 @@ export default function DrillLibrary() {
   }, {} as Record<string, typeof drills>);
 
   return (
-    <MainLayout>
+    <>
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => navigate("/")} className="mb-2">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Tilbage til menu
-        </Button>
-
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -166,7 +146,6 @@ export default function DrillLibrary() {
                     {/* Expanded details */}
                     {isExpanded && (
                       <div className="space-y-3 pt-2 border-t">
-                        {/* Setup */}
                         {drill.setup && (
                           <div>
                             <p className="text-xs font-semibold text-muted-foreground mb-1">SETUP</p>
@@ -174,7 +153,6 @@ export default function DrillLibrary() {
                           </div>
                         )}
 
-                        {/* Steps */}
                         {drill.steps && drill.steps.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-muted-foreground mb-1">TRIN</p>
@@ -186,7 +164,6 @@ export default function DrillLibrary() {
                           </div>
                         )}
 
-                        {/* Script snippets */}
                         {drill.script_snippets && drill.script_snippets.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-muted-foreground mb-1">SCRIPTS</p>
@@ -200,7 +177,6 @@ export default function DrillLibrary() {
                           </div>
                         )}
 
-                        {/* Success criteria */}
                         {drill.success_criteria && drill.success_criteria.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-muted-foreground mb-1">SUCCESKRITERIER</p>
@@ -215,7 +191,6 @@ export default function DrillLibrary() {
                           </div>
                         )}
 
-                        {/* Common mistakes */}
                         {drill.common_mistakes && drill.common_mistakes.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-muted-foreground mb-1">TYPISKE FEJL</p>
@@ -274,6 +249,6 @@ export default function DrillLibrary() {
         onOpenChange={(open) => !open && setEditingDrill(null)}
         drill={editingDrill}
       />
-    </MainLayout>
+    </>
   );
 }

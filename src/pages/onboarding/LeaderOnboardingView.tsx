@@ -7,19 +7,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useOnboardingDays, useOnboardingDrills, useCoachingTasks, useUpdateCoachingTask, useCoachingCoverageStats } from "@/hooks/useOnboarding";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, ClipboardList, BookOpen, CheckCircle2, AlertTriangle, BarChart3, Calendar, ArrowLeft } from "lucide-react";
+import { Users, ClipboardList, BookOpen, CheckCircle2, AlertTriangle, BarChart3, Calendar } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format, formatDistanceToNow, isPast } from "date-fns";
 import { da } from "date-fns/locale";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { MainLayout } from "@/components/layout/MainLayout";
 
 export default function LeaderOnboardingView() {
-  const navigate = useNavigate();
   const { data: days = [] } = useOnboardingDays();
   const { data: drills = [] } = useOnboardingDrills();
   const { data: tasks = [], isLoading: tasksLoading } = useCoachingTasks({});
@@ -121,18 +118,8 @@ export default function LeaderOnboardingView() {
   }).length;
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate("/")} 
-          className="mb-2"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Tilbage til menu
-        </Button>
-
-        {/* Stats Overview */}
+    <div className="space-y-6">
+      {/* Stats Overview */}
         <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
@@ -365,7 +352,6 @@ export default function LeaderOnboardingView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      </div>
-    </MainLayout>
+    </div>
   );
 }
