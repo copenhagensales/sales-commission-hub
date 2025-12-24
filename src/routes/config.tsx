@@ -89,6 +89,7 @@ import {
   TvBoardLogin,
   TvBoardView,
   TvBoardAdmin,
+  PrivateStats,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -206,6 +207,9 @@ export const routes: RouteConfig[] = [
   { path: "/tv", component: TvBoardLogin, access: "public" },
   { path: "/tv/:slug", component: TvBoardView, access: "public" },
   { path: "/tv-board-admin", component: TvBoardAdmin, access: "role", positionPermission: "menu_settings" },
+
+  // Private Stats (hidden from sidebar, accessible via URL only)
+  { path: "/private-stats", component: PrivateStats, access: "protected" },
 
   { path: "*", component: NotFound, access: "public" },
 ];
