@@ -4,14 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useOnboardingDays, useEmployeeOnboardingProgress, useCurrentEmployeeId, useUpdateProgress, OnboardingVideo } from "@/hooks/useOnboarding";
-import { Play, CheckCircle2, Clock, Target, BookOpen, Dumbbell, PhoneCall } from "lucide-react";
+import { Play, CheckCircle2, Clock, Target, BookOpen, Dumbbell, PhoneCall, ArrowLeft } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { VideoPlayerDialog } from "@/components/onboarding/VideoPlayerDialog";
 import { DailyMessage } from "@/components/onboarding/DailyMessage";
 import { MyProgression } from "@/components/onboarding/MyProgression";
 
 export default function EmployeeOnboardingView() {
+  const navigate = useNavigate();
   const { data: employeeId } = useCurrentEmployeeId();
   const { data: days = [], isLoading: daysLoading } = useOnboardingDays();
   const { data: progress = [], isLoading: progressLoading } = useEmployeeOnboardingProgress(employeeId || undefined);
@@ -105,6 +107,15 @@ export default function EmployeeOnboardingView() {
 
   return (
     <div className="space-y-4">
+      <Button 
+        variant="ghost" 
+        onClick={() => navigate("/")} 
+        className="mb-2"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Tilbage til menu
+      </Button>
+      
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Timeline Sidebar */}
       <Card className="lg:col-span-1">
