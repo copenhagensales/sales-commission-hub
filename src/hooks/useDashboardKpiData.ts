@@ -419,10 +419,11 @@ export const useDashboardKpiData = () => {
           const { data, error } = await query;
           if (error) throw error;
           
+          // mapped_commission already contains the total for the line (qty × unit_commission)
+          // so we just sum it directly without multiplying by quantity again
           value = data?.reduce((sum, item) => {
-            const qty = Number((item as any).quantity ?? 1) || 1;
-            const commissionPerUnit = Number((item as any).mapped_commission) || 0;
-            return sum + (qty * commissionPerUnit);
+            const lineCommission = Number((item as any).mapped_commission) || 0;
+            return sum + lineCommission;
           }, 0) || 0;
           break;
         }
