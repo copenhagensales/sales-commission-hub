@@ -38,6 +38,15 @@ export function OnboardingStatusBoard({
       {/* Hero Section */}
       <OnboardingHeroSection />
 
+      {/* Progression & Future Scenario - Right after hero */}
+      <OnboardingRampChart 
+        currentWeek={currentWeek}
+        actualRevenue={actualRevenueHistory}
+        currentDailyCalls={Math.round(callsPerWeek / 5)}
+        currentMeetingsPerWeek={meetingsBookedPerWeek}
+        currentOrdersPerWeek={Math.round(meetingsBookedPerWeek * (meetingToOrderRate / 100))}
+      />
+
       {/* Three Column Status Board */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <OnboardingJourneyColumn 
@@ -58,15 +67,6 @@ export function OnboardingStatusBoard({
           currentWeek={currentWeek}
         />
       </div>
-
-      {/* Progression & Future Scenario */}
-      <OnboardingRampChart 
-        currentWeek={currentWeek}
-        actualRevenue={actualRevenueHistory}
-        currentDailyCalls={Math.round(callsPerWeek / 5)}
-        currentMeetingsPerWeek={meetingsBookedPerWeek}
-        currentOrdersPerWeek={Math.round(meetingsBookedPerWeek * (meetingToOrderRate / 100))}
-      />
     </div>
   );
 }
