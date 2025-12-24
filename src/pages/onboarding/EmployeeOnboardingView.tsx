@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { VideoPlayerDialog } from "@/components/onboarding/VideoPlayerDialog";
 import { DailyMessage } from "@/components/onboarding/DailyMessage";
 import { OnboardingStatusBoard } from "@/components/onboarding/OnboardingStatusBoard";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 export default function EmployeeOnboardingView() {
   const { data: employeeId } = useCurrentEmployeeId();
@@ -20,17 +21,23 @@ export default function EmployeeOnboardingView() {
   const [playingVideo, setPlayingVideo] = useState<OnboardingVideo | null>(null);
 
   if (daysLoading || progressLoading) {
-    return <div className="text-muted-foreground py-8 text-center">Indlæser onboarding...</div>;
+    return (
+      <MainLayout>
+        <div className="text-muted-foreground py-8 text-center">Indlæser onboarding...</div>
+      </MainLayout>
+    );
   }
 
   if (days.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">Ingen onboarding-dage oprettet endnu.</p>
-        </CardContent>
-      </Card>
+      <MainLayout>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Ingen onboarding-dage oprettet endnu.</p>
+          </CardContent>
+        </Card>
+      </MainLayout>
     );
   }
 
@@ -106,6 +113,7 @@ export default function EmployeeOnboardingView() {
   const currentWeekNumber = currentDayIndex >= 0 ? days[currentDayIndex]?.week || 1 : 1;
 
   return (
+    <MainLayout>
     <div className="space-y-8">
       {/* Status Board - Hero section at top */}
       <OnboardingStatusBoard 
@@ -344,5 +352,6 @@ export default function EmployeeOnboardingView() {
       videoUrl={playingVideo?.video_url}
     />
     </div>
+    </MainLayout>
   );
 }
