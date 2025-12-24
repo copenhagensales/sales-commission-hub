@@ -110,6 +110,7 @@ const BASE_METRICS = [
   { value: "antal_kunder", label: "Antal kunder", description: "Antal unikke salg" },
   { value: "timer", label: "Timer", description: "Timer fra vagtplan" },
   { value: "antal_medarbejdere", label: "Antal medarbejdere", description: "Unikke sælgere med data" },
+  { value: "commission", label: "Commission", description: "Commission fra product mapping" },
 ];
 
 const PRESET_THEMES: DashboardTheme[] = [
