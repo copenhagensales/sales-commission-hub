@@ -30,9 +30,9 @@ export const SUGGESTED_KPIS: Omit<KpiTypeConfig, "isActive">[] = [
     isSuggested: true,
   },
   {
-    id: "conversion-rate",
-    name: "Konverteringsrate",
-    description: "Konverteringsrate i %",
+    id: "provision-value",
+    name: "Provision",
+    description: "Provision",
     category: "Salg",
     isSuggested: true,
   },
