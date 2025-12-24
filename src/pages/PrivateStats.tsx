@@ -751,13 +751,16 @@ export default function PrivateStats() {
           {/* Raw Data Tab */}
           <TabsContent value="raw" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Raw Sales Data (Last 100)</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Raw Sales Data ({salesData?.length || 0} total)</CardTitle>
+                <div className="text-sm text-muted-foreground">
+                  Total Commission: <span className="font-bold text-primary">{formatCurrency(salesStats?.totalCommission || 0)}</span>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 bg-background z-10">
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Agent</TableHead>
@@ -769,33 +772,34 @@ export default function PrivateStats() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {salesData?.slice(0, 100).map((sale) => (
-                        <TableRow key={sale.id}>
-                          <TableCell>{format(parseISO(sale.sale_datetime), "dd/MM/yyyy HH:mm")}</TableCell>
-                          <TableCell>{sale.agent_name}</TableCell>
-                          <TableCell>{(sale.client_campaigns as any)?.name || "-"}</TableCell>
-                          <TableCell>{(sale.client_campaigns as any)?.clients?.name || "-"}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                sale.validation_status === "cancelled"
-                                  ? "destructive"
-                                  : sale.validation_status === "pending"
-                                  ? "secondary"
-                                  : "default"
-                              }
-                            >
-                              {sale.validation_status || "unknown"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{sale.sale_items?.length || 0}</TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(
-                              sale.sale_items?.reduce((s, i: any) => s + (Number(i.mapped_commission) || 0), 0) || 0
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {salesData?.map((sale: any) => {
+                        const saleCommission = sale.sale_items?.reduce((s: number, i: any) => s + (Number(i.mapped_commission) || 0), 0) || 0;
+                        return (
+                          <TableRow key={sale.id}>
+                            <TableCell>{format(parseISO(sale.sale_datetime), "dd/MM/yyyy HH:mm")}</TableCell>
+                            <TableCell>{sale.agent_name}</TableCell>
+                            <TableCell>{sale.client_campaigns?.name || "-"}</TableCell>
+                            <TableCell>{sale.client_campaigns?.clients?.name || "-"}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  sale.validation_status === "cancelled"
+                                    ? "destructive"
+                                    : sale.validation_status === "pending"
+                                    ? "secondary"
+                                    : "default"
+                                }
+                              >
+                                {sale.validation_status || "unknown"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">{sale.sale_items?.length || 0}</TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatCurrency(saleCommission)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
