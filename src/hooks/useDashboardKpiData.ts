@@ -745,46 +745,49 @@ export const useWidgetKpiData = (widgets: Array<{
               }
 
               case "commission": {
-                // Sum commission_dkk from products in sale_items for the date range
+                // Sum mapped_commission from sale_items (matches Sales page logic)
+                // Exclude cancelled/rejected sales
                 let targetClientIds: string[] = [];
                 if (widget.teamId) {
                   const { data: teamClients } = await supabase
                     .from("team_clients")
                     .select("client_id")
                     .eq("team_id", widget.teamId);
-                  targetClientIds = (teamClients || []).map(tc => tc.client_id);
+                  targetClientIds = (teamClients || []).map((tc) => tc.client_id);
                 } else if (widget.clientId) {
                   targetClientIds = [widget.clientId];
                 }
-                
+
                 let campaignIds: string[] = [];
                 if (targetClientIds.length > 0) {
                   const { data: campaigns } = await supabase
                     .from("client_campaigns")
                     .select("id")
                     .in("client_id", targetClientIds);
-                  campaignIds = (campaigns || []).map(c => c.id);
+                  campaignIds = (campaigns || []).map((c) => c.id);
                 }
-                
+
                 let query = supabase
                   .from("sale_items")
                   .select(`
-                    quantity,
-                    products!inner(commission_dkk),
-                    sales!inner(sale_datetime, client_campaign_id)
+                    mapped_commission,
+                    sales!inner(sale_datetime, client_campaign_id, validation_status)
                   `)
                   .gte("sales.sale_datetime", startISO)
-                  .lte("sales.sale_datetime", endISO);
-                
+                  .lte("sales.sale_datetime", endISO)
+                  .not("sales.validation_status", "eq", "cancelled")
+                  .not("sales.validation_status", "eq", "rejected");
+
                 if (campaignIds.length > 0) {
                   query = query.in("sales.client_campaign_id", campaignIds);
                 }
-                
-                const { data } = await query;
-                value = data?.reduce((sum, item) => {
-                  const commission = (item.products as any)?.commission_dkk || 0;
-                  return sum + (commission * (item.quantity || 1));
-                }, 0) || 0;
+
+                const { data, error } = await query;
+                if (error) throw error;
+
+                // mapped_commission already contains the total for the line
+                value =
+                  data?.reduce((sum, item) => sum + (Number((item as any).mapped_commission) || 0), 0) || 0;
                 break;
               }
               
