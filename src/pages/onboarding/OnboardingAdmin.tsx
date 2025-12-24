@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useOnboardingDays, useOnboardingDrills, OnboardingVideo, OnboardingDay } from "@/hooks/useOnboarding";
 import { supabase } from "@/integrations/supabase/client";
-import { Settings, Database, RefreshCcw, CheckCircle2, ArrowLeft, Video, Upload, X, Pencil } from "lucide-react";
+import { Settings, Database, RefreshCcw, CheckCircle2, ArrowLeft, Video, Upload, X, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -124,12 +124,24 @@ export default function OnboardingAdmin() {
     const day = days.find(d => d.id === videoUpload.dayId);
     if (!day) return;
 
-    // Update the videos array with the new URL
-    const updatedVideos = day.videos.map((v, idx) =>
-      idx === videoUpload.videoIndex
-        ? { title: v.title, duration_min: v.duration_min, video_url: url || undefined }
-        : { title: v.title, duration_min: v.duration_min, video_url: v.video_url }
-    );
+    // Check if this is a new video (videoIndex >= current videos length)
+    const isNewVideo = videoUpload.videoIndex >= day.videos.length;
+    
+    let updatedVideos;
+    if (isNewVideo) {
+      // Add new video to the array
+      updatedVideos = [
+        ...day.videos.map(v => ({ title: v.title, duration_min: v.duration_min, video_url: v.video_url })),
+        { title: videoUpload.videoTitle, duration_min: 5, video_url: url }
+      ];
+    } else {
+      // Update existing video
+      updatedVideos = day.videos.map((v, idx) =>
+        idx === videoUpload.videoIndex
+          ? { title: v.title, duration_min: v.duration_min, video_url: url || undefined }
+          : { title: v.title, duration_min: v.duration_min, video_url: v.video_url }
+      );
+    }
 
     try {
       // Cast to any to satisfy Supabase's Json type
@@ -141,6 +153,7 @@ export default function OnboardingAdmin() {
       if (error) throw error;
 
       queryClient.invalidateQueries({ queryKey: ["onboarding-days"] });
+      toast.success(isNewVideo ? "Video tilføjet" : "Video opdateret");
     } catch (error: any) {
       console.error("Update error:", error);
       toast.error("Kunne ikke opdatere video");
@@ -322,6 +335,23 @@ export default function OnboardingAdmin() {
                         </div>
                       </div>
                     ))}
+                    {/* Add new video button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={() =>
+                        setVideoUpload({
+                          dayId: day.id,
+                          videoIndex: day.videos.length,
+                          videoTitle: `Video ${day.videos.length + 1}`,
+                          currentUrl: undefined,
+                        })
+                      }
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Tilføj video/lydfil
+                    </Button>
                   </div>
                 </div>
               ))}
