@@ -82,12 +82,7 @@ import {
   DashboardSettings,
   DesignDashboard,
   Messages,
-  OnboardingDashboard,
-  EmployeeOnboardingView,
-  LeaderOnboardingView,
-  DrillLibrary,
   OnboardingAdmin,
-  ExpectationsRamp,
   ExcelFieldMatcher,
   TvBoardLogin,
   TvBoardView,
@@ -199,12 +194,7 @@ export const routes: RouteConfig[] = [
   { path: "/permissions", component: Permissions, access: "role", positionPermission: "menu_permissions" },
   { path: "/role-preview/:id", component: RolePreview, access: "role", positionPermission: "menu_permissions" },
 
-  // Onboarding
-  { path: "/onboarding-program", component: OnboardingDashboard, access: "role", positionPermission: "menu_onboarding" },
-  { path: "/onboarding-program/employee", component: EmployeeOnboardingView, access: "protected" },
-  { path: "/onboarding-program/expectations", component: ExpectationsRamp, access: "protected" },
-  { path: "/onboarding-program/leader", component: LeaderOnboardingView, access: "role", positionPermission: "menu_onboarding_leader" },
-  { path: "/onboarding-program/drills", component: DrillLibrary, access: "protected" },
+  // Onboarding - Only admin route active for now (system not ready for employees)
   { path: "/onboarding-program/admin", component: OnboardingAdmin, access: "role", positionPermission: "menu_onboarding_admin" },
 
   { path: "/excel-field-matcher", component: ExcelFieldMatcher, access: "protected" },
