@@ -9,7 +9,7 @@ export interface KpiTypeConfig {
   isSuggested?: boolean;
 }
 
-const STORAGE_KEY = "dashboard-kpi-types-v2";
+const STORAGE_KEY = "dashboard-kpi-types";
 
 export const SUGGESTED_KPIS: Omit<KpiTypeConfig, "isActive">[] = [
   // Salg
