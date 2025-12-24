@@ -279,8 +279,11 @@ export default function PrivateStats() {
     };
   }, [employeesData]);
 
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(value);
+  const formatCurrency = (value: number) => {
+    // Use space as thousands separator for clarity (27 070 instead of 27.070)
+    const formatted = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 }).format(value);
+    return `${formatted.replace(/\./g, " ")} DKK`;
+  };
 
   return (
     <div className="min-h-screen bg-background p-6">
