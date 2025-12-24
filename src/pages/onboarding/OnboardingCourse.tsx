@@ -1,10 +1,10 @@
 import { MainLayout } from "@/components/layout/MainLayout";
-import EmployeeOnboardingView from "./EmployeeOnboardingView";
+import { OnboardingCourseContent } from "@/components/onboarding/OnboardingCourseContent";
 
 export default function OnboardingCourse() {
   return (
     <MainLayout>
-      <EmployeeOnboardingView />
+      <OnboardingCourseContent />
     </MainLayout>
   );
 }
