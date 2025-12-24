@@ -139,6 +139,7 @@ const DEFAULT_KPI_TYPES: KpiTypeConfig[] = SUGGESTED_KPIS.map((kpi) => ({
     "sales-revenue",
     "calls-total",
     "conversion-rate",
+    "commission",
     "team-target-progress",
     "leads-generated",
   ].includes(kpi.id),
