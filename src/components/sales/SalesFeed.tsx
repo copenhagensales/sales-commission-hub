@@ -69,7 +69,7 @@ const DATE_PRESETS: { value: DatePreset; label: string }[] = [
   { value: "last7days", label: "Sidste 7 dage" },
   { value: "last30days", label: "Sidste 30 dage" },
   { value: "thisMonth", label: "Denne måned" },
-  { value: "custom", label: "Vælg dato..." },
+  { value: "custom", label: "Vælg periode..." },
 ];
 
 function getDateRangeFromPreset(preset: DatePreset): { start: Date; end: Date } | null {
@@ -97,25 +97,29 @@ export default function SalesFeed() {
   const [searchQuery, setSearchQuery] = useState("");
   const [agentFilter, setAgentFilter] = useState<string>("all");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
-  const [customDate, setCustomDate] = useState<Date | undefined>(undefined);
+  const [customDateRange, setCustomDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
   const [newSaleIds, setNewSaleIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
 
-  // Get effective date range based on preset or custom date
+  // Get effective date range based on preset or custom range
   const getEffectiveDateRange = useCallback(() => {
-    if (datePreset === "custom" && customDate) {
-      return { start: startOfDay(customDate), end: endOfDay(customDate) };
+    if (datePreset === "custom" && customDateRange.from) {
+      return { 
+        start: startOfDay(customDateRange.from), 
+        end: endOfDay(customDateRange.to || customDateRange.from) 
+      };
     }
     return getDateRangeFromPreset(datePreset);
-  }, [datePreset, customDate]);
+  }, [datePreset, customDateRange]);
 
   // Fetch paginated sales data
   const dateRange = getEffectiveDateRange();
   const { data, isLoading } = useQuery({
-    queryKey: ["sales-feed", currentPage, agentFilter, searchQuery, datePreset, customDate?.toISOString()],
+    queryKey: ["sales-feed", currentPage, agentFilter, searchQuery, datePreset, customDateRange.from?.toISOString(), customDateRange.to?.toISOString()],
     queryFn: async () => {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
@@ -252,7 +256,7 @@ export default function SalesFeed() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, agentFilter, datePreset, customDate]);
+  }, [searchQuery, agentFilter, datePreset, customDateRange]);
 
   // Copy phone number
   const copyPhone = useCallback((phone: string, saleId: string) => {
@@ -353,13 +357,15 @@ export default function SalesFeed() {
               <Button
                 variant="outline"
                 className={cn(
-                  "w-full sm:w-[200px] justify-start text-left font-normal",
+                  "w-full sm:w-[220px] justify-start text-left font-normal",
                   datePreset === "all" && "text-muted-foreground"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {datePreset === "custom" && customDate 
-                  ? format(customDate, "d. MMM yyyy", { locale: da })
+                {datePreset === "custom" && customDateRange.from 
+                  ? customDateRange.to 
+                    ? `${format(customDateRange.from, "d/M", { locale: da })} - ${format(customDateRange.to, "d/M", { locale: da })}`
+                    : format(customDateRange.from, "d. MMM yyyy", { locale: da })
                   : DATE_PRESETS.find(p => p.value === datePreset)?.label || "Vælg periode"
                 }
               </Button>
@@ -367,7 +373,7 @@ export default function SalesFeed() {
             <PopoverContent className="w-auto p-0" align="start">
               <div className="flex flex-col">
                 {/* Preset Options */}
-                <div className="border-b p-2 space-y-1">
+                <div className="p-2 space-y-1">
                   {DATE_PRESETS.filter(p => p.value !== "custom").map((preset) => (
                     <Button
                       key={preset.value}
@@ -375,28 +381,69 @@ export default function SalesFeed() {
                       className="w-full justify-start text-left h-9"
                       onClick={() => {
                         setDatePreset(preset.value);
-                        setCustomDate(undefined);
+                        setCustomDateRange({ from: undefined, to: undefined });
                         setIsCalendarOpen(false);
                       }}
                     >
                       {preset.label}
                     </Button>
                   ))}
-                </div>
-                {/* Custom Date Picker */}
-                <div className="p-2">
-                  <p className="text-xs text-muted-foreground mb-2 px-2">Eller vælg specifik dato:</p>
-                  <Calendar
-                    mode="single"
-                    selected={customDate}
-                    onSelect={(date) => {
-                      setCustomDate(date);
-                      setDatePreset("custom");
+                  {/* Custom Period Button */}
+                  <Button
+                    variant={datePreset === "custom" ? "secondary" : "ghost"}
+                    className="w-full justify-start text-left h-9"
+                    onClick={() => {
                       setIsCalendarOpen(false);
+                      setIsRangePickerOpen(true);
                     }}
-                    locale={da}
-                    className="pointer-events-auto"
-                  />
+                  >
+                    Vælg periode...
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Date Range Picker Dialog */}
+          <Popover open={isRangePickerOpen} onOpenChange={setIsRangePickerOpen}>
+            <PopoverTrigger asChild>
+              <span className="hidden" />
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-4" align="start">
+              <div className="space-y-4">
+                <p className="text-sm font-medium">Vælg periode</p>
+                <Calendar
+                  mode="range"
+                  selected={{ from: customDateRange.from, to: customDateRange.to }}
+                  onSelect={(range) => {
+                    setCustomDateRange({ from: range?.from, to: range?.to });
+                  }}
+                  locale={da}
+                  numberOfMonths={2}
+                  className="pointer-events-auto"
+                />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setIsRangePickerOpen(false);
+                    }}
+                  >
+                    Annuller
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!customDateRange.from}
+                    onClick={() => {
+                      if (customDateRange.from) {
+                        setDatePreset("custom");
+                        setIsRangePickerOpen(false);
+                      }
+                    }}
+                  >
+                    Anvend
+                  </Button>
                 </div>
               </div>
             </PopoverContent>
@@ -408,7 +455,7 @@ export default function SalesFeed() {
               size="icon"
               onClick={() => {
                 setDatePreset("all");
-                setCustomDate(undefined);
+                setCustomDateRange({ from: undefined, to: undefined });
               }}
               className="h-10 w-10"
             >
