@@ -408,12 +408,12 @@ export default function SalesFeed() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Dato</TableHead>
+                    <TableHead>Kunde</TableHead>
                     <TableHead className="w-[180px]">Agent</TableHead>
                     <TableHead>Telefon</TableHead>
-                    <TableHead>Kunde</TableHead>
                     <TableHead>Produkter</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Tidspunkt</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -425,6 +425,33 @@ export default function SalesFeed() {
                         newSaleIds.has(sale.id) && "bg-primary/10 animate-in slide-in-from-top-2"
                       )}
                     >
+                      {/* Date Column */}
+                      <TableCell>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-sm whitespace-nowrap cursor-default">
+                              {format(parseISO(sale.sale_datetime), "d. MMM HH:mm", { locale: da })}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {format(parseISO(sale.sale_datetime), "EEEE d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TableCell>
+                      {/* Customer Column */}
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="truncate max-w-[150px]">
+                            {sale.customer_company || "-"}
+                          </span>
+                          {sale.client_campaigns?.clients?.name && (
+                            <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+                              {sale.client_campaigns.clients.name}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      {/* Agent Column */}
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Tooltip>
@@ -444,6 +471,7 @@ export default function SalesFeed() {
                           </span>
                         </div>
                       </TableCell>
+                      {/* Phone Column */}
                       <TableCell>
                         {sale.customer_phone ? (
                           <div className="flex items-center gap-1">
@@ -465,19 +493,9 @@ export default function SalesFeed() {
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="truncate max-w-[150px]">
-                            {sale.customer_company || "-"}
-                          </span>
-                          {sale.client_campaigns?.clients?.name && (
-                            <span className="text-xs text-muted-foreground truncate max-w-[150px]">
-                              {sale.client_campaigns.clients.name}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
+                      {/* Products Column */}
                       <TableCell>{getProductsDisplay(sale.sale_items)}</TableCell>
+                      {/* Status Column */}
                       <TableCell>
                         <Badge
                           variant={
@@ -490,21 +508,6 @@ export default function SalesFeed() {
                         >
                           {sale.validation_status || "ny"}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="text-sm text-muted-foreground whitespace-nowrap cursor-default">
-                              {formatDistanceToNow(parseISO(sale.sale_datetime), { 
-                                addSuffix: true, 
-                                locale: da 
-                              })}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {format(parseISO(sale.sale_datetime), "EEEE d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
-                          </TooltipContent>
-                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ))}
