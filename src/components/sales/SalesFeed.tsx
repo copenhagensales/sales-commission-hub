@@ -65,11 +65,14 @@ export default function SalesFeed() {
   const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
 
-  // Fetch initial sales data (last 500)
-  const { data: sales, isLoading } = useQuery({
-    queryKey: ["sales-feed"],
+  // Fetch paginated sales data
+  const { data, isLoading } = useQuery({
+    queryKey: ["sales-feed", currentPage, agentFilter, searchQuery],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const from = (currentPage - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
+      let query = supabase
         .from("sales")
         .select(`
           id,
@@ -90,14 +93,27 @@ export default function SalesFeed() {
             adversus_product_title,
             products (id, name)
           )
-        `)
-        .order("sale_datetime", { ascending: false })
-        .limit(500);
+        `, { count: "exact" })
+        .order("sale_datetime", { ascending: false });
+
+      // Apply filters
+      if (agentFilter !== "all") {
+        query = query.eq("agent_name", agentFilter);
+      }
+      if (searchQuery) {
+        query = query.or(`customer_phone.ilike.%${searchQuery}%,customer_company.ilike.%${searchQuery}%,agent_name.ilike.%${searchQuery}%`);
+      }
+
+      const { data, error, count } = await query.range(from, to);
 
       if (error) throw error;
-      return (data || []) as Sale[];
+      return { sales: (data || []) as Sale[], totalCount: count || 0 };
     },
   });
+
+  const sales = data?.sales || [];
+  const totalCount = data?.totalCount || 0;
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   // Fetch unique agents for filter
   const { data: agents } = useQuery({
@@ -167,12 +183,8 @@ export default function SalesFeed() {
               });
             }, 5000);
 
-            // Update the query cache
-            queryClient.setQueryData<Sale[]>(["sales-feed"], (old) => {
-              if (!old) return [newSale as Sale];
-              // Add to top and keep max 500
-              return [newSale as Sale, ...old].slice(0, 500);
-            });
+            // Invalidate query to refetch with new data
+            queryClient.invalidateQueries({ queryKey: ["sales-feed"] });
 
             // Reset to first page when new sale arrives
             setCurrentPage(1);
@@ -185,26 +197,6 @@ export default function SalesFeed() {
       supabase.removeChannel(channel);
     };
   }, [isPaused, queryClient]);
-
-  // Filter sales
-  const filteredSales = sales?.filter((sale) => {
-    if (agentFilter !== "all" && sale.agent_name !== agentFilter) return false;
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const phoneMatch = sale.customer_phone?.toLowerCase().includes(query);
-      const companyMatch = sale.customer_company?.toLowerCase().includes(query);
-      const agentMatch = sale.agent_name?.toLowerCase().includes(query);
-      if (!phoneMatch && !companyMatch && !agentMatch) return false;
-    }
-    return true;
-  }) || [];
-
-  // Pagination
-  const totalPages = Math.ceil(filteredSales.length / ITEMS_PER_PAGE);
-  const paginatedSales = filteredSales.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
 
   // Reset page when filters change
   useEffect(() => {
@@ -347,12 +339,12 @@ export default function SalesFeed() {
             {isPaused ? "Live opdateringer sat på pause" : "Live - nye salg vises automatisk"}
           </div>
           <span className="text-sm text-muted-foreground">
-            Viser {paginatedSales.length} af {filteredSales.length} salg
+            Viser {sales.length} af {totalCount} salg
           </span>
         </div>
 
         {/* Sales Table */}
-        {filteredSales.length === 0 ? (
+        {sales.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <div className="rounded-full bg-muted p-4 mb-4">
@@ -379,7 +371,7 @@ export default function SalesFeed() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedSales.map((sale) => (
+                  {sales.map((sale) => (
                     <TableRow 
                       key={sale.id}
                       className={cn(
