@@ -7,7 +7,6 @@ import {
   Sales,
   Payroll,
   Settings,
-  
   MgTest,
   MgTestDashboard,
   KmTest,
@@ -121,7 +120,7 @@ export const routes: RouteConfig[] = [
   { path: "/codan", component: Codan, access: "role", positionPermission: "menu_codan" },
   { path: "/tdc-erhverv", component: TdcErhverv, access: "role", positionPermission: "menu_tdc_erhverv" },
   { path: "/team-overview", component: TeamOverview, access: "role", positionPermission: "menu_mg_test" },
-  
+
   { path: "/payroll", component: Payroll, access: "role", positionPermission: "menu_payroll" },
   { path: "/mg-test", component: MgTest, access: "role", positionPermission: "menu_mg_test" },
   { path: "/mg-test-dashboard", component: MgTestDashboard, access: "role", positionPermission: "menu_test_dashboard" },
@@ -133,63 +132,188 @@ export const routes: RouteConfig[] = [
   { path: "/employees", component: EmployeeMasterData, access: "role", positionPermission: "menu_employees" },
   { path: "/employees/:id", component: EmployeeDetail, access: "role", positionPermission: "menu_employees" },
   { path: "/login-log", component: LoginLog, access: "role", positionPermission: "menu_login_log" },
-  
+
   { path: "/settings", component: Settings, access: "role", positionPermission: "menu_settings" },
 
   { path: "/vagt-flow", component: VagtFlowIndex, access: "role", positionPermission: "menu_fm_overview" },
-  { path: "/vagt-flow/booking", component: VagtBookingManagement, access: "role", positionPermission: "menu_fm_book_week" },
+  {
+    path: "/vagt-flow/booking",
+    component: VagtBookingManagement,
+    access: "role",
+    positionPermission: "menu_fm_book_week",
+  },
   { path: "/vagt-flow/book-week", component: VagtBookWeek, access: "role", positionPermission: "menu_fm_book_week" },
   { path: "/vagt-flow/locations", component: VagtLocations, access: "role", positionPermission: "menu_fm_locations" },
-  { path: "/vagt-flow/locations/:id", component: VagtLocationDetail, access: "role", positionPermission: "menu_fm_locations" },
+  {
+    path: "/vagt-flow/locations/:id",
+    component: VagtLocationDetail,
+    access: "role",
+    positionPermission: "menu_fm_locations",
+  },
   { path: "/vagt-flow/bookings", component: VagtBookings, access: "role", positionPermission: "menu_fm_bookings" },
   { path: "/vagt-flow/vehicles", component: VagtVehicles, access: "role", positionPermission: "menu_fm_vehicles" },
-  { path: "/vagt-flow/time-off", component: VagtTimeOffRequests, access: "role", positionPermission: "menu_fm_time_off" },
-  { path: "/vagt-flow/sales-registration", component: VagtSalesRegistration, access: "role", positionPermission: "menu_fm_sales_registration" },
-  { path: "/vagt-flow/fieldmarketing-dashboard", component: VagtFieldmarketingDashboard, access: "role", positionPermission: "menu_fm_sales_registration" },
+  {
+    path: "/vagt-flow/time-off",
+    component: VagtTimeOffRequests,
+    access: "role",
+    positionPermission: "menu_fm_time_off",
+  },
+  {
+    path: "/vagt-flow/sales-registration",
+    component: VagtSalesRegistration,
+    access: "role",
+    positionPermission: "menu_fm_sales_registration",
+  },
+  {
+    path: "/vagt-flow/fieldmarketing-dashboard",
+    component: VagtFieldmarketingDashboard,
+    access: "role",
+    positionPermission: "menu_fm_sales_registration",
+  },
   { path: "/vagt-flow/billing", component: VagtBilling, access: "role", positionPermission: "menu_fm_billing" },
   { path: "/vagt-flow/min-uge", component: VagtMinUge, access: "protected" },
 
   { path: "/shift-planning", component: ShiftOverview, access: "role", positionPermission: "menu_shift_overview" },
   { path: "/shift-planning/my-schedule", component: MySchedule, access: "protected" },
   { path: "/shift-planning/absence", component: AbsenceManagement, access: "role", positionPermission: "menu_absence" },
-  { path: "/shift-planning/time-tracking", component: TimeTracking, access: "role", positionPermission: "menu_time_tracking" },
+  {
+    path: "/shift-planning/time-tracking",
+    component: TimeTracking,
+    access: "role",
+    positionPermission: "menu_time_tracking",
+  },
 
   { path: "/extra-work-admin", component: ExtraWorkAdmin, access: "role", positionPermission: "menu_extra_work_admin" },
   { path: "/contracts", component: Contracts, access: "role", positionPermission: "menu_contracts" },
   { path: "/company-overview", component: CompanyOverview, access: "role", positionPermission: "menu_contracts" },
-  { path: "/pulse-survey-results", component: PulseSurveyResults, access: "role", positionPermission: "menu_pulse_survey" },
-  { path: "/career-wishes-overview", component: CareerWishesOverview, access: "role", positionPermission: "menu_career_wishes_overview" },
+  {
+    path: "/pulse-survey-results",
+    component: PulseSurveyResults,
+    access: "role",
+    positionPermission: "menu_pulse_survey",
+  },
+  {
+    path: "/career-wishes-overview",
+    component: CareerWishesOverview,
+    access: "role",
+    positionPermission: "menu_career_wishes_overview",
+  },
   { path: "/car-quiz-admin", component: CarQuizAdmin, access: "role", positionPermission: "menu_car_quiz_admin" },
-  { path: "/code-of-conduct-admin", component: CodeOfConductAdmin, access: "role", positionPermission: "menu_coc_admin" },
+  {
+    path: "/code-of-conduct-admin",
+    component: CodeOfConductAdmin,
+    access: "role",
+    positionPermission: "menu_coc_admin",
+  },
 
-  { path: "/recruitment", component: RecruitmentDashboard, access: "role", positionPermission: "menu_recruitment_dashboard" },
-  { path: "/recruitment/candidates", component: RecruitmentCandidates, access: "role", positionPermission: "menu_candidates" },
-  { path: "/recruitment/candidates/:id", component: CandidateDetail, access: "role", positionPermission: "menu_candidates" },
-  { path: "/recruitment/messages", component: RecruitmentMessages, access: "role", positionPermission: "menu_messages" },
-  { path: "/recruitment/sms-templates", component: SmsTemplates, access: "role", positionPermission: "menu_sms_templates" },
-  { path: "/recruitment/email-templates", component: EmailTemplatesPage, access: "role", positionPermission: "menu_email_templates" },
+  {
+    path: "/recruitment",
+    component: RecruitmentDashboard,
+    access: "role",
+    positionPermission: "menu_recruitment_dashboard",
+  },
+  {
+    path: "/recruitment/candidates",
+    component: RecruitmentCandidates,
+    access: "role",
+    positionPermission: "menu_candidates",
+  },
+  {
+    path: "/recruitment/candidates/:id",
+    component: CandidateDetail,
+    access: "role",
+    positionPermission: "menu_candidates",
+  },
+  {
+    path: "/recruitment/messages",
+    component: RecruitmentMessages,
+    access: "role",
+    positionPermission: "menu_messages",
+  },
+  {
+    path: "/recruitment/sms-templates",
+    component: SmsTemplates,
+    access: "role",
+    positionPermission: "menu_sms_templates",
+  },
+  {
+    path: "/recruitment/email-templates",
+    component: EmailTemplatesPage,
+    access: "role",
+    positionPermission: "menu_email_templates",
+  },
   { path: "/recruitment/winback", component: Winback, access: "role", positionPermission: "menu_winback" },
-  { path: "/recruitment/upcoming-interviews", component: UpcomingInterviews, access: "role", positionPermission: "menu_upcoming_interviews" },
-  { path: "/recruitment/upcoming-hires", component: UpcomingHires, access: "role", positionPermission: "menu_upcoming_hires" },
+  {
+    path: "/recruitment/upcoming-interviews",
+    component: UpcomingInterviews,
+    access: "role",
+    positionPermission: "menu_upcoming_interviews",
+  },
+  {
+    path: "/recruitment/upcoming-hires",
+    component: UpcomingHires,
+    access: "role",
+    positionPermission: "menu_upcoming_hires",
+  },
 
   { path: "/client-sales-overview", component: ClientSalesOverview, access: "role", positionPermission: "menu_sales" },
   { path: "/boards/sales", component: SalesDashboard, access: "protected" },
-  
+
   // Team Dashboards (full screen, no sidebar) - with role-based permissions
-  { path: "/dashboards/cph-sales", component: CphSalesDashboard, access: "role", positionPermission: "menu_dashboard_cph_sales" },
-  { path: "/dashboards/fieldmarketing", component: FieldmarketingDashboardFull, access: "role", positionPermission: "menu_dashboard_fieldmarketing" },
-  { path: "/dashboards/tdc-erhverv", component: TdcErhvervDashboard, access: "role", positionPermission: "menu_dashboard_tdc_erhverv" },
-  { path: "/dashboards/relatel", component: RelatelDashboard, access: "role", positionPermission: "menu_dashboard_relatel" },
+  {
+    path: "/dashboards/cph-sales",
+    component: CphSalesDashboard,
+    access: "role",
+    positionPermission: "menu_dashboard_cph_sales",
+  },
+  {
+    path: "/dashboards/fieldmarketing",
+    component: FieldmarketingDashboardFull,
+    access: "role",
+    positionPermission: "menu_dashboard_fieldmarketing",
+  },
+  {
+    path: "/dashboards/tdc-erhverv",
+    component: TdcErhvervDashboard,
+    access: "role",
+    positionPermission: "menu_dashboard_tdc_erhverv",
+  },
+  {
+    path: "/dashboards/relatel",
+    component: RelatelDashboard,
+    access: "role",
+    positionPermission: "menu_dashboard_relatel",
+  },
   { path: "/dashboards/tryg", component: TrygDashboard, access: "role", positionPermission: "menu_dashboard_tryg" },
   { path: "/dashboards/ase", component: AseDashboard, access: "role", positionPermission: "menu_dashboard_ase" },
-  { path: "/dashboards/mg-test", component: MgTestDashboard, access: "role", positionPermission: "menu_dashboard_test" },
-  { path: "/dashboards/eesy-tm", component: TeamDashboard, access: "role", positionPermission: "menu_dashboard_eesy_tm" },
+  {
+    path: "/dashboards/mg-test",
+    component: MgTestDashboard,
+    access: "role",
+    positionPermission: "menu_dashboard_test",
+  },
+  {
+    path: "/dashboards/eesy-tm",
+    component: TeamDashboard,
+    access: "role",
+    positionPermission: "menu_dashboard_eesy_tm",
+  },
   { path: "/dashboards/united", component: TeamDashboard, access: "role", positionPermission: "menu_dashboard_united" },
-  
-  { path: "/dashboards/settings", component: DashboardSettings, access: "role", positionPermission: "menu_dashboard_settings" },
-  { path: "/dashboards/design", component: DesignDashboard, access: "role", positionPermission: "menu_dashboard_design" },
+
+  {
+    path: "/dashboards/settings",
+    component: DashboardSettings,
+    access: "role",
+    positionPermission: "menu_dashboard_settings",
+  },
+  {
+    path: "/dashboards/design",
+    component: DesignDashboard,
+    access: "role",
+    positionPermission: "menu_dashboard_design",
+  },
   { path: "/dashboards/:teamSlug", component: TeamDashboard, access: "role", positionPermission: "menu_dashboards" },
-  
+
   { path: "/survey", component: PublicPulseSurvey, access: "public" },
 
   { path: "/closing-shifts", component: ClosingShifts, access: "role", positionPermission: "menu_closing_shifts" },
@@ -198,7 +322,12 @@ export const routes: RouteConfig[] = [
   { path: "/role-preview/:id", component: RolePreview, access: "role", positionPermission: "menu_permissions" },
 
   // Onboarding
-  { path: "/onboarding-program", component: OnboardingDashboard, access: "role", positionPermission: "menu_onboarding_admin" },
+  {
+    path: "/onboarding-program",
+    component: OnboardingDashboard,
+    access: "role",
+    positionPermission: "menu_onboarding_admin",
+  },
   { path: "/onboarding-program/kursus", component: OnboardingCourse, access: "protected" },
 
   { path: "/excel-field-matcher", component: ExcelFieldMatcher, access: "protected" },
@@ -209,7 +338,7 @@ export const routes: RouteConfig[] = [
   { path: "/tv-board-admin", component: TvBoardAdmin, access: "role", positionPermission: "menu_settings" },
 
   // Private Stats (hidden from sidebar, accessible via URL only)
-  { path: "/private-stats", component: PrivateStats, access: "protected" },
+  { path: "/live-stats", component: PrivateStats, access: "protected" },
 
   { path: "*", component: NotFound, access: "public" },
 ];
