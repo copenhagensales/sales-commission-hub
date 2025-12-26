@@ -41,7 +41,7 @@ const COLORS = [
   "#ec4899",
 ];
 
-export default function PrivateStats() {
+export default function LiveStats() {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
     to: new Date(),
