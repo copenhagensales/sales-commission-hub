@@ -13,10 +13,33 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { CalendarIcon, TrendingUp, TrendingDown, Users, DollarSign, BarChart3, RefreshCw, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 import SalesFeed from "@/components/sales/SalesFeed";
 
-const COLORS = ["hsl(var(--primary))", "hsl(var(--secondary))", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899"];
+const COLORS = [
+  "hsl(var(--primary))",
+  "hsl(var(--secondary))",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#06b6d4",
+  "#ec4899",
+];
 
 export default function PrivateStats() {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
@@ -35,7 +58,11 @@ export default function PrivateStats() {
   });
 
   // Fetch comprehensive sales data with pagination to get all rows
-  const { data: salesData, isLoading: salesLoading, refetch: refetchSales } = useQuery({
+  const {
+    data: salesData,
+    isLoading: salesLoading,
+    refetch: refetchSales,
+  } = useQuery({
     queryKey: ["stats-sales", dateRange, selectedClient],
     queryFn: async () => {
       const startISO = format(dateRange.from, "yyyy-MM-dd") + "T00:00:00";
@@ -50,7 +77,8 @@ export default function PrivateStats() {
       while (hasMore) {
         const { data, error } = await supabase
           .from("sales")
-          .select(`
+          .select(
+            `
             id,
             sale_datetime,
             validation_status,
@@ -67,7 +95,8 @@ export default function PrivateStats() {
               mapped_commission,
               products (id, name, commission_dkk)
             )
-          `)
+          `,
+          )
           .gte("sale_datetime", startISO)
           .lte("sale_datetime", endISO)
           .order("sale_datetime", { ascending: false })
@@ -87,9 +116,7 @@ export default function PrivateStats() {
       // Filter by client if selected
       let filteredData = allSales;
       if (selectedClient !== "all") {
-        filteredData = filteredData.filter(
-          (s: any) => s.client_campaigns?.client_id === selectedClient
-        );
+        filteredData = filteredData.filter((s: any) => s.client_campaigns?.client_id === selectedClient);
       }
 
       return filteredData;
@@ -102,7 +129,8 @@ export default function PrivateStats() {
     queryFn: async () => {
       const { data } = await supabase
         .from("employee_master_data")
-        .select(`
+        .select(
+          `
           id,
           first_name,
           last_name,
@@ -114,7 +142,8 @@ export default function PrivateStats() {
           position_id,
           teams (id, name),
           job_positions:position_id (id, name)
-        `)
+        `,
+        )
         .order("first_name");
       return data || [];
     },
@@ -124,11 +153,7 @@ export default function PrivateStats() {
   const { data: kpisData } = useQuery({
     queryKey: ["stats-kpis"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("dashboard_kpis")
-        .select("*")
-        .eq("is_active", true)
-        .order("display_order");
+      const { data } = await supabase.from("dashboard_kpis").select("*").eq("is_active", true).order("display_order");
       return data || [];
     },
   });
@@ -138,7 +163,9 @@ export default function PrivateStats() {
     if (!salesData) return null;
 
     const totalSales = salesData.length;
-    const validatedSales = salesData.filter((s) => !["cancelled", "rejected"].includes(s.validation_status || "")).length;
+    const validatedSales = salesData.filter(
+      (s) => !["cancelled", "rejected"].includes(s.validation_status || ""),
+    ).length;
     const cancelledSales = salesData.filter((s) => s.validation_status === "cancelled").length;
     const rejectedSales = salesData.filter((s) => s.validation_status === "rejected").length;
     const pendingSales = salesData.filter((s) => s.validation_status === "pending").length;
@@ -151,48 +178,57 @@ export default function PrivateStats() {
       }, 0);
 
     // Sales by agent
-    const salesByAgent = salesData.reduce((acc, sale) => {
-      const agent = sale.agent_name || "Unknown";
-      if (!acc[agent]) {
-        acc[agent] = { sales: 0, commission: 0, cancelled: 0 };
-      }
-      acc[agent].sales += 1;
-      if (sale.validation_status === "cancelled") {
-        acc[agent].cancelled += 1;
-      } else if (!["rejected"].includes(sale.validation_status || "")) {
-        const items = sale.sale_items || [];
-        acc[agent].commission += items.reduce((s, i: any) => s + (Number(i.mapped_commission) || 0), 0);
-      }
-      return acc;
-    }, {} as Record<string, { sales: number; commission: number; cancelled: number }>);
+    const salesByAgent = salesData.reduce(
+      (acc, sale) => {
+        const agent = sale.agent_name || "Unknown";
+        if (!acc[agent]) {
+          acc[agent] = { sales: 0, commission: 0, cancelled: 0 };
+        }
+        acc[agent].sales += 1;
+        if (sale.validation_status === "cancelled") {
+          acc[agent].cancelled += 1;
+        } else if (!["rejected"].includes(sale.validation_status || "")) {
+          const items = sale.sale_items || [];
+          acc[agent].commission += items.reduce((s, i: any) => s + (Number(i.mapped_commission) || 0), 0);
+        }
+        return acc;
+      },
+      {} as Record<string, { sales: number; commission: number; cancelled: number }>,
+    );
 
     // Sales by date
-    const salesByDate = salesData.reduce((acc, sale) => {
-      const date = format(parseISO(sale.sale_datetime), "yyyy-MM-dd");
-      if (!acc[date]) {
-        acc[date] = { sales: 0, commission: 0 };
-      }
-      acc[date].sales += 1;
-      if (!["cancelled", "rejected"].includes(sale.validation_status || "")) {
-        const items = sale.sale_items || [];
-        acc[date].commission += items.reduce((s, i: any) => s + (Number(i.mapped_commission) || 0), 0);
-      }
-      return acc;
-    }, {} as Record<string, { sales: number; commission: number }>);
+    const salesByDate = salesData.reduce(
+      (acc, sale) => {
+        const date = format(parseISO(sale.sale_datetime), "yyyy-MM-dd");
+        if (!acc[date]) {
+          acc[date] = { sales: 0, commission: 0 };
+        }
+        acc[date].sales += 1;
+        if (!["cancelled", "rejected"].includes(sale.validation_status || "")) {
+          const items = sale.sale_items || [];
+          acc[date].commission += items.reduce((s, i: any) => s + (Number(i.mapped_commission) || 0), 0);
+        }
+        return acc;
+      },
+      {} as Record<string, { sales: number; commission: number }>,
+    );
 
     // Sales by client
-    const salesByClient = salesData.reduce((acc, sale) => {
-      const clientName = (sale.client_campaigns as any)?.clients?.name || "Unknown";
-      if (!acc[clientName]) {
-        acc[clientName] = { sales: 0, commission: 0 };
-      }
-      acc[clientName].sales += 1;
-      if (!["cancelled", "rejected"].includes(sale.validation_status || "")) {
-        const items = sale.sale_items || [];
-        acc[clientName].commission += items.reduce((s, i: any) => s + (Number(i.mapped_commission) || 0), 0);
-      }
-      return acc;
-    }, {} as Record<string, { sales: number; commission: number }>);
+    const salesByClient = salesData.reduce(
+      (acc, sale) => {
+        const clientName = (sale.client_campaigns as any)?.clients?.name || "Unknown";
+        if (!acc[clientName]) {
+          acc[clientName] = { sales: 0, commission: 0 };
+        }
+        acc[clientName].sales += 1;
+        if (!["cancelled", "rejected"].includes(sale.validation_status || "")) {
+          const items = sale.sale_items || [];
+          acc[clientName].commission += items.reduce((s, i: any) => s + (Number(i.mapped_commission) || 0), 0);
+        }
+        return acc;
+      },
+      {} as Record<string, { sales: number; commission: number }>,
+    );
 
     // Validation status breakdown
     const statusBreakdown = [
@@ -230,18 +266,24 @@ export default function PrivateStats() {
     const inactiveEmployees = employeesData.filter((e) => !e.is_active);
 
     // Team distribution
-    const byTeam = activeEmployees.reduce((acc, emp) => {
-      const team = (emp.teams as any)?.name || "No Team";
-      acc[team] = (acc[team] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const byTeam = activeEmployees.reduce(
+      (acc, emp) => {
+        const team = (emp.teams as any)?.name || "No Team";
+        acc[team] = (acc[team] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     // Position distribution
-    const byPosition = activeEmployees.reduce((acc, emp) => {
-      const position = (emp.job_positions as any)?.name || "No Position";
-      acc[position] = (acc[position] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const byPosition = activeEmployees.reduce(
+      (acc, emp) => {
+        const position = (emp.job_positions as any)?.name || "No Position";
+        acc[position] = (acc[position] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     // Tenure calculation
     const today = new Date();
@@ -257,11 +299,13 @@ export default function PrivateStats() {
 
     // Recent hires (last 30 days)
     const thirtyDaysAgo = subDays(today, 30);
-    const recentHires = activeEmployees.filter((e) => e.employment_start_date && parseISO(e.employment_start_date) >= thirtyDaysAgo);
+    const recentHires = activeEmployees.filter(
+      (e) => e.employment_start_date && parseISO(e.employment_start_date) >= thirtyDaysAgo,
+    );
 
     // Recent terminations (last 30 days)
     const recentTerminations = employeesData.filter(
-      (e) => e.employment_end_date && parseISO(e.employment_end_date) >= thirtyDaysAgo
+      (e) => e.employment_end_date && parseISO(e.employment_end_date) >= thirtyDaysAgo,
     );
 
     return {
@@ -292,7 +336,7 @@ export default function PrivateStats() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Private Statistics</h1>
+            <h1 className="text-3xl font-bold text-foreground">Live Statistics</h1>
             <p className="text-muted-foreground">Comprehensive data overview</p>
           </div>
           <div className="flex items-center gap-3">
@@ -339,11 +383,7 @@ export default function PrivateStats() {
 
         {/* Quick Date Presets */}
         <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDateRange({ from: new Date(), to: new Date() })}
-          >
+          <Button variant="outline" size="sm" onClick={() => setDateRange({ from: new Date(), to: new Date() })}>
             Today
           </Button>
           <Button
@@ -483,8 +523,24 @@ export default function PrivateStats() {
                           }
                         />
                         <Legend />
-                        <Line yAxisId="left" type="monotone" dataKey="sales" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 4 }} name="Sales" />
-                        <Line yAxisId="right" type="monotone" dataKey="commission" stroke="#ef4444" strokeWidth={2} dot={{ fill: "#ef4444", r: 4 }} name="Commission" />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="sales"
+                          stroke="#3b82f6"
+                          strokeWidth={2}
+                          dot={{ fill: "#3b82f6", r: 4 }}
+                          name="Sales"
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="commission"
+                          stroke="#ef4444"
+                          strokeWidth={2}
+                          dot={{ fill: "#ef4444", r: 4 }}
+                          name="Commission"
+                        />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -711,7 +767,9 @@ export default function PrivateStats() {
                           <TableCell>{(emp.teams as any)?.name || "-"}</TableCell>
                           <TableCell>{(emp.job_positions as any)?.name || "-"}</TableCell>
                           <TableCell>
-                            {emp.employment_start_date ? format(parseISO(emp.employment_start_date), "dd/MM/yyyy") : "-"}
+                            {emp.employment_start_date
+                              ? format(parseISO(emp.employment_start_date), "dd/MM/yyyy")
+                              : "-"}
                           </TableCell>
                           <TableCell>
                             <Badge variant={emp.is_active ? "default" : "secondary"}>
@@ -777,7 +835,8 @@ export default function PrivateStats() {
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Raw Sales Data ({salesData?.length || 0} total)</CardTitle>
                 <div className="text-sm text-muted-foreground">
-                  Total Commission: <span className="font-bold text-primary">{formatCurrency(salesStats?.totalCommission || 0)}</span>
+                  Total Commission:{" "}
+                  <span className="font-bold text-primary">{formatCurrency(salesStats?.totalCommission || 0)}</span>
                 </div>
               </CardHeader>
               <CardContent>
@@ -796,7 +855,9 @@ export default function PrivateStats() {
                     </TableHeader>
                     <TableBody>
                       {salesData?.map((sale: any) => {
-                        const saleCommission = sale.sale_items?.reduce((s: number, i: any) => s + (Number(i.mapped_commission) || 0), 0) || 0;
+                        const saleCommission =
+                          sale.sale_items?.reduce((s: number, i: any) => s + (Number(i.mapped_commission) || 0), 0) ||
+                          0;
                         return (
                           <TableRow key={sale.id}>
                             <TableCell>{format(parseISO(sale.sale_datetime), "dd/MM/yyyy HH:mm")}</TableCell>
@@ -809,17 +870,15 @@ export default function PrivateStats() {
                                   sale.validation_status === "cancelled"
                                     ? "destructive"
                                     : sale.validation_status === "pending"
-                                    ? "secondary"
-                                    : "default"
+                                      ? "secondary"
+                                      : "default"
                                 }
                               >
                                 {sale.validation_status || "unknown"}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">{sale.sale_items?.length || 0}</TableCell>
-                            <TableCell className="text-right font-medium">
-                              {formatCurrency(saleCommission)}
-                            </TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(saleCommission)}</TableCell>
                           </TableRow>
                         );
                       })}
