@@ -550,67 +550,144 @@ export default function SalesFeed() {
                   )}
                 >
                   <CardContent className="p-4">
-                    {/* Header: Agent + Date + Status */}
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <p className="font-semibold truncate cursor-default">
-                              {sale.agent_name || "Ukendt agent"}
-                            </p>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {sale.agent_email && <p className="text-xs">{sale.agent_email}</p>}
-                          </TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <p className="text-xs text-muted-foreground cursor-default">
-                              {format(parseISO(sale.sale_datetime), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
-                            </p>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {format(parseISO(sale.sale_datetime), "EEEE d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
-                          </TooltipContent>
-                        </Tooltip>
+                    {/* Mobile Layout (stacked) */}
+                    <div className="lg:hidden">
+                      {/* Header: Agent + Date + Status */}
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <p className="font-semibold truncate cursor-default">
+                                {sale.agent_name || "Ukendt agent"}
+                              </p>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {sale.agent_email && <p className="text-xs">{sale.agent_email}</p>}
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <p className="text-xs text-muted-foreground cursor-default">
+                                {format(parseISO(sale.sale_datetime), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
+                              </p>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {format(parseISO(sale.sale_datetime), "EEEE d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Badge
+                          variant={
+                            sale.validation_status === "cancelled" || sale.validation_status === "rejected"
+                              ? "destructive"
+                              : sale.validation_status === "pending"
+                              ? "secondary"
+                              : "default"
+                          }
+                          className="shrink-0"
+                        >
+                          {sale.validation_status || "ny"}
+                        </Badge>
                       </div>
-                      <Badge
-                        variant={
-                          sale.validation_status === "cancelled" || sale.validation_status === "rejected"
-                            ? "destructive"
-                            : sale.validation_status === "pending"
-                            ? "secondary"
-                            : "default"
-                        }
-                        className="shrink-0"
-                      >
-                        {sale.validation_status || "ny"}
-                      </Badge>
+
+                      {/* Customer Info */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm">
+                          <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <span className="truncate block">
+                              {sale.customer_company || "Ingen virksomhed"}
+                            </span>
+                            {sale.client_campaigns?.clients?.name && (
+                              <span className="text-xs text-muted-foreground truncate block">
+                                {sale.client_campaigns.clients.name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {sale.customer_phone && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span className="font-mono truncate">{formatPhone(sale.customer_phone)}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 shrink-0"
+                                onClick={() => copyPhone(sale.customer_phone!, sale.id)}
+                              >
+                                {copiedId === sale.id ? (
+                                  <Check className="h-3 w-3 text-green-500" />
+                                ) : (
+                                  <Copy className="h-3 w-3 text-muted-foreground" />
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-start gap-2 text-sm">
+                          <Package className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                          <span className="text-muted-foreground">
+                            {getProductsDisplay(sale.sale_items)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Customer Info */}
-                    <div className="space-y-2">
-                      {/* Customer Name & Client */}
-                      <div className="flex items-center gap-2 text-sm">
-                        <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <span className="truncate block">
-                            {sale.customer_company || "Ingen virksomhed"}
-                          </span>
-                          {sale.client_campaigns?.clients?.name && (
-                            <span className="text-xs text-muted-foreground truncate block">
-                              {sale.client_campaigns.clients.name}
-                            </span>
-                          )}
+                    {/* Desktop Layout (horizontal grid) */}
+                    <div className="hidden lg:grid lg:grid-cols-12 lg:gap-4 lg:items-center">
+                      {/* Agent + Date - 3 cols */}
+                      <div className="col-span-3 min-w-0">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-9 w-9 shrink-0">
+                            <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                              {getInitials(sale.agent_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <p className="font-medium truncate text-sm cursor-default">
+                                  {sale.agent_name || "Ukendt agent"}
+                                </p>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {sale.agent_email && <p className="text-xs">{sale.agent_email}</p>}
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <p className="text-xs text-muted-foreground cursor-default">
+                                  {format(parseISO(sale.sale_datetime), "d. MMM 'kl.' HH:mm", { locale: da })}
+                                </p>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {format(parseISO(sale.sale_datetime), "EEEE d. MMMM yyyy 'kl.' HH:mm:ss", { locale: da })}
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Phone */}
-                      {sale.customer_phone && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <div className="flex items-center gap-1 min-w-0">
-                            <span className="font-mono truncate">{formatPhone(sale.customer_phone)}</span>
+                      {/* Customer + Client - 3 cols */}
+                      <div className="col-span-3 min-w-0">
+                        <p className="font-medium truncate text-sm">
+                          {sale.customer_company || "Ingen virksomhed"}
+                        </p>
+                        {sale.client_campaigns?.clients?.name && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {sale.client_campaigns.clients.name}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Phone - 2 cols */}
+                      <div className="col-span-2 min-w-0">
+                        {sale.customer_phone ? (
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono text-sm truncate">{formatPhone(sale.customer_phone)}</span>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -624,15 +701,29 @@ export default function SalesFeed() {
                               )}
                             </Button>
                           </div>
-                        </div>
-                      )}
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </div>
 
-                      {/* Products */}
-                      <div className="flex items-start gap-2 text-sm">
-                        <Package className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                        <span className="text-muted-foreground">
-                          {getProductsDisplay(sale.sale_items)}
-                        </span>
+                      {/* Products - 3 cols */}
+                      <div className="col-span-3 min-w-0">
+                        {getProductsDisplay(sale.sale_items)}
+                      </div>
+
+                      {/* Status - 1 col */}
+                      <div className="col-span-1 flex justify-end">
+                        <Badge
+                          variant={
+                            sale.validation_status === "cancelled" || sale.validation_status === "rejected"
+                              ? "destructive"
+                              : sale.validation_status === "pending"
+                              ? "secondary"
+                              : "default"
+                          }
+                        >
+                          {sale.validation_status || "ny"}
+                        </Badge>
                       </div>
                     </div>
                   </CardContent>
