@@ -108,6 +108,6 @@ export const TvBoardLogin = lazyPage(() => import("@/pages/tv-board/TvBoardLogin
 export const TvBoardView = lazyPage(() => import("@/pages/tv-board/TvBoardView"));
 export const TvBoardAdmin = lazyPage(() => import("@/pages/tv-board/TvBoardAdmin"));
 
-// Private Stats
-export const PrivateStats = lazyPage(() => import("@/pages/PrivateStats"));
+// Live Stats
+export const LiveStats = lazyPage(() => import("@/pages/LiveStats"));
 
