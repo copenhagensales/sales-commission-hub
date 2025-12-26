@@ -99,21 +99,43 @@ export class AdversusAdapter implements DialerAdapter {
       const agentObj = s.ownedBy || s.createdBy;
       const agentId = typeof agentObj === "object" ? String(agentObj.id) : String(agentObj);
       
-      // First try to get from the embedded object, then from userMap lookup
-      let agentEmail: string;
-      let agentName: string;
+      // Enhanced email extraction with multiple fallbacks
+      let agentEmail: string | null = null;
+      let agentName: string | null = null;
       
-      if (typeof agentObj === "object" && agentObj.email) {
-        agentEmail = agentObj.email;
-        agentName = agentObj.name || agentObj.displayName || "Desconocido";
-      } else if (userMap.has(agentId)) {
+      // 1. Try embedded object fields (most reliable)
+      if (typeof agentObj === "object" && agentObj) {
+        agentEmail = agentObj.email || agentObj.mail || agentObj.emailAddress || null;
+        agentName = agentObj.name || agentObj.displayName || agentObj.fullName || null;
+        
+        // Try to extract email from username if it looks like an email
+        if (!agentEmail && agentObj.username && String(agentObj.username).includes("@")) {
+          agentEmail = String(agentObj.username);
+        }
+      }
+      
+      // 2. Try userMap lookup by ID
+      if (!agentEmail && userMap.has(agentId)) {
         const user = userMap.get(agentId)!;
         agentEmail = user.email;
-        agentName = user.name;
-      } else {
-        agentEmail = `agent-${agentId}@adversus.local`;
-        agentName = "Desconocido";
+        agentName = agentName || user.name;
       }
+      
+      // 3. Try to find in lead data (some sales have agent email in lead)
+      if (!agentEmail && s.lead) {
+        const leadAgentEmail = s.lead.agentEmail || s.lead.sellerEmail || s.lead.salesRepEmail;
+        if (leadAgentEmail && String(leadAgentEmail).includes("@")) {
+          agentEmail = String(leadAgentEmail);
+        }
+      }
+      
+      // 4. Final fallback - only if we truly have no email
+      if (!agentEmail) {
+        agentEmail = `agent-${agentId}@adversus.local`;
+        console.log(`[Adversus] Warning: No email found for agent ${agentId}, using fallback`);
+      }
+      
+      agentName = agentName || "Desconocido";
 
       const campaignId = s.campaignId ? String(s.campaignId) : undefined;
       const leadId = s.leadId ? String(s.leadId) : undefined;
@@ -197,19 +219,41 @@ export class AdversusAdapter implements DialerAdapter {
     return rawSales.map((s: any) => {
       const agentObj = s.ownedBy || s.createdBy;
       const agentId = typeof agentObj === "object" ? String(agentObj.id) : String(agentObj);
-      let agentEmail: string;
-      let agentName: string;
-      if (typeof agentObj === "object" && agentObj.email) {
-        agentEmail = agentObj.email;
-        agentName = agentObj.name || agentObj.displayName || "Desconocido";
-      } else if (userMap.has(agentId)) {
+      
+      // Enhanced email extraction with multiple fallbacks
+      let agentEmail: string | null = null;
+      let agentName: string | null = null;
+      
+      // 1. Try embedded object fields
+      if (typeof agentObj === "object" && agentObj) {
+        agentEmail = agentObj.email || agentObj.mail || agentObj.emailAddress || null;
+        agentName = agentObj.name || agentObj.displayName || agentObj.fullName || null;
+        if (!agentEmail && agentObj.username && String(agentObj.username).includes("@")) {
+          agentEmail = String(agentObj.username);
+        }
+      }
+      
+      // 2. Try userMap lookup
+      if (!agentEmail && userMap.has(agentId)) {
         const user = userMap.get(agentId)!;
         agentEmail = user.email;
-        agentName = user.name;
-      } else {
-        agentEmail = `agent-${agentId}@adversus.local`;
-        agentName = "Desconocido";
+        agentName = agentName || user.name;
       }
+      
+      // 3. Try lead data
+      if (!agentEmail && s.lead) {
+        const leadAgentEmail = s.lead.agentEmail || s.lead.sellerEmail || s.lead.salesRepEmail;
+        if (leadAgentEmail && String(leadAgentEmail).includes("@")) {
+          agentEmail = String(leadAgentEmail);
+        }
+      }
+      
+      // 4. Final fallback
+      if (!agentEmail) {
+        agentEmail = `agent-${agentId}@adversus.local`;
+      }
+      
+      agentName = agentName || "Desconocido";
       const campaignId = s.campaignId ? String(s.campaignId) : undefined;
       const leadId = s.leadId ? String(s.leadId) : undefined;
       let externalReference: string | null = null;

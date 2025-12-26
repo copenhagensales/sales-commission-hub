@@ -801,12 +801,107 @@ export class EnreachAdapter implements DialerAdapter {
     return true;
   }
 
+  /**
+   * Fetch users from Enreach API
+   * Enreach doesn't have a dedicated /users endpoint, so we extract unique users from leads data
+   */
   async fetchUsers(): Promise<StandardUser[]> {
-    return [];
+    try {
+      console.log(`[EnreachAdapter] Fetching users from leads data...`);
+      
+      // Fetch recent leads to extract unique users
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - 30); // Last 30 days
+      const modifiedFrom = cutoffDate.toISOString().split("T")[0];
+      
+      const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true`;
+      
+      const userMap = new Map<string, StandardUser>();
+      let skip = 0;
+      const take = 500;
+      let hasMore = true;
+      let page = 1;
+      
+      while (hasMore && page <= 20) { // Max 10,000 leads for user extraction
+        const separator = endpoint.includes("?") ? "&" : "?";
+        const pagedEndpoint = `${endpoint}${separator}skip=${skip}&take=${take}`;
+        
+        try {
+          const data = (await this.get(pagedEndpoint)) as unknown;
+          let pageResults: HeroBaseLead[] = [];
+          
+          if (Array.isArray(data)) {
+            pageResults = data as HeroBaseLead[];
+          } else if (data && typeof data === "object") {
+            const wrapper = data as Record<string, unknown>;
+            pageResults = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as HeroBaseLead[];
+          }
+          
+          if (pageResults.length === 0) {
+            hasMore = false;
+            continue;
+          }
+          
+          // Extract unique users from this page
+          for (const lead of pageResults) {
+            const firstProcessedByUser = (lead.firstProcessedByUser || lead.FirstProcessedByUser) as Record<string, unknown> | undefined;
+            const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
+            
+            // Process firstProcessedByUser
+            if (firstProcessedByUser) {
+              const orgCode = this.getStr(firstProcessedByUser, ["orgCode", "OrgCode"]);
+              if (orgCode && orgCode.includes("@") && !userMap.has(orgCode)) {
+                const name = this.getStr(firstProcessedByUser, ["name", "Name", "fullName", "FullName"]) || orgCode.split("@")[0];
+                userMap.set(orgCode, {
+                  externalId: orgCode,
+                  name: name,
+                  email: orgCode,
+                  isActive: true,
+                });
+              }
+            }
+            
+            // Process lastModifiedByUser
+            if (lastModifiedByUser) {
+              const orgCode = this.getStr(lastModifiedByUser, ["orgCode", "OrgCode"]);
+              if (orgCode && orgCode.includes("@") && !userMap.has(orgCode)) {
+                const name = this.getStr(lastModifiedByUser, ["name", "Name", "fullName", "FullName"]) || orgCode.split("@")[0];
+                userMap.set(orgCode, {
+                  externalId: orgCode,
+                  name: name,
+                  email: orgCode,
+                  isActive: true,
+                });
+              }
+            }
+          }
+          
+          if (pageResults.length < take) {
+            hasMore = false;
+          } else {
+            skip += take;
+            page++;
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+        } catch (e) {
+          console.error(`[EnreachAdapter] Error fetching page ${page} for users:`, e);
+          hasMore = false;
+        }
+      }
+      
+      const users = Array.from(userMap.values());
+      console.log(`[EnreachAdapter] Extracted ${users.length} unique users from leads`);
+      return users;
+    } catch (error) {
+      console.error("[EnreachAdapter] Error fetching users:", error);
+      return [];
+    }
   }
+
   async fetchCampaigns(): Promise<StandardCampaign[]> {
     return [];
   }
+  
   async fetchCalls(): Promise<StandardCall[]> {
     return [];
   }
