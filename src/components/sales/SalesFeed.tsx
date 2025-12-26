@@ -96,7 +96,8 @@ export default function SalesFeed() {
   const [isPaused, setIsPaused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [validationStatusFilter, setValidationStatusFilter] = useState<string>("all");
+  const [salesStatusFilter, setSalesStatusFilter] = useState<string>("all");
   const [customDateRange, setCustomDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
@@ -119,7 +120,7 @@ export default function SalesFeed() {
   // Fetch paginated sales data
   const dateRange = getEffectiveDateRange();
   const { data, isLoading } = useQuery({
-    queryKey: ["sales-feed", currentPage, searchQuery, datePreset, statusFilter, customDateRange.from?.toISOString(), customDateRange.to?.toISOString()],
+    queryKey: ["sales-feed", currentPage, searchQuery, datePreset, validationStatusFilter, salesStatusFilter, customDateRange.from?.toISOString(), customDateRange.to?.toISOString()],
     queryFn: async () => {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
@@ -155,11 +156,20 @@ export default function SalesFeed() {
       if (dateRange) {
         query = query.gte("sale_datetime", dateRange.start.toISOString()).lte("sale_datetime", dateRange.end.toISOString());
       }
-      if (statusFilter !== "all") {
-        if (statusFilter === "pending") {
+      // Validation status filter
+      if (validationStatusFilter !== "all") {
+        if (validationStatusFilter === "pending") {
           query = query.or('validation_status.is.null,validation_status.eq.pending');
         } else {
-          query = query.eq('validation_status', statusFilter);
+          query = query.eq('validation_status', validationStatusFilter);
+        }
+      }
+      // Sales status filter
+      if (salesStatusFilter !== "all") {
+        if (salesStatusFilter === "pending") {
+          query = query.or('status.is.null,status.eq.pending');
+        } else {
+          query = query.eq('status', salesStatusFilter);
         }
       }
 
@@ -245,7 +255,7 @@ export default function SalesFeed() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, datePreset, statusFilter, customDateRange]);
+  }, [searchQuery, datePreset, validationStatusFilter, salesStatusFilter, customDateRange]);
 
   // Copy phone number
   const copyPhone = useCallback((phone: string, saleId: string) => {
@@ -452,13 +462,26 @@ export default function SalesFeed() {
             </Button>
           )}
 
-          {/* Status Filter */}
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[160px]">
-              <SelectValue placeholder="Alle status" />
+          {/* Sales Status Filter */}
+          <Select value={salesStatusFilter} onValueChange={setSalesStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Alle status</SelectItem>
+              <SelectItem value="pending">Afventer</SelectItem>
+              <SelectItem value="active">Aktiv</SelectItem>
+              <SelectItem value="completed">Fuldført</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Validation Status Filter */}
+          <Select value={validationStatusFilter} onValueChange={setValidationStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="Validering" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle validering</SelectItem>
               <SelectItem value="pending">Afventer</SelectItem>
               <SelectItem value="approved">Godkendt</SelectItem>
               <SelectItem value="cancelled">Annulleret</SelectItem>
