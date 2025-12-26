@@ -453,23 +453,16 @@ export default function SalesFeed() {
                       </TableCell>
                       {/* Agent Column */}
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Avatar className="h-8 w-8">
-                                <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
-                                  {getInitials(sale.agent_name)}
-                                </AvatarFallback>
-                              </Avatar>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {sale.agent_email && <p className="text-xs">{sale.agent_email}</p>}
-                            </TooltipContent>
-                          </Tooltip>
-                          <span className="font-medium truncate max-w-[120px]">
-                            {sale.agent_name || "Ukendt"}
-                          </span>
-                        </div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="font-medium truncate max-w-[150px] cursor-default">
+                              {sale.agent_name || "Ukendt"}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {sale.agent_email && <p className="text-xs">{sale.agent_email}</p>}
+                          </TooltipContent>
+                        </Tooltip>
                       </TableCell>
                       {/* Phone Column */}
                       <TableCell>
