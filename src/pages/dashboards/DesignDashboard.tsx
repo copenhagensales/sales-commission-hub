@@ -887,24 +887,25 @@ export default function DesignDashboard() {
               )}
             </div>
 
-            {/* 5. Advanced Options - Comparison, Target, Trend */}
+            {/* 5. Custom Title - Always visible */}
+            <div className="space-y-2 border-t pt-4">
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <Settings2 className="h-4 w-4" />
+                5. Tilpasset navn
+              </Label>
+              <Input
+                id="customTitle"
+                placeholder="Automatisk baseret på KPI'er"
+                value={customTitle}
+                onChange={(e) => setCustomTitle(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Giv din widget et brugerdefineret navn</p>
+            </div>
+
+            {/* 6. Advanced Options - Comparison, Target, Trend */}
             {(supportsComparison || supportsTarget) && (
               <div className="space-y-4 border-t pt-4">
-                <Label className="text-base font-semibold">5. Avancerede indstillinger</Label>
-
-                {/* Custom Title */}
-                <div className="space-y-2">
-                  <Label htmlFor="customTitle" className="text-sm flex items-center gap-2">
-                    <Settings2 className="h-4 w-4" />
-                    Tilpasset titel (valgfrit)
-                  </Label>
-                  <Input
-                    id="customTitle"
-                    placeholder="Automatisk baseret på KPI'er"
-                    value={customTitle}
-                    onChange={(e) => setCustomTitle(e.target.value)}
-                  />
-                </div>
+                <Label className="text-base font-semibold">6. Avancerede indstillinger</Label>
 
                 {/* Target Value */}
                 {supportsTarget && (
@@ -962,11 +963,11 @@ export default function DesignDashboard() {
               </div>
             )}
 
-            {/* 6. Color Theme */}
+            {/* 7. Color Theme */}
             <div className="space-y-2 border-t pt-4">
               <Label className="text-base font-semibold flex items-center gap-2">
                 <Palette className="h-4 w-4" />
-                6. Farvetema
+                7. Farvetema
               </Label>
               <div className="grid grid-cols-6 gap-2">
                 {COLOR_THEMES.map((theme) => (
