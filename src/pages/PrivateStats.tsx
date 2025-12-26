@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, TrendingUp, TrendingDown, Users, DollarSign, BarChart3, RefreshCw } from "lucide-react";
+import { CalendarIcon, TrendingUp, TrendingDown, Users, DollarSign, BarChart3, RefreshCw, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
+import SalesFeed from "@/components/sales/SalesFeed";
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--secondary))", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899"];
 
@@ -378,13 +379,32 @@ export default function PrivateStats() {
           </Button>
         </div>
 
-        <Tabs defaultValue="sales" className="space-y-6">
+        <Tabs defaultValue="live" className="space-y-6">
           <TabsList>
+            <TabsTrigger value="live" className="gap-2">
+              <Radio className="h-3.5 w-3.5" />
+              Live Feed
+            </TabsTrigger>
             <TabsTrigger value="sales">Sales & Commission</TabsTrigger>
             <TabsTrigger value="employees">Employees</TabsTrigger>
             <TabsTrigger value="kpis">KPIs</TabsTrigger>
             <TabsTrigger value="raw">Raw Data</TabsTrigger>
           </TabsList>
+
+          {/* Live Sales Feed Tab */}
+          <TabsContent value="live">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Radio className="h-5 w-5 text-green-500 animate-pulse" />
+                  Live Sales Feed
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SalesFeed />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Sales Tab */}
           <TabsContent value="sales" className="space-y-6">
