@@ -22,6 +22,7 @@ interface Agent {
   name: string;
   email: string;
   external_adversus_id: string | null;
+  is_active: boolean | null;
 }
 
 interface Mapping {
@@ -53,13 +54,14 @@ export function DialerMappingTab() {
     },
   });
 
-  // Fetch all agents from APIs
+  // Fetch all ACTIVE agents from APIs
   const { data: agents = [], isLoading: loadingAgents } = useQuery({
     queryKey: ["agents-for-mapping"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("agents")
-        .select("id, name, email, external_adversus_id")
+        .select("id, name, email, external_adversus_id, is_active")
+        .eq("is_active", true)
         .order("name");
       if (error) throw error;
       return data as Agent[];
@@ -397,7 +399,7 @@ export function DialerMappingTab() {
       )}
 
       <div className="text-xs text-muted-foreground mt-4">
-        Totalt: {agents.length} agenter fra API'er • {mappings.length} tilknytninger • 
+        Totalt: {agents.length} aktive agenter fra API'er • {mappings.length} tilknytninger •
         <span className={unmappedAgents.length > 0 ? "text-destructive font-medium" : "text-green-600"}>
           {unmappedAgents.length > 0 ? `${unmappedAgents.length} agenter mangler mapping` : "Alle agenter er mappet ✓"}
         </span>
