@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, formatDistanceToNow, parseISO, startOfDay, endOfDay } from "date-fns";
+import { format, formatDistanceToNow, parseISO, startOfDay, endOfDay, subDays, subWeeks, subMonths } from "date-fns";
 import { da } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -60,19 +60,62 @@ interface Sale {
 
 const ITEMS_PER_PAGE = 20;
 
+type DatePreset = "all" | "today" | "yesterday" | "last7days" | "last30days" | "thisMonth" | "custom";
+
+const DATE_PRESETS: { value: DatePreset; label: string }[] = [
+  { value: "all", label: "Alle datoer" },
+  { value: "today", label: "I dag" },
+  { value: "yesterday", label: "I går" },
+  { value: "last7days", label: "Sidste 7 dage" },
+  { value: "last30days", label: "Sidste 30 dage" },
+  { value: "thisMonth", label: "Denne måned" },
+  { value: "custom", label: "Vælg dato..." },
+];
+
+function getDateRangeFromPreset(preset: DatePreset): { start: Date; end: Date } | null {
+  const now = new Date();
+  switch (preset) {
+    case "today":
+      return { start: startOfDay(now), end: endOfDay(now) };
+    case "yesterday":
+      const yesterday = subDays(now, 1);
+      return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
+    case "last7days":
+      return { start: startOfDay(subDays(now, 6)), end: endOfDay(now) };
+    case "last30days":
+      return { start: startOfDay(subDays(now, 29)), end: endOfDay(now) };
+    case "thisMonth":
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { start: startOfDay(firstOfMonth), end: endOfDay(now) };
+    default:
+      return null;
+  }
+}
+
 export default function SalesFeed() {
   const [isPaused, setIsPaused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [agentFilter, setAgentFilter] = useState<string>("all");
-  const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
+  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [customDate, setCustomDate] = useState<Date | undefined>(undefined);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [newSaleIds, setNewSaleIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const queryClient = useQueryClient();
 
+  // Get effective date range based on preset or custom date
+  const getEffectiveDateRange = useCallback(() => {
+    if (datePreset === "custom" && customDate) {
+      return { start: startOfDay(customDate), end: endOfDay(customDate) };
+    }
+    return getDateRangeFromPreset(datePreset);
+  }, [datePreset, customDate]);
+
   // Fetch paginated sales data
+  const dateRange = getEffectiveDateRange();
   const { data, isLoading } = useQuery({
-    queryKey: ["sales-feed", currentPage, agentFilter, searchQuery, dateFilter?.toISOString()],
+    queryKey: ["sales-feed", currentPage, agentFilter, searchQuery, datePreset, customDate?.toISOString()],
     queryFn: async () => {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
@@ -108,10 +151,8 @@ export default function SalesFeed() {
       if (searchQuery) {
         query = query.or(`customer_phone.ilike.%${searchQuery}%,customer_company.ilike.%${searchQuery}%,agent_name.ilike.%${searchQuery}%`);
       }
-      if (dateFilter) {
-        const dayStart = startOfDay(dateFilter).toISOString();
-        const dayEnd = endOfDay(dateFilter).toISOString();
-        query = query.gte("sale_datetime", dayStart).lte("sale_datetime", dayEnd);
+      if (dateRange) {
+        query = query.gte("sale_datetime", dateRange.start.toISOString()).lte("sale_datetime", dateRange.end.toISOString());
       }
 
       const { data, error, count } = await query.range(from, to);
@@ -211,7 +252,7 @@ export default function SalesFeed() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, agentFilter, dateFilter]);
+  }, [searchQuery, agentFilter, datePreset, customDate]);
 
   // Copy phone number
   const copyPhone = useCallback((phone: string, saleId: string) => {
@@ -306,36 +347,69 @@ export default function SalesFeed() {
             />
           </div>
           
-          {/* Date Filter */}
-          <Popover>
+          {/* Date Filter with Presets */}
+          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 className={cn(
-                  "w-full sm:w-[180px] justify-start text-left font-normal",
-                  !dateFilter && "text-muted-foreground"
+                  "w-full sm:w-[200px] justify-start text-left font-normal",
+                  datePreset === "all" && "text-muted-foreground"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateFilter ? format(dateFilter, "d. MMM yyyy", { locale: da }) : "Vælg dato"}
+                {datePreset === "custom" && customDate 
+                  ? format(customDate, "d. MMM yyyy", { locale: da })
+                  : DATE_PRESETS.find(p => p.value === datePreset)?.label || "Vælg periode"
+                }
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={dateFilter}
-                onSelect={setDateFilter}
-                locale={da}
-                initialFocus
-              />
+              <div className="flex flex-col">
+                {/* Preset Options */}
+                <div className="border-b p-2 space-y-1">
+                  {DATE_PRESETS.filter(p => p.value !== "custom").map((preset) => (
+                    <Button
+                      key={preset.value}
+                      variant={datePreset === preset.value ? "secondary" : "ghost"}
+                      className="w-full justify-start text-left h-9"
+                      onClick={() => {
+                        setDatePreset(preset.value);
+                        setCustomDate(undefined);
+                        setIsCalendarOpen(false);
+                      }}
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+                {/* Custom Date Picker */}
+                <div className="p-2">
+                  <p className="text-xs text-muted-foreground mb-2 px-2">Eller vælg specifik dato:</p>
+                  <Calendar
+                    mode="single"
+                    selected={customDate}
+                    onSelect={(date) => {
+                      setCustomDate(date);
+                      setDatePreset("custom");
+                      setIsCalendarOpen(false);
+                    }}
+                    locale={da}
+                    className="pointer-events-auto"
+                  />
+                </div>
+              </div>
             </PopoverContent>
           </Popover>
           
-          {dateFilter && (
+          {datePreset !== "all" && (
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setDateFilter(undefined)}
+              onClick={() => {
+                setDatePreset("all");
+                setCustomDate(undefined);
+              }}
               className="h-10 w-10"
             >
               <X className="h-4 w-4" />
