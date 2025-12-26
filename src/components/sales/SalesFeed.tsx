@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, formatDistanceToNow, parseISO } from "date-fns";
+import { format, formatDistanceToNow, parseISO, startOfDay, endOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Pagination,
   PaginationContent,
@@ -28,7 +30,9 @@ import {
   Search, 
   Loader2, 
   Radio,
-  Clock
+  Clock,
+  CalendarIcon,
+  X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -60,6 +64,7 @@ export default function SalesFeed() {
   const [isPaused, setIsPaused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [agentFilter, setAgentFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [newSaleIds, setNewSaleIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -67,7 +72,7 @@ export default function SalesFeed() {
 
   // Fetch paginated sales data
   const { data, isLoading } = useQuery({
-    queryKey: ["sales-feed", currentPage, agentFilter, searchQuery],
+    queryKey: ["sales-feed", currentPage, agentFilter, searchQuery, dateFilter?.toISOString()],
     queryFn: async () => {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
@@ -102,6 +107,11 @@ export default function SalesFeed() {
       }
       if (searchQuery) {
         query = query.or(`customer_phone.ilike.%${searchQuery}%,customer_company.ilike.%${searchQuery}%,agent_name.ilike.%${searchQuery}%`);
+      }
+      if (dateFilter) {
+        const dayStart = startOfDay(dateFilter).toISOString();
+        const dayEnd = endOfDay(dateFilter).toISOString();
+        query = query.gte("sale_datetime", dayStart).lte("sale_datetime", dayEnd);
       }
 
       const { data, error, count } = await query.range(from, to);
@@ -201,7 +211,7 @@ export default function SalesFeed() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, agentFilter]);
+  }, [searchQuery, agentFilter, dateFilter]);
 
   // Copy phone number
   const copyPhone = useCallback((phone: string, saleId: string) => {
@@ -285,8 +295,8 @@ export default function SalesFeed() {
     <TooltipProvider>
       <div className="space-y-4">
         {/* Controls */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
+        <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Søg efter telefon, kunde eller agent..."
@@ -295,6 +305,42 @@ export default function SalesFeed() {
               className="pl-9"
             />
           </div>
+          
+          {/* Date Filter */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full sm:w-[180px] justify-start text-left font-normal",
+                  !dateFilter && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateFilter ? format(dateFilter, "d. MMM yyyy", { locale: da }) : "Vælg dato"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={dateFilter}
+                onSelect={setDateFilter}
+                locale={da}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          
+          {dateFilter && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setDateFilter(undefined)}
+              className="h-10 w-10"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
           
           <Select value={agentFilter} onValueChange={setAgentFilter}>
             <SelectTrigger className="w-full sm:w-[200px]">
@@ -362,7 +408,7 @@ export default function SalesFeed() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[200px]">Agent</TableHead>
+                    <TableHead className="w-[180px]">Agent</TableHead>
                     <TableHead>Telefon</TableHead>
                     <TableHead>Kunde</TableHead>
                     <TableHead>Produkter</TableHead>
@@ -422,11 +468,11 @@ export default function SalesFeed() {
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="truncate max-w-[150px]">
-                            {sale.client_campaigns?.clients?.name || sale.client_campaigns?.name || "-"}
+                            {sale.customer_company || "-"}
                           </span>
-                          {sale.customer_company && (
+                          {sale.client_campaigns?.clients?.name && (
                             <span className="text-xs text-muted-foreground truncate max-w-[150px]">
-                              {sale.customer_company}
+                              {sale.client_campaigns.clients.name}
                             </span>
                           )}
                         </div>
