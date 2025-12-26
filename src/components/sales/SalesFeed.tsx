@@ -32,7 +32,10 @@ import {
   Radio,
   Clock,
   CalendarIcon,
-  X
+  X,
+  User,
+  Phone,
+  Package
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -522,7 +525,7 @@ export default function SalesFeed() {
           </span>
         </div>
 
-        {/* Sales Table */}
+        {/* Sales Cards */}
         {sales.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -537,75 +540,81 @@ export default function SalesFeed() {
           </Card>
         ) : (
           <>
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Dato</TableHead>
-                    <TableHead>Kunde</TableHead>
-                    <TableHead className="w-[180px]">Agent</TableHead>
-                    <TableHead>Telefon</TableHead>
-                    <TableHead>Produkter</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sales.map((sale) => (
-                    <TableRow 
-                      key={sale.id}
-                      className={cn(
-                        "transition-all duration-500",
-                        newSaleIds.has(sale.id) && "bg-primary/10 animate-in slide-in-from-top-2"
-                      )}
-                    >
-                      {/* Date Column */}
-                      <TableCell>
+            <div className="grid gap-3 sm:gap-4">
+              {sales.map((sale) => (
+                <Card 
+                  key={sale.id}
+                  className={cn(
+                    "transition-all duration-500 overflow-hidden",
+                    newSaleIds.has(sale.id) && "ring-2 ring-primary/50 animate-in slide-in-from-top-2"
+                  )}
+                >
+                  <CardContent className="p-4">
+                    {/* Header: Agent + Date + Status */}
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex-1 min-w-0">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="text-sm whitespace-nowrap cursor-default">
-                              {format(parseISO(sale.sale_datetime), "d. MMM HH:mm", { locale: da })}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {format(parseISO(sale.sale_datetime), "EEEE d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-                      {/* Customer Column */}
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="truncate max-w-[150px]">
-                            {sale.customer_company || "-"}
-                          </span>
-                          {sale.client_campaigns?.clients?.name && (
-                            <span className="text-xs text-muted-foreground truncate max-w-[150px]">
-                              {sale.client_campaigns.clients.name}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      {/* Agent Column */}
-                      <TableCell>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="font-medium truncate max-w-[150px] cursor-default">
-                              {sale.agent_name || "Ukendt"}
-                            </span>
+                            <p className="font-semibold truncate cursor-default">
+                              {sale.agent_name || "Ukendt agent"}
+                            </p>
                           </TooltipTrigger>
                           <TooltipContent>
                             {sale.agent_email && <p className="text-xs">{sale.agent_email}</p>}
                           </TooltipContent>
                         </Tooltip>
-                      </TableCell>
-                      {/* Phone Column */}
-                      <TableCell>
-                        {sale.customer_phone ? (
-                          <div className="flex items-center gap-1">
-                            <span className="font-mono text-sm">{formatPhone(sale.customer_phone)}</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <p className="text-xs text-muted-foreground cursor-default">
+                              {format(parseISO(sale.sale_datetime), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}
+                            </p>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {format(parseISO(sale.sale_datetime), "EEEE d. MMMM yyyy 'kl.' HH:mm", { locale: da })}
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Badge
+                        variant={
+                          sale.validation_status === "cancelled" || sale.validation_status === "rejected"
+                            ? "destructive"
+                            : sale.validation_status === "pending"
+                            ? "secondary"
+                            : "default"
+                        }
+                        className="shrink-0"
+                      >
+                        {sale.validation_status || "ny"}
+                      </Badge>
+                    </div>
+
+                    {/* Customer Info */}
+                    <div className="space-y-2">
+                      {/* Customer Name & Client */}
+                      <div className="flex items-center gap-2 text-sm">
+                        <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <span className="truncate block">
+                            {sale.customer_company || "Ingen virksomhed"}
+                          </span>
+                          {sale.client_campaigns?.clients?.name && (
+                            <span className="text-xs text-muted-foreground truncate block">
+                              {sale.client_campaigns.clients.name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Phone */}
+                      {sale.customer_phone && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div className="flex items-center gap-1 min-w-0">
+                            <span className="font-mono truncate">{formatPhone(sale.customer_phone)}</span>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6"
+                              className="h-6 w-6 shrink-0"
                               onClick={() => copyPhone(sale.customer_phone!, sale.id)}
                             >
                               {copiedId === sale.id ? (
@@ -615,30 +624,20 @@ export default function SalesFeed() {
                               )}
                             </Button>
                           </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      {/* Products Column */}
-                      <TableCell>{getProductsDisplay(sale.sale_items)}</TableCell>
-                      {/* Status Column */}
-                      <TableCell>
-                        <Badge
-                          variant={
-                            sale.validation_status === "cancelled" || sale.validation_status === "rejected"
-                              ? "destructive"
-                              : sale.validation_status === "pending"
-                              ? "secondary"
-                              : "default"
-                          }
-                        >
-                          {sale.validation_status || "ny"}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        </div>
+                      )}
+
+                      {/* Products */}
+                      <div className="flex items-start gap-2 text-sm">
+                        <Package className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                        <span className="text-muted-foreground">
+                          {getProductsDisplay(sale.sale_items)}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
             {/* Pagination */}
