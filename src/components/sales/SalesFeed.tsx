@@ -95,7 +95,6 @@ function getDateRangeFromPreset(preset: DatePreset): { start: Date; end: Date } 
 export default function SalesFeed() {
   const [isPaused, setIsPaused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [agentFilter, setAgentFilter] = useState<string>("all");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [customDateRange, setCustomDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -119,7 +118,7 @@ export default function SalesFeed() {
   // Fetch paginated sales data
   const dateRange = getEffectiveDateRange();
   const { data, isLoading } = useQuery({
-    queryKey: ["sales-feed", currentPage, agentFilter, searchQuery, datePreset, customDateRange.from?.toISOString(), customDateRange.to?.toISOString()],
+    queryKey: ["sales-feed", currentPage, searchQuery, datePreset, customDateRange.from?.toISOString(), customDateRange.to?.toISOString()],
     queryFn: async () => {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
@@ -149,9 +148,6 @@ export default function SalesFeed() {
         .order("sale_datetime", { ascending: false });
 
       // Apply filters
-      if (agentFilter !== "all") {
-        query = query.eq("agent_name", agentFilter);
-      }
       if (searchQuery) {
         query = query.or(`customer_phone.ilike.%${searchQuery}%,customer_company.ilike.%${searchQuery}%,agent_name.ilike.%${searchQuery}%`);
       }
@@ -169,21 +165,6 @@ export default function SalesFeed() {
   const sales = data?.sales || [];
   const totalCount = data?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
-
-  // Fetch unique agents for filter
-  const { data: agents } = useQuery({
-    queryKey: ["sales-feed-agents"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("sales")
-        .select("agent_name")
-        .not("agent_name", "is", null)
-        .order("agent_name");
-      
-      const uniqueAgents = [...new Set(data?.map(s => s.agent_name).filter(Boolean))];
-      return uniqueAgents as string[];
-    },
-  });
 
   // Real-time subscription
   useEffect(() => {
@@ -256,7 +237,7 @@ export default function SalesFeed() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, agentFilter, datePreset, customDateRange]);
+  }, [searchQuery, datePreset, customDateRange]);
 
   // Copy phone number
   const copyPhone = useCallback((phone: string, saleId: string) => {
@@ -462,20 +443,6 @@ export default function SalesFeed() {
               <X className="h-4 w-4" />
             </Button>
           )}
-          
-          <Select value={agentFilter} onValueChange={setAgentFilter}>
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Alle agenter" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Alle agenter</SelectItem>
-              {agents?.map((agent) => (
-                <SelectItem key={agent} value={agent}>
-                  {agent}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
           <Button
             variant={isPaused ? "default" : "outline"}
