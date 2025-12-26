@@ -96,6 +96,7 @@ export default function SalesFeed() {
   const [isPaused, setIsPaused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [customDateRange, setCustomDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
@@ -118,7 +119,7 @@ export default function SalesFeed() {
   // Fetch paginated sales data
   const dateRange = getEffectiveDateRange();
   const { data, isLoading } = useQuery({
-    queryKey: ["sales-feed", currentPage, searchQuery, datePreset, customDateRange.from?.toISOString(), customDateRange.to?.toISOString()],
+    queryKey: ["sales-feed", currentPage, searchQuery, datePreset, statusFilter, customDateRange.from?.toISOString(), customDateRange.to?.toISOString()],
     queryFn: async () => {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
@@ -153,6 +154,13 @@ export default function SalesFeed() {
       }
       if (dateRange) {
         query = query.gte("sale_datetime", dateRange.start.toISOString()).lte("sale_datetime", dateRange.end.toISOString());
+      }
+      if (statusFilter !== "all") {
+        if (statusFilter === "pending") {
+          query = query.or('validation_status.is.null,validation_status.eq.pending');
+        } else {
+          query = query.eq('validation_status', statusFilter);
+        }
       }
 
       const { data, error, count } = await query.range(from, to);
@@ -237,7 +245,7 @@ export default function SalesFeed() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, datePreset, customDateRange]);
+  }, [searchQuery, datePreset, statusFilter, customDateRange]);
 
   // Copy phone number
   const copyPhone = useCallback((phone: string, saleId: string) => {
@@ -443,6 +451,20 @@ export default function SalesFeed() {
               <X className="h-4 w-4" />
             </Button>
           )}
+
+          {/* Status Filter */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[160px]">
+              <SelectValue placeholder="Alle status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle status</SelectItem>
+              <SelectItem value="pending">Afventer</SelectItem>
+              <SelectItem value="approved">Godkendt</SelectItem>
+              <SelectItem value="cancelled">Annulleret</SelectItem>
+              <SelectItem value="rejected">Afvist</SelectItem>
+            </SelectContent>
+          </Select>
 
           <Button
             variant={isPaused ? "default" : "outline"}
