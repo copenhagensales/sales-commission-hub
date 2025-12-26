@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, X, Loader2 } from "lucide-react";
+import { Search, Plus, X, Loader2, AlertTriangle, Check, UserPlus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface Employee {
   id: string;
@@ -36,6 +37,7 @@ export function DialerMappingTab() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAgents, setSelectedAgents] = useState<Record<string, string>>({});
+  const [unmappedSelections, setUnmappedSelections] = useState<Record<string, string>>({});
 
   // Fetch active employees
   const { data: employees = [], isLoading: loadingEmployees } = useQuery({
@@ -137,11 +139,43 @@ export function DialerMappingTab() {
   const mappedAgentIds = mappings.map((m) => m.agent_id);
   const unmappedAgents = agents.filter((a) => !mappedAgentIds.includes(a.id));
 
+  // Find suggested employee for each unmapped agent based on email match
+  const getSuggestedEmployee = (agentEmail: string) => {
+    return employees.find(
+      (emp) => emp.private_email?.toLowerCase() === agentEmail.toLowerCase()
+    );
+  };
+
+  // Memoized unmapped agents with suggestions
+  const unmappedAgentsWithSuggestions = useMemo(() => {
+    return unmappedAgents.map((agent) => ({
+      ...agent,
+      suggestedEmployee: getSuggestedEmployee(agent.email),
+    }));
+  }, [unmappedAgents, employees]);
+
+  // Handle mapping from unmapped section
+  const handleMapUnmappedAgent = (agentId: string, employeeId: string) => {
+    if (!employeeId) return;
+    addMappingMutation.mutate(
+      { employeeId, agentId },
+      {
+        onSuccess: () => {
+          setUnmappedSelections((prev) => {
+            const newState = { ...prev };
+            delete newState[agentId];
+            return newState;
+          });
+        },
+      }
+    );
+  };
+
+  const isLoading = loadingEmployees || loadingAgents || loadingMappings;
+
   const filteredEmployees = employees.filter((emp) =>
     `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const isLoading = loadingEmployees || loadingAgents || loadingMappings;
 
   return (
     <div className="space-y-4">
@@ -163,22 +197,97 @@ export function DialerMappingTab() {
         <strong className="block mt-1 text-foreground">Vigtigt: Alt data overføres til medarbejderen. Agenter uden medarbejder-tilknytning vil ikke kunne bruges.</strong>
       </div>
 
-      {/* Warning for unmapped agents */}
-      {unmappedAgents.length > 0 && (
-        <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 mb-4">
-          <div className="flex items-start gap-3">
-            <div className="text-destructive font-medium">⚠️ {unmappedAgents.length} agenter mangler mapping</div>
+      {/* Unmapped agents resolution section */}
+      {unmappedAgentsWithSuggestions.length > 0 && (
+        <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 mb-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <span className="text-destructive font-medium">
+              {unmappedAgentsWithSuggestions.length} agenter mangler mapping
+            </span>
           </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {unmappedAgents.map((agent) => (
-              <Badge key={agent.id} variant="outline" className="border-destructive/30 text-destructive">
-                {agent.name} ({agent.email})
-              </Badge>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Disse agenter har ingen medarbejder-tilknytning og vil ikke kunne bruges i systemet.
+          <p className="text-sm text-muted-foreground">
+            Disse agenter har ingen medarbejder-tilknytning og kan ikke bruges i systemet. 
+            Tilknyt dem herunder for at aktivere dem.
           </p>
+
+          <div className="grid gap-3">
+            {unmappedAgentsWithSuggestions.map((agent) => {
+              const currentSelection = unmappedSelections[agent.id] || agent.suggestedEmployee?.id || "";
+              const hasSuggestion = !!agent.suggestedEmployee;
+
+              return (
+                <Card key={agent.id} className="bg-background/50 border-border/50">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      {/* Agent info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center text-xs font-semibold text-destructive">
+                            {agent.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">{agent.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{agent.email}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Employee selection */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Select
+                          value={currentSelection}
+                          onValueChange={(value) =>
+                            setUnmappedSelections((prev) => ({ ...prev, [agent.id]: value }))
+                          }
+                        >
+                          <SelectTrigger className="w-[220px] h-9 bg-background border-border">
+                            <SelectValue placeholder="Vælg medarbejder..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {employees.map((emp) => (
+                              <SelectItem key={emp.id} value={emp.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{emp.first_name} {emp.last_name}</span>
+                                  {emp.private_email?.toLowerCase() === agent.email.toLowerCase() && (
+                                    <Badge variant="secondary" className="text-[10px] px-1 py-0">Match</Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <Button
+                          size="sm"
+                          onClick={() => handleMapUnmappedAgent(agent.id, currentSelection)}
+                          disabled={!currentSelection || addMappingMutation.isPending}
+                          className="h-9 gap-1.5"
+                        >
+                          {addMappingMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <UserPlus className="h-4 w-4" />
+                              <span className="hidden sm:inline">Tilknyt</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {/* Suggestion indicator */}
+                      {hasSuggestion && currentSelection === agent.suggestedEmployee?.id && (
+                        <div className="flex items-center gap-1 text-xs text-green-600">
+                          <Check className="h-3 w-3" />
+                          <span className="hidden sm:inline">Foreslået match</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </div>
       )}
 
