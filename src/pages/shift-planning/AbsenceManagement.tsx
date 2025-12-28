@@ -27,6 +27,7 @@ import {
   useCurrentEmployee,
   AbsenceRequest,
 } from "@/hooks/useShiftPlanning";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 import { MarkSickDialog } from "@/components/shift-planning/MarkSickDialog";
 
 export default function AbsenceManagement() {
@@ -41,6 +42,7 @@ export default function AbsenceManagement() {
   const { data: rejectedRequests } = useAbsenceRequests("rejected");
   const { data: departments } = useDepartments();
   const { data: currentEmployee } = useCurrentEmployee();
+  const { scopeAbsence } = usePermissions();
   const updateRequest = useUpdateAbsenceRequest();
 
   // Fetch team members for filtering
@@ -58,12 +60,30 @@ export default function AbsenceManagement() {
     enabled: selectedDepartment !== "all",
   });
 
-  const filterByTeam = (requests: AbsenceRequest[] | undefined) => {
-    if (!requests) return [];
+  const filterByTeamAndScope = (requests: AbsenceRequest[] | undefined) => {
+    if (!requests || !currentEmployee) return [];
+    
     // Filter out current user's own requests (can't approve your own)
-    let filtered = requests.filter(r => r.employee_id !== currentEmployee?.id);
-    if (selectedDepartment === "all" || !teamMemberIds) return filtered;
-    return filtered.filter(r => teamMemberIds.includes(r.employee_id));
+    let filtered = requests.filter(r => r.employee_id !== currentEmployee.id);
+    
+    // Apply scope-based filtering:
+    // Team leaders: only see their direct reports (where manager_id matches)
+    // Admins (scopeAbsence === "alt"): only see employees WITHOUT a manager
+    if (scopeAbsence !== "alt") {
+      // Team leader: only see requests from employees where I am their manager
+      filtered = filtered.filter(r => r.employee?.manager_id === currentEmployee.id);
+    } else {
+      // Admin/Owner: only see requests from employees with NO manager
+      // This ensures team leaders handle their own team's requests first
+      filtered = filtered.filter(r => !r.employee?.manager_id);
+    }
+    
+    // Additional department filter if selected
+    if (selectedDepartment !== "all" && teamMemberIds) {
+      filtered = filtered.filter(r => teamMemberIds.includes(r.employee_id));
+    }
+    
+    return filtered;
   };
 
   const handleApprove = (request: AbsenceRequest) => {
@@ -193,7 +213,7 @@ export default function AbsenceManagement() {
                 <Clock className="h-5 w-5 text-yellow-500" />
                 <div>
                   <p className="text-sm text-muted-foreground">Afventer</p>
-                  <p className="text-2xl font-bold">{filterByTeam(pendingRequests).length}</p>
+                  <p className="text-2xl font-bold">{filterByTeamAndScope(pendingRequests).length}</p>
                 </div>
               </div>
             </CardContent>
@@ -204,7 +224,7 @@ export default function AbsenceManagement() {
                 <Check className="h-5 w-5 text-green-500" />
                 <div>
                   <p className="text-sm text-muted-foreground">Godkendt (denne måned)</p>
-                  <p className="text-2xl font-bold">{filterByTeam(approvedRequests).length}</p>
+                  <p className="text-2xl font-bold">{filterByTeamAndScope(approvedRequests).length}</p>
                 </div>
               </div>
             </CardContent>
@@ -215,7 +235,7 @@ export default function AbsenceManagement() {
                 <X className="h-5 w-5 text-red-500" />
                 <div>
                   <p className="text-sm text-muted-foreground">Afvist (denne måned)</p>
-                  <p className="text-2xl font-bold">{filterByTeam(rejectedRequests).length}</p>
+                  <p className="text-2xl font-bold">{filterByTeamAndScope(rejectedRequests).length}</p>
                 </div>
               </div>
             </CardContent>
@@ -227,8 +247,8 @@ export default function AbsenceManagement() {
           <TabsList>
             <TabsTrigger value="pending" className="flex items-center gap-2">
               Afventer
-              {filterByTeam(pendingRequests).length > 0 && (
-                <Badge variant="secondary">{filterByTeam(pendingRequests).length}</Badge>
+              {filterByTeamAndScope(pendingRequests).length > 0 && (
+                <Badge variant="secondary">{filterByTeamAndScope(pendingRequests).length}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="approved">Godkendt</TabsTrigger>
@@ -236,42 +256,42 @@ export default function AbsenceManagement() {
           </TabsList>
 
           <TabsContent value="pending" className="space-y-4 mt-4">
-            {filterByTeam(pendingRequests).length === 0 ? (
+            {filterByTeamAndScope(pendingRequests).length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
                   Ingen ventende anmodninger
                 </CardContent>
               </Card>
             ) : (
-              filterByTeam(pendingRequests).map(request => (
+              filterByTeamAndScope(pendingRequests).map(request => (
                 <RequestCard key={request.id} request={request} showActions />
               ))
             )}
           </TabsContent>
 
           <TabsContent value="approved" className="space-y-4 mt-4">
-            {filterByTeam(approvedRequests).length === 0 ? (
+            {filterByTeamAndScope(approvedRequests).length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
                   Ingen godkendte anmodninger
                 </CardContent>
               </Card>
             ) : (
-              filterByTeam(approvedRequests).map(request => (
+              filterByTeamAndScope(approvedRequests).map(request => (
                 <RequestCard key={request.id} request={request} />
               ))
             )}
           </TabsContent>
 
           <TabsContent value="rejected" className="space-y-4 mt-4">
-            {filterByTeam(rejectedRequests).length === 0 ? (
+            {filterByTeamAndScope(rejectedRequests).length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
                   Ingen afviste anmodninger
                 </CardContent>
               </Card>
             ) : (
-              filterByTeam(rejectedRequests).map(request => (
+              filterByTeamAndScope(rejectedRequests).map(request => (
                 <RequestCard key={request.id} request={request} />
               ))
             )}

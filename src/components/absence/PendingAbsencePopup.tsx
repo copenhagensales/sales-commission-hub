@@ -32,7 +32,7 @@ export function PendingAbsencePopup() {
 
   // Fetch pending absence requests for team
   const { data: pendingRequests, isLoading } = useQuery({
-    queryKey: ["pending-absence-popup", user?.email],
+    queryKey: ["pending-absence-popup", user?.email, scopeAbsence],
     queryFn: async () => {
       if (!user?.email) return [];
 
@@ -49,34 +49,34 @@ export function PendingAbsencePopup() {
       const now = new Date().toISOString();
 
       // Get pending requests that are not postponed or postponement has expired
-      let query = supabase
+      const { data: allPendingRequests, error } = await supabase
         .from("absence_request_v2")
         .select(`
           *,
           employee:employee_master_data!absence_request_v2_employee_id_fkey(
-            id, first_name, last_name
+            id, first_name, last_name, manager_id
           )
         `)
         .eq("status", "pending")
         .or(`postponed_until.is.null,postponed_until.lt.${now}`)
         .order("created_at", { ascending: true });
 
-      // If scope is not "alt", filter to team members only
-      if (scopeAbsence !== "alt" && currentEmployee) {
-        const { data: teamMembers } = await supabase
-          .from("employee_master_data")
-          .select("id")
-          .eq("manager_id", currentEmployee.id);
+      if (error) throw error;
+      if (!allPendingRequests) return [];
 
-        const teamIds = teamMembers?.map(m => m.id) || [];
-        if (teamIds.length === 0) return [];
-
-        query = query.in("employee_id", teamIds);
+      // Team leader: Only see requests from employees where I am their manager
+      if (scopeAbsence !== "alt") {
+        return allPendingRequests.filter(req => 
+          req.employee?.manager_id === currentEmployee.id
+        );
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+      // Admin/Owner (scopeAbsence === "alt"):
+      // ONLY see requests from employees who have NO manager assigned
+      // This ensures team leaders handle their own team's requests first
+      return allPendingRequests.filter(req => 
+        !req.employee?.manager_id
+      );
     },
     enabled: !!user?.email && canViewAbsence,
     refetchOnWindowFocus: true,

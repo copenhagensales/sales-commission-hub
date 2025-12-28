@@ -44,6 +44,7 @@ export interface AbsenceRequest {
     first_name: string;
     last_name: string;
     department: string | null;
+    manager_id: string | null;
   };
 }
 
@@ -226,7 +227,7 @@ export function useAbsenceRequests(status?: "pending" | "approved" | "rejected",
         .from("absence_request_v2")
         .select(`
           *,
-          employee:employee_master_data(id, first_name, last_name)
+          employee:employee_master_data(id, first_name, last_name, manager_id)
         `)
         .order("created_at", { ascending: false });
 
@@ -278,7 +279,7 @@ export function useAbsencesForDateRange(startDate: string, endDate: string) {
         .from("absence_request_v2")
         .select(`
           *,
-          employee:employee_master_data(id, first_name, last_name)
+          employee:employee_master_data(id, first_name, last_name, manager_id)
         `)
         .eq("status", "approved")
         .lte("start_date", endDate)
