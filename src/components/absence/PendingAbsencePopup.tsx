@@ -54,7 +54,7 @@ export function PendingAbsencePopup() {
         .select(`
           *,
           employee:employee_master_data!absence_request_v2_employee_id_fkey(
-            id, first_name, last_name, manager_id
+            id, first_name, last_name
           )
         `)
         .eq("status", "pending")
@@ -64,18 +64,53 @@ export function PendingAbsencePopup() {
       if (error) throw error;
       if (!allPendingRequests) return [];
 
-      // Team leader: Only see requests from employees where I am their manager
+      // Get teams where current user is team_leader or assistant_team_leader
+      const { data: ledTeams } = await supabase
+        .from("teams")
+        .select("id")
+        .or(`team_leader_id.eq.${currentEmployee.id},assistant_team_leader_id.eq.${currentEmployee.id}`);
+
+      const ledTeamIds = ledTeams?.map(t => t.id) || [];
+
+      // Get all employees from those teams
+      let teamMemberIds: string[] = [];
+      if (ledTeamIds.length > 0) {
+        const { data: teamMembers } = await supabase
+          .from("team_members")
+          .select("employee_id")
+          .in("team_id", ledTeamIds);
+        teamMemberIds = teamMembers?.map(tm => tm.employee_id) || [];
+      }
+
+      // Team leader: Only see requests from employees in teams I lead
       if (scopeAbsence !== "alt") {
         return allPendingRequests.filter(req => 
-          req.employee?.manager_id === currentEmployee.id
+          teamMemberIds.includes(req.employee_id)
         );
       }
 
       // Admin/Owner (scopeAbsence === "alt"):
-      // ONLY see requests from employees who have NO manager assigned
+      // Get ALL employees who are in a team with a leader assigned
+      const { data: teamsWithLeaders } = await supabase
+        .from("teams")
+        .select("id")
+        .not("team_leader_id", "is", null);
+
+      const teamsWithLeaderIds = teamsWithLeaders?.map(t => t.id) || [];
+
+      let employeesWithLeaders: string[] = [];
+      if (teamsWithLeaderIds.length > 0) {
+        const { data: members } = await supabase
+          .from("team_members")
+          .select("employee_id")
+          .in("team_id", teamsWithLeaderIds);
+        employeesWithLeaders = members?.map(m => m.employee_id) || [];
+      }
+
+      // Admin only sees requests from employees who are NOT in any team with a leader
       // This ensures team leaders handle their own team's requests first
       return allPendingRequests.filter(req => 
-        !req.employee?.manager_id
+        !employeesWithLeaders.includes(req.employee_id)
       );
     },
     enabled: !!user?.email && canViewAbsence,

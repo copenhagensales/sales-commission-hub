@@ -60,22 +60,78 @@ export default function AbsenceManagement() {
     enabled: selectedDepartment !== "all",
   });
 
+  // Fetch teams where current user is team leader or assistant team leader
+  const { data: ledTeamMemberIds } = useQuery({
+    queryKey: ["led-team-member-ids", currentEmployee?.id],
+    queryFn: async () => {
+      if (!currentEmployee?.id) return [];
+      
+      // Get teams where current user is team_leader or assistant_team_leader
+      const { data: ledTeams, error: teamsError } = await supabase
+        .from("teams")
+        .select("id")
+        .or(`team_leader_id.eq.${currentEmployee.id},assistant_team_leader_id.eq.${currentEmployee.id}`);
+      
+      if (teamsError) throw teamsError;
+      
+      const ledTeamIds = ledTeams?.map(t => t.id) || [];
+      if (ledTeamIds.length === 0) return [];
+      
+      // Get all employees from those teams
+      const { data: teamMembers, error: membersError } = await supabase
+        .from("team_members")
+        .select("employee_id")
+        .in("team_id", ledTeamIds);
+      
+      if (membersError) throw membersError;
+      return teamMembers?.map(tm => tm.employee_id) || [];
+    },
+    enabled: !!currentEmployee?.id,
+  });
+
+  // Fetch all employees who are in teams with leaders (for admin filtering)
+  const { data: employeesWithTeamLeaders } = useQuery({
+    queryKey: ["employees-with-team-leaders"],
+    queryFn: async () => {
+      // Get all teams that have a leader assigned
+      const { data: teamsWithLeaders, error: teamsError } = await supabase
+        .from("teams")
+        .select("id")
+        .not("team_leader_id", "is", null);
+      
+      if (teamsError) throw teamsError;
+      
+      const teamIds = teamsWithLeaders?.map(t => t.id) || [];
+      if (teamIds.length === 0) return [];
+      
+      // Get all employees from those teams
+      const { data: members, error: membersError } = await supabase
+        .from("team_members")
+        .select("employee_id")
+        .in("team_id", teamIds);
+      
+      if (membersError) throw membersError;
+      return members?.map(m => m.employee_id) || [];
+    },
+    enabled: scopeAbsence === "alt",
+  });
+
   const filterByTeamAndScope = (requests: AbsenceRequest[] | undefined) => {
     if (!requests || !currentEmployee) return [];
     
     // Filter out current user's own requests (can't approve your own)
     let filtered = requests.filter(r => r.employee_id !== currentEmployee.id);
     
-    // Apply scope-based filtering:
-    // Team leaders: only see their direct reports (where manager_id matches)
-    // Admins (scopeAbsence === "alt"): only see employees WITHOUT a manager
+    // Apply scope-based filtering using team relationships:
+    // Team leaders: only see employees from teams they lead
+    // Admins (scopeAbsence === "alt"): only see employees NOT in any team with a leader
     if (scopeAbsence !== "alt") {
-      // Team leader: only see requests from employees where I am their manager
-      filtered = filtered.filter(r => r.employee?.manager_id === currentEmployee.id);
+      // Team leader: only see requests from employees in teams I lead
+      filtered = filtered.filter(r => ledTeamMemberIds?.includes(r.employee_id) ?? false);
     } else {
-      // Admin/Owner: only see requests from employees with NO manager
+      // Admin/Owner: only see requests from employees NOT in any team with a leader
       // This ensures team leaders handle their own team's requests first
-      filtered = filtered.filter(r => !r.employee?.manager_id);
+      filtered = filtered.filter(r => !(employeesWithTeamLeaders?.includes(r.employee_id) ?? false));
     }
     
     // Additional department filter if selected
