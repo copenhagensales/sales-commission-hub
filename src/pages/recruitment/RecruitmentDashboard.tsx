@@ -296,20 +296,20 @@ export default function RecruitmentDashboard() {
           <CardTitle className="text-lg font-semibold text-foreground">Rekrutteringspipeline (30 dage)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 overflow-x-auto pb-2">
             {[
               { status: "new", label: "Ny", color: "bg-blue-500" },
               { status: "contacted", label: "Kontaktet", color: "bg-yellow-500" },
-              { status: "interview_scheduled", label: "Samtale planlagt", color: "bg-purple-500" },
-              { status: "interviewed", label: "Samtale afholdt", color: "bg-cyan-500" },
+              { status: "interview_scheduled", label: "Samtale", color: "bg-purple-500" },
+              { status: "interviewed", label: "Afholdt", color: "bg-cyan-500" },
               { status: "hired", label: "Ansat", color: "bg-green-500" },
             ].map((stage, idx) => (
-              <div key={stage.status} className="flex-1 text-center">
+              <div key={stage.status} className="flex-1 min-w-[60px] text-center">
                 <div className={`h-2 ${stage.color} rounded-full mb-2`} />
-                <div className="text-2xl font-bold text-foreground">
+                <div className="text-xl sm:text-2xl font-bold text-foreground">
                   {statusCounts[stage.status] || 0}
                 </div>
-                <p className="text-xs text-muted-foreground">{stage.label}</p>
+                <p className="text-xs text-muted-foreground whitespace-nowrap">{stage.label}</p>
               </div>
             ))}
           </div>
@@ -318,26 +318,26 @@ export default function RecruitmentDashboard() {
 
       {/* Applicants Over Time Chart */}
       <Card className="bg-card border-border">
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
               Ansøgninger over tid
             </CardTitle>
-            <div className="flex gap-1">
+            <div className="flex gap-1 overflow-x-auto pb-1 -mb-1">
               {[
-                { label: "30 dage", days: 30 },
-                { label: "60 dage", days: 60 },
-                { label: "90 dage", days: 90 },
-                { label: "6 mdr.", days: 180 },
-                { label: "12 mdr.", days: 365 },
+                { label: "30d", days: 30 },
+                { label: "60d", days: 60 },
+                { label: "90d", days: 90 },
+                { label: "6m", days: 180 },
+                { label: "12m", days: 365 },
               ].map((option) => (
                 <Button
                   key={option.days}
                   variant={chartPeriod === option.days ? "default" : "outline"}
                   size="sm"
                   onClick={() => setChartPeriod(option.days)}
-                  className="text-xs"
+                  className="text-xs px-2 sm:px-3 shrink-0"
                 >
                   {option.label}
                 </Button>
@@ -346,8 +346,8 @@ export default function RecruitmentDashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={chartConfig} className="h-[300px] w-full">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <ChartContainer config={chartConfig} className="h-[200px] sm:h-[300px] w-full">
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="applicantGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
@@ -358,15 +358,16 @@ export default function RecruitmentDashboard() {
                 dataKey="date" 
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                tickFormatter={(value) => format(new Date(value), chartPeriod > 90 ? "MMM" : "d. MMM", { locale: da })}
-                interval={chartPeriod > 90 ? "preserveStartEnd" : Math.floor(chartData.length / 6)}
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                tickFormatter={(value) => format(new Date(value), chartPeriod > 90 ? "MMM" : "d/M", { locale: da })}
+                interval={chartPeriod > 90 ? "preserveStartEnd" : Math.floor(chartData.length / 4)}
               />
               <YAxis 
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
                 allowDecimals={false}
+                width={30}
               />
               <ChartTooltip 
                 content={<ChartTooltipContent />}
@@ -395,14 +396,14 @@ export default function RecruitmentDashboard() {
           {recentHiresByTeam.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">Ingen ansættelser de sidste 30 dage</p>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
               {recentHiresByTeam.map((team) => (
                 <div 
                   key={team.name} 
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border"
+                  className="flex items-center justify-between p-2.5 sm:p-3 rounded-lg bg-muted/30 border border-border"
                 >
                   <span className="text-sm font-medium text-foreground truncate">{team.name}</span>
-                  <span className="text-lg font-bold text-foreground ml-2">{team.count}</span>
+                  <span className="text-lg font-bold text-foreground ml-2 shrink-0">{team.count}</span>
                 </div>
               ))}
             </div>
