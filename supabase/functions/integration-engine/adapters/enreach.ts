@@ -809,20 +809,20 @@ export class EnreachAdapter implements DialerAdapter {
     try {
       console.log(`[EnreachAdapter] Fetching users from leads data...`);
       
-      // Fetch recent leads to extract unique users
+      // Fetch recent leads to extract unique users - use 7 days for faster extraction
       const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - 30); // Last 30 days
+      cutoffDate.setDate(cutoffDate.getDate() - 7);
       const modifiedFrom = cutoffDate.toISOString().split("T")[0];
       
       const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true`;
       
       const userMap = new Map<string, StandardUser>();
       let skip = 0;
-      const take = 500;
+      const take = 1000; // Larger batch size for efficiency
       let hasMore = true;
       let page = 1;
       
-      while (hasMore && page <= 20) { // Max 10,000 leads for user extraction
+      while (hasMore && page <= 10) { // Max 10,000 leads for user extraction
         const separator = endpoint.includes("?") ? "&" : "?";
         const pagedEndpoint = `${endpoint}${separator}skip=${skip}&take=${take}`;
         
