@@ -144,19 +144,82 @@ export function DialerMappingTab() {
     (a) => !mappedAgentIds.includes(a.id) && a.email?.toLowerCase().endsWith("@copenhagensales.dk")
   );
 
-  // Find suggested employee for each unmapped agent based on email match
-  const getSuggestedEmployee = (agentEmail: string) => {
-    return employees.find(
-      (emp) => emp.private_email?.toLowerCase() === agentEmail.toLowerCase()
+  // Normalize name for comparison (remove accents, lowercase, trim)
+  const normalizeName = (name: string): string => {
+    return name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Remove accents
+      .replace(/[^a-z\s]/g, "") // Keep only letters and spaces
+      .trim();
+  };
+
+  // Calculate similarity score between two names (0-100)
+  const calculateNameSimilarity = (name1: string, name2: string): number => {
+    const n1 = normalizeName(name1);
+    const n2 = normalizeName(name2);
+    
+    if (n1 === n2) return 100;
+    
+    // Check if one contains the other
+    if (n1.includes(n2) || n2.includes(n1)) return 80;
+    
+    // Split into words and check overlap
+    const words1 = n1.split(/\s+/).filter(Boolean);
+    const words2 = n2.split(/\s+/).filter(Boolean);
+    
+    let matchedWords = 0;
+    for (const w1 of words1) {
+      for (const w2 of words2) {
+        if (w1 === w2 || (w1.length > 2 && w2.length > 2 && (w1.includes(w2) || w2.includes(w1)))) {
+          matchedWords++;
+          break;
+        }
+      }
+    }
+    
+    const totalWords = Math.max(words1.length, words2.length);
+    if (totalWords === 0) return 0;
+    
+    return Math.round((matchedWords / totalWords) * 70);
+  };
+
+  // Find suggested employee for each unmapped agent based on email or name match
+  const getSuggestedEmployee = (agent: Agent) => {
+    // First try email match
+    const emailMatch = employees.find(
+      (emp) => emp.private_email?.toLowerCase() === agent.email.toLowerCase()
     );
+    if (emailMatch) return { employee: emailMatch, score: 100, matchType: "email" as const };
+
+    // Then try name matching
+    let bestMatch: { employee: Employee; score: number; matchType: "name" } | null = null;
+    
+    for (const emp of employees) {
+      const employeeName = `${emp.first_name || ""} ${emp.last_name || ""}`.trim();
+      const score = calculateNameSimilarity(agent.name, employeeName);
+      
+      if (score >= 50 && (!bestMatch || score > bestMatch.score)) {
+        bestMatch = { employee: emp, score, matchType: "name" };
+      }
+    }
+    
+    return bestMatch;
   };
 
   // Memoized unmapped agents with suggestions
   const unmappedAgentsWithSuggestions = useMemo(() => {
-    return unmappedAgents.map((agent) => ({
-      ...agent,
-      suggestedEmployee: getSuggestedEmployee(agent.email),
-    }));
+    return unmappedAgents
+      .map((agent) => {
+        const suggestion = getSuggestedEmployee(agent);
+        return {
+          ...agent,
+          suggestedEmployee: suggestion?.employee,
+          matchScore: suggestion?.score || 0,
+          matchType: suggestion?.matchType,
+        };
+      })
+      .sort((a, b) => b.matchScore - a.matchScore); // Sort by best matches first
   }, [unmappedAgents, employees]);
 
   // Handle mapping from unmapped section
@@ -211,10 +274,31 @@ export function DialerMappingTab() {
               {unmappedAgentsWithSuggestions.length} agenter mangler mapping
             </span>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Disse agenter har ingen medarbejder-tilknytning og kan ikke bruges i systemet. 
-            Tilknyt dem herunder for at aktivere dem.
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Disse agenter har ingen medarbejder-tilknytning og kan ikke bruges i systemet. 
+              Tilknyt dem herunder for at aktivere dem.
+            </p>
+            {unmappedAgentsWithSuggestions.filter(a => a.suggestedEmployee).length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const agentsWithSuggestions = unmappedAgentsWithSuggestions.filter(a => a.suggestedEmployee);
+                  agentsWithSuggestions.forEach((agent) => {
+                    if (agent.suggestedEmployee) {
+                      addMappingMutation.mutate({ employeeId: agent.suggestedEmployee.id, agentId: agent.id });
+                    }
+                  });
+                }}
+                disabled={addMappingMutation.isPending}
+                className="gap-1.5 shrink-0"
+              >
+                <Check className="h-4 w-4" />
+                Godkend alle foreslåede ({unmappedAgentsWithSuggestions.filter(a => a.suggestedEmployee).length})
+              </Button>
+            )}
+          </div>
 
           <div className="grid gap-3">
             {unmappedAgentsWithSuggestions.map((agent) => {
@@ -238,6 +322,16 @@ export function DialerMappingTab() {
                         </div>
                       </div>
 
+                      {/* Match indicator */}
+                      {hasSuggestion && (
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/10 text-green-600 text-xs">
+                          <Check className="h-3 w-3" />
+                          <span>
+                            {agent.matchType === "email" ? "Email match" : `${agent.matchScore}% name match`}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Employee selection */}
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <Select
@@ -254,8 +348,10 @@ export function DialerMappingTab() {
                               <SelectItem key={emp.id} value={emp.id}>
                                 <div className="flex items-center gap-2">
                                   <span>{emp.first_name} {emp.last_name}</span>
-                                  {emp.private_email?.toLowerCase() === agent.email.toLowerCase() && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 py-0">Match</Badge>
+                                  {emp.id === agent.suggestedEmployee?.id && (
+                                    <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                                      {agent.matchType === "email" ? "Email" : "Name"}
+                                    </Badge>
                                   )}
                                 </div>
                               </SelectItem>
@@ -279,14 +375,6 @@ export function DialerMappingTab() {
                           )}
                         </Button>
                       </div>
-
-                      {/* Suggestion indicator */}
-                      {hasSuggestion && currentSelection === agent.suggestedEmployee?.id && (
-                        <div className="flex items-center gap-1 text-xs text-green-600">
-                          <Check className="h-3 w-3" />
-                          <span className="hidden sm:inline">Foreslået match</span>
-                        </div>
-                      )}
                     </div>
                   </CardContent>
                 </Card>
