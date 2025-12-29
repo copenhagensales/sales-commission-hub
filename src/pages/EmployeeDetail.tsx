@@ -12,7 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Phone, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, AlertTriangle, AlarmClock, FileText, Send, Palmtree, History, Lock } from "lucide-react";
+import { ArrowLeft, Phone, MessageSquare, KeyRound, RotateCcw, Thermometer, CalendarX, AlertTriangle, AlarmClock, FileText, Send, Palmtree, History, Lock, Clock } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SendContractDialog } from "@/components/contracts/SendContractDialog";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
 import { TeamLeaderTeams } from "@/components/employees/TeamLeaderTeams";
@@ -251,6 +252,23 @@ export default function EmployeeDetail() {
         .select("*")
         .eq("employee_id", id)
         .order("date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  // Fetch time stamps for this employee
+  const { data: timeStamps = [] } = useQuery({
+    queryKey: ["employee-time-stamps", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data, error } = await supabase
+        .from("time_stamps")
+        .select("*")
+        .eq("employee_id", id)
+        .order("clock_in", { ascending: false })
+        .limit(50);
       if (error) throw error;
       return data;
     },
@@ -1058,16 +1076,74 @@ export default function EmployeeDetail() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5 text-primary" />
-                  Lønhistorik
+                  <Clock className="h-5 w-5 text-primary" />
+                  Indstemplinger ({timeStamps.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12 text-muted-foreground">
-                  <History className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium">Historik kommer snart</p>
-                  <p className="text-sm mt-2">Her vil du kunne se løndata fra vagter, salg, provision og annulleringer.</p>
-                </div>
+                {timeStamps.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg font-medium">Ingen indstemplinger endnu</p>
+                    <p className="text-sm mt-2">Medarbejderen har ikke stemplet ind endnu.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Dato</TableHead>
+                          <TableHead>Ind</TableHead>
+                          <TableHead>Ud</TableHead>
+                          <TableHead>Pause</TableHead>
+                          <TableHead className="text-right">Effektive timer</TableHead>
+                          {employee?.salary_type === "hourly" && employee?.salary_amount && (
+                            <TableHead className="text-right">Løn</TableHead>
+                          )}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {timeStamps.map((stamp) => {
+                          const clockIn = new Date(stamp.clock_in);
+                          const clockOut = stamp.clock_out ? new Date(stamp.clock_out) : null;
+                          const effectiveHours = stamp.effective_hours ?? 0;
+                          const dailyPay = employee?.salary_type === "hourly" && employee?.salary_amount 
+                            ? effectiveHours * employee.salary_amount 
+                            : null;
+
+                          return (
+                            <TableRow key={stamp.id}>
+                              <TableCell className="font-medium">
+                                {format(clockIn, "EEE d. MMM", { locale: da })}
+                              </TableCell>
+                              <TableCell>
+                                {format(clockIn, "HH:mm")}
+                              </TableCell>
+                              <TableCell>
+                                {clockOut ? format(clockOut, "HH:mm") : (
+                                  <Badge variant="outline" className="text-amber-600 border-amber-500/30">
+                                    Aktiv
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {stamp.break_minutes ? `${stamp.break_minutes} min` : "-"}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {effectiveHours.toFixed(1)} t
+                              </TableCell>
+                              {employee?.salary_type === "hourly" && employee?.salary_amount && (
+                                <TableCell className="text-right font-medium">
+                                  {dailyPay?.toLocaleString("da-DK", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kr
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
