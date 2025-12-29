@@ -120,19 +120,20 @@ function getRawResultText(payload: Record<string, any> | null): string | null {
 }
 
 // Get display info for a campaign status
-function getCampaignStatusInfo(status: string | null): { label: string; color: string; isKnown: boolean } {
-  if (!status) return { label: "-", color: "bg-muted text-muted-foreground", isKnown: false };
+function getCampaignStatusInfo(status: string | null): { label: string; color: string; isKnown: boolean; isEmpty: boolean } {
+  if (!status) return { label: "No data", color: "bg-muted/30 text-muted-foreground/60 border-dashed", isKnown: false, isEmpty: true };
   
   const info = CAMPAIGN_STATUS_LABELS[status];
   if (info) {
-    return { ...info, isKnown: true };
+    return { ...info, isKnown: true, isEmpty: false };
   }
   
   // Handle unknown status gracefully - display as-is with neutral styling
   return { 
     label: status, 
     color: "bg-muted/50 text-foreground border-border", 
-    isKnown: false 
+    isKnown: false,
+    isEmpty: false 
   };
 }
 
@@ -215,7 +216,14 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
       render: (value) => {
         const statusInfo = getCampaignStatusInfo(value);
         return (
-          <Badge className={cn(statusInfo.color, !statusInfo.isKnown && "border-dashed")} variant="outline">
+          <Badge 
+            className={cn(
+              statusInfo.color, 
+              !statusInfo.isKnown && "border-dashed",
+              statusInfo.isEmpty && "italic font-normal"
+            )} 
+            variant="outline"
+          >
             {statusInfo.label}
             {!statusInfo.isKnown && value && (
               <span className="ml-1 text-[10px] opacity-60">(?)</span>
@@ -266,9 +274,14 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
       label: "Agent",
       accessor: (e) => {
         const payload = e.payload as Record<string, any> | null;
-        return e._agent?.name || payload?.agentName || payload?.agent_name || "-";
+        const name = e._agent?.name || payload?.agentName || payload?.agent_name || payload?.AgentEmail || "";
+        return name && name.trim() ? name : null;
       },
-      render: (value) => <span className="text-sm truncate max-w-[150px] block">{value}</span>,
+      render: (value) => value ? (
+        <span className="text-sm truncate max-w-[150px] block">{value}</span>
+      ) : (
+        <span className="text-xs text-muted-foreground/60 italic">No data</span>
+      ),
       sortable: true,
       filterable: true,
       filterType: "text",
@@ -280,9 +293,14 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
       label: "Customer",
       accessor: (e) => {
         const payload = e.payload as Record<string, any> | null;
-        return e._customer?.phone || payload?.customerPhone || payload?.phone || "-";
+        const phone = e._customer?.phone || payload?.customerPhone || payload?.phone || payload?.CustomerPhone || "";
+        return phone && phone.trim() ? phone : null;
       },
-      render: (value) => <span className="font-mono text-xs truncate max-w-[120px] block">{value}</span>,
+      render: (value) => value ? (
+        <span className="font-mono text-xs truncate max-w-[120px] block">{value}</span>
+      ) : (
+        <span className="text-xs text-muted-foreground/60 italic">No data</span>
+      ),
       sortable: false,
       filterable: true,
       filterType: "text",
