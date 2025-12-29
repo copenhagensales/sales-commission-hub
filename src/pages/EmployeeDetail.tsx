@@ -1073,64 +1073,116 @@ export default function EmployeeDetail() {
           </TabsContent>
 
           <TabsContent value="historik" className="mt-6">
-            {/* Payroll Period KPI Card */}
+            {/* Payroll Period KPI Cards */}
             {(() => {
-              // Calculate payroll period (15th to 14th)
+              // Calculate payroll periods (15th to 14th)
               const now = new Date();
               const currentDay = now.getDate();
-              let periodStart: Date;
-              let periodEnd: Date;
+              let currentPeriodStart: Date;
+              let currentPeriodEnd: Date;
+              let prevPeriodStart: Date;
+              let prevPeriodEnd: Date;
               
               if (currentDay >= 15) {
                 // Current period: 15th of this month to 14th of next month
-                periodStart = new Date(now.getFullYear(), now.getMonth(), 15);
-                periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 14, 23, 59, 59);
+                currentPeriodStart = new Date(now.getFullYear(), now.getMonth(), 15);
+                currentPeriodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 14, 23, 59, 59);
+                // Previous period: 15th of last month to 14th of this month
+                prevPeriodStart = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+                prevPeriodEnd = new Date(now.getFullYear(), now.getMonth(), 14, 23, 59, 59);
               } else {
                 // Current period: 15th of last month to 14th of this month
-                periodStart = new Date(now.getFullYear(), now.getMonth() - 1, 15);
-                periodEnd = new Date(now.getFullYear(), now.getMonth(), 14, 23, 59, 59);
+                currentPeriodStart = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+                currentPeriodEnd = new Date(now.getFullYear(), now.getMonth(), 14, 23, 59, 59);
+                // Previous period: 15th of 2 months ago to 14th of last month
+                prevPeriodStart = new Date(now.getFullYear(), now.getMonth() - 2, 15);
+                prevPeriodEnd = new Date(now.getFullYear(), now.getMonth() - 1, 14, 23, 59, 59);
               }
 
-              // Filter time stamps for this period
-              const periodStamps = timeStamps.filter(stamp => {
+              // Filter time stamps for current period
+              const currentPeriodStamps = timeStamps.filter(stamp => {
                 const clockIn = new Date(stamp.clock_in);
-                return clockIn >= periodStart && clockIn <= periodEnd;
+                return clockIn >= currentPeriodStart && clockIn <= currentPeriodEnd;
               });
 
-              const totalHours = periodStamps.reduce((sum, stamp) => sum + (stamp.effective_hours ?? 0), 0);
-              const totalPay = employee?.salary_type === "hourly" && employee?.salary_amount 
-                ? totalHours * employee.salary_amount 
+              // Filter time stamps for previous period
+              const prevPeriodStamps = timeStamps.filter(stamp => {
+                const clockIn = new Date(stamp.clock_in);
+                return clockIn >= prevPeriodStart && clockIn <= prevPeriodEnd;
+              });
+
+              const currentTotalHours = currentPeriodStamps.reduce((sum, stamp) => sum + (stamp.effective_hours ?? 0), 0);
+              const currentTotalPay = employee?.salary_type === "hourly" && employee?.salary_amount 
+                ? currentTotalHours * employee.salary_amount 
+                : null;
+
+              const prevTotalHours = prevPeriodStamps.reduce((sum, stamp) => sum + (stamp.effective_hours ?? 0), 0);
+              const prevTotalPay = employee?.salary_type === "hourly" && employee?.salary_amount 
+                ? prevTotalHours * employee.salary_amount 
                 : null;
 
               return (
-                <Card className="mb-6 bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <AlarmClock className="h-4 w-4" />
-                      Lønperiode: {format(periodStart, "d. MMM", { locale: da })} - {format(periodEnd, "d. MMM yyyy", { locale: da })}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-2xl font-bold">{totalHours.toFixed(1)} t</p>
-                        <p className="text-xs text-muted-foreground">Timer optjent</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold">{periodStamps.length}</p>
-                        <p className="text-xs text-muted-foreground">Arbejdsdage</p>
-                      </div>
-                      {totalPay !== null && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {/* Current Period */}
+                  <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <AlarmClock className="h-4 w-4" />
+                        Nuværende periode: {format(currentPeriodStart, "d. MMM", { locale: da })} - {format(currentPeriodEnd, "d. MMM", { locale: da })}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-4">
                         <div>
-                          <p className="text-2xl font-bold text-primary">
-                            {totalPay.toLocaleString("da-DK", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kr
-                          </p>
-                          <p className="text-xs text-muted-foreground">Opsparet løn</p>
+                          <p className="text-2xl font-bold">{currentTotalHours.toFixed(1)} t</p>
+                          <p className="text-xs text-muted-foreground">Timer</p>
                         </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                        <div>
+                          <p className="text-2xl font-bold">{currentPeriodStamps.length}</p>
+                          <p className="text-xs text-muted-foreground">Dage</p>
+                        </div>
+                        {currentTotalPay !== null && (
+                          <div>
+                            <p className="text-2xl font-bold text-primary">
+                              {currentTotalPay.toLocaleString("da-DK", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kr
+                            </p>
+                            <p className="text-xs text-muted-foreground">Løn</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Previous Period */}
+                  <Card className="bg-muted/30 border-muted-foreground/10">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <History className="h-4 w-4" />
+                        Sidste periode: {format(prevPeriodStart, "d. MMM", { locale: da })} - {format(prevPeriodEnd, "d. MMM", { locale: da })}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-2xl font-bold">{prevTotalHours.toFixed(1)} t</p>
+                          <p className="text-xs text-muted-foreground">Timer</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold">{prevPeriodStamps.length}</p>
+                          <p className="text-xs text-muted-foreground">Dage</p>
+                        </div>
+                        {prevTotalPay !== null && (
+                          <div>
+                            <p className="text-2xl font-bold">
+                              {prevTotalPay.toLocaleString("da-DK", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kr
+                            </p>
+                            <p className="text-xs text-muted-foreground">Løn</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               );
             })()}
 
