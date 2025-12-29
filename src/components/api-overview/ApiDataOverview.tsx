@@ -12,6 +12,9 @@ import { Search, Users, Phone, ShoppingCart, Database, Loader2, FileJson } from 
 import { Skeleton } from "@/components/ui/skeleton";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import EventDataTable from "./EventDataTable";
+import AgentsDataTable from "./AgentsDataTable";
+import SalesDataTable from "./SalesDataTable";
+import CallsDataTable from "./CallsDataTable";
 
 const CHART_COLORS = [
   "hsl(var(--primary))",
