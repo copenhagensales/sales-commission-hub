@@ -557,30 +557,30 @@ export default function ApiDataOverview() {
             <Tabs defaultValue="events" className="space-y-4">
               <ScrollArea className="w-full pb-2">
                 <TabsList className="inline-flex w-max min-w-full sm:w-auto gap-1">
-                  <TabsTrigger value="events" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+                  <TabsTrigger value="events" className="gap-1 sm:gap-1.5 text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3">
                     <FileJson className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    <span className="hidden xs:inline">Events</span>
-                    <span className="xs:hidden">Evt</span>
+                    <span className="hidden sm:inline">Events</span>
+                    <span className="sm:hidden">Evt</span>
                     <span className="text-[10px] sm:text-xs opacity-70">
                       ({sourceStats?.bySource?.[source.toLowerCase()]?.events?.toLocaleString() || providerStats.sales.toLocaleString()})
                     </span>
                   </TabsTrigger>
-                  <TabsTrigger value="agents" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+                  <TabsTrigger value="agents" className="gap-1 sm:gap-1.5 text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3">
                     <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    <span className="hidden xs:inline">Agents</span>
-                    <span className="xs:hidden">Agt</span>
+                    <span className="hidden sm:inline">Agents</span>
+                    <span className="sm:hidden">Agt</span>
                     <span className="text-[10px] sm:text-xs opacity-70">({filteredAgents.length})</span>
                   </TabsTrigger>
-                  <TabsTrigger value="sales" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+                  <TabsTrigger value="sales" className="gap-1 sm:gap-1.5 text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3">
                     <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    <span className="hidden xs:inline">Sales</span>
-                    <span className="xs:hidden">Sls</span>
+                    <span className="hidden sm:inline">Sales</span>
+                    <span className="sm:hidden">Sls</span>
                     <span className="text-[10px] sm:text-xs opacity-70">({filteredSales.length})</span>
                   </TabsTrigger>
-                  <TabsTrigger value="calls" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+                  <TabsTrigger value="calls" className="gap-1 sm:gap-1.5 text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3">
                     <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    <span className="hidden xs:inline">Calls</span>
-                    <span className="xs:hidden">Cls</span>
+                    <span className="hidden sm:inline">Calls</span>
+                    <span className="sm:hidden">Cls</span>
                     <span className="text-[10px] sm:text-xs opacity-70">({filteredCalls.length})</span>
                   </TabsTrigger>
                 </TabsList>
