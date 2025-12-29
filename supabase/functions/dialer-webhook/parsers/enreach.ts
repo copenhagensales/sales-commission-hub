@@ -192,10 +192,35 @@ export class EnreachWebhookParser implements WebhookParser {
       
       externalReference,
       
+      // Enreach: derive campaign status from result field
+      campaignStatus: this.deriveCampaignStatus(result),
+      rawResultText: result || null,
+      
       products: [], // HeroBase webhooks typically don't include product data inline
       
       rawPayload: body as unknown as Record<string, unknown>,
     };
+  }
+  
+  /**
+   * Derive canonical campaign_status enum from Enreach result field
+   */
+  private deriveCampaignStatus(result: string): string | null {
+    if (!result) return null;
+    
+    const r = result.toLowerCase();
+    
+    if (r.includes('success') || r.includes('sale') || r.includes('succes')) return 'success';
+    if (r.includes('not interested') || r.includes('ikke interesseret')) return 'notInterested';
+    if (r.includes('invalid') || r.includes('ugyldig')) return 'invalid';
+    if (r.includes('no answer') || r.includes('ingen svar')) return 'noAnswer';
+    if (r.includes('busy') || r.includes('optaget')) return 'busy';
+    if (r.includes('callback') || r.includes('ring tilbage')) return 'callback';
+    if (r.includes('voicemail')) return 'voicemail';
+    if (r.includes('unqualified')) return 'unqualified';
+    
+    // Return original if no match
+    return result;
   }
   
   /**

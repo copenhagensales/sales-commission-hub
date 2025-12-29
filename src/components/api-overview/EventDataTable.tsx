@@ -71,21 +71,32 @@ const CAMPAIGN_STATUS_LABELS: Record<string, { label: string; color: string }> =
 
 // Helper to get campaign status enum from payload (canonical source of truth)
 // IMPORTANT: We ONLY use the structured enum field (campaign_status / campaignStatus).
-// We intentionally do NOT fall back to generic fields like "status" or event_type.
 function getCampaignStatus(payload: Record<string, any> | null): string | null {
   if (!payload) return null;
-  return (
-    payload.campaign_status ??
-    payload.campaignStatus ??
-    payload.CampaignStatus ??
-    payload.CAMPAIGN_STATUS ??
-    null
-  );
+  
+  // First check top-level (where we now store it in webhook processing)
+  const topLevel = payload.campaign_status ?? payload.campaignStatus ?? payload.CampaignStatus;
+  if (topLevel) return topLevel;
+  
+  // Also check in _parsed_webhook_data if present
+  const parsed = payload._parsed_webhook_data;
+  if (parsed) {
+    return parsed.campaignStatus ?? parsed.campaign_status ?? null;
+  }
+  
+  return null;
 }
 
 // Helper to get raw result text from payload (human-readable/localized, NOT used for logic)
 function getRawResultText(payload: Record<string, any> | null): string | null {
   if (!payload) return null;
+
+  // First check top-level (where we now store it)
+  if (payload.raw_result_text) return payload.raw_result_text;
+  
+  // Check in _parsed_webhook_data
+  const parsed = payload._parsed_webhook_data;
+  if (parsed?.rawResultText) return parsed.rawResultText;
 
   // Explicit common keys (including capitalized variants)
   if (Object.prototype.hasOwnProperty.call(payload, "Resultat Af Samtalen")) {
@@ -104,16 +115,6 @@ function getRawResultText(payload: Record<string, any> | null): string | null {
     null;
 
   if (direct !== null && direct !== undefined) return direct;
-
-  // Graceful fallback: find any key that looks like a result field (case-insensitive)
-  // and return its value if it's a primitive.
-  for (const [k, v] of Object.entries(payload)) {
-    const key = k.toLowerCase();
-    if (key.includes("result")) {
-      if (typeof v === "string") return v;
-      if (typeof v === "number" || typeof v === "boolean") return String(v);
-    }
-  }
 
   return null;
 }
