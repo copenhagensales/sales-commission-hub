@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, TrendingUp, TrendingDown, Users, DollarSign, BarChart3, RefreshCw, Radio } from "lucide-react";
+import { CalendarIcon, TrendingUp, TrendingDown, Users, DollarSign, BarChart3, RefreshCw, Radio, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   BarChart,
@@ -29,6 +29,7 @@ import {
   Cell,
 } from "recharts";
 import SalesFeed from "@/components/sales/SalesFeed";
+import ApiDataOverview from "@/components/api-overview/ApiDataOverview";
 
 const COLORS = [
   "hsl(var(--primary))",
@@ -429,6 +430,10 @@ export default function LiveStats() {
             <TabsTrigger value="employees">Employees</TabsTrigger>
             <TabsTrigger value="kpis">KPIs</TabsTrigger>
             <TabsTrigger value="raw">Raw Data</TabsTrigger>
+            <TabsTrigger value="api-overview" className="gap-2">
+              <Database className="h-3.5 w-3.5" />
+              API Data Overview
+            </TabsTrigger>
           </TabsList>
 
           {/* Live Sales Feed Tab */}
@@ -887,6 +892,11 @@ export default function LiveStats() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* API Data Overview Tab */}
+          <TabsContent value="api-overview">
+            <ApiDataOverview />
           </TabsContent>
         </Tabs>
       </div>
