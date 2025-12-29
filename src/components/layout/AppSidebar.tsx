@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,6 +60,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   );
   const [onboardingOpen, setOnboardingOpen] = useState(
     location.pathname.startsWith("/onboarding-program") || location.pathname === "/onboarding-program/kursus"
+  );
+  const [settingsOpen, setSettingsOpen] = useState(
+    ["/settings", "/live-stats"].includes(location.pathname)
   );
 
   // Fetch employee name and pending contracts count
@@ -1280,19 +1283,36 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             </NavLink>
           )}
 
-          {/* Settings */}
+          {/* Settings Menu */}
           {p.canViewSettings && (
-            <NavLink
-              to="/settings"
-              onClick={handleNavClick}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                location.pathname === "/settings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}
-            >
-              <Settings className="h-5 w-5" />
-              {t("sidebar.settings")}
-            </NavLink>
+            <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                ["/settings", "/live-stats"].includes(location.pathname) ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <Settings className="h-5 w-5" />
+                  {t("sidebar.settings")}
+                </div>
+                {settingsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                <NavLink to="/settings" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/settings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <Settings className="h-4 w-4" />
+                  {t("sidebar.settings")}
+                </NavLink>
+                <NavLink to="/live-stats" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/live-stats" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <Activity className="h-4 w-4" />
+                  Live Stats
+                </NavLink>
+              </CollapsibleContent>
+            </Collapsible>
           )}
         </nav>
         <div className="border-t border-sidebar-border p-4 space-y-2">
