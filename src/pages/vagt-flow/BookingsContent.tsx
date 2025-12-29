@@ -4,9 +4,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
-import { ChevronUp, ChevronDown, Trash2, Plus, Calendar, Car, AlertTriangle, Users, FileText, X, Pencil } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash2, Plus, Calendar as CalendarIcon, Car, AlertTriangle, Users, FileText, X, Pencil } from "lucide-react";
 import { usePermissions } from "@/hooks/usePositionPermissions";
-import { format, addDays, getWeek } from "date-fns";
+import { format, addDays, getWeek, startOfWeek } from "date-fns";
 import { getWeekStartDate, getWeekYear } from "@/lib/vagt-flow-date-utils";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +41,8 @@ import {
 import { AddEmployeeDialog } from "@/components/vagt-flow/AddEmployeeDialog";
 import { AddVehicleDialog } from "@/components/vagt-flow/AddVehicleDialog";
 import { EditBookingDialog } from "@/components/vagt-flow/EditBookingDialog";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
 export default function BookingsContent() {
   const { toast } = useToast();
@@ -313,10 +315,32 @@ export default function BookingsContent() {
           <Button variant="outline" size="icon" onClick={handlePrevWeek}>
             <ChevronDown className="h-4 w-4 rotate-90" />
           </Button>
-          <div className="text-center min-w-[80px]">
-            <div className="text-3xl font-bold">{selectedWeek}</div>
-            <div className="text-xs text-muted-foreground">{selectedYear}</div>
-          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="text-center min-w-[80px] hover:bg-muted/50 rounded-lg p-2 transition-colors cursor-pointer">
+                <div className="text-3xl font-bold">{selectedWeek}</div>
+                <div className="text-xs text-muted-foreground">{selectedYear}</div>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 bg-popover" align="center">
+              <Calendar
+                mode="single"
+                selected={weekStart}
+                onSelect={(date) => {
+                  if (date) {
+                    const newWeek = getWeek(date, { weekStartsOn: 1 });
+                    const newYear = getWeekYear(date);
+                    setSelectedWeek(newWeek);
+                    setSelectedYear(newYear);
+                  }
+                }}
+                showWeekNumber
+                weekStartsOn={1}
+                locale={da}
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
           <Button variant="outline" size="icon" onClick={handleNextWeek}>
             <ChevronUp className="h-4 w-4 rotate-90" />
           </Button>
@@ -381,7 +405,7 @@ export default function BookingsContent() {
                 <CardContent className="py-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Calendar className="h-5 w-5 text-primary" />
+                      <CalendarIcon className="h-5 w-5 text-primary" />
                     </div>
                     <div className="text-left">
                       <h3 className="font-semibold">{name}</h3>
