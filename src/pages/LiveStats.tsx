@@ -332,17 +332,24 @@ export default function LiveStats() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-3 sm:p-6">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Live Statistics</h1>
-            <p className="text-muted-foreground">Comprehensive data overview</p>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Live Statistics</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">Comprehensive data overview</p>
+            </div>
+            <Button variant="outline" size="icon" onClick={() => refetchSales()} className="shrink-0">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           </div>
-          <div className="flex items-center gap-3">
+          
+          {/* Filters Row - Stack on mobile */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <Select value={selectedClient} onValueChange={setSelectedClient}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="All Clients" />
               </SelectTrigger>
               <SelectContent>
@@ -357,12 +364,23 @@ export default function LiveStats() {
 
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-start text-left font-normal">
+                <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal">
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {format(dateRange.from, "dd MMM", { locale: da })} - {format(dateRange.to, "dd MMM", { locale: da })}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="range"
+                  selected={{ from: dateRange.from, to: dateRange.to }}
+                  onSelect={(range) => {
+                    if (range?.from) {
+                      setDateRange({ from: range.from, to: range.to || range.from });
+                    }
+                  }}
+                  numberOfMonths={1}
+                  className="sm:hidden"
+                />
                 <Calendar
                   mode="range"
                   selected={{ from: dateRange.from, to: dateRange.to }}
@@ -372,69 +390,75 @@ export default function LiveStats() {
                     }
                   }}
                   numberOfMonths={2}
+                  className="hidden sm:block"
                 />
               </PopoverContent>
             </Popover>
+          </div>
+        </div>
 
-            <Button variant="outline" size="icon" onClick={() => refetchSales()}>
-              <RefreshCw className="h-4 w-4" />
+        {/* Quick Date Presets - Horizontally scrollable on mobile */}
+        <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+          <div className="flex gap-2 min-w-max sm:min-w-0 sm:flex-wrap pb-2 sm:pb-0">
+            <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => setDateRange({ from: new Date(), to: new Date() })}>
+              Today
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs sm:text-sm"
+              onClick={() => setDateRange({ from: subDays(new Date(), 7), to: new Date() })}
+            >
+              Last 7 days
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs sm:text-sm"
+              onClick={() => setDateRange({ from: startOfMonth(new Date()), to: new Date() })}
+            >
+              This Month
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs sm:text-sm"
+              onClick={() => {
+                const lastMonth = subDays(startOfMonth(new Date()), 1);
+                setDateRange({ from: startOfMonth(lastMonth), to: endOfMonth(lastMonth) });
+              }}
+            >
+              Last Month
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs sm:text-sm"
+              onClick={() => setDateRange({ from: startOfYear(new Date()), to: new Date() })}
+            >
+              This Year
             </Button>
           </div>
         </div>
 
-        {/* Quick Date Presets */}
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => setDateRange({ from: new Date(), to: new Date() })}>
-            Today
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDateRange({ from: subDays(new Date(), 7), to: new Date() })}
-          >
-            Last 7 days
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDateRange({ from: startOfMonth(new Date()), to: new Date() })}
-          >
-            This Month
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const lastMonth = subDays(startOfMonth(new Date()), 1);
-              setDateRange({ from: startOfMonth(lastMonth), to: endOfMonth(lastMonth) });
-            }}
-          >
-            Last Month
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDateRange({ from: startOfYear(new Date()), to: new Date() })}
-          >
-            This Year
-          </Button>
-        </div>
-
-        <Tabs defaultValue="live" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="live" className="gap-2">
-              <Radio className="h-3.5 w-3.5" />
-              Live Feed
-            </TabsTrigger>
-            <TabsTrigger value="sales">Sales & Commission</TabsTrigger>
-            <TabsTrigger value="employees">Employees</TabsTrigger>
-            <TabsTrigger value="kpis">KPIs</TabsTrigger>
-            <TabsTrigger value="raw">Raw Data</TabsTrigger>
-            <TabsTrigger value="api-overview" className="gap-2">
-              <Database className="h-3.5 w-3.5" />
-              API Data Overview
-            </TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="live" className="space-y-4 sm:space-y-6">
+          {/* Scrollable tabs on mobile */}
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <TabsList className="w-max sm:w-auto">
+              <TabsTrigger value="live" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+                <Radio className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                <span className="hidden xs:inline">Live</span> Feed
+              </TabsTrigger>
+              <TabsTrigger value="sales" className="text-xs sm:text-sm px-2 sm:px-3">Sales</TabsTrigger>
+              <TabsTrigger value="employees" className="text-xs sm:text-sm px-2 sm:px-3">Employees</TabsTrigger>
+              <TabsTrigger value="kpis" className="text-xs sm:text-sm px-2 sm:px-3">KPIs</TabsTrigger>
+              <TabsTrigger value="raw" className="text-xs sm:text-sm px-2 sm:px-3">Raw</TabsTrigger>
+              <TabsTrigger value="api-overview" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+                <Database className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                API
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Live Sales Feed Tab */}
           <TabsContent value="live">
@@ -454,53 +478,53 @@ export default function LiveStats() {
           {/* Sales Tab */}
           <TabsContent value="sales" className="space-y-6">
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Sales</CardTitle>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
+              <Card className="p-2 sm:p-0">
+                <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Total Sales</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{salesStats?.totalSales || 0}</div>
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="text-lg sm:text-2xl font-bold">{salesStats?.totalSales || 0}</div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Validated</CardTitle>
+              <Card className="p-2 sm:p-0">
+                <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Validated</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{salesStats?.validatedSales || 0}</div>
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="text-lg sm:text-2xl font-bold text-green-600">{salesStats?.validatedSales || 0}</div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Cancelled</CardTitle>
+              <Card className="p-2 sm:p-0">
+                <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Cancelled</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">{salesStats?.cancelledSales || 0}</div>
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="text-lg sm:text-2xl font-bold text-red-600">{salesStats?.cancelledSales || 0}</div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
+              <Card className="p-2 sm:p-0">
+                <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Pending</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-yellow-600">{salesStats?.pendingSales || 0}</div>
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="text-lg sm:text-2xl font-bold text-yellow-600">{salesStats?.pendingSales || 0}</div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Rejected</CardTitle>
+              <Card className="p-2 sm:p-0">
+                <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Rejected</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-gray-600">{salesStats?.rejectedSales || 0}</div>
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="text-lg sm:text-2xl font-bold text-gray-600">{salesStats?.rejectedSales || 0}</div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Commission</CardTitle>
+              <Card className="p-2 sm:p-0 col-span-2 sm:col-span-1">
+                <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Commission</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-primary">
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="text-lg sm:text-2xl font-bold text-primary truncate">
                     {formatCurrency(salesStats?.totalCommission || 0)}
                   </div>
                 </CardContent>
@@ -508,33 +532,33 @@ export default function LiveStats() {
             </div>
 
             {/* Charts Row */}
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               {/* Sales Trend */}
               <Card>
-                <CardHeader>
-                  <CardTitle>Sales & Commission Trend</CardTitle>
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="text-sm sm:text-base">Sales & Commission Trend</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="h-[300px]">
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="h-[220px] sm:h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={salesStats?.salesByDate || []}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" tickFormatter={(v) => format(parseISO(v), "dd/MM")} />
-                        <YAxis yAxisId="left" />
-                        <YAxis yAxisId="right" orientation="right" />
+                        <XAxis dataKey="date" tickFormatter={(v) => format(parseISO(v), "dd/MM")} tick={{ fontSize: 10 }} />
+                        <YAxis yAxisId="left" tick={{ fontSize: 10 }} width={40} />
+                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} width={50} />
                         <Tooltip
                           formatter={(value: number, name: string) =>
                             name === "commission" ? formatCurrency(value) : value
                           }
                         />
-                        <Legend />
+                        <Legend wrapperStyle={{ fontSize: '12px' }} />
                         <Line
                           yAxisId="left"
                           type="monotone"
                           dataKey="sales"
                           stroke="#3b82f6"
                           strokeWidth={2}
-                          dot={{ fill: "#3b82f6", r: 4 }}
+                          dot={{ fill: "#3b82f6", r: 3 }}
                           name="Sales"
                         />
                         <Line
@@ -543,7 +567,7 @@ export default function LiveStats() {
                           dataKey="commission"
                           stroke="#ef4444"
                           strokeWidth={2}
-                          dot={{ fill: "#ef4444", r: 4 }}
+                          dot={{ fill: "#ef4444", r: 3 }}
                           name="Commission"
                         />
                       </LineChart>
@@ -554,22 +578,23 @@ export default function LiveStats() {
 
               {/* Status Breakdown */}
               <Card>
-                <CardHeader>
-                  <CardTitle>Validation Status Breakdown</CardTitle>
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="text-sm sm:text-base">Validation Status</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="h-[300px]">
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="h-[220px] sm:h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
                           data={salesStats?.statusBreakdown || []}
                           cx="50%"
                           cy="50%"
-                          innerRadius={60}
-                          outerRadius={100}
+                          innerRadius={40}
+                          outerRadius={70}
                           paddingAngle={5}
                           dataKey="value"
                           label={({ name, value }) => `${name}: ${value}`}
+                          labelLine={{ strokeWidth: 1 }}
                         >
                           {salesStats?.statusBreakdown?.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
@@ -585,49 +610,51 @@ export default function LiveStats() {
 
             {/* Sales by Agent */}
             <Card>
-              <CardHeader>
-                <CardTitle>Sales by Agent</CardTitle>
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="text-sm sm:text-base">Sales by Agent</CardTitle>
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Agent</TableHead>
-                      <TableHead className="text-right">Sales</TableHead>
-                      <TableHead className="text-right">Cancelled</TableHead>
-                      <TableHead className="text-right">Cancel Rate</TableHead>
-                      <TableHead className="text-right">Commission</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {salesStats?.salesByAgent.slice(0, 20).map((agent) => (
-                      <TableRow key={agent.name}>
-                        <TableCell className="font-medium">{agent.name}</TableCell>
-                        <TableCell className="text-right">{agent.sales}</TableCell>
-                        <TableCell className="text-right text-red-600">{agent.cancelled}</TableCell>
-                        <TableCell className="text-right">
-                          {agent.sales > 0 ? ((agent.cancelled / agent.sales) * 100).toFixed(1) : 0}%
-                        </TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(agent.commission)}</TableCell>
+              <CardContent className="p-0 sm:p-6">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs sm:text-sm">Agent</TableHead>
+                        <TableHead className="text-right text-xs sm:text-sm">Sales</TableHead>
+                        <TableHead className="text-right text-xs sm:text-sm hidden sm:table-cell">Cancelled</TableHead>
+                        <TableHead className="text-right text-xs sm:text-sm hidden md:table-cell">Cancel Rate</TableHead>
+                        <TableHead className="text-right text-xs sm:text-sm">Commission</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {salesStats?.salesByAgent.slice(0, 20).map((agent) => (
+                        <TableRow key={agent.name}>
+                          <TableCell className="font-medium text-xs sm:text-sm max-w-[120px] sm:max-w-none truncate">{agent.name}</TableCell>
+                          <TableCell className="text-right text-xs sm:text-sm">{agent.sales}</TableCell>
+                          <TableCell className="text-right text-red-600 text-xs sm:text-sm hidden sm:table-cell">{agent.cancelled}</TableCell>
+                          <TableCell className="text-right text-xs sm:text-sm hidden md:table-cell">
+                            {agent.sales > 0 ? ((agent.cancelled / agent.sales) * 100).toFixed(1) : 0}%
+                          </TableCell>
+                          <TableCell className="text-right font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(agent.commission)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
 
             {/* Sales by Client */}
             <Card>
-              <CardHeader>
-                <CardTitle>Sales by Client</CardTitle>
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="text-sm sm:text-base">Sales by Client</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
+              <CardContent className="p-2 sm:p-6 pt-0">
+                <div className="h-[220px] sm:h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={salesStats?.salesByClient || []} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="name" type="category" width={150} />
+                      <XAxis type="number" tick={{ fontSize: 10 }} />
+                      <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 10 }} />
                       <Tooltip formatter={(value: number) => formatCurrency(value)} />
                       <Bar dataKey="commission" fill="hsl(var(--primary))" name="Commission" />
                     </BarChart>
@@ -638,73 +665,73 @@ export default function LiveStats() {
           </TabsContent>
 
           {/* Employees Tab */}
-          <TabsContent value="employees" className="space-y-6">
+          <TabsContent value="employees" className="space-y-4 sm:space-y-6">
             {/* Employee KPIs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Employees</CardTitle>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
+              <Card className="p-2 sm:p-0">
+                <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Total</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{employeeStats?.total || 0}</div>
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="text-lg sm:text-2xl font-bold">{employeeStats?.total || 0}</div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
+              <Card className="p-2 sm:p-0">
+                <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Active</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{employeeStats?.active || 0}</div>
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="text-lg sm:text-2xl font-bold text-green-600">{employeeStats?.active || 0}</div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Inactive</CardTitle>
+              <Card className="p-2 sm:p-0">
+                <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Inactive</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-gray-600">{employeeStats?.inactive || 0}</div>
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="text-lg sm:text-2xl font-bold text-gray-600">{employeeStats?.inactive || 0}</div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Avg Tenure (days)</CardTitle>
+              <Card className="p-2 sm:p-0">
+                <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Avg Tenure</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{employeeStats?.avgTenureDays || 0}</div>
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="text-lg sm:text-2xl font-bold">{employeeStats?.avgTenureDays || 0}d</div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Recent Hires (30d)</CardTitle>
+              <Card className="p-2 sm:p-0">
+                <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">New (30d)</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{employeeStats?.recentHires || 0}</div>
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="text-lg sm:text-2xl font-bold text-blue-600">{employeeStats?.recentHires || 0}</div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Terminations (30d)</CardTitle>
+              <Card className="p-2 sm:p-0">
+                <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Left (30d)</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">{employeeStats?.recentTerminations || 0}</div>
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="text-lg sm:text-2xl font-bold text-red-600">{employeeStats?.recentTerminations || 0}</div>
                 </CardContent>
               </Card>
             </div>
 
             {/* Charts */}
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               {/* By Team */}
               <Card>
-                <CardHeader>
-                  <CardTitle>Employees by Team</CardTitle>
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="text-sm sm:text-base">By Team</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="h-[300px]">
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="h-[220px] sm:h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={employeeStats?.byTeam || []}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                        <YAxis />
+                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} width={30} />
                         <Tooltip />
                         <Bar dataKey="count" fill="hsl(var(--primary))" />
                       </BarChart>
@@ -715,20 +742,21 @@ export default function LiveStats() {
 
               {/* By Position */}
               <Card>
-                <CardHeader>
-                  <CardTitle>Employees by Position</CardTitle>
+                <CardHeader className="pb-2 sm:pb-4">
+                  <CardTitle className="text-sm sm:text-base">By Position</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="h-[300px]">
+                <CardContent className="p-2 sm:p-6 pt-0">
+                  <div className="h-[220px] sm:h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
                           data={employeeStats?.byPosition || []}
                           cx="50%"
                           cy="50%"
-                          outerRadius={100}
+                          outerRadius={70}
                           dataKey="count"
                           label={({ name, count }) => `${name}: ${count}`}
+                          labelLine={{ strokeWidth: 1 }}
                         >
                           {employeeStats?.byPosition?.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -744,118 +772,129 @@ export default function LiveStats() {
 
             {/* Employee List */}
             <Card>
-              <CardHeader>
-                <CardTitle>Active Employees</CardTitle>
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="text-sm sm:text-base">Active Employees</CardTitle>
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Team</TableHead>
-                      <TableHead>Position</TableHead>
-                      <TableHead>Hire Date</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {employeesData
-                      ?.filter((e) => e.is_active)
-                      .slice(0, 50)
-                      .map((emp) => (
-                        <TableRow key={emp.id}>
-                          <TableCell className="font-medium">
-                            {emp.first_name} {emp.last_name}
-                          </TableCell>
-                          <TableCell>{emp.work_email || emp.private_email}</TableCell>
-                          <TableCell>{(emp.teams as any)?.name || "-"}</TableCell>
-                          <TableCell>{(emp.job_positions as any)?.name || "-"}</TableCell>
-                          <TableCell>
-                            {emp.employment_start_date
-                              ? format(parseISO(emp.employment_start_date), "dd/MM/yyyy")
-                              : "-"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={emp.is_active ? "default" : "secondary"}>
-                              {emp.is_active ? "Active" : "Inactive"}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
+              <CardContent className="p-0 sm:p-6">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs sm:text-sm">Name</TableHead>
+                        <TableHead className="text-xs sm:text-sm hidden md:table-cell">Email</TableHead>
+                        <TableHead className="text-xs sm:text-sm">Team</TableHead>
+                        <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Position</TableHead>
+                        <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Hire Date</TableHead>
+                        <TableHead className="text-xs sm:text-sm">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {employeesData
+                        ?.filter((e) => e.is_active)
+                        .slice(0, 50)
+                        .map((emp) => (
+                          <TableRow key={emp.id}>
+                            <TableCell className="font-medium text-xs sm:text-sm max-w-[100px] sm:max-w-none truncate">
+                              {emp.first_name} {emp.last_name}
+                            </TableCell>
+                            <TableCell className="text-xs sm:text-sm hidden md:table-cell truncate max-w-[150px]">{emp.work_email || emp.private_email}</TableCell>
+                            <TableCell className="text-xs sm:text-sm">{(emp.teams as any)?.name || "-"}</TableCell>
+                            <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{(emp.job_positions as any)?.name || "-"}</TableCell>
+                            <TableCell className="text-xs sm:text-sm hidden lg:table-cell">
+                              {emp.employment_start_date
+                                ? format(parseISO(emp.employment_start_date), "dd/MM/yy")
+                                : "-"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={emp.is_active ? "default" : "secondary"} className="text-xs">
+                                {emp.is_active ? "Active" : "Inactive"}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* KPIs Tab */}
-          <TabsContent value="kpis" className="space-y-6">
+          <TabsContent value="kpis" className="space-y-4 sm:space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Configured KPIs</CardTitle>
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="text-sm sm:text-base">Configured KPIs</CardTitle>
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Data Source</TableHead>
-                      <TableHead>Target</TableHead>
-                      <TableHead>Unit</TableHead>
-                      <TableHead>Dashboards</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {kpisData?.map((kpi) => (
-                      <TableRow key={kpi.id}>
-                        <TableCell className="font-medium">{kpi.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{kpi.kpi_type}</Badge>
-                        </TableCell>
-                        <TableCell>{kpi.data_source || "-"}</TableCell>
-                        <TableCell>{kpi.target_value || "-"}</TableCell>
-                        <TableCell>{kpi.unit || "-"}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {kpi.dashboard_slugs?.map((slug) => (
-                              <Badge key={slug} variant="secondary" className="text-xs">
-                                {slug}
-                              </Badge>
-                            ))}
-                          </div>
-                        </TableCell>
+              <CardContent className="p-0 sm:p-6">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs sm:text-sm">Name</TableHead>
+                        <TableHead className="text-xs sm:text-sm">Type</TableHead>
+                        <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Source</TableHead>
+                        <TableHead className="text-xs sm:text-sm hidden md:table-cell">Target</TableHead>
+                        <TableHead className="text-xs sm:text-sm hidden md:table-cell">Unit</TableHead>
+                        <TableHead className="text-xs sm:text-sm hidden lg:table-cell">Dashboards</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {kpisData?.map((kpi) => (
+                        <TableRow key={kpi.id}>
+                          <TableCell className="font-medium text-xs sm:text-sm max-w-[120px] sm:max-w-none truncate">{kpi.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">{kpi.kpi_type}</Badge>
+                          </TableCell>
+                          <TableCell className="text-xs sm:text-sm hidden sm:table-cell">{kpi.data_source || "-"}</TableCell>
+                          <TableCell className="text-xs sm:text-sm hidden md:table-cell">{kpi.target_value || "-"}</TableCell>
+                          <TableCell className="text-xs sm:text-sm hidden md:table-cell">{kpi.unit || "-"}</TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            <div className="flex flex-wrap gap-1">
+                              {kpi.dashboard_slugs?.slice(0, 3).map((slug) => (
+                                <Badge key={slug} variant="secondary" className="text-xs">
+                                  {slug}
+                                </Badge>
+                              ))}
+                              {(kpi.dashboard_slugs?.length || 0) > 3 && (
+                                <Badge variant="secondary" className="text-xs">
+                                  +{(kpi.dashboard_slugs?.length || 0) - 3}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Raw Data Tab */}
-          <TabsContent value="raw" className="space-y-6">
+          <TabsContent value="raw" className="space-y-4 sm:space-y-6">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Raw Sales Data ({salesData?.length || 0} total)</CardTitle>
-                <div className="text-sm text-muted-foreground">
-                  Total Commission:{" "}
-                  <span className="font-bold text-primary">{formatCurrency(salesStats?.totalCommission || 0)}</span>
+              <CardHeader className="pb-2 sm:pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <CardTitle className="text-sm sm:text-base">Raw Sales ({salesData?.length || 0})</CardTitle>
+                  <div className="text-xs sm:text-sm text-muted-foreground">
+                    Commission:{" "}
+                    <span className="font-bold text-primary">{formatCurrency(salesStats?.totalCommission || 0)}</span>
+                  </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <CardContent className="p-0 sm:p-6">
+                <div className="overflow-x-auto max-h-[400px] sm:max-h-[600px] overflow-y-auto">
                   <Table>
                     <TableHeader className="sticky top-0 bg-background z-10">
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Agent</TableHead>
-                        <TableHead>Campaign</TableHead>
-                        <TableHead>Client</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Items</TableHead>
-                        <TableHead className="text-right">Commission</TableHead>
+                        <TableHead className="text-xs sm:text-sm">Date</TableHead>
+                        <TableHead className="text-xs sm:text-sm">Agent</TableHead>
+                        <TableHead className="text-xs sm:text-sm hidden sm:table-cell">Campaign</TableHead>
+                        <TableHead className="text-xs sm:text-sm hidden md:table-cell">Client</TableHead>
+                        <TableHead className="text-xs sm:text-sm">Status</TableHead>
+                        <TableHead className="text-right text-xs sm:text-sm hidden sm:table-cell">Items</TableHead>
+                        <TableHead className="text-right text-xs sm:text-sm">Comm.</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -865,10 +904,10 @@ export default function LiveStats() {
                           0;
                         return (
                           <TableRow key={sale.id}>
-                            <TableCell>{format(parseISO(sale.sale_datetime), "dd/MM/yyyy HH:mm")}</TableCell>
-                            <TableCell>{sale.agent_name}</TableCell>
-                            <TableCell>{sale.client_campaigns?.name || "-"}</TableCell>
-                            <TableCell>{sale.client_campaigns?.clients?.name || "-"}</TableCell>
+                            <TableCell className="text-xs sm:text-sm whitespace-nowrap">{format(parseISO(sale.sale_datetime), "dd/MM HH:mm")}</TableCell>
+                            <TableCell className="text-xs sm:text-sm max-w-[80px] sm:max-w-none truncate">{sale.agent_name}</TableCell>
+                            <TableCell className="text-xs sm:text-sm hidden sm:table-cell truncate max-w-[100px]">{sale.client_campaigns?.name || "-"}</TableCell>
+                            <TableCell className="text-xs sm:text-sm hidden md:table-cell">{sale.client_campaigns?.clients?.name || "-"}</TableCell>
                             <TableCell>
                               <Badge
                                 variant={
@@ -878,12 +917,13 @@ export default function LiveStats() {
                                       ? "secondary"
                                       : "default"
                                 }
+                                className="text-xs"
                               >
-                                {sale.validation_status || "unknown"}
+                                {sale.validation_status?.slice(0, 3) || "unk"}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-right">{sale.sale_items?.length || 0}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(saleCommission)}</TableCell>
+                            <TableCell className="text-right text-xs sm:text-sm hidden sm:table-cell">{sale.sale_items?.length || 0}</TableCell>
+                            <TableCell className="text-right font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(saleCommission)}</TableCell>
                           </TableRow>
                         );
                       })}
