@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { format } from "date-fns";
+import { format, subDays, startOfMonth, startOfWeek, endOfWeek, subWeeks } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ import {
   ShoppingCart,
   User,
   Phone,
-  Calendar,
+  Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRightIcon,
   X,
@@ -29,6 +29,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -215,15 +217,122 @@ export default function SalesDataTable({ provider, providerColor, iconColor, sal
 
       <Separator />
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <label className="text-sm font-medium flex items-center gap-2">
-          <Calendar className="h-4 w-4" />
+          <CalendarIcon className="h-4 w-4" />
           Date Range
         </label>
-        <div className="space-y-2">
-          <Input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(0); }} placeholder="From" />
-          <Input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(0); }} placeholder="To" />
+        
+        {/* Quick presets */}
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs justify-start"
+            onClick={() => {
+              const today = new Date();
+              setDateFrom(format(today, "yyyy-MM-dd"));
+              setDateTo(format(today, "yyyy-MM-dd"));
+              setPage(0);
+            }}
+          >
+            Today
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs justify-start"
+            onClick={() => {
+              const yesterday = subDays(new Date(), 1);
+              setDateFrom(format(yesterday, "yyyy-MM-dd"));
+              setDateTo(format(yesterday, "yyyy-MM-dd"));
+              setPage(0);
+            }}
+          >
+            Yesterday
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs justify-start"
+            onClick={() => {
+              const today = new Date();
+              setDateFrom(format(subDays(today, 6), "yyyy-MM-dd"));
+              setDateTo(format(today, "yyyy-MM-dd"));
+              setPage(0);
+            }}
+          >
+            Last 7 days
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs justify-start"
+            onClick={() => {
+              const today = new Date();
+              setDateFrom(format(subDays(today, 29), "yyyy-MM-dd"));
+              setDateTo(format(today, "yyyy-MM-dd"));
+              setPage(0);
+            }}
+          >
+            Last 30 days
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs justify-start col-span-2"
+            onClick={() => {
+              const today = new Date();
+              setDateFrom(format(startOfMonth(today), "yyyy-MM-dd"));
+              setDateTo(format(today, "yyyy-MM-dd"));
+              setPage(0);
+            }}
+          >
+            This month
+          </Button>
         </div>
+
+        {/* Custom date pickers */}
+        <div className="space-y-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full justify-start text-left font-normal h-9">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateFrom ? format(new Date(dateFrom), "PPP") : <span className="text-muted-foreground">From date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={dateFrom ? new Date(dateFrom) : undefined}
+                onSelect={(date) => { setDateFrom(date ? format(date, "yyyy-MM-dd") : ""); setPage(0); }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full justify-start text-left font-normal h-9">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateTo ? format(new Date(dateTo), "PPP") : <span className="text-muted-foreground">To date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={dateTo ? new Date(dateTo) : undefined}
+                onSelect={(date) => { setDateTo(date ? format(date, "yyyy-MM-dd") : ""); setPage(0); }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+        
+        {(dateFrom || dateTo) && (
+          <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => { setDateFrom(""); setDateTo(""); setPage(0); }}>
+            <X className="h-3 w-3 mr-1" /> Clear dates
+          </Button>
+        )}
       </div>
 
       <Separator />
