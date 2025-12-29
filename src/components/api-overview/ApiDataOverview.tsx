@@ -7,9 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Users, Phone, ShoppingCart, Database, Loader2 } from "lucide-react";
+import { Search, Users, Phone, ShoppingCart, Database, Loader2, FileJson } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import EventsView from "./EventsView";
 
 const CHART_COLORS = [
   "hsl(var(--primary))",
@@ -517,8 +518,12 @@ export default function ApiDataOverview() {
             </div>
 
             {/* Data Sections */}
-            <Tabs defaultValue="agents" className="space-y-4">
+            <Tabs defaultValue="events" className="space-y-4">
               <TabsList>
+                <TabsTrigger value="events" className="gap-2">
+                  <FileJson className="h-4 w-4" />
+                  Events
+                </TabsTrigger>
                 <TabsTrigger value="agents" className="gap-2">
                   <Users className="h-4 w-4" />
                   Agents ({filteredAgents.length})
@@ -532,6 +537,15 @@ export default function ApiDataOverview() {
                   Calls ({filteredCalls.length})
                 </TabsTrigger>
               </TabsList>
+
+              {/* Events Tab */}
+              <TabsContent value="events">
+                <EventsView 
+                  provider={source} 
+                  providerColor={getProviderColor(source, sourceIndex)}
+                  iconColor={getProviderIconColor(source)}
+                />
+              </TabsContent>
 
               {/* Agents Tab */}
               <TabsContent value="agents">
