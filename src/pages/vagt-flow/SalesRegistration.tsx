@@ -19,6 +19,7 @@ import { Plus, Minus, Phone, Save, ArrowLeft, MapPin, Building2, Tag, AlertCircl
 import { toast } from "sonner";
 import { useCreateFieldmarketingSale } from "@/hooks/useFieldmarketingSales";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePositionPermissions";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 
@@ -43,10 +44,13 @@ const SalesRegistration = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { position } = usePermissions();
+  const isOwner = position?.name?.toLowerCase() === "ejer";
   const [locationId, setLocationId] = useState<string>("");
   const [comment, setComment] = useState("");
   const [productSelections, setProductSelections] = useState<ProductSelection[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedBookingId, setSelectedBookingId] = useState<string>("");
   
   const createSalesMutation = useCreateFieldmarketingSale();
   const today = format(new Date(), "yyyy-MM-dd");
@@ -110,12 +114,68 @@ const SalesRegistration = () => {
     enabled: !!currentEmployee?.id,
   });
 
+  // Fetch all bookings for owner to select from
+  const { data: allBookings } = useQuery({
+    queryKey: ["all-bookings-for-owner", today],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("booking")
+        .select(`
+          id,
+          location:location_id (id, name),
+          client:client_id (id, name),
+          brand:brand_id (id, name, color_hex),
+          campaign:campaign_id (id, name)
+        `)
+        .gte("end_date", today)
+        .lte("start_date", today)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: isOwner && !todayBooking,
+  });
+
+  // Owner-selected booking
+  const { data: ownerSelectedBooking } = useQuery({
+    queryKey: ["owner-selected-booking", selectedBookingId],
+    queryFn: async () => {
+      if (!selectedBookingId) return null;
+      const { data, error } = await supabase
+        .from("booking")
+        .select(`
+          id,
+          location:location_id (id, name),
+          client:client_id (id, name),
+          brand:brand_id (id, name, color_hex),
+          campaign:campaign_id (id, name)
+        `)
+        .eq("id", selectedBookingId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return {
+        id: data.id,
+        location: data.location as { id: string; name: string } | null,
+        client: data.client as { id: string; name: string } | null,
+        brand: data.brand as { id: string; name: string; color_hex: string } | null,
+        campaign: data.campaign as { id: string; name: string } | null,
+        startTime: "",
+        endTime: "",
+      } as TodayBooking;
+    },
+    enabled: !!selectedBookingId && isOwner,
+  });
+
+  // Use either today's booking or owner-selected booking
+  const activeBooking = todayBooking || ownerSelectedBooking;
+
   // Auto-set location when today's booking is loaded
   useEffect(() => {
-    if (todayBooking?.location?.id && !locationId) {
-      setLocationId(todayBooking.location.id);
+    if (activeBooking?.location?.id && !locationId) {
+      setLocationId(activeBooking.location.id);
     }
-  }, [todayBooking, locationId]);
+  }, [activeBooking, locationId]);
 
   // Fetch locations
   const { data: locations } = useQuery({
@@ -130,16 +190,16 @@ const SalesRegistration = () => {
     },
   });
 
-  // Fetch products based on the campaign from today's booking
+  // Fetch products based on the campaign from active booking
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ["campaign-products", todayBooking?.campaign?.id, todayBooking?.brand?.name, todayBooking?.client?.id],
+    queryKey: ["campaign-products", activeBooking?.campaign?.id, activeBooking?.brand?.name, activeBooking?.client?.id],
     queryFn: async () => {
       // If booking has a direct campaign_id, use it
-      if (todayBooking?.campaign?.id) {
+      if (activeBooking?.campaign?.id) {
         const { data, error } = await supabase
           .from("products")
           .select("id, name")
-          .eq("client_campaign_id", todayBooking.campaign.id)
+          .eq("client_campaign_id", activeBooking.campaign.id)
           .neq("name", "Lokation")
           .order("name");
         if (error) throw error;
@@ -153,11 +213,11 @@ const SalesRegistration = () => {
       }
       
       // Fallback 1: search by brand name if no campaign_id
-      if (todayBooking?.brand?.name) {
+      if (activeBooking?.brand?.name) {
         const { data: campaigns } = await supabase
           .from("client_campaigns")
           .select("id, name")
-          .ilike("name", `%${todayBooking.brand.name}%`);
+          .ilike("name", `%${activeBooking.brand.name}%`);
         
         if (campaigns && campaigns.length > 0) {
           const campaignIds = campaigns.map(c => c.id);
@@ -180,11 +240,11 @@ const SalesRegistration = () => {
       }
       
       // Fallback 2: search by client_id if no campaign or brand
-      if (todayBooking?.client?.id) {
+      if (activeBooking?.client?.id) {
         const { data: campaigns } = await supabase
           .from("client_campaigns")
           .select("id")
-          .eq("client_id", todayBooking.client.id);
+          .eq("client_id", activeBooking.client.id);
         
         if (campaigns && campaigns.length > 0) {
           const campaignIds = campaigns.map(c => c.id);
@@ -208,7 +268,7 @@ const SalesRegistration = () => {
       
       return [];
     },
-    enabled: !!(todayBooking?.campaign?.id || todayBooking?.brand?.name || todayBooking?.client?.id),
+    enabled: !!(activeBooking?.campaign?.id || activeBooking?.brand?.name || activeBooking?.client?.id),
   });
 
   const addProduct = (productId: string) => {
@@ -292,8 +352,8 @@ const SalesRegistration = () => {
       toast.error("Kunne ikke finde din medarbejderprofil");
       return;
     }
-    if (!todayBooking?.location?.id) {
-      toast.error("Ingen lokation fundet for dagens vagt");
+    if (!activeBooking?.location?.id) {
+      toast.error("Ingen lokation fundet for vagten");
       return;
     }
     if (productSelections.length === 0) {
@@ -313,7 +373,7 @@ const SalesRegistration = () => {
     setIsSubmitting(true);
     
     // Use client from booking if available, otherwise use locationId to look it up
-    const clientId = todayBooking?.client?.id;
+    const clientId = activeBooking?.client?.id;
     
     if (!clientId) {
       toast.error("Kunne ikke finde kunde for denne booking");
@@ -326,7 +386,7 @@ const SalesRegistration = () => {
       const salesRecords = productSelections.flatMap((selection) =>
         selection.phoneNumbers.map((phone) => ({
           seller_id: currentEmployee.id,
-          location_id: todayBooking.location.id,
+          location_id: activeBooking.location!.id,
           client_id: clientId,
           product_name: selection.productName,
           phone_number: phone.trim(),
@@ -489,7 +549,7 @@ const SalesRegistration = () => {
           onClick={handleSubmit}
           className="w-full"
           size="lg"
-          disabled={!currentEmployee || !todayBooking?.location?.id || productSelections.length === 0 || isSubmitting}
+          disabled={!currentEmployee || !activeBooking?.location?.id || productSelections.length === 0 || isSubmitting}
         >
           <Save className="h-5 w-5 mr-2" />
           {isSubmitting ? "Gemmer..." : "Registrer salg"}
@@ -517,11 +577,11 @@ const SalesRegistration = () => {
       </div>
 
       {/* Today's booking info card */}
-      {todayBooking && (
+      {activeBooking && (
         <Card className="border-primary/30 bg-primary/5">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <span className="text-primary">Dagens vagt</span>
+              <span className="text-primary">{todayBooking ? "Dagens vagt" : "Valgt booking"}</span>
               <span className="text-muted-foreground text-sm font-normal">
                 ({format(new Date(), "EEEE d. MMMM", { locale: da })})
               </span>
@@ -529,25 +589,25 @@ const SalesRegistration = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {todayBooking.location && (
+              {activeBooking.location && (
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-xs text-muted-foreground">Lokation</p>
-                    <p className="font-medium">{todayBooking.location.name}</p>
+                    <p className="font-medium">{activeBooking.location.name}</p>
                   </div>
                 </div>
               )}
-              {todayBooking.client && (
+              {activeBooking.client && (
                 <div className="flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-xs text-muted-foreground">Kunde</p>
-                    <p className="font-medium">{todayBooking.client.name}</p>
+                    <p className="font-medium">{activeBooking.client.name}</p>
                   </div>
                 </div>
               )}
-              {todayBooking.brand && (
+              {activeBooking.brand && (
                 <div className="flex items-center gap-2">
                   <Tag className="h-4 w-4 text-muted-foreground" />
                   <div>
@@ -555,24 +615,49 @@ const SalesRegistration = () => {
                     <p className="font-medium flex items-center gap-2">
                       <span 
                         className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: todayBooking.brand.color_hex }}
+                        style={{ backgroundColor: activeBooking.brand.color_hex }}
                       />
-                      {todayBooking.brand.name}
+                      {activeBooking.brand.name}
                     </p>
                   </div>
                 </div>
               )}
             </div>
-            {todayBooking.startTime && todayBooking.endTime && (
+            {activeBooking.startTime && activeBooking.endTime && (
               <p className="text-sm text-muted-foreground mt-2">
-                Arbejdstid: {todayBooking.startTime.slice(0, 5)} - {todayBooking.endTime.slice(0, 5)}
+                Arbejdstid: {activeBooking.startTime.slice(0, 5)} - {activeBooking.endTime.slice(0, 5)}
               </p>
             )}
           </CardContent>
         </Card>
       )}
 
-      {!todayBooking && currentEmployee && (
+      {/* Owner booking selector - shown when no booking but owner */}
+      {!todayBooking && isOwner && currentEmployee && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <span className="text-primary">Vælg booking (Ejer-adgang)</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedBookingId} onValueChange={setSelectedBookingId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Vælg en booking..." />
+              </SelectTrigger>
+              <SelectContent>
+                {allBookings?.map((booking: any) => (
+                  <SelectItem key={booking.id} value={booking.id}>
+                    {booking.location?.name || "Ukendt lokation"} - {booking.client?.name || "Ukendt kunde"} {booking.brand?.name ? `(${booking.brand.name})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+      )}
+
+      {!activeBooking && !isOwner && currentEmployee && (
         <Card className="border-muted bg-muted/20">
           <CardContent className="py-4">
             <p className="text-sm text-muted-foreground text-center">
@@ -582,8 +667,8 @@ const SalesRegistration = () => {
         </Card>
       )}
 
-      {/* Show form content if there's a booking with products, or allow manual selection */}
-      {todayBooking ? (
+      {/* Show form content if there's an active booking with products */}
+      {activeBooking ? (
         products && products.length > 0 ? (
           renderFormContent()
         ) : productsLoading ? (
@@ -598,13 +683,13 @@ const SalesRegistration = () => {
               <div className="flex items-center gap-3 justify-center">
                 <AlertCircle className="h-5 w-5 text-destructive" />
                 <p className="text-sm text-destructive">
-                  Ingen produkter fundet for kampagnen "{todayBooking.brand?.name}".
+                  Ingen produkter fundet for kampagnen "{activeBooking.brand?.name}".
                 </p>
               </div>
             </CardContent>
           </Card>
         )
-      ) : (
+      ) : !isOwner ? (
         <Card className="border-muted">
           <CardContent className="py-8">
             <p className="text-center text-muted-foreground">
@@ -612,7 +697,7 @@ const SalesRegistration = () => {
             </p>
           </CardContent>
         </Card>
-      )}
+      ) : null}
     </div>
   );
 };
