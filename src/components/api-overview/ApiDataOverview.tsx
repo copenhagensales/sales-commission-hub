@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search, Users, Phone, ShoppingCart, Database, Loader2, FileJson } from "lucide-react";
@@ -349,9 +350,9 @@ export default function ApiDataOverview() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Distribution Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -466,109 +467,125 @@ export default function ApiDataOverview() {
 
       {/* Provider Selector */}
       <Tabs value={effectiveProvider} onValueChange={setSelectedProvider}>
-        <TabsList className="mb-4 flex-wrap h-auto gap-1 bg-card/50 p-1">
-          {apiSources.map((source, index) => (
-            <TabsTrigger 
-              key={source} 
-              value={source} 
-              className={`gap-2 capitalize data-[state=active]:bg-gradient-to-r ${getProviderColor(source, index)} data-[state=active]:shadow-md transition-all`}
-            >
-              <Database className={`h-4 w-4 ${effectiveProvider === source ? getProviderIconColor(source) : ""}`} />
-              {source}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <ScrollArea className="w-full pb-2 mb-4">
+          <TabsList className="inline-flex w-max min-w-full gap-1 bg-card/50 p-1">
+            {apiSources.map((source, index) => (
+              <TabsTrigger 
+                key={source} 
+                value={source} 
+                className={`gap-1.5 capitalize text-xs sm:text-sm whitespace-nowrap data-[state=active]:bg-gradient-to-r ${getProviderColor(source, index)} data-[state=active]:shadow-md transition-all`}
+              >
+                <Database className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${effectiveProvider === source ? getProviderIconColor(source) : ""}`} />
+                {source}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <ScrollBar orientation="horizontal" className="invisible" />
+        </ScrollArea>
 
         {apiSources.map((source, sourceIndex) => (
-          <TabsContent key={source} value={source} className="space-y-6">
+          <TabsContent key={source} value={source} className="space-y-4 sm:space-y-6">
             {/* Stats Overview */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
               <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-purple-300 flex items-center gap-2">
-                    <FileJson className="h-4 w-4 text-purple-400" />
+                <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-purple-300 flex items-center gap-1.5 sm:gap-2">
+                    <FileJson className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-purple-400" />
                     Events
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-purple-100">
+                <CardContent className="p-3 sm:p-4 pt-0">
+                  <div className="text-xl sm:text-2xl font-bold text-purple-100">
                     {(sourceStats?.bySource?.[source.toLowerCase()]?.events || 0).toLocaleString()}
                   </div>
-                  <p className="text-xs text-purple-300/70">API events</p>
+                  <p className="text-[10px] sm:text-xs text-purple-300/70">API events</p>
                 </CardContent>
               </Card>
               <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-blue-300 flex items-center gap-2">
-                    <Users className="h-4 w-4 text-blue-400" />
+                <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-blue-300 flex items-center gap-1.5 sm:gap-2">
+                    <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-400" />
                     Agents
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-100">{providerStats.agents}</div>
-                  <p className="text-xs text-blue-300/70">
+                <CardContent className="p-3 sm:p-4 pt-0">
+                  <div className="text-xl sm:text-2xl font-bold text-blue-100">{providerStats.agents}</div>
+                  <p className="text-[10px] sm:text-xs text-blue-300/70">
                     {providerStats.activeAgents} active
                   </p>
                 </CardContent>
               </Card>
               <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/20">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-emerald-300 flex items-center gap-2">
-                    <ShoppingCart className="h-4 w-4 text-emerald-400" />
+                <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-emerald-300 flex items-center gap-1.5 sm:gap-2">
+                    <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-400" />
                     Sales
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-emerald-100">{providerStats.sales}</div>
-                  <p className="text-xs text-emerald-300/70">Total records</p>
+                <CardContent className="p-3 sm:p-4 pt-0">
+                  <div className="text-xl sm:text-2xl font-bold text-emerald-100">{providerStats.sales}</div>
+                  <p className="text-[10px] sm:text-xs text-emerald-300/70">Total records</p>
                 </CardContent>
               </Card>
               <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-amber-300 flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-amber-400" />
+                <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-amber-300 flex items-center gap-1.5 sm:gap-2">
+                    <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400" />
                     Calls
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-amber-100">{providerStats.calls}</div>
-                  <p className="text-xs text-amber-300/70">Total records</p>
+                <CardContent className="p-3 sm:p-4 pt-0">
+                  <div className="text-xl sm:text-2xl font-bold text-amber-100">{providerStats.calls}</div>
+                  <p className="text-[10px] sm:text-xs text-amber-300/70">Total records</p>
                 </CardContent>
               </Card>
-              <Card className={`bg-gradient-to-br ${getProviderColor(source, sourceIndex)}`}>
-                <CardHeader className="pb-2">
-                  <CardTitle className={`text-sm font-medium flex items-center gap-2 ${getProviderIconColor(source)}`}>
-                    <Database className="h-4 w-4" />
+              <Card className={`bg-gradient-to-br col-span-2 sm:col-span-1 ${getProviderColor(source, sourceIndex)}`}>
+                <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                  <CardTitle className={`text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 ${getProviderIconColor(source)}`}>
+                    <Database className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     Source
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold capitalize">{source}</div>
-                  <p className="text-xs text-muted-foreground">API Provider</p>
+                <CardContent className="p-3 sm:p-4 pt-0">
+                  <div className="text-xl sm:text-2xl font-bold capitalize">{source}</div>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">API Provider</p>
                 </CardContent>
               </Card>
             </div>
 
             {/* Data Sections */}
             <Tabs defaultValue="events" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="events" className="gap-2">
-                  <FileJson className="h-4 w-4" />
-                  Events ({sourceStats?.bySource?.[source.toLowerCase()]?.events?.toLocaleString() || providerStats.sales.toLocaleString()})
-                </TabsTrigger>
-                <TabsTrigger value="agents" className="gap-2">
-                  <Users className="h-4 w-4" />
-                  Agents ({filteredAgents.length})
-                </TabsTrigger>
-                <TabsTrigger value="sales" className="gap-2">
-                  <ShoppingCart className="h-4 w-4" />
-                  Sales ({filteredSales.length})
-                </TabsTrigger>
-                <TabsTrigger value="calls" className="gap-2">
-                  <Phone className="h-4 w-4" />
-                  Calls ({filteredCalls.length})
-                </TabsTrigger>
-              </TabsList>
+              <ScrollArea className="w-full pb-2">
+                <TabsList className="inline-flex w-max min-w-full sm:w-auto gap-1">
+                  <TabsTrigger value="events" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+                    <FileJson className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="hidden xs:inline">Events</span>
+                    <span className="xs:hidden">Evt</span>
+                    <span className="text-[10px] sm:text-xs opacity-70">
+                      ({sourceStats?.bySource?.[source.toLowerCase()]?.events?.toLocaleString() || providerStats.sales.toLocaleString()})
+                    </span>
+                  </TabsTrigger>
+                  <TabsTrigger value="agents" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+                    <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="hidden xs:inline">Agents</span>
+                    <span className="xs:hidden">Agt</span>
+                    <span className="text-[10px] sm:text-xs opacity-70">({filteredAgents.length})</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="sales" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+                    <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="hidden xs:inline">Sales</span>
+                    <span className="xs:hidden">Sls</span>
+                    <span className="text-[10px] sm:text-xs opacity-70">({filteredSales.length})</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="calls" className="gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+                    <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="hidden xs:inline">Calls</span>
+                    <span className="xs:hidden">Cls</span>
+                    <span className="text-[10px] sm:text-xs opacity-70">({filteredCalls.length})</span>
+                  </TabsTrigger>
+                </TabsList>
+                <ScrollBar orientation="horizontal" className="invisible" />
+              </ScrollArea>
 
               {/* Events Tab */}
               <TabsContent value="events">
@@ -582,23 +599,23 @@ export default function ApiDataOverview() {
               {/* Agents Tab */}
               <TabsContent value="agents">
                 <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="capitalize">Agents from {source}</CardTitle>
-                      <div className="relative w-64">
+                  <CardHeader className="p-3 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <CardTitle className="capitalize text-base sm:text-lg">Agents from {source}</CardTitle>
+                      <div className="relative w-full sm:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                           placeholder="Search agents..."
                           value={agentSearch}
                           onChange={(e) => setAgentSearch(e.target.value)}
-                          className="pl-9"
+                          className="pl-9 h-9"
                         />
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-0 sm:p-6 sm:pt-0">
                     {agentsLoading ? (
-                      <div className="space-y-2">
+                      <div className="space-y-2 p-3 sm:p-0">
                         {[...Array(5)].map((_, i) => (
                           <Skeleton key={i} className="h-12 w-full" />
                         ))}
@@ -610,45 +627,48 @@ export default function ApiDataOverview() {
                         description={agentSearch ? "Try adjusting your search" : `No agents from ${source} yet`}
                       />
                     ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Name</TableHead>
-                              <TableHead>Email</TableHead>
-                              <TableHead>External ID</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Last Updated</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredAgents.slice(0, 100).map((agent) => (
-                              <TableRow key={agent.id}>
-                                <TableCell className="font-medium">{agent.name}</TableCell>
-                                <TableCell className="text-muted-foreground text-sm">
-                                  {agent.email}
-                                </TableCell>
-                                <TableCell className="font-mono text-xs">
-                                  {agent.external_adversus_id || agent.external_dialer_id || "-"}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={agent.is_active ? "default" : "secondary"}>
-                                    {agent.is_active ? "Active" : "Inactive"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-muted-foreground text-sm">
-                                  {agent.updated_at ? format(new Date(agent.updated_at), "dd/MM/yyyy HH:mm") : "-"}
-                                </TableCell>
+                      <ScrollArea className="w-full">
+                        <div className="min-w-[600px]">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead className="hidden sm:table-cell">Email</TableHead>
+                                <TableHead>External ID</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="hidden md:table-cell">Last Updated</TableHead>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                            </TableHeader>
+                            <TableBody>
+                              {filteredAgents.slice(0, 100).map((agent) => (
+                                <TableRow key={agent.id}>
+                                  <TableCell className="font-medium text-sm">{agent.name}</TableCell>
+                                  <TableCell className="text-muted-foreground text-xs hidden sm:table-cell">
+                                    {agent.email}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-xs">
+                                    {agent.external_adversus_id || agent.external_dialer_id || "-"}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={agent.is_active ? "default" : "secondary"} className="text-xs">
+                                      {agent.is_active ? "Active" : "Inactive"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground text-xs hidden md:table-cell whitespace-nowrap">
+                                    {agent.updated_at ? format(new Date(agent.updated_at), "dd/MM/yy HH:mm") : "-"}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        <ScrollBar orientation="horizontal" />
                         {filteredAgents.length > 100 && (
-                          <p className="text-sm text-muted-foreground text-center mt-4">
+                          <p className="text-sm text-muted-foreground text-center p-4">
                             Showing 100 of {filteredAgents.length} agents
                           </p>
                         )}
-                      </div>
+                      </ScrollArea>
                     )}
                   </CardContent>
                 </Card>
@@ -657,23 +677,23 @@ export default function ApiDataOverview() {
               {/* Sales Tab */}
               <TabsContent value="sales">
                 <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="capitalize">Sales from {source}</CardTitle>
-                      <div className="relative w-64">
+                  <CardHeader className="p-3 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <CardTitle className="capitalize text-base sm:text-lg">Sales from {source}</CardTitle>
+                      <div className="relative w-full sm:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                           placeholder="Search sales..."
                           value={salesSearch}
                           onChange={(e) => setSalesSearch(e.target.value)}
-                          className="pl-9"
+                          className="pl-9 h-9"
                         />
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-0 sm:p-6 sm:pt-0">
                     {salesLoading ? (
-                      <div className="space-y-2">
+                      <div className="space-y-2 p-3 sm:p-0">
                         {[...Array(5)].map((_, i) => (
                           <Skeleton key={i} className="h-12 w-full" />
                         ))}
@@ -685,53 +705,56 @@ export default function ApiDataOverview() {
                         description={salesSearch ? "Try adjusting your search" : `No sales from ${source} yet`}
                       />
                     ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>External ID</TableHead>
-                              <TableHead>Agent</TableHead>
-                              <TableHead>Customer</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Sale Date</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredSales.slice(0, 100).map((sale) => (
-                              <TableRow key={sale.id}>
-                                <TableCell className="font-mono text-xs">
-                                  {sale.adversus_external_id || "-"}
-                                </TableCell>
-                                <TableCell>
-                                  <div>
-                                    <div className="font-medium">{sale.agent_name || "-"}</div>
-                                    <div className="text-xs text-muted-foreground">{sale.agent_email || "-"}</div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div>
-                                    <div className="font-medium">{sale.customer_company || "-"}</div>
-                                    <div className="text-xs text-muted-foreground">{sale.customer_phone || "-"}</div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={getStatusVariant(sale.validation_status)}>
-                                    {sale.validation_status || sale.status || "unknown"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-muted-foreground text-sm">
-                                  {sale.sale_datetime ? format(new Date(sale.sale_datetime), "dd/MM/yyyy HH:mm") : "-"}
-                                </TableCell>
+                      <ScrollArea className="w-full">
+                        <div className="min-w-[600px]">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>External ID</TableHead>
+                                <TableHead>Agent</TableHead>
+                                <TableHead className="hidden sm:table-cell">Customer</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="hidden md:table-cell">Sale Date</TableHead>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                            </TableHeader>
+                            <TableBody>
+                              {filteredSales.slice(0, 100).map((sale) => (
+                                <TableRow key={sale.id}>
+                                  <TableCell className="font-mono text-xs">
+                                    {sale.adversus_external_id || "-"}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div>
+                                      <div className="font-medium text-sm">{sale.agent_name || "-"}</div>
+                                      <div className="text-xs text-muted-foreground hidden sm:block">{sale.agent_email || "-"}</div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="hidden sm:table-cell">
+                                    <div>
+                                      <div className="font-medium text-sm">{sale.customer_company || "-"}</div>
+                                      <div className="text-xs text-muted-foreground font-mono">{sale.customer_phone || "-"}</div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={getStatusVariant(sale.validation_status)} className="text-xs">
+                                      {sale.validation_status || sale.status || "unknown"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground text-xs hidden md:table-cell whitespace-nowrap">
+                                    {sale.sale_datetime ? format(new Date(sale.sale_datetime), "dd/MM/yy HH:mm") : "-"}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        <ScrollBar orientation="horizontal" />
                         {filteredSales.length > 100 && (
-                          <p className="text-sm text-muted-foreground text-center mt-4">
+                          <p className="text-sm text-muted-foreground text-center p-4">
                             Showing 100 of {filteredSales.length} sales
                           </p>
                         )}
-                      </div>
+                      </ScrollArea>
                     )}
                   </CardContent>
                 </Card>
@@ -740,23 +763,23 @@ export default function ApiDataOverview() {
               {/* Calls Tab */}
               <TabsContent value="calls">
                 <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="capitalize">Calls from {source}</CardTitle>
-                      <div className="relative w-64">
+                  <CardHeader className="p-3 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <CardTitle className="capitalize text-base sm:text-lg">Calls from {source}</CardTitle>
+                      <div className="relative w-full sm:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                           placeholder="Search calls..."
                           value={callsSearch}
                           onChange={(e) => setCallsSearch(e.target.value)}
-                          className="pl-9"
+                          className="pl-9 h-9"
                         />
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-0 sm:p-6 sm:pt-0">
                     {callsLoading ? (
-                      <div className="space-y-2">
+                      <div className="space-y-2 p-3 sm:p-0">
                         {[...Array(5)].map((_, i) => (
                           <Skeleton key={i} className="h-12 w-full" />
                         ))}
@@ -768,49 +791,52 @@ export default function ApiDataOverview() {
                         description={callsSearch ? "Try adjusting your search" : `No calls from ${source} yet`}
                       />
                     ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>External ID</TableHead>
-                              <TableHead>Agent ID</TableHead>
-                              <TableHead>Campaign</TableHead>
-                              <TableHead>Duration</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Start Time</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredCalls.slice(0, 100).map((call) => (
-                              <TableRow key={call.id}>
-                                <TableCell className="font-mono text-xs">
-                                  {call.external_id || "-"}
-                                </TableCell>
-                                <TableCell className="font-mono text-xs">
-                                  {call.agent_external_id || "-"}
-                                </TableCell>
-                                <TableCell className="font-mono text-xs">
-                                  {call.campaign_external_id || "-"}
-                                </TableCell>
-                                <TableCell>
-                                  {call.duration_seconds ? formatDuration(call.duration_seconds) : "-"}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline">{call.status || "unknown"}</Badge>
-                                </TableCell>
-                                <TableCell className="text-muted-foreground text-sm">
-                                  {call.start_time ? format(new Date(call.start_time), "dd/MM/yyyy HH:mm") : "-"}
-                                </TableCell>
+                      <ScrollArea className="w-full">
+                        <div className="min-w-[650px]">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>External ID</TableHead>
+                                <TableHead>Agent ID</TableHead>
+                                <TableHead className="hidden sm:table-cell">Campaign</TableHead>
+                                <TableHead>Duration</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="hidden md:table-cell">Start Time</TableHead>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                            </TableHeader>
+                            <TableBody>
+                              {filteredCalls.slice(0, 100).map((call) => (
+                                <TableRow key={call.id}>
+                                  <TableCell className="font-mono text-xs">
+                                    {call.external_id || "-"}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-xs">
+                                    {call.agent_external_id || "-"}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-xs hidden sm:table-cell">
+                                    {call.campaign_external_id || "-"}
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    {call.duration_seconds ? formatDuration(call.duration_seconds) : "-"}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-xs">{call.status || "unknown"}</Badge>
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground text-xs hidden md:table-cell whitespace-nowrap">
+                                    {call.start_time ? format(new Date(call.start_time), "dd/MM/yy HH:mm") : "-"}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                        <ScrollBar orientation="horizontal" />
                         {filteredCalls.length > 100 && (
-                          <p className="text-sm text-muted-foreground text-center mt-4">
+                          <p className="text-sm text-muted-foreground text-center p-4">
                             Showing 100 of {filteredCalls.length} calls
                           </p>
                         )}
-                      </div>
+                      </ScrollArea>
                     )}
                   </CardContent>
                 </Card>
