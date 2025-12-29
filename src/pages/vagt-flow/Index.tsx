@@ -6,15 +6,16 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, Users, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { format, startOfWeek, endOfWeek, getWeek, getYear } from "date-fns";
+import { format, startOfWeek, endOfWeek, getWeek } from "date-fns";
 import { da } from "date-fns/locale";
+import { getWeekYear } from "@/lib/vagt-flow-date-utils";
 import { BookingsLast30DaysChart } from "@/components/vagt-flow/BookingsLast30DaysChart";
 
 export default function VagtFlowIndex() {
   const navigate = useNavigate();
   const now = new Date();
   const currentWeek = getWeek(now, { weekStartsOn: 1 });
-  const currentYear = getYear(now);
+  const currentYear = getWeekYear(now);
 
   const { data: thisWeekBookings } = useQuery({
     queryKey: ["vagt-this-week-bookings"],
