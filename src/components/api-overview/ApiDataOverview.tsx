@@ -9,6 +9,20 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search, Users, Phone, ShoppingCart, Database, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+
+const CHART_COLORS = [
+  "hsl(var(--primary))",
+  "hsl(220, 70%, 50%)",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#06b6d4",
+  "#ec4899",
+  "#14b8a6",
+  "#f97316",
+];
 
 export default function ApiDataOverview() {
   const [selectedProvider, setSelectedProvider] = useState<string>("");
@@ -16,28 +30,57 @@ export default function ApiDataOverview() {
   const [salesSearch, setSalesSearch] = useState("");
   const [callsSearch, setCallsSearch] = useState("");
 
-  // Fetch all unique API sources dynamically
-  const { data: apiSources, isLoading: sourcesLoading } = useQuery({
-    queryKey: ["api-overview-sources"],
+  // Fetch all unique API sources dynamically with counts
+  const { data: sourceStats, isLoading: sourcesLoading } = useQuery({
+    queryKey: ["api-overview-sources-stats"],
     queryFn: async () => {
-      // Get sources from agents, sales, and calls
-      const [agentSources, saleSources, callSources, integrationTypes] = await Promise.all([
+      // Get sources from agents, sales, and calls with counts
+      const [agentData, salesData, callsData] = await Promise.all([
         supabase.from("agents").select("source").not("source", "is", null),
         supabase.from("sales").select("source").not("source", "is", null),
         supabase.from("dialer_calls").select("integration_type").not("integration_type", "is", null),
-        supabase.from("api_integrations").select("type, name"),
       ]);
 
-      const sources = new Set<string>();
+      const sourceMap = new Map<string, { agents: number; sales: number; calls: number }>();
       
-      agentSources.data?.forEach(r => r.source && sources.add(r.source.toLowerCase()));
-      saleSources.data?.forEach(r => r.source && sources.add(r.source.toLowerCase()));
-      callSources.data?.forEach(r => r.integration_type && sources.add(r.integration_type.toLowerCase()));
-      integrationTypes.data?.forEach(r => r.type && sources.add(r.type.toLowerCase()));
+      agentData.data?.forEach(r => {
+        if (r.source) {
+          const key = r.source.toLowerCase();
+          const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0 };
+          existing.agents += 1;
+          sourceMap.set(key, existing);
+        }
+      });
+      
+      salesData.data?.forEach(r => {
+        if (r.source) {
+          const key = r.source.toLowerCase();
+          const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0 };
+          existing.sales += 1;
+          sourceMap.set(key, existing);
+        }
+      });
+      
+      callsData.data?.forEach(r => {
+        if (r.integration_type) {
+          const key = r.integration_type.toLowerCase();
+          const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0 };
+          existing.calls += 1;
+          sourceMap.set(key, existing);
+        }
+      });
 
-      return Array.from(sources).sort();
+      return {
+        sources: Array.from(sourceMap.keys()).sort(),
+        bySource: Object.fromEntries(sourceMap),
+        totalAgents: agentData.data?.length || 0,
+        totalSales: salesData.data?.length || 0,
+        totalCalls: callsData.data?.length || 0,
+      };
     },
   });
+
+  const apiSources = sourceStats?.sources || [];
 
   // Set default provider when sources are loaded
   const effectiveProvider = selectedProvider || (apiSources?.[0] ?? "");
@@ -196,6 +239,40 @@ export default function ApiDataOverview() {
     calls: calls?.length || 0,
   };
 
+  // Prepare pie chart data
+  const agentsPieData = useMemo(() => {
+    if (!sourceStats?.bySource) return [];
+    return Object.entries(sourceStats.bySource)
+      .filter(([_, stats]) => stats.agents > 0)
+      .map(([name, stats]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value: stats.agents,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [sourceStats]);
+
+  const salesPieData = useMemo(() => {
+    if (!sourceStats?.bySource) return [];
+    return Object.entries(sourceStats.bySource)
+      .filter(([_, stats]) => stats.sales > 0)
+      .map(([name, stats]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value: stats.sales,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [sourceStats]);
+
+  const callsPieData = useMemo(() => {
+    if (!sourceStats?.bySource) return [];
+    return Object.entries(sourceStats.bySource)
+      .filter(([_, stats]) => stats.calls > 0)
+      .map(([name, stats]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value: stats.calls,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [sourceStats]);
+
   if (sourcesLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -215,8 +292,123 @@ export default function ApiDataOverview() {
     );
   }
 
+
   return (
     <div className="space-y-6">
+      {/* Distribution Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Agents by Source ({sourceStats?.totalAgents || 0})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {agentsPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={agentsPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={70}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
+                  >
+                    {agentsPieData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => [value, "Agents"]} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+                No agent data
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4" />
+              Sales by Source ({sourceStats?.totalSales || 0})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {salesPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={salesPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={70}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
+                  >
+                    {salesPieData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => [value, "Sales"]} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+                No sales data
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Phone className="h-4 w-4" />
+              Calls by Source ({sourceStats?.totalCalls || 0})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {callsPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={callsPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={70}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
+                  >
+                    {callsPieData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => [value, "Calls"]} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+                No calls data
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Provider Selector */}
       <Tabs value={effectiveProvider} onValueChange={setSelectedProvider}>
         <TabsList className="mb-4 flex-wrap h-auto gap-1">
