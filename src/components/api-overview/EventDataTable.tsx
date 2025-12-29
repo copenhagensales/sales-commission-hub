@@ -69,20 +69,53 @@ const CAMPAIGN_STATUS_LABELS: Record<string, { label: string; color: string }> =
   voicemail: { label: "Voicemail", color: "bg-pink-500/20 text-pink-300 border-pink-500/30" },
 };
 
-// Helper to get campaign status from payload
+// Helper to get campaign status enum from payload (canonical source of truth)
+// IMPORTANT: We ONLY use the structured enum field (campaign_status / campaignStatus).
+// We intentionally do NOT fall back to generic fields like "status" or event_type.
 function getCampaignStatus(payload: Record<string, any> | null): string | null {
   if (!payload) return null;
-  // Check common field names for campaign status enum
-  return payload.campaignStatus || payload.campaign_status || payload.status || payload.outcome || null;
+  return (
+    payload.campaign_status ??
+    payload.campaignStatus ??
+    payload.CampaignStatus ??
+    payload.CAMPAIGN_STATUS ??
+    null
+  );
 }
 
-// Helper to get raw result text from payload (human-readable)
+// Helper to get raw result text from payload (human-readable/localized, NOT used for logic)
 function getRawResultText(payload: Record<string, any> | null): string | null {
   if (!payload) return null;
-  // Check for localized/human-readable result fields
-  return payload.result || payload.resultText || payload.result_text || 
-         payload["Resultat Af Samtalen"] || payload.resultatAfSamtalen || 
-         payload.humanReadableResult || null;
+
+  // Explicit common keys (including capitalized variants)
+  if (Object.prototype.hasOwnProperty.call(payload, "Resultat Af Samtalen")) {
+    return payload["Resultat Af Samtalen"] ?? "";
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, "Result")) {
+    return payload["Result"] ?? "";
+  }
+
+  const direct =
+    payload.result ??
+    payload.resultText ??
+    payload.result_text ??
+    payload.resultatAfSamtalen ??
+    payload.humanReadableResult ??
+    null;
+
+  if (direct !== null && direct !== undefined) return direct;
+
+  // Graceful fallback: find any key that looks like a result field (case-insensitive)
+  // and return its value if it's a primitive.
+  for (const [k, v] of Object.entries(payload)) {
+    const key = k.toLowerCase();
+    if (key.includes("result")) {
+      if (typeof v === "string") return v;
+      if (typeof v === "number" || typeof v === "boolean") return String(v);
+    }
+  }
+
+  return null;
 }
 
 // Get display info for a campaign status
@@ -1209,47 +1242,50 @@ function ExpandedEventDetails({ event, linkedData, provider }: ExpandedEventDeta
   return (
     <div className="p-4 space-y-4 border-l-2 border-primary/30 ml-2 md:ml-6">
       {/* Campaign Outcome Section - Shows both canonical enum and raw result */}
-      {(campaignStatus || rawResultText) && (
-        <div className="border border-border/50 rounded-lg p-3 bg-gradient-to-br from-primary/5 to-transparent">
-          <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-            Campaign Outcome
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Canonical Status (Source of Truth) */}
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Canonical Status</p>
-              <div className="flex items-center gap-2">
-                <Badge className={cn(statusInfo.color, !statusInfo.isKnown && "border-dashed")} variant="outline">
-                  {statusInfo.label}
-                </Badge>
-                {campaignStatus && (
-                  <code className="text-xs font-mono text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
-                    {campaignStatus}
-                  </code>
+      <div className="border border-border/50 rounded-lg p-3 bg-gradient-to-br from-primary/5 to-transparent">
+        <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+          Campaign Outcome
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Canonical Status (Source of Truth) */}
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Canonical Status</p>
+            <div className="flex items-center gap-2">
+              <Badge className={cn(statusInfo.color, !statusInfo.isKnown && campaignStatus && "border-dashed")} variant="outline">
+                {statusInfo.label}
+                {!statusInfo.isKnown && campaignStatus && (
+                  <span className="ml-1 text-[10px] opacity-60">(?)</span>
                 )}
-              </div>
-              {!statusInfo.isKnown && campaignStatus && (
-                <p className="text-xs text-amber-500 flex items-center gap-1 mt-1">
-                  <AlertCircle className="h-3 w-3" />
-                  Unknown status value (displayed as-is)
-                </p>
+              </Badge>
+              {campaignStatus ? (
+                <code className="text-xs font-mono text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                  {campaignStatus}
+                </code>
+              ) : (
+                <span className="text-xs text-muted-foreground">No campaign_status provided</span>
               )}
             </div>
-            
-            {/* Raw Result Text (Human-Readable) */}
-            {rawResultText && (
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Raw Result Text</p>
-                <p className="text-sm font-medium">{rawResultText}</p>
-                <p className="text-xs text-muted-foreground">
-                  (Localized/human-readable value from API)
-                </p>
-              </div>
+            {!statusInfo.isKnown && campaignStatus && (
+              <p className="text-xs text-amber-500 flex items-center gap-1 mt-1">
+                <AlertCircle className="h-3 w-3" />
+                Unknown status value (displayed as-is)
+              </p>
             )}
           </div>
+
+          {/* Raw Result Text (Human-Readable) */}
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Raw Result Text</p>
+            <p className="text-sm font-medium">
+              {rawResultText !== null && rawResultText !== undefined && rawResultText !== "" ? rawResultText : "-"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              (Stored for transparency; not used for filtering/logic)
+            </p>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Raw Payload */}
       <div>
