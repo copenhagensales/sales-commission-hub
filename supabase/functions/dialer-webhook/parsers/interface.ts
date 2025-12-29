@@ -23,6 +23,11 @@ export interface StandardWebhookPayload {
   // External reference (OPP number, order ID, etc.)
   externalReference: string | null;
   
+  // Campaign outcome - canonical enum (e.g. success, notInterested, invalid)
+  campaignStatus: string | null;
+  // Human-readable result text (for display only, not for logic)
+  rawResultText: string | null;
+  
   // Products
   products: StandardWebhookProduct[];
   

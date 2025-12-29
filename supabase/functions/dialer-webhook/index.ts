@@ -96,7 +96,7 @@ async function processWebhookPayload(
     }
   }
 
-  // Store raw event with dialer reference and leadId
+  // Store raw event with dialer reference, leadId, and campaign_status
   const { data: eventData, error: eventError } = await supabase
     .from('adversus_events')
     .insert({
@@ -104,6 +104,10 @@ async function processWebhookPayload(
       event_type: payload.eventType,
       payload: {
         ...payload.rawPayload,
+        // Canonical campaign_status enum - SOURCE OF TRUTH for filtering/reporting
+        campaign_status: payload.campaignStatus,
+        // Human-readable result text - for display only
+        raw_result_text: payload.rawResultText,
         _parsed_webhook_data: {
           externalId: payload.externalId,
           leadId: payload.leadId,
@@ -115,6 +119,8 @@ async function processWebhookPayload(
           customerPhone: payload.customerPhone,
           customerCompany: payload.customerCompany,
           externalReference: payload.externalReference,
+          campaignStatus: payload.campaignStatus,
+          rawResultText: payload.rawResultText,
           products: payload.products,
         },
         _dialer_webhook_info: {

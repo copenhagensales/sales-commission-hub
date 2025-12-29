@@ -101,11 +101,19 @@ export class AdversusWebhookParser implements WebhookParser {
     // Extract customer info
     const customerCompany = formData['company'] || formData['CVR'] || formData['Efternavn'] || '';
     const customerName = formData['NAVN FF Forsikring'] || formData['customer_name'] || formData['navn'] || '';
+
+    // Campaign status enum - derive from 'status' field which is the outcome
+    // Adversus uses 'status' for the campaign outcome (e.g. leadClosedSuccess, notInterested)
+    const rawStatus = formData['status'] || '';
+    const campaignStatus = this.deriveCampaignStatus(rawStatus);
+    
+    // Human-readable result text (for display only)
+    const rawResultText = formData['Resultat Af Samtalen'] || formData['Result'] || formData['result'] || null;
     
     return {
       externalId: leadId,
       leadId: leadId, // Store leadId explicitly for deduplication
-      eventType: formData['status'] || 'leadClosedSuccess',
+      eventType: rawStatus || 'leadClosedSuccess',
       eventTime: new Date().toISOString(),
       
       agentId,
@@ -120,10 +128,42 @@ export class AdversusWebhookParser implements WebhookParser {
       
       externalReference,
       
+      campaignStatus,
+      rawResultText,
+      
       products: [], // Form data doesn't typically include products
       
       rawPayload: formData, // Store ALL form data for debugging
     };
+  }
+  
+  /**
+   * Derive canonical campaign_status enum from Adversus status field
+   * Maps Adversus-specific values to standard enum values
+   */
+  private deriveCampaignStatus(status: string): string | null {
+    if (!status) return null;
+    
+    // Normalize to lowercase for comparison
+    const s = status.toLowerCase();
+    
+    // Map Adversus status values to canonical enum
+    if (s.includes('success') || s.includes('closed') && s.includes('success')) return 'success';
+    if (s.includes('notinterested') || s.includes('not_interested')) return 'notInterested';
+    if (s.includes('invalid')) return 'invalid';
+    if (s.includes('unqualified')) return 'unqualified';
+    if (s.includes('callback') || s.includes('redial')) return 'callback';
+    if (s.includes('noanswer') || s.includes('no_answer')) return 'noAnswer';
+    if (s.includes('busy')) return 'busy';
+    if (s.includes('voicemail')) return 'voicemail';
+    if (s.includes('automaticredial') || s.includes('automatic_redial')) return 'automaticRedial';
+    if (s.includes('privateredial') || s.includes('private_redial')) return 'privateRedial';
+    if (s.includes('new')) return 'new';
+    if (s.includes('pending')) return 'pending';
+    if (s.includes('completed')) return 'completed';
+    
+    // If no match, return the original status as-is (graceful handling)
+    return status;
   }
 
   private parseJson(rawBody: string): StandardWebhookPayload {
@@ -132,6 +172,7 @@ export class AdversusWebhookParser implements WebhookParser {
     
     // Extract external reference from resultData if available
     let externalReference: string | null = null;
+    let rawResultText: string | null = null;
     if (payload.resultData) {
       externalReference = String(
         payload.resultData.orderId || 
@@ -139,6 +180,11 @@ export class AdversusWebhookParser implements WebhookParser {
         payload.resultData.oppNumber ||
         ''
       ) || null;
+      
+      // Extract human-readable result text
+      rawResultText = (payload.resultData as Record<string, unknown>)?.['Resultat Af Samtalen'] as string || 
+                      (payload.resultData as Record<string, unknown>)?.result as string || 
+                      null;
     }
     
     const leadId = payload.lead?.id ? String(payload.lead.id) : undefined;
@@ -157,10 +203,14 @@ export class AdversusWebhookParser implements WebhookParser {
       unitPrice: p.unitPrice,
     }));
 
+    // Derive campaign status from event type
+    const eventType = body.type || 'result';
+    const campaignStatus = this.deriveCampaignStatus(eventType);
+
     return {
       externalId,
       leadId, // Store leadId for deduplication with API sync
-      eventType: body.type || 'result',
+      eventType,
       eventTime: body.event_time || new Date().toISOString(),
       
       agentId: payload.user?.id || '',
@@ -174,6 +224,9 @@ export class AdversusWebhookParser implements WebhookParser {
       customerCompany: payload.lead?.company || '',
       
       externalReference,
+      
+      campaignStatus,
+      rawResultText,
       
       products,
       
