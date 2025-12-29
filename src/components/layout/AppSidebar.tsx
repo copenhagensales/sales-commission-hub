@@ -61,9 +61,6 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [onboardingOpen, setOnboardingOpen] = useState(
     location.pathname.startsWith("/onboarding-program") || location.pathname === "/onboarding-program/kursus"
   );
-  const [settingsOpen, setSettingsOpen] = useState(
-    ["/settings", "/live-stats"].includes(location.pathname)
-  );
 
   // Fetch employee name and pending contracts count
   const { data: employeeData } = useQuery({
@@ -1283,36 +1280,34 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             </NavLink>
           )}
 
-          {/* Settings Menu */}
+          {/* Live Stats */}
           {p.canViewSettings && (
-            <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
-              <CollapsibleTrigger className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                ["/settings", "/live-stats"].includes(location.pathname) ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-              )}>
-                <div className="flex items-center gap-3">
-                  <Settings className="h-5 w-5" />
-                  {t("sidebar.settings")}
-                </div>
-                {settingsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pl-4 space-y-1 mt-1">
-                <NavLink to="/settings" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/settings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <Settings className="h-4 w-4" />
-                  {t("sidebar.settings")}
-                </NavLink>
-                <NavLink to="/live-stats" onClick={handleNavClick} className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/live-stats" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}>
-                  <Activity className="h-4 w-4" />
-                  Live Stats
-                </NavLink>
-              </CollapsibleContent>
-            </Collapsible>
+            <NavLink
+              to="/live-stats"
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/live-stats" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <Activity className="h-5 w-5" />
+              Live Stats
+            </NavLink>
+          )}
+
+          {/* Settings */}
+          {p.canViewSettings && (
+            <NavLink
+              to="/settings"
+              onClick={handleNavClick}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname === "/settings" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <Settings className="h-5 w-5" />
+              {t("sidebar.settings")}
+            </NavLink>
           )}
         </nav>
         <div className="border-t border-sidebar-border p-4 space-y-2">
