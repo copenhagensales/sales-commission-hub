@@ -293,14 +293,50 @@ export default function ApiDataOverview() {
   }
 
 
+  // Color mapping for providers
+  const getProviderColor = (provider: string, index: number) => {
+    const colors: Record<string, string> = {
+      adversus: "from-blue-500/20 to-blue-600/10 border-blue-500/30",
+      enreach: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30",
+      ase: "from-purple-500/20 to-purple-600/10 border-purple-500/30",
+      eesy: "from-amber-500/20 to-amber-600/10 border-amber-500/30",
+      lovablecph: "from-pink-500/20 to-pink-600/10 border-pink-500/30",
+      relatel_cphsales: "from-cyan-500/20 to-cyan-600/10 border-cyan-500/30",
+      tryg: "from-orange-500/20 to-orange-600/10 border-orange-500/30",
+      m365: "from-indigo-500/20 to-indigo-600/10 border-indigo-500/30",
+      economic: "from-teal-500/20 to-teal-600/10 border-teal-500/30",
+    };
+    const fallbackColors = [
+      "from-violet-500/20 to-violet-600/10 border-violet-500/30",
+      "from-rose-500/20 to-rose-600/10 border-rose-500/30",
+      "from-sky-500/20 to-sky-600/10 border-sky-500/30",
+    ];
+    return colors[provider.toLowerCase()] || fallbackColors[index % fallbackColors.length];
+  };
+
+  const getProviderIconColor = (provider: string) => {
+    const iconColors: Record<string, string> = {
+      adversus: "text-blue-400",
+      enreach: "text-emerald-400",
+      ase: "text-purple-400",
+      eesy: "text-amber-400",
+      lovablecph: "text-pink-400",
+      relatel_cphsales: "text-cyan-400",
+      tryg: "text-orange-400",
+      m365: "text-indigo-400",
+      economic: "text-teal-400",
+    };
+    return iconColors[provider.toLowerCase()] || "text-primary";
+  };
+
   return (
     <div className="space-y-6">
       {/* Distribution Charts */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Users className="h-4 w-4" />
+              <Users className="h-4 w-4 text-blue-400" />
               Agents by Source ({sourceStats?.totalAgents || 0})
             </CardTitle>
           </CardHeader>
@@ -334,10 +370,10 @@ export default function ApiDataOverview() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <ShoppingCart className="h-4 w-4" />
+              <ShoppingCart className="h-4 w-4 text-emerald-400" />
               Sales by Source ({sourceStats?.totalSales || 0})
             </CardTitle>
           </CardHeader>
@@ -371,10 +407,10 @@ export default function ApiDataOverview() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Phone className="h-4 w-4" />
+              <Phone className="h-4 w-4 text-amber-400" />
               Calls by Source ({sourceStats?.totalCalls || 0})
             </CardTitle>
           </CardHeader>
@@ -411,60 +447,64 @@ export default function ApiDataOverview() {
 
       {/* Provider Selector */}
       <Tabs value={effectiveProvider} onValueChange={setSelectedProvider}>
-        <TabsList className="mb-4 flex-wrap h-auto gap-1">
-          {apiSources.map(source => (
-            <TabsTrigger key={source} value={source} className="gap-2 capitalize">
-              <Database className="h-4 w-4" />
+        <TabsList className="mb-4 flex-wrap h-auto gap-1 bg-card/50 p-1">
+          {apiSources.map((source, index) => (
+            <TabsTrigger 
+              key={source} 
+              value={source} 
+              className={`gap-2 capitalize data-[state=active]:bg-gradient-to-r ${getProviderColor(source, index)} data-[state=active]:shadow-md transition-all`}
+            >
+              <Database className={`h-4 w-4 ${effectiveProvider === source ? getProviderIconColor(source) : ""}`} />
               {source}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        {apiSources.map(source => (
+        {apiSources.map((source, sourceIndex) => (
           <TabsContent key={source} value={source} className="space-y-6">
             {/* Stats Overview */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card>
+              <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <Users className="h-4 w-4" />
+                  <CardTitle className="text-sm font-medium text-blue-300 flex items-center gap-2">
+                    <Users className="h-4 w-4 text-blue-400" />
                     Agents
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{providerStats.agents}</div>
-                  <p className="text-xs text-muted-foreground">
+                  <div className="text-2xl font-bold text-blue-100">{providerStats.agents}</div>
+                  <p className="text-xs text-blue-300/70">
                     {providerStats.activeAgents} active
                   </p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/20">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <ShoppingCart className="h-4 w-4" />
+                  <CardTitle className="text-sm font-medium text-emerald-300 flex items-center gap-2">
+                    <ShoppingCart className="h-4 w-4 text-emerald-400" />
                     Sales
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{providerStats.sales}</div>
-                  <p className="text-xs text-muted-foreground">Total records</p>
+                  <div className="text-2xl font-bold text-emerald-100">{providerStats.sales}</div>
+                  <p className="text-xs text-emerald-300/70">Total records</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
+                  <CardTitle className="text-sm font-medium text-amber-300 flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-amber-400" />
                     Calls
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{providerStats.calls}</div>
-                  <p className="text-xs text-muted-foreground">Total records</p>
+                  <div className="text-2xl font-bold text-amber-100">{providerStats.calls}</div>
+                  <p className="text-xs text-amber-300/70">Total records</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className={`bg-gradient-to-br ${getProviderColor(source, sourceIndex)}`}>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <CardTitle className={`text-sm font-medium flex items-center gap-2 ${getProviderIconColor(source)}`}>
                     <Database className="h-4 w-4" />
                     Source
                   </CardTitle>
