@@ -51,6 +51,57 @@ interface EventDataTableProps {
   iconColor: string;
 }
 
+// Campaign status enum mapping - canonical source of truth
+const CAMPAIGN_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  new: { label: "New", color: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
+  automaticRedial: { label: "Auto Redial", color: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30" },
+  privateRedial: { label: "Private Redial", color: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30" },
+  notInterested: { label: "Not Interested", color: "bg-orange-500/20 text-orange-300 border-orange-500/30" },
+  success: { label: "Success", color: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" },
+  invalid: { label: "Invalid", color: "bg-red-500/20 text-red-300 border-red-500/30" },
+  unqualified: { label: "Unqualified", color: "bg-slate-500/20 text-slate-300 border-slate-500/30" },
+  // Additional common statuses
+  pending: { label: "Pending", color: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
+  completed: { label: "Completed", color: "bg-green-500/20 text-green-300 border-green-500/30" },
+  callback: { label: "Callback", color: "bg-purple-500/20 text-purple-300 border-purple-500/30" },
+  noAnswer: { label: "No Answer", color: "bg-gray-500/20 text-gray-300 border-gray-500/30" },
+  busy: { label: "Busy", color: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30" },
+  voicemail: { label: "Voicemail", color: "bg-pink-500/20 text-pink-300 border-pink-500/30" },
+};
+
+// Helper to get campaign status from payload
+function getCampaignStatus(payload: Record<string, any> | null): string | null {
+  if (!payload) return null;
+  // Check common field names for campaign status enum
+  return payload.campaignStatus || payload.campaign_status || payload.status || payload.outcome || null;
+}
+
+// Helper to get raw result text from payload (human-readable)
+function getRawResultText(payload: Record<string, any> | null): string | null {
+  if (!payload) return null;
+  // Check for localized/human-readable result fields
+  return payload.result || payload.resultText || payload.result_text || 
+         payload["Resultat Af Samtalen"] || payload.resultatAfSamtalen || 
+         payload.humanReadableResult || null;
+}
+
+// Get display info for a campaign status
+function getCampaignStatusInfo(status: string | null): { label: string; color: string; isKnown: boolean } {
+  if (!status) return { label: "-", color: "bg-muted text-muted-foreground", isKnown: false };
+  
+  const info = CAMPAIGN_STATUS_LABELS[status];
+  if (info) {
+    return { ...info, isKnown: true };
+  }
+  
+  // Handle unknown status gracefully - display as-is with neutral styling
+  return { 
+    label: status, 
+    color: "bg-muted/50 text-foreground border-border", 
+    isKnown: false 
+  };
+}
+
 interface ColumnConfig {
   id: string;
   label: string;
@@ -89,6 +140,7 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
     id: true,
     event_type: true,
+    campaign_status: true,
     received_at: true,
     status: true,
     agent: true,
@@ -121,6 +173,26 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
       filterable: true,
       filterType: "select",
       minWidth: "100px",
+    },
+    {
+      id: "campaign_status",
+      label: "Campaign Outcome",
+      accessor: (e) => getCampaignStatus(e.payload as Record<string, any> | null),
+      render: (value) => {
+        const statusInfo = getCampaignStatusInfo(value);
+        return (
+          <Badge className={cn(statusInfo.color, !statusInfo.isKnown && "border-dashed")} variant="outline">
+            {statusInfo.label}
+            {!statusInfo.isKnown && value && (
+              <span className="ml-1 text-[10px] opacity-60">(?)</span>
+            )}
+          </Badge>
+        );
+      },
+      sortable: true,
+      filterable: true,
+      filterType: "select",
+      minWidth: "130px",
     },
     {
       id: "received_at",
@@ -435,7 +507,25 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
     return count;
   }, [search, dateFrom, dateTo, filters]);
 
-  const totalPages = Math.ceil((eventsData?.total || 0) / pageSize);
+  // Client-side filter for campaign_status (since it's in JSON payload)
+  const filteredEvents = useMemo(() => {
+    if (!eventsData?.events) return [];
+    
+    let events = eventsData.events;
+    
+    // Filter by campaign_status (client-side since it's in JSON payload)
+    if (filters.campaign_status) {
+      events = events.filter(event => {
+        const status = getCampaignStatus(event.payload as Record<string, any> | null);
+        return status === filters.campaign_status;
+      });
+    }
+    
+    return events;
+  }, [eventsData?.events, filters.campaign_status]);
+
+  const filteredTotal = filters.campaign_status ? filteredEvents.length : (eventsData?.total || 0);
+  const totalPages = Math.ceil(filteredTotal / pageSize);
 
   // Filter panel content (shared between desktop sidebar and mobile sheet)
   const FilterPanelContent = () => (
@@ -479,7 +569,7 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
 
       {/* Status Filter */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Status</label>
+        <label className="text-sm font-medium">Processing Status</label>
         <Select 
           value={filters.status || "all"} 
           onValueChange={(v) => handleFilterChange("status", v === "all" ? "" : v)}
@@ -491,6 +581,25 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="processed">Processed</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Campaign Outcome Filter */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Campaign Outcome</label>
+        <Select 
+          value={filters.campaign_status || "all"} 
+          onValueChange={(v) => handleFilterChange("campaign_status", v === "all" ? "" : v)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="All Outcomes" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Outcomes</SelectItem>
+            {Object.entries(CAMPAIGN_STATUS_LABELS).map(([value, { label }]) => (
+              <SelectItem key={value} value={value}>{label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -745,8 +854,14 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
               )}
               {filters.status && (
                 <Badge variant="secondary" className="gap-1">
-                  Status: {filters.status}
+                  Processing: {filters.status}
                   <X className="h-3 w-3 cursor-pointer" onClick={() => handleFilterChange("status", "")} />
+                </Badge>
+              )}
+              {filters.campaign_status && (
+                <Badge variant="secondary" className="gap-1">
+                  Outcome: {getCampaignStatusInfo(filters.campaign_status).label}
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => handleFilterChange("campaign_status", "")} />
                 </Badge>
               )}
               {dateFrom && (
@@ -854,7 +969,7 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {eventsData.events.map((event: any) => (
+                      {filteredEvents.map((event: any) => (
                         <EventTableRow
                           key={event.id}
                           event={event}
@@ -871,7 +986,7 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
 
                 {/* Mobile Card View */}
                 <div className="md:hidden divide-y divide-border">
-                  {eventsData.events.map((event: any) => (
+                  {filteredEvents.map((event: any) => (
                     <MobileEventCard
                       key={event.id}
                       event={event}
@@ -887,7 +1002,7 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t">
                   <div className="flex items-center gap-3">
                     <p className="text-sm text-muted-foreground text-center sm:text-left">
-                      {eventsData.total.toLocaleString()} events
+                      {filteredTotal.toLocaleString()} events
                     </p>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground hidden sm:inline">Show</span>
@@ -1087,9 +1202,55 @@ interface ExpandedEventDetailsProps {
 
 function ExpandedEventDetails({ event, linkedData, provider }: ExpandedEventDetailsProps) {
   const payload = event.payload as Record<string, any> | null;
+  const campaignStatus = getCampaignStatus(payload);
+  const rawResultText = getRawResultText(payload);
+  const statusInfo = getCampaignStatusInfo(campaignStatus);
 
   return (
     <div className="p-4 space-y-4 border-l-2 border-primary/30 ml-2 md:ml-6">
+      {/* Campaign Outcome Section - Shows both canonical enum and raw result */}
+      {(campaignStatus || rawResultText) && (
+        <div className="border border-border/50 rounded-lg p-3 bg-gradient-to-br from-primary/5 to-transparent">
+          <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            Campaign Outcome
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Canonical Status (Source of Truth) */}
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Canonical Status</p>
+              <div className="flex items-center gap-2">
+                <Badge className={cn(statusInfo.color, !statusInfo.isKnown && "border-dashed")} variant="outline">
+                  {statusInfo.label}
+                </Badge>
+                {campaignStatus && (
+                  <code className="text-xs font-mono text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                    {campaignStatus}
+                  </code>
+                )}
+              </div>
+              {!statusInfo.isKnown && campaignStatus && (
+                <p className="text-xs text-amber-500 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" />
+                  Unknown status value (displayed as-is)
+                </p>
+              )}
+            </div>
+            
+            {/* Raw Result Text (Human-Readable) */}
+            {rawResultText && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Raw Result Text</p>
+                <p className="text-sm font-medium">{rawResultText}</p>
+                <p className="text-xs text-muted-foreground">
+                  (Localized/human-readable value from API)
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Raw Payload */}
       <div>
         <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
@@ -1312,10 +1473,15 @@ function getEventTypeColor(type: string) {
 function extractKeyFields(payload: Record<string, any>): Record<string, any> {
   const keyFields: Record<string, any> = {};
   const importantKeys = [
+    // Campaign status fields (canonical source of truth)
+    "campaignStatus", "campaign_status", 
+    // Raw result fields (human-readable)
+    "result", "resultText", "result_text", "Resultat Af Samtalen",
+    // Other important fields
     "userId", "agentId", "agent_id", "campaignId", "campaign_id",
     "phone", "customerPhone", "customer_phone", "email",
     "orderId", "order_id", "leadId", "lead_id",
-    "status", "result", "outcome",
+    "status", "outcome",
     "productName", "product_name", "amount", "price",
   ];
 
