@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { getWeekStartDate } from "@/lib/vagt-flow-date-utils";
+import { getWeekStartDate, getWeekYear } from "@/lib/vagt-flow-date-utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, getWeek, getYear, differenceInWeeks } from "date-fns";
+import { format, getWeek, differenceInWeeks } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CapacityPanel } from "@/components/vagt-flow/CapacityPanel";
@@ -51,7 +51,7 @@ export default function BookWeekContent() {
     weekParam ? parseInt(weekParam) : getWeek(new Date(), { weekStartsOn: 1 })
   );
   const [selectedYear, setSelectedYear] = useState(
-    yearParam ? parseInt(yearParam) : getYear(new Date())
+    yearParam ? parseInt(yearParam) : getWeekYear(new Date())
   );
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");

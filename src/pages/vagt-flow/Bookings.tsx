@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { ChevronUp, ChevronDown, Trash2, Plus, Calendar, Car, AlertTriangle, Users, FileText, X } from "lucide-react";
-import { format, addDays, getWeek, getYear } from "date-fns";
-import { getWeekStartDate } from "@/lib/vagt-flow-date-utils";
+import { format, addDays, getWeek } from "date-fns";
+import { getWeekStartDate, getWeekYear } from "@/lib/vagt-flow-date-utils";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -55,7 +55,7 @@ export default function VagtBookings() {
     weekParam ? parseInt(weekParam) : getWeek(now, { weekStartsOn: 1 })
   );
   const [selectedYear, setSelectedYear] = useState(
-    yearParam ? parseInt(yearParam) : getYear(now)
+    yearParam ? parseInt(yearParam) : getWeekYear(now)
   );
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
