@@ -1,4 +1,4 @@
-import { format, getWeek, getYear, startOfWeek, addDays, endOfWeek } from "date-fns";
+import { format, getWeek, startOfWeek, addDays, endOfWeek, getISOWeekYear } from "date-fns";
 import { da } from "date-fns/locale";
 
 export function getWeekNumber(date: Date): number {
@@ -6,7 +6,9 @@ export function getWeekNumber(date: Date): number {
 }
 
 export function getWeekYear(date: Date): number {
-  return getYear(date);
+  // Use ISO week year - this returns the correct year for week calculations
+  // e.g., Dec 29, 2025 is in week 1 of 2026, so this returns 2026
+  return getISOWeekYear(date);
 }
 
 export function formatWeekRange(startDate: Date, endDate: Date): string {
