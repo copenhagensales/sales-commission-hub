@@ -188,7 +188,7 @@ export default function EventsView({ provider, providerColor, iconColor }: Event
               .select("*")
               .or(`external_adversus_id.eq.${agentExternalId},external_dialer_id.eq.${agentExternalId}`)
               .limit(1)
-              .single();
+              .maybeSingle();
             relatedAgent = data;
           }
 
@@ -203,7 +203,7 @@ export default function EventsView({ provider, providerColor, iconColor }: Event
               `)
               .eq("source_employee_id", String(agentExternalId))
               .limit(1)
-              .single();
+              .maybeSingle();
             employeeMapping = data;
           }
 
