@@ -15,7 +15,6 @@ interface Employee {
   first_name: string;
   last_name: string;
   private_email: string | null;
-  work_email: string | null;
 }
 
 interface Agent {
@@ -47,7 +46,7 @@ export function DialerMappingTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, private_email, work_email")
+        .select("id, first_name, last_name, private_email")
         .eq("is_active", true)
         .order("first_name");
       if (error) throw error;
@@ -145,13 +144,10 @@ export function DialerMappingTab() {
     (a) => !mappedAgentIds.includes(a.id) && a.email?.toLowerCase().endsWith("@copenhagensales.dk")
   );
 
-  // Find suggested employee for each unmapped agent based on email match (check both private and work email)
+  // Find suggested employee for each unmapped agent based on email match
   const getSuggestedEmployee = (agentEmail: string) => {
-    const lowerEmail = agentEmail.toLowerCase();
     return employees.find(
-      (emp) => 
-        emp.private_email?.toLowerCase() === lowerEmail ||
-        emp.work_email?.toLowerCase() === lowerEmail
+      (emp) => emp.private_email?.toLowerCase() === agentEmail.toLowerCase()
     );
   };
 
@@ -258,10 +254,9 @@ export function DialerMappingTab() {
                               <SelectItem key={emp.id} value={emp.id}>
                                 <div className="flex items-center gap-2">
                                   <span>{emp.first_name} {emp.last_name}</span>
-                                                  {(emp.private_email?.toLowerCase() === agent.email.toLowerCase() || 
-                                                    emp.work_email?.toLowerCase() === agent.email.toLowerCase()) && (
-                                                    <Badge variant="secondary" className="text-[10px] px-1 py-0">Match</Badge>
-                                                  )}
+                                  {emp.private_email?.toLowerCase() === agent.email.toLowerCase() && (
+                                    <Badge variant="secondary" className="text-[10px] px-1 py-0">Match</Badge>
+                                  )}
                                 </div>
                               </SelectItem>
                             ))}
