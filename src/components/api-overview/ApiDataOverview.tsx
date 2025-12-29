@@ -1,16 +1,12 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Search, Users, Phone, ShoppingCart, Database, Loader2, FileJson } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { Users, Phone, ShoppingCart, Database, Loader2, FileJson } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import EventDataTable from "./EventDataTable";
 import AgentsDataTable from "./AgentsDataTable";
 import SalesDataTable from "./SalesDataTable";
@@ -31,9 +27,6 @@ const CHART_COLORS = [
 
 export default function ApiDataOverview() {
   const [selectedProvider, setSelectedProvider] = useState<string>("");
-  const [agentSearch, setAgentSearch] = useState("");
-  const [salesSearch, setSalesSearch] = useState("");
-  const [callsSearch, setCallsSearch] = useState("");
 
   // Fetch all unique API sources dynamically with counts
   const { data: sourceStats, isLoading: sourcesLoading } = useQuery({
@@ -219,40 +212,6 @@ export default function ApiDataOverview() {
     enabled: !!effectiveProvider,
   });
 
-  // Filter functions
-  const filteredAgents = agents?.filter(agent => {
-    if (!agentSearch) return true;
-    const search = agentSearch.toLowerCase();
-    return (
-      agent.name?.toLowerCase().includes(search) ||
-      agent.email?.toLowerCase().includes(search) ||
-      agent.external_adversus_id?.toLowerCase().includes(search) ||
-      agent.external_dialer_id?.toLowerCase().includes(search)
-    );
-  }) || [];
-
-  const filteredSales = sales?.filter(sale => {
-    if (!salesSearch) return true;
-    const search = salesSearch.toLowerCase();
-    return (
-      sale.agent_name?.toLowerCase().includes(search) ||
-      sale.agent_email?.toLowerCase().includes(search) ||
-      sale.adversus_external_id?.toLowerCase().includes(search) ||
-      sale.customer_phone?.toLowerCase().includes(search) ||
-      sale.customer_company?.toLowerCase().includes(search)
-    );
-  }) || [];
-
-  const filteredCalls = calls?.filter(call => {
-    if (!callsSearch) return true;
-    const search = callsSearch.toLowerCase();
-    return (
-      call.external_id?.toLowerCase().includes(search) ||
-      call.agent_external_id?.toLowerCase().includes(search) ||
-      call.campaign_external_id?.toLowerCase().includes(search) ||
-      call.status?.toLowerCase().includes(search)
-    );
-  }) || [];
 
   const providerStats = {
     agents: agents?.length || 0,
@@ -572,19 +531,19 @@ export default function ApiDataOverview() {
                     <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     <span className="hidden sm:inline">Agents</span>
                     <span className="sm:hidden">Agt</span>
-                    <span className="text-[10px] sm:text-xs opacity-70">({filteredAgents.length})</span>
+                    <span className="text-[10px] sm:text-xs opacity-70">({agents?.length || 0})</span>
                   </TabsTrigger>
                   <TabsTrigger value="sales" className="gap-1 sm:gap-1.5 text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3">
                     <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     <span className="hidden sm:inline">Sales</span>
                     <span className="sm:hidden">Sls</span>
-                    <span className="text-[10px] sm:text-xs opacity-70">({filteredSales.length})</span>
+                    <span className="text-[10px] sm:text-xs opacity-70">({sales?.length || 0})</span>
                   </TabsTrigger>
                   <TabsTrigger value="calls" className="gap-1 sm:gap-1.5 text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3">
                     <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     <span className="hidden sm:inline">Calls</span>
                     <span className="sm:hidden">Cls</span>
-                    <span className="text-[10px] sm:text-xs opacity-70">({filteredCalls.length})</span>
+                    <span className="text-[10px] sm:text-xs opacity-70">({calls?.length || 0})</span>
                   </TabsTrigger>
                 </TabsList>
                 <ScrollBar orientation="horizontal" className="invisible" />
@@ -601,248 +560,35 @@ export default function ApiDataOverview() {
 
               {/* Agents Tab */}
               <TabsContent value="agents">
-                <Card>
-                  <CardHeader className="p-3 sm:p-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <CardTitle className="capitalize text-base sm:text-lg">Agents from {source}</CardTitle>
-                      <div className="relative w-full sm:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Search agents..."
-                          value={agentSearch}
-                          onChange={(e) => setAgentSearch(e.target.value)}
-                          className="pl-9 h-9"
-                        />
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0 sm:p-6 sm:pt-0">
-                    {agentsLoading ? (
-                      <div className="space-y-2 p-3 sm:p-0">
-                        {[...Array(5)].map((_, i) => (
-                          <Skeleton key={i} className="h-12 w-full" />
-                        ))}
-                      </div>
-                    ) : filteredAgents.length === 0 ? (
-                      <EmptyState 
-                        icon={<Users className="h-12 w-12" />}
-                        title="No agents found"
-                        description={agentSearch ? "Try adjusting your search" : `No agents from ${source} yet`}
-                      />
-                    ) : (
-                      <ScrollArea className="w-full">
-                        <div className="min-w-[600px]">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead className="hidden sm:table-cell">Email</TableHead>
-                                <TableHead>External ID</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="hidden md:table-cell">Last Updated</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filteredAgents.slice(0, 100).map((agent) => (
-                                <TableRow key={agent.id}>
-                                  <TableCell className="font-medium text-sm">{agent.name}</TableCell>
-                                  <TableCell className="text-muted-foreground text-xs hidden sm:table-cell">
-                                    {agent.email}
-                                  </TableCell>
-                                  <TableCell className="font-mono text-xs">
-                                    {agent.external_adversus_id || agent.external_dialer_id || "-"}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant={agent.is_active ? "default" : "secondary"} className="text-xs">
-                                      {agent.is_active ? "Active" : "Inactive"}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-muted-foreground text-xs hidden md:table-cell whitespace-nowrap">
-                                    {agent.updated_at ? format(new Date(agent.updated_at), "dd/MM/yy HH:mm") : "-"}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                        <ScrollBar orientation="horizontal" />
-                        {filteredAgents.length > 100 && (
-                          <p className="text-sm text-muted-foreground text-center p-4">
-                            Showing 100 of {filteredAgents.length} agents
-                          </p>
-                        )}
-                      </ScrollArea>
-                    )}
-                  </CardContent>
-                </Card>
+                <AgentsDataTable
+                  provider={source}
+                  providerColor={getProviderColor(source, sourceIndex)}
+                  iconColor={getProviderIconColor(source)}
+                  agents={agents || []}
+                  isLoading={agentsLoading}
+                />
               </TabsContent>
 
               {/* Sales Tab */}
               <TabsContent value="sales">
-                <Card>
-                  <CardHeader className="p-3 sm:p-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <CardTitle className="capitalize text-base sm:text-lg">Sales from {source}</CardTitle>
-                      <div className="relative w-full sm:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Search sales..."
-                          value={salesSearch}
-                          onChange={(e) => setSalesSearch(e.target.value)}
-                          className="pl-9 h-9"
-                        />
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0 sm:p-6 sm:pt-0">
-                    {salesLoading ? (
-                      <div className="space-y-2 p-3 sm:p-0">
-                        {[...Array(5)].map((_, i) => (
-                          <Skeleton key={i} className="h-12 w-full" />
-                        ))}
-                      </div>
-                    ) : filteredSales.length === 0 ? (
-                      <EmptyState 
-                        icon={<ShoppingCart className="h-12 w-12" />}
-                        title="No sales found"
-                        description={salesSearch ? "Try adjusting your search" : `No sales from ${source} yet`}
-                      />
-                    ) : (
-                      <ScrollArea className="w-full">
-                        <div className="min-w-[600px]">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>External ID</TableHead>
-                                <TableHead>Agent</TableHead>
-                                <TableHead className="hidden sm:table-cell">Customer</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="hidden md:table-cell">Sale Date</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filteredSales.slice(0, 100).map((sale) => (
-                                <TableRow key={sale.id}>
-                                  <TableCell className="font-mono text-xs">
-                                    {sale.adversus_external_id || "-"}
-                                  </TableCell>
-                                  <TableCell>
-                                    <div>
-                                      <div className="font-medium text-sm">{sale.agent_name || "-"}</div>
-                                      <div className="text-xs text-muted-foreground hidden sm:block">{sale.agent_email || "-"}</div>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="hidden sm:table-cell">
-                                    <div>
-                                      <div className="font-medium text-sm">{sale.customer_company || "-"}</div>
-                                      <div className="text-xs text-muted-foreground font-mono">{sale.customer_phone || "-"}</div>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant={getStatusVariant(sale.validation_status)} className="text-xs">
-                                      {sale.validation_status || sale.status || "unknown"}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-muted-foreground text-xs hidden md:table-cell whitespace-nowrap">
-                                    {sale.sale_datetime ? format(new Date(sale.sale_datetime), "dd/MM/yy HH:mm") : "-"}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                        <ScrollBar orientation="horizontal" />
-                        {filteredSales.length > 100 && (
-                          <p className="text-sm text-muted-foreground text-center p-4">
-                            Showing 100 of {filteredSales.length} sales
-                          </p>
-                        )}
-                      </ScrollArea>
-                    )}
-                  </CardContent>
-                </Card>
+                <SalesDataTable
+                  provider={source}
+                  providerColor={getProviderColor(source, sourceIndex)}
+                  iconColor={getProviderIconColor(source)}
+                  sales={sales || []}
+                  isLoading={salesLoading}
+                />
               </TabsContent>
 
               {/* Calls Tab */}
               <TabsContent value="calls">
-                <Card>
-                  <CardHeader className="p-3 sm:p-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <CardTitle className="capitalize text-base sm:text-lg">Calls from {source}</CardTitle>
-                      <div className="relative w-full sm:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Search calls..."
-                          value={callsSearch}
-                          onChange={(e) => setCallsSearch(e.target.value)}
-                          className="pl-9 h-9"
-                        />
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0 sm:p-6 sm:pt-0">
-                    {callsLoading ? (
-                      <div className="space-y-2 p-3 sm:p-0">
-                        {[...Array(5)].map((_, i) => (
-                          <Skeleton key={i} className="h-12 w-full" />
-                        ))}
-                      </div>
-                    ) : filteredCalls.length === 0 ? (
-                      <EmptyState 
-                        icon={<Phone className="h-12 w-12" />}
-                        title="No calls found"
-                        description={callsSearch ? "Try adjusting your search" : `No calls from ${source} yet`}
-                      />
-                    ) : (
-                      <ScrollArea className="w-full">
-                        <div className="min-w-[650px]">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>External ID</TableHead>
-                                <TableHead>Agent ID</TableHead>
-                                <TableHead className="hidden sm:table-cell">Campaign</TableHead>
-                                <TableHead>Duration</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="hidden md:table-cell">Start Time</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filteredCalls.slice(0, 100).map((call) => (
-                                <TableRow key={call.id}>
-                                  <TableCell className="font-mono text-xs">
-                                    {call.external_id || "-"}
-                                  </TableCell>
-                                  <TableCell className="font-mono text-xs">
-                                    {call.agent_external_id || "-"}
-                                  </TableCell>
-                                  <TableCell className="font-mono text-xs hidden sm:table-cell">
-                                    {call.campaign_external_id || "-"}
-                                  </TableCell>
-                                  <TableCell className="text-sm">
-                                    {call.duration_seconds ? formatDuration(call.duration_seconds) : "-"}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline" className="text-xs">{call.status || "unknown"}</Badge>
-                                  </TableCell>
-                                  <TableCell className="text-muted-foreground text-xs hidden md:table-cell whitespace-nowrap">
-                                    {call.start_time ? format(new Date(call.start_time), "dd/MM/yy HH:mm") : "-"}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                        <ScrollBar orientation="horizontal" />
-                        {filteredCalls.length > 100 && (
-                          <p className="text-sm text-muted-foreground text-center p-4">
-                            Showing 100 of {filteredCalls.length} calls
-                          </p>
-                        )}
-                      </ScrollArea>
-                    )}
-                  </CardContent>
-                </Card>
+                <CallsDataTable
+                  provider={source}
+                  providerColor={getProviderColor(source, sourceIndex)}
+                  iconColor={getProviderIconColor(source)}
+                  calls={calls || []}
+                  isLoading={callsLoading}
+                />
               </TabsContent>
             </Tabs>
           </TabsContent>
@@ -860,25 +606,4 @@ function EmptyState({ icon, title, description }: { icon: React.ReactNode; title
       <p className="text-sm text-muted-foreground mt-1">{description}</p>
     </div>
   );
-}
-
-function getStatusVariant(status: string | null): "default" | "secondary" | "destructive" | "outline" {
-  switch (status) {
-    case "validated":
-    case "approved":
-      return "default";
-    case "pending":
-      return "outline";
-    case "cancelled":
-    case "rejected":
-      return "destructive";
-    default:
-      return "secondary";
-  }
-}
-
-function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}m ${secs}s`;
 }
