@@ -138,8 +138,11 @@ export function DialerMappingTab() {
   };
 
   // Get unmapped agents (agents without any employee mapping)
+  // Only show agents with @copenhagensales.dk emails - external client agents are ignored
   const mappedAgentIds = mappings.map((m) => m.agent_id);
-  const unmappedAgents = agents.filter((a) => !mappedAgentIds.includes(a.id));
+  const unmappedAgents = agents.filter(
+    (a) => !mappedAgentIds.includes(a.id) && a.email?.toLowerCase().endsWith("@copenhagensales.dk")
+  );
 
   // Find suggested employee for each unmapped agent based on email match
   const getSuggestedEmployee = (agentEmail: string) => {
