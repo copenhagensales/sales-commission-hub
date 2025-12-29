@@ -72,7 +72,8 @@ interface FilterConfig {
   [key: string]: string | undefined;
 }
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const DEFAULT_PAGE_SIZE = 50;
 
 export default function EventDataTable({ provider, providerColor, iconColor }: EventDataTableProps) {
   const [search, setSearch] = useState("");
@@ -80,6 +81,7 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
   const [dateTo, setDateTo] = useState("");
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ column: "received_at", direction: "desc" });
   const [filters, setFilters] = useState<FilterConfig>({});
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
@@ -217,7 +219,7 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
 
   // Fetch events with pagination
   const { data: eventsData, isLoading: eventsLoading } = useQuery({
-    queryKey: ["events-table-v2", provider, dateFrom, dateTo, search, page, sortConfig, filters],
+    queryKey: ["events-table-v2", provider, dateFrom, dateTo, search, page, pageSize, sortConfig, filters],
     queryFn: async () => {
       if (provider.toLowerCase() !== "adversus") {
         let query = supabase
@@ -240,7 +242,7 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
             created_at
           `, { count: "exact" })
           .ilike("source", provider)
-          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+          .range(page * pageSize, (page + 1) * pageSize - 1);
 
         // Apply sorting
         if (sortConfig.column === "received_at") {
@@ -282,7 +284,7 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
       let query = supabase
         .from("adversus_events")
         .select("*", { count: "exact" })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        .range(page * pageSize, (page + 1) * pageSize - 1);
 
       // Apply sorting
       if (sortConfig.column === "received_at") {
@@ -432,7 +434,7 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
     return count;
   }, [search, dateFrom, dateTo, filters]);
 
-  const totalPages = Math.ceil((eventsData?.total || 0) / PAGE_SIZE);
+  const totalPages = Math.ceil((eventsData?.total || 0) / pageSize);
 
   // Filter panel content (shared between desktop sidebar and mobile sheet)
   const FilterPanelContent = () => (
@@ -784,12 +786,31 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
                 </div>
 
                 {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t">
+                  <div className="flex items-center gap-3">
                     <p className="text-sm text-muted-foreground text-center sm:text-left">
-                      Page {page + 1} of {totalPages} ({eventsData.total.toLocaleString()} events)
+                      {eventsData.total.toLocaleString()} events
                     </p>
                     <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground hidden sm:inline">Show</span>
+                      <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(Number(v)); setPage(0); }}>
+                        <SelectTrigger className="w-[70px] h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAGE_SIZE_OPTIONS.map(size => (
+                            <SelectItem key={size} value={size.toString()}>{size}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm text-muted-foreground hidden sm:inline">per page</span>
+                    </div>
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground mr-2">
+                        Page {page + 1} of {totalPages}
+                      </span>
                       <Button
                         variant="outline"
                         size="sm"
@@ -826,8 +847,8 @@ export default function EventDataTable({ provider, providerColor, iconColor }: E
                         <ChevronRightIcon className="h-4 w-4 sm:ml-1" />
                       </Button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </>
             )}
           </CardContent>

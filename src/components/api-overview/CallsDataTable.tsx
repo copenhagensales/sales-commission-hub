@@ -46,7 +46,8 @@ interface SortConfig {
   direction: "asc" | "desc";
 }
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const DEFAULT_PAGE_SIZE = 50;
 
 export default function CallsDataTable({ provider, providerColor, iconColor, calls, isLoading }: CallsDataTableProps) {
   const [search, setSearch] = useState("");
@@ -54,6 +55,7 @@ export default function CallsDataTable({ provider, providerColor, iconColor, cal
   const [dateTo, setDateTo] = useState("");
   const [expandedCalls, setExpandedCalls] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ column: "start_time", direction: "desc" });
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
@@ -137,11 +139,11 @@ export default function CallsDataTable({ provider, providerColor, iconColor, cal
   }, [calls, search, statusFilter, dateFrom, dateTo, sortConfig]);
 
   const paginatedCalls = useMemo(() => {
-    const start = page * PAGE_SIZE;
-    return filteredCalls.slice(start, start + PAGE_SIZE);
-  }, [filteredCalls, page]);
+    const start = page * pageSize;
+    return filteredCalls.slice(start, start + pageSize);
+  }, [filteredCalls, page, pageSize]);
 
-  const totalPages = Math.ceil(filteredCalls.length / PAGE_SIZE);
+  const totalPages = Math.ceil(filteredCalls.length / pageSize);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedCalls(prev => {
@@ -456,12 +458,31 @@ export default function CallsDataTable({ provider, providerColor, iconColor, cal
                 </div>
 
                 {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t">
+                  <div className="flex items-center gap-3">
                     <p className="text-sm text-muted-foreground text-center sm:text-left">
-                      Page {page + 1} of {totalPages} ({filteredCalls.length.toLocaleString()} calls)
+                      {filteredCalls.length.toLocaleString()} calls
                     </p>
                     <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground hidden sm:inline">Show</span>
+                      <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(Number(v)); setPage(0); }}>
+                        <SelectTrigger className="w-[70px] h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAGE_SIZE_OPTIONS.map(size => (
+                            <SelectItem key={size} value={size.toString()}>{size}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm text-muted-foreground hidden sm:inline">per page</span>
+                    </div>
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground mr-2">
+                        Page {page + 1} of {totalPages}
+                      </span>
                       <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>
                         <ChevronLeft className="h-4 w-4 sm:mr-1" />
                         <span className="hidden sm:inline">Previous</span>
@@ -482,8 +503,8 @@ export default function CallsDataTable({ provider, providerColor, iconColor, cal
                         <ChevronRightIcon className="h-4 w-4 sm:ml-1" />
                       </Button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </>
             )}
           </CardContent>
