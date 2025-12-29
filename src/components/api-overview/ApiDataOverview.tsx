@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Users, Phone, ShoppingCart, Database, Loader2, FileJson } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
-import EventsView from "./EventsView";
+import EventDataTable from "./EventDataTable";
 
 const CHART_COLORS = [
   "hsl(var(--primary))",
@@ -572,7 +572,7 @@ export default function ApiDataOverview() {
 
               {/* Events Tab */}
               <TabsContent value="events">
-                <EventsView 
+                <EventDataTable 
                   provider={source} 
                   providerColor={getProviderColor(source, sourceIndex)}
                   iconColor={getProviderIconColor(source)}
