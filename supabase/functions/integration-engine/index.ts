@@ -139,7 +139,8 @@ serve(async (req) => {
 
         if (actionList.includes("users")) {
           const users = await adapter.fetchUsers();
-          runResults["users"] = await engine.processUsers(users);
+          const dialerSource = (source || integration.provider) === "enreach" ? "enreach" : "adversus";
+          runResults["users"] = await engine.processUsers(users, dialerSource);
         }
 
         if (actionList.includes("sales") || action === "sync") {

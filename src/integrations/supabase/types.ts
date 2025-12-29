@@ -207,9 +207,11 @@ export type Database = {
           email: string
           employment_type: Database["public"]["Enums"]["employment_type"] | null
           external_adversus_id: string | null
+          external_dialer_id: string | null
           id: string
           is_active: boolean | null
           name: string
+          source: string | null
           updated_at: string | null
           user_id: string | null
         }
@@ -221,9 +223,11 @@ export type Database = {
             | Database["public"]["Enums"]["employment_type"]
             | null
           external_adversus_id?: string | null
+          external_dialer_id?: string | null
           id?: string
           is_active?: boolean | null
           name: string
+          source?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -235,9 +239,11 @@ export type Database = {
             | Database["public"]["Enums"]["employment_type"]
             | null
           external_adversus_id?: string | null
+          external_dialer_id?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
+          source?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
