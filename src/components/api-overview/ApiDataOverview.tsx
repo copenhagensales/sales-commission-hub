@@ -59,6 +59,10 @@ export default function ApiDataOverview() {
           const key = r.source.toLowerCase();
           const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0, events: 0 };
           existing.sales += 1;
+          // For non-adversus providers, sales count as events (each sale originated from an API event)
+          if (key !== "adversus") {
+            existing.events += 1;
+          }
           sourceMap.set(key, existing);
         }
       });
@@ -72,10 +76,16 @@ export default function ApiDataOverview() {
         }
       });
 
-      // Add adversus events count
+      // Add adversus events count from dedicated events table
       const adversusStats = sourceMap.get("adversus") || { agents: 0, sales: 0, calls: 0, events: 0 };
       adversusStats.events = eventsData.count || 0;
       sourceMap.set("adversus", adversusStats);
+
+      // Calculate total events across all providers
+      let totalEvents = 0;
+      sourceMap.forEach(stats => {
+        totalEvents += stats.events;
+      });
 
       return {
         sources: Array.from(sourceMap.keys()).sort(),
@@ -83,7 +93,7 @@ export default function ApiDataOverview() {
         totalAgents: agentData.data?.length || 0,
         totalSales: salesData.data?.length || 0,
         totalCalls: callsData.data?.length || 0,
-        totalEvents: eventsData.count || 0,
+        totalEvents: totalEvents,
       };
     },
   });
@@ -472,7 +482,21 @@ export default function ApiDataOverview() {
         {apiSources.map((source, sourceIndex) => (
           <TabsContent key={source} value={source} className="space-y-6">
             {/* Stats Overview */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-purple-300 flex items-center gap-2">
+                    <FileJson className="h-4 w-4 text-purple-400" />
+                    Events
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-purple-100">
+                    {(sourceStats?.bySource?.[source.toLowerCase()]?.events || 0).toLocaleString()}
+                  </div>
+                  <p className="text-xs text-purple-300/70">API events</p>
+                </CardContent>
+              </Card>
               <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-blue-300 flex items-center gap-2">
