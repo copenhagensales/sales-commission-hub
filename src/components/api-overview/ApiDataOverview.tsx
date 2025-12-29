@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -7,45 +7,63 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Users, Phone, ShoppingCart, Database, AlertCircle } from "lucide-react";
+import { Search, Users, Phone, ShoppingCart, Database, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-interface ApiProvider {
-  id: string;
-  name: string;
-  icon: React.ReactNode;
-}
-
-const API_PROVIDERS: ApiProvider[] = [
-  { id: "adversus", name: "Adversus", icon: <Database className="h-4 w-4" /> },
-  { id: "enreach", name: "Enreach", icon: <Database className="h-4 w-4" /> },
-];
-
 export default function ApiDataOverview() {
-  const [selectedProvider, setSelectedProvider] = useState<string>("adversus");
+  const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [agentSearch, setAgentSearch] = useState("");
   const [salesSearch, setSalesSearch] = useState("");
   const [callsSearch, setCallsSearch] = useState("");
 
-  // Fetch agents by source
-  const { data: agents, isLoading: agentsLoading } = useQuery({
-    queryKey: ["api-overview-agents", selectedProvider],
+  // Fetch all unique API sources dynamically
+  const { data: apiSources, isLoading: sourcesLoading } = useQuery({
+    queryKey: ["api-overview-sources"],
     queryFn: async () => {
+      // Get sources from agents, sales, and calls
+      const [agentSources, saleSources, callSources, integrationTypes] = await Promise.all([
+        supabase.from("agents").select("source").not("source", "is", null),
+        supabase.from("sales").select("source").not("source", "is", null),
+        supabase.from("dialer_calls").select("integration_type").not("integration_type", "is", null),
+        supabase.from("api_integrations").select("type, name"),
+      ]);
+
+      const sources = new Set<string>();
+      
+      agentSources.data?.forEach(r => r.source && sources.add(r.source.toLowerCase()));
+      saleSources.data?.forEach(r => r.source && sources.add(r.source.toLowerCase()));
+      callSources.data?.forEach(r => r.integration_type && sources.add(r.integration_type.toLowerCase()));
+      integrationTypes.data?.forEach(r => r.type && sources.add(r.type.toLowerCase()));
+
+      return Array.from(sources).sort();
+    },
+  });
+
+  // Set default provider when sources are loaded
+  const effectiveProvider = selectedProvider || (apiSources?.[0] ?? "");
+
+  // Fetch agents by source (case-insensitive matching)
+  const { data: agents, isLoading: agentsLoading } = useQuery({
+    queryKey: ["api-overview-agents", effectiveProvider],
+    queryFn: async () => {
+      if (!effectiveProvider) return [];
       const { data, error } = await supabase
         .from("agents")
         .select("*")
-        .eq("source", selectedProvider)
+        .ilike("source", effectiveProvider)
         .order("updated_at", { ascending: false });
       
       if (error) throw error;
       return data || [];
     },
+    enabled: !!effectiveProvider,
   });
 
-  // Fetch sales by source with pagination
+  // Fetch sales by source with pagination (case-insensitive matching)
   const { data: sales, isLoading: salesLoading } = useQuery({
-    queryKey: ["api-overview-sales", selectedProvider],
+    queryKey: ["api-overview-sales", effectiveProvider],
     queryFn: async () => {
+      if (!effectiveProvider) return [];
       const allSales: any[] = [];
       let from = 0;
       const pageSize = 1000;
@@ -70,7 +88,7 @@ export default function ApiDataOverview() {
             dialer_campaign_id,
             created_at
           `)
-          .eq("source", selectedProvider)
+          .ilike("source", effectiveProvider)
           .order("sale_datetime", { ascending: false })
           .range(from, from + pageSize - 1);
 
@@ -87,12 +105,14 @@ export default function ApiDataOverview() {
 
       return allSales;
     },
+    enabled: !!effectiveProvider,
   });
 
-  // Fetch calls by integration type
+  // Fetch calls by integration type (case-insensitive matching)
   const { data: calls, isLoading: callsLoading } = useQuery({
-    queryKey: ["api-overview-calls", selectedProvider],
+    queryKey: ["api-overview-calls", effectiveProvider],
     queryFn: async () => {
+      if (!effectiveProvider) return [];
       const allCalls: any[] = [];
       let from = 0;
       const pageSize = 1000;
@@ -114,7 +134,7 @@ export default function ApiDataOverview() {
             campaign_external_id,
             created_at
           `)
-          .eq("integration_type", selectedProvider)
+          .ilike("integration_type", effectiveProvider)
           .order("start_time", { ascending: false })
           .range(from, from + pageSize - 1);
 
@@ -131,6 +151,7 @@ export default function ApiDataOverview() {
 
       return allCalls;
     },
+    enabled: !!effectiveProvider,
   });
 
   // Filter functions
@@ -175,21 +196,40 @@ export default function ApiDataOverview() {
     calls: calls?.length || 0,
   };
 
+  if (sourcesLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading API sources...</span>
+      </div>
+    );
+  }
+
+  if (!apiSources || apiSources.length === 0) {
+    return (
+      <EmptyState 
+        icon={<Database className="h-12 w-12" />}
+        title="No API data found"
+        description="No data has been ingested from any API sources yet"
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Provider Selector */}
-      <Tabs value={selectedProvider} onValueChange={setSelectedProvider}>
-        <TabsList className="mb-4">
-          {API_PROVIDERS.map(provider => (
-            <TabsTrigger key={provider.id} value={provider.id} className="gap-2">
-              {provider.icon}
-              {provider.name}
+      <Tabs value={effectiveProvider} onValueChange={setSelectedProvider}>
+        <TabsList className="mb-4 flex-wrap h-auto gap-1">
+          {apiSources.map(source => (
+            <TabsTrigger key={source} value={source} className="gap-2 capitalize">
+              <Database className="h-4 w-4" />
+              {source}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        {API_PROVIDERS.map(provider => (
-          <TabsContent key={provider.id} value={provider.id} className="space-y-6">
+        {apiSources.map(source => (
+          <TabsContent key={source} value={source} className="space-y-6">
             {/* Stats Overview */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card>
@@ -238,7 +278,7 @@ export default function ApiDataOverview() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold capitalize">{provider.name}</div>
+                  <div className="text-2xl font-bold capitalize">{source}</div>
                   <p className="text-xs text-muted-foreground">API Provider</p>
                 </CardContent>
               </Card>
@@ -266,7 +306,7 @@ export default function ApiDataOverview() {
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle>Agents from {provider.name}</CardTitle>
+                      <CardTitle className="capitalize">Agents from {source}</CardTitle>
                       <div className="relative w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -289,7 +329,7 @@ export default function ApiDataOverview() {
                       <EmptyState 
                         icon={<Users className="h-12 w-12" />}
                         title="No agents found"
-                        description={agentSearch ? "Try adjusting your search" : `No agents from ${provider.name} yet`}
+                        description={agentSearch ? "Try adjusting your search" : `No agents from ${source} yet`}
                       />
                     ) : (
                       <div className="overflow-x-auto">
@@ -341,7 +381,7 @@ export default function ApiDataOverview() {
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle>Sales from {provider.name}</CardTitle>
+                      <CardTitle className="capitalize">Sales from {source}</CardTitle>
                       <div className="relative w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -364,7 +404,7 @@ export default function ApiDataOverview() {
                       <EmptyState 
                         icon={<ShoppingCart className="h-12 w-12" />}
                         title="No sales found"
-                        description={salesSearch ? "Try adjusting your search" : `No sales from ${provider.name} yet`}
+                        description={salesSearch ? "Try adjusting your search" : `No sales from ${source} yet`}
                       />
                     ) : (
                       <div className="overflow-x-auto">
@@ -424,7 +464,7 @@ export default function ApiDataOverview() {
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle>Calls from {provider.name}</CardTitle>
+                      <CardTitle className="capitalize">Calls from {source}</CardTitle>
                       <div className="relative w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -447,7 +487,7 @@ export default function ApiDataOverview() {
                       <EmptyState 
                         icon={<Phone className="h-12 w-12" />}
                         title="No calls found"
-                        description={callsSearch ? "Try adjusting your search" : `No calls from ${provider.name} yet`}
+                        description={callsSearch ? "Try adjusting your search" : `No calls from ${source} yet`}
                       />
                     ) : (
                       <div className="overflow-x-auto">
