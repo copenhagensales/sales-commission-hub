@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, TrendingUp, TrendingDown, Users, DollarSign, BarChart3, RefreshCw, Radio, Database } from "lucide-react";
+import { CalendarIcon, TrendingUp, TrendingDown, Users, DollarSign, BarChart3, RefreshCw, Radio, Database, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   BarChart,
@@ -43,6 +44,7 @@ const COLORS = [
 ];
 
 export default function LiveStats() {
+  const navigate = useNavigate();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
     to: new Date(),
@@ -337,9 +339,14 @@ export default function LiveStats() {
         {/* Header */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Live Statistics</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">Comprehensive data overview</p>
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="shrink-0">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <h1 className="text-xl sm:text-3xl font-bold text-foreground">Live Statistics</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground">Comprehensive data overview</p>
+              </div>
             </div>
             <Button variant="outline" size="icon" onClick={() => refetchSales()} className="shrink-0">
               <RefreshCw className="h-4 w-4" />
