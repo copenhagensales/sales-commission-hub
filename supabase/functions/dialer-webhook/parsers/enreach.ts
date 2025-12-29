@@ -62,22 +62,22 @@ interface HeroBaseLeadPayload {
 }
 
 export class EnreachWebhookParser implements WebhookParser {
-  
   canHandle(rawBody: string, contentType: string, headers: Headers): boolean {
-    // Primary: Enreach sends X-Benemen-Event header
+    // Primary: Enreach often sends X-Benemen-Event header
     const eventHeader = headers.get('X-Benemen-Event');
     if (eventHeader) {
-      try {
-        JSON.parse(rawBody);
-        console.log(`[EnreachParser] Detected via X-Benemen-Event: ${eventHeader}`);
-        return true;
-      } catch {
-        console.log(`[EnreachParser] X-Benemen-Event header present but body is not valid JSON`);
-        return false;
-      }
+      console.log(`[EnreachParser] Detected via X-Benemen-Event: ${eventHeader}`);
+      return true;
     }
-    
-    // Secondary: Check for HeroBase SimpleLead payload structure
+
+    // Some Enreach/Herobase instances send an "almost JSON" key/value string with empty content-type.
+    // Example: "\"\",\"AgentEmail\":\"\",..."
+    if (rawBody.includes('"AgentEmail"') && rawBody.includes('"CampaignName"') && rawBody.includes('"CustomerPhone"')) {
+      console.log('[EnreachParser] Detected legacy key/value payload (AgentEmail/CampaignName/CustomerPhone)');
+      return true;
+    }
+
+    // Secondary: Check for HeroBase SimpleLead payload structure (valid JSON)
     if (contentType.includes('application/json')) {
       try {
         const json = JSON.parse(rawBody);
@@ -95,20 +95,28 @@ export class EnreachWebhookParser implements WebhookParser {
         return false;
       }
     }
-    
+
     return false;
   }
 
   parse(rawBody: string, _contentType: string, headers: Headers): StandardWebhookPayload {
     let body: HeroBaseLeadPayload;
-    
+
+    // Try JSON first
     try {
       body = JSON.parse(rawBody);
-    } catch (e) {
-      console.error(`[EnreachParser] Failed to parse JSON body: ${rawBody.substring(0, 200)}`);
-      throw new Error(`Invalid JSON payload for Enreach webhook: ${e}`);
+    } catch {
+      // Fallback: parse legacy key/value string by extracting "Key":"Value" pairs
+      body = this.parseLegacyKeyValueBody(rawBody) as unknown as HeroBaseLeadPayload;
+
+      if (!body || Object.keys(body).length === 0) {
+        console.error(`[EnreachParser] Failed to parse legacy body: ${rawBody.substring(0, 200)}`);
+        throw new Error('Invalid Enreach webhook payload (neither JSON nor legacy key/value format)');
+      }
+
+      console.log(`[EnreachParser] Parsed legacy key/value body with keys: ${Object.keys(body).slice(0, 25).join(', ')}`);
     }
-    
+
     // Get event type from header or derive from payload
     const eventHeader = headers.get('X-Benemen-Event');
     const eventType = eventHeader || this.getStr(body, ['status', 'Status']) || 'HeroBaseLead';
@@ -200,6 +208,24 @@ export class EnreachWebhookParser implements WebhookParser {
       
       rawPayload: body as unknown as Record<string, unknown>,
     };
+  }
+
+  /**
+   * Parse legacy key/value payload that is not valid JSON.
+   * Example input: "\"\",\"AgentEmail\":\"\",\"CampaignName\":\"...\""
+   */
+  private parseLegacyKeyValueBody(rawBody: string): Record<string, string> {
+    const out: Record<string, string> = {};
+
+    // Extract pairs like "Key":"Value" (works even if the full string isn't valid JSON)
+    const pairRe = /"([^"\\]+)":"([^"\\]*)"/g;
+    for (const match of rawBody.matchAll(pairRe)) {
+      const key = match[1]?.trim();
+      const value = match[2] ?? '';
+      if (key) out[key] = value;
+    }
+
+    return out;
   }
   
   /**
