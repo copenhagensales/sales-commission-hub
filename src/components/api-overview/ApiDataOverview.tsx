@@ -35,19 +35,20 @@ export default function ApiDataOverview() {
   const { data: sourceStats, isLoading: sourcesLoading } = useQuery({
     queryKey: ["api-overview-sources-stats"],
     queryFn: async () => {
-      // Get sources from agents, sales, and calls with counts
-      const [agentData, salesData, callsData] = await Promise.all([
+      // Get sources from agents, sales, calls, and events with counts
+      const [agentData, salesData, callsData, eventsData] = await Promise.all([
         supabase.from("agents").select("source").not("source", "is", null),
         supabase.from("sales").select("source").not("source", "is", null),
         supabase.from("dialer_calls").select("integration_type").not("integration_type", "is", null),
+        supabase.from("adversus_events").select("id", { count: "exact", head: true }),
       ]);
 
-      const sourceMap = new Map<string, { agents: number; sales: number; calls: number }>();
+      const sourceMap = new Map<string, { agents: number; sales: number; calls: number; events: number }>();
       
       agentData.data?.forEach(r => {
         if (r.source) {
           const key = r.source.toLowerCase();
-          const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0 };
+          const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0, events: 0 };
           existing.agents += 1;
           sourceMap.set(key, existing);
         }
@@ -56,7 +57,7 @@ export default function ApiDataOverview() {
       salesData.data?.forEach(r => {
         if (r.source) {
           const key = r.source.toLowerCase();
-          const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0 };
+          const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0, events: 0 };
           existing.sales += 1;
           sourceMap.set(key, existing);
         }
@@ -65,11 +66,16 @@ export default function ApiDataOverview() {
       callsData.data?.forEach(r => {
         if (r.integration_type) {
           const key = r.integration_type.toLowerCase();
-          const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0 };
+          const existing = sourceMap.get(key) || { agents: 0, sales: 0, calls: 0, events: 0 };
           existing.calls += 1;
           sourceMap.set(key, existing);
         }
       });
+
+      // Add adversus events count
+      const adversusStats = sourceMap.get("adversus") || { agents: 0, sales: 0, calls: 0, events: 0 };
+      adversusStats.events = eventsData.count || 0;
+      sourceMap.set("adversus", adversusStats);
 
       return {
         sources: Array.from(sourceMap.keys()).sort(),
@@ -77,6 +83,7 @@ export default function ApiDataOverview() {
         totalAgents: agentData.data?.length || 0,
         totalSales: salesData.data?.length || 0,
         totalCalls: callsData.data?.length || 0,
+        totalEvents: eventsData.count || 0,
       };
     },
   });
@@ -238,6 +245,7 @@ export default function ApiDataOverview() {
     activeAgents: agents?.filter(a => a.is_active).length || 0,
     sales: sales?.length || 0,
     calls: calls?.length || 0,
+    events: sourceStats?.bySource?.[effectiveProvider.toLowerCase()]?.events || 0,
   };
 
   // Prepare pie chart data
@@ -522,7 +530,7 @@ export default function ApiDataOverview() {
               <TabsList>
                 <TabsTrigger value="events" className="gap-2">
                   <FileJson className="h-4 w-4" />
-                  Events
+                  Events ({sourceStats?.bySource?.[source.toLowerCase()]?.events?.toLocaleString() || providerStats.sales.toLocaleString()})
                 </TabsTrigger>
                 <TabsTrigger value="agents" className="gap-2">
                   <Users className="h-4 w-4" />
