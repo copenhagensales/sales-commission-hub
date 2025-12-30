@@ -996,11 +996,37 @@ export class EnreachAdapter implements DialerAdapter {
   }
 
   async fetchCalls(days: number): Promise<StandardCall[]> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    const startDateStr = startDate.toISOString();
-    const endDateStr = new Date().toISOString();
-    return this.fetchCallsRange({ from: startDateStr, to: endDateStr });
+    const allCalls: StandardCall[] = [];
+    const seenIds = new Set<string>();
+
+    console.log(`[EnreachAdapter] Starting daily loop for last ${days} days...`);
+
+    for (let i = days; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayStr = d.toISOString().split('T')[0];
+
+      console.log(`[EnreachAdapter] Day-by-day fetch: Processing day ${dayStr} (${i} days ago)`);
+      // Start of day to end of day
+      const dailyCalls = await this.fetchCallsRange({
+        from: `${dayStr}T00:00:00Z`,
+        to: `${dayStr}T23:59:59Z`
+      });
+
+      let addedCount = 0;
+      for (const call of dailyCalls) {
+        if (!seenIds.has(call.externalId)) {
+          seenIds.add(call.externalId);
+          allCalls.push(call);
+          addedCount++;
+        }
+      }
+      console.log(`[EnreachAdapter] Finished day ${dayStr}: Added ${addedCount} new calls. Total: ${allCalls.length}`);
+
+      if (i > 0) await new Promise(r => setTimeout(r, 1000));
+    }
+
+    return allCalls;
   }
 
   async fetchCallsRange(range: { from: string; to: string }): Promise<StandardCall[]> {

@@ -481,13 +481,34 @@ export class AdversusAdapter implements DialerAdapter {
    * GDPR-Compliant CDR fetch - only IDs and metadata, NO personal Lead data
    */
   async fetchCalls(days: number): Promise<StandardCall[]> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = new Date().toISOString().split('T')[0];
+    const allCalls: StandardCall[] = [];
+    const seenIds = new Set<string>();
 
-    console.log(`[Adversus] Fetching calls for last ${days} days (delegating to fetchCallsRange)`);
-    return this.fetchCallsRange({ from: startDateStr, to: endDateStr });
+    console.log(`[Adversus] Starting daily loop for last ${days} days...`);
+
+    for (let i = days; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayStr = d.toISOString().split('T')[0];
+
+      console.log(`[Adversus] Day-by-day fetch: Processing day ${dayStr} (${i} days ago)`);
+      const dailyCalls = await this.fetchCallsRange({ from: dayStr, to: dayStr });
+
+      let addedCount = 0;
+      for (const call of dailyCalls) {
+        if (!seenIds.has(call.externalId)) {
+          seenIds.add(call.externalId);
+          allCalls.push(call);
+          addedCount++;
+        }
+      }
+      console.log(`[Adversus] Finished day ${dayStr}: Added ${addedCount} new calls. Total so far: ${allCalls.length}`);
+
+      // Safety pause between days
+      if (i > 0) await new Promise(r => setTimeout(r, 1000));
+    }
+
+    return allCalls;
   }
 
   async fetchCallsRange(range: { from: string; to: string }): Promise<StandardCall[]> {
