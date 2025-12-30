@@ -113,77 +113,77 @@ export class EnreachAdapter implements DialerAdapter {
     processor: (leads: HeroBaseLead[]) => StandardSale[],
     maxLeads = 50000
   ): Promise<StandardSale[]> {
-     const allSales: StandardSale[] = [];
-     const seenIds = new Set<string>(); // Deduplicación
-     let skip = 0;
-     const take = 500;
-     let hasMore = true;
-     let page = 1;
-     let totalProcessed = 0;
-     let duplicatesSkipped = 0;
-     let lastFirstId: string | null = null;
+    const allSales: StandardSale[] = [];
+    const seenIds = new Set<string>(); // Deduplicación
+    let skip = 0;
+    const take = 500;
+    let hasMore = true;
+    let page = 1;
+    let totalProcessed = 0;
+    let duplicatesSkipped = 0;
+    let lastFirstId: string | null = null;
 
-     console.log(`[EnreachAdapter] Starting pagination on: ${baseEndpoint}`);
+    console.log(`[EnreachAdapter] Starting pagination on: ${baseEndpoint}`);
 
-     while (hasMore && totalProcessed < maxLeads) {
-       const separator = baseEndpoint.includes("?") ? "&" : "?";
-       const pagedEndpoint = `${baseEndpoint}${separator}skip=${skip}&take=${take}`;
+    while (hasMore && totalProcessed < maxLeads) {
+      const separator = baseEndpoint.includes("?") ? "&" : "?";
+      const pagedEndpoint = `${baseEndpoint}${separator}skip=${skip}&take=${take}`;
 
-       try {
-         const data = (await this.get(pagedEndpoint)) as unknown;
-         let pageResults: HeroBaseLead[] = [];
+      try {
+        const data = (await this.get(pagedEndpoint)) as unknown;
+        let pageResults: HeroBaseLead[] = [];
 
-         if (Array.isArray(data)) {
-           pageResults = data as HeroBaseLead[];
-         } else if (data && typeof data === "object") {
-           const wrapper = data as Record<string, unknown>;
-           pageResults = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as HeroBaseLead[];
-         }
+        if (Array.isArray(data)) {
+          pageResults = data as HeroBaseLead[];
+        } else if (data && typeof data === "object") {
+          const wrapper = data as Record<string, unknown>;
+          pageResults = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as HeroBaseLead[];
+        }
 
-         if (pageResults.length > 0) {
-           // Guardrail: algunos endpoints ignoran skip/take y devuelven siempre la misma página
-           const firstAny = pageResults[0] as Record<string, unknown>;
-           const firstId = this.getStr(firstAny, ["uniqueId", "UniqueId", "id", "Id"]);
-           if (skip > 0 && lastFirstId && firstId && firstId === lastFirstId) {
-             console.warn(`[EnreachAdapter] Pagination appears stuck (same firstId: ${firstId}). Stopping to avoid infinite loop.`);
-             break;
-           }
-           if (firstId) lastFirstId = firstId;
+        if (pageResults.length > 0) {
+          // Guardrail: algunos endpoints ignoran skip/take y devuelven siempre la misma página
+          const firstAny = pageResults[0] as Record<string, unknown>;
+          const firstId = this.getStr(firstAny, ["uniqueId", "UniqueId", "id", "Id"]);
+          if (skip > 0 && lastFirstId && firstId && firstId === lastFirstId) {
+            console.warn(`[EnreachAdapter] Pagination appears stuck (same firstId: ${firstId}). Stopping to avoid infinite loop.`);
+            break;
+          }
+          if (firstId) lastFirstId = firstId;
 
-           const pageSales = processor(pageResults);
+          const pageSales = processor(pageResults);
 
-           // Deduplicar: solo agregar ventas con externalId único
-           let addedThisPage = 0;
-           for (const sale of pageSales) {
-             if (sale.externalId && !seenIds.has(sale.externalId)) {
-               seenIds.add(sale.externalId);
-               allSales.push(sale);
-               addedThisPage++;
-             } else if (sale.externalId) {
-               duplicatesSkipped++;
-             }
-           }
+          // Deduplicar: solo agregar ventas con externalId único
+          let addedThisPage = 0;
+          for (const sale of pageSales) {
+            if (sale.externalId && !seenIds.has(sale.externalId)) {
+              seenIds.add(sale.externalId);
+              allSales.push(sale);
+              addedThisPage++;
+            } else if (sale.externalId) {
+              duplicatesSkipped++;
+            }
+          }
 
-           totalProcessed += pageResults.length;
-           console.log(
-             `[EnreachAdapter] Page ${page}: ${pageResults.length} leads -> ${addedThisPage} sales (Total: ${allSales.length}, Dups: ${duplicatesSkipped})`
-           );
+          totalProcessed += pageResults.length;
+          console.log(
+            `[EnreachAdapter] Page ${page}: ${pageResults.length} leads -> ${addedThisPage} sales (Total: ${allSales.length}, Dups: ${duplicatesSkipped})`
+          );
 
-           if (pageResults.length < take || totalProcessed >= maxLeads) {
-             hasMore = false;
-           } else {
-             skip += take;
-             page++;
-             await new Promise((resolve) => setTimeout(resolve, 50));
-           }
-         } else {
-           hasMore = false;
-         }
-       } catch (e) {
-         console.error(`[EnreachAdapter] Error fetching page ${page}:`, e);
-         hasMore = false;
-       }
-     }
+          if (pageResults.length < take || totalProcessed >= maxLeads) {
+            hasMore = false;
+          } else {
+            skip += take;
+            page++;
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+        } else {
+          hasMore = false;
+        }
+      } catch (e) {
+        console.error(`[EnreachAdapter] Error fetching page ${page}:`, e);
+        hasMore = false;
+      }
+    }
 
     if (duplicatesSkipped > 0) {
       console.log(`[EnreachAdapter] Total duplicates skipped: ${duplicatesSkipped}`);
@@ -268,7 +268,7 @@ export class EnreachAdapter implements DialerAdapter {
           const closure = this.getStr(lead, ["closure", "Closure"]);
           const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
           const agentEmail = lastModifiedByUser?.orgCode as string || "unknown";
-          
+
           if (leadDate === today) {
             todayLeads.push({ agentEmail, closure, date: leadDate });
           }
@@ -327,7 +327,7 @@ export class EnreachAdapter implements DialerAdapter {
       console.log(`[EnreachAdapter] Filtered out by data filters: ${filteredByDataFilters}`);
       console.log(`[EnreachAdapter] Final sales count: ${results.length}`);
       console.log(`[EnreachAdapter] Debug data stored: ${allRawLeads.length} raw leads, ${skipReasonMap.size} skip reasons`);
-      
+
       if (todayLeads.length > 0) {
         console.log(`[EnreachAdapter] Leads from TODAY (${today}): ${todayLeads.length}`);
         console.log(`[EnreachAdapter] Today's leads details: ${JSON.stringify(todayLeads.slice(0, 10))}`);
@@ -491,10 +491,6 @@ export class EnreachAdapter implements DialerAdapter {
         campaignId,
       },
     };
-  }
-
-  async fetchCallsRange(): Promise<StandardCall[]> {
-    return [];
   }
 
   // --- LÓGICA DE EXTRACCIÓN DE PRODUCTOS ---
@@ -836,16 +832,16 @@ export class EnreachAdapter implements DialerAdapter {
     // NEW: If rule has conditions array, use those with boolean logic
     if (rule.conditions && rule.conditions.length > 0) {
       const logic = rule.conditionsLogic || 'AND';
-      
+
       const checkCondition = (condition: ExtractionCondition): boolean => {
         // Try to get value from dataObj first, then from lead root
         let fieldValue = this.getValue(dataObj, [condition.field]);
         if (fieldValue === undefined || fieldValue === null || fieldValue === "") {
           fieldValue = this.getNestedValue(lead, condition.field);
         }
-        
+
         const fieldExists = fieldValue !== undefined && fieldValue !== null;
-        
+
         // Handle existence/empty checks
         switch (condition.operator) {
           case "notExists":
@@ -855,10 +851,10 @@ export class EnreachAdapter implements DialerAdapter {
           case "isNotEmpty":
             return fieldExists && fieldValue !== "";
         }
-        
+
         const strValue = fieldExists ? String(fieldValue) : "";
         const condValue = condition.value || "";
-        
+
         switch (condition.operator) {
           case "equals":
             return strValue.toLowerCase() === condValue.toLowerCase();
@@ -882,14 +878,14 @@ export class EnreachAdapter implements DialerAdapter {
             return true;
         }
       };
-      
+
       if (logic === 'OR') {
         return rule.conditions.some(checkCondition);
       } else {
         return rule.conditions.every(checkCondition);
       }
     }
-    
+
     // LEGACY: Single conditionKey/conditionValue (backward compatible)
     if (rule.conditionKey) {
       const conditionValue = this.getValue(dataObj, [rule.conditionKey]);
@@ -897,7 +893,7 @@ export class EnreachAdapter implements DialerAdapter {
       if (rule.conditionValue && String(conditionValue) !== rule.conditionValue) return false;
       return true;
     }
-    
+
     // No conditions = always pass (useful for catch-all rules)
     return true;
   }
@@ -909,45 +905,45 @@ export class EnreachAdapter implements DialerAdapter {
   async fetchUsers(): Promise<StandardUser[]> {
     try {
       console.log(`[EnreachAdapter] Fetching users from leads data...`);
-      
+
       // Fetch recent leads to extract unique users - use 7 days for faster extraction
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - 7);
       const modifiedFrom = cutoffDate.toISOString().split("T")[0];
-      
+
       const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true`;
-      
+
       const userMap = new Map<string, StandardUser>();
       let skip = 0;
       const take = 1000; // Larger batch size for efficiency
       let hasMore = true;
       let page = 1;
-      
+
       while (hasMore && page <= 10) { // Max 10,000 leads for user extraction
         const separator = endpoint.includes("?") ? "&" : "?";
         const pagedEndpoint = `${endpoint}${separator}skip=${skip}&take=${take}`;
-        
+
         try {
           const data = (await this.get(pagedEndpoint)) as unknown;
           let pageResults: HeroBaseLead[] = [];
-          
+
           if (Array.isArray(data)) {
             pageResults = data as HeroBaseLead[];
           } else if (data && typeof data === "object") {
             const wrapper = data as Record<string, unknown>;
             pageResults = (wrapper.Results || wrapper.results || wrapper.Leads || wrapper.leads || []) as HeroBaseLead[];
           }
-          
+
           if (pageResults.length === 0) {
             hasMore = false;
             continue;
           }
-          
+
           // Extract unique users from this page
           for (const lead of pageResults) {
             const firstProcessedByUser = (lead.firstProcessedByUser || lead.FirstProcessedByUser) as Record<string, unknown> | undefined;
             const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
-            
+
             // Process firstProcessedByUser
             if (firstProcessedByUser) {
               const orgCode = this.getStr(firstProcessedByUser, ["orgCode", "OrgCode"]);
@@ -961,7 +957,7 @@ export class EnreachAdapter implements DialerAdapter {
                 });
               }
             }
-            
+
             // Process lastModifiedByUser
             if (lastModifiedByUser) {
               const orgCode = this.getStr(lastModifiedByUser, ["orgCode", "OrgCode"]);
@@ -976,7 +972,7 @@ export class EnreachAdapter implements DialerAdapter {
               }
             }
           }
-          
+
           if (pageResults.length < take) {
             hasMore = false;
           } else {
@@ -989,7 +985,7 @@ export class EnreachAdapter implements DialerAdapter {
           hasMore = false;
         }
       }
-      
+
       const users = Array.from(userMap.values());
       console.log(`[EnreachAdapter] Extracted ${users.length} unique users from leads`);
       return users;
@@ -999,11 +995,105 @@ export class EnreachAdapter implements DialerAdapter {
     }
   }
 
-  async fetchCampaigns(): Promise<StandardCampaign[]> {
+  async fetchCalls(days: number): Promise<StandardCall[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    const startDateStr = startDate.toISOString();
+    const endDateStr = new Date().toISOString();
+    return this.fetchCallsRange({ from: startDateStr, to: endDateStr });
+  }
+
+  async fetchCallsRange(range: { from: string; to: string }): Promise<StandardCall[]> {
+    console.log(`[EnreachAdapter] Starting call fetch session...`);
+
+    // 1. Diagnostic/Auto-detection: Try to get OrgCode if not present
+    try {
+      const accountInfo: any = await this.get("/myaccount");
+      if (accountInfo && accountInfo.OrgCode) {
+        if (!this.orgCode) {
+          console.log(`[EnreachAdapter] Auto-detected missing OrgCode: ${accountInfo.OrgCode}`);
+          this.orgCode = accountInfo.OrgCode;
+        }
+      }
+    } catch (err) {
+      console.warn(`[EnreachAdapter] Diagnostic /myaccount check failed. Continuing anyway.`);
+    }
+
+    // 2. Format dates for Herobase compatibility (YYYY-MM-DD HH:mm:ss)
+    const start = new Date(range.from);
+    const end = new Date(range.to);
+    const startTimeParam = start.toISOString().split('.')[0].replace('T', ' ').replace('Z', '');
+
+    const diffMs = end.getTime() - start.getTime();
+    const daysArr = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const hoursArr = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutesArr = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const secondsArr = Math.floor((diffMs % (1000 * 60)) / 1000);
+    const timeSpan = `${daysArr}.${hoursArr.toString().padStart(2, '0')}:${minutesArr.toString().padStart(2, '0')}:${secondsArr.toString().padStart(2, '0')}`;
+
+    const orgParam = this.orgCode ? `&OrgCode=${this.orgCode}` : '';
+
+    // 3. Multi-endpoint strategy
+    const possibleEndpoints = [
+      `/calls?StartTime=${encodeURIComponent(startTimeParam)}&TimeSpan=${encodeURIComponent(timeSpan)}${orgParam}`,
+      `/activities?StartTime=${encodeURIComponent(startTimeParam)}&TimeSpan=${encodeURIComponent(timeSpan)}${orgParam}`,
+      `/reporting/calls?StartTime=${encodeURIComponent(startTimeParam)}&TimeSpan=${encodeURIComponent(timeSpan)}${orgParam}`,
+    ];
+
+    for (const ep of possibleEndpoints) {
+      console.log(`[EnreachAdapter] Trying call endpoint: ${ep}`);
+      try {
+        const data = await this.get(ep);
+        if (Array.isArray(data) && data.length > 0) {
+          console.log(`[EnreachAdapter] SUCCESS with endpoint: ${ep}. Found ${data.length} records.`);
+          return this.mapCdrsToStandardCalls(data);
+        } else if (data) {
+          console.log(`[EnreachAdapter] Endpoint ${ep} returned no active records or empty array.`);
+        }
+      } catch (e) {
+        console.warn(`[EnreachAdapter] Endpoint ${ep} failed or not supported.`);
+      }
+    }
+
+    console.log(`[EnreachAdapter] All call endpoints exhausted. Returning empty results.`);
     return [];
   }
-  
-  async fetchCalls(): Promise<StandardCall[]> {
+
+  private mapCdrsToStandardCalls(records: any[]): StandardCall[] {
+    return records.map(r => {
+      // Determine status
+      let status: StandardCall['status'] = 'OTHER';
+      const result = (r.Result || r.result || '').toLowerCase();
+
+      if (result === 'answered' || result === 'connected' || r.IsAnswered) status = 'ANSWERED';
+      else if (result === 'busy') status = 'BUSY';
+      else if (result === 'noanswer' || result === 'no answer' || result === 'no_answer') status = 'NO_ANSWER';
+      else if (result === 'failed') status = 'FAILED';
+
+      // Map to StandardCall
+      return {
+        externalId: String(r.Id || r.id || r.CallId || r.uniqueId || r.UniqueId),
+        integrationType: 'enreach',
+        dialerName: this.dialerName,
+        startTime: r.StartTime || r.startTime || r.Time || new Date().toISOString(),
+        endTime: r.EndTime || r.endTime || r.StartTime || r.startTime || new Date().toISOString(),
+        durationSeconds: Number(r.DurationTotalSeconds || r.duration || r.Duration || 0),
+        totalDurationSeconds: Number(r.DurationTotalSeconds || r.duration || r.Duration || 0),
+        status: status,
+        agentExternalId: String(r.UserId || r.User?.Id || r.agentId || r.AgentId || 'unknown'),
+        campaignExternalId: String(r.CampaignId || r.Campaign?.Id || r.ProjectUniqueId || 'unknown'),
+        leadExternalId: String(r.LeadId || r.Lead?.Id || r.LeadUniqueId || 'unknown'),
+        metadata: {
+          project: r.ProjectName || r.Campaign?.Name,
+          result: r.Result || r.Closure,
+          number: r.PhoneNumber || r.Phone,
+          orgCode: this.orgCode
+        }
+      };
+    });
+  }
+
+  async fetchCampaigns(): Promise<StandardCampaign[]> {
     return [];
   }
 }

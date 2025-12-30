@@ -98,29 +98,29 @@ export class AdversusAdapter implements DialerAdapter {
     return rawSales.map((s: any) => {
       const agentObj = s.ownedBy || s.createdBy;
       const agentId = typeof agentObj === "object" ? String(agentObj.id) : String(agentObj);
-      
+
       // Enhanced email extraction with multiple fallbacks
       let agentEmail: string | null = null;
       let agentName: string | null = null;
-      
+
       // 1. Try embedded object fields (most reliable)
       if (typeof agentObj === "object" && agentObj) {
         agentEmail = agentObj.email || agentObj.mail || agentObj.emailAddress || null;
         agentName = agentObj.name || agentObj.displayName || agentObj.fullName || null;
-        
+
         // Try to extract email from username if it looks like an email
         if (!agentEmail && agentObj.username && String(agentObj.username).includes("@")) {
           agentEmail = String(agentObj.username);
         }
       }
-      
+
       // 2. Try userMap lookup by ID
       if (!agentEmail && userMap.has(agentId)) {
         const user = userMap.get(agentId)!;
         agentEmail = user.email;
         agentName = agentName || user.name;
       }
-      
+
       // 3. Try to find in lead data (some sales have agent email in lead)
       if (!agentEmail && s.lead) {
         const leadAgentEmail = s.lead.agentEmail || s.lead.sellerEmail || s.lead.salesRepEmail;
@@ -128,13 +128,13 @@ export class AdversusAdapter implements DialerAdapter {
           agentEmail = String(leadAgentEmail);
         }
       }
-      
+
       // 4. Final fallback - only if we truly have no email
       if (!agentEmail) {
         agentEmail = `agent-${agentId}@adversus.local`;
         console.log(`[Adversus] Warning: No email found for agent ${agentId}, using fallback`);
       }
-      
+
       agentName = agentName || "Desconocido";
 
       const campaignId = s.campaignId ? String(s.campaignId) : undefined;
@@ -152,12 +152,12 @@ export class AdversusAdapter implements DialerAdapter {
       if (leadId && leadIdToOpp.has(leadId)) {
         externalReference = leadIdToOpp.get(leadId)!;
       }
-      
+
       // Use sale ID (s.id) as the primary externalId - this is unique per sale in Adversus
       // Also store leadId separately for potential webhook matching
       const saleId = String(s.id);
       const leadIdValue = s.leadId ? String(s.leadId) : null;
-      
+
       return {
         externalId: saleId,
         leadId: leadIdValue, // Store leadId for webhook matching
@@ -171,7 +171,7 @@ export class AdversusAdapter implements DialerAdapter {
 
         customerName: s.lead?.company || s.lead?.name || "",
         customerPhone: s.lead?.phone || "",
-        
+
         campaignId: campaignId,
         campaignName: s.campaign?.name || undefined,
         externalReference: externalReference,
@@ -219,11 +219,11 @@ export class AdversusAdapter implements DialerAdapter {
     return rawSales.map((s: any) => {
       const agentObj = s.ownedBy || s.createdBy;
       const agentId = typeof agentObj === "object" ? String(agentObj.id) : String(agentObj);
-      
+
       // Enhanced email extraction with multiple fallbacks
       let agentEmail: string | null = null;
       let agentName: string | null = null;
-      
+
       // 1. Try embedded object fields
       if (typeof agentObj === "object" && agentObj) {
         agentEmail = agentObj.email || agentObj.mail || agentObj.emailAddress || null;
@@ -232,14 +232,14 @@ export class AdversusAdapter implements DialerAdapter {
           agentEmail = String(agentObj.username);
         }
       }
-      
+
       // 2. Try userMap lookup
       if (!agentEmail && userMap.has(agentId)) {
         const user = userMap.get(agentId)!;
         agentEmail = user.email;
         agentName = agentName || user.name;
       }
-      
+
       // 3. Try lead data
       if (!agentEmail && s.lead) {
         const leadAgentEmail = s.lead.agentEmail || s.lead.sellerEmail || s.lead.salesRepEmail;
@@ -247,12 +247,12 @@ export class AdversusAdapter implements DialerAdapter {
           agentEmail = String(leadAgentEmail);
         }
       }
-      
+
       // 4. Final fallback
       if (!agentEmail) {
         agentEmail = `agent-${agentId}@adversus.local`;
       }
-      
+
       agentName = agentName || "Desconocido";
       const campaignId = s.campaignId ? String(s.campaignId) : undefined;
       const leadId = s.leadId ? String(s.leadId) : undefined;
@@ -300,7 +300,7 @@ export class AdversusAdapter implements DialerAdapter {
 
   // Construir mapa leadId -> OPP desde /leads con filtros por campaña (SECUENCIAL para evitar rate limit)
   private async buildLeadOppMap(
-    sales: any[], 
+    sales: any[],
     campaignConfigMap: Map<string, CampaignMappingConfig>
   ): Promise<Map<string, string>> {
     const leadIdToOpp = new Map<string, string>();
@@ -314,11 +314,11 @@ export class AdversusAdapter implements DialerAdapter {
       const campaignIdStr = String(campaignId);
       const config = campaignConfigMap.get(campaignIdStr);
       let oppFieldId = '80862'; // Default
-      
+
       if (config?.referenceConfig?.type === 'field_id') {
         oppFieldId = config.referenceConfig.value.replace('result_', '');
       }
-      
+
       return { campaignId, oppFieldId };
     });
 
@@ -330,9 +330,9 @@ export class AdversusAdapter implements DialerAdapter {
       try {
         const filters = JSON.stringify({ campaignId: { "$eq": campaignId } });
         const url = `${this.baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=5000`;
-        
-        const res = await fetch(url, { 
-          headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" } 
+
+        const res = await fetch(url, {
+          headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
         });
 
         if (!res.ok) {
@@ -350,11 +350,11 @@ export class AdversusAdapter implements DialerAdapter {
 
         // Usar misma lógica que adversus-diagnostics (que funcionó perfectamente)
         const oppPattern = /OPP-\d{4,6}/;
-        
+
         for (const lead of leads) {
           const leadId = String(lead.id);
           const resultData = lead.resultData || [];
-          
+
           if (Array.isArray(resultData)) {
             for (const field of resultData) {
               if (field && field.value) {
@@ -403,24 +403,24 @@ export class AdversusAdapter implements DialerAdapter {
 
     while (hasMore && page <= 100) { // Max 100,000 ventas
       const url = `${this.baseUrl}/sales?pageSize=${pageSize}&page=${page}&filters=${filterStr}`;
-      
+
       try {
         const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
-        
+
         if (!res.ok) {
           console.log(`[Adversus] Page ${page} failed with status ${res.status}`);
           break;
         }
-        
+
         const data = await res.json();
         const pageData = data.sales || data || [];
-        
+
         if (pageData.length === 0) {
           hasMore = false;
         } else {
           allSales.push(...pageData);
           console.log(`[Adversus] Page ${page}: ${pageData.length} sales (total: ${allSales.length})`);
-          
+
           if (pageData.length < pageSize) {
             hasMore = false; // Última página incompleta
           } else {
@@ -443,9 +443,9 @@ export class AdversusAdapter implements DialerAdapter {
     try {
       const filters = JSON.stringify({ campaignId: { "$eq": Number(campaignId) } });
       const url = `${this.baseUrl}/leads?filters=${encodeURIComponent(filters)}&pageSize=${pageSize}`;
-      
-      const res = await fetch(url, { 
-        headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" } 
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" }
       });
 
       if (!res.ok) {
@@ -465,77 +465,145 @@ export class AdversusAdapter implements DialerAdapter {
    * GDPR-Compliant CDR fetch - only IDs and metadata, NO personal Lead data
    * Tries multiple Adversus endpoints for Call Detail Records
    */
+  /**
+   * GDPR-Compliant CDR fetch - only IDs and metadata, NO personal Lead data
+   */
   async fetchCalls(days: number): Promise<StandardCall[]> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     const startDateStr = startDate.toISOString().split('T')[0];
-    
-    console.log(`[Adversus] Fetching calls for last ${days} days from ${startDateStr}`);
-    
-    // Try multiple potential endpoints
-    const endpoints = [
-      `/calls?from=${startDateStr}&pageSize=1000`,
-      `/cdr?from=${startDateStr}&pageSize=1000`,
-      `/activity?from=${startDateStr}&type=call&pageSize=1000`,
-    ];
-    
-    for (const endpoint of endpoints) {
-      console.log(`[Adversus] Trying endpoint: ${endpoint}`);
-      try {
-        const url = `${this.baseUrl}${endpoint}`;
-        const res = await fetch(url, { 
-          headers: { Authorization: `Basic ${this.authHeader}` } 
-        });
-        
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.log(`[Adversus] Endpoint ${endpoint} failed: ${res.status} - ${errorText.substring(0, 200)}`);
-          continue;
+    const endDateStr = new Date().toISOString().split('T')[0];
+
+    console.log(`[Adversus] Fetching calls for last ${days} days (delegating to fetchCallsRange)`);
+    return this.fetchCallsRange({ from: startDateStr, to: endDateStr });
+  }
+
+  async fetchCallsRange(range: { from: string; to: string }): Promise<StandardCall[]> {
+    // Adversus often prefers full ISO strings
+    const startIso = range.from.includes('T') ? range.from : `${range.from}T00:00:00Z`;
+    const endIso = range.to.includes('T') ? range.to : `${range.to}T23:59:59Z`;
+
+    // Also keep simple YYYY-MM-DD for logging/checks
+    const startDateStr = startIso.split('T')[0];
+    const endDateStr = endIso.split('T')[0];
+
+    console.log(`[Adversus] Fetching calls range ${startIso} -> ${endIso}`);
+
+    // Per official Adversus API docs, use /cdr endpoint with $gt/$lt filter operators
+    const filterObj = {
+      insertedTime: {
+        $gt: startIso,
+        $lt: endIso
+      }
+    };
+    const filterString = encodeURIComponent(JSON.stringify(filterObj));
+
+    const endpointBase = `/cdr?filters=${filterString}`;
+    let allRecords: any[] = [];
+    const seenIds = new Set<string>();
+    const seenHashes = new Set<string>();
+
+    let page = 1;
+    let pageSize = 1000;
+    let hasMore = true;
+    let consecutiveEmptyPages = 0;
+
+    while (hasMore) {
+      let retries = 0;
+      const maxRetries = 5;
+      let success = false;
+
+      while (!success && retries < maxRetries) {
+        try {
+          const url = `${this.baseUrl}${endpointBase}&pageSize=${pageSize}&page=${page}`;
+          const res = await fetch(url, {
+            headers: {
+              'Authorization': `Basic ${this.authHeader}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (res.status === 429) {
+            const waitTime = 2000 * Math.pow(2, retries);
+            console.warn(`[Adversus] Rate limit hit (429). Waiting ${waitTime / 1000}s...`);
+            await new Promise(r => setTimeout(r, waitTime));
+            retries++;
+            continue;
+          }
+
+          if (!res.ok) {
+            if (res.status === 404) {
+              console.log(`[Adversus] Page ${page} returned 404. Assuming end of data.`);
+            } else {
+              const errorBody = await res.text();
+              console.warn(`[Adversus] Page ${page} failed: ${res.status} - ${errorBody.substring(0, 100)}`);
+            }
+            hasMore = false;
+            success = true;
+            break;
+          }
+
+          const data = await res.json();
+          let records = data.calls || data.cdr || data.cdrs || data.activities || data.data || [];
+          if (!Array.isArray(records) && data.results && Array.isArray(data.results)) {
+            records = data.results;
+          }
+
+          if (Array.isArray(records) && records.length > 0) {
+            const newRecords = records.filter((r: any) => {
+              // 1. Client-Side Date Filter (Safety Net)
+              const callDateStr = r.startTime || r.started || r.created || r.insertedTime;
+              if (callDateStr) {
+                const callDay = callDateStr.includes('T') ? callDateStr.split('T')[0] : callDateStr.split(' ')[0];
+                if (callDay < startDateStr || callDay > endDateStr) return false;
+              }
+
+              const id = String(r.id || r.uniqueId || r.uuid);
+              const hash = this.generateRecordHash(r);
+              if (id && id !== 'undefined' && seenIds.has(id)) return false;
+              if (seenHashes.has(hash)) return false;
+              if (id && id !== 'undefined') seenIds.add(id);
+              return true;
+            });
+
+            if (newRecords.length > 0) {
+              allRecords = allRecords.concat(newRecords);
+              consecutiveEmptyPages = 0;
+            } else {
+              consecutiveEmptyPages++;
+              if (consecutiveEmptyPages > 10) {
+                console.warn(`[Adversus] 10 consecutive empty pages. Stopping safety.`);
+                hasMore = false;
+                success = true;
+                break;
+              }
+            }
+
+            if (records.length < pageSize) {
+              hasMore = false;
+            } else {
+              page++;
+              await new Promise(r => setTimeout(r, 100));
+            }
+          } else {
+            hasMore = false;
+          }
+          success = true;
+        } catch (e) {
+          console.error(`[Adversus] Error page ${page}:`, e);
+          retries++;
+          if (retries >= maxRetries) {
+            hasMore = false;
+            success = true;
+          } else {
+            await new Promise(r => setTimeout(r, 2000));
+          }
         }
-        
-        const data = await res.json();
-        console.log(`[Adversus] Response keys: ${Object.keys(data).join(', ')}`);
-        
-        const records = data.calls || data.cdr || data.cdrs || data.activities || data.data || [];
-        
-        if (Array.isArray(records) && records.length > 0) {
-          console.log(`[Adversus] Found ${records.length} call records via ${endpoint}`);
-          console.log(`[Adversus] Sample record keys: ${Object.keys(records[0]).join(', ')}`);
-          return this.mapCdrsToStandardCalls(records);
-        }
-      } catch (e) {
-        console.error(`[Adversus] Error with endpoint ${endpoint}:`, e);
       }
     }
-    
-    console.log(`[Adversus] No call data found from any endpoint`);
-    return [];
-  }
-  async fetchCallsRange(range: { from: string; to: string }): Promise<StandardCall[]> {
-    const startDateStr = range.from.split('T')[0];
-    const endDateStr = range.to.split('T')[0];
-    console.log(`[Adversus] Fetching calls range ${startDateStr} -> ${endDateStr}`);
-    const endpoints = [
-      `/calls?from=${startDateStr}&to=${endDateStr}&pageSize=1000`,
-      `/cdr?from=${startDateStr}&to=${endDateStr}&pageSize=1000`,
-      `/activity?from=${startDateStr}&to=${endDateStr}&type=call&pageSize=1000`,
-      `/calls?from=${startDateStr}&pageSize=1000`,
-      `/cdr?from=${startDateStr}&pageSize=1000`,
-      `/activity?from=${startDateStr}&type=call&pageSize=1000`,
-    ];
-    for (const endpoint of endpoints) {
-      try {
-        const url = `${this.baseUrl}${endpoint}`;
-        const res = await fetch(url, { headers: { Authorization: `Basic ${this.authHeader}` } });
-        if (!res.ok) continue;
-        const data = await res.json();
-        const records = data.calls || data.cdr || data.cdrs || data.activities || data.data || [];
-        if (Array.isArray(records) && records.length > 0) {
-          return this.mapCdrsToStandardCalls(records);
-        }
-      } catch (_e) { void 0; }
-    }
-    return [];
+
+    console.log(`[Adversus] Fetched ${allRecords.length} unique calls.`);
+    return this.mapCdrsToStandardCalls(allRecords);
   }
 
   private mapCdrsToStandardCalls(allCdrs: any[]): StandardCall[] {
@@ -544,31 +612,31 @@ export class AdversusAdapter implements DialerAdapter {
     // Map to StandardCall (GDPR-compliant - only IDs)
     return allCdrs.map((cdr: any) => {
       // Map disposition to status - Adversus uses disposition field primarily
-      const status = this.mapAdversusDisposition(cdr.disposition) || 
-                     this.mapAdversusHangupCause(cdr.hangupCause || cdr.hangup_cause);
-      
+      const status = this.mapAdversusDisposition(cdr.disposition) ||
+        this.mapAdversusHangupCause(cdr.hangupCause || cdr.hangup_cause);
+
       return {
         externalId: String(cdr.id || cdr.uniqueId || cdr.uuid),
         integrationType: "adversus" as const,
         dialerName: this.dialerName,
-        
+
         // Adversus uses startTime, answerTime, endTime
         startTime: cdr.startTime || cdr.started || cdr.created || new Date().toISOString(),
         endTime: cdr.endTime || cdr.ended || cdr.created || new Date().toISOString(),
-        
+
         // Adversus fields: conversationSeconds = talk time, durationSeconds = total time
         durationSeconds: Number(cdr.conversationSeconds || cdr.billsec || cdr.talkTime || 0),
         totalDurationSeconds: Number(cdr.durationSeconds || cdr.duration || cdr.totalDuration || 0),
-        
+
         status,
-        
+
         // ONLY IDs - No personal data (GDPR compliant)
         agentExternalId: String(cdr.userId || cdr.agentId || cdr.ownedBy?.id || ""),
         campaignExternalId: String(cdr.campaignId || ""),
         leadExternalId: String(cdr.contactId || cdr.leadId || ""),
-        
+
         recordingUrl: cdr.recordingUrl || cdr.recording || (cdr.links?.recording) || undefined,
-        
+
         metadata: {
           direction: cdr.source ? "outbound" : "inbound",
           callType: cdr.type,
@@ -585,9 +653,9 @@ export class AdversusAdapter implements DialerAdapter {
    */
   private mapAdversusDisposition(disposition: string | undefined): StandardCall['status'] | null {
     if (!disposition) return null;
-    
+
     const d = disposition.toLowerCase();
-    
+
     // Answered / Success dispositions
     if (d.includes('answered') || d.includes('success') || d.includes('connected') || d.includes('sale') || d === 'answer') {
       return 'ANSWERED';
@@ -607,7 +675,7 @@ export class AdversusAdapter implements DialerAdapter {
     if (d.includes('fail') || d.includes('error') || d.includes('invalid')) {
       return 'FAILED';
     }
-    
+
     return null; // Let hangup cause handle it
   }
 
@@ -616,9 +684,9 @@ export class AdversusAdapter implements DialerAdapter {
    */
   private mapAdversusHangupCause(cause: string | undefined): StandardCall['status'] {
     if (!cause) return 'OTHER';
-    
+
     const c = cause.toUpperCase();
-    
+
     // Answered / Success
     if (c.includes('NORMAL_CLEARING') || c.includes('SUCCESS') || c.includes('ANSWERED')) {
       return 'ANSWERED';
@@ -635,7 +703,21 @@ export class AdversusAdapter implements DialerAdapter {
     if (c.includes('CALL_REJECTED') || c.includes('FAIL') || c.includes('UNALLOCATED') || c.includes('INVALID')) {
       return 'FAILED';
     }
-    
+
     return 'OTHER';
+  }
+
+  // Generate a consistent hash for a record to detect duplicates
+  private generateRecordHash(record: any): string {
+    const keyData = {
+      id: record.id || record.uniqueId || record.uuid,
+      startTime: record.startTime || record.started || record.created,
+      endTime: record.endTime || record.ended,
+      agentId: record.userId || record.agentId || record.ownedBy?.id,
+      campaignId: record.campaignId,
+      leadId: record.contactId || record.leadId,
+      duration: record.conversationSeconds || record.billsec,
+    };
+    return JSON.stringify(keyData);
   }
 }
