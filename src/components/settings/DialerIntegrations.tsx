@@ -360,13 +360,12 @@ export function DialerIntegrations() {
     },
   });
 
-  // Trigger Sync
+  // Trigger Sync - uses integration_id, provider is fetched from DB by integration-engine
   const syncMutation = useMutation({
-    mutationFn: async ({ integrationId, provider, days }: { integrationId: string; provider: string; days: number }) => {
+    mutationFn: async ({ integrationId, dialerName, days }: { integrationId: string; dialerName: string; days: number }) => {
       setSyncingId(integrationId);
       const { data, error } = await supabase.functions.invoke("integration-engine", {
         body: {
-          source: provider,
           integration_id: integrationId,
           action: "sync",
           days,
@@ -374,11 +373,12 @@ export function DialerIntegrations() {
       });
 
       if (error) throw error;
-      return data;
+      return { ...data, dialerName };
     },
     onSuccess: (data) => {
-      toast.success("Synkronisering gennemført", {
-        description: `Resultat: ${JSON.stringify(data.results?.length || 0)} poster behandlet`,
+      const salesCount = data.results?.[0]?.data?.sales?.processed || 0;
+      toast.success(`${data.dialerName}: Synkronisering gennemført`, {
+        description: `${salesCount} salg behandlet`,
       });
       queryClient.invalidateQueries({ queryKey: ["dialer-integrations"] });
     },
@@ -390,13 +390,12 @@ export function DialerIntegrations() {
     },
   });
 
-  // Fetch Calls
+  // Fetch Calls - uses integration_id only, provider is resolved by integration-engine
   const fetchCallsMutation = useMutation({
-    mutationFn: async ({ integrationId, provider, days }: { integrationId: string; provider: string; days: number }) => {
+    mutationFn: async ({ integrationId, dialerName, days }: { integrationId: string; dialerName: string; days: number }) => {
       setFetchingCallsId(integrationId);
       const { data, error } = await supabase.functions.invoke("integration-engine", {
         body: {
-          source: provider,
           integration_id: integrationId,
           actions: ["calls"],
           days,
@@ -404,11 +403,12 @@ export function DialerIntegrations() {
       });
 
       if (error) throw error;
-      return data;
+      return { ...data, dialerName };
     },
     onSuccess: (data) => {
-      toast.success("Calls hentet", {
-        description: `Resultat: ${data.calls?.created || 0} oprettet, ${data.calls?.updated || 0} opdateret`,
+      const callsResult = data.results?.[0]?.data?.calls || {};
+      toast.success(`${data.dialerName}: Calls hentet`, {
+        description: `${callsResult.processed || 0} calls (${callsResult.matched || 0} matched)`,
       });
       queryClient.invalidateQueries({ queryKey: ["dialer-calls-by-agent"] });
     },
@@ -1668,7 +1668,7 @@ export function DialerIntegrations() {
                             disabled={syncingId === integration.id}
                             onClick={() => syncMutation.mutate({ 
                               integrationId: integration.id, 
-                              provider: integration.provider,
+                              dialerName: integration.name,
                               days: parseInt(syncDays[integration.id]) || 7
                             })}
                           >
@@ -1789,7 +1789,7 @@ export function DialerIntegrations() {
                                 disabled={fetchingCallsId === integration.id}
                                 onClick={() => fetchCallsMutation.mutate({
                                   integrationId: integration.id,
-                                  provider: integration.provider,
+                                  dialerName: integration.name,
                                   days: parseInt(callsDays[integration.id]) || 7
                                 })}
                               >
