@@ -540,12 +540,12 @@ export class AdversusAdapter implements DialerAdapter {
       const seenIds = new Set<string>();
       const seenHashes = new Set<string>();
 
-      let page = 0; // START AT PAGE 0 - Official Adversus API is likely 0-indexed
+      let page = 0; // START AT PAGE 0
       let hasMore = true;
       let pageSize = 1000;
       let consecutiveEmptyPages = 0;
 
-      console.log(`[Adversus] Starting aggressive fetch for ${endpointBase}`);
+      console.log(`[Adversus] Starting deep sync for ${endpointBase}`);
 
       while (hasMore) {
         let retries = 0;
@@ -573,9 +573,9 @@ export class AdversusAdapter implements DialerAdapter {
             if (!res.ok) {
               const errorBody = await res.text();
               if (res.status === 404) {
-                console.log(`[Adversus] Page ${page} returned 404. End of data.`);
+                console.log(`[Adversus] Page ${page} 404 - end of data reached.`);
               } else {
-                console.warn(`[Adversus] Page ${page} failed: ${res.status} - ${errorBody.substring(0, 100)}`);
+                console.warn(`[Adversus] Page ${page} error ${res.status}: ${errorBody.substring(0, 100)}`);
               }
               hasMore = false;
               success = true;
@@ -590,7 +590,7 @@ export class AdversusAdapter implements DialerAdapter {
 
             if (Array.isArray(records) && records.length > 0) {
               const newRecords = records.filter((r: any) => {
-                // 1. Client-Side Date Filter (Safety Net)
+                // Client-side date filter as safety net
                 const callDateStr = r.startTime || r.started || r.created || r.insertedTime;
                 if (callDateStr) {
                   const callDay = callDateStr.includes('T') ? callDateStr.split('T')[0] : callDateStr.split(' ')[0];
@@ -607,38 +607,46 @@ export class AdversusAdapter implements DialerAdapter {
                 return true;
               });
 
-              if (newRecords.length > 0) {
-                allRecords = allRecords.concat(newRecords);
+              if (records.length > 0) {
+                // We reset consecutiveEmptyPages if we got ANY records from the API, 
+                // even if they were already processed. This prevents quitting too early 
+                // in case of overlap.
                 consecutiveEmptyPages = 0;
-              } else {
-                consecutiveEmptyPages++;
-                // HIGHER THRESHOLD: 50 pages. Don't stop too early!
-                if (consecutiveEmptyPages > 50) {
-                  console.warn(`[Adversus] 50 consecutive empty pages. Stopping deep search.`);
-                  hasMore = false;
-                  success = true;
-                  break;
-                }
               }
 
-              console.log(`[Adversus] Page ${page}: Found ${records.length} records. New: ${newRecords.length}. (Total so far: ${allRecords.length})`);
+              if (newRecords.length > 0) {
+                allRecords = allRecords.concat(newRecords);
+              }
 
-              // AGGRESSIVE PAGINATION: Keep going even if < pageSize
-              // Only stop when we get 0 records or hit too many empty pages
-              // Adversus sometimes returns partial pages but has more data
-              page++;
-              await new Promise(r => setTimeout(r, 200));
+              console.log(`[Adversus] Page ${page}: Found ${records.length} raw. Relevant: ${newRecords.length}. (Acc: ${allRecords.length})`);
+
+              // Reliable exit condition: if we got less than the page size, it's the end.
+              if (records.length < pageSize) {
+                hasMore = false;
+              } else {
+                page++;
+                await new Promise(r => setTimeout(r, 300)); // Respectful delay
+              }
             } else {
-              console.log(`[Adversus] Page ${page} is empty. Finishing.`);
-              hasMore = false;
+              // Truly empty response
+              consecutiveEmptyPages++;
+              if (consecutiveEmptyPages > 20) { // Safety break
+                console.log(`[Adversus] 20 empty pages reached. Stopping.`);
+                hasMore = false;
+              } else {
+                // Some APIs require moving to next page even if empty (unlikely for Adversus)
+                hasMore = false;
+              }
             }
             success = true;
           } catch (e) {
-            console.error(`[Adversus] Error page ${page}:`, e);
+            console.error(`[Adversus] Exception on page ${page}:`, e);
             retries++;
             if (retries >= maxRetries) {
               hasMore = false;
               success = true;
+            } else {
+              await new Promise(r => setTimeout(r, 2000));
             }
           }
         }
