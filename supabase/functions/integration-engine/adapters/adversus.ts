@@ -12,7 +12,7 @@ export class AdversusAdapter implements DialerAdapter {
   private authHeader: string;
   private baseUrl = "https://api.adversus.io";
   private dialerName: string;
-  
+
   // Debug data for calls
   private lastDebugData: {
     rawCalls: Record<string, unknown>[];
@@ -38,7 +38,7 @@ export class AdversusAdapter implements DialerAdapter {
     this.authHeader = btoa(`${user}:${pass}`);
     this.dialerName = dialerName || "Adversus";
   }
-  
+
   getLastDebugData() {
     return this.lastDebugData;
   }
@@ -510,131 +510,139 @@ export class AdversusAdapter implements DialerAdapter {
     };
     const filterString = encodeURIComponent(JSON.stringify(filterObj));
 
-    const endpointBase = `/cdr?filters=${filterString}`;
-    let allRecords: any[] = [];
-    const seenIds = new Set<string>();
-    const seenHashes = new Set<string>();
+    const endpoints = [
+      `/cdr?filters=${filterString}`
+    ];
 
-    let page = 1;
-    let pageSize = 1000;
-    let hasMore = true;
-    let consecutiveEmptyPages = 0;
+    for (const endpointBase of endpoints) {
+      let allRecords: any[] = [];
+      const seenIds = new Set<string>();
+      const seenHashes = new Set<string>();
 
-    while (hasMore) {
-      let retries = 0;
-      const maxRetries = 5;
-      let success = false;
+      let page = 1;
+      let hasMore = true;
+      let pageSize = 1000;
+      let consecutiveEmptyPages = 0;
 
-      while (!success && retries < maxRetries) {
-        try {
-          // Use the base URL which should be https://api.adversus.io (no /v1)
-          const url = `${this.baseUrl}${endpointBase}&pageSize=${pageSize}&page=${page}`;
-          const res = await fetch(url, {
-            headers: {
-              'Authorization': `Basic ${this.authHeader}`,
-              'Content-Type': 'application/json'
-            }
-          });
+      console.log(`[Adversus] Trying endpoint base: ${endpointBase}`);
 
-          if (res.status === 429) {
-            const waitTime = 2000 * Math.pow(2, retries);
-            console.warn(`[Adversus] Rate limit hit (429). Waiting ${waitTime / 1000}s...`);
-            await new Promise(r => setTimeout(r, waitTime));
-            retries++;
-            continue;
-          }
+      while (hasMore) {
+        let retries = 0;
+        const maxRetries = 5;
+        let success = false;
 
-          if (!res.ok) {
-            if (res.status === 404) {
-              console.log(`[Adversus] Page ${page} returned 404. Assuming end of data.`);
-            } else {
-              const errorBody = await res.text();
-              console.warn(`[Adversus] Page ${page} failed: ${res.status} - ${errorBody.substring(0, 100)}`);
-            }
-            hasMore = false;
-            success = true;
-            break;
-          }
-
-          const data = await res.json();
-          // Prioritize 'cdr' or 'calls' array
-          let records = data.cdr || data.cdrs || data.calls || data.activities || data.data || [];
-          if (!Array.isArray(records) && data.results && Array.isArray(data.results)) {
-            records = data.results;
-          }
-
-          if (Array.isArray(records) && records.length > 0) {
-            const newRecords = records.filter((r: any) => {
-              // 1. Client-Side Date Filter (Safety Net)
-              // IMPORTANT: Use insertedTime primarily for CDR endpoint consistency
-              const callDateStr = r.insertedTime || r.startTime || r.started || r.created;
-              if (callDateStr) {
-                const callDay = callDateStr.includes('T') ? callDateStr.split('T')[0] : callDateStr.split(' ')[0];
-                if (callDay < startDateStr || callDay > endDateStr) return false;
+        while (!success && retries < maxRetries) {
+          try {
+            const url = `${this.baseUrl}${endpointBase}&pageSize=${pageSize}&page=${page}`;
+            const res = await fetch(url, {
+              headers: {
+                'Authorization': `Basic ${this.authHeader}`,
+                'Content-Type': 'application/json'
               }
-
-              const id = String(r.id || r.uniqueId || r.uuid);
-              const hash = this.generateRecordHash(r);
-              if (id && id !== 'undefined' && seenIds.has(id)) return false;
-              if (seenHashes.has(hash)) return false;
-
-              if (id && id !== 'undefined') seenIds.add(id);
-              seenHashes.add(hash);
-              return true;
             });
 
-            if (newRecords.length > 0) {
-              allRecords = allRecords.concat(newRecords);
-              consecutiveEmptyPages = 0;
-            } else {
-              consecutiveEmptyPages++;
-              // Increase safety threshold for holiday seasons/gaps
-              if (consecutiveEmptyPages > 20) {
-                console.warn(`[Adversus] 20 consecutive empty pages. Stopping safety.`);
-                hasMore = false;
-                success = true;
-                break;
+            if (res.status === 429) {
+              const waitTime = 2000 * Math.pow(2, retries);
+              console.warn(`[Adversus] Rate limit hit (429). Waiting ${waitTime / 1000}s before retry ${retries + 1}/${maxRetries}...`);
+              await new Promise(r => setTimeout(r, waitTime));
+              retries++;
+              continue;
+            }
+
+            if (!res.ok) {
+              const errorBody = await res.text();
+              if (page === 1) {
+                console.log(`[Adversus] Endpoint ${endpointBase} failed: ${res.status} - ${errorBody.substring(0, 200)}`);
+              } else if (res.status === 404) {
+                console.log(`[Adversus] Page ${page} returned 404. Assuming end of data.`);
+              } else {
+                console.warn(`[Adversus] Page ${page} failed with status ${res.status}.`);
               }
-            }
-
-            console.log(`[Adversus] Page ${page}: Found ${records.length} records, ${newRecords.length} new/valid. (Total: ${allRecords.length})`);
-
-            if (records.length < pageSize) {
               hasMore = false;
-            } else {
-              page++;
-              // Moderate delay to be kind to the API but fast enough for 40k+ records
-              await new Promise(r => setTimeout(r, 50));
+              success = true;
+              break;
             }
-          } else {
-            hasMore = false;
-          }
-          success = true;
-        } catch (e) {
-          console.error(`[Adversus] Error page ${page}:`, e);
-          retries++;
-          if (retries >= maxRetries) {
-            hasMore = false;
+
+            const data = await res.json();
+            let records = data.calls || data.cdr || data.cdrs || data.activities || data.data || [];
+            if (!Array.isArray(records) && data.results && Array.isArray(data.results)) {
+              records = data.results;
+            }
+
+            if (Array.isArray(records) && records.length > 0) {
+              const newRecords = records.filter((r: any) => {
+                // 1. Client-Side Date Filter (Safety Net)
+                const callDateStr = r.startTime || r.started || r.created || r.insertedTime;
+                if (callDateStr) {
+                  const callDay = callDateStr.includes('T') ? callDateStr.split('T')[0] : callDateStr.split(' ')[0];
+                  if (callDay < startDateStr || callDay > endDateStr) return false;
+                }
+
+                const id = String(r.id || r.uniqueId || r.uuid);
+                const hash = this.generateRecordHash(r);
+                if (id && id !== 'undefined' && seenIds.has(id)) return false;
+                if (seenHashes.has(hash)) return false;
+
+                if (id && id !== 'undefined') seenIds.add(id);
+                seenHashes.add(hash);
+                return true;
+              });
+
+              if (newRecords.length > 0) {
+                allRecords = allRecords.concat(newRecords);
+                consecutiveEmptyPages = 0;
+              } else {
+                consecutiveEmptyPages++;
+                if (consecutiveEmptyPages > 10) {
+                  console.warn(`[Adversus] 10 consecutive empty pages. Stopping pagination safety. (Last page: ${page})`);
+                  hasMore = false;
+                  success = true;
+                  break;
+                }
+              }
+
+              console.log(`[Adversus] Page ${page}: Fetched ${records.length} raw. Unique relevant: ${newRecords.length}. Total unique: ${allRecords.length}`);
+
+              if (records.length < pageSize) {
+                hasMore = false;
+              } else {
+                page++;
+                await new Promise(r => setTimeout(r, 500));
+              }
+            } else {
+              console.log(`[Adversus] Page ${page} empty. Stopping.`);
+              hasMore = false;
+            }
             success = true;
-          } else {
-            await new Promise(r => setTimeout(r, 2000));
+          } catch (e) {
+            console.error(`[Adversus] Error page ${page} (Attempt ${retries + 1}):`, e);
+            retries++;
+            if (retries >= maxRetries) {
+              hasMore = false;
+              success = true;
+            } else {
+              await new Promise(r => setTimeout(r, 2000));
+            }
           }
         }
       }
+
+      if (allRecords.length > 0) {
+        console.log(`[Adversus] Finished fetching. Total unique records found: ${allRecords.length}`);
+        const mappedCalls = this.mapCdrsToStandardCalls(allRecords);
+
+        // Store debug data for calls
+        this.lastDebugData = {
+          rawCalls: allRecords,
+          processedCalls: mappedCalls.map(c => ({ externalId: c.externalId })),
+          skipReasonMap: new Map(),
+        };
+
+        return mappedCalls;
+      }
     }
 
-    console.log(`[Adversus] Completed fetch. Total unique calls: ${allRecords.length}`);
-    
-    const mappedCalls = this.mapCdrsToStandardCalls(allRecords);
-    
-    // Store debug data for calls
-    this.lastDebugData = {
-      rawCalls: allRecords,
-      processedCalls: mappedCalls.map(c => ({ externalId: c.externalId })),
-      skipReasonMap: new Map(), // All fetched calls are processed
-    };
-    
-    return mappedCalls;
+    return [];
   }
 
   private mapCdrsToStandardCalls(allCdrs: any[]): StandardCall[] {
