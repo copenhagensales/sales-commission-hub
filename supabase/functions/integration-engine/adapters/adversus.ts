@@ -10,7 +10,7 @@ interface AdversusCredentials {
 
 export class AdversusAdapter implements DialerAdapter {
   private authHeader: string;
-  private baseUrl = "https://api.adversus.io/v1";
+  private baseUrl = "https://api.adversus.io";
   private dialerName: string;
 
   constructor(credentials?: AdversusCredentials | Record<string, string> | null, dialerName?: string) {
@@ -515,6 +515,7 @@ export class AdversusAdapter implements DialerAdapter {
 
       while (!success && retries < maxRetries) {
         try {
+          // Use the base URL which should be https://api.adversus.io (no /v1)
           const url = `${this.baseUrl}${endpointBase}&pageSize=${pageSize}&page=${page}`;
           const res = await fetch(url, {
             headers: {
@@ -544,7 +545,8 @@ export class AdversusAdapter implements DialerAdapter {
           }
 
           const data = await res.json();
-          let records = data.calls || data.cdr || data.cdrs || data.activities || data.data || [];
+          // Prioritize 'cdr' or 'calls' array
+          let records = data.cdr || data.cdrs || data.calls || data.activities || data.data || [];
           if (!Array.isArray(records) && data.results && Array.isArray(data.results)) {
             records = data.results;
           }
@@ -552,7 +554,8 @@ export class AdversusAdapter implements DialerAdapter {
           if (Array.isArray(records) && records.length > 0) {
             const newRecords = records.filter((r: any) => {
               // 1. Client-Side Date Filter (Safety Net)
-              const callDateStr = r.startTime || r.started || r.created || r.insertedTime;
+              // IMPORTANT: Use insertedTime primarily for CDR endpoint consistency
+              const callDateStr = r.insertedTime || r.startTime || r.started || r.created;
               if (callDateStr) {
                 const callDay = callDateStr.includes('T') ? callDateStr.split('T')[0] : callDateStr.split(' ')[0];
                 if (callDay < startDateStr || callDay > endDateStr) return false;
@@ -562,7 +565,9 @@ export class AdversusAdapter implements DialerAdapter {
               const hash = this.generateRecordHash(r);
               if (id && id !== 'undefined' && seenIds.has(id)) return false;
               if (seenHashes.has(hash)) return false;
+
               if (id && id !== 'undefined') seenIds.add(id);
+              seenHashes.add(hash);
               return true;
             });
 
@@ -571,19 +576,23 @@ export class AdversusAdapter implements DialerAdapter {
               consecutiveEmptyPages = 0;
             } else {
               consecutiveEmptyPages++;
-              if (consecutiveEmptyPages > 10) {
-                console.warn(`[Adversus] 10 consecutive empty pages. Stopping safety.`);
+              // Increase safety threshold for holiday seasons/gaps
+              if (consecutiveEmptyPages > 20) {
+                console.warn(`[Adversus] 20 consecutive empty pages. Stopping safety.`);
                 hasMore = false;
                 success = true;
                 break;
               }
             }
 
+            console.log(`[Adversus] Page ${page}: Found ${records.length} records, ${newRecords.length} new/valid. (Total: ${allRecords.length})`);
+
             if (records.length < pageSize) {
               hasMore = false;
             } else {
               page++;
-              await new Promise(r => setTimeout(r, 100));
+              // Moderate delay to be kind to the API but fast enough for 40k+ records
+              await new Promise(r => setTimeout(r, 50));
             }
           } else {
             hasMore = false;
@@ -602,7 +611,7 @@ export class AdversusAdapter implements DialerAdapter {
       }
     }
 
-    console.log(`[Adversus] Fetched ${allRecords.length} unique calls.`);
+    console.log(`[Adversus] Completed fetch. Total unique calls: ${allRecords.length}`);
     return this.mapCdrsToStandardCalls(allRecords);
   }
 
