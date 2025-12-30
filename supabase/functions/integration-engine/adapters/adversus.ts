@@ -623,15 +623,11 @@ export class AdversusAdapter implements DialerAdapter {
 
               console.log(`[Adversus] Page ${page}: Found ${records.length} records. New: ${newRecords.length}. (Total so far: ${allRecords.length})`);
 
-              // If we get EXACTLY 0 records, we stop. 
-              // If we get > 0, even if < pageSize, we might still want to try next page 
-              // for some problematic APIs, but usually < pageSize is end.
-              if (records.length < pageSize) {
-                hasMore = false;
-              } else {
-                page++;
-                await new Promise(r => setTimeout(r, 200)); // Slightly faster between pages
-              }
+              // AGGRESSIVE PAGINATION: Keep going even if < pageSize
+              // Only stop when we get 0 records or hit too many empty pages
+              // Adversus sometimes returns partial pages but has more data
+              page++;
+              await new Promise(r => setTimeout(r, 200));
             } else {
               console.log(`[Adversus] Page ${page} is empty. Finishing.`);
               hasMore = false;
