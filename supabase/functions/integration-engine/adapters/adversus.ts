@@ -540,12 +540,12 @@ export class AdversusAdapter implements DialerAdapter {
       const seenIds = new Set<string>();
       const seenHashes = new Set<string>();
 
-      let page = 1;
+      let page = 0; // START AT PAGE 0 - Official Adversus API is likely 0-indexed
       let hasMore = true;
       let pageSize = 1000;
       let consecutiveEmptyPages = 0;
 
-      console.log(`[Adversus] Trying endpoint base: ${endpointBase}`);
+      console.log(`[Adversus] Starting aggressive fetch for ${endpointBase}`);
 
       while (hasMore) {
         let retries = 0;
@@ -564,7 +564,7 @@ export class AdversusAdapter implements DialerAdapter {
 
             if (res.status === 429) {
               const waitTime = 2000 * Math.pow(2, retries);
-              console.warn(`[Adversus] Rate limit hit (429). Waiting ${waitTime / 1000}s before retry ${retries + 1}/${maxRetries}...`);
+              console.warn(`[Adversus] Rate limit hit (429). Waiting ${waitTime / 1000}s...`);
               await new Promise(r => setTimeout(r, waitTime));
               retries++;
               continue;
@@ -572,12 +572,10 @@ export class AdversusAdapter implements DialerAdapter {
 
             if (!res.ok) {
               const errorBody = await res.text();
-              if (page === 1) {
-                console.log(`[Adversus] Endpoint ${endpointBase} failed: ${res.status} - ${errorBody.substring(0, 200)}`);
-              } else if (res.status === 404) {
-                console.log(`[Adversus] Page ${page} returned 404. Assuming end of data.`);
+              if (res.status === 404) {
+                console.log(`[Adversus] Page ${page} returned 404. End of data.`);
               } else {
-                console.warn(`[Adversus] Page ${page} failed with status ${res.status}.`);
+                console.warn(`[Adversus] Page ${page} failed: ${res.status} - ${errorBody.substring(0, 100)}`);
               }
               hasMore = false;
               success = true;
@@ -614,35 +612,37 @@ export class AdversusAdapter implements DialerAdapter {
                 consecutiveEmptyPages = 0;
               } else {
                 consecutiveEmptyPages++;
-                if (consecutiveEmptyPages > 10) {
-                  console.warn(`[Adversus] 10 consecutive empty pages. Stopping pagination safety. (Last page: ${page})`);
+                // HIGHER THRESHOLD: 50 pages. Don't stop too early!
+                if (consecutiveEmptyPages > 50) {
+                  console.warn(`[Adversus] 50 consecutive empty pages. Stopping deep search.`);
                   hasMore = false;
                   success = true;
                   break;
                 }
               }
 
-              console.log(`[Adversus] Page ${page}: Fetched ${records.length} raw. Unique relevant: ${newRecords.length}. Total unique: ${allRecords.length}`);
+              console.log(`[Adversus] Page ${page}: Found ${records.length} records. New: ${newRecords.length}. (Total so far: ${allRecords.length})`);
 
+              // If we get EXACTLY 0 records, we stop. 
+              // If we get > 0, even if < pageSize, we might still want to try next page 
+              // for some problematic APIs, but usually < pageSize is end.
               if (records.length < pageSize) {
                 hasMore = false;
               } else {
                 page++;
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 200)); // Slightly faster between pages
               }
             } else {
-              console.log(`[Adversus] Page ${page} empty. Stopping.`);
+              console.log(`[Adversus] Page ${page} is empty. Finishing.`);
               hasMore = false;
             }
             success = true;
           } catch (e) {
-            console.error(`[Adversus] Error page ${page} (Attempt ${retries + 1}):`, e);
+            console.error(`[Adversus] Error page ${page}:`, e);
             retries++;
             if (retries >= maxRetries) {
               hasMore = false;
               success = true;
-            } else {
-              await new Promise(r => setTimeout(r, 2000));
             }
           }
         }
