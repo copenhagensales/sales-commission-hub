@@ -204,10 +204,14 @@ export class EnreachAdapter implements DialerAdapter {
       }
 
       console.log(`[EnreachAdapter] Fetching leads for last ${effectiveDays} days (will filter closure=success client-side)`);
+      console.log(`[EnreachAdapter] Dialer name: ${this.dialerName}`);
 
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - effectiveDays);
       const modifiedFrom = cutoffDate.toISOString().split("T")[0];
+      const today = new Date().toISOString().split("T")[0];
+
+      console.log(`[EnreachAdapter] Date range: ${modifiedFrom} to ${today}`);
 
       // NO usar LeadClosures=Success - filtrar client-side como hace el simulador
       const endpoint = `/simpleleads?Projects=*&ModifiedFrom=${modifiedFrom}&AllClosedStatuses=true`;
@@ -223,23 +227,83 @@ export class EnreachAdapter implements DialerAdapter {
       const dataFilterGroups = this.config?.productExtraction?.dataFilterGroups;
       const dataFilterGroupsLogic = this.config?.productExtraction?.dataFilterGroupsLogic;
 
+      // Log filter configuration
+      console.log(`[EnreachAdapter] Data filters configured: ${JSON.stringify(dataFilters || [])}`);
+
+      // Diagnostic counters
+      let totalLeadsReceived = 0;
+      let closureSuccessCount = 0;
+      let filteredByDataFilters = 0;
+      const rejectedByFilter: { agentEmail: string; closure: string; date: string }[] = [];
+      const todayLeads: { agentEmail: string; closure: string; date: string }[] = [];
+
       // Procesador por página: filtrar closure=success client-side (igual que el simulador)
       const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
+        totalLeadsReceived += leads.length;
+
+        // Log leads from today for diagnostics
+        for (const lead of leads) {
+          const modifiedTime = this.getStr(lead, ["lastModifiedTime", "firstProcessedTime"]);
+          const leadDate = modifiedTime ? modifiedTime.split("T")[0] : "";
+          const closure = this.getStr(lead, ["closure", "Closure"]);
+          const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
+          const agentEmail = lastModifiedByUser?.orgCode as string || "unknown";
+          
+          if (leadDate === today) {
+            todayLeads.push({ agentEmail, closure, date: leadDate });
+          }
+        }
+
         // Filtrar solo closure=Success (case-insensitive)
         let filtered = leads.filter((lead) => {
           const closure = this.getStr(lead, ["closure", "Closure"]);
           return closure && closure.toLowerCase() === "success";
         });
+        closureSuccessCount += filtered.length;
 
         // Aplicar filtros de datos adicionales si existen
         if ((dataFilters && dataFilters.length > 0) || (dataFilterGroups && dataFilterGroups.length > 0)) {
-          filtered = filtered.filter((lead) => this.passesDataFilters(lead, dataFilters || [], dataFilterGroups, dataFilterGroupsLogic));
+          const beforeFilter = filtered.length;
+          filtered = filtered.filter((lead) => {
+            const passes = this.passesDataFilters(lead, dataFilters || [], dataFilterGroups, dataFilterGroupsLogic);
+            if (!passes) {
+              const modifiedTime = this.getStr(lead, ["lastModifiedTime", "firstProcessedTime"]);
+              const leadDate = modifiedTime ? modifiedTime.split("T")[0] : "";
+              const closure = this.getStr(lead, ["closure", "Closure"]);
+              const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
+              const agentEmail = lastModifiedByUser?.orgCode as string || "unknown";
+              rejectedByFilter.push({ agentEmail, closure, date: leadDate });
+            }
+            return passes;
+          });
+          filteredByDataFilters += (beforeFilter - filtered.length);
         }
 
         return filtered.map((lead) => this.mapLeadToSale(lead, mappingLookup));
       };
 
-      return await this.processPageByPage(endpoint, pageProcessor);
+      const results = await this.processPageByPage(endpoint, pageProcessor);
+
+      // Log diagnostic summary
+      console.log(`[EnreachAdapter] ===== SYNC DIAGNOSTICS for ${this.dialerName} =====`);
+      console.log(`[EnreachAdapter] Total leads from API: ${totalLeadsReceived}`);
+      console.log(`[EnreachAdapter] Leads with closure=success: ${closureSuccessCount}`);
+      console.log(`[EnreachAdapter] Filtered out by data filters: ${filteredByDataFilters}`);
+      console.log(`[EnreachAdapter] Final sales count: ${results.length}`);
+      
+      if (todayLeads.length > 0) {
+        console.log(`[EnreachAdapter] Leads from TODAY (${today}): ${todayLeads.length}`);
+        console.log(`[EnreachAdapter] Today's leads details: ${JSON.stringify(todayLeads.slice(0, 10))}`);
+      } else {
+        console.log(`[EnreachAdapter] NO leads found from TODAY (${today})`);
+      }
+
+      if (rejectedByFilter.length > 0) {
+        console.log(`[EnreachAdapter] Sample rejected by filter (first 5): ${JSON.stringify(rejectedByFilter.slice(0, 5))}`);
+      }
+      console.log(`[EnreachAdapter] ===== END DIAGNOSTICS =====`);
+
+      return results;
     } catch (error) {
       console.error("[EnreachAdapter] Critical error in fetchSales:", error);
       return [];
