@@ -589,18 +589,31 @@ export class AdversusAdapter implements DialerAdapter {
             }
 
             if (Array.isArray(records) && records.length > 0) {
+              let outOfRange = 0;
+              let duplicateId = 0;
+              let duplicateHash = 0;
+
               const newRecords = records.filter((r: any) => {
                 // Client-side date filter as safety net
                 const callDateStr = r.startTime || r.started || r.created || r.insertedTime;
                 if (callDateStr) {
                   const callDay = callDateStr.includes('T') ? callDateStr.split('T')[0] : callDateStr.split(' ')[0];
-                  if (callDay < startDateStr || callDay > endDateStr) return false;
+                  if (callDay < startDateStr || callDay > endDateStr) {
+                    outOfRange++;
+                    return false;
+                  }
                 }
 
                 const id = String(r.id || r.uniqueId || r.uuid);
                 const hash = this.generateRecordHash(r);
-                if (id && id !== 'undefined' && seenIds.has(id)) return false;
-                if (seenHashes.has(hash)) return false;
+                if (id && id !== 'undefined' && seenIds.has(id)) {
+                  duplicateId++;
+                  return false;
+                }
+                if (seenHashes.has(hash)) {
+                  duplicateHash++;
+                  return false;
+                }
 
                 if (id && id !== 'undefined') seenIds.add(id);
                 seenHashes.add(hash);
@@ -608,9 +621,6 @@ export class AdversusAdapter implements DialerAdapter {
               });
 
               if (records.length > 0) {
-                // We reset consecutiveEmptyPages if we got ANY records from the API, 
-                // even if they were already processed. This prevents quitting too early 
-                // in case of overlap.
                 consecutiveEmptyPages = 0;
               }
 
@@ -618,14 +628,27 @@ export class AdversusAdapter implements DialerAdapter {
                 allRecords = allRecords.concat(newRecords);
               }
 
-              console.log(`[Adversus] Page ${page}: Found ${records.length} raw. Relevant: ${newRecords.length}. (Acc: ${allRecords.length})`);
+              // STRONG LOGGING
+              console.log(`[Adversus] Page ${page} Report:
+                - Raw records: ${records.length}
+                - Filtered out of date range (${startDateStr} to ${endDateStr}): ${outOfRange}
+                - Duplicate IDs: ${duplicateId}
+                - Duplicate Hashes: ${duplicateHash}
+                - SUCCESSFULLY ADDED: ${newRecords.length}
+                - Accumulated Total: ${allRecords.length}`);
 
-              // Reliable exit condition: if we got less than the page size, it's the end.
+              if (records.length > 0) {
+                const firstDate = records[0].startTime || records[0].insertedTime;
+                const lastDate = records[records.length - 1].startTime || records[records.length - 1].insertedTime;
+                console.log(`[Adversus] Page ${page} Date Sample: First[${firstDate}] Last[${lastDate}]`);
+              }
+
               if (records.length < pageSize) {
+                console.log(`[Adversus] Page ${page} size ${records.length} < ${pageSize}. End reached.`);
                 hasMore = false;
               } else {
                 page++;
-                await new Promise(r => setTimeout(r, 300)); // Respectful delay
+                await new Promise(r => setTimeout(r, 400));
               }
             } else {
               // Truly empty response
