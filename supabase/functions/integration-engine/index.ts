@@ -178,19 +178,34 @@ serve(async (req) => {
 
         // --- CALLS (CDR - GDPR Compliant) ---
         if (actionList.includes("calls")) {
+          let calls: any[] = [];
           if ((adapter as any).fetchCallsRange && from && to) {
             console.log(`[Integration Engine] Fetching calls by range ${from} -> ${to}`);
-            const calls = await (adapter as any).fetchCallsRange({ from, to });
+            calls = await (adapter as any).fetchCallsRange({ from, to });
             console.log(`[Integration Engine] Fetched ${calls.length} calls`);
             runResults["calls"] = await engine.processCalls(calls);
           } else if (adapter.fetchCalls) {
             console.log(`[Integration Engine] Fetching calls for ${integration.name}...`);
-            const calls = await adapter.fetchCalls(days);
+            calls = await adapter.fetchCalls(days);
             console.log(`[Integration Engine] Fetched ${calls.length} calls`);
             runResults["calls"] = await engine.processCalls(calls);
           } else {
             console.log(`[Integration Engine] Adapter for ${integration.name} does not support fetchCalls`);
             runResults["calls"] = { processed: 0, errors: 0, matched: 0, message: "Adapter does not support calls" };
+          }
+          
+          // Save debug log for calls if adapter supports it
+          const callsDebugData = (adapter as any).getLastDebugData?.();
+          if (callsDebugData?.rawCalls) {
+            console.log(`[Integration Engine] Saving calls debug log for ${integration.name}...`);
+            const callsDebugEntry = createDebugLogEntry(
+              integration.name,
+              "calls",
+              callsDebugData.rawCalls,
+              callsDebugData.processedCalls,
+              callsDebugData.skipReasonMap || new Map()
+            );
+            await saveDebugLog(supabase, callsDebugEntry);
           }
         }
 

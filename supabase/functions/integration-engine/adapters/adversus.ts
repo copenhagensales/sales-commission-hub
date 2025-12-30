@@ -12,6 +12,13 @@ export class AdversusAdapter implements DialerAdapter {
   private authHeader: string;
   private baseUrl = "https://api.adversus.io";
   private dialerName: string;
+  
+  // Debug data for calls
+  private lastDebugData: {
+    rawCalls: Record<string, unknown>[];
+    processedCalls: { externalId: string }[];
+    skipReasonMap: Map<string, string>;
+  } | null = null;
 
   constructor(credentials?: AdversusCredentials | Record<string, string> | null, dialerName?: string) {
     // Extract credentials - support multiple key formats
@@ -31,13 +38,18 @@ export class AdversusAdapter implements DialerAdapter {
     this.authHeader = btoa(`${user}:${pass}`);
     this.dialerName = dialerName || "Adversus";
   }
+  
+  getLastDebugData() {
+    return this.lastDebugData;
+  }
 
   setDialerName(name: string) {
     this.dialerName = name;
   }
 
   private async get(endpoint: string) {
-    const res = await fetch(`${this.baseUrl}${endpoint}`, {
+    // Use /v1 for standard endpoints
+    const res = await fetch(`${this.baseUrl}/v1${endpoint}`, {
       headers: { Authorization: `Basic ${this.authHeader}`, "Content-Type": "application/json" },
     });
     if (res.status === 429) throw new Error("Rate Limit Adversus Excedido");
@@ -612,7 +624,17 @@ export class AdversusAdapter implements DialerAdapter {
     }
 
     console.log(`[Adversus] Completed fetch. Total unique calls: ${allRecords.length}`);
-    return this.mapCdrsToStandardCalls(allRecords);
+    
+    const mappedCalls = this.mapCdrsToStandardCalls(allRecords);
+    
+    // Store debug data for calls
+    this.lastDebugData = {
+      rawCalls: allRecords,
+      processedCalls: mappedCalls.map(c => ({ externalId: c.externalId })),
+      skipReasonMap: new Map(), // All fetched calls are processed
+    };
+    
+    return mappedCalls;
   }
 
   private mapCdrsToStandardCalls(allCdrs: any[]): StandardCall[] {
