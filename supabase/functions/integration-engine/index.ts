@@ -5,6 +5,7 @@ import { DialerAdapter } from "./adapters/interface.ts";
 import { getAdapter } from "./adapters/registry.ts";
 import { fetchSampleFields } from "./actions/fetch-sample-fields.ts";
 import { repairHistory } from "./actions/repair-history.ts";
+import { saveDebugLog, createDebugLogEntry } from "./utils/debug-log.ts";
 
 // Declare EdgeRuntime for background tasks
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
@@ -159,6 +160,20 @@ serve(async (req) => {
             console.log(`[Integration Engine] Filtered ${beforeCount} -> ${sales.length} sales for campaign ${campaignId}`);
           }
           runResults["sales"] = await engine.processSales(sales);
+
+          // Save debug log if adapter supports it
+          const debugData = (adapter as any).getLastDebugData?.();
+          if (debugData) {
+            console.log(`[Integration Engine] Saving debug log for ${integration.name}...`);
+            const debugEntry = createDebugLogEntry(
+              integration.name,
+              "sales",
+              debugData.rawLeads,
+              debugData.processedSales,
+              debugData.skipReasonMap
+            );
+            await saveDebugLog(supabase, debugEntry);
+          }
         }
 
         // --- CALLS (CDR - GDPR Compliant) ---

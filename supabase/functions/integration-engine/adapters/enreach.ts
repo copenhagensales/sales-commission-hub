@@ -195,6 +195,17 @@ export class EnreachAdapter implements DialerAdapter {
     return allSales;
   }
 
+  // Debug result type for storing raw data
+  private lastDebugData: {
+    rawLeads: Record<string, unknown>[];
+    processedSales: StandardSale[];
+    skipReasonMap: Map<string, string>;
+  } | null = null;
+
+  getLastDebugData() {
+    return this.lastDebugData;
+  }
+
   async fetchSales(days: number, campaignMappings?: CampaignMappingConfig[]): Promise<StandardSale[]> {
     try {
       // IMPORTANTE: Limitar días para evitar OOM. Máximo 7 días por llamada.
@@ -237,9 +248,18 @@ export class EnreachAdapter implements DialerAdapter {
       const rejectedByFilter: { agentEmail: string; closure: string; date: string }[] = [];
       const todayLeads: { agentEmail: string; closure: string; date: string }[] = [];
 
+      // Store raw leads for debug
+      const allRawLeads: Record<string, unknown>[] = [];
+      const skipReasonMap = new Map<string, string>();
+
       // Procesador por página: filtrar closure=success client-side (igual que el simulador)
       const pageProcessor = (leads: HeroBaseLead[]): StandardSale[] => {
         totalLeadsReceived += leads.length;
+
+        // Store ALL raw leads for debugging
+        for (const lead of leads) {
+          allRawLeads.push(lead as Record<string, unknown>);
+        }
 
         // Log leads from today for diagnostics
         for (const lead of leads) {
@@ -257,7 +277,12 @@ export class EnreachAdapter implements DialerAdapter {
         // Filtrar solo closure=Success (case-insensitive)
         let filtered = leads.filter((lead) => {
           const closure = this.getStr(lead, ["closure", "Closure"]);
-          return closure && closure.toLowerCase() === "success";
+          const externalId = this.getStr(lead, ["uniqueId", "UniqueId"]);
+          const isSuccess = closure && closure.toLowerCase() === "success";
+          if (!isSuccess && externalId) {
+            skipReasonMap.set(externalId, `closure_not_success:${closure}`);
+          }
+          return isSuccess;
         });
         closureSuccessCount += filtered.length;
 
@@ -265,6 +290,7 @@ export class EnreachAdapter implements DialerAdapter {
         if ((dataFilters && dataFilters.length > 0) || (dataFilterGroups && dataFilterGroups.length > 0)) {
           const beforeFilter = filtered.length;
           filtered = filtered.filter((lead) => {
+            const externalId = this.getStr(lead, ["uniqueId", "UniqueId"]);
             const passes = this.passesDataFilters(lead, dataFilters || [], dataFilterGroups, dataFilterGroupsLogic);
             if (!passes) {
               const modifiedTime = this.getStr(lead, ["lastModifiedTime", "firstProcessedTime"]);
@@ -273,6 +299,9 @@ export class EnreachAdapter implements DialerAdapter {
               const lastModifiedByUser = (lead.lastModifiedByUser || lead.LastModifiedByUser) as Record<string, unknown> | undefined;
               const agentEmail = lastModifiedByUser?.orgCode as string || "unknown";
               rejectedByFilter.push({ agentEmail, closure, date: leadDate });
+              if (externalId) {
+                skipReasonMap.set(externalId, `data_filter:email=${agentEmail}`);
+              }
             }
             return passes;
           });
@@ -284,12 +313,20 @@ export class EnreachAdapter implements DialerAdapter {
 
       const results = await this.processPageByPage(endpoint, pageProcessor);
 
+      // Store debug data for later retrieval
+      this.lastDebugData = {
+        rawLeads: allRawLeads,
+        processedSales: results,
+        skipReasonMap: skipReasonMap,
+      };
+
       // Log diagnostic summary
       console.log(`[EnreachAdapter] ===== SYNC DIAGNOSTICS for ${this.dialerName} =====`);
       console.log(`[EnreachAdapter] Total leads from API: ${totalLeadsReceived}`);
       console.log(`[EnreachAdapter] Leads with closure=success: ${closureSuccessCount}`);
       console.log(`[EnreachAdapter] Filtered out by data filters: ${filteredByDataFilters}`);
       console.log(`[EnreachAdapter] Final sales count: ${results.length}`);
+      console.log(`[EnreachAdapter] Debug data stored: ${allRawLeads.length} raw leads, ${skipReasonMap.size} skip reasons`);
       
       if (todayLeads.length > 0) {
         console.log(`[EnreachAdapter] Leads from TODAY (${today}): ${todayLeads.length}`);
