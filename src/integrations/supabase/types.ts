@@ -3030,6 +3030,48 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_debug_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          provider: string
+          raw_items: Json
+          registered_items: Json
+          skipped_items: Json
+          stats: Json | null
+          sync_completed_at: string | null
+          sync_started_at: string
+          sync_type: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          provider: string
+          raw_items?: Json
+          registered_items?: Json
+          skipped_items?: Json
+          stats?: Json | null
+          sync_completed_at?: string | null
+          sync_started_at?: string
+          sync_type: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          provider?: string
+          raw_items?: Json
+          registered_items?: Json
+          skipped_items?: Json
+          stats?: Json | null
+          sync_completed_at?: string | null
+          sync_started_at?: string
+          sync_type?: string
+        }
+        Relationships: []
+      }
       integration_logs: {
         Row: {
           created_at: string

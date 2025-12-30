@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, TrendingUp, TrendingDown, Users, DollarSign, BarChart3, RefreshCw, Radio, Database, ArrowLeft } from "lucide-react";
+import { CalendarIcon, TrendingUp, TrendingDown, Users, DollarSign, BarChart3, RefreshCw, Radio, Database, ArrowLeft, Bug } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -31,6 +31,7 @@ import {
 } from "recharts";
 import SalesFeed from "@/components/sales/SalesFeed";
 import ApiDataOverview from "@/components/api-overview/ApiDataOverview";
+import IntegrationDebugTab from "@/components/debug/IntegrationDebugTab";
 
 const COLORS = [
   "hsl(var(--primary))",
@@ -463,6 +464,10 @@ export default function LiveStats() {
               <TabsTrigger value="api-overview" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
                 <Database className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 API
+              </TabsTrigger>
+              <TabsTrigger value="debug" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+                <Bug className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                Debug
               </TabsTrigger>
             </TabsList>
           </div>
@@ -944,6 +949,11 @@ export default function LiveStats() {
           {/* API Data Overview Tab */}
           <TabsContent value="api-overview">
             <ApiDataOverview />
+          </TabsContent>
+
+          {/* Debug Tab */}
+          <TabsContent value="debug">
+            <IntegrationDebugTab />
           </TabsContent>
         </Tabs>
       </div>
