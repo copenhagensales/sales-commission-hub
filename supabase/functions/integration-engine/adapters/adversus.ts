@@ -621,7 +621,7 @@ export class AdversusAdapter implements DialerAdapter {
                 const id = String(r.id || r.uniqueId || r.uuid);
                 const hashStr = JSON.stringify({
                   id: r.id || r.uniqueId || r.uuid,
-                  startTime: r.insertedTime || r.startTime || r.started || r.created, // Use insertedTime first to match filter
+                  startTime: r.insertedTime || r.startTime || r.started || r.created,
                   agentId: r.userId || r.agentId || r.ownedBy?.id,
                   campaignId: r.campaignId,
                   duration: r.conversationSeconds || r.billsec,
@@ -652,6 +652,7 @@ export class AdversusAdapter implements DialerAdapter {
 
               // STRONG LOGGING
               console.log(`[Adversus] Page ${page} Report:
+                - URL: ${url}
                 - Raw records: ${records.length}
                 - Filtered out of date range (${startDateStr} to ${endDateStr}): ${outOfRange}
                 - Duplicate IDs: ${duplicateId}
@@ -660,8 +661,10 @@ export class AdversusAdapter implements DialerAdapter {
                 - Accumulated Total: ${allRecords.length}`);
 
               if (records.length > 0) {
-                const firstDate = records[0].startTime || records[0].insertedTime;
-                const lastDate = records[records.length - 1].startTime || records[records.length - 1].insertedTime;
+                const first = records[0];
+                console.log(`[Adversus] Record Sample: id=${first.id}, insertedTime=${first.insertedTime}, startTime=${first.startTime || first.started}`);
+                const firstDate = first.insertedTime || first.startTime || first.started;
+                const lastDate = records[records.length - 1].insertedTime || records[records.length - 1].startTime || records[records.length - 1].started;
                 console.log(`[Adversus] Page ${page} Date Sample: First[${firstDate}] Last[${lastDate}]`);
               }
 
