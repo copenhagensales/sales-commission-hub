@@ -61,6 +61,7 @@ export class EnreachAdapter implements DialerAdapter {
       Authorization: authHeader,
       "Content-Type": "application/json; charset=utf-8",
       Accept: "application/json",
+      "X-Rate-Limit-Fair-Use-Policy": "Minute rated",
     };
   }
 
@@ -1052,14 +1053,14 @@ export class EnreachAdapter implements DialerAdapter {
     // 2. Parse date range
     const startDate = new Date(range.from);
     const endDate = new Date(range.to);
-    
+
     console.log(`[EnreachAdapter] Fetching calls from ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
     // 3. Generate all days in the range
     const days: string[] = [];
     const currentDate = new Date(startDate);
     currentDate.setHours(0, 0, 0, 0);
-    
+
     while (currentDate <= endDate) {
       days.push(currentDate.toISOString().split('T')[0]);
       currentDate.setDate(currentDate.getDate() + 1);
@@ -1075,7 +1076,7 @@ export class EnreachAdapter implements DialerAdapter {
 
     for (const day of days) {
       console.log(`[EnreachAdapter] Processing day: ${day}`);
-      
+
       // Divide each day into 2-hour chunks (12 chunks per day)
       const chunks: { startTime: string; timeSpan: string }[] = [];
       for (let hour = 0; hour < 24; hour += 2) {
@@ -1087,12 +1088,12 @@ export class EnreachAdapter implements DialerAdapter {
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
         totalChunks++;
-        
+
         console.log(`[EnreachAdapter] [Chunk ${i + 1}/${chunks.length}] Fetching calls from ${chunk.startTime}...`);
 
         try {
           const chunkCalls = await this.fetchCallsChunk(chunk.startTime, chunk.timeSpan);
-          
+
           // Deduplicate by uniqueId
           let newCalls = 0;
           for (const call of chunkCalls) {
@@ -1133,16 +1134,17 @@ export class EnreachAdapter implements DialerAdapter {
    * Helper method to fetch a single chunk of calls
    */
   private async fetchCallsChunk(startTime: string, timeSpan: string): Promise<StandardCall[]> {
-    const orgParam = this.orgCode ? `&OrgCode=${this.orgCode}` : '';
-    
-    // Format startTime for Herobase API (YYYY-MM-DD HH:mm:ss)
-    const formattedStartTime = startTime.replace('T', ' ').replace('Z', '');
-    
-    const endpoint = `/calls?StartTime=${encodeURIComponent(formattedStartTime)}&TimeSpan=${encodeURIComponent(timeSpan)}${orgParam}&Limit=5000`;
+
+
+    // Format startTime for Herobase API - keep ISO format (as per working reference)
+    const formattedStartTime = startTime;
+
+    // NOTE: validation against enreach-data-app reference
+    const endpoint = `/calls?OrgCode=${this.orgCode || 'Salg'}&StartTime=${encodeURIComponent(formattedStartTime)}&TimeSpan=${encodeURIComponent(timeSpan)}&Limit=5000`;
 
     try {
       const data = await this.get(endpoint);
-      
+
       if (Array.isArray(data) && data.length > 0) {
         return this.mapCdrsToStandardCalls(data);
       } else if (Array.isArray(data)) {
@@ -1171,7 +1173,7 @@ export class EnreachAdapter implements DialerAdapter {
 
       // Map to StandardCall
       return {
-        externalId: String(r.Id || r.id || r.CallId || r.uniqueId || r.UniqueId),
+        externalId: String(r.uniqueId || r.UniqueId || r.Id || r.id || r.CallId),
         integrationType: 'enreach',
         dialerName: this.dialerName,
         startTime: r.StartTime || r.startTime || r.Time || new Date().toISOString(),
