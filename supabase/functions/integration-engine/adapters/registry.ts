@@ -7,7 +7,8 @@ export function getAdapter(
   credentials: Record<string, unknown> | string[] | null,
   integrationName: string,
   integrationApiUrl?: string | null,
-  integrationConfig?: unknown | null
+  integrationConfig?: unknown | null,
+  callsOrgCodes?: string[] | null
 ): DialerAdapter {
   const p = (provider || "").toLowerCase()
   if (p === "adversus") {
@@ -18,7 +19,7 @@ export function getAdapter(
       ...(credentials as Record<string, unknown> | null) || {},
       api_url: integrationApiUrl,
     } as Record<string, unknown>
-    return new EnreachAdapter(creds as any, integrationName, integrationConfig as any)
+    return new EnreachAdapter(creds as any, integrationName, integrationConfig as any, callsOrgCodes || null)
   }
   throw new Error(`Fuente no soportada: ${provider}`)
 }

@@ -1994,6 +1994,7 @@ export type Database = {
       dialer_integrations: {
         Row: {
           api_url: string | null
+          calls_org_codes: string[] | null
           config: Json | null
           created_at: string | null
           encrypted_credentials: string
@@ -2008,6 +2009,7 @@ export type Database = {
         }
         Insert: {
           api_url?: string | null
+          calls_org_codes?: string[] | null
           config?: Json | null
           created_at?: string | null
           encrypted_credentials: string
@@ -2022,6 +2024,7 @@ export type Database = {
         }
         Update: {
           api_url?: string | null
+          calls_org_codes?: string[] | null
           config?: Json | null
           created_at?: string | null
           encrypted_credentials?: string

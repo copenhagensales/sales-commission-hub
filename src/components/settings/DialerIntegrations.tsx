@@ -82,6 +82,7 @@ interface DialerIntegration {
   last_sync_at: string | null;
   sync_frequency_minutes: number | null;
   config: DialerIntegrationConfig | null;
+  calls_org_codes: string[] | null;
 }
 
 interface FormData {
@@ -91,6 +92,7 @@ interface FormData {
   password: string;
   api_url: string;
   org_code: string;
+  calls_org_codes: string; // Comma-separated list of org codes for calls sync
   // Product extraction config
   productExtractionStrategy: 'standard_closure' | 'data_keys_regex' | 'specific_fields' | 'conditional';
   productRegexPattern: string;
@@ -140,6 +142,7 @@ export function DialerIntegrations() {
     password: "",
     api_url: "",
     org_code: "",
+    calls_org_codes: "",
     productExtractionStrategy: "standard_closure",
     productRegexPattern: "",
     productTargetKeys: "",
@@ -222,7 +225,7 @@ export function DialerIntegrations() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("dialer_integrations")
-        .select("id, name, provider, api_url, config, is_active, last_sync_at, sync_frequency_minutes")
+        .select("id, name, provider, api_url, config, is_active, last_sync_at, sync_frequency_minutes, calls_org_codes")
         .order("name");
 
       if (error) throw error;
@@ -280,6 +283,11 @@ export function DialerIntegrations() {
       // For Enreach, org_code is the same as username
       const orgCode = data.provider === 'enreach' ? data.username : (data.org_code || null);
       
+      // Parse calls_org_codes from comma-separated string to array
+      const callsOrgCodes = data.calls_org_codes
+        ? data.calls_org_codes.split(',').map(c => c.trim()).filter(Boolean)
+        : [];
+      
       // Build product extraction config
       const productExtraction: ProductExtractionConfig = {
         strategy: data.productExtractionStrategy,
@@ -319,6 +327,7 @@ export function DialerIntegrations() {
           provider: data.provider,
           api_url: data.api_url || null,
           config,
+          calls_org_codes: callsOrgCodes.length > 0 ? callsOrgCodes : null,
           credentials: {
             username: data.username,
             password: data.password,
@@ -428,6 +437,7 @@ export function DialerIntegrations() {
       password: "", 
       api_url: "", 
       org_code: "",
+      calls_org_codes: "",
       productExtractionStrategy: "standard_closure",
       productRegexPattern: "",
       productTargetKeys: "",
@@ -871,6 +881,22 @@ export function DialerIntegrations() {
                       <p className="text-xs text-muted-foreground">{t("dialerIntegrations.keepCredentials")}</p>
                     )}
                   </div>
+                  
+                  {/* Calls Org Codes - For Enreach multi org code calls sync */}
+                  {formData.provider === 'enreach' && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="calls_org_codes">Calls Org Codes (for calls sync)</Label>
+                      <Input
+                        id="calls_org_codes"
+                        placeholder="Copenhagen sales, CPH-Sales - Outbound, salg"
+                        value={formData.calls_org_codes}
+                        onChange={(e) => setFormData({ ...formData, calls_org_codes: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Comma-separated list of org codes to fetch calls from. Calls will be deduplicated across all org codes.
+                      </p>
+                    </div>
+                  )}
                   
                   {/* Product Extraction Configuration - Only for Enreach */}
                   {formData.provider === 'enreach' && (
@@ -1756,6 +1782,7 @@ export function DialerIntegrations() {
                                 password: "",
                                 api_url: integration.api_url || "",
                                 org_code: "",
+                                calls_org_codes: integration.calls_org_codes?.join(", ") || "",
                                 productExtractionStrategy: extractionConfig?.strategy || "standard_closure",
                                 productRegexPattern: extractionConfig?.regexPattern || "",
                                 productTargetKeys: extractionConfig?.targetKeys?.join(", ") || "",

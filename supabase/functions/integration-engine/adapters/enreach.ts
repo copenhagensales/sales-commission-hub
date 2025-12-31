@@ -33,8 +33,9 @@ export class EnreachAdapter implements DialerAdapter {
   private dialerName: string;
   private orgCode: string | null;
   private config: DialerIntegrationConfig | null;
+  private callsOrgCodes: string[] | null;
 
-  constructor(credentials: EnreachCredentials, dialerName?: string, config?: DialerIntegrationConfig | null) {
+  constructor(credentials: EnreachCredentials, dialerName?: string, config?: DialerIntegrationConfig | null, callsOrgCodes?: string[] | null) {
     const providedUrl = credentials.api_url || "https://wshero01.herobase.com/api";
     this.baseUrl = providedUrl.endsWith("/") ? providedUrl.slice(0, -1) : providedUrl;
     if (!this.baseUrl.endsWith("/api")) {
@@ -44,8 +45,10 @@ export class EnreachAdapter implements DialerAdapter {
     this.dialerName = dialerName || "Enreach";
     this.orgCode = credentials.org_code || null;
     this.config = config || null;
+    this.callsOrgCodes = callsOrgCodes || null;
 
     console.log(`[EnreachAdapter] Config loaded: ${JSON.stringify(this.config?.productExtraction || "None")}`);
+    console.log(`[EnreachAdapter] Calls org codes: ${JSON.stringify(this.callsOrgCodes || "None (will use default)")}`);
 
     let authHeader: string;
     if (credentials.username && credentials.password) {
