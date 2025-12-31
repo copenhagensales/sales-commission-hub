@@ -506,9 +506,10 @@ export class AdversusAdapter implements DialerAdapter {
       console.log(`[Adversus] Finished day ${dayStr}: Added ${addedCount} new calls. Total so far: ${allCalls.length}`);
 
       // Accumulate debug data
-      if (this.lastDebugData) {
-        accumulatedRaw.push(...(this.lastDebugData.rawCalls || []));
-        accumulatedProcessed.push(...(this.lastDebugData.processedCalls || []));
+      const debugData = this.getLastDebugData();
+      if (debugData && debugData.rawCalls.length > 0) {
+        accumulatedRaw.push(...(debugData.rawCalls || []));
+        accumulatedProcessed.push(...(debugData.processedCalls || []));
       }
 
       // Safety pause between days
@@ -621,9 +622,11 @@ export class AdversusAdapter implements DialerAdapter {
                 const id = String(r.id || r.uniqueId || r.uuid);
                 const hashStr = JSON.stringify({
                   id: r.id || r.uniqueId || r.uuid,
-                  startTime: r.insertedTime || r.startTime || r.started || r.created,
+                  startTime: r.startTime || r.started || r.created,
+                  endTime: r.endTime || r.ended,
                   agentId: r.userId || r.agentId || r.ownedBy?.id,
                   campaignId: r.campaignId,
+                  leadId: r.contactId || r.leadId,
                   duration: r.conversationSeconds || r.billsec,
                   status: r.disposition || r.hangupCause
                 });
@@ -677,14 +680,8 @@ export class AdversusAdapter implements DialerAdapter {
               }
             } else {
               // Truly empty response
-              consecutiveEmptyPages++;
-              if (consecutiveEmptyPages > 20) { // Safety break
-                console.log(`[Adversus] 20 empty pages reached. Stopping.`);
-                hasMore = false;
-              } else {
-                // Some APIs require moving to next page even if empty (unlikely for Adversus)
-                hasMore = false;
-              }
+              console.log(`[Adversus] Page ${page} is empty. No records found for this period.`);
+              hasMore = false;
             }
             success = true;
           } catch (e) {
@@ -701,7 +698,7 @@ export class AdversusAdapter implements DialerAdapter {
       }
 
       if (allRecords.length > 0) {
-        console.log(`[Adversus] Finished fetching. Total unique records found: ${allRecords.length}`);
+        console.log(`[Adversus] Finished fetching range. Total unique records found: ${allRecords.length}`);
         const mappedCalls = this.mapCdrsToStandardCalls(allRecords);
 
         // Store debug data for calls
@@ -710,11 +707,11 @@ export class AdversusAdapter implements DialerAdapter {
           processedCalls: mappedCalls.map(c => ({ externalId: c.externalId })),
           skipReasonMap: new Map(),
         };
-
         return mappedCalls;
+      } else {
+        this.lastDebugData = null;
       }
     }
-
     return [];
   }
 
