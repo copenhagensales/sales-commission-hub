@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, TrendingUp, TrendingDown, Users, DollarSign, BarChart3, RefreshCw, Radio, Database, ArrowLeft, Bug } from "lucide-react";
+import { CalendarIcon, TrendingUp, TrendingDown, Users, DollarSign, BarChart3, RefreshCw, Radio, Database, ArrowLeft, Bug, Phone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -32,6 +32,7 @@ import {
 import SalesFeed from "@/components/sales/SalesFeed";
 import ApiDataOverview from "@/components/api-overview/ApiDataOverview";
 import IntegrationDebugTab from "@/components/debug/IntegrationDebugTab";
+import { CallsAnalytics } from "@/components/calls-analytics/CallsAnalytics";
 
 const COLORS = [
   "hsl(var(--primary))",
@@ -457,6 +458,10 @@ export default function LiveStats() {
                 <Radio className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 <span className="hidden xs:inline">Live</span> Feed
               </TabsTrigger>
+              <TabsTrigger value="calls" className="gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3">
+                <Phone className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                Calls
+              </TabsTrigger>
               <TabsTrigger value="sales" className="text-xs sm:text-sm px-2 sm:px-3">Sales</TabsTrigger>
               <TabsTrigger value="employees" className="text-xs sm:text-sm px-2 sm:px-3">Employees</TabsTrigger>
               <TabsTrigger value="kpis" className="text-xs sm:text-sm px-2 sm:px-3">KPIs</TabsTrigger>
@@ -485,6 +490,11 @@ export default function LiveStats() {
                 <SalesFeed />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Calls Analytics Tab */}
+          <TabsContent value="calls">
+            <CallsAnalytics dateRange={dateRange} />
           </TabsContent>
 
           {/* Sales Tab */}
