@@ -1192,8 +1192,9 @@ export class EnreachAdapter implements DialerAdapter {
       else if (result === 'failed') status = 'FAILED';
 
       // Attempt to find an email for the agent to help with matching
-      const possibleEmail = r.User?.Email || r.User?.Username || r.UserId || '';
-      const agentEmail = possibleEmail.includes('@') ? possibleEmail : undefined;
+      // HEROBASE/ENREACH: 'user.orgCode' almost always contains the agent email
+      const possibleEmail = this.getStr(r.user || r.User, ["orgCode", "OrgCode", "email", "Email", "username", "Username"]);
+      const agentEmail = (possibleEmail && possibleEmail.includes('@')) ? possibleEmail : undefined;
 
       // Map to StandardCall
       return {
@@ -1205,13 +1206,13 @@ export class EnreachAdapter implements DialerAdapter {
         durationSeconds: Number(r.DurationTotalSeconds || r.duration || r.Duration || 0),
         totalDurationSeconds: Number(r.DurationTotalSeconds || r.duration || r.Duration || 0),
         status: status,
-        agentExternalId: String(r.UserId || r.User?.Id || r.agentId || r.AgentId || 'unknown'),
-        campaignExternalId: String(r.CampaignId || r.Campaign?.Id || r.ProjectUniqueId || 'unknown'),
-        leadExternalId: String(r.LeadId || r.Lead?.Id || r.LeadUniqueId || 'unknown'),
+        agentExternalId: String(r.user?.uniqueId || r.User?.UniqueId || r.UserId || r.agentId || 'unknown'),
+        campaignExternalId: String(r.campaign?.uniqueId || r.Campaign?.UniqueId || r.CampaignId || 'unknown'),
+        leadExternalId: String(r.uniqueLeadId || r.LeadUniqueId || r.LeadId || 'unknown'),
         metadata: {
-          project: r.ProjectName || r.Campaign?.Name,
-          result: r.Result || r.Closure,
-          number: r.PhoneNumber || r.Phone,
+          project: r.campaign?.code || r.Campaign?.Code || r.ProjectName,
+          result: r.endCause || r.Result || r.Closure,
+          number: r.leadPhoneNumber || r.PhoneNumber || r.Phone,
           orgCode: this.orgCode,
           agentEmail: agentEmail
         }

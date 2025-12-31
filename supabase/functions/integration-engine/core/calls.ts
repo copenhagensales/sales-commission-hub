@@ -7,7 +7,8 @@ async function processCallsBatch(
   calls: StandardCall[],
   agentMapByExtId: Map<string, string>,
   agentMapByEmail: Map<string, string>,
-  log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void
+  log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
+  agentMapByDialerId: Map<string, string>
 ) {
   let processed = 0
   let errors = 0
@@ -15,7 +16,9 @@ async function processCallsBatch(
   const allCallsData: any[] = []
   for (const call of calls) {
     try {
-      let agentId = agentMapByExtId.get(call.agentExternalId) || null
+      let agentId = agentMapByExtId.get(call.agentExternalId) ||
+        agentMapByDialerId.get(call.agentExternalId) ||
+        null
       if (!agentId && call.metadata) {
         const agentEmail = (call.metadata as any).agentEmail?.toLowerCase()
         if (agentEmail) {
@@ -80,9 +83,16 @@ export async function processCalls(
     "INFO",
     `Procesando ${calls.length} llamadas de ${sampleCall.dialerName} (${sampleCall.integrationType}) en lotes de ${batchSize}...`
   )
-  const { data: agents } = await supabase.from("agents").select("id, external_adversus_id, email")
-  const agentMapByExtId = new Map(agents?.map((a: any) => [a.external_adversus_id, a.id]) || [])
-  const agentMapByEmail = new Map(agents?.map((a: any) => [a.email?.toLowerCase(), a.id]) || [])
+  const { data: agents } = await supabase.from("agents").select("id, external_adversus_id, external_dialer_id, email")
+  const agentMapByExtId = new Map<string, string>(
+    agents?.filter((a: any) => a.external_adversus_id && a.id).map((a: any) => [a.external_adversus_id, a.id]) || []
+  )
+  const agentMapByDialerId = new Map<string, string>(
+    agents?.filter((a: any) => a.external_dialer_id && a.id).map((a: any) => [a.external_dialer_id, a.id]) || []
+  )
+  const agentMapByEmail = new Map<string, string>(
+    agents?.filter((a: any) => a.email && a.id).map((a: any) => [a.email.toLowerCase(), a.id]) || []
+  )
   let totalProcessed = 0
   let totalErrors = 0
   let totalMatched = 0
@@ -96,7 +106,8 @@ export async function processCalls(
       batch,
       agentMapByExtId,
       agentMapByEmail,
-      log
+      log,
+      agentMapByDialerId
     )
     totalProcessed += processed
     totalErrors += errors
