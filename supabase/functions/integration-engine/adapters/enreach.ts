@@ -52,14 +52,19 @@ export class EnreachAdapter implements DialerAdapter {
       const basicAuth = btoa(`${credentials.username}:${credentials.password}`);
       authHeader = `Basic ${basicAuth}`;
     } else if (credentials.api_token) {
-      authHeader = `Bearer ${credentials.api_token}`;
+      // Heuristic: if token contains ':', treat as user:pass for Basic Auth (matching enreach-data-app behavior)
+      if (credentials.api_token.includes(':')) {
+        const basicAuth = btoa(credentials.api_token);
+        authHeader = `Basic ${basicAuth}`;
+      } else {
+        authHeader = `Bearer ${credentials.api_token}`;
+      }
     } else {
       throw new Error("[EnreachAdapter] No valid credentials provided.");
     }
 
     this.headers = {
       Authorization: authHeader,
-      "Content-Type": "application/json; charset=utf-8",
       Accept: "application/json",
       "X-Rate-Limit-Fair-Use-Policy": "Minute rated",
     };
