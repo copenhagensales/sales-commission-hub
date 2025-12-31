@@ -2364,6 +2364,7 @@ export type Database = {
           address_postal_code: string | null
           address_street: string | null
           auth_user_id: string | null
+          avatar_url: string | null
           bank_account_number: string | null
           bank_reg_number: string | null
           contract_id: string | null
@@ -2415,6 +2416,7 @@ export type Database = {
           address_postal_code?: string | null
           address_street?: string | null
           auth_user_id?: string | null
+          avatar_url?: string | null
           bank_account_number?: string | null
           bank_reg_number?: string | null
           contract_id?: string | null
@@ -2466,6 +2468,7 @@ export type Database = {
           address_postal_code?: string | null
           address_street?: string | null
           auth_user_id?: string | null
+          avatar_url?: string | null
           bank_account_number?: string | null
           bank_reg_number?: string | null
           contract_id?: string | null

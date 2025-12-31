@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X, UserX } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X, UserX, Camera, User } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -65,6 +66,7 @@ interface EmployeeMasterDataRecord {
   updated_at: string;
   invitation_status: "none" | "pending" | "completed" | null;
   auth_user_id: string | null;
+  avatar_url: string | null;
 }
 
 type NewEmployee = Omit<EmployeeMasterDataRecord, "id" | "created_at" | "updated_at">;
@@ -105,6 +107,7 @@ const defaultEmployee: NewEmployee = {
   is_active: true,
   invitation_status: "none",
   auth_user_id: null,
+  avatar_url: null,
 };
 
 export default function EmployeeMasterData() {
@@ -127,7 +130,47 @@ export default function EmployeeMasterData() {
   const [deleteEmployeeId, setDeleteEmployeeId] = useState<string | null>(null);
   const [moveToStaffId, setMoveToStaffId] = useState<string | null>(null);
   const [sendingResetTo, setSendingResetTo] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const { canEditEmployees } = usePermissions();
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingEmployee) return;
+
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${editingEmployee.id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('employee-avatars')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('employee-avatars')
+        .getPublicUrl(filePath);
+
+      setFormData({ ...formData, avatar_url: publicUrl });
+      
+      // Auto-save immediately
+      await supabase
+        .from("employee_master_data")
+        .update({ avatar_url: publicUrl })
+        .eq("id", editingEmployee.id);
+      
+      setLastSaved(new Date());
+      queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
+      toast({ title: "Profilbillede uploadet" });
+    } catch (error) {
+      console.error("Avatar upload error:", error);
+      toast({ title: "Fejl ved upload", variant: "destructive" });
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const dialogSteps = [
     { title: t("employees.steps.identity"), key: "identity" },
@@ -263,6 +306,7 @@ export default function EmployeeMasterData() {
       is_active: employee.is_active,
       invitation_status: employee.invitation_status,
       auth_user_id: employee.auth_user_id,
+      avatar_url: employee.avatar_url,
     });
     setDialogOpen(true);
   };
@@ -579,6 +623,40 @@ export default function EmployeeMasterData() {
               {/* Step 0: Identity */}
               {currentStep === 0 && (
                 <div className="space-y-4">
+                  {/* Avatar Upload - Only show when editing existing employee */}
+                  {editingEmployee && (
+                    <div className="flex flex-col items-center gap-3">
+                      <Label className="text-sm text-muted-foreground">Profilbillede</Label>
+                      <div className="relative group">
+                        <Avatar className="h-24 w-24 border-2 border-border">
+                          <AvatarImage src={formData.avatar_url || undefined} alt="Profilbillede" />
+                          <AvatarFallback className="bg-muted text-muted-foreground text-lg">
+                            {formData.first_name?.[0]?.toUpperCase() || ""}
+                            {formData.last_name?.[0]?.toUpperCase() || ""}
+                          </AvatarFallback>
+                        </Avatar>
+                        <label 
+                          htmlFor="avatar-upload" 
+                          className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                        >
+                          {uploadingAvatar ? (
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                          ) : (
+                            <Camera className="h-6 w-6 text-muted-foreground" />
+                          )}
+                        </label>
+                        <input
+                          id="avatar-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarUpload}
+                          disabled={uploadingAvatar}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>{t("employees.fields.firstName")} *</Label>
