@@ -1784,14 +1784,34 @@ export function DialerIntegrations() {
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
+                            <DropdownMenuContent align="end" className="w-64">
+                              <div className="px-2 py-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs text-muted-foreground">Calls (dage)</span>
+                                  <Input
+                                    type="number"
+                                    inputMode="numeric"
+                                    className="h-7 w-20 text-xs"
+                                    placeholder={syncDays[integration.id] || "7"}
+                                    min="1"
+                                    max="365"
+                                    value={callsDays[integration.id] || ""}
+                                    onChange={(e) =>
+                                      setCallsDays((prev) => ({ ...prev, [integration.id]: e.target.value }))
+                                    }
+                                  />
+                                </div>
+                              </div>
+                              <Separator />
                               <DropdownMenuItem
                                 disabled={fetchingCallsId === integration.id}
-                                onClick={() => fetchCallsMutation.mutate({
-                                  integrationId: integration.id,
-                                  dialerName: integration.name,
-                                  days: parseInt(callsDays[integration.id]) || 7
-                                })}
+                                onClick={() =>
+                                  fetchCallsMutation.mutate({
+                                    integrationId: integration.id,
+                                    dialerName: integration.name,
+                                    days: parseInt(callsDays[integration.id] || syncDays[integration.id] || "") || 7,
+                                  })
+                                }
                               >
                                 {fetchingCallsId === integration.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
