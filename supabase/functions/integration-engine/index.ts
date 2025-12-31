@@ -27,7 +27,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { source, action, actions, days = 1, campaignId, integration_id, background = false, from, to } = body;
+    const { source, action, actions, days = 3, campaignId, integration_id, background = false, from, to } = body;
 
     const supabase = getSupabase();
 
@@ -66,9 +66,9 @@ serve(async (req) => {
     }
 
     // integration_id already parsed from body above
-    
+
     const engine = new IngestionEngine();
-    
+
     // Fetch campaign mappings ONCE at the start for reference extraction
     const campaignMappings = await engine.getCampaignMappings();
     console.log(`[Integration Engine] Loaded ${campaignMappings.length} campaign mappings for reference extraction`);
@@ -78,7 +78,7 @@ serve(async (req) => {
       .from("dialer_integrations")
       .select("*")
       .eq("is_active", true);
-    
+
     if (integration_id) {
       // Sync specific integration by ID
       console.log(`[Integration Engine] Fetching specific integration: ${integration_id}`);
@@ -96,8 +96,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          message: integration_id 
-            ? `Integración no encontrada o inactiva: ${integration_id}` 
+          message: integration_id
+            ? `Integración no encontrada o inactiva: ${integration_id}`
             : `No hay integraciones activas para ${source}`,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -193,7 +193,7 @@ serve(async (req) => {
             console.log(`[Integration Engine] Adapter for ${integration.name} does not support fetchCalls`);
             runResults["calls"] = { processed: 0, errors: 0, matched: 0, message: "Adapter does not support calls" };
           }
-          
+
           // Save debug log for calls if adapter supports it
           const callsDebugData = (adapter as any).getLastDebugData?.();
           if (callsDebugData?.rawCalls) {
@@ -218,7 +218,7 @@ serve(async (req) => {
         // Log success to integration_logs
         const salesData = runResults["sales"] as { processed?: number } | undefined;
         const callsData = runResults["calls"] as { processed?: number; matched?: number } | undefined;
-        
+
         // Build message based on what was synced
         const messageParts: string[] = [];
         if (salesData?.processed !== undefined) {
@@ -227,10 +227,10 @@ serve(async (req) => {
         if (callsData?.processed !== undefined) {
           messageParts.push(`${callsData.processed} calls (${callsData.matched || 0} matched)`);
         }
-        const syncMessage = messageParts.length > 0 
+        const syncMessage = messageParts.length > 0
           ? `Sync completed: ${messageParts.join(', ')}`
           : 'Sync completed: No data processed';
-        
+
         await supabase.from("integration_logs").insert({
           integration_type: "dialer",
           integration_id: integration.id,
@@ -278,8 +278,8 @@ serve(async (req) => {
       return acc;
     }, 0);
 
-    return new Response(JSON.stringify({ 
-      success: true, 
+    return new Response(JSON.stringify({
+      success: true,
       results,
       created: totalCreated,
       updated: 0, // core.ts doesn't distinguish created vs updated yet

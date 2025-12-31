@@ -1042,8 +1042,9 @@ export class EnreachAdapter implements DialerAdapter {
     try {
       const accountInfo: any = await this.get("/myaccount");
       if (accountInfo && accountInfo.OrgCode) {
-        if (!this.orgCode) {
-          console.log(`[EnreachAdapter] Auto-detected missing OrgCode: ${accountInfo.OrgCode}`);
+        // Fix: If OrgCode is set to an email (common config error) or missing, use the one from API
+        if (!this.orgCode || this.orgCode.includes('@') || this.orgCode !== accountInfo.OrgCode) {
+          console.log(`[EnreachAdapter] Auto-detected correct OrgCode: ${accountInfo.OrgCode} (was configured as: ${this.orgCode})`);
           this.orgCode = accountInfo.OrgCode;
         }
       }
