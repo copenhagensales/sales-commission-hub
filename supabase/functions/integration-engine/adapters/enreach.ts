@@ -1030,7 +1030,7 @@ export class EnreachAdapter implements DialerAdapter {
   }
 
   async fetchCallsRange(range: { from: string; to: string }): Promise<StandardCall[]> {
-    console.log(`[EnreachAdapter] Starting call fetch session...`);
+    console.log(`[EnreachAdapter] Starting call fetch session with chunked approach...`);
 
     // 1. Diagnostic/Auto-detection: Try to get OrgCode if not present
     try {
@@ -1045,44 +1045,117 @@ export class EnreachAdapter implements DialerAdapter {
       console.warn(`[EnreachAdapter] Diagnostic /myaccount check failed. Continuing anyway.`);
     }
 
-    // 2. Format dates for Herobase compatibility (YYYY-MM-DD HH:mm:ss)
-    const start = new Date(range.from);
-    const end = new Date(range.to);
-    const startTimeParam = start.toISOString().split('.')[0].replace('T', ' ').replace('Z', '');
-
-    const diffMs = end.getTime() - start.getTime();
-    const daysArr = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const hoursArr = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutesArr = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    const secondsArr = Math.floor((diffMs % (1000 * 60)) / 1000);
-    const timeSpan = `${daysArr}.${hoursArr.toString().padStart(2, '0')}:${minutesArr.toString().padStart(2, '0')}:${secondsArr.toString().padStart(2, '0')}`;
-
-    const orgParam = this.orgCode ? `&OrgCode=${this.orgCode}` : '';
-
-    // 3. Multi-endpoint strategy
-    const possibleEndpoints = [
-      `/calls?StartTime=${encodeURIComponent(startTimeParam)}&TimeSpan=${encodeURIComponent(timeSpan)}${orgParam}`,
-      `/activities?StartTime=${encodeURIComponent(startTimeParam)}&TimeSpan=${encodeURIComponent(timeSpan)}${orgParam}`,
-      `/reporting/calls?StartTime=${encodeURIComponent(startTimeParam)}&TimeSpan=${encodeURIComponent(timeSpan)}${orgParam}`,
-    ];
-
-    for (const ep of possibleEndpoints) {
-      console.log(`[EnreachAdapter] Trying call endpoint: ${ep}`);
-      try {
-        const data = await this.get(ep);
-        if (Array.isArray(data) && data.length > 0) {
-          console.log(`[EnreachAdapter] SUCCESS with endpoint: ${ep}. Found ${data.length} records.`);
-          return this.mapCdrsToStandardCalls(data);
-        } else if (data) {
-          console.log(`[EnreachAdapter] Endpoint ${ep} returned no active records or empty array.`);
-        }
-      } catch (e) {
-        console.warn(`[EnreachAdapter] Endpoint ${ep} failed or not supported.`);
-      }
+    if (!this.orgCode) {
+      console.warn(`[EnreachAdapter] No OrgCode available. Call fetching may fail.`);
     }
 
-    console.log(`[EnreachAdapter] All call endpoints exhausted. Returning empty results.`);
-    return [];
+    // 2. Parse date range
+    const startDate = new Date(range.from);
+    const endDate = new Date(range.to);
+    
+    console.log(`[EnreachAdapter] Fetching calls from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
+    // 3. Generate all days in the range
+    const days: string[] = [];
+    const currentDate = new Date(startDate);
+    currentDate.setHours(0, 0, 0, 0);
+    
+    while (currentDate <= endDate) {
+      days.push(currentDate.toISOString().split('T')[0]);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    console.log(`[EnreachAdapter] Processing ${days.length} day(s) in chunks of 2 hours...`);
+
+    // 4. Fetch calls for each day using chunked approach
+    const allCalls: StandardCall[] = [];
+    const seenIds = new Set<string>();
+    let totalChunks = 0;
+    let totalCallsFetched = 0;
+
+    for (const day of days) {
+      console.log(`[EnreachAdapter] Processing day: ${day}`);
+      
+      // Divide each day into 2-hour chunks (12 chunks per day)
+      const chunks: { startTime: string; timeSpan: string }[] = [];
+      for (let hour = 0; hour < 24; hour += 2) {
+        const startTime = `${day}T${String(hour).padStart(2, '0')}:00:00Z`;
+        chunks.push({ startTime, timeSpan: 'PT2H' }); // PT2H = 2 hours in ISO 8601 duration format
+      }
+
+      // Fetch each chunk
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        totalChunks++;
+        
+        console.log(`[EnreachAdapter] [Chunk ${i + 1}/${chunks.length}] Fetching calls from ${chunk.startTime}...`);
+
+        try {
+          const chunkCalls = await this.fetchCallsChunk(chunk.startTime, chunk.timeSpan);
+          
+          // Deduplicate by uniqueId
+          let newCalls = 0;
+          for (const call of chunkCalls) {
+            if (!seenIds.has(call.externalId)) {
+              seenIds.add(call.externalId);
+              allCalls.push(call);
+              newCalls++;
+            }
+          }
+
+          totalCallsFetched += chunkCalls.length;
+          console.log(`[EnreachAdapter]   -> Retrieved ${chunkCalls.length} calls (${newCalls} unique)`);
+
+          // Small delay to avoid rate limiting
+          if (i < chunks.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } catch (error) {
+          console.error(`[EnreachAdapter] Error fetching chunk ${chunk.startTime}:`, error);
+          // Continue with next chunk even if this one fails
+        }
+      }
+
+      console.log(`[EnreachAdapter] Completed day ${day}: Total unique calls so far: ${allCalls.length}`);
+    }
+
+    console.log(`[EnreachAdapter] ===== CALL FETCH SUMMARY =====`);
+    console.log(`[EnreachAdapter] Total chunks processed: ${totalChunks}`);
+    console.log(`[EnreachAdapter] Total calls fetched: ${totalCallsFetched}`);
+    console.log(`[EnreachAdapter] Unique calls after deduplication: ${allCalls.length}`);
+    console.log(`[EnreachAdapter] Duplicates removed: ${totalCallsFetched - allCalls.length}`);
+    console.log(`[EnreachAdapter] ==============================`);
+
+    return allCalls;
+  }
+
+  /**
+   * Helper method to fetch a single chunk of calls
+   */
+  private async fetchCallsChunk(startTime: string, timeSpan: string): Promise<StandardCall[]> {
+    const orgParam = this.orgCode ? `&OrgCode=${this.orgCode}` : '';
+    
+    // Format startTime for Herobase API (YYYY-MM-DD HH:mm:ss)
+    const formattedStartTime = startTime.replace('T', ' ').replace('Z', '');
+    
+    const endpoint = `/calls?StartTime=${encodeURIComponent(formattedStartTime)}&TimeSpan=${encodeURIComponent(timeSpan)}${orgParam}&Limit=5000`;
+
+    try {
+      const data = await this.get(endpoint);
+      
+      if (Array.isArray(data) && data.length > 0) {
+        return this.mapCdrsToStandardCalls(data);
+      } else if (Array.isArray(data)) {
+        // Empty array is valid, just no calls in this chunk
+        return [];
+      } else {
+        console.warn(`[EnreachAdapter] Unexpected response format from ${endpoint}`);
+        return [];
+      }
+    } catch (error) {
+      console.error(`[EnreachAdapter] Error fetching chunk:`, error);
+      return [];
+    }
   }
 
   private mapCdrsToStandardCalls(records: any[]): StandardCall[] {
