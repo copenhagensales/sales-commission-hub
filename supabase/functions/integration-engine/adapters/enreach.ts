@@ -1145,7 +1145,9 @@ export class EnreachAdapter implements DialerAdapter {
     const formattedStartTime = startTime;
 
     // NOTE: validation against enreach-data-app reference
-    const endpoint = `/calls?OrgCode=${this.orgCode || 'Salg'}&StartTime=${encodeURIComponent(formattedStartTime)}&TimeSpan=${encodeURIComponent(timeSpan)}&Limit=50000`;
+    const orgParam = this.orgCode ? this.orgCode.trim() : 'Salg';
+    const endpoint = `/calls?OrgCode=${orgParam}&StartTime=${encodeURIComponent(formattedStartTime)}&TimeSpan=${encodeURIComponent(timeSpan)}&Limit=5000`;
+    console.log(`[EnreachAdapter] Requesting URL: ${this.baseUrl}${endpoint}`);
 
     try {
       const data = await this.get(endpoint);
