@@ -525,8 +525,8 @@ export class AdversusAdapter implements DialerAdapter {
     // Per official Adversus API docs, use /cdr endpoint with $gt/$lt filter operators
     const filterObj = {
       insertedTime: {
-        $gte: startIso,
-        $lte: endIso
+        $gt: startIso,
+        $lt: endIso
       }
     };
     const filterString = encodeURIComponent(JSON.stringify(filterObj));
@@ -540,7 +540,7 @@ export class AdversusAdapter implements DialerAdapter {
       const seenIds = new Set<string>();
       const seenHashes = new Set<string>();
 
-      let page = 1; // Start at page 1 (Adversus is 1-indexed, or 0/1 are same)
+      let page = 0; // START AT PAGE 0 (Matches standalone)
       let hasMore = true;
       let pageSize = 1000;
       let consecutiveEmptyPages = 0;
@@ -805,14 +805,6 @@ export class AdversusAdapter implements DialerAdapter {
       leadId: record.contactId || record.leadId,
       duration: record.conversationSeconds || record.billsec,
     };
-    const hashStr = JSON.stringify(keyData);
-    // Use a simple hash for Set efficiency
-    let hash = 0;
-    for (let i = 0; i < hashStr.length; i++) {
-      const char = hashStr.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
-    }
-    return String(hash);
+    return JSON.stringify(keyData);
   }
 }
