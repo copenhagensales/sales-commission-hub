@@ -484,7 +484,8 @@ export class AdversusAdapter implements DialerAdapter {
     const allCalls: StandardCall[] = [];
     const seenIds = new Set<string>();
 
-    console.log(`[Adversus] Starting daily loop for last ${days} days...`);
+    const accumulatedRaw: any[] = [];
+    const accumulatedProcessed: any[] = [];
 
     for (let i = days; i >= 0; i--) {
       const d = new Date();
@@ -504,9 +505,22 @@ export class AdversusAdapter implements DialerAdapter {
       }
       console.log(`[Adversus] Finished day ${dayStr}: Added ${addedCount} new calls. Total so far: ${allCalls.length}`);
 
+      // Accumulate debug data
+      if (this.lastDebugData) {
+        accumulatedRaw.push(...(this.lastDebugData.rawCalls || []));
+        accumulatedProcessed.push(...(this.lastDebugData.processedCalls || []));
+      }
+
       // Safety pause between days
       if (i > 0) await new Promise(r => setTimeout(r, 1000));
     }
+
+    // Set complete debug data
+    this.lastDebugData = {
+      rawCalls: accumulatedRaw,
+      processedCalls: accumulatedProcessed,
+      skipReasonMap: new Map(),
+    };
 
     return allCalls;
   }
@@ -605,18 +619,26 @@ export class AdversusAdapter implements DialerAdapter {
                 }
 
                 const id = String(r.id || r.uniqueId || r.uuid);
-                const hash = this.generateRecordHash(r);
+                const hashStr = JSON.stringify({
+                  id: r.id || r.uniqueId || r.uuid,
+                  startTime: r.insertedTime || r.startTime || r.started || r.created, // Use insertedTime first to match filter
+                  agentId: r.userId || r.agentId || r.ownedBy?.id,
+                  campaignId: r.campaignId,
+                  duration: r.conversationSeconds || r.billsec,
+                  status: r.disposition || r.hangupCause
+                });
+
                 if (id && id !== 'undefined' && seenIds.has(id)) {
                   duplicateId++;
                   return false;
                 }
-                if (seenHashes.has(hash)) {
+                if (seenHashes.has(hashStr)) {
                   duplicateHash++;
                   return false;
                 }
 
                 if (id && id !== 'undefined') seenIds.add(id);
-                seenHashes.add(hash);
+                seenHashes.add(hashStr);
                 return true;
               });
 
@@ -794,17 +816,4 @@ export class AdversusAdapter implements DialerAdapter {
     return 'OTHER';
   }
 
-  // Generate a consistent hash for a record to detect duplicates
-  private generateRecordHash(record: any): string {
-    const keyData = {
-      id: record.id || record.uniqueId || record.uuid,
-      startTime: record.startTime || record.started || record.created,
-      endTime: record.endTime || record.ended,
-      agentId: record.userId || record.agentId || record.ownedBy?.id,
-      campaignId: record.campaignId,
-      leadId: record.contactId || record.leadId,
-      duration: record.conversationSeconds || record.billsec,
-    };
-    return JSON.stringify(keyData);
-  }
 }
