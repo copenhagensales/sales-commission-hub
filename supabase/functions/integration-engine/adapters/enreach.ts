@@ -1041,6 +1041,8 @@ export class EnreachAdapter implements DialerAdapter {
     // 1. Diagnostic/Auto-detection: Try to get OrgCode if not present
     try {
       const accountInfo: any = await this.get("/myaccount");
+      console.log(`[EnreachAdapter] /myaccount response: ${JSON.stringify(accountInfo)}`);
+
       if (accountInfo && accountInfo.OrgCode) {
         // Fix: If OrgCode is set to an email (common config error) or missing, use the one from API
         if (!this.orgCode || this.orgCode.includes('@') || this.orgCode !== accountInfo.OrgCode) {
@@ -1048,8 +1050,18 @@ export class EnreachAdapter implements DialerAdapter {
           this.orgCode = accountInfo.OrgCode;
         }
       }
+
+      // Fallback FORCE: If it STILL contains @ (implies /myaccount also returned an email or failed to clarify), force 'Salg'
+      if (this.orgCode && this.orgCode.includes('@')) {
+        console.warn(`[EnreachAdapter] OrgCode '${this.orgCode}' appears to be an email. Forcing fallback to 'Salg' as per standard configuration.`);
+        this.orgCode = 'Salg';
+      }
     } catch (err) {
-      console.warn(`[EnreachAdapter] Diagnostic /myaccount check failed. Continuing anyway.`);
+      console.warn(`[EnreachAdapter] Diagnostic /myaccount check failed. Continuing anyway. Error: ${err}`);
+      // Fallback on error if bad config
+      if (this.orgCode && this.orgCode.includes('@')) {
+        this.orgCode = 'Salg';
+      }
     }
 
     if (!this.orgCode) {
