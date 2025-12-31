@@ -124,7 +124,8 @@ serve(async (req) => {
           credentials,
           integration.name,
           integration.api_url,
-          integration.config
+          integration.config,
+          integration.calls_org_codes
         );
 
         const runResults: Record<string, unknown> = {};

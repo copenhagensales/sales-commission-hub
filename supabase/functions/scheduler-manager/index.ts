@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
 
     // ============ DIALER INTEGRATIONS ============
     if (action === "save_dialer") {
-      const { integration_id, name, provider, credentials, api_url, config } = body;
+      const { integration_id, name, provider, credentials, api_url, config, calls_org_codes } = body;
 
       if (!integration_id && (!name || !provider || !credentials?.username || !credentials?.password)) {
         return new Response(
@@ -56,6 +56,7 @@ Deno.serve(async (req) => {
             provider,
             api_url: api_url || null,
             config: config || null,
+            calls_org_codes: calls_org_codes || null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", integration_id);
@@ -98,6 +99,7 @@ Deno.serve(async (req) => {
               provider,
               api_url: api_url || null,
               config: config || null,
+              calls_org_codes: calls_org_codes || null,
               encrypted_credentials: credentialsJson || "{}",
             })
             .select("id")
@@ -119,6 +121,7 @@ Deno.serve(async (req) => {
             .update({ 
               api_url: api_url || null,
               config: config || null,
+              calls_org_codes: calls_org_codes || null,
             })
             .eq("id", data);
           
