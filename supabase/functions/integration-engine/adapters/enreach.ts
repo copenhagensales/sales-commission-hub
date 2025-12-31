@@ -1180,16 +1180,46 @@ export class EnreachAdapter implements DialerAdapter {
     }
   }
 
+  private parseISO8601Duration(duration: string | undefined | null): number {
+    if (!duration || typeof duration !== 'string') return 0;
+
+    // Simple parser for PT12M42S, PT6S, etc.
+    const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)(?:\.\d+)?S)?/;
+    const matches = duration.match(regex);
+    if (!matches) return 0;
+
+    const hours = parseInt(matches[1] || '0', 10);
+    const minutes = parseInt(matches[2] || '0', 10);
+    const seconds = parseInt(matches[3] || '0', 10);
+
+    return (hours * 3600) + (minutes * 60) + seconds;
+  }
+
   private mapCdrsToStandardCalls(records: any[]): StandardCall[] {
     return records.map(r => {
       // Determine status
       let status: StandardCall['status'] = 'OTHER';
-      const result = (r.Result || r.result || '').toLowerCase();
+      const result = (r.Result || r.result || r.endCause || '').toLowerCase();
+      const connected = r.connected === true || r.Connected === true;
 
-      if (result === 'answered' || result === 'connected' || r.IsAnswered) status = 'ANSWERED';
-      else if (result === 'busy') status = 'BUSY';
-      else if (result === 'noanswer' || result === 'no answer' || result === 'no_answer') status = 'NO_ANSWER';
-      else if (result === 'failed') status = 'FAILED';
+      if (connected || result === 'answered' || result === 'connected' || r.IsAnswered) {
+        status = 'ANSWERED';
+      } else if (result === 'busy') {
+        status = 'BUSY';
+      } else if (result === 'noanswer' || result === 'no answer' || result === 'no_answer' || result === 'noresponse') {
+        status = 'NO_ANSWER';
+      } else if (result === 'failed') {
+        status = 'FAILED';
+      }
+
+      // Parse durations
+      const talkTime = this.parseISO8601Duration(r.conversationDuration || r.ConversationDuration);
+      const dialTime = this.parseISO8601Duration(r.dialingDuration || r.DialingDuration);
+      const wrapTime = this.parseISO8601Duration(r.wrapUpDuration || r.WrapUpDuration);
+
+      // Fallback for direct seconds if available
+      const altDuration = Number(r.DurationTotalSeconds || r.duration || r.Duration || 0);
+      const talkSeconds = talkTime > 0 ? talkTime : altDuration;
 
       // Attempt to find an email for the agent to help with matching
       // HEROBASE/ENREACH: 'user.orgCode' almost always contains the agent email
@@ -1203,18 +1233,21 @@ export class EnreachAdapter implements DialerAdapter {
         dialerName: this.dialerName,
         startTime: r.StartTime || r.startTime || r.Time || new Date().toISOString(),
         endTime: r.EndTime || r.endTime || r.StartTime || r.startTime || new Date().toISOString(),
-        durationSeconds: Number(r.DurationTotalSeconds || r.duration || r.Duration || 0),
-        totalDurationSeconds: Number(r.DurationTotalSeconds || r.duration || r.Duration || 0),
+        durationSeconds: talkSeconds,
+        totalDurationSeconds: talkSeconds + dialTime + wrapTime,
         status: status,
         agentExternalId: String(r.user?.uniqueId || r.User?.UniqueId || r.UserId || r.agentId || 'unknown'),
         campaignExternalId: String(r.campaign?.uniqueId || r.Campaign?.UniqueId || r.CampaignId || 'unknown'),
         leadExternalId: String(r.uniqueLeadId || r.LeadUniqueId || r.LeadId || 'unknown'),
         metadata: {
           project: r.campaign?.code || r.Campaign?.Code || r.ProjectName,
-          result: r.endCause || r.Result || r.Closure,
+          result: r.endCause || r.Result || r.Closure || r.leadClosure,
           number: r.leadPhoneNumber || r.PhoneNumber || r.Phone,
           orgCode: this.orgCode,
-          agentEmail: agentEmail
+          agentEmail: agentEmail,
+          dialingDuration: dialTime,
+          wrapUpDuration: wrapTime,
+          isSale: (r.leadClosure || '').toLowerCase() === 'success' || (r.Closure || '').toLowerCase() === 'success'
         }
       };
     });
