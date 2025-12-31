@@ -1041,43 +1041,49 @@ export class EnreachAdapter implements DialerAdapter {
   async fetchCallsRange(range: { from: string; to: string }): Promise<StandardCall[]> {
     console.log(`[EnreachAdapter] Starting call fetch session with chunked approach...`);
 
-    // 1. Diagnostic/Auto-detection: Try to get OrgCode if not present
-    try {
-      const accountInfo: any = await this.get("/myaccount");
-      console.log(`[EnreachAdapter] /myaccount response: ${JSON.stringify(accountInfo)}`);
+    // Determine which org codes to use for calls
+    let orgCodesToFetch: string[] = [];
+    
+    if (this.callsOrgCodes && this.callsOrgCodes.length > 0) {
+      // Use configured multi-org codes
+      orgCodesToFetch = this.callsOrgCodes;
+      console.log(`[EnreachAdapter] Using configured callsOrgCodes: ${JSON.stringify(orgCodesToFetch)}`);
+    } else {
+      // Fallback to single orgCode or auto-detection
+      try {
+        const accountInfo: any = await this.get("/myaccount");
+        console.log(`[EnreachAdapter] /myaccount response: ${JSON.stringify(accountInfo)}`);
 
-      if (accountInfo && accountInfo.OrgCode) {
-        // Fix: If OrgCode is set to an email (common config error) or missing, use the one from API
-        if (!this.orgCode || this.orgCode.includes('@') || this.orgCode !== accountInfo.OrgCode) {
-          console.log(`[EnreachAdapter] Auto-detected correct OrgCode: ${accountInfo.OrgCode} (was configured as: ${this.orgCode})`);
-          this.orgCode = accountInfo.OrgCode;
+        if (accountInfo && accountInfo.OrgCode) {
+          if (!this.orgCode || this.orgCode.includes('@') || this.orgCode !== accountInfo.OrgCode) {
+            console.log(`[EnreachAdapter] Auto-detected correct OrgCode: ${accountInfo.OrgCode} (was configured as: ${this.orgCode})`);
+            this.orgCode = accountInfo.OrgCode;
+          }
+        }
+
+        if (this.orgCode && this.orgCode.includes('@')) {
+          console.warn(`[EnreachAdapter] OrgCode '${this.orgCode}' appears to be an email. Forcing fallback to 'Salg'.`);
+          this.orgCode = 'Salg';
+        }
+      } catch (err) {
+        console.warn(`[EnreachAdapter] Diagnostic /myaccount check failed. Continuing anyway. Error: ${err}`);
+        if (this.orgCode && this.orgCode.includes('@')) {
+          this.orgCode = 'Salg';
         }
       }
 
-      // Fallback FORCE: If it STILL contains @ (implies /myaccount also returned an email or failed to clarify), force 'Salg'
-      if (this.orgCode && this.orgCode.includes('@')) {
-        console.warn(`[EnreachAdapter] OrgCode '${this.orgCode}' appears to be an email. Forcing fallback to 'Salg' as per standard configuration.`);
-        this.orgCode = 'Salg';
-      }
-    } catch (err) {
-      console.warn(`[EnreachAdapter] Diagnostic /myaccount check failed. Continuing anyway. Error: ${err}`);
-      // Fallback on error if bad config
-      if (this.orgCode && this.orgCode.includes('@')) {
-        this.orgCode = 'Salg';
-      }
+      orgCodesToFetch = [this.orgCode || 'Salg'];
+      console.log(`[EnreachAdapter] Using single orgCode: ${orgCodesToFetch[0]}`);
     }
 
-    if (!this.orgCode) {
-      console.warn(`[EnreachAdapter] No OrgCode available. Call fetching may fail.`);
-    }
-
-    // 2. Parse date range
+    // Parse date range
     const startDate = new Date(range.from);
     const endDate = new Date(range.to);
 
     console.log(`[EnreachAdapter] Fetching calls from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    console.log(`[EnreachAdapter] Fetching from ${orgCodesToFetch.length} org code(s): ${orgCodesToFetch.join(', ')}`);
 
-    // 3. Generate all days in the range
+    // Generate all days in the range
     const days: string[] = [];
     const currentDate = new Date(startDate);
     currentDate.setHours(0, 0, 0, 0);
@@ -1087,83 +1093,83 @@ export class EnreachAdapter implements DialerAdapter {
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    console.log(`[EnreachAdapter] Processing ${days.length} day(s) in chunks of 2 hours...`);
+    console.log(`[EnreachAdapter] Processing ${days.length} day(s) in chunks of 2 hours across ${orgCodesToFetch.length} org code(s)...`);
 
-    // 4. Fetch calls for each day using chunked approach
+    // Fetch calls for each org code and deduplicate
     const allCalls: StandardCall[] = [];
     const seenIds = new Set<string>();
     let totalChunks = 0;
     let totalCallsFetched = 0;
+    const statsPerOrg: Record<string, { fetched: number; unique: number }> = {};
 
-    for (const day of days) {
-      console.log(`[EnreachAdapter] Processing day: ${day}`);
+    for (const orgCode of orgCodesToFetch) {
+      console.log(`[EnreachAdapter] ===== Processing OrgCode: ${orgCode} =====`);
+      statsPerOrg[orgCode] = { fetched: 0, unique: 0 };
 
-      // Divide each day into 2-hour chunks (12 chunks per day)
-      const chunks: { startTime: string; timeSpan: string }[] = [];
-      for (let hour = 0; hour < 24; hour += 2) {
-        const startTime = `${day}T${String(hour).padStart(2, '0')}:00:00Z`;
-        chunks.push({ startTime, timeSpan: 'PT2H' }); // PT2H = 2 hours in ISO 8601 duration format
-      }
+      for (const day of days) {
+        // Divide each day into 2-hour chunks (12 chunks per day)
+        const chunks: { startTime: string; timeSpan: string }[] = [];
+        for (let hour = 0; hour < 24; hour += 2) {
+          const startTime = `${day}T${String(hour).padStart(2, '0')}:00:00Z`;
+          chunks.push({ startTime, timeSpan: 'PT2H' });
+        }
 
-      // Fetch each chunk
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        totalChunks++;
+        // Fetch each chunk for this org code
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          totalChunks++;
 
-        console.log(`[EnreachAdapter] [Chunk ${i + 1}/${chunks.length}] Fetching calls from ${chunk.startTime}...`);
+          try {
+            const chunkCalls = await this.fetchCallsChunkWithOrg(chunk.startTime, chunk.timeSpan, orgCode);
 
-        try {
-          const chunkCalls = await this.fetchCallsChunk(chunk.startTime, chunk.timeSpan);
-
-          // Deduplicate by uniqueId
-          let newCalls = 0;
-          for (const call of chunkCalls) {
-            if (!seenIds.has(call.externalId)) {
-              seenIds.add(call.externalId);
-              allCalls.push(call);
-              newCalls++;
+            // Deduplicate by uniqueId across ALL org codes
+            let newCalls = 0;
+            for (const call of chunkCalls) {
+              if (!seenIds.has(call.externalId)) {
+                seenIds.add(call.externalId);
+                allCalls.push(call);
+                newCalls++;
+                statsPerOrg[orgCode].unique++;
+              }
             }
-          }
 
-          totalCallsFetched += chunkCalls.length;
-          console.log(`[EnreachAdapter]   -> Retrieved ${chunkCalls.length} calls (${newCalls} unique)`);
+            totalCallsFetched += chunkCalls.length;
+            statsPerOrg[orgCode].fetched += chunkCalls.length;
 
-          // Small delay to avoid rate limiting
-          if (i < chunks.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Small delay to avoid rate limiting
+            if (i < chunks.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          } catch (error) {
+            console.error(`[EnreachAdapter] Error fetching chunk ${chunk.startTime} for ${orgCode}:`, error);
           }
-        } catch (error) {
-          console.error(`[EnreachAdapter] Error fetching chunk ${chunk.startTime}:`, error);
-          // Continue with next chunk even if this one fails
         }
       }
 
-      console.log(`[EnreachAdapter] Completed day ${day}: Total unique calls so far: ${allCalls.length}`);
+      console.log(`[EnreachAdapter] Completed OrgCode ${orgCode}: Fetched ${statsPerOrg[orgCode].fetched}, Unique added: ${statsPerOrg[orgCode].unique}`);
     }
 
-    console.log(`[EnreachAdapter] ===== CALL FETCH SUMMARY =====`);
+    console.log(`[EnreachAdapter] ===== MULTI-ORG CALL FETCH SUMMARY =====`);
+    console.log(`[EnreachAdapter] Org codes processed: ${orgCodesToFetch.join(', ')}`);
     console.log(`[EnreachAdapter] Total chunks processed: ${totalChunks}`);
     console.log(`[EnreachAdapter] Total calls fetched: ${totalCallsFetched}`);
-    console.log(`[EnreachAdapter] Unique calls after deduplication: ${allCalls.length}`);
+    console.log(`[EnreachAdapter] Unique calls after cross-org deduplication: ${allCalls.length}`);
     console.log(`[EnreachAdapter] Duplicates removed: ${totalCallsFetched - allCalls.length}`);
-    console.log(`[EnreachAdapter] ==============================`);
+    for (const [org, stats] of Object.entries(statsPerOrg)) {
+      console.log(`[EnreachAdapter]   - ${org}: ${stats.fetched} fetched, ${stats.unique} unique`);
+    }
+    console.log(`[EnreachAdapter] ========================================`);
 
     return allCalls;
   }
 
   /**
-   * Helper method to fetch a single chunk of calls
+   * Helper method to fetch a single chunk of calls with a specific org code
    */
-  private async fetchCallsChunk(startTime: string, timeSpan: string): Promise<StandardCall[]> {
-
-
-    // Format startTime for Herobase API - keep ISO format (as per working reference)
+  private async fetchCallsChunkWithOrg(startTime: string, timeSpan: string, orgCode: string): Promise<StandardCall[]> {
     const formattedStartTime = startTime;
-
-    // NOTE: validation against enreach-data-app reference
-    const orgParam = this.orgCode ? this.orgCode.trim() : 'Salg';
+    const orgParam = orgCode.trim();
     const endpoint = `/calls?OrgCode=${orgParam}&StartTime=${encodeURIComponent(formattedStartTime)}&TimeSpan=${encodeURIComponent(timeSpan)}&Limit=5000`;
-    console.log(`[EnreachAdapter] Requesting URL: ${this.baseUrl}${endpoint}`);
 
     try {
       const data = await this.get(endpoint);
@@ -1171,16 +1177,23 @@ export class EnreachAdapter implements DialerAdapter {
       if (Array.isArray(data) && data.length > 0) {
         return this.mapCdrsToStandardCalls(data);
       } else if (Array.isArray(data)) {
-        // Empty array is valid, just no calls in this chunk
         return [];
       } else {
         console.warn(`[EnreachAdapter] Unexpected response format from ${endpoint}`);
         return [];
       }
     } catch (error) {
-      console.error(`[EnreachAdapter] Error fetching chunk:`, error);
+      console.error(`[EnreachAdapter] Error fetching chunk for ${orgCode}:`, error);
       return [];
     }
+  }
+
+  /**
+   * Helper method to fetch a single chunk of calls (backwards compatibility)
+   */
+  private async fetchCallsChunk(startTime: string, timeSpan: string): Promise<StandardCall[]> {
+    const orgParam = this.orgCode ? this.orgCode.trim() : 'Salg';
+    return this.fetchCallsChunkWithOrg(startTime, timeSpan, orgParam);
   }
 
   private parseISO8601Duration(duration: string | undefined | null): number {
