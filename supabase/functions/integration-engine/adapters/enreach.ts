@@ -1191,6 +1191,10 @@ export class EnreachAdapter implements DialerAdapter {
       else if (result === 'noanswer' || result === 'no answer' || result === 'no_answer') status = 'NO_ANSWER';
       else if (result === 'failed') status = 'FAILED';
 
+      // Attempt to find an email for the agent to help with matching
+      const possibleEmail = r.User?.Email || r.User?.Username || r.UserId || '';
+      const agentEmail = possibleEmail.includes('@') ? possibleEmail : undefined;
+
       // Map to StandardCall
       return {
         externalId: String(r.uniqueId || r.UniqueId || r.Id || r.id || r.CallId),
@@ -1208,7 +1212,8 @@ export class EnreachAdapter implements DialerAdapter {
           project: r.ProjectName || r.Campaign?.Name,
           result: r.Result || r.Closure,
           number: r.PhoneNumber || r.Phone,
-          orgCode: this.orgCode
+          orgCode: this.orgCode,
+          agentEmail: agentEmail
         }
       };
     });
