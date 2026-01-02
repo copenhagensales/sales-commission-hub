@@ -2,15 +2,13 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { Users, Package, DollarSign, ShoppingCart, TrendingUp, CalendarIcon } from "lucide-react";
+import { Users, Package, DollarSign, ShoppingCart, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
+import { DateRange } from "react-day-picker";
 
 interface ProductStat {
   name: string;
@@ -30,14 +28,19 @@ const formatCurrency = (value: number) =>
   new Intl.NumberFormat('da-DK', { style: 'decimal', maximumFractionDigits: 0 }).format(value) + ' DKK';
 
 export default function RelatelDashboard() {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfDay(new Date()),
+    to: new Date()
+  });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["relatel-today-dashboard", selectedDate.toDateString()],
+    queryKey: ["relatel-dashboard", dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async () => {
-      const dayStart = startOfDay(selectedDate);
-      const dayEnd = new Date(dayStart);
-      dayEnd.setDate(dayEnd.getDate() + 1);
+      if (!dateRange?.from) return { sales: [], campaignIds: [] };
+      
+      const rangeStart = startOfDay(dateRange.from);
+      const rangeEnd = dateRange.to ? new Date(startOfDay(dateRange.to)) : new Date(rangeStart);
+      rangeEnd.setDate(rangeEnd.getDate() + 1);
 
       // Find Relatel client
       const { data: clients } = await supabase
@@ -58,7 +61,7 @@ export default function RelatelDashboard() {
       const campaignIds = (campaigns || []).map(c => c.id);
       if (campaignIds.length === 0) return { sales: [], campaignIds: [] };
 
-      // Fetch today's sales with product mappings
+      // Fetch sales for date range with product mappings
       const { data: sales } = await supabase
         .from("sales")
         .select(`
@@ -81,35 +84,26 @@ export default function RelatelDashboard() {
           )
         `)
         .in("client_campaign_id", campaignIds)
-        .gte("sale_datetime", dayStart.toISOString())
-        .lt("sale_datetime", dayEnd.toISOString())
+        .gte("sale_datetime", rangeStart.toISOString())
+        .lt("sale_datetime", rangeEnd.toISOString())
         .order("sale_datetime", { ascending: false });
 
       return { sales: sales || [], campaignIds };
     },
-    refetchInterval: 30000,
+    enabled: !!dateRange?.from
   });
 
-  const { totalSales, totalRevenue, totalCommission, agentStats, productStats } = useMemo(() => {
-    if (!data?.sales?.length) {
-      return {
-        totalSales: 0,
-        totalRevenue: 0,
-        totalCommission: 0,
-        agentStats: [],
-        productStats: [],
-      };
-    }
-
+  // Process stats
+  const { agentStats, productStats, totalSales, totalRevenue, totalCommission } = useMemo(() => {
+    const agentMap = new Map<string, AgentStat>();
+    const productMap = new Map<string, ProductStat>();
     let totalSales = 0;
     let totalRevenue = 0;
     let totalCommission = 0;
-    const agentMap = new Map<string, AgentStat>();
-    const productMap = new Map<string, ProductStat>();
 
-    data.sales.forEach((sale: any) => {
+    (data?.sales || []).forEach((sale: any) => {
       const agentName = sale.agent_name?.trim() || "Ukendt";
-      
+
       (sale.sale_items || []).forEach((item: any) => {
         const product = item.products;
         
@@ -144,44 +138,36 @@ export default function RelatelDashboard() {
       });
     });
 
-    const agentStats = Array.from(agentMap.values()).sort((a, b) => b.commission - a.commission);
-    const productStats = Array.from(productMap.values()).sort((a, b) => b.quantity - a.quantity);
+    return {
+      agentStats: Array.from(agentMap.values()).sort((a, b) => b.commission - a.commission),
+      productStats: Array.from(productMap.values()).sort((a, b) => b.quantity - a.quantity),
+      totalSales,
+      totalRevenue,
+      totalCommission
+    };
+  }, [data?.sales]);
 
-    return { totalSales, totalRevenue, totalCommission, agentStats, productStats };
-  }, [data]);
+  const getSubtitle = () => {
+    if (!dateRange?.from) return "Baseret på produkt-mapping fra MG Test";
+    const isSingleDay = !dateRange.to || startOfDay(dateRange.from).getTime() === startOfDay(dateRange.to).getTime();
+    if (isSingleDay) {
+      return `Salg for ${format(dateRange.from, "d. MMMM yyyy", { locale: da })} • Baseret på produkt-mapping fra MG Test`;
+    }
+    return `Salg fra ${format(dateRange.from, "d. MMM", { locale: da })} til ${format(dateRange.to!, "d. MMM yyyy", { locale: da })} • Baseret på produkt-mapping fra MG Test`;
+  };
 
   const datePickerContent = (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className={cn(
-            "w-[240px] justify-start text-left font-normal",
-            !selectedDate && "text-muted-foreground"
-          )}
-        >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {format(selectedDate, "EEEE d. MMMM yyyy", { locale: da })}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="end">
-        <Calendar
-          mode="single"
-          selected={selectedDate}
-          onSelect={(date) => date && setSelectedDate(date)}
-          initialFocus
-          className="pointer-events-auto"
-          locale={da}
-        />
-      </PopoverContent>
-    </Popover>
+    <DashboardDateRangePicker 
+      dateRange={dateRange} 
+      onDateRangeChange={setDateRange} 
+    />
   );
 
   return (
     <div className="min-h-screen bg-background p-6">
       <DashboardHeader 
-        title="Relatel – Dagsoverblik" 
-        subtitle="Baseret på produkt-mapping fra MG Test"
+        title="Relatel – Overblik" 
+        subtitle={getSubtitle()}
         rightContent={datePickerContent}
       />
       <div className="space-y-6">
@@ -222,7 +208,7 @@ export default function RelatelDashboard() {
               {isLoading ? (
                 <p className="text-center text-muted-foreground py-8">Indlæser...</p>
               ) : agentStats.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Ingen salg registreret denne dag</p>
+                <p className="text-center text-muted-foreground py-8">Ingen salg registreret i perioden</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -233,17 +219,17 @@ export default function RelatelDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {agentStats.map((agent) => (
+                    {agentStats.map(agent => (
                       <TableRow key={agent.name}>
                         <TableCell className="font-medium">{agent.name}</TableCell>
-                        <TableCell className="text-right tabular-nums">{agent.salesCount}</TableCell>
-                        <TableCell className="text-right tabular-nums">{formatCurrency(agent.commission)}</TableCell>
+                        <TableCell className="text-right">{agent.salesCount}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(agent.commission)}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="bg-muted/50 font-semibold">
                       <TableCell>Total</TableCell>
-                      <TableCell className="text-right tabular-nums">{totalSales}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatCurrency(totalCommission)}</TableCell>
+                      <TableCell className="text-right">{totalSales}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(totalCommission)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -255,14 +241,14 @@ export default function RelatelDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Package className="h-5 w-5 text-primary" />
-                Solgte produkter
+                Produkter solgt
               </CardTitle>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <p className="text-center text-muted-foreground py-8">Indlæser...</p>
               ) : productStats.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Ingen produkter solgt denne dag</p>
+                <p className="text-center text-muted-foreground py-8">Ingen produkter solgt i perioden</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -273,23 +259,23 @@ export default function RelatelDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {productStats.map((product) => (
+                    {productStats.map(product => (
                       <TableRow key={product.name}>
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell className="text-right tabular-nums">{product.quantity}</TableCell>
-                        <TableCell className="text-right tabular-nums">{formatCurrency(product.commission)}</TableCell>
+                        <TableCell className="font-medium max-w-[200px] truncate">{product.name}</TableCell>
+                        <TableCell className="text-right">{product.quantity}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(product.commission)}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="bg-muted/50 font-semibold">
                       <TableCell>Total</TableCell>
-                      <TableCell className="text-right tabular-nums">{totalSales}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatCurrency(totalCommission)}</TableCell>
+                      <TableCell className="text-right">{totalSales}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(totalCommission)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
               )}
             </CardContent>
-        </Card>
+          </Card>
         </div>
       </div>
     </div>
