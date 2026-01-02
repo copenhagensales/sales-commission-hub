@@ -319,9 +319,8 @@ async function createClawbackTransaction(
   let totalClawback = 0;
 
   for (const item of saleItems) {
-    const qty = Number(item.quantity ?? 1) || 1;
-    const commission = Number(item.mapped_commission) || 0;
-    const lineCommission = qty * commission;
+    // mapped_commission already contains total (base × quantity), don't multiply again
+    const lineCommission = Number(item.mapped_commission) || 0;
     
     if (lineCommission > 0) {
       totalClawback += lineCommission;

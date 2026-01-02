@@ -125,7 +125,10 @@ export default function TeamOverview() {
           if (!countsAsSale) return;
 
           const qty = Number(item.quantity) || 1;
-          const commission = qty * (Number(item.products?.commission_dkk) || Number(item.mapped_commission) || 0);
+          // Use products.commission_dkk (base value) × qty, or mapped_commission directly (already includes qty)
+          const commission = item.products?.commission_dkk 
+            ? qty * Number(item.products.commission_dkk) 
+            : (Number(item.mapped_commission) || 0);
 
           const existing = clientStats.get(clientId) || { 
             sales: 0, 

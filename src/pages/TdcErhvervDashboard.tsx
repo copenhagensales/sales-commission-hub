@@ -120,9 +120,13 @@ export default function TdcErhvervDashboard() {
         if (!countsAsSale) return;
 
         const qty = Number(item.quantity) || 1;
-        // Use product mapping values (commission_dkk, revenue_dkk) from the products table
-        const itemCommission = qty * (Number(product?.commission_dkk) || Number(item.mapped_commission) || 0);
-        const itemRevenue = qty * (Number(product?.revenue_dkk) || Number(item.mapped_revenue) || 0);
+        // Use products table values (base) × qty, or mapped values directly (already includes qty)
+        const itemCommission = product?.commission_dkk 
+          ? qty * Number(product.commission_dkk) 
+          : (Number(item.mapped_commission) || 0);
+        const itemRevenue = product?.revenue_dkk 
+          ? qty * Number(product.revenue_dkk) 
+          : (Number(item.mapped_revenue) || 0);
         const productName = product?.name || "Ukendt produkt";
 
         // Update totals

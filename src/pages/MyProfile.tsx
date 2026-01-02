@@ -647,11 +647,12 @@ export default function MyProfile() {
           console.log("[MyProfile Commission Debug] Period sales data:", periodSales);
           
           // Use period sales for daily breakdown (same as period query)
-          // Build daily commission map from period sales - multiply by quantity
+          // Build daily commission map from period sales
+          // NOTE: mapped_commission already contains total (base × quantity), don't multiply again
           periodSales?.forEach(sale => {
             const dateKey = sale.sale_datetime.split('T')[0];
             const saleCommission = sale.sale_items?.reduce((sum, item) => 
-              sum + ((item.mapped_commission || 0) * (item.quantity || 1)), 0) || 0;
+              sum + (item.mapped_commission || 0), 0) || 0;
             dailyCommissionMap.set(dateKey, (dailyCommissionMap.get(dateKey) || 0) + saleCommission);
           });
           
@@ -670,16 +671,16 @@ export default function MyProfile() {
             .gte("sale_datetime", todayStart)
             .lte("sale_datetime", todayEnd);
           
-          // Calculate totals - multiply by quantity for correct commission
+          // Calculate totals - mapped_commission already contains total (base × quantity)
           periodCommission += periodSales?.reduce((total, sale) => {
             return total + (sale.sale_items?.reduce((sum, item) => {
-              return sum + ((item.mapped_commission || 0) * (item.quantity || 1));
+              return sum + (item.mapped_commission || 0);
             }, 0) || 0);
           }, 0) || 0;
           
           todayCommission += todaySales?.reduce((total, sale) => {
             return total + (sale.sale_items?.reduce((sum, item) => {
-              return sum + ((item.mapped_commission || 0) * (item.quantity || 1));
+              return sum + (item.mapped_commission || 0);
             }, 0) || 0);
           }, 0) || 0;
           
