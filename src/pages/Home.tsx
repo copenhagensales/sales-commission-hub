@@ -511,21 +511,20 @@ const Home = () => {
         .gte("sale_datetime", todayStart)
         .lte("sale_datetime", todayEnd);
       
-      // Calculate totals
-      // mapped_commission is already pre-multiplied by quantity, don't multiply again
+      // Calculate totals - multiply by quantity for correct commission
       const periodCommission = periodSales?.reduce((total, sale) => {
         return total + (sale.sale_items?.reduce((sum, item) => {
-          return sum + (item.mapped_commission || 0);
+          return sum + ((item.mapped_commission || 0) * (item.quantity || 1));
         }, 0) || 0);
       }, 0) || 0;
       
       const periodSalesCount = periodSales?.length || 0;
       const todaySalesCount = todaySales?.length || 0;
       
-      // mapped_commission is already pre-multiplied by quantity, don't multiply again
+      // Multiply by quantity for correct commission
       const todayCommission = todaySales?.reduce((total, sale) => {
         return total + (sale.sale_items?.reduce((sum, item) => {
-          return sum + (item.mapped_commission || 0);
+          return sum + ((item.mapped_commission || 0) * (item.quantity || 1));
         }, 0) || 0);
       }, 0) || 0;
       
