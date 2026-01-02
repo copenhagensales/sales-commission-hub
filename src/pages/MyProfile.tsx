@@ -1506,50 +1506,6 @@ export default function MyProfile() {
                     </div>
                   </CardContent>
                 </Card>
-                {/* Vagter i lønperiode */}
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-full bg-green-500/10">
-                            <Briefcase className="h-5 w-5 text-green-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">Vagter i lønperiode</p>
-                            <p className="text-2xl font-bold">{shiftStats.actualShifts}</p>
-                          </div>
-                        </div>
-                        <div className={`flex items-center gap-1 text-sm font-medium ${
-                          shiftStats.shiftsPercentage >= 100 ? 'text-green-600' : 
-                          shiftStats.shiftsPercentage >= 80 ? 'text-yellow-600' : 'text-red-600'
-                        }`}>
-                          {shiftStats.shiftsPercentage >= 100 ? (
-                            <TrendingUp className="h-4 w-4" />
-                          ) : (
-                            <TrendingDown className="h-4 w-4" />
-                          )}
-                          <span>{Math.round(shiftStats.shiftsPercentage)}%</span>
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <Progress 
-                          value={Math.min(shiftStats.shiftsPercentage, 100)} 
-                          className={`h-2 ${
-                            shiftStats.shiftsPercentage >= 100 ? '[&>div]:bg-green-500' : 
-                            shiftStats.shiftsPercentage >= 80 ? '[&>div]:bg-yellow-500' : '[&>div]:bg-red-500'
-                          }`}
-                        />
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>af {shiftStats.expectedShiftsToDate} forventet</span>
-                          <span className={shiftStats.shiftsDifference >= 0 ? 'text-green-600' : 'text-red-600'}>
-                            {shiftStats.shiftsDifference >= 0 ? '+' : ''}{shiftStats.shiftsDifference}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
                 <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
