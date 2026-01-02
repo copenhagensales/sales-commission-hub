@@ -39,7 +39,7 @@ import { toast } from "sonner";
 const Home = () => {
   const { user } = useAuth();
   const { canEditHomeGoals: realCanEditHomeGoals } = usePermissions();
-  const { isPreviewMode, previewPermissions } = useRolePreview();
+  const { isPreviewMode, previewPermissions, previewEmployee } = useRolePreview();
   
   // In preview mode, check preview permissions for canEditHomeGoals
   const canEditHomeGoals = isPreviewMode 
@@ -62,10 +62,21 @@ const Home = () => {
     try { localStorage.setItem("home-show-h2h", show ? "true" : "false"); } catch {}
   };
   
-  // Fetch current employee data
+  // Fetch current employee data (or preview employee if in preview mode)
   const { data: employee } = useQuery({
-    queryKey: ["home-employee", user?.email],
+    queryKey: ["home-employee", isPreviewMode, previewEmployee?.id, user?.email],
     queryFn: async () => {
+      // If in preview mode, fetch the preview employee's data
+      if (isPreviewMode && previewEmployee?.id) {
+        const { data } = await supabase
+          .from("employee_master_data")
+          .select("id, first_name, last_name, job_title, team_id, employment_start_date")
+          .eq("id", previewEmployee.id)
+          .maybeSingle();
+        return data;
+      }
+      
+      // Normal flow: fetch current user's data
       if (!user?.email) return null;
       const lowerEmail = user.email.toLowerCase();
       const { data } = await supabase
@@ -76,7 +87,7 @@ const Home = () => {
         .maybeSingle();
       return data;
     },
-    enabled: !!user?.email,
+    enabled: !!(user?.email || (isPreviewMode && previewEmployee?.id)),
   });
 
   // Fetch upcoming birthdays and anniversaries (next 14 days)
