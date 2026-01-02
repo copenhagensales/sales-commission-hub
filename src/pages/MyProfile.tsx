@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useRolePreview } from "@/contexts/RolePreviewContext";
 
 // Read-only display field
 function DisplayField({ value, displayValue }: { value: string | number | null | undefined; displayValue?: string | null }) {
@@ -110,11 +111,40 @@ export default function MyProfile() {
   const queryClient = useQueryClient();
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
   const { hasConsent, isLoading: consentLoading } = useHasDataProcessingConsent();
+  const { isPreviewMode, previewEmployee } = useRolePreview();
 
-  // Fetch current user's employee data
+  // Fetch current user's employee data (or preview employee if in preview mode)
   const { data: employee, isLoading } = useQuery({
-    queryKey: ["my-profile"],
+    queryKey: ["my-profile", isPreviewMode, previewEmployee?.id],
     queryFn: async () => {
+      // If in preview mode, fetch the preview employee's data
+      if (isPreviewMode && previewEmployee?.id) {
+        const { data, error } = await supabase
+          .from("employee_master_data")
+          .select("*")
+          .eq("id", previewEmployee.id)
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) return null;
+        
+        // Fetch team names for this employee
+        const { data: teamMemberships } = await supabase
+          .from("team_members")
+          .select("team:teams(name)")
+          .eq("employee_id", data.id);
+        
+        const teamNames = (teamMemberships || [])
+          .map((tm: { team: { name: string } | null }) => tm.team?.name)
+          .filter(Boolean)
+          .join(", ");
+        
+        return {
+          ...data,
+          department: teamNames || data.department,
+        };
+      }
+
+      // Normal flow: fetch current user's data
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return null;
 
@@ -140,7 +170,7 @@ export default function MyProfile() {
       
       return {
         ...data,
-        department: teamNames || data.department, // Use team names, fallback to department
+        department: teamNames || data.department,
       };
     },
   });
