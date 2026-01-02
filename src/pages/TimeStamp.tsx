@@ -26,7 +26,8 @@ export default function TimeStamp() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [elapsedTime, setElapsedTime] = useState("");
   
-  const isHourly = employee?.salary_type !== "fixed";
+  const isFixedSalary = employee?.salary_type === "fixed";
+  const isHourly = !isFixedSalary;
 
   useEffect(() => {
     const interval = setInterval(() => {

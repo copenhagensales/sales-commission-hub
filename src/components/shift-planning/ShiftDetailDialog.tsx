@@ -57,22 +57,22 @@ export function ShiftDetailDialog({
   const clockedOutBySystem = timeStamp && !timeStamp.clock_out && timeStamp.effective_clock_out;
 
   // Calculate salary estimate
+  // Don't show salary estimates for fixed-salary employees
   const getSalaryEstimate = () => {
     if (!employee.salary_type || !employee.salary_amount) return null;
     
-    if (employee.salary_type === "Timeløn") {
+    // Fixed salary employees don't get hourly-based salary estimates in dashboards
+    if (employee.salary_type === "fixed" || employee.salary_type === "Månedsløn") {
+      return null;
+    }
+    
+    if (employee.salary_type === "Timeløn" || employee.salary_type === "hourly") {
       const hours = timeStamp?.effective_hours || (durationMinutes - (timeStamp?.break_minutes || 0)) / 60;
       return {
         type: "hourly",
         hourlyRate: employee.salary_amount,
         estimatedPay: Math.round(hours * employee.salary_amount),
         hours: hours.toFixed(2),
-      };
-    } else if (employee.salary_type === "Månedsløn") {
-      return {
-        type: "monthly",
-        monthlyRate: employee.salary_amount,
-        estimatedPay: null,
       };
     }
     return null;
@@ -207,7 +207,7 @@ export function ShiftDetailDialog({
             </div>
           )}
 
-          {/* Salary Info */}
+          {/* Salary Info - only shown for hourly employees */}
           {salaryInfo && (
             <div className="space-y-2">
               <h4 className="text-sm font-medium flex items-center gap-2">
@@ -215,31 +215,24 @@ export function ShiftDetailDialog({
                 Lønoplysninger
               </h4>
               <div className="bg-muted/30 rounded-lg p-3">
-                {salaryInfo.type === "hourly" ? (
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Timeløn</span>
-                      <span>{salaryInfo.hourlyRate} kr/time</span>
-                    </div>
-                    {timeStamp && (
-                      <>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Timer</span>
-                          <span>{salaryInfo.hours} timer</span>
-                        </div>
-                        <div className="border-t pt-1 mt-1 flex justify-between font-medium">
-                          <span>Estimeret løn</span>
-                          <span className="text-primary">{salaryInfo.estimatedPay} kr</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : (
+                <div className="space-y-1">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Månedsløn</span>
-                    <span>{salaryInfo.monthlyRate?.toLocaleString("da-DK")} kr/måned</span>
+                    <span className="text-muted-foreground">Timeløn</span>
+                    <span>{salaryInfo.hourlyRate} kr/time</span>
                   </div>
-                )}
+                  {timeStamp && (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Timer</span>
+                        <span>{salaryInfo.hours} timer</span>
+                      </div>
+                      <div className="border-t pt-1 mt-1 flex justify-between font-medium">
+                        <span>Estimeret løn</span>
+                        <span className="text-primary">{salaryInfo.estimatedPay} kr</span>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           )}

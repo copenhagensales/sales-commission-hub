@@ -266,8 +266,10 @@ export default function MySchedule() {
                           const effectiveHours = timeStamp.effective_hours ?? null;
                           
                           // Calculate daily pay if we have effective hours and salary amount
+                          // Only show for hourly employees, not fixed salary
+                          const isFixedSalary = employee?.salary_type === 'fixed';
                           const hourlyRate = employee?.salary_amount || 0;
-                          const dailyPay = effectiveHours != null && hourlyRate > 0 
+                          const dailyPay = !isFixedSalary && effectiveHours != null && hourlyRate > 0 
                             ? effectiveHours * hourlyRate 
                             : null;
                           
