@@ -6,6 +6,7 @@ import { Users, Search, Mail, ExternalLink } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useMemo } from "react";
+import { filterExcludedEmails } from "@/lib/excluded-domains";
 import {
   Table,
   TableBody,
@@ -56,7 +57,10 @@ export default function Agents() {
   const filteredAgents = useMemo(() => {
     if (!agents) return [];
 
-    return agents.filter((agent) => {
+    // First filter out excluded email domains
+    const nonExcludedAgents = filterExcludedEmails(agents);
+
+    return nonExcludedAgents.filter((agent) => {
       const matchesSearch =
         agent.name.toLowerCase().includes(search.toLowerCase()) ||
         agent.email.toLowerCase().includes(search.toLowerCase()) ||
@@ -76,10 +80,12 @@ export default function Agents() {
     });
   }, [agents, search, statusFilter, sourceFilter]);
 
-  const activeCount = agents?.filter((a) => a.is_active).length ?? 0;
-  const inactiveCount = agents?.filter((a) => !a.is_active).length ?? 0;
-  const adversusCount = agents?.filter((a) => a.source === "adversus").length ?? 0;
-  const enreachCount = agents?.filter((a) => a.source === "enreach").length ?? 0;
+  // Use filtered agents for stats (excluding internal domains)
+  const visibleAgents = useMemo(() => filterExcludedEmails(agents || []), [agents]);
+  const activeCount = visibleAgents.filter((a) => a.is_active).length;
+  const inactiveCount = visibleAgents.filter((a) => !a.is_active).length;
+  const adversusCount = visibleAgents.filter((a) => a.source === "adversus").length;
+  const enreachCount = visibleAgents.filter((a) => a.source === "enreach").length;
 
   return (
     <MainLayout>
@@ -99,7 +105,7 @@ export default function Agents() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{agents?.length ?? 0}</div>
+              <div className="text-2xl font-bold">{visibleAgents.length}</div>
             </CardContent>
           </Card>
           <Card>
