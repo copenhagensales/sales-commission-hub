@@ -2611,6 +2611,44 @@ export type Database = {
           },
         ]
       }
+      employee_sales_goals: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          period_end: string
+          period_start: string
+          target_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          period_end: string
+          period_start: string
+          target_amount: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          target_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_sales_goals_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       extra_work: {
         Row: {
           approved_at: string | null

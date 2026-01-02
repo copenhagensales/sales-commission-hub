@@ -19,6 +19,7 @@ import { da } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
+import { SalesGoalTracker } from "@/components/my-profile/SalesGoalTracker";
 
 // Read-only display field
 function DisplayField({ value, displayValue }: { value: string | number | null | undefined; displayValue?: string | null }) {
@@ -1689,6 +1690,24 @@ export default function MyProfile() {
                   </Card>
                 )}
               </div>
+
+              {/* Sales Goal Tracker - only for provision employees */}
+              {employee?.salary_type === 'provision' && employee?.id && (
+                <SalesGoalTracker
+                  employeeId={employee.id}
+                  payrollPeriod={payrollPeriod}
+                  commissionStats={{
+                    periodTotal: commissionStats?.periodCommission || 0,
+                    periodSales: commissionStats?.periodSalesCount || 0,
+                    monthTotal: commissionStats?.periodCommission || 0,
+                    monthSales: commissionStats?.periodSalesCount || 0,
+                    todayTotal: commissionStats?.todayCommission || 0,
+                    todaySales: commissionStats?.todaySalesCount || 0,
+                  }}
+                  absences={absences}
+                  danishHolidays={danishHolidays || []}
+                />
+              )}
 
               {/* Payroll Period Schedule */}
               <Card>
