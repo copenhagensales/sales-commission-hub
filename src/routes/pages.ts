@@ -55,6 +55,7 @@ export const PulseSurvey = lazyPage(() => import("@/pages/PulseSurvey"));
 export const PulseSurveyResults = lazyPage(() => import("@/pages/PulseSurveyResults"));
 export const PublicPulseSurvey = lazyPage(() => import("@/pages/PublicPulseSurvey"));
 export const MyProfile = lazyPage(() => import("@/pages/MyProfile"));
+export const MyGoals = lazyPage(() => import("@/pages/MyGoals"));
 export const CareerWishes = lazyPage(() => import("@/pages/CareerWishes"));
 export const CareerWishesOverview = lazyPage(() => import("@/pages/CareerWishesOverview"));
 export const CarQuiz = lazyPage(() => import("@/pages/CarQuiz"));
