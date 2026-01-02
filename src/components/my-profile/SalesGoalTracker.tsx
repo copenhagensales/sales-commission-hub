@@ -40,6 +40,7 @@ import { SalesRecords } from "./SalesRecords";
 import { SalesAvatar } from "./SalesAvatar";
 import { SalesMotivationalQuote } from "./SalesMotivationalQuote";
 import { SalesProgressComparison } from "./SalesProgressComparison";
+import { SalesExtraEffortSuggestions } from "./SalesExtraEffortSuggestions";
 import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
 
 interface SalesGoalTrackerProps {
@@ -313,6 +314,15 @@ export function SalesGoalTracker({
       ? Math.min(100, (currentAmount / targetAmount) * 100) 
       : 0;
 
+    // Hourly rate calculation (assuming 8-hour workday)
+    const hourlyRate = actualDailyAvg / 8;
+    
+    // Performance status
+    const isAhead = currentAmount >= expectedByNow;
+    const isOnTrack = Math.abs(trendPercent) < 10;
+    const performanceStatus: "ahead" | "on_track" | "behind" = 
+      isAhead ? "ahead" : isOnTrack ? "on_track" : "behind";
+
     return {
       targetAmount,
       currentAmount,
@@ -327,8 +337,10 @@ export function SalesGoalTracker({
       sprintTarget,
       trendPercent,
       progressPercent,
-      isAhead: currentAmount >= expectedByNow,
-      isOnTrack: Math.abs(trendPercent) < 10,
+      hourlyRate,
+      performanceStatus,
+      isAhead,
+      isOnTrack,
       willHitGoal: projectedFinal >= targetAmount,
     };
   }, [currentGoal, commissionStats.periodTotal, workingDaysData]);
@@ -552,6 +564,18 @@ export function SalesGoalTracker({
           )}
         </CardContent>
       </Card>
+
+      {/* Extra Effort Suggestions */}
+      {currentGoal && kpis.hourlyRate > 0 && (
+        <SalesExtraEffortSuggestions
+          hourlyRate={kpis.hourlyRate}
+          amountRemaining={kpis.amountRemaining}
+          currentAmount={kpis.currentAmount}
+          targetAmount={kpis.targetAmount}
+          status={kpis.performanceStatus}
+          bestDayRecord={gamification.bestDayRecord?.record_value}
+        />
+      )}
 
       {/* Motivational Quote */}
       {currentGoal && (
