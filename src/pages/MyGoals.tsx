@@ -46,7 +46,7 @@ export default function MyGoals() {
       const { data } = await (supabase as any)
         .from("employee_master_data")
         .select("id, salary_type")
-        .eq("user_id", currentUser.id)
+        .eq("auth_user_id", currentUser.id)
         .single();
       return data as EmployeeData | null;
     },
