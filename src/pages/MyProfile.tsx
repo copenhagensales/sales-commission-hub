@@ -8,13 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star } from "lucide-react";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp } from "lucide-react";
 import { GdprSettingsCard } from "@/components/gdpr/GdprSettingsCard";
 import { GdprConsentDialog } from "@/components/gdpr/GdprConsentDialog";
 import { useHasDataProcessingConsent } from "@/hooks/useGdpr";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
 import { Progress } from "@/components/ui/progress";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -334,6 +334,139 @@ export default function MyProfile() {
       return data;
     },
     enabled: !!employee?.id,
+  });
+
+  // Fetch commission/provision stats for provision-based employees
+  const { data: commissionStats } = useQuery({
+    queryKey: ["my-commission-stats", employee?.id, employee?.salary_type, employee?.job_title],
+    queryFn: async () => {
+      if (!employee?.id) return null;
+      
+      const now = new Date();
+      const monthStart = startOfMonth(now).toISOString();
+      const monthEnd = endOfMonth(now).toISOString();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+      
+      let monthlyCommission = 0;
+      let todayCommission = 0;
+      let monthlySalesCount = 0;
+      let todaySalesCount = 0;
+
+      // Check for agent mappings (for dialer-based sales)
+      const { data: mappings } = await supabase
+        .from("employee_agent_mapping")
+        .select("agent_id, agents(name)")
+        .eq("employee_id", employee.id);
+      
+      if (mappings && mappings.length > 0) {
+        const agentNames = mappings.map(m => (m.agents as { name: string } | null)?.name).filter(Boolean);
+        
+        if (agentNames.length > 0) {
+          // Fetch monthly sales for this employee's agents
+          const { data: monthlySales } = await supabase
+            .from("sales")
+            .select(`
+              id,
+              sale_items (
+                id,
+                mapped_commission
+              )
+            `)
+            .in("agent_name", agentNames)
+            .gte("sale_datetime", monthStart)
+            .lte("sale_datetime", monthEnd);
+          
+          // Fetch today's sales
+          const { data: todaySales } = await supabase
+            .from("sales")
+            .select(`
+              id,
+              sale_items (
+                id,
+                mapped_commission
+              )
+            `)
+            .in("agent_name", agentNames)
+            .gte("sale_datetime", todayStart)
+            .lte("sale_datetime", todayEnd);
+          
+          // Calculate totals (mapped_commission is already pre-multiplied by quantity)
+          monthlyCommission += monthlySales?.reduce((total, sale) => {
+            return total + (sale.sale_items?.reduce((sum, item) => {
+              return sum + (item.mapped_commission || 0);
+            }, 0) || 0);
+          }, 0) || 0;
+          
+          todayCommission += todaySales?.reduce((total, sale) => {
+            return total + (sale.sale_items?.reduce((sum, item) => {
+              return sum + (item.mapped_commission || 0);
+            }, 0) || 0);
+          }, 0) || 0;
+          
+          monthlySalesCount += monthlySales?.length || 0;
+          todaySalesCount += todaySales?.length || 0;
+        }
+      }
+
+      // Also check fieldmarketing_sales (for fieldmarketing employees)
+      // fieldmarketing_sales uses seller_id, registered_at, and product_name (not product_id)
+      const { data: fmMonthlySales } = await supabase
+        .from("fieldmarketing_sales")
+        .select("id, product_name")
+        .eq("seller_id", employee.id)
+        .gte("registered_at", monthStart)
+        .lte("registered_at", monthEnd);
+      
+      const { data: fmTodaySales } = await supabase
+        .from("fieldmarketing_sales")
+        .select("id, product_name")
+        .eq("seller_id", employee.id)
+        .gte("registered_at", todayStart)
+        .lte("registered_at", todayEnd);
+      
+      // Fetch products to get commission values for fieldmarketing sales
+      if ((fmMonthlySales && fmMonthlySales.length > 0) || (fmTodaySales && fmTodaySales.length > 0)) {
+        const allProductNames = [
+          ...(fmMonthlySales || []).map(s => s.product_name),
+          ...(fmTodaySales || []).map(s => s.product_name)
+        ].filter(Boolean);
+        
+        const uniqueProductNames = [...new Set(allProductNames)];
+        
+        if (uniqueProductNames.length > 0) {
+          const { data: products } = await supabase
+            .from("products")
+            .select("name, commission_dkk")
+            .in("name", uniqueProductNames);
+          
+          const productCommissionMap = new Map(
+            (products || []).map(p => [p.name, p.commission_dkk || 0])
+          );
+          
+          // Add fieldmarketing commission
+          monthlyCommission += fmMonthlySales?.reduce((total, sale) => {
+            return total + (productCommissionMap.get(sale.product_name) || 0);
+          }, 0) || 0;
+          
+          todayCommission += fmTodaySales?.reduce((total, sale) => {
+            return total + (productCommissionMap.get(sale.product_name) || 0);
+          }, 0) || 0;
+        }
+      }
+      
+      monthlySalesCount += fmMonthlySales?.length || 0;
+      todaySalesCount += fmTodaySales?.length || 0;
+
+      return {
+        monthlyCommission,
+        todayCommission,
+        monthlySalesCount,
+        todaySalesCount,
+        hasData: monthlyCommission > 0 || monthlySalesCount > 0 || todaySalesCount > 0
+      };
+    },
+    enabled: !!employee?.id && employee?.salary_type === 'provision',
   });
 
   // Fetch Danish holidays for payroll calculations
@@ -1292,7 +1425,51 @@ export default function MyProfile() {
                     </div>
                   </CardContent>
                 </Card>
-                {shiftStats.isFixedSalary ? (
+                {employee?.salary_type === 'provision' ? (
+                  // Commission-based salary display
+                  <>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-emerald-500/10">
+                            <TrendingUp className="h-5 w-5 text-emerald-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              Provision denne måned
+                            </p>
+                            <p className="text-2xl font-bold">
+                              {(commissionStats?.monthlyCommission || 0).toLocaleString('da-DK')} kr
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {commissionStats?.monthlySalesCount || 0} salg
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-primary/10">
+                            <Wallet className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              Provision i dag
+                            </p>
+                            <p className="text-2xl font-bold">
+                              {(commissionStats?.todayCommission || 0).toLocaleString('da-DK')} kr
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {commissionStats?.todaySalesCount || 0} salg
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                ) : shiftStats.isFixedSalary ? (
                   <>
                     <Card>
                       <CardContent className="pt-6">
