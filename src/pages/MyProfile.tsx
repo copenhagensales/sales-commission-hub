@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp } from "lucide-react";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star, TrendingUp, TrendingDown, Target } from "lucide-react";
 import { GdprSettingsCard } from "@/components/gdpr/GdprSettingsCard";
 import { GdprConsentDialog } from "@/components/gdpr/GdprConsentDialog";
 import { useHasDataProcessingConsent } from "@/hooks/useGdpr";
@@ -768,55 +768,100 @@ export default function MyProfile() {
     enabled: !!employee?.id && employee?.salary_type === 'provision',
   });
 
-  // Calculate shift statistics using expected schedule
+  // Calculate shift statistics using payroll period (15th-14th)
   const shiftStats = useMemo(() => {
     const salaryType = employee?.salary_type;
     const salaryAmount = employee?.salary_amount || 0;
     const isFixedSalary = salaryType === 'fixed';
+    const weeklyHours = employee?.weekly_hours || 37;
+    const dailyExpectedHours = weeklyHours / 5;
     
-    const workDays = expectedSchedule.filter(d => d.status === "work");
-    const totalHoursThisMonth = workDays.reduce((sum, d) => sum + d.hours, 0);
-    
-    // For fixed salary: show monthly salary, not calculated from hours
-    // For hourly: calculate based on hours worked
-    const hourlyRate = isFixedSalary ? 0 : salaryAmount;
-    const totalSalaryThisMonth = isFixedSalary ? salaryAmount : (totalHoursThisMonth * hourlyRate);
-    
-    // Calculate earned salary in current payroll period (for fixed salary)
-    // Proportional: (workdays passed / total workdays) * monthly salary
-    const earnedInPeriod = isFixedSalary && payrollPeriod.totalWorkdays > 0
-      ? (payrollPeriod.workdaysPassed / payrollPeriod.totalWorkdays) * salaryAmount
-      : 0;
-    
-    // Calculate vacation pay (12.5% of earned salary for SH/Feriepengeordning)
-    const vacationPayRate = 0.125; // 12.5%
-    const earnedVacationPay = earnedInPeriod * vacationPayRate;
-    
-    // Booking assignments stats (for fieldmarketing)
     const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthBookings = bookingAssignments.filter(b => new Date(b.date) >= monthStart);
-    const totalBookingHours = monthBookings.reduce((sum, b) => {
+    
+    // Filter time stamps and booking assignments within payroll period
+    const periodTimeStamps = deduplicatedTimeStamps.filter(stamp => {
+      const stampDate = new Date(stamp.clock_in);
+      return stampDate >= payrollPeriod.start && stampDate <= payrollPeriod.end;
+    });
+    
+    const periodBookings = bookingAssignments.filter(b => {
+      const bookingDate = new Date(b.date);
+      return bookingDate >= payrollPeriod.start && bookingDate <= payrollPeriod.end;
+    });
+    
+    // Calculate actual hours from time stamps
+    const actualStampHours = periodTimeStamps.reduce((sum, stamp) => {
+      if (stamp.clock_in && stamp.clock_out) {
+        const clockIn = new Date(stamp.clock_in);
+        const clockOut = new Date(stamp.clock_out);
+        const hours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+        return sum + hours;
+      }
+      return sum;
+    }, 0);
+    
+    // Calculate actual hours from bookings
+    const actualBookingHours = periodBookings.reduce((sum, b) => {
       const start = new Date(`1970-01-01T${b.start_time}`);
       const end = new Date(`1970-01-01T${b.end_time}`);
       const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
       return sum + hours;
     }, 0);
-    const totalBookingSalary = isFixedSalary ? 0 : (totalBookingHours * hourlyRate);
+    
+    const totalActualHours = actualStampHours + actualBookingHours;
+    const totalActualShifts = periodTimeStamps.length + periodBookings.length;
+    
+    // Calculate expected hours and shifts to date
+    const expectedHoursToDate = payrollPeriod.workdaysPassed * dailyExpectedHours;
+    const expectedShiftsToDate = payrollPeriod.workdaysPassed;
+    
+    // Calculate expected for full period
+    const expectedHoursTotal = payrollPeriod.totalWorkdays * dailyExpectedHours;
+    const expectedShiftsTotal = payrollPeriod.totalWorkdays;
+    
+    // Calculate percentage and difference
+    const hoursPercentage = expectedHoursToDate > 0 ? (totalActualHours / expectedHoursToDate) * 100 : 100;
+    const shiftsPercentage = expectedShiftsToDate > 0 ? (totalActualShifts / expectedShiftsToDate) * 100 : 100;
+    const hoursDifference = totalActualHours - expectedHoursToDate;
+    const shiftsDifference = totalActualShifts - expectedShiftsToDate;
+    
+    // For fixed salary: show monthly salary, not calculated from hours
+    // For hourly: calculate based on hours worked
+    const hourlyRate = isFixedSalary ? 0 : salaryAmount;
+    
+    // Calculate earned salary in current payroll period (for fixed salary)
+    const earnedInPeriod = isFixedSalary && payrollPeriod.totalWorkdays > 0
+      ? (payrollPeriod.workdaysPassed / payrollPeriod.totalWorkdays) * salaryAmount
+      : 0;
+    
+    // Calculate vacation pay (12.5% of earned salary)
+    const vacationPayRate = 0.125;
+    const earnedVacationPay = earnedInPeriod * vacationPayRate;
     
     return {
-      stampCount: workDays.length,
-      stampHours: totalHoursThisMonth,
-      stampSalary: totalSalaryThisMonth,
-      bookingCount: monthBookings.length,
-      bookingHours: totalBookingHours,
-      bookingSalary: totalBookingSalary,
+      // Payroll period stats
+      actualHours: totalActualHours,
+      actualShifts: totalActualShifts,
+      expectedHoursToDate,
+      expectedShiftsToDate,
+      expectedHoursTotal,
+      expectedShiftsTotal,
+      hoursPercentage,
+      shiftsPercentage,
+      hoursDifference,
+      shiftsDifference,
+      // Legacy (calendar month) - keep for compatibility
+      stampCount: periodTimeStamps.length,
+      stampHours: actualStampHours,
+      bookingCount: periodBookings.length,
+      bookingHours: actualBookingHours,
+      // Financial
       hourlyRate,
       isFixedSalary,
       earnedInPeriod,
       earnedVacationPay,
     };
-  }, [expectedSchedule, bookingAssignments, employee?.salary_amount, employee?.salary_type, payrollPeriod]);
+  }, [deduplicatedTimeStamps, bookingAssignments, employee?.salary_amount, employee?.salary_type, employee?.weekly_hours, payrollPeriod]);
 
   // Calculate absence statistics
   const absenceStats = useMemo(() => {
@@ -1424,28 +1469,90 @@ export default function MyProfile() {
             <div className="space-y-6">
               {/* Stats Cards */}
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                {/* Timer i lønperiode */}
                 <Card>
                   <CardContent className="pt-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-full bg-primary/10">
-                        <Clock className="h-5 w-5 text-primary" />
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-primary/10">
+                            <Clock className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Timer i lønperiode</p>
+                            <p className="text-2xl font-bold">{shiftStats.actualHours.toFixed(1)}</p>
+                          </div>
+                        </div>
+                        <div className={`flex items-center gap-1 text-sm font-medium ${
+                          shiftStats.hoursPercentage >= 100 ? 'text-green-600' : 
+                          shiftStats.hoursPercentage >= 80 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {shiftStats.hoursPercentage >= 100 ? (
+                            <TrendingUp className="h-4 w-4" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4" />
+                          )}
+                          <span>{Math.round(shiftStats.hoursPercentage)}%</span>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Timer denne måned</p>
-                        <p className="text-2xl font-bold">{(shiftStats.stampHours + shiftStats.bookingHours).toFixed(1)}</p>
+                      <div className="space-y-1">
+                        <Progress 
+                          value={Math.min(shiftStats.hoursPercentage, 100)} 
+                          className={`h-2 ${
+                            shiftStats.hoursPercentage >= 100 ? '[&>div]:bg-green-500' : 
+                            shiftStats.hoursPercentage >= 80 ? '[&>div]:bg-yellow-500' : '[&>div]:bg-red-500'
+                          }`}
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>af {shiftStats.expectedHoursToDate.toFixed(1)} forventet</span>
+                          <span className={shiftStats.hoursDifference >= 0 ? 'text-green-600' : 'text-red-600'}>
+                            {shiftStats.hoursDifference >= 0 ? '+' : ''}{shiftStats.hoursDifference.toFixed(1)}t
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
+                {/* Vagter i lønperiode */}
                 <Card>
                   <CardContent className="pt-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-full bg-green-500/10">
-                        <Briefcase className="h-5 w-5 text-green-600" />
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-green-500/10">
+                            <Briefcase className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Vagter i lønperiode</p>
+                            <p className="text-2xl font-bold">{shiftStats.actualShifts}</p>
+                          </div>
+                        </div>
+                        <div className={`flex items-center gap-1 text-sm font-medium ${
+                          shiftStats.shiftsPercentage >= 100 ? 'text-green-600' : 
+                          shiftStats.shiftsPercentage >= 80 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {shiftStats.shiftsPercentage >= 100 ? (
+                            <TrendingUp className="h-4 w-4" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4" />
+                          )}
+                          <span>{Math.round(shiftStats.shiftsPercentage)}%</span>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Vagter denne måned</p>
-                        <p className="text-2xl font-bold">{shiftStats.stampCount + shiftStats.bookingCount}</p>
+                      <div className="space-y-1">
+                        <Progress 
+                          value={Math.min(shiftStats.shiftsPercentage, 100)} 
+                          className={`h-2 ${
+                            shiftStats.shiftsPercentage >= 100 ? '[&>div]:bg-green-500' : 
+                            shiftStats.shiftsPercentage >= 80 ? '[&>div]:bg-yellow-500' : '[&>div]:bg-red-500'
+                          }`}
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>af {shiftStats.expectedShiftsToDate} forventet</span>
+                          <span className={shiftStats.shiftsDifference >= 0 ? 'text-green-600' : 'text-red-600'}>
+                            {shiftStats.shiftsDifference >= 0 ? '+' : ''}{shiftStats.shiftsDifference}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -1568,9 +1675,14 @@ export default function MyProfile() {
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">
-                            Løn denne måned
+                            Løn i lønperiode
                           </p>
-                          <p className="text-2xl font-bold">{(shiftStats.stampSalary + shiftStats.bookingSalary).toLocaleString('da-DK')} kr</p>
+                          <p className="text-2xl font-bold">
+                            {Math.round(shiftStats.actualHours * shiftStats.hourlyRate).toLocaleString('da-DK')} kr
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(payrollPeriod.start, "d. MMM", { locale: da })} - {format(payrollPeriod.end, "d. MMM", { locale: da })}
+                          </p>
                         </div>
                       </div>
                     </CardContent>
