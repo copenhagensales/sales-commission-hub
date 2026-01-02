@@ -587,6 +587,7 @@ export default function MyProfile() {
 
   // Fetch commission/provision stats for provision-based employees
   // Uses payroll period (15th-14th) instead of calendar month
+  // Also fetches daily commission breakdown for the monthly overview
   const { data: commissionStats } = useQuery({
     queryKey: ["my-commission-stats", employee?.id, employee?.salary_type, payrollPeriod.start.toISOString()],
     queryFn: async () => {
@@ -599,10 +600,17 @@ export default function MyProfile() {
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
       
+      // For monthly overview: get current month range
+      const monthStart = startOfMonth(now).toISOString();
+      const monthEnd = endOfMonth(now).toISOString();
+      
       let periodCommission = 0;
       let todayCommission = 0;
       let periodSalesCount = 0;
       let todaySalesCount = 0;
+      
+      // Map to store daily commission: date string -> commission amount
+      const dailyCommissionMap = new Map<string, number>();
 
       // Check for agent mappings (for dialer-based sales)
       const { data: mappings } = await supabase
@@ -619,6 +627,7 @@ export default function MyProfile() {
             .from("sales")
             .select(`
               id,
+              sale_datetime,
               sale_items (
                 id,
                 mapped_commission
@@ -627,6 +636,21 @@ export default function MyProfile() {
             .in("agent_name", agentNames)
             .gte("sale_datetime", periodStart)
             .lte("sale_datetime", periodEnd);
+          
+          // Fetch this month's sales for daily breakdown
+          const { data: monthSales } = await supabase
+            .from("sales")
+            .select(`
+              id,
+              sale_datetime,
+              sale_items (
+                id,
+                mapped_commission
+              )
+            `)
+            .in("agent_name", agentNames)
+            .gte("sale_datetime", monthStart)
+            .lte("sale_datetime", monthEnd);
           
           // Fetch today's sales
           const { data: todaySales } = await supabase
@@ -657,16 +681,30 @@ export default function MyProfile() {
           
           periodSalesCount += periodSales?.length || 0;
           todaySalesCount += todaySales?.length || 0;
+          
+          // Build daily commission map for this month
+          monthSales?.forEach(sale => {
+            const dateKey = sale.sale_datetime.split('T')[0];
+            const saleCommission = sale.sale_items?.reduce((sum, item) => sum + (item.mapped_commission || 0), 0) || 0;
+            dailyCommissionMap.set(dateKey, (dailyCommissionMap.get(dateKey) || 0) + saleCommission);
+          });
         }
       }
 
       // Also check fieldmarketing_sales (for fieldmarketing employees)
       const { data: fmPeriodSales } = await supabase
         .from("fieldmarketing_sales")
-        .select("id, product_name")
+        .select("id, product_name, registered_at")
         .eq("seller_id", employee.id)
         .gte("registered_at", periodStart)
         .lte("registered_at", periodEnd);
+      
+      const { data: fmMonthSales } = await supabase
+        .from("fieldmarketing_sales")
+        .select("id, product_name, registered_at")
+        .eq("seller_id", employee.id)
+        .gte("registered_at", monthStart)
+        .lte("registered_at", monthEnd);
       
       const { data: fmTodaySales } = await supabase
         .from("fieldmarketing_sales")
@@ -676,12 +714,9 @@ export default function MyProfile() {
         .lte("registered_at", todayEnd);
       
       // Fetch products to get commission values for fieldmarketing sales
-      if ((fmPeriodSales && fmPeriodSales.length > 0) || (fmTodaySales && fmTodaySales.length > 0)) {
-        const allProductNames = [
-          ...(fmPeriodSales || []).map(s => s.product_name),
-          ...(fmTodaySales || []).map(s => s.product_name)
-        ].filter(Boolean);
-        
+      const allFmSales = [...(fmPeriodSales || []), ...(fmMonthSales || []), ...(fmTodaySales || [])];
+      if (allFmSales.length > 0) {
+        const allProductNames = allFmSales.map(s => s.product_name).filter(Boolean);
         const uniqueProductNames = [...new Set(allProductNames)];
         
         if (uniqueProductNames.length > 0) {
@@ -694,14 +729,22 @@ export default function MyProfile() {
             (products || []).map(p => [p.name, p.commission_dkk || 0])
           );
           
-          // Add fieldmarketing commission
+          // Add fieldmarketing commission for period
           periodCommission += fmPeriodSales?.reduce((total, sale) => {
             return total + (productCommissionMap.get(sale.product_name) || 0);
           }, 0) || 0;
           
+          // Add fieldmarketing commission for today
           todayCommission += fmTodaySales?.reduce((total, sale) => {
             return total + (productCommissionMap.get(sale.product_name) || 0);
           }, 0) || 0;
+          
+          // Build daily commission map for fieldmarketing this month
+          fmMonthSales?.forEach(sale => {
+            const dateKey = sale.registered_at.split('T')[0];
+            const saleCommission = productCommissionMap.get(sale.product_name) || 0;
+            dailyCommissionMap.set(dateKey, (dailyCommissionMap.get(dateKey) || 0) + saleCommission);
+          });
         }
       }
       
@@ -718,6 +761,7 @@ export default function MyProfile() {
         periodSalesCount,
         todaySalesCount,
         earnedVacationPay,
+        dailyCommission: Object.fromEntries(dailyCommissionMap),
         hasData: periodCommission > 0 || periodSalesCount > 0 || todaySalesCount > 0
       };
     },
@@ -1550,6 +1594,10 @@ export default function MyProfile() {
                     {expectedSchedule.slice(0, 25).map((day) => {
                       const date = new Date(day.date);
                       const dailySalary = day.hours * shiftStats.hourlyRate;
+                      // Get daily commission for provision employees
+                      const dailyCommission = employee?.salary_type === 'provision' 
+                        ? (commissionStats?.dailyCommission?.[day.date] || 0)
+                        : 0;
                       
                       return (
                         <div key={day.date} className="flex items-center justify-between py-2 border-b last:border-0">
@@ -1586,9 +1634,16 @@ export default function MyProfile() {
                                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
                                   {day.hours.toFixed(1)} timer
                                 </Badge>
+                                {/* Show salary for hourly employees */}
                                 {!shiftStats.isFixedSalary && shiftStats.hourlyRate > 0 && (
                                   <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                                     {dailySalary.toLocaleString('da-DK')} kr
+                                  </Badge>
+                                )}
+                                {/* Show commission for provision employees */}
+                                {employee?.salary_type === 'provision' && dailyCommission > 0 && (
+                                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                    {dailyCommission.toLocaleString('da-DK')} kr
                                   </Badge>
                                 )}
                               </>
