@@ -384,6 +384,37 @@ export function SalesGoalTracker({
     });
   }, [workingDaysData, currentGoal, commissionStats]);
 
+  // Initialize gamification hook
+  const gamification = useSalesGamification({
+    employeeId,
+    currentPeriodTotal: commissionStats.periodTotal,
+    targetAmount: kpis.targetAmount,
+    progressPercent: kpis.progressPercent,
+    isAhead: kpis.isAhead,
+    isOnTrack: kpis.isOnTrack,
+    daysPassedInPeriod: workingDaysData.passed,
+    totalDaysInPeriod: workingDaysData.total,
+    dailyTarget: kpis.todayTarget,
+    todayTotal: commissionStats.todayTotal,
+  });
+
+  // Check for new achievements and trigger celebrations
+  useEffect(() => {
+    if (gamification.newAchievements.length > 0) {
+      const achievementId = gamification.newAchievements[0];
+      gamification.unlockAchievement(achievementId);
+      setCelebrationConfig({ effect: "stars", text: "Achievement Unlocked! 🏅" });
+      setShowCelebration(true);
+    }
+  }, [gamification.newAchievements]);
+
+  // Update streak when daily goal is hit
+  useEffect(() => {
+    if (gamification.hitDailyGoal && currentGoal) {
+      gamification.updateStreak(true);
+    }
+  }, [gamification.hitDailyGoal, currentGoal]);
+
   const handleSaveGoal = () => {
     const amount = parseInt(goalInput);
     if (isNaN(amount) || amount <= 0) {
@@ -686,6 +717,10 @@ export function SalesGoalTracker({
               </CardContent>
             </Card>
           </div>
+
+          {/* Progression Chart with Race Track Zones */}
+          <Card>
+            <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
                 Daglig progression mod mål
