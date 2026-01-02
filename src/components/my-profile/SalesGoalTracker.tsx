@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -398,19 +398,28 @@ export function SalesGoalTracker({
     todayTotal: commissionStats.todayTotal,
   });
 
+  // Track which achievements we've already processed to prevent infinite loops
+  const processedAchievementsRef = useRef<Set<string>>(new Set());
+  const hasUpdatedStreakRef = useRef(false);
+
   // Check for new achievements and trigger celebrations
   useEffect(() => {
     if (gamification.newAchievements.length > 0) {
       const achievementId = gamification.newAchievements[0];
-      gamification.unlockAchievement(achievementId);
-      setCelebrationConfig({ effect: "stars", text: "Achievement Unlocked! 🏅" });
-      setShowCelebration(true);
+      // Only process if we haven't already processed this achievement
+      if (!processedAchievementsRef.current.has(achievementId)) {
+        processedAchievementsRef.current.add(achievementId);
+        gamification.unlockAchievement(achievementId);
+        setCelebrationConfig({ effect: "stars", text: "Achievement Unlocked! 🏅" });
+        setShowCelebration(true);
+      }
     }
   }, [gamification.newAchievements]);
 
-  // Update streak when daily goal is hit
+  // Update streak when daily goal is hit (only once per session)
   useEffect(() => {
-    if (gamification.hitDailyGoal && currentGoal) {
+    if (gamification.hitDailyGoal && currentGoal && !hasUpdatedStreakRef.current) {
+      hasUpdatedStreakRef.current = true;
       gamification.updateStreak(true);
     }
   }, [gamification.hitDailyGoal, currentGoal]);
