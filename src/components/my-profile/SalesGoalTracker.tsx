@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
   Target,
@@ -15,6 +14,8 @@ import {
   Zap,
   Trophy,
   Flame,
+  MapPin,
+  Rocket,
 } from "lucide-react";
 import {
   ComposedChart,
@@ -26,6 +27,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  ReferenceArea,
   Scatter,
 } from "recharts";
 import { format, eachDayOfInterval, isWeekend, isBefore, isAfter, isSameDay, startOfDay } from "date-fns";
@@ -55,6 +57,99 @@ interface SalesGoalTrackerProps {
     date: string;
     name: string;
   }>;
+}
+
+// Milestone Progress Bar Component
+function MilestoneProgressBar({ progress, targetAmount, currentAmount }: { 
+  progress: number; 
+  targetAmount: number;
+  currentAmount: number;
+}) {
+  const milestones = [
+    { percent: 0, label: "Start" },
+    { percent: 25, label: "25%" },
+    { percent: 50, label: "Halvvejs" },
+    { percent: 75, label: "Sidste sprint" },
+    { percent: 100, label: "Mål" },
+  ];
+
+  return (
+    <div className="relative mt-6 mb-8">
+      {/* Background bar */}
+      <div className="h-6 bg-muted/40 rounded-full overflow-hidden relative">
+        {/* Progress fill */}
+        <div 
+          className="h-full bg-gradient-to-r from-primary/80 to-primary rounded-full transition-all duration-500"
+          style={{ width: `${Math.min(100, progress)}%` }}
+        />
+        
+        {/* Milestone markers */}
+        {milestones.map((milestone) => (
+          <div
+            key={milestone.percent}
+            className="absolute top-0 bottom-0 w-0.5 bg-background/50"
+            style={{ left: `${milestone.percent}%` }}
+          />
+        ))}
+      </div>
+      
+      {/* "Du er her" pin */}
+      <div 
+        className="absolute -top-2 flex flex-col items-center transition-all duration-500"
+        style={{ left: `${Math.min(100, Math.max(0, progress))}%`, transform: 'translateX(-50%)' }}
+      >
+        <div className="flex items-center gap-1 bg-primary text-primary-foreground px-2 py-0.5 rounded-full text-xs font-medium shadow-lg">
+          <MapPin className="h-3 w-3" />
+          Du er her
+        </div>
+        <div className="w-0.5 h-2 bg-primary" />
+      </div>
+      
+      {/* Milestone labels */}
+      <div className="absolute -bottom-6 left-0 right-0 flex justify-between text-xs text-muted-foreground">
+        {milestones.map((milestone) => (
+          <span 
+            key={milestone.percent} 
+            className={`${progress >= milestone.percent ? 'text-primary font-medium' : ''}`}
+            style={{ transform: milestone.percent === 100 ? 'translateX(-100%)' : milestone.percent === 0 ? 'none' : 'translateX(-50%)' }}
+          >
+            {milestone.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Scenario Chip Component
+function ScenarioChip({ 
+  label, 
+  value, 
+  isHighlighted = false,
+  icon: Icon 
+}: { 
+  label: string; 
+  value: number; 
+  isHighlighted?: boolean;
+  icon?: React.ElementType;
+}) {
+  return (
+    <div className={`flex flex-col items-center p-3 rounded-lg border transition-all ${
+      isHighlighted 
+        ? 'bg-primary/10 border-primary/30 ring-1 ring-primary/20' 
+        : 'bg-muted/30 border-border/50'
+    }`}>
+      <div className="flex items-center gap-1.5 mb-1">
+        {Icon && <Icon className={`h-3 w-3 ${isHighlighted ? 'text-primary' : 'text-muted-foreground'}`} />}
+        <span className={`text-xs ${isHighlighted ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+          {label}
+        </span>
+      </div>
+      <span className={`text-sm font-bold ${isHighlighted ? 'text-primary' : ''}`}>
+        {value.toLocaleString("da-DK")} kr
+      </span>
+    </div>
+  );
 }
 
 export function SalesGoalTracker({
@@ -186,6 +281,15 @@ export function SalesGoalTracker({
     // Daily amount needed from now on to hit goal
     const dailyNeededFromNow = remaining > 0 ? amountRemaining / remaining : 0;
     
+    // Gap to track: extra per day needed to get back on track
+    const gapToTrack = dailyNeededFromNow - dailyNeeded;
+    
+    // Today's target (daily needed to stay on track)
+    const todayTarget = dailyNeeded;
+    
+    // Sprint target (+10%)
+    const sprintTarget = targetAmount * 1.10;
+    
     // Trend percentage (how far ahead/behind)
     const trendPercent = expectedByNow > 0 
       ? ((currentAmount - expectedByNow) / expectedByNow) * 100 
@@ -205,6 +309,9 @@ export function SalesGoalTracker({
       projectedFinal,
       amountRemaining,
       dailyNeededFromNow,
+      gapToTrack,
+      todayTarget,
+      sprintTarget,
       trendPercent,
       progressPercent,
       isAhead: currentAmount >= expectedByNow,
@@ -213,7 +320,7 @@ export function SalesGoalTracker({
     };
   }, [currentGoal, commissionStats.periodTotal, workingDaysData]);
 
-  // Build chart data
+  // Build chart data with zones
   const chartData = useMemo(() => {
     const { days, total } = workingDaysData;
     const targetAmount = currentGoal?.target_amount || 0;
@@ -228,8 +335,6 @@ export function SalesGoalTracker({
       const isPast = isBefore(day, today) || isSameDay(day, today);
       const isToday = isSameDay(day, today);
 
-      // For demonstration, we distribute actual commission proportionally
-      // In real implementation, you'd have daily sales data
       if (isPast && commissionStats.periodTotal > 0) {
         const avgDaily = commissionStats.periodTotal / workingDaysData.passed;
         cumulativeActual = avgDaily * dayNumber;
@@ -238,15 +343,30 @@ export function SalesGoalTracker({
         }
       }
 
+      // Calculate catch-up line (from today to target)
+      const isFuture = isAfter(day, today);
+      let catchUpLine = null;
+      if (isFuture || isToday) {
+        const remainingDays = total - workingDaysData.passed;
+        const amountRemaining = Math.max(0, targetAmount - commissionStats.periodTotal);
+        const dailyNeededFromNow = remainingDays > 0 ? amountRemaining / remainingDays : 0;
+        const daysFromToday = dayNumber - workingDaysData.passed;
+        catchUpLine = commissionStats.periodTotal + (dailyNeededFromNow * daysFromToday);
+      }
+
       return {
         day: format(day, "d. MMM", { locale: da }),
         dayNumber,
         date: day,
         targetCumulative: Math.round(targetCumulative),
         actualCumulative: isPast ? Math.round(cumulativeActual) : null,
+        catchUpLine: catchUpLine ? Math.round(catchUpLine) : null,
         goalLine: targetAmount,
         isToday,
         todayMarker: isToday ? commissionStats.periodTotal : null,
+        // Zone boundaries for reference areas
+        greenZone: targetCumulative * 0.90,
+        yellowZone: targetCumulative * 0.75,
       };
     });
   }, [workingDaysData, currentGoal, commissionStats]);
@@ -258,12 +378,6 @@ export function SalesGoalTracker({
       return;
     }
     saveGoalMutation.mutate(amount);
-  };
-
-  const getStatusColor = () => {
-    if (kpis.willHitGoal && kpis.isAhead) return "text-green-500";
-    if (kpis.isOnTrack) return "text-yellow-500";
-    return "text-red-500";
   };
 
   const getStatusBadge = () => {
@@ -291,10 +405,11 @@ export function SalesGoalTracker({
         </Badge>
       );
     }
+    // Reframed from "Bag planen" to "Gap til plan"
     return (
-      <Badge className="bg-red-500/20 text-red-400 border-red-500/30 gap-1">
-        <TrendingDown className="h-3 w-3" />
-        Bag planen
+      <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 gap-1">
+        <Target className="h-3 w-3" />
+        Gap til plan
       </Badge>
     );
   };
@@ -346,14 +461,18 @@ export function SalesGoalTracker({
           </div>
           
           {currentGoal && (
-            <div className="mt-4">
+            <div className="mt-6">
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-muted-foreground">Fremdrift mod mål</span>
                 <span className="font-medium">
                   {kpis.currentAmount.toLocaleString("da-DK")} / {kpis.targetAmount.toLocaleString("da-DK")} kr
                 </span>
               </div>
-              <Progress value={kpis.progressPercent} className="h-2" />
+              <MilestoneProgressBar 
+                progress={kpis.progressPercent} 
+                targetAmount={kpis.targetAmount}
+                currentAmount={kpis.currentAmount}
+              />
             </div>
           )}
         </CardContent>
@@ -361,10 +480,38 @@ export function SalesGoalTracker({
 
       {currentGoal && (
         <>
-          {/* Hero Status Card */}
-          <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20">
+          {/* Today's Focus Card */}
+          <Card className="bg-gradient-to-br from-primary/15 via-primary/5 to-transparent border-primary/30">
             <CardContent className="p-6">
-              <div className="flex items-start justify-between">
+              {/* Today's Goal - Action Focus */}
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 rounded-full bg-primary/20">
+                  <MapPin className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Dagens mål</p>
+                  <p className="text-2xl font-bold text-primary">
+                    {Math.round(kpis.todayTarget).toLocaleString("da-DK")} kr
+                  </p>
+                </div>
+                <div className="ml-auto">
+                  {getStatusBadge()}
+                </div>
+              </div>
+              
+              {/* Supportive microcopy for gap */}
+              {!kpis.isAhead && !kpis.isOnTrack && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-amber-300">
+                    <span className="font-medium">Gap til plan:</span> +{Math.round(kpis.gapToTrack).toLocaleString("da-DK")} kr/dag for at være på sporet
+                  </p>
+                  <p className="text-xs text-amber-300/70 mt-1">
+                    Rammer du dagens mål, er du tilbage på planen.
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Du er her nu</p>
                   <p className="text-3xl font-bold">
@@ -375,14 +522,31 @@ export function SalesGoalTracker({
                   </p>
                 </div>
                 <div className="text-right">
-                  {getStatusBadge()}
-                  <div className="mt-3">
-                    <p className="text-sm text-muted-foreground">Projiceret slutprovision</p>
-                    <p className={`text-2xl font-bold ${getStatusColor()}`}>
-                      {Math.round(kpis.projectedFinal).toLocaleString("da-DK")} kr
-                    </p>
-                  </div>
+                  <p className="text-sm text-muted-foreground mb-1">Projiceret slutprovision</p>
+                  <p className={`text-2xl font-bold ${kpis.willHitGoal ? 'text-green-400' : 'text-amber-400'}`}>
+                    {Math.round(kpis.projectedFinal).toLocaleString("da-DK")} kr
+                  </p>
                 </div>
+              </div>
+
+              {/* Scenario Chips */}
+              <div className="grid grid-cols-3 gap-3 mt-6">
+                <ScenarioChip 
+                  label="Nuværende tempo" 
+                  value={Math.round(kpis.projectedFinal)} 
+                  icon={TrendingUp}
+                />
+                <ScenarioChip 
+                  label="På sporet" 
+                  value={kpis.targetAmount} 
+                  isHighlighted={true}
+                  icon={Target}
+                />
+                <ScenarioChip 
+                  label="Sprint (+10%)" 
+                  value={Math.round(kpis.sprintTarget)} 
+                  icon={Rocket}
+                />
               </div>
             </CardContent>
           </Card>
@@ -411,20 +575,20 @@ export function SalesGoalTracker({
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${kpis.isAhead ? "bg-green-500/10" : "bg-red-500/10"}`}>
+                  <div className={`p-2 rounded-lg ${kpis.isAhead ? "bg-green-500/10" : "bg-amber-500/10"}`}>
                     {kpis.isAhead ? (
                       <TrendingUp className="h-5 w-5 text-green-500" />
                     ) : (
-                      <TrendingDown className="h-5 w-5 text-red-500" />
+                      <TrendingDown className="h-5 w-5 text-amber-500" />
                     )}
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Trend</p>
-                    <p className={`text-xl font-bold ${kpis.isAhead ? "text-green-500" : "text-red-500"}`}>
+                    <p className={`text-xl font-bold ${kpis.isAhead ? "text-green-500" : "text-amber-500"}`}>
                       {kpis.trendPercent > 0 ? "+" : ""}{Math.round(kpis.trendPercent)}%
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {kpis.isAhead ? "foran" : "bagud"} forventet tempo
+                      {kpis.isAhead ? "foran" : "ift."} forventet tempo
                     </p>
                   </div>
                 </div>
@@ -451,7 +615,7 @@ export function SalesGoalTracker({
             </Card>
           </div>
 
-          {/* Progression Chart */}
+          {/* Progression Chart with Race Track Zones */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
@@ -460,10 +624,50 @@ export function SalesGoalTracker({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
+              <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={chartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" />
+                    <defs>
+                      <linearGradient id="greenZone" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="hsl(142 76% 36%)" stopOpacity={0.15} />
+                        <stop offset="100%" stopColor="hsl(142 76% 36%)" stopOpacity={0.05} />
+                      </linearGradient>
+                      <linearGradient id="yellowZone" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="hsl(45 93% 47%)" stopOpacity={0.15} />
+                        <stop offset="100%" stopColor="hsl(45 93% 47%)" stopOpacity={0.05} />
+                      </linearGradient>
+                      <linearGradient id="redZone" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="hsl(0 84% 60%)" stopOpacity={0.1} />
+                        <stop offset="100%" stopColor="hsl(0 84% 60%)" stopOpacity={0.03} />
+                      </linearGradient>
+                    </defs>
+                    
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted/20" />
+                    
+                    {/* Background zone areas - Green (on track) */}
+                    <ReferenceArea
+                      y1={kpis.targetAmount * 0.90}
+                      y2={kpis.targetAmount * 1.10}
+                      fill="url(#greenZone)"
+                      strokeOpacity={0}
+                    />
+                    
+                    {/* Yellow zone (risk) */}
+                    <ReferenceArea
+                      y1={kpis.targetAmount * 0.75}
+                      y2={kpis.targetAmount * 0.90}
+                      fill="url(#yellowZone)"
+                      strokeOpacity={0}
+                    />
+                    
+                    {/* Red zone (off track) */}
+                    <ReferenceArea
+                      y1={0}
+                      y2={kpis.targetAmount * 0.75}
+                      fill="url(#redZone)"
+                      strokeOpacity={0}
+                    />
+                    
                     <XAxis 
                       dataKey="day" 
                       tick={{ fontSize: 11 }} 
@@ -483,9 +687,10 @@ export function SalesGoalTracker({
                       }}
                       formatter={(value: number, name: string) => {
                         const labels: Record<string, string> = {
-                          targetCumulative: "Forventet",
-                          actualCumulative: "Faktisk",
-                          goalLine: "Mål",
+                          targetCumulative: "Forventet tempo",
+                          actualCumulative: "Faktisk provision",
+                          catchUpLine: "For at nå mål",
+                          goalLine: "Slutmål",
                         };
                         return [`${value?.toLocaleString("da-DK")} kr`, labels[name] || name];
                       }}
@@ -513,7 +718,19 @@ export function SalesGoalTracker({
                       strokeDasharray="4 4"
                       strokeWidth={2}
                       dot={false}
-                      name="Forventet"
+                      name="Forventet tempo"
+                    />
+                    
+                    {/* Catch-up line (from today to target) */}
+                    <Line
+                      type="monotone"
+                      dataKey="catchUpLine"
+                      stroke="hsl(142 76% 36%)"
+                      strokeDasharray="6 3"
+                      strokeWidth={2}
+                      dot={false}
+                      name="For at nå mål"
+                      connectNulls={false}
                     />
                     
                     {/* Actual progression area */}
@@ -523,7 +740,7 @@ export function SalesGoalTracker({
                       fill="hsl(var(--primary) / 0.2)"
                       stroke="hsl(var(--primary))"
                       strokeWidth={3}
-                      name="Faktisk"
+                      name="Faktisk provision"
                       connectNulls={false}
                     />
                     
@@ -534,28 +751,45 @@ export function SalesGoalTracker({
                       shape={(props: any) => {
                         if (!props.payload?.isToday) return null;
                         return (
-                          <circle
-                            cx={props.cx}
-                            cy={props.cy}
-                            r={8}
-                            fill="hsl(var(--primary))"
-                            stroke="hsl(var(--background))"
-                            strokeWidth={3}
-                          />
+                          <g>
+                            <circle
+                              cx={props.cx}
+                              cy={props.cy}
+                              r={10}
+                              fill="hsl(var(--primary))"
+                              stroke="hsl(var(--background))"
+                              strokeWidth={3}
+                            />
+                            {/* Today callout */}
+                            <text
+                              x={props.cx}
+                              y={props.cy - 20}
+                              textAnchor="middle"
+                              fill="hsl(var(--foreground))"
+                              fontSize={10}
+                              fontWeight="bold"
+                            >
+                              {`${Math.round(kpis.dailyNeededFromNow).toLocaleString("da-DK")} kr/dag`}
+                            </text>
+                          </g>
                         );
                       }}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex justify-center gap-6 mt-2 text-xs text-muted-foreground">
+              <div className="flex flex-wrap justify-center gap-4 mt-3 text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-0.5 bg-primary rounded" />
+                  <div className="w-4 h-1 bg-primary rounded" />
                   <span>Faktisk provision</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-0.5 bg-muted-foreground rounded" style={{ borderStyle: "dashed" }} />
                   <span>Forventet tempo</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-0.5 rounded" style={{ backgroundColor: "hsl(142 76% 36%)", borderStyle: "dashed" }} />
+                  <span>For at nå mål</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-primary" />
