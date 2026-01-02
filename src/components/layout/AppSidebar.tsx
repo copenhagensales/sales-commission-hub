@@ -39,7 +39,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
   
   const [mitHjemOpen, setMitHjemOpen] = useState(
-    ["/home", "/messages", "/my-schedule", "/my-profile", "/my-contracts", "/career-wishes"].some(path => location.pathname === path || location.pathname.startsWith(path))
+    ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp" || location.pathname === "/closing-shifts");
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
@@ -303,7 +303,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
           <Collapsible open={mitHjemOpen} onOpenChange={setMitHjemOpen}>
             <CollapsibleTrigger className={cn(
               "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              ["/home", "/messages", "/my-schedule", "/my-profile", "/my-contracts", "/career-wishes"].some(path => location.pathname === path || location.pathname.startsWith(path))
+              ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes"].some(path => location.pathname === path || location.pathname.startsWith(path))
                 ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}>
@@ -383,6 +383,19 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   {t("sidebar.myProfile")}
                 </NavLink>
               )}
+              
+              {/* Mine Mål */}
+              <NavLink
+                to="/my-goals"
+                onClick={handleNavClick}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/my-goals" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}
+              >
+                <Target className="h-4 w-4" />
+                {t("sidebar.myGoals", "Mine Mål")}
+              </NavLink>
               
               {/* Mine Kontrakter */}
               {p.canViewMyContracts && (
