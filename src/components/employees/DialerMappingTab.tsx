@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Search, Plus, X, Loader2, AlertTriangle, Check, UserPlus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { filterExcludedEmails } from "@/lib/excluded-domains";
 
 interface Employee {
   id: string;
@@ -134,13 +135,17 @@ export function DialerMappingTab() {
 
   const getAvailableAgents = (employeeId: string) => {
     const existingAgentIds = getMappingsForEmployee(employeeId).map((m) => m.agent_id);
-    return agents.filter((a) => !existingAgentIds.includes(a.id));
+    // Filter out excluded email domains and already mapped agents
+    const nonExcludedAgents = filterExcludedEmails(agents);
+    return nonExcludedAgents.filter((a) => !existingAgentIds.includes(a.id));
   };
 
   // Get unmapped agents (agents without any employee mapping)
   // Only show agents with @copenhagensales.dk emails - external client agents are ignored
+  // Also filter out excluded email domains
   const mappedAgentIds = mappings.map((m) => m.agent_id);
-  const unmappedAgents = agents.filter(
+  const nonExcludedAgents = filterExcludedEmails(agents);
+  const unmappedAgents = nonExcludedAgents.filter(
     (a) => !mappedAgentIds.includes(a.id) && a.email?.toLowerCase().endsWith("@copenhagensales.dk")
   );
 
@@ -490,7 +495,7 @@ export function DialerMappingTab() {
       )}
 
       <div className="text-xs text-muted-foreground mt-4">
-        Totalt: {agents.length} aktive agenter fra API'er • {mappings.length} tilknytninger •
+        Totalt: {nonExcludedAgents.length} aktive agenter fra API'er • {mappings.length} tilknytninger •
         <span className={unmappedAgents.length > 0 ? "text-destructive font-medium" : "text-green-600"}>
           {unmappedAgents.length > 0 ? `${unmappedAgents.length} agenter mangler mapping` : "Alle agenter er mappet ✓"}
         </span>
