@@ -617,12 +617,18 @@ export default function MyProfile() {
         .select("agent_id, agents(name)")
         .eq("employee_id", employee.id);
       
+      console.log("[MyProfile Commission Debug] Employee ID:", employee.id);
+      console.log("[MyProfile Commission Debug] Agent mappings:", mappings);
+      
       if (mappings && mappings.length > 0) {
         const agentNames = mappings.map(m => (m.agents as { name: string } | null)?.name).filter(Boolean);
         
+        console.log("[MyProfile Commission Debug] Agent names:", agentNames);
+        console.log("[MyProfile Commission Debug] Period:", periodStart, "to", periodEnd);
+        
         if (agentNames.length > 0) {
           // Fetch period sales for this employee's agents
-          const { data: periodSales } = await supabase
+          const { data: periodSales, error: periodError } = await supabase
             .from("sales")
             .select(`
               id,
@@ -636,6 +642,9 @@ export default function MyProfile() {
             .in("agent_name", agentNames)
             .gte("sale_datetime", periodStart)
             .lte("sale_datetime", periodEnd);
+          
+          console.log("[MyProfile Commission Debug] Period sales found:", periodSales?.length, "Error:", periodError);
+          console.log("[MyProfile Commission Debug] Period sales data:", periodSales);
           
           // Use period sales for daily breakdown (same as period query)
           // Build daily commission map from period sales - multiply by quantity
