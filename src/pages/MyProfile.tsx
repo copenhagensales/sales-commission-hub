@@ -565,12 +565,21 @@ export default function MyProfile() {
       return date >= periodStart && date <= now;
     });
     
+    // Count only weekdays (excluding weekends)
     const countDays = (absenceList: typeof absences, type: string) => {
       return absenceList.filter(a => a.type === type).reduce((sum, a) => {
         const start = new Date(a.start_date);
         const end = new Date(a.end_date);
-        const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        return sum + days;
+        let weekdays = 0;
+        const current = new Date(start);
+        while (current <= end) {
+          const dayOfWeek = current.getDay();
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) { // 0 = Sunday, 6 = Saturday
+            weekdays++;
+          }
+          current.setDate(current.getDate() + 1);
+        }
+        return sum + weekdays;
       }, 0);
     };
     
