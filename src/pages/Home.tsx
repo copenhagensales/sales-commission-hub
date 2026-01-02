@@ -456,13 +456,29 @@ const Home = () => {
       if (agentNames.length === 0) return null;
       
       const now = new Date();
-      const monthStart = startOfMonth(now).toISOString();
-      const monthEnd = endOfMonth(now).toISOString();
+      const currentDay = now.getDate();
+      
+      // Calculate payroll period (15th-14th)
+      let periodStart: Date;
+      let periodEnd: Date;
+      
+      if (currentDay >= 15) {
+        // Current period: 15th of this month to 14th of next month
+        periodStart = new Date(now.getFullYear(), now.getMonth(), 15);
+        periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 14, 23, 59, 59);
+      } else {
+        // Current period: 15th of last month to 14th of this month
+        periodStart = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+        periodEnd = new Date(now.getFullYear(), now.getMonth(), 14, 23, 59, 59);
+      }
+      
+      const periodStartIso = periodStart.toISOString();
+      const periodEndIso = periodEnd.toISOString();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
       
-      // Fetch monthly sales for this employee's agents
-      const { data: monthlySales } = await supabase
+      // Fetch payroll period sales for this employee's agents
+      const { data: periodSales } = await supabase
         .from("sales")
         .select(`
           id,
@@ -475,8 +491,8 @@ const Home = () => {
           )
         `)
         .in("agent_name", agentNames)
-        .gte("sale_datetime", monthStart)
-        .lte("sale_datetime", monthEnd);
+        .gte("sale_datetime", periodStartIso)
+        .lte("sale_datetime", periodEndIso);
       
       // Fetch today's sales
       const { data: todaySales } = await supabase
@@ -497,13 +513,13 @@ const Home = () => {
       
       // Calculate totals
       // mapped_commission is already pre-multiplied by quantity, don't multiply again
-      const monthlyCommission = monthlySales?.reduce((total, sale) => {
+      const periodCommission = periodSales?.reduce((total, sale) => {
         return total + (sale.sale_items?.reduce((sum, item) => {
           return sum + (item.mapped_commission || 0);
         }, 0) || 0);
       }, 0) || 0;
       
-      const monthlySalesCount = monthlySales?.length || 0;
+      const periodSalesCount = periodSales?.length || 0;
       const todaySalesCount = todaySales?.length || 0;
       
       // mapped_commission is already pre-multiplied by quantity, don't multiply again
@@ -514,8 +530,8 @@ const Home = () => {
       }, 0) || 0;
       
       return {
-        monthlyCommission,
-        monthlySalesCount,
+        periodCommission,
+        periodSalesCount,
         todaySalesCount,
         todayCommission
       };
@@ -993,15 +1009,15 @@ const Home = () => {
                 <>
                   <div className="text-center py-4">
                     <div className="text-4xl font-bold text-primary mb-1">
-                      {formatCommission(personalStats.monthlyCommission)}
+                      {formatCommission(personalStats.periodCommission)}
                     </div>
-                    <p className="text-sm text-muted-foreground">provision denne måned</p>
+                    <p className="text-sm text-muted-foreground">provision i lønperiode</p>
                   </div>
                   
                   <div className="space-y-3 pt-2 border-t">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Salg denne måned</span>
-                      <span className="font-semibold">{personalStats.monthlySalesCount}</span>
+                      <span className="text-sm text-muted-foreground">Salg i lønperiode</span>
+                      <span className="font-semibold">{personalStats.periodSalesCount}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Salg i dag</span>
