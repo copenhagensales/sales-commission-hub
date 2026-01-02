@@ -305,31 +305,43 @@ export function useSalesGamification({
   const streakAtRisk = currentStreak > 0 && !hitDailyGoal;
 
   // Auto-initialize records if they don't exist and we have data
-  const hasInitializedRef = useRef(false);
+  const hasInitializedRecordsRef = useRef(false);
+  const hasInitializedLevelRef = useRef(false);
   
   useEffect(() => {
-    if (hasInitializedRef.current) return;
-    if (!employeeId || !records) return;
+    if (hasInitializedRecordsRef.current) return;
+    if (!employeeId || records === undefined) return; // Wait for records to load
     
-    // Initialize best day record if we have today's data
-    if (todayTotal > 0 && !bestDayRecord) {
-      hasInitializedRef.current = true;
+    // Initialize best day record using period average if we have period data
+    // This estimates a "best day" from the daily average
+    const dailyAverage = daysPassedInPeriod > 0 ? currentPeriodTotal / daysPassedInPeriod : 0;
+    
+    if (dailyAverage > 0 && !bestDayRecord) {
+      hasInitializedRecordsRef.current = true;
+      // Use today's total if available, otherwise use daily average as initial record
+      const initialBestDay = todayTotal > 0 ? todayTotal : Math.round(dailyAverage);
       updateRecordMutation.mutate({
         recordType: "best_day",
-        recordValue: todayTotal,
+        recordValue: initialBestDay,
         periodReference: new Date().toISOString().split("T")[0],
       });
     }
+  }, [employeeId, records, todayTotal, bestDayRecord, currentPeriodTotal, daysPassedInPeriod]);
+
+  // Initialize level separately
+  useEffect(() => {
+    if (hasInitializedLevelRef.current) return;
+    if (!employeeId || levelData === undefined) return;
     
-    // Initialize level if we have period data
     if (currentPeriodTotal > 0 && !levelData) {
+      hasInitializedLevelRef.current = true;
       updateLevelMutation.mutate(currentPeriodTotal);
     }
-  }, [employeeId, records, todayTotal, bestDayRecord, currentPeriodTotal, levelData]);
+  }, [employeeId, currentPeriodTotal, levelData]);
 
   // Update best day record if today exceeds it
   useEffect(() => {
-    if (!employeeId || !records) return;
+    if (!employeeId || records === undefined) return;
     if (todayTotal <= 0) return;
     
     const currentBestDay = bestDayRecord?.record_value || 0;
