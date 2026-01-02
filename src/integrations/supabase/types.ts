@@ -2611,6 +2611,41 @@ export type Database = {
           },
         ]
       }
+      employee_sales_achievements: {
+        Row: {
+          achievement_type: string
+          created_at: string
+          employee_id: string
+          id: string
+          metadata: Json | null
+          unlocked_at: string
+        }
+        Insert: {
+          achievement_type: string
+          created_at?: string
+          employee_id: string
+          id?: string
+          metadata?: Json | null
+          unlocked_at?: string
+        }
+        Update: {
+          achievement_type?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+          metadata?: Json | null
+          unlocked_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_sales_achievements_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_sales_goals: {
         Row: {
           created_at: string
@@ -2644,6 +2679,123 @@ export type Database = {
             foreignKeyName: "employee_sales_goals_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_sales_levels: {
+        Row: {
+          created_at: string
+          current_level: number
+          employee_id: string
+          id: string
+          total_earned: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_level?: number
+          employee_id: string
+          id?: string
+          total_earned?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_level?: number
+          employee_id?: string
+          id?: string
+          total_earned?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_sales_levels_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_sales_records: {
+        Row: {
+          achieved_at: string
+          created_at: string
+          employee_id: string
+          id: string
+          period_reference: string | null
+          record_type: string
+          record_value: number
+          updated_at: string
+        }
+        Insert: {
+          achieved_at: string
+          created_at?: string
+          employee_id: string
+          id?: string
+          period_reference?: string | null
+          record_type: string
+          record_value: number
+          updated_at?: string
+        }
+        Update: {
+          achieved_at?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+          period_reference?: string | null
+          record_type?: string
+          record_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_sales_records_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_sales_streaks: {
+        Row: {
+          created_at: string
+          current_streak: number
+          employee_id: string
+          id: string
+          last_streak_date: string | null
+          longest_streak: number
+          total_streak_days: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_streak?: number
+          employee_id: string
+          id?: string
+          last_streak_date?: string | null
+          longest_streak?: number
+          total_streak_days?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_streak?: number
+          employee_id?: string
+          id?: string
+          last_streak_date?: string | null
+          longest_streak?: number
+          total_streak_days?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_sales_streaks_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
             referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
           },

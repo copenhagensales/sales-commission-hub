@@ -33,6 +33,14 @@ import {
 import { format, eachDayOfInterval, isWeekend, isBefore, isAfter, isSameDay, startOfDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
+import { useSalesGamification } from "@/hooks/useSalesGamification";
+import { SalesStreakBadge } from "./SalesStreakBadge";
+import { SalesAchievements } from "./SalesAchievements";
+import { SalesRecords } from "./SalesRecords";
+import { SalesAvatar } from "./SalesAvatar";
+import { SalesMotivationalQuote } from "./SalesMotivationalQuote";
+import { SalesProgressComparison } from "./SalesProgressComparison";
+import { CelebrationOverlay } from "@/components/dashboard/CelebrationOverlay";
 
 interface SalesGoalTrackerProps {
   employeeId: string;
@@ -161,6 +169,11 @@ export function SalesGoalTracker({
 }: SalesGoalTrackerProps) {
   const queryClient = useQueryClient();
   const [goalInput, setGoalInput] = useState("");
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationConfig, setCelebrationConfig] = useState<{
+    effect: "fireworks" | "confetti" | "stars" | "flames";
+    text: string;
+  }>({ effect: "confetti", text: "" });
 
   // Fetch current goal for this period
   const { data: currentGoal, isLoading } = useQuery({
@@ -428,13 +441,31 @@ export function SalesGoalTracker({
 
   return (
     <div className="space-y-4">
+      {/* Celebration Overlay */}
+      <CelebrationOverlay
+        isOpen={showCelebration}
+        onClose={() => setShowCelebration(false)}
+        effect={celebrationConfig.effect}
+        text={celebrationConfig.text}
+        duration={3000}
+      />
+
       {/* Goal Input Section */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            Sæt dit salgsmål for lønperioden
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <SalesAvatar totalEarned={gamification.totalEarned} showProgress={false} />
+              <CardTitle className="text-base flex items-center gap-2">
+                <Target className="h-4 w-4" />
+                Sæt dit salgsmål for lønperioden
+              </CardTitle>
+            </div>
+            <SalesStreakBadge 
+              currentStreak={gamification.currentStreak} 
+              streakAtRisk={gamification.streakAtRisk}
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex gap-3 items-end">
@@ -477,6 +508,14 @@ export function SalesGoalTracker({
           )}
         </CardContent>
       </Card>
+
+      {/* Motivational Quote */}
+      {currentGoal && (
+        <SalesMotivationalQuote 
+          quote={gamification.motivationalQuote} 
+          status={gamification.performanceStatus} 
+        />
+      )}
 
       {currentGoal && (
         <>
@@ -615,9 +654,38 @@ export function SalesGoalTracker({
             </Card>
           </div>
 
-          {/* Progression Chart with Race Track Zones */}
-          <Card>
-            <CardHeader className="pb-2">
+          {/* Gamification Section - Records, Comparison, Achievements */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <SalesRecords
+                  bestDayRecord={gamification.bestDayRecord}
+                  bestWeekRecord={gamification.bestWeekRecord}
+                  longestStreak={gamification.longestStreak}
+                  currentStreak={gamification.currentStreak}
+                  todayTotal={commissionStats.todayTotal}
+                  currentPeriodTotal={commissionStats.periodTotal}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <SalesProgressComparison
+                  currentPeriodTotal={commissionStats.periodTotal}
+                  daysPassedInPeriod={workingDaysData.passed}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <SalesAchievements
+                  unlockedAchievementIds={gamification.unlockedAchievementIds}
+                />
+              </CardContent>
+            </Card>
+          </div>
               <CardTitle className="text-base flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
                 Daglig progression mod mål
