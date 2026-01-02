@@ -447,6 +447,63 @@ export default function MyProfile() {
   
   const [showWeekends, setShowWeekends] = useState(false);
 
+  // Calculate payroll period (15th to 14th)
+  const payrollPeriod = useMemo(() => {
+    const now = new Date();
+    const currentDay = now.getDate();
+    let periodStart: Date;
+    let periodEnd: Date;
+    
+    if (currentDay >= 15) {
+      // We're in the period from 15th of current month to 14th of next month
+      periodStart = new Date(now.getFullYear(), now.getMonth(), 15);
+      periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 14);
+    } else {
+      // We're in the period from 15th of previous month to 14th of current month
+      periodStart = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+      periodEnd = new Date(now.getFullYear(), now.getMonth(), 14);
+    }
+    
+    // Calculate workdays in period (excluding weekends)
+    const countWorkdays = (start: Date, end: Date) => {
+      let count = 0;
+      const current = new Date(start);
+      while (current <= end) {
+        const dayOfWeek = current.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          count++;
+        }
+        current.setDate(current.getDate() + 1);
+      }
+      return count;
+    };
+    
+    // Calculate workdays passed so far in period
+    const countWorkdaysPassed = (start: Date, upTo: Date) => {
+      let count = 0;
+      const current = new Date(start);
+      const endDate = upTo < periodEnd ? upTo : periodEnd;
+      while (current <= endDate) {
+        const dayOfWeek = current.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          count++;
+        }
+        current.setDate(current.getDate() + 1);
+      }
+      return count;
+    };
+    
+    const totalWorkdays = countWorkdays(periodStart, periodEnd);
+    const workdaysPassed = countWorkdaysPassed(periodStart, now);
+    
+    return {
+      start: periodStart,
+      end: periodEnd,
+      totalWorkdays,
+      workdaysPassed,
+    };
+  }, []);
+
   // Calculate shift statistics using expected schedule
   const shiftStats = useMemo(() => {
     const salaryType = employee?.salary_type;
@@ -460,6 +517,16 @@ export default function MyProfile() {
     // For hourly: calculate based on hours worked
     const hourlyRate = isFixedSalary ? 0 : salaryAmount;
     const totalSalaryThisMonth = isFixedSalary ? salaryAmount : (totalHoursThisMonth * hourlyRate);
+    
+    // Calculate earned salary in current payroll period (for fixed salary)
+    // Proportional: (workdays passed / total workdays) * monthly salary
+    const earnedInPeriod = isFixedSalary && payrollPeriod.totalWorkdays > 0
+      ? (payrollPeriod.workdaysPassed / payrollPeriod.totalWorkdays) * salaryAmount
+      : 0;
+    
+    // Calculate vacation pay (12.5% of earned salary for SH/Feriepengeordning)
+    const vacationPayRate = 0.125; // 12.5%
+    const earnedVacationPay = earnedInPeriod * vacationPayRate;
     
     // Booking assignments stats (for fieldmarketing)
     const now = new Date();
@@ -482,8 +549,10 @@ export default function MyProfile() {
       bookingSalary: totalBookingSalary,
       hourlyRate,
       isFixedSalary,
+      earnedInPeriod,
+      earnedVacationPay,
     };
-  }, [expectedSchedule, bookingAssignments, employee?.salary_amount, employee?.salary_type]);
+  }, [expectedSchedule, bookingAssignments, employee?.salary_amount, employee?.salary_type, payrollPeriod]);
 
   // Calculate absence statistics
   const absenceStats = useMemo(() => {
@@ -1127,21 +1196,62 @@ export default function MyProfile() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-full bg-emerald-500/10">
-                        <Wallet className="h-5 w-5 text-emerald-600" />
+                {shiftStats.isFixedSalary ? (
+                  <>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-emerald-500/10">
+                            <Wallet className="h-5 w-5 text-emerald-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              Optjent løn i periode
+                            </p>
+                            <p className="text-2xl font-bold">{Math.round(shiftStats.earnedInPeriod).toLocaleString('da-DK')} kr</p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(payrollPeriod.start, "d. MMM", { locale: da })} - {format(payrollPeriod.end, "d. MMM", { locale: da })}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-blue-500/10">
+                            <Palmtree className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              Optjente feriepenge
+                            </p>
+                            <p className="text-2xl font-bold">{Math.round(shiftStats.earnedVacationPay).toLocaleString('da-DK')} kr</p>
+                            <p className="text-xs text-muted-foreground">
+                              12,5% af optjent løn
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                ) : (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-full bg-emerald-500/10">
+                          <Wallet className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            Løn denne måned
+                          </p>
+                          <p className="text-2xl font-bold">{(shiftStats.stampSalary + shiftStats.bookingSalary).toLocaleString('da-DK')} kr</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          {shiftStats.isFixedSalary ? "Fast månedsløn" : "Løn denne måned"}
-                        </p>
-                        <p className="text-2xl font-bold">{(shiftStats.stampSalary + shiftStats.bookingSalary).toLocaleString('da-DK')} kr</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
 
               {/* Expected Schedule - based on standard work hours */}
