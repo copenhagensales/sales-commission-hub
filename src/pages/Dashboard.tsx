@@ -20,16 +20,13 @@ export default function Dashboard() {
         return status !== 'cancelled' && status !== 'rejected';
       }) || [];
 
+      // mapped_commission and mapped_revenue already contain total (base × quantity)
       const totalCommission = validItems.reduce((sum: number, item: any) => {
-        const qty = Number(item.quantity ?? 1) || 1;
-        const commissionPerUnit = Number(item.mapped_commission) || 0;
-        return sum + qty * commissionPerUnit;
+        return sum + (Number(item.mapped_commission) || 0);
       }, 0);
 
       const totalRevenue = validItems.reduce((sum: number, item: any) => {
-        const qty = Number(item.quantity ?? 1) || 1;
-        const revenuePerUnit = Number(item.mapped_revenue) || 0;
-        return sum + qty * revenuePerUnit;
+        return sum + (Number(item.mapped_revenue) || 0);
       }, 0);
 
       const unmappedCount = saleItems?.filter((item: any) => item.needs_mapping).length || 0;

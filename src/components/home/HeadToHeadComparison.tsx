@@ -398,15 +398,23 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
 
         const revenue = teamSales.reduce((sum, s) => {
           return sum + (s.sale_items?.reduce((itemSum, item) => {
-            const rev = (item.products as any)?.revenue_dkk || 0;
-            return itemSum + (rev * (item.quantity || 1));
+            const qty = item.quantity || 1;
+            // Use products.revenue_dkk (base) × qty, or mapped_revenue directly (already includes qty)
+            const rev = (item.products as any)?.revenue_dkk 
+              ? qty * Number((item.products as any).revenue_dkk)
+              : (Number((item as any).mapped_revenue) || 0);
+            return itemSum + rev;
           }, 0) || 0);
         }, 0);
 
         const commission = teamSales.reduce((sum, s) => {
           return sum + (s.sale_items?.reduce((itemSum, item) => {
-            const comm = (item.products as any)?.commission_dkk || item.mapped_commission || 0;
-            return itemSum + (comm * (item.quantity || 1));
+            const qty = item.quantity || 1;
+            // Use products.commission_dkk (base) × qty, or mapped_commission directly (already includes qty)
+            const comm = (item.products as any)?.commission_dkk 
+              ? qty * Number((item.products as any).commission_dkk)
+              : (Number(item.mapped_commission) || 0);
+            return itemSum + comm;
           }, 0) || 0);
         }, 0);
 

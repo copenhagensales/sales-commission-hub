@@ -117,8 +117,13 @@ export default function RelatelDashboard() {
         if (!product || product.counts_as_sale === false) return;
 
         const qty = Number(item.quantity) || 1;
-        const itemCommission = qty * (Number(product?.commission_dkk) || Number(item.mapped_commission) || 0);
-        const itemRevenue = qty * (Number(product?.revenue_dkk) || Number(item.mapped_revenue) || 0);
+        // Use products table values (base) × qty, or mapped values directly (already includes qty)
+        const itemCommission = product?.commission_dkk 
+          ? qty * Number(product.commission_dkk) 
+          : (Number(item.mapped_commission) || 0);
+        const itemRevenue = product?.revenue_dkk 
+          ? qty * Number(product.revenue_dkk) 
+          : (Number(item.mapped_revenue) || 0);
         const productName = product?.name || "Ukendt produkt";
 
         totalSales += qty;
