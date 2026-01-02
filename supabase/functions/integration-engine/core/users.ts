@@ -2,6 +2,27 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { StandardUser } from "../types.ts"
 
 /**
+ * List of email domains that should be excluded from syncing.
+ * These are internal/partner accounts that shouldn't be visible to users.
+ */
+const EXCLUDED_EMAIL_DOMAINS = [
+  "@relatel.dk",
+  "@ps-marketing.dk",
+  "@finansforbundet.dk",
+  "@straightlineagency.dk",
+  "@staightlineagency.dk",
+  "@tele-part.dk",
+  "@aogtil.dk",
+  "@ase.dk",
+];
+
+function isExcludedEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const emailLower = email.toLowerCase();
+  return EXCLUDED_EMAIL_DOMAINS.some(domain => emailLower.endsWith(domain));
+}
+
+/**
  * For Enreach users, try to match with employee_master_data by email
  * to get real names instead of email prefixes
  */
@@ -38,14 +59,21 @@ export async function processUsers(
   log: (type: "INFO" | "ERROR" | "WARN", msg: string, data?: unknown) => void,
   source: "adversus" | "enreach" = "adversus"
 ) {
-  if (users.length === 0) return { processed: 0, errors: 0 }
+  if (users.length === 0) return { processed: 0, errors: 0, skipped: 0 }
   log("INFO", `Processing ${users.length} users from ${source}...`)
 
   let processed = 0
   let errors = 0
+  let skipped = 0
 
   for (const user of users) {
     try {
+      // Skip users with excluded email domains
+      if (isExcludedEmail(user.email)) {
+        log("INFO", `Skipping excluded email domain: ${user.email}`)
+        skipped++
+        continue
+      }
       // For Enreach users, try to enrich name from employee_master_data
       let userName = user.name
       if (source === "enreach") {
@@ -81,6 +109,11 @@ export async function processUsers(
       log("ERROR", `Error saving user ${user.name}`, errMsg)
     }
   }
-  return { processed, errors }
+  
+  if (skipped > 0) {
+    log("INFO", `Skipped ${skipped} users with excluded email domains`)
+  }
+  
+  return { processed, errors, skipped }
 }
 

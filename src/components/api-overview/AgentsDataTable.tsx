@@ -34,6 +34,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { filterExcludedEmails } from "@/lib/excluded-domains";
 
 interface AgentsDataTableProps {
   provider: string;
@@ -79,7 +80,8 @@ export default function AgentsDataTable({ provider, providerColor, iconColor, ag
 
   // Filter and sort agents
   const filteredAgents = useMemo(() => {
-    let result = agents || [];
+    // First filter out excluded email domains
+    let result = filterExcludedEmails(agents || []);
     
     if (search) {
       const searchLower = search.toLowerCase();
