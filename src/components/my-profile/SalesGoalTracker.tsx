@@ -402,19 +402,23 @@ export function SalesGoalTracker({
   const processedAchievementsRef = useRef<Set<string>>(new Set());
   const hasUpdatedStreakRef = useRef(false);
 
-  // Check for new achievements and trigger celebrations
+  // Check for new achievements and trigger celebrations - use stable check
   useEffect(() => {
-    if (gamification.newAchievements.length > 0) {
-      const achievementId = gamification.newAchievements[0];
-      // Only process if we haven't already processed this achievement
-      if (!processedAchievementsRef.current.has(achievementId)) {
-        processedAchievementsRef.current.add(achievementId);
-        gamification.unlockAchievement(achievementId);
+    const newAchievementsList = gamification.newAchievements;
+    if (newAchievementsList.length > 0) {
+      // Find the first achievement we haven't processed yet
+      const unprocessedAchievement = newAchievementsList.find(
+        id => !processedAchievementsRef.current.has(id)
+      );
+      
+      if (unprocessedAchievement) {
+        processedAchievementsRef.current.add(unprocessedAchievement);
+        gamification.unlockAchievement(unprocessedAchievement);
         setCelebrationConfig({ effect: "stars", text: "Achievement Unlocked! 🏅" });
         setShowCelebration(true);
       }
     }
-  }, [gamification.newAchievements]);
+  }, [gamification.newAchievements.join(',')]); // Use joined string for stable comparison
 
   // Update streak when daily goal is hit (only once per session)
   useEffect(() => {
