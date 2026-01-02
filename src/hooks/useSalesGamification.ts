@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useMemo } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { checkAchievements, type AchievementCheckData } from "@/lib/gamification-achievements";
 import { getProgressToNextLevel } from "@/lib/gamification-levels";
 import { getPerformanceStatus, getRandomQuote } from "@/lib/gamification-quotes";
@@ -299,10 +299,48 @@ export function useSalesGamification({
   const bestMonthRecord = records?.find(r => r.record_type === "best_month");
 
   // Check if today hit daily target
-  const hitDailyGoal = todayTotal >= dailyTarget;
+  const hitDailyGoal = dailyTarget > 0 && todayTotal >= dailyTarget;
 
   // Streak status
   const streakAtRisk = currentStreak > 0 && !hitDailyGoal;
+
+  // Auto-initialize records if they don't exist and we have data
+  const hasInitializedRef = useRef(false);
+  
+  useEffect(() => {
+    if (hasInitializedRef.current) return;
+    if (!employeeId || !records) return;
+    
+    // Initialize best day record if we have today's data
+    if (todayTotal > 0 && !bestDayRecord) {
+      hasInitializedRef.current = true;
+      updateRecordMutation.mutate({
+        recordType: "best_day",
+        recordValue: todayTotal,
+        periodReference: new Date().toISOString().split("T")[0],
+      });
+    }
+    
+    // Initialize level if we have period data
+    if (currentPeriodTotal > 0 && !levelData) {
+      updateLevelMutation.mutate(currentPeriodTotal);
+    }
+  }, [employeeId, records, todayTotal, bestDayRecord, currentPeriodTotal, levelData]);
+
+  // Update best day record if today exceeds it
+  useEffect(() => {
+    if (!employeeId || !records) return;
+    if (todayTotal <= 0) return;
+    
+    const currentBestDay = bestDayRecord?.record_value || 0;
+    if (todayTotal > currentBestDay) {
+      updateRecordMutation.mutate({
+        recordType: "best_day",
+        recordValue: todayTotal,
+        periodReference: new Date().toISOString().split("T")[0],
+      });
+    }
+  }, [todayTotal, bestDayRecord?.record_value, employeeId, records]);
 
   return {
     // Streak
