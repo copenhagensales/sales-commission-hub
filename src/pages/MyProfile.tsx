@@ -306,6 +306,26 @@ export default function MyProfile() {
     enabled: !!employee?.id,
   });
 
+  // Fetch Danish holidays for payroll calculations
+  const { data: danishHolidays = [] } = useQuery({
+    queryKey: ["danish-holidays"],
+    queryFn: async () => {
+      const currentYear = new Date().getFullYear();
+      const { data, error } = await supabase
+        .from("danish_holiday")
+        .select("date, name")
+        .gte("year", currentYear - 1)
+        .lte("year", currentYear + 1);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Create a Set of holiday dates for quick lookup
+  const holidayDates = useMemo(() => {
+    return new Set(danishHolidays.map(h => h.date));
+  }, [danishHolidays]);
+
   // Deduplicate time stamps - keep only the most recent entry per date (manager edits take priority)
   const deduplicatedTimeStamps = useMemo(() => {
     const byDate = new Map<string, typeof timeStamps[0]>();
@@ -448,6 +468,7 @@ export default function MyProfile() {
   const [showWeekends, setShowWeekends] = useState(false);
 
   // Calculate payroll period (15th to 14th)
+  // Holidays count as paid days (not deducted from workdays)
   const payrollPeriod = useMemo(() => {
     const now = new Date();
     const currentDay = now.getDate();
@@ -464,12 +485,18 @@ export default function MyProfile() {
       periodEnd = new Date(now.getFullYear(), now.getMonth(), 14);
     }
     
-    // Calculate workdays in period (excluding weekends)
+    // Helper to format date as YYYY-MM-DD for holiday lookup
+    const formatDateKey = (date: Date) => {
+      return date.toISOString().split('T')[0];
+    };
+    
+    // Calculate workdays in period (excluding weekends, but including holidays as paid days)
     const countWorkdays = (start: Date, end: Date) => {
       let count = 0;
       const current = new Date(start);
       while (current <= end) {
         const dayOfWeek = current.getDay();
+        // Count weekdays (mon-fri) - holidays on weekdays still count as paid days
         if (dayOfWeek !== 0 && dayOfWeek !== 6) {
           count++;
         }
@@ -478,13 +505,14 @@ export default function MyProfile() {
       return count;
     };
     
-    // Calculate workdays passed so far in period
+    // Calculate workdays passed so far in period (including holidays as paid)
     const countWorkdaysPassed = (start: Date, upTo: Date) => {
       let count = 0;
       const current = new Date(start);
       const endDate = upTo < periodEnd ? upTo : periodEnd;
       while (current <= endDate) {
         const dayOfWeek = current.getDay();
+        // Weekdays count as worked/paid (including holidays)
         if (dayOfWeek !== 0 && dayOfWeek !== 6) {
           count++;
         }
@@ -565,21 +593,28 @@ export default function MyProfile() {
       return date >= periodStart && date <= now;
     });
     
-    // Count only weekdays (excluding weekends)
+    // Helper to format date as YYYY-MM-DD for holiday lookup
+    const formatDateKey = (date: Date) => {
+      return date.toISOString().split('T')[0];
+    };
+    
+    // Count only weekdays (excluding weekends AND holidays)
     const countDays = (absenceList: typeof absences, type: string) => {
       return absenceList.filter(a => a.type === type).reduce((sum, a) => {
         const start = new Date(a.start_date);
         const end = new Date(a.end_date);
-        let weekdays = 0;
+        let workdays = 0;
         const current = new Date(start);
         while (current <= end) {
           const dayOfWeek = current.getDay();
-          if (dayOfWeek !== 0 && dayOfWeek !== 6) { // 0 = Sunday, 6 = Saturday
-            weekdays++;
+          const dateKey = formatDateKey(current);
+          // Only count if it's a weekday AND not a holiday
+          if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidayDates.has(dateKey)) {
+            workdays++;
           }
           current.setDate(current.getDate() + 1);
         }
-        return sum + weekdays;
+        return sum + workdays;
       }, 0);
     };
     
@@ -604,7 +639,7 @@ export default function MyProfile() {
       sickPercentInPeriod,
       sickAbsences,
     };
-  }, [absences, absencePeriod]);
+  }, [absences, absencePeriod, holidayDates]);
 
   // Calculate lateness statistics
   const latenessStats = useMemo(() => {
