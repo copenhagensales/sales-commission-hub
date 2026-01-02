@@ -601,9 +601,7 @@ export default function MyProfile() {
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
       
-      // For monthly overview: get current month range
-      const monthStart = startOfMonth(now).toISOString();
-      const monthEnd = endOfMonth(now).toISOString();
+      // Remove calendar month range - we now use payroll period for daily breakdown too
       
       let periodCommission = 0;
       let todayCommission = 0;
@@ -638,20 +636,13 @@ export default function MyProfile() {
             .gte("sale_datetime", periodStart)
             .lte("sale_datetime", periodEnd);
           
-          // Fetch this month's sales for daily breakdown
-          const { data: monthSales } = await supabase
-            .from("sales")
-            .select(`
-              id,
-              sale_datetime,
-              sale_items (
-                id,
-                mapped_commission
-              )
-            `)
-            .in("agent_name", agentNames)
-            .gte("sale_datetime", monthStart)
-            .lte("sale_datetime", monthEnd);
+          // Use period sales for daily breakdown (same as period query)
+          // Build daily commission map from period sales
+          periodSales?.forEach(sale => {
+            const dateKey = sale.sale_datetime.split('T')[0];
+            const saleCommission = sale.sale_items?.reduce((sum, item) => sum + (item.mapped_commission || 0), 0) || 0;
+            dailyCommissionMap.set(dateKey, (dailyCommissionMap.get(dateKey) || 0) + saleCommission);
+          });
           
           // Fetch today's sales
           const { data: todaySales } = await supabase
@@ -682,13 +673,6 @@ export default function MyProfile() {
           
           periodSalesCount += periodSales?.length || 0;
           todaySalesCount += todaySales?.length || 0;
-          
-          // Build daily commission map for this month
-          monthSales?.forEach(sale => {
-            const dateKey = sale.sale_datetime.split('T')[0];
-            const saleCommission = sale.sale_items?.reduce((sum, item) => sum + (item.mapped_commission || 0), 0) || 0;
-            dailyCommissionMap.set(dateKey, (dailyCommissionMap.get(dateKey) || 0) + saleCommission);
-          });
         }
       }
 
@@ -700,12 +684,7 @@ export default function MyProfile() {
         .gte("registered_at", periodStart)
         .lte("registered_at", periodEnd);
       
-      const { data: fmMonthSales } = await supabase
-        .from("fieldmarketing_sales")
-        .select("id, product_name, registered_at")
-        .eq("seller_id", employee.id)
-        .gte("registered_at", monthStart)
-        .lte("registered_at", monthEnd);
+      // Use fmPeriodSales for daily breakdown instead of separate month query
       
       const { data: fmTodaySales } = await supabase
         .from("fieldmarketing_sales")
@@ -715,7 +694,7 @@ export default function MyProfile() {
         .lte("registered_at", todayEnd);
       
       // Fetch products to get commission values for fieldmarketing sales
-      const allFmSales = [...(fmPeriodSales || []), ...(fmMonthSales || []), ...(fmTodaySales || [])];
+      const allFmSales = [...(fmPeriodSales || []), ...(fmTodaySales || [])];
       if (allFmSales.length > 0) {
         const allProductNames = allFmSales.map(s => s.product_name).filter(Boolean);
         const uniqueProductNames = [...new Set(allProductNames)];
@@ -740,8 +719,8 @@ export default function MyProfile() {
             return total + (productCommissionMap.get(sale.product_name) || 0);
           }, 0) || 0;
           
-          // Build daily commission map for fieldmarketing this month
-          fmMonthSales?.forEach(sale => {
+          // Build daily commission map for fieldmarketing from period sales
+          fmPeriodSales?.forEach(sale => {
             const dateKey = sale.registered_at.split('T')[0];
             const saleCommission = productCommissionMap.get(sale.product_name) || 0;
             dailyCommissionMap.set(dateKey, (dailyCommissionMap.get(dateKey) || 0) + saleCommission);
@@ -1713,139 +1692,280 @@ export default function MyProfile() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
+                    {employee?.salary_type === 'provision' ? (
+                      <TrendingUp className="h-4 w-4" />
+                    ) : (
+                      <Clock className="h-4 w-4" />
+                    )}
                     Lønperiodeoversigt
                     <span className="text-xs font-normal text-muted-foreground ml-2">
-                      ({format(payrollPeriod.start, "d. MMM", { locale: da })} - {format(payrollPeriod.end, "d. MMM", { locale: da })} · {employee?.weekly_hours || 37} timer/uge)
+                      ({format(payrollPeriod.start, "d. MMM", { locale: da })} - {format(payrollPeriod.end, "d. MMM", { locale: da })}{employee?.salary_type !== 'provision' ? ` · ${employee?.weekly_hours || 37} timer/uge` : ''})
                     </span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    {expectedSchedule.slice(0, 25).map((day) => {
-                      const date = new Date(day.date);
-                      const dailySalary = day.hours * shiftStats.hourlyRate;
-                      // Get daily commission for provision employees
-                      const dailyCommission = employee?.salary_type === 'provision' 
-                        ? (commissionStats?.dailyCommission?.[day.date] || 0)
-                        : 0;
-                      
-                      return (
-                        <div key={day.date} className="flex items-center justify-between py-2 border-b last:border-0">
-                          <div className="flex items-center gap-3">
-                            {day.status === "work" ? (
-                              <div className="w-3 h-3 rounded-full bg-green-500" />
-                            ) : day.status === "vacation" ? (
-                              <Palmtree className="h-4 w-4 text-amber-500" />
-                            ) : day.status === "holiday" ? (
-                              <Star className="h-4 w-4 text-purple-500" />
-                            ) : (
-                              <Thermometer className="h-4 w-4 text-red-500" />
-                            )}
-                            <span className="text-sm font-medium">
-                              {format(date, "EEEE d. MMM", { locale: da })}
-                            </span>
-                            {day.status === "holiday" && day.holidayName && (
-                              <span className="text-xs text-purple-600 dark:text-purple-400">
-                                {day.holidayName}
-                              </span>
-                            )}
-                            {day.status === "work" && day.startTime && (
-                              <span className="text-xs text-muted-foreground">
-                                {day.hasActualStamp 
-                                  ? `${day.startTime}${day.endTime ? ` - ${day.endTime}` : ' (ikke udstemplet)'}`
-                                  : `fra ${day.startTime}`
-                                }
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {day.status === "work" ? (
-                              <>
-                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
-                                  {day.hours.toFixed(1)} timer
-                                </Badge>
-                                {/* Show salary for hourly employees */}
-                                {!shiftStats.isFixedSalary && shiftStats.hourlyRate > 0 && (
-                                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                    {dailySalary.toLocaleString('da-DK')} kr
-                                  </Badge>
-                                )}
-                                {/* Show commission for provision employees */}
-                                {employee?.salary_type === 'provision' && dailyCommission > 0 && (
-                                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                    {dailyCommission.toLocaleString('da-DK')} kr
-                                  </Badge>
-                                )}
-                              </>
-                            ) : day.status === "holiday" ? (
-                              <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200">
-                                Helligdag
-                              </Badge>
-                            ) : (
-                              <Badge 
-                                variant={day.status === "vacation" ? "secondary" : "destructive"}
-                                className={day.status === "vacation" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : ""}
-                              >
-                                {day.status === "vacation" ? "Ferie" : "Syg"}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {expectedSchedule.length === 0 && weekendSchedule.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        Ingen arbejdsdage endnu denne måned
-                      </p>
-                    )}
-                    
-                    {/* Weekend section - collapsible */}
-                    {weekendSchedule.length > 0 && (
-                      <div className="mt-4 pt-4 border-t">
-                        <button
-                          onClick={() => setShowWeekends(!showWeekends)}
-                          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
-                        >
-                          <ChevronDown className={`h-4 w-4 transition-transform ${showWeekends ? 'rotate-180' : ''}`} />
-                          <span>Weekend-vagter ({weekendSchedule.length})</span>
-                        </button>
+                  {employee?.salary_type === 'provision' ? (
+                    // Provision-based: Show daily commission breakdown for entire payroll period
+                    <div className="space-y-1">
+                      {(() => {
+                        // Generate all days in payroll period
+                        const allDays: Array<{
+                          date: string;
+                          dayOfWeek: number;
+                          isWeekend: boolean;
+                          isHoliday: boolean;
+                          holidayName?: string;
+                          isVacation: boolean;
+                          isSick: boolean;
+                          commission: number;
+                          isPast: boolean;
+                          isToday: boolean;
+                        }> = [];
                         
-                        {showWeekends && (
-                          <div className="mt-3 space-y-2 pl-2 border-l-2 border-orange-300 dark:border-orange-700">
-                            {weekendSchedule.map((day) => {
-                              const date = new Date(day.date);
-                              const dailySalary = day.hours * shiftStats.hourlyRate;
-                              
-                              return (
-                                <div key={day.date} className="flex items-center justify-between py-2">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-3 h-3 rounded-full bg-orange-500" />
-                                    <span className="text-sm font-medium">
-                                      {format(date, "EEEE d. MMM", { locale: da })}
+                        const current = new Date(payrollPeriod.start);
+                        const end = new Date(payrollPeriod.end);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        
+                        const holidaysByDate = new Map(
+                          (danishHolidays || []).map(h => [h.date, h.name])
+                        );
+                        
+                        while (current <= end) {
+                          const dateStr = format(current, 'yyyy-MM-dd');
+                          const dayOfWeek = current.getDay();
+                          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                          const holidayName = holidaysByDate.get(dateStr);
+                          const isHoliday = !!holidayName;
+                          
+                          // Check for absence
+                          const absence = absences.find(a => {
+                            const start = new Date(a.start_date);
+                            const end = new Date(a.end_date);
+                            return current >= start && current <= end;
+                          });
+                          
+                          const currentCopy = new Date(current);
+                          currentCopy.setHours(0, 0, 0, 0);
+                          
+                          allDays.push({
+                            date: dateStr,
+                            dayOfWeek,
+                            isWeekend,
+                            isHoliday,
+                            holidayName,
+                            isVacation: absence?.type === 'vacation',
+                            isSick: absence?.type === 'sick',
+                            commission: commissionStats?.dailyCommission?.[dateStr] || 0,
+                            isPast: currentCopy < today,
+                            isToday: currentCopy.getTime() === today.getTime(),
+                          });
+                          
+                          current.setDate(current.getDate() + 1);
+                        }
+                        
+                        // Filter to only show working days (not weekends)
+                        const workingDays = allDays.filter(d => !d.isWeekend);
+                        
+                        return workingDays.map((day) => {
+                          const date = new Date(day.date);
+                          const hasCommission = day.commission > 0;
+                          
+                          // Determine status
+                          let status: 'work' | 'holiday' | 'vacation' | 'sick' | 'future' = 'work';
+                          if (day.isHoliday) status = 'holiday';
+                          else if (day.isVacation) status = 'vacation';
+                          else if (day.isSick) status = 'sick';
+                          else if (!day.isPast && !day.isToday) status = 'future';
+                          
+                          return (
+                            <div 
+                              key={day.date} 
+                              className={`flex items-center justify-between py-2 px-2 rounded-lg transition-colors ${
+                                day.isToday 
+                                  ? 'bg-primary/10 border border-primary/20' 
+                                  : hasCommission 
+                                    ? 'bg-emerald-50/50 dark:bg-emerald-900/10' 
+                                    : ''
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                {status === 'holiday' ? (
+                                  <Star className="h-4 w-4 text-purple-500" />
+                                ) : status === 'vacation' ? (
+                                  <Palmtree className="h-4 w-4 text-amber-500" />
+                                ) : status === 'sick' ? (
+                                  <Thermometer className="h-4 w-4 text-red-500" />
+                                ) : status === 'future' ? (
+                                  <div className="w-3 h-3 rounded-full bg-muted border border-muted-foreground/30" />
+                                ) : hasCommission ? (
+                                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                                ) : (
+                                  <div className="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600" />
+                                )}
+                                <div className="flex flex-col">
+                                  <span className={`text-sm font-medium ${day.isToday ? 'text-primary' : ''}`}>
+                                    {format(date, "EEEE d. MMM", { locale: da })}
+                                    {day.isToday && (
+                                      <Badge variant="outline" className="ml-2 text-xs py-0 px-1.5">I dag</Badge>
+                                    )}
+                                  </span>
+                                  {day.holidayName && (
+                                    <span className="text-xs text-purple-600 dark:text-purple-400">
+                                      {day.holidayName}
                                     </span>
-                                    <span className="text-xs text-muted-foreground">
-                                      {day.startTime}{day.endTime ? ` - ${day.endTime}` : ' (ikke udstemplet)'}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800">
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {status === 'holiday' ? (
+                                  <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200">
+                                    Helligdag
+                                  </Badge>
+                                ) : status === 'vacation' ? (
+                                  <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                    Ferie
+                                  </Badge>
+                                ) : status === 'sick' ? (
+                                  <Badge variant="destructive">Syg</Badge>
+                                ) : status === 'future' ? (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                ) : (
+                                  <Badge 
+                                    variant="secondary" 
+                                    className={hasCommission 
+                                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 font-semibold" 
+                                      : "bg-muted text-muted-foreground"
+                                    }
+                                  >
+                                    {day.commission.toLocaleString('da-DK')} kr
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  ) : (
+                    // Non-provision: Show hours-based schedule
+                    <>
+                      <div className="space-y-2">
+                        {expectedSchedule.slice(0, 25).map((day) => {
+                          const date = new Date(day.date);
+                          const dailySalary = day.hours * shiftStats.hourlyRate;
+                          
+                          return (
+                            <div key={day.date} className="flex items-center justify-between py-2 border-b last:border-0">
+                              <div className="flex items-center gap-3">
+                                {day.status === "work" ? (
+                                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                                ) : day.status === "vacation" ? (
+                                  <Palmtree className="h-4 w-4 text-amber-500" />
+                                ) : day.status === "holiday" ? (
+                                  <Star className="h-4 w-4 text-purple-500" />
+                                ) : (
+                                  <Thermometer className="h-4 w-4 text-red-500" />
+                                )}
+                                <span className="text-sm font-medium">
+                                  {format(date, "EEEE d. MMM", { locale: da })}
+                                </span>
+                                {day.status === "holiday" && day.holidayName && (
+                                  <span className="text-xs text-purple-600 dark:text-purple-400">
+                                    {day.holidayName}
+                                  </span>
+                                )}
+                                {day.status === "work" && day.startTime && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {day.hasActualStamp 
+                                      ? `${day.startTime}${day.endTime ? ` - ${day.endTime}` : ' (ikke udstemplet)'}`
+                                      : `fra ${day.startTime}`
+                                    }
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {day.status === "work" ? (
+                                  <>
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
                                       {day.hours.toFixed(1)} timer
                                     </Badge>
-                                    {shiftStats.hourlyRate > 0 && (
-                                      <Badge variant="secondary" className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                    {!shiftStats.isFixedSalary && shiftStats.hourlyRate > 0 && (
+                                      <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                                         {dailySalary.toLocaleString('da-DK')} kr
                                       </Badge>
                                     )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                                  </>
+                                ) : day.status === "holiday" ? (
+                                  <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200">
+                                    Helligdag
+                                  </Badge>
+                                ) : (
+                                  <Badge 
+                                    variant={day.status === "vacation" ? "secondary" : "destructive"}
+                                    className={day.status === "vacation" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : ""}
+                                  >
+                                    {day.status === "vacation" ? "Ferie" : "Syg"}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {expectedSchedule.length === 0 && weekendSchedule.length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            Ingen arbejdsdage endnu denne måned
+                          </p>
                         )}
                       </div>
-                    )}
-                  </div>
+                      
+                      {/* Weekend section - collapsible (only for non-provision employees) */}
+                      {weekendSchedule.length > 0 && (
+                        <div className="mt-4 pt-4 border-t">
+                          <button
+                            onClick={() => setShowWeekends(!showWeekends)}
+                            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
+                          >
+                            <ChevronDown className={`h-4 w-4 transition-transform ${showWeekends ? 'rotate-180' : ''}`} />
+                            <span>Weekend-vagter ({weekendSchedule.length})</span>
+                          </button>
+                          
+                          {showWeekends && (
+                            <div className="mt-3 space-y-2 pl-2 border-l-2 border-orange-300 dark:border-orange-700">
+                              {weekendSchedule.map((day) => {
+                                const date = new Date(day.date);
+                                const dailySalary = day.hours * shiftStats.hourlyRate;
+                                
+                                return (
+                                  <div key={day.date} className="flex items-center justify-between py-2">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-3 h-3 rounded-full bg-orange-500" />
+                                      <span className="text-sm font-medium">
+                                        {format(date, "EEEE d. MMM", { locale: da })}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {day.startTime}{day.endTime ? ` - ${day.endTime}` : ' (ikke udstemplet)'}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800">
+                                        {day.hours.toFixed(1)} timer
+                                      </Badge>
+                                      {shiftStats.hourlyRate > 0 && (
+                                        <Badge variant="secondary" className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                          {dailySalary.toLocaleString('da-DK')} kr
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
