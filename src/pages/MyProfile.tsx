@@ -449,11 +449,17 @@ export default function MyProfile() {
 
   // Calculate shift statistics using expected schedule
   const shiftStats = useMemo(() => {
-    const hourlyRate = employee?.salary_amount || 0;
+    const salaryType = employee?.salary_type;
+    const salaryAmount = employee?.salary_amount || 0;
+    const isFixedSalary = salaryType === 'fixed';
     
     const workDays = expectedSchedule.filter(d => d.status === "work");
     const totalHoursThisMonth = workDays.reduce((sum, d) => sum + d.hours, 0);
-    const totalSalaryThisMonth = totalHoursThisMonth * hourlyRate;
+    
+    // For fixed salary: show monthly salary, not calculated from hours
+    // For hourly: calculate based on hours worked
+    const hourlyRate = isFixedSalary ? 0 : salaryAmount;
+    const totalSalaryThisMonth = isFixedSalary ? salaryAmount : (totalHoursThisMonth * hourlyRate);
     
     // Booking assignments stats (for fieldmarketing)
     const now = new Date();
@@ -465,7 +471,7 @@ export default function MyProfile() {
       const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
       return sum + hours;
     }, 0);
-    const totalBookingSalary = totalBookingHours * hourlyRate;
+    const totalBookingSalary = isFixedSalary ? 0 : (totalBookingHours * hourlyRate);
     
     return {
       stampCount: workDays.length,
@@ -475,8 +481,9 @@ export default function MyProfile() {
       bookingHours: totalBookingHours,
       bookingSalary: totalBookingSalary,
       hourlyRate,
+      isFixedSalary,
     };
-  }, [expectedSchedule, bookingAssignments, employee?.salary_amount]);
+  }, [expectedSchedule, bookingAssignments, employee?.salary_amount, employee?.salary_type]);
 
   // Calculate absence statistics
   const absenceStats = useMemo(() => {
@@ -820,6 +827,17 @@ export default function MyProfile() {
                         <label className="text-xs text-muted-foreground">Løntype</label>
                         <DisplayField value={employee.salary_type} displayValue={getSalaryTypeLabel(employee.salary_type)} />
                       </div>
+                      {employee.salary_amount && (
+                        <div>
+                          <label className="text-xs text-muted-foreground">
+                            {employee.salary_type === 'fixed' ? 'Månedsløn' : 'Timesats'}
+                          </label>
+                          <DisplayField 
+                            value={employee.salary_amount} 
+                            displayValue={`${employee.salary_amount.toLocaleString('da-DK')} kr${employee.salary_type === 'fixed' ? '/måned' : '/time'}`} 
+                          />
+                        </div>
+                      )}
                       <div>
                         <label className="text-xs text-muted-foreground">Reg.nr.</label>
                         <MaskedDisplayField value={employee.bank_reg_number} />
@@ -1116,7 +1134,9 @@ export default function MyProfile() {
                         <Wallet className="h-5 w-5 text-emerald-600" />
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Løn denne måned</p>
+                        <p className="text-sm text-muted-foreground">
+                          {shiftStats.isFixedSalary ? "Fast månedsløn" : "Løn denne måned"}
+                        </p>
                         <p className="text-2xl font-bold">{(shiftStats.stampSalary + shiftStats.bookingSalary).toLocaleString('da-DK')} kr</p>
                       </div>
                     </div>
@@ -1169,7 +1189,7 @@ export default function MyProfile() {
                                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
                                   {day.hours.toFixed(1)} timer
                                 </Badge>
-                                {shiftStats.hourlyRate > 0 && (
+                                {!shiftStats.isFixedSalary && shiftStats.hourlyRate > 0 && (
                                   <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                                     {dailySalary.toLocaleString('da-DK')} kr
                                   </Badge>
