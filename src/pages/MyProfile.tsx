@@ -629,7 +629,8 @@ export default function MyProfile() {
               sale_datetime,
               sale_items (
                 id,
-                mapped_commission
+                mapped_commission,
+                quantity
               )
             `)
             .in("agent_name", agentNames)
@@ -637,10 +638,11 @@ export default function MyProfile() {
             .lte("sale_datetime", periodEnd);
           
           // Use period sales for daily breakdown (same as period query)
-          // Build daily commission map from period sales
+          // Build daily commission map from period sales - multiply by quantity
           periodSales?.forEach(sale => {
             const dateKey = sale.sale_datetime.split('T')[0];
-            const saleCommission = sale.sale_items?.reduce((sum, item) => sum + (item.mapped_commission || 0), 0) || 0;
+            const saleCommission = sale.sale_items?.reduce((sum, item) => 
+              sum + ((item.mapped_commission || 0) * (item.quantity || 1)), 0) || 0;
             dailyCommissionMap.set(dateKey, (dailyCommissionMap.get(dateKey) || 0) + saleCommission);
           });
           
@@ -651,23 +653,24 @@ export default function MyProfile() {
               id,
               sale_items (
                 id,
-                mapped_commission
+                mapped_commission,
+                quantity
               )
             `)
             .in("agent_name", agentNames)
             .gte("sale_datetime", todayStart)
             .lte("sale_datetime", todayEnd);
           
-          // Calculate totals (mapped_commission is already pre-multiplied by quantity)
+          // Calculate totals - multiply by quantity for correct commission
           periodCommission += periodSales?.reduce((total, sale) => {
             return total + (sale.sale_items?.reduce((sum, item) => {
-              return sum + (item.mapped_commission || 0);
+              return sum + ((item.mapped_commission || 0) * (item.quantity || 1));
             }, 0) || 0);
           }, 0) || 0;
           
           todayCommission += todaySales?.reduce((total, sale) => {
             return total + (sale.sale_items?.reduce((sum, item) => {
-              return sum + (item.mapped_commission || 0);
+              return sum + ((item.mapped_commission || 0) * (item.quantity || 1));
             }, 0) || 0);
           }, 0) || 0;
           
