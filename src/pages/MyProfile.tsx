@@ -1690,14 +1690,14 @@ export default function MyProfile() {
                 )}
               </div>
 
-              {/* Expected Schedule - based on standard work hours */}
+              {/* Payroll Period Schedule */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
                     <Clock className="h-4 w-4" />
-                    Månedsoversigt
+                    Lønperiodeoversigt
                     <span className="text-xs font-normal text-muted-foreground ml-2">
-                      (Baseret på {employee?.weekly_hours || 37} timer/uge)
+                      ({format(payrollPeriod.start, "d. MMM", { locale: da })} - {format(payrollPeriod.end, "d. MMM", { locale: da })} · {employee?.weekly_hours || 37} timer/uge)
                     </span>
                   </CardTitle>
                 </CardHeader>
