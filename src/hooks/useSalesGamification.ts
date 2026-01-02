@@ -253,7 +253,10 @@ export function useSalesGamification({
   // Computed values
   const currentStreak = streakData?.current_streak || 0;
   const longestStreak = streakData?.longest_streak || 0;
-  const unlockedAchievementIds = achievements?.map(a => a.achievement_type) || [];
+  
+  const unlockedAchievementIds = useMemo(() => {
+    return achievements?.map(a => a.achievement_type) || [];
+  }, [achievements]);
   
   const levelProgress = useMemo(() => {
     const totalEarned = levelData?.total_earned || 0;
@@ -268,26 +271,27 @@ export function useSalesGamification({
     return getRandomQuote(performanceStatus);
   }, [performanceStatus]);
 
-  // Check for new achievements
-  const achievementCheckData: AchievementCheckData = useMemo(() => ({
-    hasSetGoal: targetAmount > 0,
-    progressPercent,
-    isAhead,
-    currentStreak,
-    longestStreak,
-    daysPassedInPeriod,
-    totalDaysInPeriod,
-    currentPeriodTotal,
-    exceededGoalBy10Percent: progressPercent >= 110,
-  }), [targetAmount, progressPercent, isAhead, currentStreak, longestStreak, daysPassedInPeriod, totalDaysInPeriod, currentPeriodTotal]);
-
+  // Check for new achievements - only compute once when achievements data is stable
   const potentialAchievements = useMemo(() => {
-    return checkAchievements(achievementCheckData);
-  }, [achievementCheckData]);
+    const checkData: AchievementCheckData = {
+      hasSetGoal: targetAmount > 0,
+      progressPercent,
+      isAhead,
+      currentStreak,
+      longestStreak,
+      daysPassedInPeriod,
+      totalDaysInPeriod,
+      currentPeriodTotal,
+      exceededGoalBy10Percent: progressPercent >= 110,
+    };
+    return checkAchievements(checkData);
+  }, [targetAmount, progressPercent, isAhead, currentStreak, longestStreak, daysPassedInPeriod, totalDaysInPeriod, currentPeriodTotal]);
 
+  // Calculate new achievements - use stable references
   const newAchievements = useMemo(() => {
+    if (!achievements) return []; // Don't compute until achievements are loaded
     return potentialAchievements.filter(id => !unlockedAchievementIds.includes(id));
-  }, [potentialAchievements, unlockedAchievementIds]);
+  }, [potentialAchievements, unlockedAchievementIds, achievements]);
 
   // Get records by type
   const bestDayRecord = records?.find(r => r.record_type === "best_day");
