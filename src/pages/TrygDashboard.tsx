@@ -1,10 +1,15 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { format, startOfDay } from "date-fns";
+import { da } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, Users, Package, DollarSign } from "lucide-react";
+import { TrendingUp, Users, Package } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
+import { DateRange } from "react-day-picker";
 
 interface SaleItem {
   id: string;
@@ -41,14 +46,24 @@ interface ProductStats {
   commission: number;
 }
 
+const formatCurrency = (value: number) => 
+  new Intl.NumberFormat('da-DK', { style: 'decimal', maximumFractionDigits: 0 }).format(value) + ' DKK';
+
 const TrygDashboard = () => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayISO = today.toISOString();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfDay(new Date()),
+    to: new Date()
+  });
 
   const { data: saleItems, isLoading } = useQuery({
-    queryKey: ['tryg-dashboard-sales', todayISO],
+    queryKey: ['tryg-dashboard-sales', dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async () => {
+      if (!dateRange?.from) return [];
+      
+      const rangeStart = startOfDay(dateRange.from);
+      const rangeEnd = dateRange.to ? new Date(startOfDay(dateRange.to)) : new Date(rangeStart);
+      rangeEnd.setDate(rangeEnd.getDate() + 1);
+
       const { data, error } = await supabase
         .from('sale_items')
         .select(`
@@ -71,12 +86,14 @@ const TrygDashboard = () => {
             source
           )
         `)
-        .gte('sales.sale_datetime', todayISO)
+        .gte('sales.sale_datetime', rangeStart.toISOString())
+        .lt('sales.sale_datetime', rangeEnd.toISOString())
         .ilike('sales.source', '%tryg%');
 
       if (error) throw error;
       return data as unknown as SaleItem[];
     },
+    enabled: !!dateRange?.from
   });
 
   // Filter to only count items where counts_as_sale is true
@@ -84,49 +101,64 @@ const TrygDashboard = () => {
     item.products?.counts_as_sale === true
   ) || [];
 
-  // Calculate totals
-  const totalSales = countableSaleItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
-  const totalRevenue = countableSaleItems.reduce((sum, item) => 
-    sum + ((item.products?.revenue_dkk || 0) * (item.quantity || 1)), 0
-  );
-  const totalCommission = countableSaleItems.reduce((sum, item) => 
-    sum + ((item.products?.commission_dkk || 0) * (item.quantity || 1)), 0
-  );
+  // Calculate totals and stats
+  const { totalSales, totalCommission, agentList, productList } = useMemo(() => {
+    const totalSales = countableSaleItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+    const totalCommission = countableSaleItems.reduce((sum, item) => 
+      sum + ((item.products?.commission_dkk || 0) * (item.quantity || 1)), 0
+    );
 
-  // Group by agent
-  const agentStats: Record<string, AgentStats> = {};
-  countableSaleItems.forEach(item => {
-    const agentName = item.sales?.agent_name || 'Ukendt';
-    if (!agentStats[agentName]) {
-      agentStats[agentName] = { name: agentName, salesCount: 0, revenue: 0, commission: 0 };
+    // Group by agent
+    const agentMap = new Map<string, AgentStats>();
+    countableSaleItems.forEach(item => {
+      const agentName = item.sales?.agent_name || 'Ukendt';
+      const existing = agentMap.get(agentName) || { name: agentName, salesCount: 0, revenue: 0, commission: 0 };
+      const qty = item.quantity || 1;
+      existing.salesCount += qty;
+      existing.commission += (item.products?.commission_dkk || 0) * qty;
+      agentMap.set(agentName, existing);
+    });
+
+    // Group by product
+    const productMap = new Map<string, ProductStats>();
+    countableSaleItems.forEach(item => {
+      const productName = item.products?.name || 'Ukendt produkt';
+      const existing = productMap.get(productName) || { name: productName, quantity: 0, revenue: 0, commission: 0 };
+      const qty = item.quantity || 1;
+      existing.quantity += qty;
+      existing.commission += (item.products?.commission_dkk || 0) * qty;
+      productMap.set(productName, existing);
+    });
+
+    return {
+      totalSales,
+      totalCommission,
+      agentList: Array.from(agentMap.values()).sort((a, b) => b.commission - a.commission),
+      productList: Array.from(productMap.values()).sort((a, b) => b.quantity - a.quantity)
+    };
+  }, [countableSaleItems]);
+
+  const getSubtitle = () => {
+    if (!dateRange?.from) return "Salgsdata baseret på produkt mapping";
+    const isSingleDay = !dateRange.to || startOfDay(dateRange.from).getTime() === startOfDay(dateRange.to).getTime();
+    if (isSingleDay) {
+      const isToday = startOfDay(dateRange.from).getTime() === startOfDay(new Date()).getTime();
+      return `Salg for ${isToday ? "i dag" : format(dateRange.from, "d. MMMM yyyy", { locale: da })} • Baseret på produkt mapping`;
     }
-    agentStats[agentName].salesCount += item.quantity || 1;
-    agentStats[agentName].revenue += (item.products?.revenue_dkk || 0) * (item.quantity || 1);
-    agentStats[agentName].commission += (item.products?.commission_dkk || 0) * (item.quantity || 1);
-  });
-  const agentList = Object.values(agentStats).sort((a, b) => b.salesCount - a.salesCount);
-
-  // Group by product
-  const productStats: Record<string, ProductStats> = {};
-  countableSaleItems.forEach(item => {
-    const productName = item.products?.name || item.adversus_product_title || 'Ukendt produkt';
-    if (!productStats[productName]) {
-      productStats[productName] = { name: productName, quantity: 0, revenue: 0, commission: 0 };
-    }
-    productStats[productName].quantity += item.quantity || 1;
-    productStats[productName].revenue += (item.products?.revenue_dkk || 0) * (item.quantity || 1);
-    productStats[productName].commission += (item.products?.commission_dkk || 0) * (item.quantity || 1);
-  });
-  const productList = Object.values(productStats).sort((a, b) => b.quantity - a.quantity);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('da-DK', { style: 'currency', currency: 'DKK' }).format(value);
+    return `Salg fra ${format(dateRange.from, "d. MMM", { locale: da })} til ${format(dateRange.to!, "d. MMM yyyy", { locale: da })} • Baseret på produkt mapping`;
   };
+
+  const datePickerContent = (
+    <DashboardDateRangePicker 
+      dateRange={dateRange} 
+      onDateRangeChange={setDateRange} 
+    />
+  );
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-6">
-        <DashboardHeader title="Tryg – Dagsoverblik" subtitle="Salgsdata for i dag baseret på produkt mapping" />
+        <DashboardHeader title="Tryg – Overblik" subtitle="Salgsdata baseret på produkt mapping" />
         <div className="space-y-6">
           <Skeleton className="h-8 w-64" />
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -139,13 +171,17 @@ const TrygDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background p-6">
-      <DashboardHeader title="Tryg – Dagsoverblik" subtitle="Salgsdata for i dag baseret på produkt mapping" />
+      <DashboardHeader 
+        title="Tryg – Overblik" 
+        subtitle={getSubtitle()}
+        rightContent={datePickerContent}
+      />
       <div className="space-y-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Salg i dag</CardTitle>
+              <CardTitle className="text-sm font-medium">Salg</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -193,17 +229,24 @@ const TrygDashboard = () => {
                   {agentList.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={3} className="text-center text-muted-foreground">
-                        Ingen salg i dag
+                        Ingen salg registreret i perioden
                       </TableCell>
                     </TableRow>
                   ) : (
-                    agentList.map((agent) => (
-                      <TableRow key={agent.name}>
-                        <TableCell className="font-medium">{agent.name}</TableCell>
-                        <TableCell className="text-right">{agent.salesCount}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(agent.commission)}</TableCell>
+                    <>
+                      {agentList.map((agent) => (
+                        <TableRow key={agent.name}>
+                          <TableCell className="font-medium">{agent.name}</TableCell>
+                          <TableCell className="text-right">{agent.salesCount}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(agent.commission)}</TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="bg-muted/50 font-semibold">
+                        <TableCell>Total</TableCell>
+                        <TableCell className="text-right">{totalSales}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(totalCommission)}</TableCell>
                       </TableRow>
-                    ))
+                    </>
                   )}
                 </TableBody>
               </Table>
@@ -213,7 +256,7 @@ const TrygDashboard = () => {
           {/* Product Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Solgte produkter</CardTitle>
+              <CardTitle>Produkter solgt</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
@@ -228,17 +271,24 @@ const TrygDashboard = () => {
                   {productList.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={3} className="text-center text-muted-foreground">
-                        Ingen produkter solgt i dag
+                        Ingen produkter solgt i perioden
                       </TableCell>
                     </TableRow>
                   ) : (
-                    productList.map((product) => (
-                      <TableRow key={product.name}>
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell className="text-right">{product.quantity}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(product.commission)}</TableCell>
+                    <>
+                      {productList.map((product) => (
+                        <TableRow key={product.name}>
+                          <TableCell className="font-medium max-w-[200px] truncate">{product.name}</TableCell>
+                          <TableCell className="text-right">{product.quantity}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(product.commission)}</TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="bg-muted/50 font-semibold">
+                        <TableCell>Total</TableCell>
+                        <TableCell className="text-right">{totalSales}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(totalCommission)}</TableCell>
                       </TableRow>
-                    ))
+                    </>
                   )}
                 </TableBody>
               </Table>
