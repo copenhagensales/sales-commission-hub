@@ -1764,8 +1764,8 @@ export default function MyProfile() {
                           current.setDate(current.getDate() + 1);
                         }
                         
-                        // Filter to only show working days (not weekends)
-                        const workingDays = allDays.filter(d => !d.isWeekend);
+                        // Filter to only show working days (not weekends), reverse to show newest first
+                        const workingDays = allDays.filter(d => !d.isWeekend).reverse();
                         
                         return workingDays.map((day) => {
                           const date = new Date(day.date);
