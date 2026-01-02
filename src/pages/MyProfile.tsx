@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown } from "lucide-react";
+import { User, MapPin, Briefcase, Wallet, Palmtree, Car, Clock, FileText, CalendarX, Thermometer, AlertTriangle, AlarmClock, Pencil, Save, X, Check, Phone, Mail, Shield, History, ChevronDown, Star } from "lucide-react";
 import { GdprSettingsCard } from "@/components/gdpr/GdprSettingsCard";
 import { GdprConsentDialog } from "@/components/gdpr/GdprConsentDialog";
 import { useHasDataProcessingConsent } from "@/hooks/useGdpr";
@@ -359,14 +359,21 @@ export default function MyProfile() {
       timeStampsByDate.set(dateKey, stamp);
     });
     
+    // Create a map of holidays for quick lookup
+    const holidaysByDate = new Map<string, string>();
+    danishHolidays.forEach(h => {
+      holidaysByDate.set(h.date, h.name);
+    });
+    
     type ScheduleEntry = {
       date: string;
-      status: "work" | "vacation" | "sick";
+      status: "work" | "vacation" | "sick" | "holiday";
       hours: number;
       startTime: string;
       endTime: string;
       hasActualStamp: boolean;
       isWeekend?: boolean;
+      holidayName?: string;
     };
     
     const schedule: ScheduleEntry[] = [];
@@ -382,6 +389,7 @@ export default function MyProfile() {
       const day = String(current.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const holidayName = holidaysByDate.get(dateStr);
       
       // Check for actual time stamp on this date
       const actualStamp = timeStampsByDate.get(dateStr);
@@ -410,50 +418,64 @@ export default function MyProfile() {
           });
         }
       } else {
-        // Weekday logic
-        const absence = absences.find(a => {
-          const start = new Date(a.start_date);
-          const end = new Date(a.end_date);
-          return current >= start && current <= end;
-        });
-        
-        if (absence) {
+        // Weekday logic - check for holiday first
+        if (holidayName) {
+          // Holiday - count as paid day off (full hours credit for fixed salary)
           schedule.push({
             date: dateStr,
-            status: absence.type === "vacation" ? "vacation" : "sick",
-            hours: 0,
+            status: "holiday",
+            hours: dailyHours, // Holidays give full pay
             startTime: "",
             endTime: "",
             hasActualStamp: false,
-          });
-        } else if (actualStamp) {
-          const clockIn = new Date(actualStamp.clock_in);
-          const clockOut = actualStamp.clock_out ? new Date(actualStamp.clock_out) : null;
-          const actualStartTime = clockIn.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
-          const actualEndTime = clockOut ? clockOut.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }) : null;
-          
-          let actualHours = dailyHours;
-          if (clockOut) {
-            actualHours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
-          }
-          
-          schedule.push({
-            date: dateStr,
-            status: "work",
-            hours: actualHours,
-            startTime: actualStartTime,
-            endTime: actualEndTime || "",
-            hasActualStamp: true,
+            holidayName,
           });
         } else {
-          schedule.push({
-            date: dateStr,
-            status: "work",
-            hours: dailyHours,
-            startTime: defaultStartTime,
-            endTime: "",
-            hasActualStamp: false,
+          // Check for absence
+          const absence = absences.find(a => {
+            const start = new Date(a.start_date);
+            const end = new Date(a.end_date);
+            return current >= start && current <= end;
           });
+          
+          if (absence) {
+            schedule.push({
+              date: dateStr,
+              status: absence.type === "vacation" ? "vacation" : "sick",
+              hours: 0,
+              startTime: "",
+              endTime: "",
+              hasActualStamp: false,
+            });
+          } else if (actualStamp) {
+            const clockIn = new Date(actualStamp.clock_in);
+            const clockOut = actualStamp.clock_out ? new Date(actualStamp.clock_out) : null;
+            const actualStartTime = clockIn.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+            const actualEndTime = clockOut ? clockOut.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' }) : null;
+            
+            let actualHours = dailyHours;
+            if (clockOut) {
+              actualHours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+            }
+            
+            schedule.push({
+              date: dateStr,
+              status: "work",
+              hours: actualHours,
+              startTime: actualStartTime,
+              endTime: actualEndTime || "",
+              hasActualStamp: true,
+            });
+          } else {
+            schedule.push({
+              date: dateStr,
+              status: "work",
+              hours: dailyHours,
+              startTime: defaultStartTime,
+              endTime: "",
+              hasActualStamp: false,
+            });
+          }
         }
       }
       current.setDate(current.getDate() + 1);
@@ -463,7 +485,7 @@ export default function MyProfile() {
       expectedSchedule: schedule.reverse(),
       weekendSchedule: weekends.reverse(),
     };
-  }, [employee?.weekly_hours, employee?.standard_start_time, absences, deduplicatedTimeStamps]);
+  }, [employee?.weekly_hours, employee?.standard_start_time, absences, deduplicatedTimeStamps, danishHolidays]);
   
   const [showWeekends, setShowWeekends] = useState(false);
 
@@ -1322,12 +1344,19 @@ export default function MyProfile() {
                               <div className="w-3 h-3 rounded-full bg-green-500" />
                             ) : day.status === "vacation" ? (
                               <Palmtree className="h-4 w-4 text-amber-500" />
+                            ) : day.status === "holiday" ? (
+                              <Star className="h-4 w-4 text-purple-500" />
                             ) : (
                               <Thermometer className="h-4 w-4 text-red-500" />
                             )}
                             <span className="text-sm font-medium">
                               {format(date, "EEEE d. MMM", { locale: da })}
                             </span>
+                            {day.status === "holiday" && day.holidayName && (
+                              <span className="text-xs text-purple-600 dark:text-purple-400">
+                                {day.holidayName}
+                              </span>
+                            )}
                             {day.status === "work" && day.startTime && (
                               <span className="text-xs text-muted-foreground">
                                 {day.hasActualStamp 
@@ -1349,6 +1378,10 @@ export default function MyProfile() {
                                   </Badge>
                                 )}
                               </>
+                            ) : day.status === "holiday" ? (
+                              <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200">
+                                Helligdag
+                              </Badge>
                             ) : (
                               <Badge 
                                 variant={day.status === "vacation" ? "secondary" : "destructive"}
