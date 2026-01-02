@@ -3595,6 +3595,7 @@ export type Database = {
           focus_id: string
           focus_title: string
           id: string
+          is_active: boolean | null
           leader_course_duration_min: number | null
           leader_course_ppt_id: string | null
           leader_course_title: string | null
@@ -3623,6 +3624,7 @@ export type Database = {
           focus_id: string
           focus_title: string
           id?: string
+          is_active?: boolean | null
           leader_course_duration_min?: number | null
           leader_course_ppt_id?: string | null
           leader_course_title?: string | null
@@ -3651,6 +3653,7 @@ export type Database = {
           focus_id?: string
           focus_title?: string
           id?: string
+          is_active?: boolean | null
           leader_course_duration_min?: number | null
           leader_course_ppt_id?: string | null
           leader_course_title?: string | null
