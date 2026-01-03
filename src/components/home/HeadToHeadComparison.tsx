@@ -288,7 +288,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
     return { percentComplete, timeRemainingText };
   }, [dateRange, period]);
 
-  // Fetch all employees for selection with team info
+  // Fetch all employees for selection with team info (excluding Stab employees)
   const { data: employees = [] } = useQuery({
     queryKey: ["h2h-employees"],
     queryFn: async (): Promise<EmployeeForH2H[]> => {
@@ -303,15 +303,18 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
         .eq("is_active", true)
         .order("first_name");
       
-      return (employeesData || []).map(emp => {
-        const teamMember = (emp.team_members as any)?.[0];
-        const teamName = teamMember?.teams?.name || null;
-        return {
-          id: emp.id,
-          name: `${emp.first_name} ${emp.last_name}`,
-          teamName
-        };
-      });
+      return (employeesData || [])
+        .map(emp => {
+          const teamMember = (emp.team_members as any)?.[0];
+          const teamName = teamMember?.teams?.name || null;
+          return {
+            id: emp.id,
+            name: `${emp.first_name} ${emp.last_name}`,
+            teamName
+          };
+        })
+        // Exclude Stab employees from duel opponents
+        .filter(emp => emp.teamName !== "Stab");
     },
   });
 
