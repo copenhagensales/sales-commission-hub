@@ -743,6 +743,16 @@ const Home = () => {
     return new Intl.NumberFormat("da-DK", { style: "currency", currency: "DKK", maximumFractionDigits: 0 }).format(amount);
   };
 
+  // Format name as "FirstName L" (e.g., "Kasper M")
+  const formatShortName = (fullName: string | null | undefined) => {
+    if (!fullName) return "Ukendt";
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0];
+    const firstName = parts[0];
+    const lastInitial = parts[parts.length - 1].charAt(0).toUpperCase();
+    return `${firstName} ${lastInitial}`;
+  };
+
   const formatDateLong = (dateStr: string) => {
     try {
       return format(parseISO(dateStr), "EEEE d. MMMM", { locale: da });
@@ -1061,7 +1071,7 @@ const Home = () => {
                       <p className="text-[10px] text-amber-700 dark:text-amber-400 uppercase tracking-wider">Sidste uge</p>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="font-semibold text-sm text-amber-900 dark:text-amber-100 truncate">
-                          {weeklyRecognition?.lastWeek?.topWeekly?.name || "Ingen data"}
+                          {formatShortName(weeklyRecognition?.lastWeek?.topWeekly?.name) || "Ingen data"}
                         </p>
                         {weeklyRecognition?.lastWeek?.topWeekly?.team && (
                           <Badge variant="secondary" className="text-[10px] px-1.5">{weeklyRecognition.lastWeek.topWeekly.team}</Badge>
@@ -1083,7 +1093,7 @@ const Home = () => {
                       <p className="text-[10px] text-orange-700 dark:text-orange-400 uppercase tracking-wider">Denne uge</p>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="font-semibold text-sm text-orange-900 dark:text-orange-100 truncate">
-                          {weeklyRecognition?.currentWeek?.topWeekly?.name || "Ingen data endnu"}
+                          {formatShortName(weeklyRecognition?.currentWeek?.topWeekly?.name) || "Ingen data endnu"}
                         </p>
                         {weeklyRecognition?.currentWeek?.topWeekly?.team && (
                           <Badge variant="secondary" className="text-[10px] px-1.5">{weeklyRecognition.currentWeek.topWeekly.team}</Badge>
@@ -1112,7 +1122,7 @@ const Home = () => {
                       <p className="text-[10px] text-blue-700 dark:text-blue-400 uppercase tracking-wider">Sidste uge</p>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="font-semibold text-sm text-blue-900 dark:text-blue-100 truncate">
-                          {weeklyRecognition?.lastWeek?.bestDay?.name || "Ingen data"}
+                          {formatShortName(weeklyRecognition?.lastWeek?.bestDay?.name) || "Ingen data"}
                         </p>
                         {weeklyRecognition?.lastWeek?.bestDay?.team && (
                           <Badge variant="secondary" className="text-[10px] px-1.5">{weeklyRecognition.lastWeek.bestDay.team}</Badge>
@@ -1134,7 +1144,7 @@ const Home = () => {
                       <p className="text-[10px] text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">Denne uge</p>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="font-semibold text-sm text-indigo-900 dark:text-indigo-100 truncate">
-                          {weeklyRecognition?.currentWeek?.bestDay?.name || "Ingen data endnu"}
+                          {formatShortName(weeklyRecognition?.currentWeek?.bestDay?.name) || "Ingen data endnu"}
                         </p>
                         {weeklyRecognition?.currentWeek?.bestDay?.team && (
                           <Badge variant="secondary" className="text-[10px] px-1.5">{weeklyRecognition.currentWeek.bestDay.team}</Badge>
