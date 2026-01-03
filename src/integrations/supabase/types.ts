@@ -1614,7 +1614,9 @@ export type Database = {
           employee_id: string
           expires_at: string | null
           id: string
+          last_reminder_at: string | null
           notes: string | null
+          reminder_count: number | null
           sent_at: string | null
           sent_by: string | null
           status: Database["public"]["Enums"]["contract_status"] | null
@@ -1629,7 +1631,9 @@ export type Database = {
           employee_id: string
           expires_at?: string | null
           id?: string
+          last_reminder_at?: string | null
           notes?: string | null
+          reminder_count?: number | null
           sent_at?: string | null
           sent_by?: string | null
           status?: Database["public"]["Enums"]["contract_status"] | null
@@ -1644,7 +1648,9 @@ export type Database = {
           employee_id?: string
           expires_at?: string | null
           id?: string
+          last_reminder_at?: string | null
           notes?: string | null
+          reminder_count?: number | null
           sent_at?: string | null
           sent_by?: string | null
           status?: Database["public"]["Enums"]["contract_status"] | null
