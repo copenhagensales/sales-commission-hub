@@ -191,6 +191,35 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
 
+  // Fetch pending H2H challenges count
+  const { data: pendingH2hCount = 0 } = useQuery({
+    queryKey: ["pending-h2h-count", user?.email],
+    queryFn: async () => {
+      if (!user?.email) return 0;
+
+      const lowerEmail = user.email.toLowerCase();
+      const { data: currentEmployee } = await supabase
+        .from("employee_master_data")
+        .select("id")
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+        .maybeSingle();
+
+      if (!currentEmployee) return 0;
+
+      const { count } = await supabase
+        .from("h2h_challenges")
+        .select("*", { count: "exact", head: true })
+        .eq("opponent_employee_id", currentEmployee.id)
+        .eq("status", "pending");
+
+      return count || 0;
+    },
+    enabled: !!user?.email,
+    staleTime: 10000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
+  });
+
   const pendingContractsCount = employeeData?.pendingContracts ?? 0;
   const employeeName = employeeData?.name;
 
@@ -312,9 +341,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 {t("sidebar.myHome", "Mit Hjem")}
               </div>
               <div className="flex items-center gap-1">
-                {(unreadMessagesCount > 0 || pendingContractsCount > 0) && (
+                {(unreadMessagesCount > 0 || pendingContractsCount > 0 || pendingH2hCount > 0) && (
                   <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                    {(unreadMessagesCount + pendingContractsCount) > 99 ? "99+" : (unreadMessagesCount + pendingContractsCount)}
+                    {(unreadMessagesCount + pendingContractsCount + pendingH2hCount) > 99 ? "99+" : (unreadMessagesCount + pendingContractsCount + pendingH2hCount)}
                   </Badge>
                 )}
                 {mitHjemOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -326,12 +355,19 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 to="/home"
                 onClick={handleNavClick}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                   location.pathname === "/home" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                 )}
               >
-                <Home className="h-4 w-4" />
-                {t("sidebar.home")}
+                <div className="flex items-center gap-3">
+                  <Home className="h-4 w-4" />
+                  {t("sidebar.home")}
+                </div>
+                {pendingH2hCount > 0 && (
+                  <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                    {pendingH2hCount > 99 ? "99+" : pendingH2hCount}
+                  </Badge>
+                )}
               </NavLink>
               
               {/* Beskeder */}
