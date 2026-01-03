@@ -657,27 +657,35 @@ const Home = () => {
         .select("id, name, email")
         .in("name", allAgentNames.length > 0 ? allAgentNames : ["__none__"]);
       
-      // Get team info via employee_agent_mapping (primary method) - use team_members for team lookup
+      // Get team info via employee_agent_mapping - simpler approach with separate query
       const agentIds = agents?.map(a => a.id).filter(Boolean) || [];
       const { data: agentMappings } = agentIds.length > 0 ? await supabase
         .from("employee_agent_mapping")
-        .select(`
-          agent_id,
-          employee:employee_id(
-            id, 
-            first_name, 
-            last_name,
-            team_members(team_id, teams(name))
-          )
-        `)
+        .select("agent_id, employee_id")
         .in("agent_id", agentIds) : { data: [] };
       
-      // Fallback: Get team info via email matching - use team_members for team lookup
+      // Get employee IDs from mappings
+      const employeeIdsFromMappings = agentMappings?.map(m => m.employee_id).filter(Boolean) || [];
+      
+      // Get team info for mapped employees
+      const { data: teamMembersData } = employeeIdsFromMappings.length > 0 ? await supabase
+        .from("team_members")
+        .select("employee_id, teams(name)")
+        .in("employee_id", employeeIdsFromMappings) : { data: [] };
+      
+      // Also get team info via email matching as fallback
       const agentEmails = agents?.map(a => a.email).filter(Boolean) || [];
       const { data: employeesByEmail } = agentEmails.length > 0 ? await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, work_email, private_email, team_members(team_id, teams(name))")
+        .select("id, work_email, private_email")
         .or(agentEmails.map(e => `work_email.eq.${e},private_email.eq.${e}`).join(",")) : { data: [] };
+      
+      // Get team info for email-matched employees
+      const employeeIdsFromEmail = employeesByEmail?.map(e => e.id).filter(Boolean) || [];
+      const { data: teamMembersFromEmail } = employeeIdsFromEmail.length > 0 ? await supabase
+        .from("team_members")
+        .select("employee_id, teams(name)")
+        .in("employee_id", employeeIdsFromEmail) : { data: [] };
       
       const getTeamForAgent = (agentName: string) => {
         const agent = agents?.find(a => a.name === agentName);
@@ -685,17 +693,22 @@ const Home = () => {
         
         // First try employee_agent_mapping
         const mapping = agentMappings?.find(m => m.agent_id === agent.id);
-        if (mapping?.employee) {
-          const emp = mapping.employee as { team_members?: Array<{ teams?: { name: string } | null }> };
-          const teamMember = emp.team_members?.[0];
-          if (teamMember?.teams?.name) return { name: teamMember.teams.name };
+        if (mapping?.employee_id) {
+          const teamMember = teamMembersData?.find(tm => tm.employee_id === mapping.employee_id);
+          if (teamMember?.teams && typeof teamMember.teams === 'object' && 'name' in teamMember.teams) {
+            return { name: (teamMember.teams as { name: string }).name };
+          }
         }
         
         // Fallback to email matching
         if (agent.email) {
           const emp = employeesByEmail?.find(e => e.work_email === agent.email || e.private_email === agent.email);
-          const teamMember = (emp as any)?.team_members?.[0];
-          if (teamMember?.teams?.name) return { name: teamMember.teams.name };
+          if (emp?.id) {
+            const teamMember = teamMembersFromEmail?.find(tm => tm.employee_id === emp.id);
+            if (teamMember?.teams && typeof teamMember.teams === 'object' && 'name' in teamMember.teams) {
+              return { name: (teamMember.teams as { name: string }).name };
+            }
+          }
         }
         
         return null;
