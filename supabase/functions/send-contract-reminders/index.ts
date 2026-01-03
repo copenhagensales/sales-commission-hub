@@ -86,6 +86,8 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Find contracts pending employee signature for more than 3 days
+    // Only include contracts with less than 3 reminders sent
+    // And where last reminder was at least 3 days ago (or never sent)
     const threeDaysAgo = new Date();
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
@@ -95,18 +97,28 @@ const handler = async (req: Request): Promise<Response> => {
         id,
         title,
         sent_at,
+        reminder_count,
+        last_reminder_at,
         employee:employee_master_data(id, first_name, last_name, private_email)
       `)
       .eq("status", "pending_employee")
       .lt("sent_at", threeDaysAgo.toISOString())
-      .not("sent_at", "is", null);
+      .not("sent_at", "is", null)
+      .lt("reminder_count", 3); // Max 3 reminders
 
     if (fetchError) {
       console.error("Error fetching contracts:", fetchError);
       throw fetchError;
     }
 
-    if (!pendingContracts || pendingContracts.length === 0) {
+    // Filter contracts where last_reminder_at is null or at least 3 days ago
+    const eligibleContracts = (pendingContracts || []).filter(contract => {
+      if (!contract.last_reminder_at) return true;
+      const lastReminder = new Date(contract.last_reminder_at);
+      return lastReminder <= threeDaysAgo;
+    });
+
+    if (eligibleContracts.length === 0) {
       console.log("No pending contracts requiring reminders");
       return new Response(
         JSON.stringify({ message: "No reminders to send", count: 0 }),
@@ -114,13 +126,13 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Found ${pendingContracts.length} contracts pending reminder`);
+    console.log(`Found ${eligibleContracts.length} contracts eligible for reminder`);
 
-    const baseUrl = "https://jwlimmeijpfmaksvmuru.lovable.app";
+    const baseUrl = Deno.env.get("PUBLIC_APP_URL") || "https://jwlimmeijpfmaksvmuru.lovable.app";
     let sentCount = 0;
     let accessToken: string | null = null;
 
-    for (const contract of pendingContracts) {
+    for (const contract of eligibleContracts) {
       const employee = contract.employee as any;
       if (!employee?.private_email) {
         console.log(`Skipping contract ${contract.id} - no employee email`);
@@ -195,8 +207,18 @@ const handler = async (req: Request): Promise<Response> => {
           htmlBody
         );
 
+        // Update reminder tracking
+        const newReminderCount = (contract.reminder_count || 0) + 1;
+        await supabase
+          .from("contracts")
+          .update({ 
+            reminder_count: newReminderCount, 
+            last_reminder_at: new Date().toISOString() 
+          })
+          .eq("id", contract.id);
+
         sentCount++;
-        console.log(`Reminder sent to ${employee.private_email} for contract ${contract.id}`);
+        console.log(`Reminder ${newReminderCount}/3 sent to ${employee.private_email} for contract ${contract.id}`);
       } catch (emailError) {
         console.error(`Failed to send reminder to ${employee.private_email}:`, emailError);
       }
