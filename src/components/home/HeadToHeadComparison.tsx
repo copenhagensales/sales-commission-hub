@@ -16,6 +16,8 @@ import { H2HAchievementBadges } from "@/components/h2h/H2HAchievementBadges";
 import { EnhancedMomentumBar } from "@/components/h2h/EnhancedMomentumBar";
 import { MatchCountdownTimer } from "@/components/h2h/MatchCountdownTimer";
 import { H2HConfettiEffect, SparkleEffect } from "@/components/h2h/H2HConfettiEffect";
+import { H2HMatchHistory } from "@/components/h2h/H2HMatchHistory";
+import { H2HPlayerStats } from "@/components/h2h/H2HPlayerStats";
 
 interface EmployeeForH2H {
   id: string;
@@ -1396,6 +1398,13 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
             <KpiBattleRow label="Provision" icon={DollarSign} leftValue={stats.myTeam.commission} rightValue={stats.opponentTeam.commission} winner={kpiWins.commission} formatFn={formatCurrency} />
             <KpiBattleRow label="Opkald" icon={Phone} leftValue={stats.myTeam.callCount} rightValue={stats.opponentTeam.callCount} winner={kpiWins.calls} />
             <KpiBattleRow label="Taletid" icon={Clock} leftValue={stats.myTeam.talkTimeSeconds} rightValue={stats.opponentTeam.talkTimeSeconds} winner={kpiWins.talkTime} formatFn={formatTime} />
+          </div>
+        )}
+
+        {/* Match History - Show when no active match */}
+        {currentEmployeeId && !matchStarted && (
+          <div className="pt-4 border-t border-slate-700/50">
+            <H2HMatchHistory employeeId={currentEmployeeId} compact />
           </div>
         )}
 
