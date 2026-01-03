@@ -90,6 +90,7 @@ import {
   TvBoardView,
   TvBoardAdmin,
   LiveStats,
+  HeadToHead,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -100,6 +101,7 @@ export const routes: RouteConfig[] = [
   { path: "/reset-password", component: ResetPassword, access: "public" },
 
   { path: "/home", component: Home, access: "protected" },
+  { path: "/head-to-head", component: HeadToHead, access: "protected" },
   { path: "/my-schedule", component: MySchedule, access: "protected" },
   { path: "/my-profile", component: MyProfile, access: "protected" },
   { path: "/my-goals", component: MyGoals, access: "protected" },
