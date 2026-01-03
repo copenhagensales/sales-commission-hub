@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,7 +39,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
   
   const [mitHjemOpen, setMitHjemOpen] = useState(
-    ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes"].some(path => location.pathname === path || location.pathname.startsWith(path))
+    ["/home", "/head-to-head", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp" || location.pathname === "/closing-shifts");
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
@@ -355,13 +355,26 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 to="/home"
                 onClick={handleNavClick}
                 className={cn(
-                  "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                   location.pathname === "/home" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                 )}
               >
+                <Home className="h-4 w-4" />
+                {t("sidebar.home")}
+              </NavLink>
+
+              {/* Head to Head */}
+              <NavLink
+                to="/head-to-head"
+                onClick={handleNavClick}
+                className={cn(
+                  "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/head-to-head" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}
+              >
                 <div className="flex items-center gap-3">
-                  <Home className="h-4 w-4" />
-                  {t("sidebar.home")}
+                  <Swords className="h-4 w-4" />
+                  Head to Head
                 </div>
                 {pendingH2hCount > 0 && (
                   <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
