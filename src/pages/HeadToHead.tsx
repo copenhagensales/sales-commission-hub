@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { MainLayout } from "@/components/layout/MainLayout";
 import { HeadToHeadComparison } from "@/components/home/HeadToHeadComparison";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -27,18 +28,22 @@ export default function HeadToHead() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
-        <Skeleton className="h-[600px] w-full rounded-xl" />
-      </div>
+      <MainLayout>
+        <div className="container mx-auto p-6 max-w-4xl">
+          <Skeleton className="h-[600px] w-full rounded-xl" />
+        </div>
+      </MainLayout>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <HeadToHeadComparison
-        currentEmployeeId={currentEmployee?.id}
-        currentEmployeeName={currentEmployee ? `${currentEmployee.first_name} ${currentEmployee.last_name}` : undefined}
-      />
-    </div>
+    <MainLayout>
+      <div className="container mx-auto p-6 max-w-4xl">
+        <HeadToHeadComparison
+          currentEmployeeId={currentEmployee?.id}
+          currentEmployeeName={currentEmployee ? `${currentEmployee.first_name} ${currentEmployee.last_name}` : undefined}
+        />
+      </div>
+    </MainLayout>
   );
 }
