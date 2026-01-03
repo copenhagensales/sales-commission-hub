@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { HeadToHeadComparison } from "@/components/home/HeadToHeadComparison";
+
 import { 
   Cake, 
   Award, 
@@ -51,16 +51,6 @@ const Home = () => {
   const queryClient = useQueryClient();
   const [addEventOpen, setAddEventOpen] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", event_date: "", event_time: "", location: "" });
-  const [showH2H, setShowH2H] = useState(() => {
-    try {
-      return localStorage.getItem("home-show-h2h") === "true";
-    } catch { return false; }
-  });
-
-  const toggleH2H = (show: boolean) => {
-    setShowH2H(show);
-    try { localStorage.setItem("home-show-h2h", show ? "true" : "false"); } catch {}
-  };
   
   // Fetch current employee data (or preview employee if in preview mode)
   const { data: employee } = useQuery({
@@ -1316,34 +1306,6 @@ const Home = () => {
           </Card>
         </div>
 
-        {/* Head to Head - Opt-in Section */}
-        {showH2H ? (
-          <HeadToHeadComparison 
-            currentEmployeeId={employee?.id}
-            currentEmployeeName={employee ? `${employee.first_name} ${employee.last_name}` : undefined}
-            onHide={() => toggleH2H(false)}
-          />
-        ) : (
-          <Card 
-            className="border border-dashed border-slate-600/50 bg-gradient-to-r from-slate-900/50 to-slate-800/50 hover:border-amber-500/50 hover:from-slate-900/80 hover:to-slate-800/80 transition-all duration-300 cursor-pointer group"
-            onClick={() => toggleH2H(true)}
-          >
-            <CardContent className="py-6 flex items-center justify-center gap-4">
-              <div className="p-3 rounded-full bg-amber-500/10 group-hover:bg-amber-500/20 transition-colors">
-                <Swords className="w-6 h-6 text-amber-400" />
-              </div>
-              <div className="text-left">
-                <p className="font-semibold text-foreground group-hover:text-amber-400 transition-colors">
-                  Vil du udfordre en kollega?
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Klik her for at starte en Head-to-Head duel
-                </p>
-              </div>
-              <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
-            </CardContent>
-          </Card>
-        )}
 
         {/* Motivational Quote */}
         <Card className="border-0 shadow-lg bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5">
