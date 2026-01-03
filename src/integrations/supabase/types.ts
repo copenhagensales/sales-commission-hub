@@ -3070,46 +3070,67 @@ export type Database = {
           accepted_at: string | null
           battle_mode: string
           challenger_employee_id: string
+          challenger_final_commission: number | null
+          challenger_final_sales: number | null
           comment: string | null
+          completed_at: string | null
           created_at: string
           forfeited_at: string | null
           forfeited_by: string | null
           id: string
+          is_draw: boolean | null
           opponent_employee_id: string
+          opponent_final_commission: number | null
+          opponent_final_sales: number | null
           period: string
           responded_at: string | null
           status: string
           target_commission: number | null
+          winner_employee_id: string | null
         }
         Insert: {
           accepted_at?: string | null
           battle_mode?: string
           challenger_employee_id: string
+          challenger_final_commission?: number | null
+          challenger_final_sales?: number | null
           comment?: string | null
+          completed_at?: string | null
           created_at?: string
           forfeited_at?: string | null
           forfeited_by?: string | null
           id?: string
+          is_draw?: boolean | null
           opponent_employee_id: string
+          opponent_final_commission?: number | null
+          opponent_final_sales?: number | null
           period?: string
           responded_at?: string | null
           status?: string
           target_commission?: number | null
+          winner_employee_id?: string | null
         }
         Update: {
           accepted_at?: string | null
           battle_mode?: string
           challenger_employee_id?: string
+          challenger_final_commission?: number | null
+          challenger_final_sales?: number | null
           comment?: string | null
+          completed_at?: string | null
           created_at?: string
           forfeited_at?: string | null
           forfeited_by?: string | null
           id?: string
+          is_draw?: boolean | null
           opponent_employee_id?: string
+          opponent_final_commission?: number | null
+          opponent_final_sales?: number | null
           period?: string
           responded_at?: string | null
           status?: string
           target_commission?: number | null
+          winner_employee_id?: string | null
         }
         Relationships: [
           {
@@ -3130,6 +3151,66 @@ export type Database = {
             foreignKeyName: "h2h_challenges_opponent_employee_id_fkey"
             columns: ["opponent_employee_id"]
             isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "h2h_challenges_winner_employee_id_fkey"
+            columns: ["winner_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      h2h_employee_stats: {
+        Row: {
+          created_at: string | null
+          current_win_streak: number | null
+          draws: number | null
+          elo_rating: number | null
+          employee_id: string
+          id: string
+          longest_win_streak: number | null
+          losses: number | null
+          total_commission_earned: number | null
+          total_matches: number | null
+          updated_at: string | null
+          wins: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_win_streak?: number | null
+          draws?: number | null
+          elo_rating?: number | null
+          employee_id: string
+          id?: string
+          longest_win_streak?: number | null
+          losses?: number | null
+          total_commission_earned?: number | null
+          total_matches?: number | null
+          updated_at?: string | null
+          wins?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          current_win_streak?: number | null
+          draws?: number | null
+          elo_rating?: number | null
+          employee_id?: string
+          id?: string
+          longest_win_streak?: number | null
+          losses?: number | null
+          total_commission_earned?: number | null
+          total_matches?: number | null
+          updated_at?: string | null
+          wins?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "h2h_employee_stats_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
             referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
           },
