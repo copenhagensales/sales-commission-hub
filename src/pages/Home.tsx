@@ -797,51 +797,7 @@ const Home = () => {
           </div>
         </section>
 
-        {/* Celebrations - Birthdays & Anniversaries */}
-        {celebrations.length > 0 && (
-          <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                <PartyPopper className="w-5 h-5 text-primary" />
-                Fødselsdage & Jubilæer
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-3">
-                {celebrations.map((celebration, idx) => (
-                  <div 
-                    key={idx}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
-                      celebration.isToday 
-                        ? "bg-primary/10 border-primary/30 ring-2 ring-primary/50" 
-                        : "bg-muted/50 border-border"
-                    }`}
-                  >
-                    {celebration.type === 'birthday' ? (
-                      <Cake className="w-5 h-5 text-primary" />
-                    ) : (
-                      <Award className="w-5 h-5 text-amber-500" />
-                    )}
-                    <div>
-                      <p className="font-medium text-foreground">{celebration.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {celebration.type === 'anniversary' 
-                          ? (celebration.years === 0.5 ? '6 mdr. jubilæum' : `${celebration.years} års jubilæum`)
-                          : `Fylder ${celebration.years} år`
-                        }
-                        {" • "}
-                        <span className={celebration.isToday ? "font-semibold text-primary" : ""}>
-                          {formatCelebrationDate(celebration.date, celebration.isToday)}
-                        </span>
-                      </p>
-                    </div>
-                    {celebration.isToday && <span className="text-xl">🎉</span>}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Team Performance */}
@@ -1062,6 +1018,52 @@ const Home = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Celebrations - Birthdays & Anniversaries */}
+        {celebrations.length > 0 && (
+          <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <PartyPopper className="w-5 h-5 text-primary" />
+                Fødselsdage & Jubilæer
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-3">
+                {celebrations.map((celebration, idx) => (
+                  <div 
+                    key={idx}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
+                      celebration.isToday 
+                        ? "bg-primary/10 border-primary/30 ring-2 ring-primary/50" 
+                        : "bg-muted/50 border-border"
+                    }`}
+                  >
+                    {celebration.type === 'birthday' ? (
+                      <Cake className="w-5 h-5 text-primary" />
+                    ) : (
+                      <Award className="w-5 h-5 text-amber-500" />
+                    )}
+                    <div>
+                      <p className="font-medium text-foreground">{celebration.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {celebration.type === 'anniversary' 
+                          ? (celebration.years === 0.5 ? '6 mdr. jubilæum' : `${celebration.years} års jubilæum`)
+                          : `Fylder ${celebration.years} år`
+                        }
+                        {" • "}
+                        <span className={celebration.isToday ? "font-semibold text-primary" : ""}>
+                          {formatCelebrationDate(celebration.date, celebration.isToday)}
+                        </span>
+                      </p>
+                    </div>
+                    {celebration.isToday && <span className="text-xl">🎉</span>}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Recognition & Appreciation */}
