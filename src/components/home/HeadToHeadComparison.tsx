@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,11 @@ import { startOfWeek, startOfDay, endOfDay, endOfWeek, differenceInHours, differ
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { LiveScoreboard } from "@/components/h2h/LiveScoreboard";
+import { H2HAchievementBadges } from "@/components/h2h/H2HAchievementBadges";
+import { EnhancedMomentumBar } from "@/components/h2h/EnhancedMomentumBar";
+import { MatchCountdownTimer } from "@/components/h2h/MatchCountdownTimer";
+import { H2HConfettiEffect, SparkleEffect } from "@/components/h2h/H2HConfettiEffect";
 
 interface EmployeeForH2H {
   id: string;
@@ -93,6 +98,12 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
   const [setupTargetCommission, setSetupTargetCommission] = useState<number>(1000);
   const [activeChallengeId, setActiveChallengeId] = useState<string | null>(initialState?.activeChallengeId ?? null);
   const [matchStartTime, setMatchStartTime] = useState<string | null>(initialState?.matchStartTime ?? null);
+  
+  // Gamification state
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [confettiType, setConfettiType] = useState<"lead_taken" | "big_sale" | "first_blood" | "comeback">("lead_taken");
+  const [showSparkles, setShowSparkles] = useState(false);
+  const prevCommissionRef = useRef<{ my: number; opponent: number } | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -460,6 +471,7 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
     }
   }, [stats?.recentActivity]);
 
+
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
@@ -518,6 +530,36 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
   // Check if match is ongoing (has opponent AND period selected = matchStarted)
   const isMatchOngoing = matchStarted && opponentTeam.length > 0;
   const hasOpponents = opponentTeam.length > 0;
+
+  // Trigger confetti on lead changes
+  useEffect(() => {
+    if (!stats?.myTeam || !stats?.opponentTeam || !hasOpponents) return;
+    
+    const prev = prevCommissionRef.current;
+    const myComm = stats.myTeam.commission;
+    const oppComm = stats.opponentTeam.commission;
+    
+    if (prev) {
+      // Detect lead taken
+      const wasLosing = prev.my < prev.opponent;
+      const nowWinning = myComm > oppComm;
+      
+      if (wasLosing && nowWinning) {
+        setConfettiType("lead_taken");
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 100);
+      }
+      
+      // Detect big sale (commission jumped by 300+)
+      const myCommDiff = myComm - prev.my;
+      if (myCommDiff >= 300) {
+        setShowSparkles(true);
+        setTimeout(() => setShowSparkles(false), 100);
+      }
+    }
+    
+    prevCommissionRef.current = { my: myComm, opponent: oppComm };
+  }, [stats?.myTeam?.commission, stats?.opponentTeam?.commission, hasOpponents]);
 
   // Generate dynamic match narrative with pep-talk
   const getMatchNarrative = () => {
@@ -1105,27 +1147,47 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
           </div>
         )}
 
-        {/* Time & Progress Bar */}
+        {/* Confetti & Sparkle Effects */}
+        <H2HConfettiEffect trigger={showConfetti} type={confettiType} />
+        <SparkleEffect trigger={showSparkles} />
+
+        {/* Enhanced Countdown Timer */}
         {hasOpponents && (
-          <div className="flex items-center justify-between gap-4 px-2 py-2 rounded-xl bg-slate-800/40 border border-slate-700/30">
-            <div className="flex items-center gap-2">
-              <Timer className="w-4 h-4 text-slate-400" />
-              <span className="text-xs text-slate-400">{dateRange.label}</span>
-            </div>
-            <div className="flex-1 mx-4">
-              <div className="h-1.5 rounded-full bg-slate-700/50 overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-1000"
-                  style={{ width: `${timeInfo.percentComplete}%` }}
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-1 text-xs">
-              <span className="text-slate-400">{timeInfo.percentComplete}%</span>
-              <span className="text-slate-600">|</span>
-              <span className="text-amber-400 font-medium">{timeInfo.timeRemainingText} tilbage</span>
-            </div>
-          </div>
+          <MatchCountdownTimer 
+            endTime={dateRange.end} 
+            periodLabel={dateRange.label} 
+            percentComplete={timeInfo.percentComplete} 
+          />
+        )}
+
+        {/* Live Scoreboard - Main attraction */}
+        {hasOpponents && stats?.opponentTeam && (
+          <LiveScoreboard
+            myCommission={stats.myTeam.commission}
+            opponentCommission={stats.opponentTeam.commission}
+            myName={myTeamNames.length === 1 ? myTeamNames[0] : "Dit hold"}
+            opponentName={opponentTeamNames.length === 1 ? opponentTeamNames[0] : "Modstander"}
+            isLeading={isWinning}
+            isLosing={isLosing}
+            isTied={isTied}
+          />
+        )}
+
+        {/* Achievement Badges */}
+        {hasOpponents && stats?.opponentTeam && (
+          <H2HAchievementBadges
+            isLeading={isWinning}
+            isLosing={isLosing}
+            hasMoreCalls={stats.myTeam.callCount > stats.opponentTeam.callCount}
+            hasMoreTalkTime={stats.myTeam.talkTimeSeconds > stats.opponentTeam.talkTimeSeconds}
+            consecutiveWins={wins.left}
+            commissionPerSale={{
+              my: stats.myTeam.salesCount > 0 ? stats.myTeam.commission / stats.myTeam.salesCount : 0,
+              opponent: stats.opponentTeam.salesCount > 0 ? stats.opponentTeam.commission / stats.opponentTeam.salesCount : 0,
+            }}
+            callsRatio={stats.opponentTeam.callCount > 0 ? stats.myTeam.callCount / stats.opponentTeam.callCount : 1}
+            recentActivityRatio={momentum / 100}
+          />
         )}
 
         {/* Match Narrative */}
@@ -1149,8 +1211,16 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
           </div>
         )}
 
-        {/* Momentum Bar */}
-        {hasOpponents && <MomentumBar />}
+        {/* Enhanced Momentum Bar */}
+        {hasOpponents && stats?.recentActivity && (
+          <EnhancedMomentumBar
+            momentum={momentum}
+            myName={myTeamNames.length === 1 ? myTeamNames[0] : "Dig"}
+            opponentName={opponentTeamNames.length === 1 ? opponentTeamNames[0] : "Modstander"}
+            myRecentActivity={stats.recentActivity.my}
+            opponentRecentActivity={stats.recentActivity.opponent}
+          />
+        )}
 
         {/* Team Display */}
         <div className="grid grid-cols-3 gap-3 items-start">
