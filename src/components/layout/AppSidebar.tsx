@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,7 +45,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const [ledelseOpen, setLedelseOpen] = useState(
-    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview"].some(path => location.pathname.startsWith(path))
+    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates"].some(path => location.pathname.startsWith(path))
   );
   const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log");
   const [mgOpen, setMgOpen] = useState(
@@ -603,7 +603,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             <Collapsible open={ledelseOpen} onOpenChange={setLedelseOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview"].some(path => location.pathname.startsWith(path)) 
+                ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates"].some(path => location.pathname.startsWith(path)) 
                   ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
@@ -648,6 +648,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   )}>
                     <Sparkles className="h-4 w-4" />
                     {t("sidebar.careerWishesOverview")}
+                  </NavLink>
+                )}
+                {p.canViewContracts && (
+                  <NavLink to="/email-templates" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/email-templates" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Mail className="h-4 w-4" />
+                    Skabeloner
                   </NavLink>
                 )}
               </CollapsibleContent>
