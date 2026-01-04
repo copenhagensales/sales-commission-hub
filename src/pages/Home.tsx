@@ -25,7 +25,8 @@ import {
   Plus,
   Trash2,
   Swords,
-  Zap
+  Zap,
+  Info
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
@@ -351,6 +352,7 @@ const Home = () => {
   });
 
   // Fetch team sales goals with commission progress (for regular employees)
+  // Fallback: If no explicit team goal exists, sum individual employee_sales_goals
   const { data: teamGoal } = useQuery({
     queryKey: ["home-team-goal", userTeams, periodStartStr, periodEndStr],
     queryFn: async () => {
@@ -359,7 +361,10 @@ const Home = () => {
       const teamIds = userTeams.map(t => (t.teams as { id: string })?.id).filter(Boolean);
       if (teamIds.length === 0) return null;
 
-      const { data: goals } = await supabase
+      const primaryTeamId = teamIds[0];
+
+      // First try to get explicit team goal
+      const { data: explicitGoal } = await supabase
         .from("team_sales_goals")
         .select("*, teams(id, name)")
         .eq("period_start", periodStartStr)
@@ -368,48 +373,88 @@ const Home = () => {
         .limit(1)
         .maybeSingle();
 
-      if (!goals) return null;
-
+      // Get team members for calculating progress (needed for both explicit and fallback)
       const { data: teamMembers } = await supabase
         .from("team_members")
         .select("employee_id")
-        .eq("team_id", goals.team_id);
+        .eq("team_id", explicitGoal?.team_id || primaryTeamId);
 
       const employeeIds = teamMembers?.map(m => m.employee_id) || [];
-      if (employeeIds.length === 0) return { ...goals, currentAmount: 0, progress: 0 };
 
-      const { data: agentMappings } = await supabase
-        .from("employee_agent_mapping")
-        .select("agent_id, agents(email, external_dialer_id)")
-        .in("employee_id", employeeIds);
+      // Helper function to calculate team sales progress
+      const calculateTeamProgress = async (targetAmount: number) => {
+        if (employeeIds.length === 0) return { currentAmount: 0, progress: 0 };
 
-      const agentEmails = agentMappings?.map(m => (m.agents as any)?.email).filter(Boolean) || [];
-      const externalIds = agentMappings?.map(m => (m.agents as any)?.external_dialer_id).filter(Boolean) || [];
-      
-      if (agentEmails.length === 0 && externalIds.length === 0) return { ...goals, currentAmount: 0, progress: 0 };
+        const { data: agentMappings } = await supabase
+          .from("employee_agent_mapping")
+          .select("agent_id, agents(email, external_dialer_id)")
+          .in("employee_id", employeeIds);
 
-      let query = supabase
-        .from("sales")
-        .select("id, agent_email, agent_external_id, sale_items(mapped_commission)")
-        .gte("sale_datetime", `${periodStartStr}T00:00:00`)
-        .lte("sale_datetime", `${periodEndStr}T23:59:59`);
+        const agentEmails = agentMappings?.map(m => (m.agents as any)?.email).filter(Boolean) || [];
+        const externalIds = agentMappings?.map(m => (m.agents as any)?.external_dialer_id).filter(Boolean) || [];
+        
+        if (agentEmails.length === 0 && externalIds.length === 0) return { currentAmount: 0, progress: 0 };
 
-      if (agentEmails.length > 0 && externalIds.length > 0) {
-        query = query.or(`agent_email.in.(${agentEmails.join(",")}),agent_external_id.in.(${externalIds.join(",")})`);
-      } else if (agentEmails.length > 0) {
-        query = query.in("agent_email", agentEmails);
-      } else {
-        query = query.in("agent_external_id", externalIds);
+        let query = supabase
+          .from("sales")
+          .select("id, agent_email, agent_external_id, sale_items(mapped_commission)")
+          .gte("sale_datetime", `${periodStartStr}T00:00:00`)
+          .lte("sale_datetime", `${periodEndStr}T23:59:59`);
+
+        if (agentEmails.length > 0 && externalIds.length > 0) {
+          query = query.or(`agent_email.in.(${agentEmails.join(",")}),agent_external_id.in.(${externalIds.join(",")})`);
+        } else if (agentEmails.length > 0) {
+          query = query.in("agent_email", agentEmails);
+        } else {
+          query = query.in("agent_external_id", externalIds);
+        }
+
+        const { data: sales } = await query;
+
+        const currentAmount = sales?.reduce((sum, s) => {
+          return sum + (s.sale_items?.reduce((itemSum, item) => itemSum + (item.mapped_commission || 0), 0) || 0);
+        }, 0) || 0;
+
+        const progress = targetAmount > 0 ? Math.min((currentAmount / targetAmount) * 100, 100) : 0;
+        return { currentAmount, progress };
+      };
+
+      // If explicit goal exists, use it
+      if (explicitGoal) {
+        const { currentAmount, progress } = await calculateTeamProgress(explicitGoal.target_amount);
+        return { ...explicitGoal, currentAmount, progress, isFallback: false };
       }
 
-      const { data: sales } = await query;
+      // Fallback: Sum individual employee_sales_goals for this team
+      const { data: individualGoals } = await supabase
+        .from("employee_sales_goals")
+        .select("target_amount")
+        .in("employee_id", employeeIds)
+        .eq("period_start", periodStartStr)
+        .eq("period_end", periodEndStr);
 
-      const currentAmount = sales?.reduce((sum, s) => {
-        return sum + (s.sale_items?.reduce((itemSum, item) => itemSum + (item.mapped_commission || 0), 0) || 0);
-      }, 0) || 0;
+      const summedTarget = individualGoals?.reduce((sum, g) => sum + (g.target_amount || 0), 0) || 0;
 
-      const progress = goals.target_amount > 0 ? Math.min((currentAmount / goals.target_amount) * 100, 100) : 0;
-      return { ...goals, currentAmount, progress };
+      if (summedTarget === 0) return null;
+
+      // Get team name for display
+      const { data: teamData } = await supabase
+        .from("teams")
+        .select("id, name")
+        .eq("id", primaryTeamId)
+        .single();
+
+      const { currentAmount, progress } = await calculateTeamProgress(summedTarget);
+
+      return {
+        id: `fallback-${primaryTeamId}`,
+        team_id: primaryTeamId,
+        target_amount: summedTarget,
+        teams: teamData,
+        currentAmount,
+        progress,
+        isFallback: true, // Mark as fallback so we can show info message
+      };
     },
     enabled: userTeams.length > 0 && !canEditHomeGoals,
   });
@@ -948,7 +993,7 @@ const Home = () => {
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm text-muted-foreground">
-                      {userTeams[0]?.teams?.name || "Team"} – lønperiode
+                      {(teamGoal as any).teams?.name || userTeams[0]?.teams?.name || "Team"} – lønperiode
                     </span>
                     <span className="text-2xl font-bold text-primary">
                       {teamPerformance.progress.toFixed(0)}%
@@ -962,6 +1007,12 @@ const Home = () => {
                     <span>{formatCurrency(teamPerformance.currentAmount)}</span>
                     <span>Mål: {formatCurrency(teamPerformance.targetAmount)}</span>
                   </div>
+                  {(teamGoal as any).isFallback && (
+                    <div className="mt-3 p-2 bg-muted/50 rounded text-xs text-muted-foreground flex items-center gap-2">
+                      <Info className="h-3 w-3 flex-shrink-0" />
+                      <span>Målet er summen af individuelle mål. Kontakt din teamleder for at sætte et fælles teammål.</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center text-muted-foreground text-sm py-6">
