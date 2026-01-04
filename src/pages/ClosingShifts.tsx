@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Mail, Phone, CheckCircle2, Send, CalendarClock, UserMinus, Users } from "lucide-react";
+import { Mail, Phone, CheckCircle2, Send, CalendarClock, UserMinus, Users, Info, UserCheck, Briefcase } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const WEEKDAYS = [
   { day: 1, name: "Mandag" },
@@ -97,10 +98,52 @@ export default function ClosingShifts() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("teams")
-        .select("id, name")
+        .select("id, name, team_leader_id, assistant_team_leader_id")
         .order("name");
       if (error) throw error;
-      return data as Team[];
+      return data as (Team & { team_leader_id: string | null; assistant_team_leader_id: string | null })[];
+    },
+  });
+
+  // Fetch team leaders and assistant leaders info
+  const { data: teamLeadersInfo = [] } = useQuery({
+    queryKey: ["team-leaders-info", selectedTeamId],
+    enabled: !!selectedTeamId,
+    queryFn: async () => {
+      const selectedTeam = teams.find(t => t.id === selectedTeamId);
+      if (!selectedTeam) return [];
+      
+      const leaderIds = [selectedTeam.team_leader_id, selectedTeam.assistant_team_leader_id].filter(Boolean) as string[];
+      if (leaderIds.length === 0) return [];
+      
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, work_email, private_email")
+        .in("id", leaderIds);
+      if (error) throw error;
+      
+      return (data || []).map(l => ({
+        ...l,
+        email: l.work_email || l.private_email,
+        role: l.id === selectedTeam.team_leader_id ? "Teamleder" : "Ass. Teamleder"
+      }));
+    },
+  });
+
+  // Fetch recruitment responsible employees
+  const { data: recruiters = [] } = useQuery({
+    queryKey: ["recruiters-for-deactivation"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, work_email, private_email")
+        .eq("job_title", "Rekruttering")
+        .eq("is_active", true);
+      if (error) throw error;
+      return (data || []).map(r => ({
+        ...r,
+        email: r.work_email || r.private_email
+      }));
     },
   });
 
@@ -500,6 +543,38 @@ export default function ClosingShifts() {
           </TabsContent>
 
           <TabsContent value="deactivation" className="space-y-6">
+            {/* Auto-recipients info card */}
+            <Alert className="border-blue-500/30 bg-blue-500/5">
+              <Info className="h-4 w-4 text-blue-600" />
+              <AlertTitle className="text-blue-700 dark:text-blue-400">Automatiske modtagere</AlertTitle>
+              <AlertDescription className="text-blue-600/80 dark:text-blue-300/80">
+                <p className="mb-3">Ud over de manuelt konfigurerede modtagere, sendes deaktiverings-mails automatisk til:</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="h-4 w-4" />
+                    <span className="font-medium">Teamleder & Ass. Teamleder</span>
+                    <span className="text-xs text-muted-foreground">(for det relevante team)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4" />
+                    <span className="font-medium">Rekrutteringsansvarlige:</span>
+                    {recruiters.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {recruiters.map(r => (
+                          <Badge key={r.id} variant="secondary" className="text-xs">
+                            {r.first_name} {r.last_name}
+                            {r.email && <span className="ml-1 opacity-70">({r.email})</span>}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">(ingen fundet med job_title "Rekruttering")</span>
+                    )}
+                  </div>
+                </div>
+              </AlertDescription>
+            </Alert>
+
             <Card className="border-destructive/30 bg-destructive/5">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-destructive">
@@ -538,9 +613,28 @@ export default function ClosingShifts() {
 
                 {selectedTeamId && (
                   <>
+                    {/* Show team leaders for selected team */}
+                    {teamLeadersInfo.length > 0 && (
+                      <div className="rounded-lg border border-muted bg-muted/30 p-3">
+                        <p className="text-sm font-medium mb-2">Automatiske modtagere for dette team:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {teamLeadersInfo.map(leader => (
+                            <Badge key={leader.id} variant="outline" className="text-xs">
+                              {leader.role}: {leader.first_name} {leader.last_name}
+                              {leader.email ? (
+                                <span className="ml-1 opacity-70">({leader.email})</span>
+                              ) : (
+                                <span className="ml-1 text-amber-600">(mangler email)</span>
+                              )}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="space-y-2">
                       <label className="text-sm font-medium">
-                        Modtagere for {teams.find(t => t.id === selectedTeamId)?.name} (kommaseparerede emails)
+                        Ekstra modtagere for {teams.find(t => t.id === selectedTeamId)?.name} (kommaseparerede emails)
                       </label>
                       <Textarea
                         value={currentDeactivationRecipients}
@@ -548,10 +642,13 @@ export default function ClosingShifts() {
                           setEditingDeactivationRecipients(e.target.value);
                           setDeactivationChanged(true);
                         }}
-                        placeholder="it@firma.dk, hr@firma.dk, teamleder@firma.dk"
+                        placeholder="it@firma.dk, hr@firma.dk"
                         rows={2}
                         className="resize-none"
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Disse modtagere tilføjes ud over teamleder, ass. teamleder og rekrutteringsansvarlige.
+                      </p>
                     </div>
 
                     <div className="space-y-2">
