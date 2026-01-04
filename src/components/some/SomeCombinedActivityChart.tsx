@@ -64,6 +64,7 @@ export function SomeCombinedActivityChart({ historicalMetrics }: SomeCombinedAct
                   tick={{ fontSize: 12 }}
                   tickFormatter={formatNumber}
                   className="text-muted-foreground"
+                  domain={['dataMin - 5', 'dataMax + 5']}
                 />
                 <Tooltip 
                   contentStyle={{ 
