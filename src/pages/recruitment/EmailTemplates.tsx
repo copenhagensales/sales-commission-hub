@@ -13,7 +13,14 @@ import { Eye, Save, RotateCcw, Send, Loader2, CalendarCheck, XCircle, Gift } fro
 import { Badge } from "@/components/ui/badge";
 
 // CPH Sales official colors for HTML preview wrapper
-const wrapInHtmlTemplate = (title: string, content: string) => `<!DOCTYPE html>
+const wrapInHtmlTemplate = (title: string, content: string) => {
+  // Convert plain text line breaks to HTML
+  const htmlContent = content
+    .split('\n\n') // Split by double newlines (paragraphs)
+    .map(paragraph => `<p style="margin: 0 0 16px 0;">${paragraph.replace(/\n/g, '<br>')}</p>`)
+    .join('\n      ');
+
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -23,7 +30,9 @@ const wrapInHtmlTemplate = (title: string, content: string) => `<!DOCTYPE html>
     .header { background: #2e3136; color: #e6f0f1; padding: 30px 20px; text-align: center; border-radius: 8px 8px 0 0; }
     .header h1 { margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px; color: #3BE086; }
     .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.9; color: #e6f0f1; }
-    .content { padding: 30px; background: #ffffff; white-space: pre-line; }
+    .content { padding: 30px; background: #ffffff; }
+    .content p { margin: 0 0 16px 0; }
+    .content p:last-child { margin-bottom: 0; }
     .footer { padding: 20px; text-align: center; color: #2e3136; font-size: 12px; background: #e6f0f1; border-radius: 0 0 8px 8px; }
   </style>
 </head>
@@ -33,13 +42,16 @@ const wrapInHtmlTemplate = (title: string, content: string) => `<!DOCTYPE html>
       <h1>COPENHAGEN SALES</h1>
       <p>${title}</p>
     </div>
-    <div class="content">${content}</div>
+    <div class="content">
+      ${htmlContent}
+    </div>
     <div class="footer">
-      <p>Copenhagen Sales | Rekruttering</p>
+      <p style="margin: 0;">Copenhagen Sales | Rekruttering</p>
     </div>
   </div>
 </body>
 </html>`;
+};
 
 // Original default texts - exactly as stored in database
 const DEFAULT_INVITATION = `Kære {{fornavn}},
