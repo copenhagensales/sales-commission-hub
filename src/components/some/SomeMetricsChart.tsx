@@ -11,11 +11,9 @@ interface SomeMetricsChartProps {
 }
 
 type PeriodDays = 30 | 60 | 90;
-type MetricType = "followers" | "views" | "likes";
 
 export function SomeMetricsChart({ historicalMetrics }: SomeMetricsChartProps) {
   const [periodDays, setPeriodDays] = useState<PeriodDays>(30);
-  const [metricType, setMetricType] = useState<MetricType>("followers");
 
   const filteredData = useMemo(() => {
     const cutoffDate = subDays(new Date(), periodDays);
@@ -24,51 +22,26 @@ export function SomeMetricsChart({ historicalMetrics }: SomeMetricsChartProps) {
       .filter((m) => isAfter(parseISO(m.week_start_date), cutoffDate))
       .map((m) => ({
         week: format(parseISO(m.week_start_date), "d. MMM", { locale: da }),
-        tiktok: metricType === "followers" ? m.tiktok_followers 
-              : metricType === "views" ? m.tiktok_views 
-              : m.tiktok_likes,
-        instagram: metricType === "followers" ? m.insta_followers 
-              : metricType === "views" ? m.insta_views 
-              : m.insta_likes,
+        views: m.tiktok_views,
       }));
-  }, [historicalMetrics, periodDays, metricType]);
-
-  const metricLabels: Record<MetricType, string> = {
-    followers: "Følgere",
-    views: "Visninger",
-    likes: "Likes",
-  };
+  }, [historicalMetrics, periodDays]);
 
   return (
     <Card>
       <CardHeader className="pb-3">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <CardTitle className="text-lg">Udvikling over tid</CardTitle>
-          <div className="flex flex-wrap gap-2">
-            <div className="flex gap-1">
-              {(["followers", "views", "likes"] as MetricType[]).map((type) => (
-                <Button
-                  key={type}
-                  variant={metricType === type ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setMetricType(type)}
-                >
-                  {metricLabels[type]}
-                </Button>
-              ))}
-            </div>
-            <div className="flex gap-1">
-              {([30, 60, 90] as PeriodDays[]).map((days) => (
-                <Button
-                  key={days}
-                  variant={periodDays === days ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => setPeriodDays(days)}
-                >
-                  {days} dage
-                </Button>
-              ))}
-            </div>
+          <CardTitle className="text-lg">TikTok visninger over tid</CardTitle>
+          <div className="flex gap-1">
+            {([30, 60, 90] as PeriodDays[]).map((days) => (
+              <Button
+                key={days}
+                variant={periodDays === days ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setPeriodDays(days)}
+              >
+                {days} dage
+              </Button>
+            ))}
           </div>
         </div>
       </CardHeader>
@@ -100,22 +73,13 @@ export function SomeMetricsChart({ historicalMetrics }: SomeMetricsChartProps) {
                     borderRadius: "8px"
                   }}
                 />
-                <Legend />
                 <Line
                   type="monotone"
-                  dataKey="tiktok"
-                  name="TikTok"
+                  dataKey="views"
+                  name="Visninger"
                   stroke="#25F4EE"
                   strokeWidth={2}
                   dot={{ fill: "#25F4EE" }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="instagram"
-                  name="Instagram"
-                  stroke="#E1306C"
-                  strokeWidth={2}
-                  dot={{ fill: "#E1306C" }}
                 />
               </LineChart>
             </ResponsiveContainer>
