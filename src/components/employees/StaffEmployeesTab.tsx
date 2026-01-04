@@ -151,8 +151,21 @@ export function StaffEmployeesTab() {
           if (r.work_email) autoRecipientEmails.push(r.work_email);
         });
 
+        // Get all owners (only work_email) - exclude Angel, owners only get initial email (no followup)
+        const { data: owners } = await supabase
+          .from("employee_master_data")
+          .select("work_email")
+          .eq("job_title", "Ejer")
+          .eq("is_active", true)
+          .neq("first_name", "Angel");
+        
+        const ownerEmails: string[] = [];
+        (owners || []).forEach(o => {
+          if (o.work_email) ownerEmails.push(o.work_email);
+        });
+
         // Combine all recipients (manual + automatic) and remove duplicates
-        const allRecipients = [...new Set([...manualRecipients, ...autoRecipientEmails])];
+        const allRecipients = [...new Set([...manualRecipients, ...autoRecipientEmails, ...ownerEmails])];
 
         if (allRecipients.length > 0) {
           await supabase.functions.invoke("send-deactivation-reminder", {

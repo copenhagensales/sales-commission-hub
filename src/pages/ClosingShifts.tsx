@@ -147,7 +147,7 @@ export default function ClosingShifts() {
     },
   });
 
-  // Fetch owners (only work_email)
+  // Fetch owners (only work_email) - exclude Angel
   const { data: owners = [] } = useQuery({
     queryKey: ["owners-for-deactivation"],
     queryFn: async () => {
@@ -155,7 +155,8 @@ export default function ClosingShifts() {
         .from("employee_master_data")
         .select("id, first_name, last_name, work_email")
         .eq("job_title", "Ejer")
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .neq("first_name", "Angel");
       if (error) throw error;
       return (data || []).map(o => ({
         ...o,
@@ -574,7 +575,8 @@ export default function ClosingShifts() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Crown className="h-4 w-4" />
-                    <span className="font-medium">Ejere:</span>
+                    <span className="font-medium">Ejere</span>
+                    <span className="text-xs text-muted-foreground">(kun 1 mail, ingen opfølgning)</span>
                     {owners.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {owners.map(o => (
