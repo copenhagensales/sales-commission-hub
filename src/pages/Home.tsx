@@ -1010,7 +1010,7 @@ const Home = () => {
                   {(teamGoal as any).isFallback && (
                     <div className="mt-3 p-2 bg-muted/50 rounded text-xs text-muted-foreground flex items-center gap-2">
                       <Info className="h-3 w-3 flex-shrink-0" />
-                      <span>Målet er summen af individuelle mål. Kontakt din teamleder for at sætte et fælles teammål.</span>
+                      <span>Målet er summen af alle teammedlemmers individuelle mål.</span>
                     </div>
                   )}
                 </div>
