@@ -7,8 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Target, Users, TrendingUp, Award, Info } from "lucide-react";
-import { format, addDays, isWeekend } from "date-fns";
+import { Target, Users, TrendingUp, Award, Info, Clock, AlertCircle } from "lucide-react";
+import { format, addDays, isWeekend, formatDistanceToNow } from "date-fns";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { da } from "date-fns/locale";
 
 const TDC_ERHVERV_TEAM_ID = "ee967dfd-04c8-465e-bda7-f1c47094bae0";
@@ -25,6 +26,8 @@ interface TeamMemberGoal {
   status: "ahead" | "on-track" | "behind" | "no-goal";
   dailyRequired: number | null;
   remainingWorkingDays: number;
+  goalCreatedAt: string | null;
+  goalUpdatedAt: string | null;
 }
 
 // Count working days (Mon-Fri) between two dates (inclusive)
@@ -129,7 +132,7 @@ export default function TdcErhvervGoalsDashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_sales_goals")
-        .select("employee_id, target_amount, period_start, period_end")
+        .select("employee_id, target_amount, period_start, period_end, created_at, updated_at")
         .eq("period_start", periodStartStr)
         .eq("period_end", periodEndStr);
 
@@ -253,17 +256,24 @@ export default function TdcErhvervGoalsDashboard() {
       }
     });
 
-    // Create goal lookup
-    const goalLookup = new Map<string, number>();
+    // Create goal lookup with timestamps
+    const goalLookup = new Map<string, { target: number; createdAt: string | null; updatedAt: string | null }>();
     goals?.forEach((g) => {
-      goalLookup.set(g.employee_id, g.target_amount);
+      goalLookup.set(g.employee_id, {
+        target: g.target_amount,
+        createdAt: g.created_at,
+        updatedAt: g.updated_at,
+      });
     });
 
     const { totalWorkingDays, elapsedWorkingDays, remainingWorkingDays } = workingDaysStats;
 
     return teamMembers.map((member): TeamMemberGoal => {
       const emp = member.employee_master_data as any;
-      const targetAmount = goalLookup.get(member.employee_id) || null;
+      const goalData = goalLookup.get(member.employee_id);
+      const targetAmount = goalData?.target || null;
+      const goalCreatedAt = goalData?.createdAt || null;
+      const goalUpdatedAt = goalData?.updatedAt || null;
       const achievedAmount = employeeCommission.get(member.employee_id) || 0;
       
       let progressVsExpected = 0;
@@ -312,6 +322,8 @@ export default function TdcErhvervGoalsDashboard() {
         status,
         dailyRequired,
         remainingWorkingDays,
+        goalCreatedAt,
+        goalUpdatedAt,
       };
     }).sort((a, b) => {
       // Sort by status priority, then by progressVsExpected
@@ -462,6 +474,7 @@ export default function TdcErhvervGoalsDashboard() {
               <TableRow>
                 <TableHead>Medarbejder</TableHead>
                 <TableHead className="text-right">Mål</TableHead>
+                <TableHead>Mål ændret</TableHead>
                 <TableHead className="text-right">Opnået</TableHead>
                 <TableHead className="w-[220px]">Af forventet</TableHead>
                 <TableHead>Status</TableHead>
@@ -474,6 +487,7 @@ export default function TdcErhvervGoalsDashboard() {
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-full" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-16" /></TableCell>
@@ -482,7 +496,7 @@ export default function TdcErhvervGoalsDashboard() {
                 ))
               ) : teamMemberGoals.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     Ingen provisionslønne medarbejdere fundet på dette team
                   </TableCell>
                 </TableRow>
@@ -501,6 +515,47 @@ export default function TdcErhvervGoalsDashboard() {
                     </TableCell>
                     <TableCell className="text-right">
                       {member.targetAmount ? formatCurrency(member.targetAmount) : "-"}
+                    </TableCell>
+                    <TableCell>
+                      {member.goalUpdatedAt ? (
+                        (() => {
+                          const wasModified = member.goalCreatedAt && member.goalUpdatedAt !== member.goalCreatedAt;
+                          const dateToShow = new Date(member.goalUpdatedAt);
+                          const isRecent = (Date.now() - dateToShow.getTime()) < 48 * 60 * 60 * 1000; // 48 hours
+                          
+                          return (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className={`flex items-center gap-1 text-sm ${wasModified ? 'text-orange-600 font-medium' : 'text-muted-foreground'}`}>
+                                    {wasModified ? (
+                                      <AlertCircle className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <Clock className="h-3.5 w-3.5" />
+                                    )}
+                                    <span className={isRecent && wasModified ? 'underline decoration-orange-400' : ''}>
+                                      {formatDistanceToNow(dateToShow, { locale: da, addSuffix: true })}
+                                    </span>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-xs">
+                                    <div className="font-medium">{wasModified ? 'Sidst ændret' : 'Oprettet'}</div>
+                                    <div>{format(dateToShow, "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}</div>
+                                    {wasModified && member.goalCreatedAt && (
+                                      <div className="text-muted-foreground mt-1">
+                                        Oprindeligt oprettet: {format(new Date(member.goalCreatedAt), "d. MMM yyyy", { locale: da })}
+                                      </div>
+                                    )}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          );
+                        })()
+                      ) : (
+                        <span className="text-sm text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {formatCurrency(member.achievedAmount)}
