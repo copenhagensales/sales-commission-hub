@@ -90,6 +90,8 @@ export function SomeMetricsChart({ historicalMetrics }: SomeMetricsChartProps) {
                 <YAxis 
                   tick={{ fontSize: 12 }}
                   className="text-muted-foreground"
+                  domain={['dataMin - 10', 'dataMax + 10']}
+                  tickFormatter={(value) => value.toLocaleString('da-DK')}
                 />
                 <Tooltip 
                   contentStyle={{ 
