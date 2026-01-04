@@ -356,14 +356,14 @@ export default function CoachingTemplates() {
                 <div>
                   <Label>Standard Score</Label>
                   <Select
-                    value={editingTemplate.default_score?.toString() || ""}
-                    onValueChange={v => setEditingTemplate(t => t ? { ...t, default_score: v ? parseInt(v) : null } : null)}
+                    value={editingTemplate.default_score?.toString() ?? "none"}
+                    onValueChange={v => setEditingTemplate(t => t ? { ...t, default_score: v === "none" ? null : parseInt(v) } : null)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Ingen standard" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Ingen standard</SelectItem>
+                      <SelectItem value="none">Ingen standard</SelectItem>
                       <SelectItem value="0">🎯 Fokusområde</SelectItem>
                       <SelectItem value="1">📈 På vej</SelectItem>
                       <SelectItem value="2">⭐ Stærk præstation</SelectItem>
@@ -414,14 +414,14 @@ export default function CoachingTemplates() {
                   <div>
                     <Label>Drill</Label>
                     <Select
-                      value={editingTemplate.drill_id || ""}
-                      onValueChange={v => setEditingTemplate(t => t ? { ...t, drill_id: v || null } : null)}
+                      value={editingTemplate.drill_id || "none"}
+                      onValueChange={v => setEditingTemplate(t => t ? { ...t, drill_id: v === "none" ? null : v } : null)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Vælg drill..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Ingen drill</SelectItem>
+                        <SelectItem value="none">Ingen drill</SelectItem>
                         {drills.map(drill => (
                           <SelectItem key={drill.id} value={drill.id}>
                             {drill.title}
