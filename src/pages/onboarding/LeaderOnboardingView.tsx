@@ -336,15 +336,15 @@ export default function LeaderOnboardingView() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Score (0-2) *</Label>
+              <Label>Score *</Label>
               <Select value={taskForm.score} onValueChange={v => setTaskForm(f => ({ ...f, score: v }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Vælg score" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="0">0 - Skal forbedres</SelectItem>
-                  <SelectItem value="1">1 - Acceptabelt</SelectItem>
-                  <SelectItem value="2">2 - Godt</SelectItem>
+                  <SelectItem value="0">🎯 Fokusområde</SelectItem>
+                  <SelectItem value="1">📈 På vej</SelectItem>
+                  <SelectItem value="2">⭐ Stærk præstation</SelectItem>
                 </SelectContent>
               </Select>
             </div>
