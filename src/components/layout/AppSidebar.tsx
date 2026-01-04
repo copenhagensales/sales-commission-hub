@@ -332,7 +332,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
           <Collapsible open={mitHjemOpen} onOpenChange={setMitHjemOpen}>
             <CollapsibleTrigger className={cn(
               "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes"].some(path => location.pathname === path || location.pathname.startsWith(path))
+              ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes", "/my-feedback", "/head-to-head"].some(path => location.pathname === path || location.pathname.startsWith(path))
                 ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}>
@@ -482,6 +482,19 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   {t("sidebar.teamWishesCareer")}
                 </NavLink>
               )}
+              
+              {/* Min Feedback */}
+              <NavLink
+                to="/my-feedback"
+                onClick={handleNavClick}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/my-feedback" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}
+              >
+                <MessageSquare className="h-4 w-4" />
+                Min Feedback
+              </NavLink>
             </CollapsibleContent>
           </Collapsible>
           
