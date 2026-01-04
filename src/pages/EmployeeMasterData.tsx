@@ -488,7 +488,7 @@ export default function EmployeeMasterData() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
       queryClient.invalidateQueries({ queryKey: ["staff-employees"] });
-      toast({ title: "Medarbejder flyttet", description: "Medarbejderen er nu en stabsmedarbejder" });
+      toast({ title: "Medarbejder flyttet", description: "Medarbejderen er nu i backoffice" });
     },
     onError: (error) => {
       toast({ title: t("employees.toast.error"), description: error.message, variant: "destructive" });
@@ -948,7 +948,7 @@ export default function EmployeeMasterData() {
         <Tabs defaultValue="all-employees" className="space-y-6">
           <TabsList>
             <TabsTrigger value="all-employees">{t("employees.tabs.allEmployees")}</TabsTrigger>
-            <TabsTrigger value="staff-employees">Stabs medarbejdere</TabsTrigger>
+            <TabsTrigger value="staff-employees">Backoffice</TabsTrigger>
             <TabsTrigger value="teams">{t("employees.tabs.teams")}</TabsTrigger>
             <TabsTrigger value="positions">{t("employees.tabs.positions")}</TabsTrigger>
             <TabsTrigger value="dialer-mapping">{t("employees.tabs.dialerMapping")}</TabsTrigger>
@@ -965,7 +965,7 @@ export default function EmployeeMasterData() {
           </div>
           <div className="rounded-xl bg-card/50 p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Stabs medarbejdere</span>
+              <span className="text-sm text-muted-foreground">Backoffice</span>
               <Users className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="text-2xl font-bold">{staffCount}</div>
@@ -1363,9 +1363,9 @@ export default function EmployeeMasterData() {
         <AlertDialog open={!!moveToStaffId} onOpenChange={(open) => !open && setMoveToStaffId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Flyt til stab</AlertDialogTitle>
+              <AlertDialogTitle>Flyt til backoffice</AlertDialogTitle>
               <AlertDialogDescription>
-                Er du sikker på at du vil flytte denne medarbejder til stabsmedarbejdere?
+                Er du sikker på at du vil flytte denne medarbejder til backoffice?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
