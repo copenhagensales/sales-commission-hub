@@ -17,8 +17,7 @@ export function SomeCombinedActivityChart({ historicalMetrics }: SomeCombinedAct
       .filter((m) => isAfter(parseISO(m.week_start_date), cutoffDate))
       .map((m) => ({
         week: format(parseISO(m.week_start_date), "d. MMM", { locale: da }),
-        tiktokFollowers: m.tiktok_followers,
-        instaFollowers: m.insta_followers,
+        followers: m.tiktok_followers,
       }))
       .sort((a, b) => a.week.localeCompare(b.week));
   }, [historicalMetrics]);
@@ -32,8 +31,7 @@ export function SomeCombinedActivityChart({ historicalMetrics }: SomeCombinedAct
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg">Følgere sidste 30 dage</CardTitle>
-        <CardDescription>Udvikling i følgere på tværs af platforme</CardDescription>
+        <CardTitle className="text-lg">TikTok følgere sidste 30 dage</CardTitle>
       </CardHeader>
       <CardContent>
         {chartData.length === 0 ? (
@@ -48,10 +46,6 @@ export function SomeCombinedActivityChart({ historicalMetrics }: SomeCombinedAct
                   <linearGradient id="tiktokGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#25F4EE" stopOpacity={0.3}/>
                     <stop offset="95%" stopColor="#25F4EE" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="instaGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#E1306C" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#E1306C" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -74,24 +68,14 @@ export function SomeCombinedActivityChart({ historicalMetrics }: SomeCombinedAct
                   }}
                   formatter={(value: number) => [formatNumber(value), ""]}
                 />
-                <Legend />
                 <Area
                   type="monotone"
-                  dataKey="tiktokFollowers"
-                  name="TikTok"
+                  dataKey="followers"
+                  name="Følgere"
                   stroke="#25F4EE"
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#tiktokGradient)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="instaFollowers"
-                  name="Instagram"
-                  stroke="#E1306C"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#instaGradient)"
                 />
               </AreaChart>
             </ResponsiveContainer>
