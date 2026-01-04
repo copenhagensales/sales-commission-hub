@@ -232,7 +232,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         scopeKey: "scope_time_tracking",
       },
       { key: "menu_time_stamp", label: "Stempelur", description: "Adgang til stempel ind/ud", hasEditOption: false },
-      { key: "menu_closing_shifts", label: "Lukkevagter", description: "Adgang til lukkevagter", hasEditOption: true },
+      { key: "menu_closing_shifts", label: "Påmindelser", description: "Adgang til påmindelser", hasEditOption: true },
     ],
   },
 
