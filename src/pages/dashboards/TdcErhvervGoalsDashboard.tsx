@@ -7,7 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Target, Users, TrendingUp, Award, Info, AlertCircle } from "lucide-react";
+import { Target, Users, TrendingUp, Award, Info, AlertCircle, Trophy } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format, addDays, isWeekend, formatDistanceToNow } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { da } from "date-fns/locale";
@@ -18,7 +20,6 @@ interface TeamMemberGoal {
   employeeId: string;
   firstName: string;
   lastName: string;
-  jobTitle: string | null;
   targetAmount: number | null;
   achievedAmount: number;
   progressVsExpected: number; // Progress relative to where they should be now
@@ -28,6 +29,7 @@ interface TeamMemberGoal {
   remainingWorkingDays: number;
   goalCreatedAt: string | null;
   goalUpdatedAt: string | null;
+  remaining: number; // Amount remaining to reach goal
 }
 
 // Count working days (Mon-Fri) between two dates (inclusive)
@@ -314,7 +316,6 @@ export default function TdcErhvervGoalsDashboard() {
         employeeId: member.employee_id,
         firstName: emp.first_name || "",
         lastName: emp.last_name || "",
-        jobTitle: emp.job_title,
         targetAmount,
         achievedAmount,
         progressVsExpected,
@@ -324,6 +325,7 @@ export default function TdcErhvervGoalsDashboard() {
         remainingWorkingDays,
         goalCreatedAt,
         goalUpdatedAt,
+        remaining: targetAmount ? targetAmount - achievedAmount : 0,
       };
     }).sort((a, b) => {
       // Sort by status priority, then by progressVsExpected
@@ -473,10 +475,11 @@ export default function TdcErhvervGoalsDashboard() {
             <TableHeader>
               <TableRow>
                 <TableHead>Medarbejder</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Mål</TableHead>
                 <TableHead className="text-right">Opnået</TableHead>
-                <TableHead className="w-[220px]">Af forventet</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Mangler</TableHead>
+                <TableHead className="w-[180px]">Af forventet</TableHead>
                 <TableHead className="text-right">Dagligt behov</TableHead>
               </TableRow>
             </TableHeader>
@@ -484,89 +487,124 @@ export default function TdcErhvervGoalsDashboard() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-40" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                   </TableRow>
                 ))
               ) : teamMemberGoals.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     Ingen provisionslønne medarbejdere fundet på dette team
                   </TableCell>
                 </TableRow>
               ) : (
-                teamMemberGoals.map((member) => (
-                  <TableRow key={member.employeeId}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">
-                          {member.firstName} {member.lastName}
+                teamMemberGoals.map((member, index) => {
+                  const isTopPerformer = index === 0 && member.status === "ahead" && teamMemberGoals.filter(m => m.status === "ahead").length > 0;
+                  const initials = `${member.firstName.charAt(0)}${member.lastName.charAt(0)}`.toUpperCase();
+                  
+                  return (
+                    <TableRow key={member.employeeId}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                              {initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex items-center gap-1.5">
+                            <Link 
+                              to={`/employee/${member.employeeId}`}
+                              className="font-medium hover:underline hover:text-primary transition-colors"
+                            >
+                              {member.firstName} {member.lastName}
+                            </Link>
+                            {isTopPerformer && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Trophy className="h-4 w-4 text-yellow-500" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <span className="text-xs">Top performer</span>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                         </div>
-                        {member.jobTitle && (
-                          <div className="text-sm text-muted-foreground">{member.jobTitle}</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {member.targetAmount ? formatCurrency(member.targetAmount) : "-"}
-                        {member.goalUpdatedAt && member.goalCreatedAt && member.goalUpdatedAt !== member.goalCreatedAt && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <AlertCircle className="h-3.5 w-3.5 text-orange-500 cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <div className="text-xs">
-                                  <div className="font-medium">Mål ændret</div>
-                                  <div>Sidst ændret: {format(new Date(member.goalUpdatedAt), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}</div>
-                                  <div className="text-muted-foreground">
-                                    Oprettet: {format(new Date(member.goalCreatedAt), "d. MMM yyyy", { locale: da })}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(member.status)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {member.targetAmount ? formatCurrency(member.targetAmount) : "-"}
+                          {member.goalUpdatedAt && member.goalCreatedAt && member.goalUpdatedAt !== member.goalCreatedAt && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <AlertCircle className="h-3.5 w-3.5 text-orange-500 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-xs">
+                                    <div className="font-medium">Mål ændret</div>
+                                    <div>Sidst ændret: {format(new Date(member.goalUpdatedAt), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}</div>
+                                    <div className="text-muted-foreground">
+                                      Oprettet: {format(new Date(member.goalCreatedAt), "d. MMM yyyy", { locale: da })}
+                                    </div>
                                   </div>
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(member.achievedAmount)}
-                    </TableCell>
-                    <TableCell>
-                      {member.targetAmount ? (
-                        <div className="flex items-center gap-2">
-                          <Progress 
-                            value={Math.min(100, member.progressVsExpected)} 
-                            className={`h-2 ${member.progressVsExpected >= 100 ? '[&>div]:bg-green-500' : member.progressVsExpected >= 85 ? '[&>div]:bg-yellow-500' : '[&>div]:bg-red-500'}`}
-                          />
-                          <span className={`text-sm font-medium w-14 text-right ${member.progressVsExpected >= 100 ? 'text-green-600' : member.progressVsExpected >= 85 ? 'text-yellow-600' : 'text-red-600'}`}>
-                            {member.progressVsExpected.toFixed(0)}%
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(member.achievedAmount)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {member.targetAmount ? (
+                          <span className={member.remaining <= 0 ? "text-green-600 font-medium" : ""}>
+                            {member.remaining <= 0 
+                              ? `+${formatCurrency(Math.abs(member.remaining))}` 
+                              : formatCurrency(member.remaining)
+                            }
                           </span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(member.status)}</TableCell>
-                    <TableCell className="text-right">
-                      {member.dailyRequired !== null && member.dailyRequired > 0 ? (
-                        <div className="text-sm">
-                          <div>{formatCurrency(member.dailyRequired)}/dag</div>
-                          <div className="text-xs text-muted-foreground">({member.remainingWorkingDays} dage)</div>
-                        </div>
-                      ) : member.status === "no-goal" ? (
-                        "-"
-                      ) : (
-                        <span className="text-green-600 text-sm">Mål nået!</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
+                        ) : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {member.targetAmount ? (
+                          <div className="flex items-center gap-2">
+                            <Progress 
+                              value={Math.min(100, member.progressVsExpected)} 
+                              className={`h-2 flex-1 ${member.progressVsExpected >= 100 ? '[&>div]:bg-green-500' : member.progressVsExpected >= 85 ? '[&>div]:bg-yellow-500' : '[&>div]:bg-red-500'}`}
+                            />
+                            <span className={`text-sm font-medium w-12 text-right ${member.progressVsExpected >= 100 ? 'text-green-600' : member.progressVsExpected >= 85 ? 'text-yellow-600' : 'text-red-600'}`}>
+                              {member.progressVsExpected.toFixed(0)}%
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {member.dailyRequired !== null && member.dailyRequired > 0 ? (
+                          <div className="text-sm">
+                            <div>{formatCurrency(member.dailyRequired)}/dag</div>
+                            <div className="text-xs text-muted-foreground">({member.remainingWorkingDays} dage)</div>
+                          </div>
+                        ) : member.status === "no-goal" ? (
+                          "-"
+                        ) : (
+                          <span className="text-green-600 text-sm">Mål nået!</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
