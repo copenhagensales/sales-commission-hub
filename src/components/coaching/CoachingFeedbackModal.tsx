@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useFeedbackTypes, useObjections, useCoachingTemplates, useCreateCoachingFeedback, CoachingTemplate } from "@/hooks/useCoachingTemplates";
 import { useOnboardingDrills } from "@/hooks/useOnboarding";
-import { Loader2, Search, ChevronDown, Clock, X, Star, Check } from "lucide-react";
+import { Loader2, ChevronDown, Target, TrendingUp, Star, Zap, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -22,7 +22,60 @@ interface CoachingFeedbackModalProps {
 }
 
 const RECENT_TEMPLATES_KEY = "coaching_recent_templates";
-const MAX_RECENT = 5;
+
+// Quick presets - maps to template titles
+const QUICK_PRESETS = [
+  { label: "For blødt næste step", typeKey: "indvending", searchTerm: "blødt" },
+  { label: "Pitcher for tidligt", typeKey: "pitch", searchTerm: "tidligt" },
+  { label: "Mister kontrol", typeKey: "samtalestyring", searchTerm: "kontrol" },
+  { label: "Mail-indvending", typeKey: "indvending", searchTerm: "mail" },
+];
+
+// Quick-tags for fields
+const STRENGTH_TAGS = [
+  "Energi & toneleje",
+  "God lytning",
+  "Stærk åbning",
+  "Professionel",
+  "Holdt roen",
+  "Nysgerrig",
+  "Struktureret",
+];
+
+const IMPROVEMENT_TAGS = [
+  "Brug navne mere",
+  "Stil flere spørgsmål",
+  "Kortere intro",
+  "Stærkere close",
+  "Mere struktur",
+  "Lyt mere",
+  "Konkretisér værdi",
+];
+
+// Positive score options
+const scoreOptions = [
+  { 
+    value: 0, 
+    label: "Fokusområde", 
+    icon: Target, 
+    activeClass: "bg-orange-500/20 border-orange-500 text-orange-700 dark:text-orange-400 ring-2 ring-orange-500/30 ring-offset-2 ring-offset-background",
+    inactiveClass: "border-border hover:bg-orange-500/10 hover:border-orange-500/50"
+  },
+  { 
+    value: 1, 
+    label: "På vej", 
+    icon: TrendingUp, 
+    activeClass: "bg-emerald-500/20 border-emerald-500 text-emerald-700 dark:text-emerald-400 ring-2 ring-emerald-500/30 ring-offset-2 ring-offset-background",
+    inactiveClass: "border-border hover:bg-emerald-500/10 hover:border-emerald-500/50"
+  },
+  { 
+    value: 2, 
+    label: "Stærk præstation", 
+    icon: Star, 
+    activeClass: "bg-amber-500/20 border-amber-500 text-amber-700 dark:text-amber-400 ring-2 ring-amber-500/30 ring-offset-2 ring-offset-background",
+    inactiveClass: "border-border hover:bg-amber-500/10 hover:border-amber-500/50"
+  },
+];
 
 function getRecentTemplateIds(): string[] {
   try {
@@ -34,9 +87,13 @@ function getRecentTemplateIds(): string[] {
 }
 
 function addRecentTemplate(templateId: string) {
-  const recent = getRecentTemplateIds().filter(id => id !== templateId);
-  recent.unshift(templateId);
-  localStorage.setItem(RECENT_TEMPLATES_KEY, JSON.stringify(recent.slice(0, MAX_RECENT)));
+  try {
+    const recent = getRecentTemplateIds().filter(id => id !== templateId);
+    recent.unshift(templateId);
+    localStorage.setItem(RECENT_TEMPLATES_KEY, JSON.stringify(recent.slice(0, 5)));
+  } catch {
+    // Ignore localStorage errors
+  }
 }
 
 export function CoachingFeedbackModal({
@@ -49,99 +106,121 @@ export function CoachingFeedbackModal({
 }: CoachingFeedbackModalProps) {
   const { data: feedbackTypes = [] } = useFeedbackTypes();
   const { data: objections = [] } = useObjections();
-  const { data: allTemplates = [] } = useCoachingTemplates({});
+  const { data: allTemplates = [] } = useCoachingTemplates({ activeOnly: true });
   const { data: drills = [] } = useOnboardingDrills();
   const createFeedback = useCreateCoachingFeedback();
 
-  // Search and filter
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showDetails, setShowDetails] = useState(false);
-
-  // Selected template
+  // Section A: Selection state
+  const [selectedTypeKey, setSelectedTypeKey] = useState("");
+  const [selectedObjectionKey, setSelectedObjectionKey] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<CoachingTemplate | null>(null);
 
-  // Form state
-  const [score, setScore] = useState<number | null>(null);
+  // Section B: Form state
+  const [score, setScore] = useState<number>(1);
   const [strength, setStrength] = useState("");
   const [nextRep, setNextRep] = useState("");
   const [sayThis, setSayThis] = useState("");
   const [successCriteria, setSuccessCriteria] = useState("");
   const [drillId, setDrillId] = useState("");
-  const [reps, setReps] = useState("");
+  const [reps, setReps] = useState<number>(3);
   const [evidence, setEvidence] = useState("");
+  const [showDetails, setShowDetails] = useState(false);
 
-  // Recent templates
-  const recentTemplateIds = useMemo(() => getRecentTemplateIds(), [open]);
-  const recentTemplates = useMemo(() => {
-    return recentTemplateIds
-      .map(id => allTemplates.find(t => t.id === id))
-      .filter((t): t is CoachingTemplate => t !== undefined && t.is_active);
-  }, [recentTemplateIds, allTemplates]);
+  // Filter templates based on selected type and objection
+  const filteredTemplates = useMemo(() => {
+    return allTemplates.filter(t => {
+      if (selectedTypeKey && t.type_key !== selectedTypeKey) return false;
+      if (selectedObjectionKey && t.objection_key !== selectedObjectionKey) return false;
+      return true;
+    });
+  }, [allTemplates, selectedTypeKey, selectedObjectionKey]);
 
-  // Group templates by type
-  const templatesByType = useMemo(() => {
-    const activeTemplates = allTemplates.filter(t => t.is_active);
-    const filtered = searchQuery
-      ? activeTemplates.filter(t => 
-          t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          feedbackTypes.find(ft => ft.key === t.type_key)?.label_da.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      : activeTemplates;
-
-    const grouped: Record<string, CoachingTemplate[]> = {};
-    for (const template of filtered) {
-      if (!grouped[template.type_key]) {
-        grouped[template.type_key] = [];
-      }
-      grouped[template.type_key].push(template);
-    }
-    return grouped;
-  }, [allTemplates, searchQuery, feedbackTypes]);
+  // Check if selected type shows objection dropdown
+  const showObjectionDropdown = selectedTypeKey === "indvending";
 
   // Reset form when modal opens
   useEffect(() => {
     if (open) {
-      setSearchQuery("");
-      setShowDetails(false);
+      setSelectedTypeKey("");
+      setSelectedObjectionKey("");
+      setSelectedTemplateId("");
       setSelectedTemplate(null);
-      setScore(null);
+      setScore(1);
       setStrength("");
       setNextRep("");
       setSayThis("");
       setSuccessCriteria("");
       setDrillId("");
-      setReps("");
+      setReps(3);
       setEvidence("");
+      setShowDetails(false);
     }
   }, [open]);
 
   // Auto-fill form when template is selected
-  const handleSelectTemplate = (template: CoachingTemplate) => {
-    setSelectedTemplate(template);
-    if (template.default_score !== null) {
-      setScore(template.default_score);
+  useEffect(() => {
+    if (selectedTemplateId) {
+      const template = allTemplates.find(t => t.id === selectedTemplateId);
+      if (template) {
+        setSelectedTemplate(template);
+        setScore(template.default_score ?? 1);
+        setStrength(template.strength_default || "");
+        setNextRep(template.next_rep_default || "");
+        setSayThis(template.say_this_default || "");
+        setSuccessCriteria(template.success_criteria_default || "");
+        setDrillId(template.drill_id || "");
+        setReps(template.reps_default || 3);
+      }
+    } else {
+      setSelectedTemplate(null);
     }
-    setStrength(template.strength_default);
-    setNextRep(template.next_rep_default);
-    setSayThis(template.say_this_default || "");
-    setSuccessCriteria(template.success_criteria_default || "");
-    setDrillId(template.drill_id || "");
-    setReps(template.reps_default.toString());
+  }, [selectedTemplateId, allTemplates]);
+
+  // Handle quick preset click
+  const handleQuickPreset = (preset: typeof QUICK_PRESETS[0]) => {
+    setSelectedTypeKey(preset.typeKey);
+    setSelectedObjectionKey("");
+
+    // Find matching template
+    const matchingTemplate = allTemplates.find(t =>
+      t.type_key === preset.typeKey &&
+      t.title.toLowerCase().includes(preset.searchTerm.toLowerCase())
+    );
+
+    if (matchingTemplate) {
+      if (matchingTemplate.objection_key) {
+        setSelectedObjectionKey(matchingTemplate.objection_key);
+      }
+      setSelectedTemplateId(matchingTemplate.id);
+    }
   };
 
-  const handleClearTemplate = () => {
-    setSelectedTemplate(null);
-    setScore(null);
-    setStrength("");
-    setNextRep("");
-    setSayThis("");
-    setSuccessCriteria("");
-    setDrillId("");
-    setReps("");
+  // Handle tag clicks
+  const handleStrengthTag = (tag: string) => {
+    setStrength(prev => prev ? `${prev}. ${tag}` : tag);
+  };
+
+  const handleImprovementTag = (tag: string) => {
+    setNextRep(prev => prev ? `${prev}. ${tag}` : tag);
+  };
+
+  // Helper to get labels
+  const getTypeLabel = (typeKey: string) => {
+    return feedbackTypes.find(t => t.key === typeKey)?.label_da || typeKey;
+  };
+
+  const getObjectionLabel = (objKey: string) => {
+    return objections.find(o => o.key === objKey)?.label_da || objKey;
+  };
+
+  // Check if field matches template default
+  const isFromTemplate = (fieldValue: string, templateDefault: string | null | undefined) => {
+    return selectedTemplate && fieldValue === (templateDefault || "") && fieldValue !== "";
   };
 
   const handleSubmit = async () => {
-    if (!selectedTemplate || score === null || !strength || !nextRep) return;
+    if (!selectedTemplate || !strength || !nextRep) return;
 
     addRecentTemplate(selectedTemplate.id);
 
@@ -158,7 +237,7 @@ export function CoachingFeedbackModal({
       say_this: sayThis || null,
       success_criteria: successCriteria || null,
       drill_id: drillId || null,
-      reps: reps ? parseInt(reps) : null,
+      reps: drillId ? reps : null,
       evidence: evidence || null,
       is_done: false,
     });
@@ -167,241 +246,298 @@ export function CoachingFeedbackModal({
     onSuccess?.();
   };
 
-  const isValid = selectedTemplate && score !== null && strength && nextRep;
-
-  const getTypeLabel = (typeKey: string) => {
-    return feedbackTypes.find(t => t.key === typeKey)?.label_da || typeKey;
-  };
-
-  const getObjectionLabel = (objectionKey: string | null) => {
-    if (!objectionKey) return null;
-    return objections.find(o => o.key === objectionKey)?.label_da || objectionKey;
-  };
-
-  const scoreOptions = [
-    { value: 0, label: "Skal forbedres", icon: X, color: "bg-destructive/10 text-destructive border-destructive/30 hover:bg-destructive/20" },
-    { value: 1, label: "Godkendt", icon: Check, color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/20" },
-    { value: 2, label: "Stærk", icon: Star, color: "bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500/20" },
-  ];
+  const isValid = selectedTemplate && strength.trim() && nextRep.trim();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Giv Coaching Feedback</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Ny Coaching Feedback
+          </DialogTitle>
         </DialogHeader>
 
-        {!selectedTemplate ? (
-          // Template Selection View
-          <div className="space-y-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Søg skabeloner..."
-                className="pl-10"
-              />
+        <div className="space-y-6">
+          {/* Quick Presets Section */}
+          <div className="bg-muted/50 rounded-lg p-4 border border-border/50">
+            <div className="flex items-center gap-2 mb-3">
+              <Zap className="h-4 w-4 text-amber-500" />
+              <span className="text-sm font-medium">Hurtigvalg</span>
+              <span className="text-xs text-muted-foreground">(1-klik feedback)</span>
             </div>
-
-            {/* Recent Templates */}
-            {recentTemplates.length > 0 && !searchQuery && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Senest brugt</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {recentTemplates.map(template => (
-                    <button
-                      key={template.id}
-                      onClick={() => handleSelectTemplate(template)}
-                      className="px-3 py-2 rounded-lg border bg-primary/5 border-primary/20 hover:bg-primary/10 transition-colors text-sm text-left"
-                    >
-                      <span className="font-medium">{template.title}</span>
-                      <Badge variant="secondary" className="ml-2 text-xs">
-                        {getTypeLabel(template.type_key)}
-                      </Badge>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Templates grouped by type */}
-            <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
-              {Object.entries(templatesByType).map(([typeKey, templates]) => (
-                <div key={typeKey}>
-                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                    {getTypeLabel(typeKey)}
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {templates.map(template => (
-                      <button
-                        key={template.id}
-                        onClick={() => handleSelectTemplate(template)}
-                        className="p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors text-left group"
-                      >
-                        <div className="font-medium text-sm group-hover:text-primary transition-colors">
-                          {template.title}
-                        </div>
-                        {template.objection_key && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {getObjectionLabel(template.objection_key)}
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            <div className="flex flex-wrap gap-2">
+              {QUICK_PRESETS.map((preset) => (
+                <Button
+                  key={preset.label}
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs hover:bg-primary/10 hover:border-primary/50"
+                  onClick={() => handleQuickPreset(preset)}
+                >
+                  {preset.label}
+                </Button>
               ))}
-
-              {Object.keys(templatesByType).length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  Ingen skabeloner fundet
-                </div>
-              )}
             </div>
           </div>
-        ) : (
-          // Feedback Form View
-          <div className="space-y-6">
-            {/* Selected template header */}
-            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-              <div>
-                <div className="font-medium">{selectedTemplate.title}</div>
-                <div className="text-sm text-muted-foreground">
-                  {getTypeLabel(selectedTemplate.type_key)}
-                  {selectedTemplate.objection_key && ` • ${getObjectionLabel(selectedTemplate.objection_key)}`}
+
+          {/* Section A: Vælg */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">A</div>
+              <span className="text-sm font-medium">Vælg</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Feedback Type */}
+              <div className="space-y-2">
+                <Label>Feedback-type *</Label>
+                <Select value={selectedTypeKey} onValueChange={(val) => {
+                  setSelectedTypeKey(val);
+                  setSelectedObjectionKey("");
+                  setSelectedTemplateId("");
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {feedbackTypes.map(type => (
+                      <SelectItem key={type.key} value={type.key}>
+                        {type.label_da}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Objection (conditional) */}
+              {showObjectionDropdown && (
+                <div className="space-y-2">
+                  <Label>Indvending</Label>
+                  <Select value={selectedObjectionKey} onValueChange={(val) => {
+                    setSelectedObjectionKey(val);
+                    setSelectedTemplateId("");
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vælg indvending..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Alle</SelectItem>
+                      {objections.map(obj => (
+                        <SelectItem key={obj.key} value={obj.key}>
+                          {obj.label_da}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Template */}
+              <div className={cn("space-y-2", !showObjectionDropdown && "md:col-span-2")}>
+                <Label>Skabelon *</Label>
+                <Select
+                  value={selectedTemplateId}
+                  onValueChange={setSelectedTemplateId}
+                  disabled={!selectedTypeKey}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={selectedTypeKey ? "Vælg skabelon..." : "Vælg type først..."} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredTemplates.map(template => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Section B: Feedback Form (only when template selected) */}
+          {selectedTemplate && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">B</div>
+                <span className="text-sm font-medium">Feedback</span>
+                <Badge variant="secondary" className="text-xs">
+                  {selectedTemplate.title}
+                </Badge>
+              </div>
+
+              {/* Score */}
+              <div className="space-y-2">
+                <Label>Score *</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {scoreOptions.map(option => {
+                    const Icon = option.icon;
+                    const isActive = score === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setScore(option.value)}
+                        className={cn(
+                          "flex items-center justify-center gap-2 py-3 px-2 rounded-lg border-2 transition-all",
+                          isActive ? option.activeClass : option.inactiveClass
+                        )}
+                      >
+                        <Icon className="h-5 w-5" />
+                        <span className="text-sm font-medium">{option.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={handleClearTemplate}>
-                Skift skabelon
-              </Button>
-            </div>
 
-            {/* Score buttons */}
-            <div>
-              <Label className="mb-3 block">Score *</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {scoreOptions.map(option => {
-                  const Icon = option.icon;
-                  const isSelected = score === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      onClick={() => setScore(option.value)}
-                      className={cn(
-                        "flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-all",
-                        isSelected 
-                          ? option.color.replace("hover:", "") + " ring-2 ring-offset-2 ring-offset-background"
-                          : "border-border hover:border-muted-foreground/50"
-                      )}
+              {/* Strength with quick-tags */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label>1 Styrke *</Label>
+                  {isFromTemplate(strength, selectedTemplate.strength_default) && (
+                    <Badge variant="outline" className="text-xs text-muted-foreground">Fra skabelon</Badge>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {STRENGTH_TAGS.map(tag => (
+                    <Badge
+                      key={tag}
+                      variant="outline"
+                      className="cursor-pointer text-xs hover:bg-emerald-500/10 hover:border-emerald-500/50 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+                      onClick={() => handleStrengthTag(tag)}
                     >
-                      <Icon className="h-5 w-5" />
-                      <span className="font-medium text-sm">{option.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Essential fields */}
-            <div className="space-y-4">
-              <div>
-                <Label>1 Styrke *</Label>
+                      + {tag}
+                    </Badge>
+                  ))}
+                </div>
                 <Textarea
                   value={strength}
-                  onChange={e => setStrength(e.target.value)}
+                  onChange={(e) => setStrength(e.target.value)}
                   placeholder="Hvad gjorde medarbejderen godt?"
                   rows={2}
                 />
               </div>
 
-              <div>
-                <Label>1 Forbedring / Næste Rep *</Label>
+              {/* Next Rep (Improvement) with quick-tags */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label>1 Forbedring *</Label>
+                  {isFromTemplate(nextRep, selectedTemplate.next_rep_default) && (
+                    <Badge variant="outline" className="text-xs text-muted-foreground">Fra skabelon</Badge>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {IMPROVEMENT_TAGS.map(tag => (
+                    <Badge
+                      key={tag}
+                      variant="outline"
+                      className="cursor-pointer text-xs hover:bg-orange-500/10 hover:border-orange-500/50 hover:text-orange-700 dark:hover:text-orange-400 transition-colors"
+                      onClick={() => handleImprovementTag(tag)}
+                    >
+                      + {tag}
+                    </Badge>
+                  ))}
+                </div>
                 <Textarea
                   value={nextRep}
-                  onChange={e => setNextRep(e.target.value)}
-                  placeholder="Hvad skal forbedres til næste gang?"
+                  onChange={(e) => setNextRep(e.target.value)}
+                  placeholder="Hvad skal medarbejderen fokusere på næste gang?"
                   rows={2}
                 />
               </div>
-            </div>
 
-            {/* Collapsible details */}
-            <Collapsible open={showDetails} onOpenChange={setShowDetails}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="w-full justify-between">
-                  <span className="text-muted-foreground">Vis flere detaljer</span>
-                  <ChevronDown className={cn("h-4 w-4 transition-transform", showDetails && "rotate-180")} />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-4 pt-4">
-                <div>
-                  <Label>"Sig denne sætning næste gang"</Label>
-                  <Textarea
-                    value={sayThis}
-                    onChange={e => setSayThis(e.target.value)}
-                    placeholder="Konkret forslag til sætning..."
-                    rows={2}
-                  />
-                </div>
-
-                <div>
-                  <Label>Success-kriterie</Label>
-                  <Input
-                    value={successCriteria}
-                    onChange={e => setSuccessCriteria(e.target.value)}
-                    placeholder="Det er lykkedes når..."
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Tildel Drill</Label>
-                    <Select value={drillId} onValueChange={setDrillId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Vælg drill..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Ingen drill</SelectItem>
-                        {drills.map(drill => (
-                          <SelectItem key={drill.id} value={drill.id}>
-                            {drill.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label>Reps</Label>
-                    <Input
-                      type="number"
-                      value={reps}
-                      onChange={e => setReps(e.target.value)}
-                      placeholder="Antal gentagelser"
-                      min={1}
+              {/* Collapsible additional details */}
+              <Collapsible open={showDetails} onOpenChange={setShowDetails}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="w-full justify-between">
+                    <span>Vis flere detaljer</span>
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", showDetails && "rotate-180")} />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 pt-4">
+                  {/* Say This */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Label>Sig denne sætning</Label>
+                      {isFromTemplate(sayThis, selectedTemplate.say_this_default) && (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">Fra skabelon</Badge>
+                      )}
+                    </div>
+                    <Textarea
+                      value={sayThis}
+                      onChange={(e) => setSayThis(e.target.value)}
+                      placeholder="En konkret sætning medarbejderen kan bruge..."
+                      rows={2}
                     />
                   </div>
-                </div>
 
-                <div>
-                  <Label>Evidence / Timestamp</Label>
-                  <Input
-                    value={evidence}
-                    onChange={e => setEvidence(e.target.value)}
-                    placeholder="fx 02:14 / 'kunde sagde X'"
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
-        )}
+                  {/* Success Criteria */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Label>Success-kriterie</Label>
+                      {isFromTemplate(successCriteria, selectedTemplate.success_criteria_default) && (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">Fra skabelon</Badge>
+                      )}
+                    </div>
+                    <Textarea
+                      value={successCriteria}
+                      onChange={(e) => setSuccessCriteria(e.target.value)}
+                      placeholder="Det er lykkedes når..."
+                      rows={2}
+                    />
+                  </div>
 
-        <DialogFooter>
+                  {/* Drill Assignment */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Tildel Drill</Label>
+                      <Select value={drillId} onValueChange={setDrillId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Vælg drill..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Ingen drill</SelectItem>
+                          {drills.map(drill => (
+                            <SelectItem key={drill.id} value={drill.id}>
+                              {drill.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {drillId && (
+                      <div className="space-y-2">
+                        <Label>Antal reps</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={20}
+                          value={reps}
+                          onChange={(e) => setReps(parseInt(e.target.value) || 3)}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Evidence */}
+                  <div className="space-y-2">
+                    <Label>Evidence / Timestamp</Label>
+                    <Textarea
+                      value={evidence}
+                      onChange={(e) => setEvidence(e.target.value)}
+                      placeholder="Fx tidsstempel i opkaldet eller konkret citat..."
+                      rows={2}
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="mt-6">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Annuller
           </Button>
