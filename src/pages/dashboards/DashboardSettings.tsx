@@ -1681,7 +1681,7 @@ const DashboardSettings = () => {
                       <p className="text-[10px] text-white/40 mt-1">Sælgere</p>
                     </div>
 
-                    {/* Stabsmedarbejdere */}
+                    {/* Backoffice */}
                     <div
                       className={`p-3 ${getBorderRadiusClass(themeFormData.borderRadius)} ${getCardStyleClasses(themeFormData)} ${
                         themeFormData.animations ? "transition-all hover:scale-105 cursor-pointer" : ""
@@ -1692,13 +1692,13 @@ const DashboardSettings = () => {
                       }}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-white/60">Stabsmedarbejdere</span>
+                        <span className="text-xs text-white/60">Backoffice</span>
                         <Award className="h-4 w-4 text-orange-500" />
                       </div>
                       <div className={`${getFontSizeClass(themeFormData.fontSize)} font-bold text-orange-500`}>
                         8
                       </div>
-                      <p className="text-[10px] text-white/40 mt-1">Aktive stabsmedarbejdere</p>
+                      <p className="text-[10px] text-white/40 mt-1">Aktive backoffice</p>
                     </div>
                   </div>
 

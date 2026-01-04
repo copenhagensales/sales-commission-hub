@@ -344,14 +344,14 @@ export function StaffEmployeesTab() {
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-xl bg-card/50 p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">Aktive stabsmedarbejdere</span>
+            <span className="text-sm text-muted-foreground">Aktive backoffice</span>
             <Users className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="text-2xl font-bold">{activeCount}</div>
         </div>
         <div className="rounded-xl bg-card/50 p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">Inaktive stabsmedarbejdere</span>
+            <span className="text-sm text-muted-foreground">Inaktive backoffice</span>
             <Users className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="text-2xl font-bold">{inactiveCount}</div>
@@ -367,7 +367,7 @@ export function StaffEmployeesTab() {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <h2 className="text-xl font-semibold">Stabsmedarbejdere oversigt</h2>
+          <h2 className="text-xl font-semibold">Backoffice oversigt</h2>
           <div className="flex items-center gap-3">
             <div className="flex items-center rounded-lg bg-muted/50 p-1">
               <Button
@@ -398,7 +398,7 @@ export function StaffEmployeesTab() {
             <div className="relative w-56">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Søg stabsmedarbejdere..." 
+                placeholder="Søg backoffice..." 
                 value={searchTerm} 
                 onChange={(e) => setSearchTerm(e.target.value)} 
                 className="pl-9 bg-muted/50 border-0 focus-visible:ring-1 h-9" 
@@ -409,15 +409,15 @@ export function StaffEmployeesTab() {
               if (!open) setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
             }}>
               <DialogTrigger asChild>
-                <Button><Plus className="mr-2 h-4 w-4" /> Opret stabsmedarbejder</Button>
+                <Button><Plus className="mr-2 h-4 w-4" /> Opret backoffice</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Opret ny stabsmedarbejder</DialogTitle>
+                  <DialogTitle>Opret ny backoffice medarbejder</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <p className="text-sm text-muted-foreground">
-                    Opret en ny stabsmedarbejder med login-adgang til systemet.
+                    Opret en ny backoffice medarbejder med login-adgang til systemet.
                   </p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -634,7 +634,7 @@ export function StaffEmployeesTab() {
                 {filteredEmployees.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      Ingen stabsmedarbejdere fundet
+                      Ingen backoffice medarbejdere fundet
                     </TableCell>
                   </TableRow>
                 )}
@@ -669,7 +669,7 @@ export function StaffEmployeesTab() {
           <AlertDialogHeader>
             <AlertDialogTitle>Flyt til medarbejdere</AlertDialogTitle>
             <AlertDialogDescription>
-              Er du sikker på at du vil flytte denne stabsmedarbejder til almindelige medarbejdere?
+              Er du sikker på at du vil flytte denne backoffice medarbejder til almindelige medarbejdere?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
