@@ -54,44 +54,44 @@ export default function LeaderOnboardingView() {
     },
   });
 
-  // Fetch team memberships separately
-  const { data: teamMemberships = [] } = useQuery({
-    queryKey: ["team-memberships-for-coaching"],
+  // Fetch team memberships for current leader's teams
+  const { data: myTeamEmployees = [] } = useQuery({
+    queryKey: ["my-team-employees-for-coaching", currentEmployeeId],
     queryFn: async () => {
-      const { data } = await supabase
+      if (!currentEmployeeId) return [];
+      
+      // Get the leader's team IDs
+      const { data: myTeams } = await supabase
         .from("team_members")
-        .select("employee_id, team_id");
-      return (data || []) as { employee_id: string; team_id: string }[];
-    },
-  });
-
-  // Fetch all teams - explicit any to avoid TS2589 recursive type issue
-  const teamsQuery = useQuery<{ id: string; name: string }[]>({
-    queryKey: ["teams-for-quick-coaching"],
-    queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const client = supabase as any;
-      const { data } = await client
-        .from("teams")
-        .select("id, name")
+        .select("team_id")
+        .eq("employee_id", currentEmployeeId);
+      
+      if (!myTeams || myTeams.length === 0) return [];
+      
+      const myTeamIds = myTeams.map(t => t.team_id);
+      
+      // Get all employees in those teams
+      const { data: teamMembers } = await supabase
+        .from("team_members")
+        .select("employee_id")
+        .in("team_id", myTeamIds);
+      
+      if (!teamMembers) return [];
+      
+      const employeeIds = [...new Set(teamMembers.map(tm => tm.employee_id))];
+      
+      // Fetch employee details
+      const { data: employees } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name")
+        .in("id", employeeIds)
         .eq("is_active", true)
-        .order("name");
-      return data || [];
+        .order("first_name");
+      
+      return (employees || []) as { id: string; first_name: string; last_name: string }[];
     },
+    enabled: !!currentEmployeeId,
   });
-  const teams = teamsQuery.data || [];
-
-  // State for quick coaching dropdowns
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-
-  // Filter employees by selected team
-  const employeesInSelectedTeam = useMemo(() => {
-    if (!selectedTeamId) return [];
-    const employeeIdsInTeam = teamMemberships
-      .filter(tm => tm.team_id === selectedTeamId)
-      .map(tm => tm.employee_id);
-    return allEmployees.filter(emp => employeeIdsInTeam.includes(emp.id));
-  }, [allEmployees, teamMemberships, selectedTeamId]);
 
   // Handle opening modal for task completion
   const handleOpenTaskModal = (taskId: string) => {
@@ -241,38 +241,16 @@ export default function LeaderOnboardingView() {
         <CardContent>
           <div className="flex items-end gap-4">
             <div className="flex-1 space-y-2">
-              <label className="text-sm font-medium">Team</label>
-              <Select 
-                value={selectedTeamId || ""} 
-                onValueChange={(val) => {
-                  setSelectedTeamId(val || null);
-                  setSelectedEmployeeForCoaching(null);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Vælg team..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {teams.map(team => (
-                    <SelectItem key={team.id} value={team.id}>
-                      {team.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1 space-y-2">
               <label className="text-sm font-medium">Medarbejder</label>
               <Select
                 value={selectedEmployeeForCoaching || ""}
                 onValueChange={(val) => setSelectedEmployeeForCoaching(val || null)}
-                disabled={!selectedTeamId}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={selectedTeamId ? "Vælg medarbejder..." : "Vælg team først"} />
+                  <SelectValue placeholder="Vælg medarbejder..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {employeesInSelectedTeam.map(emp => (
+                  {myTeamEmployees.map(emp => (
                     <SelectItem key={emp.id} value={emp.id}>
                       {emp.first_name} {emp.last_name}
                     </SelectItem>
