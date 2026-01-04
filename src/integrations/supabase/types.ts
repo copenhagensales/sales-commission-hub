@@ -1192,6 +1192,7 @@ export type Database = {
           template_id: string | null
           type_key: string
           updated_at: string
+          video_url: string | null
         }
         Insert: {
           call_id?: string | null
@@ -1212,6 +1213,7 @@ export type Database = {
           template_id?: string | null
           type_key: string
           updated_at?: string
+          video_url?: string | null
         }
         Update: {
           call_id?: string | null
@@ -1232,6 +1234,7 @@ export type Database = {
           template_id?: string | null
           type_key?: string
           updated_at?: string
+          video_url?: string | null
         }
         Relationships: [
           {
@@ -1357,6 +1360,7 @@ export type Database = {
           type_key: string
           updated_at: string
           variant: string
+          video_url_default: string | null
         }
         Insert: {
           created_at?: string
@@ -1375,6 +1379,7 @@ export type Database = {
           type_key: string
           updated_at?: string
           variant?: string
+          video_url_default?: string | null
         }
         Update: {
           created_at?: string
@@ -1393,6 +1398,7 @@ export type Database = {
           type_key?: string
           updated_at?: string
           variant?: string
+          video_url_default?: string | null
         }
         Relationships: [
           {

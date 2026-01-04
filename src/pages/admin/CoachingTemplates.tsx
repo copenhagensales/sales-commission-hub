@@ -110,6 +110,7 @@ export default function CoachingTemplates() {
         drill_id: editingTemplate.drill_id || null,
         reps_default: editingTemplate.reps_default ?? 5,
         tags: editingTemplate.tags || [],
+        video_url_default: editingTemplate.video_url_default || null,
       });
     } else if (editingTemplate.id) {
       await updateTemplate.mutateAsync({
@@ -128,6 +129,7 @@ export default function CoachingTemplates() {
           drill_id: editingTemplate.drill_id,
           reps_default: editingTemplate.reps_default,
           tags: editingTemplate.tags,
+          video_url_default: editingTemplate.video_url_default,
         },
       });
     }

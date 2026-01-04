@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useFeedbackTypes, useObjections, useCoachingTemplates, useCreateCoachingFeedback, CoachingTemplate } from "@/hooks/useCoachingTemplates";
 import { useOnboardingDrills } from "@/hooks/useOnboarding";
-import { Loader2, ChevronDown, Target, TrendingUp, Star, Zap, Sparkles } from "lucide-react";
+import { Loader2, ChevronDown, Target, TrendingUp, Star, Zap, Sparkles, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface CoachingFeedbackModalProps {
   open: boolean;
@@ -126,6 +127,8 @@ export function CoachingFeedbackModal({
   const [reps, setReps] = useState<number>(3);
   const [evidence, setEvidence] = useState("");
   const [showDetails, setShowDetails] = useState(false);
+  const [includeVideo, setIncludeVideo] = useState(false);
+  const [videoUrl, setVideoUrl] = useState("");
 
   // Filter templates based on selected type and objection
   const filteredTemplates = useMemo(() => {
@@ -155,6 +158,8 @@ export function CoachingFeedbackModal({
       setReps(3);
       setEvidence("");
       setShowDetails(false);
+      setIncludeVideo(false);
+      setVideoUrl("");
     }
   }, [open]);
 
@@ -171,6 +176,10 @@ export function CoachingFeedbackModal({
         setSuccessCriteria(template.success_criteria_default || "");
         setDrillId(template.drill_id || "");
         setReps(template.reps_default || 3);
+        if (template.video_url_default) {
+          setIncludeVideo(true);
+          setVideoUrl(template.video_url_default);
+        }
       }
     } else {
       setSelectedTemplate(null);
@@ -239,6 +248,7 @@ export function CoachingFeedbackModal({
       drill_id: drillId || null,
       reps: drillId ? reps : null,
       evidence: evidence || null,
+      video_url: includeVideo && videoUrl ? videoUrl : null,
       is_done: false,
     });
 
@@ -517,6 +527,36 @@ export function CoachingFeedbackModal({
                           value={reps}
                           onChange={(e) => setReps(parseInt(e.target.value) || 3)}
                         />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Training Video Link */}
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="include-video"
+                        checked={includeVideo}
+                        onCheckedChange={(checked) => setIncludeVideo(checked === true)}
+                      />
+                      <label
+                        htmlFor="include-video"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
+                      >
+                        <Video className="h-4 w-4 text-muted-foreground" />
+                        Tilknyt træningsvideo
+                      </label>
+                    </div>
+                    {includeVideo && (
+                      <div className="space-y-2 pl-6">
+                        <Input
+                          value={videoUrl}
+                          onChange={(e) => setVideoUrl(e.target.value)}
+                          placeholder="YouTube, Vimeo eller SharePoint URL..."
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Indsæt link til en træningsvideo medarbejderen skal se
+                        </p>
                       </div>
                     )}
                   </div>
