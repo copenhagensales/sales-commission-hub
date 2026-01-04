@@ -49,8 +49,8 @@ export function SomeCombinedActivityChart({ historicalMetrics }: SomeCombinedAct
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="tiktokGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#000000" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#000000" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#25F4EE" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#25F4EE" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="instaGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#E1306C" stopOpacity={0.3}/>
@@ -81,7 +81,7 @@ export function SomeCombinedActivityChart({ historicalMetrics }: SomeCombinedAct
                   type="monotone"
                   dataKey="tiktokViews"
                   name="TikTok"
-                  stroke="#000000"
+                  stroke="#25F4EE"
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#tiktokGradient)"
