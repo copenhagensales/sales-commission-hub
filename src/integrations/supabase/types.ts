@@ -1929,6 +1929,92 @@ export type Database = {
         }
         Relationships: []
       }
+      deactivation_reminder_config: {
+        Row: {
+          created_at: string
+          email_body: string
+          email_subject: string
+          id: string
+          is_active: boolean
+          recipients: string
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email_body?: string
+          email_subject?: string
+          id?: string
+          is_active?: boolean
+          recipients?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email_body?: string
+          email_subject?: string
+          id?: string
+          is_active?: boolean
+          recipients?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deactivation_reminder_config_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deactivation_reminders_sent: {
+        Row: {
+          created_at: string
+          employee_id: string
+          followup_sent_at: string | null
+          id: string
+          initial_sent_at: string
+          recipients: string[]
+          team_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          followup_sent_at?: string | null
+          id?: string
+          initial_sent_at?: string
+          recipients: string[]
+          team_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          followup_sent_at?: string | null
+          id?: string
+          initial_sent_at?: string
+          recipients?: string[]
+          team_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deactivation_reminders_sent_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deactivation_reminders_sent_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dialer_calls: {
         Row: {
           agent_external_id: string
