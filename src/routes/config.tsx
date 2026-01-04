@@ -9,7 +9,6 @@ import {
   Settings,
   MgTest,
   MgTestDashboard,
-  KmTest,
   Codan,
   TdcErhverv,
   TdcErhvervDashboard,
@@ -129,7 +128,7 @@ export const routes: RouteConfig[] = [
   { path: "/payroll", component: Payroll, access: "role", positionPermission: "menu_payroll" },
   { path: "/mg-test", component: MgTest, access: "role", positionPermission: "menu_mg_test" },
   { path: "/mg-test-dashboard", component: MgTestDashboard, access: "role", positionPermission: "menu_test_dashboard" },
-  { path: "/km-test", component: KmTest, access: "role", positionPermission: "menu_km_test" },
+  
   { path: "/adversus-data", component: AdversusData, access: "role", positionPermission: "menu_adversus_data" },
   { path: "/dialer-data", component: DialerData, access: "role", positionPermission: "menu_dialer_data" },
   { path: "/calls-data", component: CallsData, access: "role", positionPermission: "menu_calls_data" },
