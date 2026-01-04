@@ -314,15 +314,15 @@ export function CoachingFeedbackModal({
               {showObjectionDropdown && (
                 <div className="space-y-2">
                   <Label>Indvending</Label>
-                  <Select value={selectedObjectionKey} onValueChange={(val) => {
-                    setSelectedObjectionKey(val);
+                  <Select value={selectedObjectionKey || "all"} onValueChange={(val) => {
+                    setSelectedObjectionKey(val === "all" ? "" : val);
                     setSelectedTemplateId("");
                   }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Vælg indvending..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Alle</SelectItem>
+                      <SelectItem value="all">Alle</SelectItem>
                       {objections.map(obj => (
                         <SelectItem key={obj.key} value={obj.key}>
                           {obj.label_da}
@@ -493,12 +493,12 @@ export function CoachingFeedbackModal({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Tildel Drill</Label>
-                      <Select value={drillId} onValueChange={setDrillId}>
+                      <Select value={drillId || "none"} onValueChange={(v) => setDrillId(v === "none" ? "" : v)}>
                         <SelectTrigger>
                           <SelectValue placeholder="Vælg drill..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Ingen drill</SelectItem>
+                          <SelectItem value="none">Ingen drill</SelectItem>
                           {drills.map(drill => (
                             <SelectItem key={drill.id} value={drill.id}>
                               {drill.title}
