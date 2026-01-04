@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Target, Users, TrendingUp, Award, Info, Clock, AlertCircle } from "lucide-react";
+import { Target, Users, TrendingUp, Award, Info, AlertCircle } from "lucide-react";
 import { format, addDays, isWeekend, formatDistanceToNow } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { da } from "date-fns/locale";
@@ -474,7 +474,6 @@ export default function TdcErhvervGoalsDashboard() {
               <TableRow>
                 <TableHead>Medarbejder</TableHead>
                 <TableHead className="text-right">Mål</TableHead>
-                <TableHead>Mål ændret</TableHead>
                 <TableHead className="text-right">Opnået</TableHead>
                 <TableHead className="w-[220px]">Af forventet</TableHead>
                 <TableHead>Status</TableHead>
@@ -487,7 +486,6 @@ export default function TdcErhvervGoalsDashboard() {
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-full" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-16" /></TableCell>
@@ -496,7 +494,7 @@ export default function TdcErhvervGoalsDashboard() {
                 ))
               ) : teamMemberGoals.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     Ingen provisionslønne medarbejdere fundet på dette team
                   </TableCell>
                 </TableRow>
@@ -514,48 +512,27 @@ export default function TdcErhvervGoalsDashboard() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      {member.targetAmount ? formatCurrency(member.targetAmount) : "-"}
-                    </TableCell>
-                    <TableCell>
-                      {member.goalUpdatedAt ? (
-                        (() => {
-                          const wasModified = member.goalCreatedAt && member.goalUpdatedAt !== member.goalCreatedAt;
-                          const dateToShow = new Date(member.goalUpdatedAt);
-                          const isRecent = (Date.now() - dateToShow.getTime()) < 48 * 60 * 60 * 1000; // 48 hours
-                          
-                          return (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className={`flex items-center gap-1 text-sm ${wasModified ? 'text-orange-600 font-medium' : 'text-muted-foreground'}`}>
-                                    {wasModified ? (
-                                      <AlertCircle className="h-3.5 w-3.5" />
-                                    ) : (
-                                      <Clock className="h-3.5 w-3.5" />
-                                    )}
-                                    <span className={isRecent && wasModified ? 'underline decoration-orange-400' : ''}>
-                                      {formatDistanceToNow(dateToShow, { locale: da, addSuffix: true })}
-                                    </span>
+                      <div className="flex items-center justify-end gap-1">
+                        {member.targetAmount ? formatCurrency(member.targetAmount) : "-"}
+                        {member.goalUpdatedAt && member.goalCreatedAt && member.goalUpdatedAt !== member.goalCreatedAt && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertCircle className="h-3.5 w-3.5 text-orange-500 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-xs">
+                                  <div className="font-medium">Mål ændret</div>
+                                  <div>Sidst ændret: {format(new Date(member.goalUpdatedAt), "d. MMM yyyy 'kl.' HH:mm", { locale: da })}</div>
+                                  <div className="text-muted-foreground">
+                                    Oprettet: {format(new Date(member.goalCreatedAt), "d. MMM yyyy", { locale: da })}
                                   </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <div className="text-xs">
-                                    <div className="font-medium">{wasModified ? 'Sidst ændret' : 'Oprettet'}</div>
-                                    <div>{format(dateToShow, "d. MMMM yyyy 'kl.' HH:mm", { locale: da })}</div>
-                                    {wasModified && member.goalCreatedAt && (
-                                      <div className="text-muted-foreground mt-1">
-                                        Oprindeligt oprettet: {format(new Date(member.goalCreatedAt), "d. MMM yyyy", { locale: da })}
-                                      </div>
-                                    )}
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          );
-                        })()
-                      ) : (
-                        <span className="text-sm text-muted-foreground">-</span>
-                      )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {formatCurrency(member.achievedAmount)}
