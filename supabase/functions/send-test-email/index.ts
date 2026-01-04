@@ -109,14 +109,22 @@ serve(async (req) => {
       );
     }
 
-    // Replace placeholders with test data for both template types
+    // Replace placeholders with test data for all template types
     const processedHtml = htmlContent
+      // Welcome/invitation templates
       .replace(/\{\{firstName\}\}/g, "Test")
       .replace(/\{\{lastName\}\}/g, "Bruger")
       .replace(/\{\{invitationUrl\}\}/g, "https://app.copenhagensales.dk/onboarding?token=TEST123")
+      // Contract templates
       .replace(/\{\{employeeName\}\}/g, "Test Bruger")
       .replace(/\{\{contractTitle\}\}/g, "Test Kontrakt")
-      .replace(/\{\{loginUrl\}\}/g, "https://app.copenhagensales.dk/auth");
+      .replace(/\{\{loginUrl\}\}/g, "https://app.copenhagensales.dk/auth")
+      // Recruitment templates
+      .replace(/\{\{fornavn\}\}/g, "Test")
+      .replace(/\{\{rolle\}\}/g, "Salgskonsulent")
+      .replace(/\{\{dato\}\}/g, "Mandag d. 15. januar 2026")
+      .replace(/\{\{tidspunkt\}\}/g, "10:00")
+      .replace(/\{\{adresse\}\}/g, "Testadresse 123, 2300 København S");
 
     // Get M365 access token and send email
     const accessToken = await getM365AccessToken();
