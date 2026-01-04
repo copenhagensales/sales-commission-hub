@@ -364,9 +364,9 @@ export default function CoachingTemplates() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">Ingen standard</SelectItem>
-                      <SelectItem value="0">0 - Skal forbedres</SelectItem>
-                      <SelectItem value="1">1 - Godkendt</SelectItem>
-                      <SelectItem value="2">2 - Stærk præstation</SelectItem>
+                      <SelectItem value="0">🎯 Fokusområde</SelectItem>
+                      <SelectItem value="1">📈 På vej</SelectItem>
+                      <SelectItem value="2">⭐ Stærk præstation</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
