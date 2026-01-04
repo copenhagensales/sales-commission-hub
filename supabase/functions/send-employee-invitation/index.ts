@@ -46,12 +46,18 @@ async function getM365AccessToken(): Promise<string> {
   return data.access_token;
 }
 
-async function sendEmail(accessToken: string, to: string, subject: string, htmlBody: string): Promise<void> {
+async function sendEmail(accessToken: string, to: string | string[], subject: string, htmlBody: string): Promise<void> {
   const senderEmail = Deno.env.get("M365_SENDER_EMAIL");
   
   if (!senderEmail) {
     throw new Error("Missing M365_SENDER_EMAIL");
   }
+
+  // Support multiple recipients
+  const recipients = Array.isArray(to) ? to : [to];
+  const toRecipients = recipients.map(email => ({
+    emailAddress: { address: email },
+  }));
 
   const emailPayload = {
     message: {
@@ -60,11 +66,7 @@ async function sendEmail(accessToken: string, to: string, subject: string, htmlB
         contentType: "HTML",
         content: htmlBody,
       },
-      toRecipients: [
-        {
-          emailAddress: { address: to },
-        },
-      ],
+      toRecipients,
     },
     saveToSentItems: true,
   };
@@ -215,6 +217,7 @@ serve(async (req) => {
       </html>
     `;
 
+    // Send to employee
     await sendEmail(
       accessToken,
       email,
@@ -222,7 +225,24 @@ serve(async (req) => {
       emailHtml
     );
 
-    console.log(`Invitation sent to ${email} for employee ${employeeId}`);
+    // Send copy to admin
+    const adminCopyEmail = "km@copenhagensales.dk";
+    const adminEmailHtml = `
+      <div style="background: #fef3c7; padding: 12px; margin-bottom: 20px; border-radius: 6px; border-left: 4px solid #f59e0b;">
+        <strong>Kopi af invitation sendt til:</strong> ${email}<br>
+        <strong>Medarbejder:</strong> ${firstName} ${lastName || ""}
+      </div>
+      ${emailHtml}
+    `;
+    
+    await sendEmail(
+      accessToken,
+      adminCopyEmail,
+      `[KOPI] Invitation sendt til ${firstName} ${lastName || ""} (${email})`,
+      adminEmailHtml
+    );
+
+    console.log(`Invitation sent to ${email} for employee ${employeeId}, copy sent to ${adminCopyEmail}`);
 
     return new Response(
       JSON.stringify({ success: true, message: "Invitation sent successfully" }),
