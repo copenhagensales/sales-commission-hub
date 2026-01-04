@@ -9,6 +9,7 @@ const ExpectationsRamp = lazy(() => import("./ExpectationsRamp"));
 const LeaderOnboardingView = lazy(() => import("./LeaderOnboardingView"));
 const DrillLibrary = lazy(() => import("./DrillLibrary"));
 const OnboardingAdmin = lazy(() => import("./OnboardingAdmin"));
+const FeedbackTemplatePreview = lazy(() => import("./FeedbackTemplatePreview"));
 
 export default function OnboardingDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -22,11 +23,12 @@ export default function OnboardingDashboard() {
     <MainLayout>
       <div className="space-y-4">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
+          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex">
             <TabsTrigger value="overview">Oversigt</TabsTrigger>
             <TabsTrigger value="ramp">Forventninger</TabsTrigger>
             <TabsTrigger value="leader">Leder</TabsTrigger>
             <TabsTrigger value="drills">Drill-bibliotek</TabsTrigger>
+            <TabsTrigger value="template">Skabelon</TabsTrigger>
             <TabsTrigger value="admin">Admin</TabsTrigger>
           </TabsList>
 
@@ -45,6 +47,10 @@ export default function OnboardingDashboard() {
 
             <TabsContent value="drills" className="space-y-4">
               <DrillLibrary />
+            </TabsContent>
+
+            <TabsContent value="template" className="space-y-4">
+              <FeedbackTemplatePreview />
             </TabsContent>
 
             <TabsContent value="admin" className="space-y-4">
