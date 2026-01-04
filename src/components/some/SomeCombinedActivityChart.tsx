@@ -17,11 +17,8 @@ export function SomeCombinedActivityChart({ historicalMetrics }: SomeCombinedAct
       .filter((m) => isAfter(parseISO(m.week_start_date), cutoffDate))
       .map((m) => ({
         week: format(parseISO(m.week_start_date), "d. MMM", { locale: da }),
-        tiktokViews: m.tiktok_views,
-        instaViews: m.insta_views,
-        totalViews: m.tiktok_views + m.insta_views,
-        tiktokLikes: m.tiktok_likes,
-        instaLikes: m.insta_likes,
+        tiktokFollowers: m.tiktok_followers,
+        instaFollowers: m.insta_followers,
       }))
       .sort((a, b) => a.week.localeCompare(b.week));
   }, [historicalMetrics]);
@@ -35,8 +32,8 @@ export function SomeCombinedActivityChart({ historicalMetrics }: SomeCombinedAct
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg">Aktivitet sidste 30 dage</CardTitle>
-        <CardDescription>Visninger på tværs af platforme</CardDescription>
+        <CardTitle className="text-lg">Følgere sidste 30 dage</CardTitle>
+        <CardDescription>Udvikling i følgere på tværs af platforme</CardDescription>
       </CardHeader>
       <CardContent>
         {chartData.length === 0 ? (
@@ -79,7 +76,7 @@ export function SomeCombinedActivityChart({ historicalMetrics }: SomeCombinedAct
                 <Legend />
                 <Area
                   type="monotone"
-                  dataKey="tiktokViews"
+                  dataKey="tiktokFollowers"
                   name="TikTok"
                   stroke="#25F4EE"
                   strokeWidth={2}
@@ -88,7 +85,7 @@ export function SomeCombinedActivityChart({ historicalMetrics }: SomeCombinedAct
                 />
                 <Area
                   type="monotone"
-                  dataKey="instaViews"
+                  dataKey="instaFollowers"
                   name="Instagram"
                   stroke="#E1306C"
                   strokeWidth={2}
