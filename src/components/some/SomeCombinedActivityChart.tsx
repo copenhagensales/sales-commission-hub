@@ -15,11 +15,11 @@ export function SomeCombinedActivityChart({ historicalMetrics }: SomeCombinedAct
     
     return historicalMetrics
       .filter((m) => isAfter(parseISO(m.week_start_date), cutoffDate))
+      .sort((a, b) => parseISO(a.week_start_date).getTime() - parseISO(b.week_start_date).getTime())
       .map((m) => ({
         week: format(parseISO(m.week_start_date), "d. MMM", { locale: da }),
         followers: m.tiktok_followers,
-      }))
-      .sort((a, b) => a.week.localeCompare(b.week));
+      }));
   }, [historicalMetrics]);
 
   const formatNumber = (num: number) => {
