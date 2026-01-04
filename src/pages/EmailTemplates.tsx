@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Mail, Eye, Save, RotateCcw } from "lucide-react";
+import { Mail, Eye, Save, RotateCcw, Send, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const DEFAULT_WELCOME_EMAIL = `<!DOCTYPE html>
@@ -79,6 +79,8 @@ export default function EmailTemplates() {
   const [editingSubject, setEditingSubject] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
+  const [isSendingTest, setIsSendingTest] = useState(false);
 
   const { data: welcomeTemplate, isLoading } = useQuery({
     queryKey: ["email-template", "welcome_invitation"],
@@ -150,6 +152,39 @@ export default function EmailTemplates() {
     setEditingContent(DEFAULT_WELCOME_EMAIL);
     setEditingSubject("Velkommen til Copenhagen Sales - Opret din profil");
     setHasChanges(true);
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testEmail) {
+      toast.error("Indtast en email-adresse");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(testEmail)) {
+      toast.error("Ugyldig email-adresse");
+      return;
+    }
+
+    setIsSendingTest(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-test-email", {
+        body: {
+          recipientEmail: testEmail,
+          subject: currentSubject,
+          htmlContent: currentContent,
+        },
+      });
+
+      if (error) throw error;
+      toast.success(`Test-mail sendt til ${testEmail}`);
+      setTestEmail("");
+    } catch (error) {
+      console.error("Error sending test email:", error);
+      toast.error("Kunne ikke sende test-mail: " + (error instanceof Error ? error.message : "Ukendt fejl"));
+    } finally {
+      setIsSendingTest(false);
+    }
   };
 
   // Generate preview with sample data
@@ -257,7 +292,43 @@ export default function EmailTemplates() {
                     Sådan ser mailen ud med eksempel-data
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                  {/* Test email section */}
+                  <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                    <Label className="text-sm font-medium">Send test-mail</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="email"
+                        placeholder="Indtast email-adresse..."
+                        value={testEmail}
+                        onChange={(e) => setTestEmail(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleSendTestEmail();
+                          }
+                        }}
+                      />
+                      <Button 
+                        onClick={handleSendTestEmail} 
+                        disabled={isSendingTest || !testEmail}
+                        size="default"
+                      >
+                        {isSendingTest ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Send
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Test-mails får automatisk [TEST] i emnelinjen
+                    </p>
+                  </div>
+
                   <div className="border rounded-lg overflow-hidden bg-white">
                     <div className="p-2 bg-muted/50 border-b text-xs text-muted-foreground">
                       <strong>Til:</strong> anders@example.dk<br />
