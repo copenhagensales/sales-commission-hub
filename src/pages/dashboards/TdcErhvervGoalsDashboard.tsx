@@ -98,14 +98,17 @@ export default function TdcErhvervGoalsDashboard() {
   });
 
   // Fetch employee goals for current period
+  const periodStartStr = format(payrollPeriod.start, "yyyy-MM-dd");
+  const periodEndStr = format(payrollPeriod.end, "yyyy-MM-dd");
+  
   const { data: goals, isLoading: loadingGoals } = useQuery({
-    queryKey: ["employee-goals", payrollPeriod.start.toISOString(), payrollPeriod.end.toISOString()],
+    queryKey: ["employee-goals", periodStartStr, periodEndStr],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_sales_goals")
         .select("employee_id, target_amount, period_start, period_end")
-        .gte("period_start", payrollPeriod.start.toISOString().split("T")[0])
-        .lte("period_end", payrollPeriod.end.toISOString().split("T")[0]);
+        .eq("period_start", periodStartStr)
+        .eq("period_end", periodEndStr);
 
       if (error) throw error;
       return data;
