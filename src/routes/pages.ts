@@ -84,6 +84,7 @@ export const SalesDashboard = lazyPage(() => import("@/pages/boards/SalesDashboa
 export const ClosingShifts = lazyPage(() => import("@/pages/ClosingShifts"));
 export const Permissions = lazyPage(() => import("@/pages/Permissions"));
 export const CompanyOverview = lazyPage(() => import("@/pages/CompanyOverview"));
+export const SystemEmailTemplates = lazyPage(() => import("@/pages/EmailTemplates"));
 
 export const RolePreview = lazyPage(() => import("@/pages/RolePreview"));
 export const LoginLog = lazyPage(() => import("@/pages/LoginLog"));
