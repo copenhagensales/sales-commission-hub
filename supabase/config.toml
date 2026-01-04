@@ -134,3 +134,9 @@ verify_jwt = true
 
 [functions.tv-dashboard-data]
 verify_jwt = false
+
+[functions.send-deactivation-reminder]
+verify_jwt = true
+
+[functions.send-deactivation-followups]
+verify_jwt = false
