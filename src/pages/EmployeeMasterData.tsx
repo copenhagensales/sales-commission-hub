@@ -1190,12 +1190,12 @@ export default function EmployeeMasterData() {
                         </div>
                       </TableCell>
                       <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
-                        {employee.private_email ? (
+                        {(employee.work_email || employee.private_email) ? (
                           <a 
-                            href={`mailto:${employee.private_email}`} 
+                            href={`mailto:${employee.work_email || employee.private_email}`} 
                             className="text-primary hover:underline text-sm"
                           >
-                            {employee.private_email}
+                            {employee.work_email || employee.private_email}
                           </a>
                         ) : <span className="text-muted-foreground/50">-</span>}
                       </TableCell>
