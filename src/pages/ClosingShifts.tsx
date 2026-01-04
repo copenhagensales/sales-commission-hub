@@ -105,7 +105,7 @@ export default function ClosingShifts() {
     },
   });
 
-  // Fetch team leaders and assistant leaders info
+  // Fetch team leaders and assistant leaders info (only work_email)
   const { data: teamLeadersInfo = [] } = useQuery({
     queryKey: ["team-leaders-info", selectedTeamId],
     enabled: !!selectedTeamId,
@@ -118,31 +118,31 @@ export default function ClosingShifts() {
       
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, work_email, private_email")
+        .select("id, first_name, last_name, work_email")
         .in("id", leaderIds);
       if (error) throw error;
       
       return (data || []).map(l => ({
         ...l,
-        email: l.work_email || l.private_email,
+        email: l.work_email,
         role: l.id === selectedTeam.team_leader_id ? "Teamleder" : "Ass. Teamleder"
       }));
     },
   });
 
-  // Fetch recruitment responsible employees
+  // Fetch recruitment responsible employees (only work_email)
   const { data: recruiters = [] } = useQuery({
     queryKey: ["recruiters-for-deactivation"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, work_email, private_email")
+        .select("id, first_name, last_name, work_email")
         .eq("job_title", "Rekruttering")
         .eq("is_active", true);
       if (error) throw error;
       return (data || []).map(r => ({
         ...r,
-        email: r.work_email || r.private_email
+        email: r.work_email
       }));
     },
   });

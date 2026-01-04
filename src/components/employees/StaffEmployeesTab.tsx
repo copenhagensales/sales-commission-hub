@@ -127,30 +127,28 @@ export function StaffEmployeesTab() {
         // Collect automatic recipients
         const autoRecipientEmails: string[] = [];
 
-        // Get team leader and assistant team leader emails
+        // Get team leader and assistant team leader work emails (only work_email, no fallback)
         const leaderIds = [team?.team_leader_id, team?.assistant_team_leader_id].filter(Boolean) as string[];
         if (leaderIds.length > 0) {
           const { data: leaders } = await supabase
             .from("employee_master_data")
-            .select("work_email, private_email")
+            .select("work_email")
             .in("id", leaderIds);
           
           (leaders || []).forEach(l => {
-            const email = l.work_email || l.private_email;
-            if (email) autoRecipientEmails.push(email);
+            if (l.work_email) autoRecipientEmails.push(l.work_email);
           });
         }
 
-        // Get all recruitment responsible employees
+        // Get all recruitment responsible employees (only work_email)
         const { data: recruiters } = await supabase
           .from("employee_master_data")
-          .select("work_email, private_email")
+          .select("work_email")
           .eq("job_title", "Rekruttering")
           .eq("is_active", true);
         
         (recruiters || []).forEach(r => {
-          const email = r.work_email || r.private_email;
-          if (email) autoRecipientEmails.push(email);
+          if (r.work_email) autoRecipientEmails.push(r.work_email);
         });
 
         // Combine all recipients (manual + automatic) and remove duplicates
@@ -161,7 +159,7 @@ export function StaffEmployeesTab() {
             body: {
               employee_id: id,
               employee_name: `${employee.first_name} ${employee.last_name}`,
-              employee_email: employee.work_email || employee.private_email || "",
+              employee_email: employee.work_email || "",
               team_id: employee.team_id,
               team_name: team?.name || "Ukendt team",
               recipients: allRecipients,
