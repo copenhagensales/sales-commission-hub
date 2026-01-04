@@ -640,15 +640,15 @@ const Home = () => {
     queryFn: async () => {
       if (!employee?.id) return null;
       
-      const periodStartIso = payrollPeriod.start.toISOString().split('T')[0];
-      const periodEndIso = payrollPeriod.end.toISOString().split('T')[0];
+      const periodStartIso = format(payrollPeriod.start, "yyyy-MM-dd");
+      const periodEndIso = format(payrollPeriod.end, "yyyy-MM-dd");
       
       const { data } = await supabase
         .from("employee_sales_goals")
         .select("target_amount")
         .eq("employee_id", employee.id)
-        .gte("period_start", periodStartIso)
-        .lte("period_end", periodEndIso)
+        .eq("period_start", periodStartIso)
+        .eq("period_end", periodEndIso)
         .maybeSingle();
       
       return data;
