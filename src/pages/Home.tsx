@@ -232,8 +232,7 @@ const Home = () => {
   // State for team goal dialog
   const [addTeamGoalOpen, setAddTeamGoalOpen] = useState(false);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
-  const [newSalesTarget, setNewSalesTarget] = useState<string>("100");
-  const [newBonusDescription, setNewBonusDescription] = useState<string>("");
+  const [newSalesTarget, setNewSalesTarget] = useState<string>("100000");
 
   // Fetch user's teams
   const { data: userTeams = [] } = useQuery({
@@ -261,25 +260,48 @@ const Home = () => {
     },
   });
 
-  // Fetch ALL team monthly goals for owners/managers
-  const { data: allTeamGoals = [] } = useQuery({
-    queryKey: ["home-all-team-goals", canEditHomeGoals],
-    queryFn: async () => {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth() + 1;
-      const monthStart = startOfMonth(now).toISOString();
-      const monthEnd = endOfMonth(now).toISOString();
+  // Calculate payroll period (15th-14th) - shared for all team goal queries
+  const payrollPeriod = useMemo(() => {
+    const today = new Date();
+    const currentDay = today.getDate();
+    
+    if (currentDay >= 15) {
+      const start = new Date(today.getFullYear(), today.getMonth(), 15);
+      const end = new Date(today.getFullYear(), today.getMonth() + 1, 14);
+      return { start, end };
+    } else {
+      const start = new Date(today.getFullYear(), today.getMonth() - 1, 15);
+      const end = new Date(today.getFullYear(), today.getMonth(), 14);
+      return { start, end };
+    }
+  }, []);
 
+  const periodStartStr = format(payrollPeriod.start, "yyyy-MM-dd");
+  const periodEndStr = format(payrollPeriod.end, "yyyy-MM-dd");
+
+  // Format currency helper
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("da-DK", {
+      style: "currency",
+      currency: "DKK",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  // Fetch ALL team sales goals for owners/managers (using team_sales_goals with amounts)
+  const { data: allTeamGoals = [] } = useQuery({
+    queryKey: ["home-all-team-goals", canEditHomeGoals, periodStartStr, periodEndStr],
+    queryFn: async () => {
       const { data: goals } = await supabase
-        .from("team_monthly_goals")
+        .from("team_sales_goals")
         .select("*, teams(id, name)")
-        .eq("year", year)
-        .eq("month", month);
+        .eq("period_start", periodStartStr)
+        .eq("period_end", periodEndStr);
 
       if (!goals || goals.length === 0) return [];
 
-      // Calculate progress for each goal
+      // Calculate progress for each goal (using commission amounts)
       const goalsWithProgress = await Promise.all(goals.map(async (goal) => {
         const { data: teamMembers } = await supabase
           .from("team_members")
@@ -287,29 +309,40 @@ const Home = () => {
           .eq("team_id", goal.team_id);
 
         const employeeIds = teamMembers?.map(m => m.employee_id) || [];
-        if (employeeIds.length === 0) return { ...goal, currentSales: 0, progress: 0 };
+        if (employeeIds.length === 0) return { ...goal, currentAmount: 0, progress: 0 };
 
         const { data: agentMappings } = await supabase
           .from("employee_agent_mapping")
-          .select("agent_id, agents(name)")
+          .select("agent_id, agents(email, external_dialer_id)")
           .in("employee_id", employeeIds);
 
-        const agentNames = agentMappings?.map(m => (m.agents as { name: string })?.name).filter(Boolean) || [];
-        if (agentNames.length === 0) return { ...goal, currentSales: 0, progress: 0 };
+        const agentEmails = agentMappings?.map(m => (m.agents as any)?.email).filter(Boolean) || [];
+        const externalIds = agentMappings?.map(m => (m.agents as any)?.external_dialer_id).filter(Boolean) || [];
+        
+        if (agentEmails.length === 0 && externalIds.length === 0) return { ...goal, currentAmount: 0, progress: 0 };
 
-        const { data: sales } = await supabase
+        let query = supabase
           .from("sales")
-          .select("id, sale_items(quantity)")
-          .in("agent_name", agentNames)
-          .gte("sale_datetime", monthStart)
-          .lte("sale_datetime", monthEnd);
+          .select("id, agent_email, agent_external_id, sale_items(mapped_commission)")
+          .gte("sale_datetime", `${periodStartStr}T00:00:00`)
+          .lte("sale_datetime", `${periodEndStr}T23:59:59`);
 
-        const currentSales = sales?.reduce((sum, s) => {
-          return sum + (s.sale_items?.reduce((itemSum, item) => itemSum + (item.quantity || 1), 0) || 0);
+        if (agentEmails.length > 0 && externalIds.length > 0) {
+          query = query.or(`agent_email.in.(${agentEmails.join(",")}),agent_external_id.in.(${externalIds.join(",")})`);
+        } else if (agentEmails.length > 0) {
+          query = query.in("agent_email", agentEmails);
+        } else {
+          query = query.in("agent_external_id", externalIds);
+        }
+
+        const { data: sales } = await query;
+
+        const currentAmount = sales?.reduce((sum, s) => {
+          return sum + (s.sale_items?.reduce((itemSum, item) => itemSum + (item.mapped_commission || 0), 0) || 0);
         }, 0) || 0;
 
-        const progress = goal.sales_target > 0 ? Math.min((currentSales / goal.sales_target) * 100, 100) : 0;
-        return { ...goal, currentSales, progress };
+        const progress = goal.target_amount > 0 ? Math.min((currentAmount / goal.target_amount) * 100, 100) : 0;
+        return { ...goal, currentAmount, progress };
       }));
 
       return goalsWithProgress;
@@ -317,26 +350,20 @@ const Home = () => {
     enabled: canEditHomeGoals,
   });
 
-  // Fetch team monthly goals with sales progress (for regular employees)
+  // Fetch team sales goals with commission progress (for regular employees)
   const { data: teamGoal } = useQuery({
-    queryKey: ["home-team-goal", userTeams],
+    queryKey: ["home-team-goal", userTeams, periodStartStr, periodEndStr],
     queryFn: async () => {
       if (userTeams.length === 0) return null;
-      
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth() + 1;
-      const monthStart = startOfMonth(now).toISOString();
-      const monthEnd = endOfMonth(now).toISOString();
 
       const teamIds = userTeams.map(t => (t.teams as { id: string })?.id).filter(Boolean);
       if (teamIds.length === 0) return null;
 
       const { data: goals } = await supabase
-        .from("team_monthly_goals")
+        .from("team_sales_goals")
         .select("*, teams(id, name)")
-        .eq("year", year)
-        .eq("month", month)
+        .eq("period_start", periodStartStr)
+        .eq("period_end", periodEndStr)
         .in("team_id", teamIds)
         .limit(1)
         .maybeSingle();
@@ -349,54 +376,62 @@ const Home = () => {
         .eq("team_id", goals.team_id);
 
       const employeeIds = teamMembers?.map(m => m.employee_id) || [];
-      if (employeeIds.length === 0) return { ...goals, currentSales: 0, progress: 0 };
+      if (employeeIds.length === 0) return { ...goals, currentAmount: 0, progress: 0 };
 
       const { data: agentMappings } = await supabase
         .from("employee_agent_mapping")
-        .select("agent_id, agents(name)")
+        .select("agent_id, agents(email, external_dialer_id)")
         .in("employee_id", employeeIds);
 
-      const agentNames = agentMappings?.map(m => (m.agents as { name: string })?.name).filter(Boolean) || [];
-      if (agentNames.length === 0) return { ...goals, currentSales: 0, progress: 0 };
+      const agentEmails = agentMappings?.map(m => (m.agents as any)?.email).filter(Boolean) || [];
+      const externalIds = agentMappings?.map(m => (m.agents as any)?.external_dialer_id).filter(Boolean) || [];
+      
+      if (agentEmails.length === 0 && externalIds.length === 0) return { ...goals, currentAmount: 0, progress: 0 };
 
-      const { data: sales } = await supabase
+      let query = supabase
         .from("sales")
-        .select("id, sale_items(quantity)")
-        .in("agent_name", agentNames)
-        .gte("sale_datetime", monthStart)
-        .lte("sale_datetime", monthEnd);
+        .select("id, agent_email, agent_external_id, sale_items(mapped_commission)")
+        .gte("sale_datetime", `${periodStartStr}T00:00:00`)
+        .lte("sale_datetime", `${periodEndStr}T23:59:59`);
 
-      const currentSales = sales?.reduce((sum, s) => {
-        return sum + (s.sale_items?.reduce((itemSum, item) => itemSum + (item.quantity || 1), 0) || 0);
+      if (agentEmails.length > 0 && externalIds.length > 0) {
+        query = query.or(`agent_email.in.(${agentEmails.join(",")}),agent_external_id.in.(${externalIds.join(",")})`);
+      } else if (agentEmails.length > 0) {
+        query = query.in("agent_email", agentEmails);
+      } else {
+        query = query.in("agent_external_id", externalIds);
+      }
+
+      const { data: sales } = await query;
+
+      const currentAmount = sales?.reduce((sum, s) => {
+        return sum + (s.sale_items?.reduce((itemSum, item) => itemSum + (item.mapped_commission || 0), 0) || 0);
       }, 0) || 0;
 
-      const progress = goals.sales_target > 0 ? Math.min((currentSales / goals.sales_target) * 100, 100) : 0;
-      return { ...goals, currentSales, progress };
+      const progress = goals.target_amount > 0 ? Math.min((currentAmount / goals.target_amount) * 100, 100) : 0;
+      return { ...goals, currentAmount, progress };
     },
     enabled: userTeams.length > 0 && !canEditHomeGoals,
   });
 
-  // Add/update team goal mutation
+  // Add/update team goal mutation (using team_sales_goals with amounts)
   const addTeamGoalMutation = useMutation({
-    mutationFn: async ({ teamId, target, bonusDescription }: { teamId: string; target: number; bonusDescription?: string }) => {
-      const now = new Date();
+    mutationFn: async ({ teamId, targetAmount }: { teamId: string; targetAmount: number }) => {
       const { error } = await supabase
-        .from("team_monthly_goals")
+        .from("team_sales_goals")
         .upsert({
           team_id: teamId,
-          year: now.getFullYear(),
-          month: now.getMonth() + 1,
-          sales_target: target,
-          bonus_description: bonusDescription || null
-        }, { onConflict: "team_id,year,month" });
+          period_start: periodStartStr,
+          period_end: periodEndStr,
+          target_amount: targetAmount,
+        }, { onConflict: "team_id,period_start,period_end" });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["home-team-goal"] });
       queryClient.invalidateQueries({ queryKey: ["home-all-team-goals"] });
       setAddTeamGoalOpen(false);
-      setNewSalesTarget("100");
-      setNewBonusDescription("");
+      setNewSalesTarget("100000");
       toast.success("Teammål opdateret");
     },
     onError: () => toast.error("Kunne ikke opdatere teammål")
@@ -406,7 +441,7 @@ const Home = () => {
   const deleteTeamGoalMutation = useMutation({
     mutationFn: async (goalId: string) => {
       const { error } = await supabase
-        .from("team_monthly_goals")
+        .from("team_sales_goals")
         .delete()
         .eq("id", goalId);
       if (error) throw error;
@@ -418,12 +453,12 @@ const Home = () => {
     }
   });
 
-  // Team performance from team goal
+  // Team performance from team goal (using amounts)
   const teamPerformance = useMemo(() => {
-    if (!teamGoal) return { currentSales: 0, targetSales: 0, progress: 0 };
+    if (!teamGoal) return { currentAmount: 0, targetAmount: 0, progress: 0 };
     return { 
-      currentSales: teamGoal.currentSales || 0, 
-      targetSales: teamGoal.sales_target || 0, 
+      currentAmount: teamGoal.currentAmount || 0, 
+      targetAmount: teamGoal.target_amount || 0, 
       progress: teamGoal.progress || 0 
     };
   }, [teamGoal]);
@@ -796,7 +831,7 @@ const Home = () => {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-lg font-semibold">
                   <Target className="w-5 h-5 text-primary" />
-                  {teamGoal ? `${(teamGoal.teams as { name: string })?.name || "Team"} mål` : "Teammål"} ({format(new Date(), "MMMM yyyy", { locale: da })})
+                  {teamGoal ? `${(teamGoal.teams as { name: string })?.name || "Team"} mål` : "Teammål"} ({format(payrollPeriod.start, "d. MMM", { locale: da })} - {format(payrollPeriod.end, "d. MMM", { locale: da })})
                 </CardTitle>
                 {canEditHomeGoals && manageableTeams.length > 0 && (
                   <Dialog open={addTeamGoalOpen} onOpenChange={(open) => {
@@ -806,8 +841,7 @@ const Home = () => {
                       const preselectedTeam = teamGoal?.team_id || (userTeams[0]?.teams as { id: string })?.id || "";
                       setSelectedTeamId(preselectedTeam);
                       if (teamGoal) {
-                        setNewSalesTarget(String(teamGoal.sales_target || 100));
-                        setNewBonusDescription(teamGoal.bonus_description || "");
+                        setNewSalesTarget(String(teamGoal.target_amount || 100000));
                       }
                     }
                   }}>
@@ -818,9 +852,12 @@ const Home = () => {
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Sæt teammål for {format(new Date(), "MMMM yyyy", { locale: da })}</DialogTitle>
+                        <DialogTitle>Sæt teammål for lønperioden</DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4 pt-4">
+                        <p className="text-sm text-muted-foreground">
+                          Periode: {format(payrollPeriod.start, "d. MMM", { locale: da })} - {format(payrollPeriod.end, "d. MMM yyyy", { locale: da })}
+                        </p>
                         <div className="space-y-2">
                           <Label>Vælg team</Label>
                           <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
@@ -837,24 +874,14 @@ const Home = () => {
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label>Salgsmål (antal salg)</Label>
+                          <Label>Målbeløb (DKK)</Label>
                           <Input 
                             type="number" 
                             value={newSalesTarget}
                             onChange={(e) => setNewSalesTarget(e.target.value)}
                             min="1"
-                            placeholder="fx 100"
+                            placeholder="fx 350000"
                           />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Bonus beskrivelse (valgfrit)</Label>
-                          <Input 
-                            type="text" 
-                            value={newBonusDescription}
-                            onChange={(e) => setNewBonusDescription(e.target.value)}
-                            placeholder="fx Gratis middag til hele teamet"
-                          />
-                          <p className="text-xs text-muted-foreground">Beskriv hvad teamet får som bonus hvis målet nås</p>
                         </div>
                         <Button 
                           className="w-full" 
@@ -862,8 +889,7 @@ const Home = () => {
                             if (selectedTeamId) {
                               addTeamGoalMutation.mutate({ 
                                 teamId: selectedTeamId, 
-                                target: parseInt(newSalesTarget) || 100,
-                                bonusDescription: newBonusDescription || undefined
+                                targetAmount: parseInt(newSalesTarget) || 100000,
                               });
                             } else {
                               toast.error("Vælg venligst et team");
@@ -894,18 +920,9 @@ const Home = () => {
                         </div>
                         <Progress value={goal.progress || 0} className="h-3 bg-muted" />
                         <div className="flex justify-between mt-2 text-sm text-muted-foreground">
-                          <span>{goal.currentSales || 0} salg</span>
-                          <span>Mål: {goal.sales_target} salg</span>
+                          <span>{formatCurrency(goal.currentAmount || 0)}</span>
+                          <span>Mål: {formatCurrency(goal.target_amount)}</span>
                         </div>
-                        
-                        {goal.bonus_description && (
-                          <div className="mt-3 p-2 rounded bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800">
-                            <div className="flex items-center gap-2">
-                              <Gift className="w-3 h-3 text-amber-600" />
-                              <span className="text-xs text-amber-700 dark:text-amber-300">{goal.bonus_description}</span>
-                            </div>
-                          </div>
-                        )}
                         
                         <div className="mt-3 flex justify-end">
                           <Button 
@@ -923,14 +940,14 @@ const Home = () => {
                   </div>
                 ) : (
                   <div className="text-center text-muted-foreground text-sm py-6">
-                    <p>Ingen teammål sat for denne måned.</p>
+                    <p>Ingen teammål sat for denne lønperiode.</p>
                     <p className="text-xs mt-1">Klik "Sæt mål" for at komme i gang.</p>
                   </div>
                 )
               ) : teamGoal ? (
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted-foreground">Teamets månedsmål</span>
+                    <span className="text-sm text-muted-foreground">Teamets mål for lønperioden</span>
                     <span className="text-2xl font-bold text-primary">
                       {teamPerformance.progress.toFixed(0)}%
                     </span>
@@ -940,24 +957,14 @@ const Home = () => {
                     className="h-4 bg-muted"
                   />
                   <div className="flex justify-between mt-2 text-sm text-muted-foreground">
-                    <span>{teamPerformance.currentSales} salg</span>
-                    <span>Mål: {teamPerformance.targetSales} salg</span>
+                    <span>{formatCurrency(teamPerformance.currentAmount)}</span>
+                    <span>Mål: {formatCurrency(teamPerformance.targetAmount)}</span>
                   </div>
-                  
-                  {teamGoal.bonus_description && (
-                    <div className="mt-4 p-3 rounded-lg bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800">
-                      <div className="flex items-center gap-2">
-                        <Gift className="w-4 h-4 text-amber-600" />
-                        <span className="text-sm font-medium text-amber-800 dark:text-amber-200">Teambonus ved opnået mål:</span>
-                      </div>
-                      <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">{teamGoal.bonus_description}</p>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="text-center text-muted-foreground text-sm py-6">
                   {userTeams.length > 0 ? (
-                    <p>Ingen teammål sat for denne måned.</p>
+                    <p>Ingen teammål sat for denne lønperiode.</p>
                   ) : (
                     <p>Du er ikke tilknyttet et team endnu.</p>
                   )}
