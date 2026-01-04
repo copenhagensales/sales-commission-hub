@@ -30,7 +30,7 @@ const statusColumns: { status: ContentStatus; title: string }[] = [
 export default function Some() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const weekStartDate = getWeekStartDate(selectedDate);
-  const previousWeekStartDate = getWeekStartDate(subWeeks(new Date(weekStartDate), 1));
+  
   const weekEnd = endOfWeek(new Date(weekStartDate), { weekStartsOn: 1 });
   
   const {
@@ -49,7 +49,7 @@ export default function Some() {
     previousMetrics,
     historicalMetrics,
     upsertMetrics,
-  } = useSomeMetrics(weekStartDate, previousWeekStartDate);
+  } = useSomeMetrics(weekStartDate);
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
