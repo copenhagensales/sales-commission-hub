@@ -33,6 +33,7 @@ export interface CoachingTemplate {
   drill_id: string | null;
   reps_default: number;
   tags: string[];
+  video_url_default: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -53,6 +54,7 @@ export interface CoachingFeedback {
   drill_id: string | null;
   reps: number | null;
   evidence: string | null;
+  video_url: string | null;
   is_done: boolean;
   created_at: string;
   updated_at: string;
