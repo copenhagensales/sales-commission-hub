@@ -1,18 +1,24 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { SalesGoalTracker } from "@/components/my-profile/SalesGoalTracker";
 import { Card, CardContent } from "@/components/ui/card";
-import { Target, AlertCircle } from "lucide-react";
+import { Target, AlertCircle, ArrowLeft } from "lucide-react";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 type EmployeeData = {
   id: string;
   salary_type: string | null;
+  first_name: string;
+  last_name: string;
 };
 
 export default function MyGoals() {
+  const { employeeId: urlEmployeeId } = useParams<{ employeeId?: string }>();
   const { previewEmployee } = useRolePreview();
 
   // Get current user
@@ -24,18 +30,19 @@ export default function MyGoals() {
     },
   });
 
-  // Get employee data - using any to avoid deep type instantiation issue
+  // Get employee data - prioritize URL param, then preview, then current user
   const { data: employee, isLoading: employeeLoading } = useQuery<EmployeeData | null>({
-    queryKey: ["my-goals-employee", currentUser?.id, previewEmployee?.id],
+    queryKey: ["my-goals-employee", currentUser?.id, previewEmployee?.id, urlEmployeeId],
     queryFn: async (): Promise<EmployeeData | null> => {
-      const employeeId = previewEmployee?.id;
+      // Priority: URL param > preview > current user
+      const targetEmployeeId = urlEmployeeId || previewEmployee?.id;
       
-      if (employeeId) {
+      if (targetEmployeeId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data } = await (supabase as any)
           .from("employee_master_data")
-          .select("id, salary_type")
-          .eq("id", employeeId)
+          .select("id, salary_type, first_name, last_name")
+          .eq("id", targetEmployeeId)
           .single();
         return data as EmployeeData | null;
       }
@@ -45,13 +52,16 @@ export default function MyGoals() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (supabase as any)
         .from("employee_master_data")
-        .select("id, salary_type")
+        .select("id, salary_type, first_name, last_name")
         .eq("auth_user_id", currentUser.id)
         .single();
       return data as EmployeeData | null;
     },
-    enabled: !!currentUser?.id || !!previewEmployee?.id,
+    enabled: !!currentUser?.id || !!previewEmployee?.id || !!urlEmployeeId,
   });
+
+  // Determine if viewing another employee's goals
+  const isViewingOther = !!urlEmployeeId;
 
   // Calculate payroll period (15th to 14th)
   const payrollPeriod = useMemo(() => {
@@ -283,13 +293,25 @@ export default function MyGoals() {
   return (
     <MainLayout>
       <div className="space-y-6">
+        {isViewingOther && (
+          <Button variant="ghost" size="sm" asChild className="gap-2">
+            <Link to="/dashboards/tdc-erhverv-goals">
+              <ArrowLeft className="h-4 w-4" />
+              Tilbage til team oversigt
+            </Link>
+          </Button>
+        )}
+        
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Target className="h-6 w-6" />
-            Mine Mål
+            {isViewingOther ? `${employee.first_name} ${employee.last_name}s Mål` : "Mine Mål"}
           </h1>
           <p className="text-muted-foreground mt-1">
-            Sæt og følg dine salgsmål for lønperioden
+            {isViewingOther 
+              ? `Se og følg ${employee.first_name}s salgsmål for lønperioden`
+              : "Sæt og følg dine salgsmål for lønperioden"
+            }
           </p>
         </div>
 
