@@ -93,6 +93,7 @@ import {
   TvBoardAdmin,
   LiveStats,
   HeadToHead,
+  CoachingTemplates,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -344,6 +345,7 @@ export const routes: RouteConfig[] = [
   },
   { path: "/onboarding-program/kursus", component: OnboardingCourse, access: "protected" },
   { path: "/my-feedback", component: MyFeedback, access: "protected" },
+  { path: "/coaching-templates", component: CoachingTemplates, access: "role", positionPermission: "menu_onboarding_admin" },
 
   { path: "/excel-field-matcher", component: ExcelFieldMatcher, access: "protected" },
 

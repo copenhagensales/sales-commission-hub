@@ -59,7 +59,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     ["/some", "/extra-work"].includes(location.pathname)
   );
   const [onboardingOpen, setOnboardingOpen] = useState(
-    location.pathname.startsWith("/onboarding-program") || location.pathname === "/onboarding-program/kursus"
+    location.pathname.startsWith("/onboarding-program") || location.pathname === "/onboarding-program/kursus" || location.pathname === "/coaching-templates"
   );
 
   // Fetch employee name and pending contracts count
@@ -1243,6 +1243,13 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 )}>
                   <Settings className="h-4 w-4" />
                   Administration
+                </NavLink>
+                <NavLink to="/coaching-templates" onClick={handleNavClick} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/coaching-templates" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}>
+                  <FileText className="h-4 w-4" />
+                  Coaching Skabeloner
                 </NavLink>
               </CollapsibleContent>
             </Collapsible>

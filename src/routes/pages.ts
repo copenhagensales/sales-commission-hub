@@ -118,3 +118,6 @@ export const LiveStats = lazyPage(() => import("@/pages/LiveStats"));
 // Head to Head
 export const HeadToHead = lazyPage(() => import("@/pages/HeadToHead"));
 
+// Coaching Templates Admin
+export const CoachingTemplates = lazyPage(() => import("@/pages/admin/CoachingTemplates"));
+

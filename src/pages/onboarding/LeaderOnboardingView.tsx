@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useOnboardingDays, useOnboardingDrills, useCoachingTasks, useUpdateCoachingTask, useCoachingCoverageStats } from "@/hooks/useOnboarding";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, ClipboardList, BookOpen, CheckCircle2, AlertTriangle, BarChart3, Calendar } from "lucide-react";
+import { Users, ClipboardList, BookOpen, CheckCircle2, AlertTriangle, BarChart3, Calendar, MessageSquarePlus, FileText, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,9 @@ import { format, formatDistanceToNow, isPast } from "date-fns";
 import { da } from "date-fns/locale";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { CoachingFeedbackModal } from "@/components/coaching/CoachingFeedbackModal";
+import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
+import { Link } from "react-router-dom";
 
 export default function LeaderOnboardingView() {
   const { data: days = [] } = useOnboardingDays();
@@ -23,8 +26,12 @@ export default function LeaderOnboardingView() {
   const { data: coverageStats = [] } = useCoachingCoverageStats();
   const updateTask = useUpdateCoachingTask();
   
+  const { data: currentEmployeeId } = useCurrentEmployeeId();
+  
   const [selectedTask, setSelectedTask] = useState<string | null>(null);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [showCoachingModal, setShowCoachingModal] = useState(false);
+  const [selectedEmployeeForCoaching, setSelectedEmployeeForCoaching] = useState<string | null>(null);
 
   // Fetch new employees (employment_start_date >= today)
   const { data: newEmployees = [] } = useQuery({
@@ -204,6 +211,45 @@ export default function LeaderOnboardingView() {
         </Card>
       )}
 
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Hurtig Coaching</CardTitle>
+              <CardDescription>Giv feedback via skabeloner</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Link to="/coaching-templates">
+                <Button variant="outline" size="sm">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Skabeloner
+                  <ExternalLink className="h-3 w-3 ml-1" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {allEmployees.slice(0, 10).map(emp => (
+              <Button
+                key={emp.id}
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedEmployeeForCoaching(emp.id);
+                  setShowCoachingModal(true);
+                }}
+              >
+                <MessageSquarePlus className="h-4 w-4 mr-1" />
+                {emp.first_name}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Coaching Tasks */}
       <Card>
         <CardHeader>
@@ -352,6 +398,17 @@ export default function LeaderOnboardingView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Coaching Feedback Modal */}
+      {currentEmployeeId && selectedEmployeeForCoaching && (
+        <CoachingFeedbackModal
+          open={showCoachingModal}
+          onOpenChange={setShowCoachingModal}
+          employeeId={selectedEmployeeForCoaching}
+          coachId={currentEmployeeId}
+          onSuccess={() => setSelectedEmployeeForCoaching(null)}
+        />
+      )}
     </div>
   );
 }

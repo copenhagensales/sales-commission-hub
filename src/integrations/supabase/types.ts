@@ -1172,6 +1172,252 @@ export type Database = {
         }
         Relationships: []
       }
+      coaching_feedback: {
+        Row: {
+          call_id: string | null
+          coach_id: string
+          created_at: string
+          drill_id: string | null
+          employee_id: string
+          evidence: string | null
+          id: string
+          is_done: boolean
+          next_rep: string
+          objection_key: string | null
+          reps: number | null
+          say_this: string | null
+          score: number
+          strength: string
+          success_criteria: string | null
+          template_id: string | null
+          type_key: string
+          updated_at: string
+        }
+        Insert: {
+          call_id?: string | null
+          coach_id: string
+          created_at?: string
+          drill_id?: string | null
+          employee_id: string
+          evidence?: string | null
+          id?: string
+          is_done?: boolean
+          next_rep: string
+          objection_key?: string | null
+          reps?: number | null
+          say_this?: string | null
+          score: number
+          strength: string
+          success_criteria?: string | null
+          template_id?: string | null
+          type_key: string
+          updated_at?: string
+        }
+        Update: {
+          call_id?: string | null
+          coach_id?: string
+          created_at?: string
+          drill_id?: string | null
+          employee_id?: string
+          evidence?: string | null
+          id?: string
+          is_done?: boolean
+          next_rep?: string
+          objection_key?: string | null
+          reps?: number | null
+          say_this?: string | null
+          score?: number
+          strength?: string
+          success_criteria?: string | null
+          template_id?: string | null
+          type_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_feedback_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "dialer_calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_feedback_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_feedback_drill_id_fkey"
+            columns: ["drill_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_drills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_feedback_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_feedback_objection_key_fkey"
+            columns: ["objection_key"]
+            isOneToOne: false
+            referencedRelation: "coaching_objections"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "coaching_feedback_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_feedback_type_key_fkey"
+            columns: ["type_key"]
+            isOneToOne: false
+            referencedRelation: "coaching_feedback_types"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      coaching_feedback_types: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          label_da: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          label_da: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          label_da?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      coaching_objections: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          label_da: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          label_da: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          label_da?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      coaching_templates: {
+        Row: {
+          created_at: string
+          default_score: number | null
+          drill_id: string | null
+          id: string
+          is_active: boolean
+          next_rep_default: string
+          objection_key: string | null
+          reps_default: number
+          say_this_default: string | null
+          strength_default: string
+          success_criteria_default: string | null
+          tags: string[] | null
+          title: string
+          type_key: string
+          updated_at: string
+          variant: string
+        }
+        Insert: {
+          created_at?: string
+          default_score?: number | null
+          drill_id?: string | null
+          id?: string
+          is_active?: boolean
+          next_rep_default: string
+          objection_key?: string | null
+          reps_default?: number
+          say_this_default?: string | null
+          strength_default: string
+          success_criteria_default?: string | null
+          tags?: string[] | null
+          title: string
+          type_key: string
+          updated_at?: string
+          variant?: string
+        }
+        Update: {
+          created_at?: string
+          default_score?: number | null
+          drill_id?: string | null
+          id?: string
+          is_active?: boolean
+          next_rep_default?: string
+          objection_key?: string | null
+          reps_default?: number
+          say_this_default?: string | null
+          strength_default?: string
+          success_criteria_default?: string | null
+          tags?: string[] | null
+          title?: string
+          type_key?: string
+          updated_at?: string
+          variant?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_templates_drill_id_fkey"
+            columns: ["drill_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_drills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coaching_templates_objection_key_fkey"
+            columns: ["objection_key"]
+            isOneToOne: false
+            referencedRelation: "coaching_objections"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "coaching_templates_type_key_fkey"
+            columns: ["type_key"]
+            isOneToOne: false
+            referencedRelation: "coaching_feedback_types"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       code_of_conduct_attempts: {
         Row: {
           answers: Json
