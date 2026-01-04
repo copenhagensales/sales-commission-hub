@@ -387,35 +387,68 @@ export default function EmployeeMasterData() {
 
       // If deactivating, send deactivation reminder
       if (!is_active && employee?.team_id) {
-        // Get config for this team
+        // Get config for this team (manually configured recipients)
         const { data: config } = await supabase
           .from("deactivation_reminder_config")
           .select("recipients")
           .eq("team_id", employee.team_id)
           .single();
 
-        if (config?.recipients) {
-          const recipientsList = config.recipients.split(",").map((r: string) => r.trim()).filter((r: string) => r);
-          if (recipientsList.length > 0) {
-            // Get team name
-            const { data: team } = await supabase
-              .from("teams")
-              .select("name")
-              .eq("id", employee.team_id)
-              .single();
+        const manualRecipients = config?.recipients 
+          ? config.recipients.split(",").map((r: string) => r.trim()).filter((r: string) => r)
+          : [];
 
-            await supabase.functions.invoke("send-deactivation-reminder", {
-              body: {
-                employee_id: id,
-                employee_name: `${employee.first_name} ${employee.last_name}`,
-                employee_email: employee.work_email || employee.private_email || "",
-                team_id: employee.team_id,
-                team_name: team?.name || "Ukendt team",
-                recipients: recipientsList,
-                is_followup: false,
-              },
-            });
-          }
+        // Get team with team leader and assistant team leader
+        const { data: team } = await supabase
+          .from("teams")
+          .select("name, team_leader_id, assistant_team_leader_id")
+          .eq("id", employee.team_id)
+          .single();
+
+        // Collect automatic recipients
+        const autoRecipientEmails: string[] = [];
+
+        // Get team leader and assistant team leader emails
+        const leaderIds = [team?.team_leader_id, team?.assistant_team_leader_id].filter(Boolean) as string[];
+        if (leaderIds.length > 0) {
+          const { data: leaders } = await supabase
+            .from("employee_master_data")
+            .select("work_email, private_email")
+            .in("id", leaderIds);
+          
+          (leaders || []).forEach(l => {
+            const email = l.work_email || l.private_email;
+            if (email) autoRecipientEmails.push(email);
+          });
+        }
+
+        // Get all recruitment responsible employees
+        const { data: recruiters } = await supabase
+          .from("employee_master_data")
+          .select("work_email, private_email")
+          .eq("job_title", "Rekruttering")
+          .eq("is_active", true);
+        
+        (recruiters || []).forEach(r => {
+          const email = r.work_email || r.private_email;
+          if (email) autoRecipientEmails.push(email);
+        });
+
+        // Combine all recipients (manual + automatic) and remove duplicates
+        const allRecipients = [...new Set([...manualRecipients, ...autoRecipientEmails])];
+
+        if (allRecipients.length > 0) {
+          await supabase.functions.invoke("send-deactivation-reminder", {
+            body: {
+              employee_id: id,
+              employee_name: `${employee.first_name} ${employee.last_name}`,
+              employee_email: employee.work_email || employee.private_email || "",
+              team_id: employee.team_id,
+              team_name: team?.name || "Ukendt team",
+              recipients: allRecipients,
+              is_followup: false,
+            },
+          });
         }
       }
     },
