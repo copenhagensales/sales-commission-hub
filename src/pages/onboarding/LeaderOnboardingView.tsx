@@ -1,35 +1,27 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useOnboardingDays, useOnboardingDrills, useCoachingTasks, useUpdateCoachingTask, useCoachingCoverageStats } from "@/hooks/useOnboarding";
+import { useOnboardingDays, useCoachingTasks, useUpdateCoachingTask, useCoachingCoverageStats } from "@/hooks/useOnboarding";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, ClipboardList, BookOpen, CheckCircle2, AlertTriangle, BarChart3, Calendar, MessageSquarePlus, FileText, ExternalLink } from "lucide-react";
+import { Users, ClipboardList, CheckCircle2, AlertTriangle, BarChart3, Calendar, MessageSquarePlus, FileText, ExternalLink } from "lucide-react";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { format, formatDistanceToNow, isPast } from "date-fns";
 import { da } from "date-fns/locale";
 import { Progress } from "@/components/ui/progress";
-import { toast } from "sonner";
 import { CoachingFeedbackModal } from "@/components/coaching/CoachingFeedbackModal";
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
 import { Link } from "react-router-dom";
 
 export default function LeaderOnboardingView() {
   const { data: days = [] } = useOnboardingDays();
-  const { data: drills = [] } = useOnboardingDrills();
   const { data: tasks = [], isLoading: tasksLoading } = useCoachingTasks({});
   const { data: coverageStats = [] } = useCoachingCoverageStats();
   const updateTask = useUpdateCoachingTask();
   
   const { data: currentEmployeeId } = useCurrentEmployeeId();
   
-  const [selectedTask, setSelectedTask] = useState<string | null>(null);
-  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showCoachingModal, setShowCoachingModal] = useState(false);
   const [selectedEmployeeForCoaching, setSelectedEmployeeForCoaching] = useState<string | null>(null);
 
@@ -60,54 +52,29 @@ export default function LeaderOnboardingView() {
     },
   });
 
-  const [taskForm, setTaskForm] = useState({
-    score: "",
-    strength: "",
-    improvement: "",
-    suggested_phrase: "",
-    assigned_drill_id: "",
-  });
-
-  const handleOpenCompleteDialog = (taskId: string) => {
-    setSelectedTask(taskId);
+  // Handle opening modal for task completion
+  const handleOpenTaskModal = (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (task) {
-      setTaskForm({
-        score: task.score?.toString() || "",
-        strength: task.strength || "",
-        improvement: task.improvement || "",
-        suggested_phrase: task.suggested_phrase || "",
-        assigned_drill_id: task.assigned_drill_id || "",
-      });
+      setSelectedTaskId(taskId);
+      setSelectedEmployeeForCoaching(task.employee_id);
+      setShowCoachingModal(true);
     }
-    setShowCompleteDialog(true);
   };
 
-  const handleCompleteTask = async () => {
-    if (!selectedTask) return;
-    
-    // Validate required fields
-    if (!taskForm.score || !taskForm.strength || !taskForm.improvement) {
-      toast.error("Udfyld venligst score, styrke og forbedring");
-      return;
+  // Handle coaching modal success - mark task as done
+  const handleCoachingSuccess = async () => {
+    if (selectedTaskId) {
+      await updateTask.mutateAsync({
+        id: selectedTaskId,
+        updates: { 
+          status: "done", 
+          completed_at: new Date().toISOString(),
+        },
+      });
+      setSelectedTaskId(null);
     }
-    
-    await updateTask.mutateAsync({
-      id: selectedTask,
-      updates: { 
-        status: "done", 
-        completed_at: new Date().toISOString(),
-        score: parseInt(taskForm.score),
-        strength: taskForm.strength,
-        improvement: taskForm.improvement,
-        suggested_phrase: taskForm.suggested_phrase || null,
-        assigned_drill_id: taskForm.assigned_drill_id || null,
-      },
-    });
-    
-    setShowCompleteDialog(false);
-    setSelectedTask(null);
-    setTaskForm({ score: "", strength: "", improvement: "", suggested_phrase: "", assigned_drill_id: "" });
+    setSelectedEmployeeForCoaching(null);
   };
 
   const getEmployeeName = (employeeId: string) => {
@@ -315,7 +282,7 @@ export default function LeaderOnboardingView() {
                       <Button
                         variant={isOverdue ? "destructive" : "outline"}
                         size="sm"
-                        onClick={() => handleOpenCompleteDialog(task.id)}
+                        onClick={() => handleOpenTaskModal(task.id)}
                       >
                         <CheckCircle2 className="h-4 w-4 mr-1" />
                         Udfyld
@@ -328,85 +295,20 @@ export default function LeaderOnboardingView() {
         </CardContent>
       </Card>
 
-      {/* Complete Task Dialog */}
-      <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Udfyld Coaching Feedback</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Score *</Label>
-              <Select value={taskForm.score} onValueChange={v => setTaskForm(f => ({ ...f, score: v }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Vælg score" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">🎯 Fokusområde</SelectItem>
-                  <SelectItem value="1">📈 På vej</SelectItem>
-                  <SelectItem value="2">⭐ Stærk præstation</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>1 Styrke *</Label>
-              <Textarea
-                value={taskForm.strength}
-                onChange={e => setTaskForm(f => ({ ...f, strength: e.target.value }))}
-                placeholder="Hvad gjorde medarbejderen godt?"
-              />
-            </div>
-            <div>
-              <Label>1 Forbedring *</Label>
-              <Textarea
-                value={taskForm.improvement}
-                onChange={e => setTaskForm(f => ({ ...f, improvement: e.target.value }))}
-                placeholder="Hvad kan forbedres?"
-              />
-            </div>
-            <div>
-              <Label>"Sig denne sætning næste gang"</Label>
-              <Input
-                value={taskForm.suggested_phrase}
-                onChange={e => setTaskForm(f => ({ ...f, suggested_phrase: e.target.value }))}
-                placeholder="Forslag til konkret sætning..."
-              />
-            </div>
-            <div>
-              <Label>Tildel Drill</Label>
-              <Select value={taskForm.assigned_drill_id} onValueChange={v => setTaskForm(f => ({ ...f, assigned_drill_id: v }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Vælg drill (valgfrit)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {drills.map(drill => (
-                    <SelectItem key={drill.id} value={drill.id}>
-                      {drill.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCompleteDialog(false)}>
-              Annuller
-            </Button>
-            <Button onClick={handleCompleteTask} disabled={!taskForm.score || !taskForm.strength || !taskForm.improvement}>
-              Gem & Marker Færdig
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Coaching Feedback Modal */}
+      {/* Coaching Feedback Modal - used for both quick coaching and task completion */}
       {currentEmployeeId && selectedEmployeeForCoaching && (
         <CoachingFeedbackModal
           open={showCoachingModal}
-          onOpenChange={setShowCoachingModal}
+          onOpenChange={(open) => {
+            setShowCoachingModal(open);
+            if (!open) {
+              setSelectedEmployeeForCoaching(null);
+              setSelectedTaskId(null);
+            }
+          }}
           employeeId={selectedEmployeeForCoaching}
           coachId={currentEmployeeId}
-          onSuccess={() => setSelectedEmployeeForCoaching(null)}
+          onSuccess={handleCoachingSuccess}
         />
       )}
     </div>
