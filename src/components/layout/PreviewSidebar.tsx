@@ -23,7 +23,7 @@ const MAIN_MENU_ITEMS = {
   menu_some: { name: "SOME", href: "/some", icon: Video },
   menu_sales: { name: "Salg", href: "/sales", icon: ShoppingCart },
   menu_logics: { name: "Logikker", href: "/logikker", icon: ListChecks },
-  menu_closing_shifts: { name: "Lukkevagter", href: "/closing-shifts", icon: Clock },
+  menu_closing_shifts: { name: "Påmindelser", href: "/closing-shifts", icon: Clock },
 };
 
 const PERSONAL_MENU_ITEMS = {

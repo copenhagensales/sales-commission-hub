@@ -354,9 +354,9 @@ export default function ClosingShifts() {
     <MainLayout>
       <div className="p-6 space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Lukkevagter & Påmindelser</h1>
+          <h1 className="text-3xl font-bold">Påmindelser</h1>
           <p className="text-muted-foreground mt-1">
-            Administrer lukkevagter og email-skabeloner
+            Administrer lukkevagter, deaktiverings-mails og andre påmindelser
           </p>
         </div>
 
