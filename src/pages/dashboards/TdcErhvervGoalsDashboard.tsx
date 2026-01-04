@@ -115,7 +115,7 @@ export default function TdcErhvervGoalsDashboard() {
     },
   });
 
-  // Fetch agent mappings for team members (including agent external IDs)
+  // Fetch agent mappings for team members (including agent emails)
   const { data: agentMappings, isLoading: loadingMappings } = useQuery({
     queryKey: ["agent-mappings", teamMembers?.map((m) => m.employee_id)],
     queryFn: async () => {
@@ -128,6 +128,8 @@ export default function TdcErhvervGoalsDashboard() {
           employee_id, 
           agent_id,
           agents!inner (
+            id,
+            email,
             external_dialer_id
           )
         `)
@@ -139,32 +141,48 @@ export default function TdcErhvervGoalsDashboard() {
     enabled: !!teamMembers?.length,
   });
 
-  // Fetch sales commission for the period using agent_external_id
+  // Fetch sales commission for the period using agent_email (more reliable than agent_external_id)
   const { data: salesData, isLoading: loadingSales } = useQuery({
-    queryKey: ["sales-commission", agentMappings, payrollPeriod.start.toISOString()],
+    queryKey: ["sales-commission", agentMappings, periodStartStr],
     queryFn: async () => {
       if (!agentMappings?.length) return [];
       
-      // Get all external dialer IDs from the agent mappings
+      // Get all agent emails from the mappings
+      const agentEmails = agentMappings
+        .map((m) => (m.agents as any)?.email)
+        .filter(Boolean);
+      
+      // Also get external IDs as fallback
       const externalIds = agentMappings
         .map((m) => (m.agents as any)?.external_dialer_id)
         .filter(Boolean);
       
-      if (!externalIds.length) return [];
+      if (!agentEmails.length && !externalIds.length) return [];
       
-      const { data, error } = await supabase
+      // Query by agent_email OR agent_external_id
+      let query = supabase
         .from("sales")
         .select(`
           id,
+          agent_email,
           agent_external_id,
           sale_items (
             mapped_commission
           )
         `)
-        .in("agent_external_id", externalIds)
-        .gte("sale_datetime", payrollPeriod.start.toISOString())
-        .lte("sale_datetime", payrollPeriod.end.toISOString());
+        .gte("sale_datetime", `${periodStartStr}T00:00:00`)
+        .lte("sale_datetime", `${periodEndStr}T23:59:59`);
+      
+      // Use OR filter for both email and external_id matching
+      if (agentEmails.length > 0 && externalIds.length > 0) {
+        query = query.or(`agent_email.in.(${agentEmails.join(",")}),agent_external_id.in.(${externalIds.join(",")})`);
+      } else if (agentEmails.length > 0) {
+        query = query.in("agent_email", agentEmails);
+      } else {
+        query = query.in("agent_external_id", externalIds);
+      }
 
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -175,19 +193,31 @@ export default function TdcErhvervGoalsDashboard() {
   const teamMemberGoals = useMemo((): TeamMemberGoal[] => {
     if (!teamMembers) return [];
 
-    // Create external_id to employee mapping
+    // Create email to employee mapping AND external_id to employee mapping
+    const emailToEmployee = new Map<string, string>();
     const externalIdToEmployee = new Map<string, string>();
     agentMappings?.forEach((m) => {
-      const externalId = (m.agents as any)?.external_dialer_id;
-      if (externalId) {
-        externalIdToEmployee.set(externalId, m.employee_id);
+      const agent = m.agents as any;
+      if (agent?.email) {
+        emailToEmployee.set(agent.email.toLowerCase(), m.employee_id);
+      }
+      if (agent?.external_dialer_id) {
+        externalIdToEmployee.set(agent.external_dialer_id, m.employee_id);
       }
     });
 
-    // Calculate commission per employee
+    // Calculate commission per employee (try email first, then external_id)
     const employeeCommission = new Map<string, number>();
     salesData?.forEach((sale) => {
-      const employeeId = externalIdToEmployee.get(sale.agent_external_id);
+      // Try to find employee by email first, then by external_id
+      let employeeId = sale.agent_email 
+        ? emailToEmployee.get(sale.agent_email.toLowerCase())
+        : undefined;
+      
+      if (!employeeId && sale.agent_external_id) {
+        employeeId = externalIdToEmployee.get(sale.agent_external_id);
+      }
+      
       if (employeeId) {
         const saleCommission = sale.sale_items?.reduce(
           (sum, item) => sum + (item.mapped_commission || 0),
