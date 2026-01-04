@@ -81,6 +81,7 @@ import {
   CphSalesDashboard,
   DashboardSettings,
   DesignDashboard,
+  TdcErhvervGoalsDashboard,
   Messages,
   OnboardingAdmin,
   OnboardingDashboard,
@@ -279,6 +280,12 @@ export const routes: RouteConfig[] = [
   {
     path: "/dashboards/tdc-erhverv",
     component: TdcErhvervDashboard,
+    access: "role",
+    positionPermission: "menu_dashboard_tdc_erhverv",
+  },
+  {
+    path: "/dashboards/tdc-erhverv-goals",
+    component: TdcErhvervGoalsDashboard,
     access: "role",
     positionPermission: "menu_dashboard_tdc_erhverv",
   },

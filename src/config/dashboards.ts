@@ -13,6 +13,7 @@ export const DASHBOARD_LIST: DashboardConfig[] = [
   { slug: "team", name: "Team Dashboard", path: "/dashboards/team" },
   { slug: "eesy-tm", name: "Eesy TM", path: "/dashboards/eesy-tm" },
   { slug: "tdc-erhverv", name: "TDC Erhverv", path: "/dashboards/tdc-erhverv" },
+  { slug: "tdc-erhverv-goals", name: "TDC Erhverv Mål", path: "/dashboards/tdc-erhverv-goals" },
   { slug: "relatel", name: "Relatel", path: "/dashboards/relatel" },
   { slug: "tryg", name: "Tryg", path: "/dashboards/tryg" },
   { slug: "ase", name: "ASE", path: "/dashboards/ase" },
