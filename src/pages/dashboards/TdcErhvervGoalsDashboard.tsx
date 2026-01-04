@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,12 +7,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Target, Users, TrendingUp, Award, Info, AlertCircle, Trophy } from "lucide-react";
+import { Target, Users, TrendingUp, Info, AlertCircle, Trophy, Pencil } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { format, addDays, isWeekend, formatDistanceToNow } from "date-fns";
+import { format, addDays, isWeekend } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { da } from "date-fns/locale";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 const TDC_ERHVERV_TEAM_ID = "ee967dfd-04c8-465e-bda7-f1c47094bae0";
 
@@ -87,6 +92,10 @@ function getStatusBadge(status: TeamMemberGoal["status"]) {
 }
 
 export default function TdcErhvervGoalsDashboard() {
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editGoalAmount, setEditGoalAmount] = useState("");
+  const queryClient = useQueryClient();
+  
   const payrollPeriod = useMemo(() => calculatePayrollPeriod(), []);
   const today = new Date();
   
@@ -140,6 +149,54 @@ export default function TdcErhvervGoalsDashboard() {
 
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Fetch team sales goal for current period
+  const { data: teamGoal, isLoading: loadingTeamGoal } = useQuery({
+    queryKey: ["team-sales-goal", TDC_ERHVERV_TEAM_ID, periodStartStr, periodEndStr],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_sales_goals")
+        .select("id, target_amount, period_start, period_end")
+        .eq("team_id", TDC_ERHVERV_TEAM_ID)
+        .eq("period_start", periodStartStr)
+        .eq("period_end", periodEndStr)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Mutation to upsert team goal
+  const upsertTeamGoal = useMutation({
+    mutationFn: async (targetAmount: number) => {
+      const { data, error } = await supabase
+        .from("team_sales_goals")
+        .upsert({
+          team_id: TDC_ERHVERV_TEAM_ID,
+          target_amount: targetAmount,
+          period_start: periodStartStr,
+          period_end: periodEndStr,
+        }, {
+          onConflict: "team_id,period_start,period_end"
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["team-sales-goal"] });
+      toast.success("Team mål opdateret");
+      setIsEditDialogOpen(false);
+      setEditGoalAmount("");
+    },
+    onError: (error) => {
+      toast.error("Kunne ikke opdatere team mål");
+      console.error(error);
     },
   });
 
@@ -359,8 +416,27 @@ export default function TdcErhvervGoalsDashboard() {
     };
   }, [teamMemberGoals]);
 
-  const isLoading = loadingMembers || loadingGoals || loadingMappings || loadingSales;
+  const isLoading = loadingMembers || loadingGoals || loadingMappings || loadingSales || loadingTeamGoal;
   const periodLabel = `${format(payrollPeriod.start, "d. MMM", { locale: da })} - ${format(payrollPeriod.end, "d. MMM yyyy", { locale: da })}`;
+
+  // Calculate team goal (use explicit team goal, or fall back to sum of individual goals)
+  const teamTargetAmount = teamGoal?.target_amount || stats.totalTarget;
+  const teamProgress = teamTargetAmount > 0 ? (stats.totalAchieved / teamTargetAmount) * 100 : 0;
+  const isUsingFallback = !teamGoal?.target_amount;
+  
+  const handleOpenEditDialog = () => {
+    setEditGoalAmount(teamGoal?.target_amount?.toString() || stats.totalTarget?.toString() || "");
+    setIsEditDialogOpen(true);
+  };
+  
+  const handleSaveTeamGoal = () => {
+    const amount = parseFloat(editGoalAmount.replace(/[^0-9.-]+/g, ""));
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("Indtast et gyldigt beløb");
+      return;
+    }
+    upsertTeamGoal.mutate(amount);
+  };
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-6">
@@ -369,11 +445,57 @@ export default function TdcErhvervGoalsDashboard() {
         subtitle={`Teammedlemmernes individuelle mål · ${periodLabel}`}
       />
 
+      {/* Team Progress Hero Card */}
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            {/* Progress Circle */}
+            <div className="flex flex-col items-center gap-2">
+              <div className={`text-6xl md:text-7xl font-bold ${teamProgress >= 100 ? 'text-green-600' : teamProgress >= 75 ? 'text-yellow-600' : 'text-red-600'}`}>
+                {teamProgress.toFixed(0)}%
+              </div>
+              <span className="text-sm text-muted-foreground">Team Fremskridt</span>
+            </div>
+            
+            {/* Progress Bar & Details */}
+            <div className="flex-1 w-full md:max-w-lg">
+              <Progress 
+                value={Math.min(100, teamProgress)} 
+                className={`h-4 mb-3 ${teamProgress >= 100 ? '[&>div]:bg-green-500' : teamProgress >= 75 ? '[&>div]:bg-yellow-500' : '[&>div]:bg-red-500'}`}
+              />
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">{formatCurrency(stats.totalAchieved)}</span>
+                <span className="text-muted-foreground">af {formatCurrency(teamTargetAmount)}</span>
+              </div>
+              {isUsingFallback && (
+                <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  Bruger sum af individuelle mål. Klik for at sætte team-mål.
+                </p>
+              )}
+            </div>
+            
+            {/* Team Goal Edit */}
+            <div className="flex flex-col items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-1.5"
+                onClick={handleOpenEditDialog}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                {teamGoal?.target_amount ? "Rediger mål" : "Sæt team mål"}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Medlemmer med mål</CardTitle>
+            <CardTitle className="text-sm font-medium">Medlemmer</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -384,26 +506,28 @@ export default function TdcErhvervGoalsDashboard() {
                 {stats.membersWithGoal} / {stats.totalMembers}
               </div>
             )}
+            <p className="text-xs text-muted-foreground">med mål</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Team Total Mål</CardTitle>
+            <CardTitle className="text-sm font-medium">Team Mål</CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatCurrency(stats.totalTarget)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(teamTargetAmount)}</div>
             )}
+            <p className="text-xs text-muted-foreground">{isUsingFallback ? "sum af individuelle" : "team mål"}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Team Opnået</CardTitle>
+            <CardTitle className="text-sm font-medium">Opnået</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -412,27 +536,27 @@ export default function TdcErhvervGoalsDashboard() {
             ) : (
               <div className="text-2xl font-bold">{formatCurrency(stats.totalAchieved)}</div>
             )}
+            <p className="text-xs text-muted-foreground">i provision</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-1">
-              Gns. af forventet
-              <span title="Gennemsnit af hvor langt medarbejdere er ift. hvor de burde være nu">
-                <Info className="h-3 w-3 text-muted-foreground" />
-              </span>
-            </CardTitle>
-            <Award className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Mangler</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-8 w-24" />
             ) : (
-              <div className={`text-2xl font-bold ${stats.avgProgressVsExpected >= 100 ? 'text-green-600' : stats.avgProgressVsExpected >= 85 ? 'text-yellow-600' : 'text-red-600'}`}>
-                {stats.avgProgressVsExpected.toFixed(0)}%
+              <div className={`text-2xl font-bold ${teamTargetAmount - stats.totalAchieved <= 0 ? 'text-green-600' : ''}`}>
+                {teamTargetAmount - stats.totalAchieved <= 0 
+                  ? `+${formatCurrency(Math.abs(teamTargetAmount - stats.totalAchieved))}`
+                  : formatCurrency(teamTargetAmount - stats.totalAchieved)
+                }
               </div>
             )}
+            <p className="text-xs text-muted-foreground">til mål</p>
           </CardContent>
         </Card>
       </div>
@@ -441,7 +565,7 @@ export default function TdcErhvervGoalsDashboard() {
       <div className="text-sm text-muted-foreground mb-4 flex items-center gap-1">
         <Info className="h-4 w-4" />
         <span>
-          {workingDaysStats.elapsedWorkingDays} af {workingDaysStats.totalWorkingDays} arbejdsdage brugt · {workingDaysStats.remainingWorkingDays} arbejdsdage tilbage (ekskl. weekender)
+          {workingDaysStats.elapsedWorkingDays} af {workingDaysStats.totalWorkingDays} arbejdsdage brugt · {workingDaysStats.remainingWorkingDays} arbejdsdage tilbage
         </span>
       </div>
 
@@ -610,6 +734,38 @@ export default function TdcErhvervGoalsDashboard() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit Team Goal Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sæt Team Mål</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="teamGoalAmount">Målbeløb (DKK)</Label>
+              <Input
+                id="teamGoalAmount"
+                type="text"
+                placeholder="350000"
+                value={editGoalAmount}
+                onChange={(e) => setEditGoalAmount(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Sum af individuelle mål: {formatCurrency(stats.totalTarget)}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Annuller
+            </Button>
+            <Button onClick={handleSaveTeamGoal} disabled={upsertTeamGoal.isPending}>
+              {upsertTeamGoal.isPending ? "Gemmer..." : "Gem"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
