@@ -86,6 +86,7 @@ import {
   OnboardingAdmin,
   OnboardingDashboard,
   OnboardingCourse,
+  MyFeedback,
   ExcelFieldMatcher,
   TvBoardLogin,
   TvBoardView,
@@ -342,6 +343,7 @@ export const routes: RouteConfig[] = [
     positionPermission: "menu_onboarding_admin",
   },
   { path: "/onboarding-program/kursus", component: OnboardingCourse, access: "protected" },
+  { path: "/my-feedback", component: MyFeedback, access: "protected" },
 
   { path: "/excel-field-matcher", component: ExcelFieldMatcher, access: "protected" },
 

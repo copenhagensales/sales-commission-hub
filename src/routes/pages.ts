@@ -103,6 +103,7 @@ export const Messages = lazyPage(() => import("@/pages/Messages"));
 export const OnboardingDashboard = lazyPage(() => import("@/pages/onboarding/OnboardingDashboard"));
 export const OnboardingAdmin = lazyPage(() => import("@/pages/onboarding/OnboardingAdmin"));
 export const OnboardingCourse = lazyPage(() => import("@/pages/onboarding/OnboardingCourse"));
+export const MyFeedback = lazyPage(() => import("@/pages/onboarding/MyFeedback"));
 
 export const ExcelFieldMatcher = lazyPage(() => import("@/pages/ExcelFieldMatcher"));
 
