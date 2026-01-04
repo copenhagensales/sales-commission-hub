@@ -947,7 +947,9 @@ const Home = () => {
               ) : teamGoal ? (
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-muted-foreground">Teamets mål for lønperioden</span>
+                    <span className="text-sm text-muted-foreground">
+                      {userTeams[0]?.teams?.name || "Team"} – lønperiode
+                    </span>
                     <span className="text-2xl font-bold text-primary">
                       {teamPerformance.progress.toFixed(0)}%
                     </span>
@@ -964,7 +966,11 @@ const Home = () => {
               ) : (
                 <div className="text-center text-muted-foreground text-sm py-6">
                   {userTeams.length > 0 ? (
-                    <p>Ingen teammål sat for denne lønperiode.</p>
+                    <>
+                      <p className="font-medium text-foreground mb-1">{userTeams[0]?.teams?.name}</p>
+                      <p>Ingen teammål sat for denne lønperiode.</p>
+                      <p className="text-xs mt-2">Kontakt din teamleder for at få sat et mål.</p>
+                    </>
                   ) : (
                     <p>Du er ikke tilknyttet et team endnu.</p>
                   )}
