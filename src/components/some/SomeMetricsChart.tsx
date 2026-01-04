@@ -105,9 +105,9 @@ export function SomeMetricsChart({ historicalMetrics }: SomeMetricsChartProps) {
                   type="monotone"
                   dataKey="tiktok"
                   name="TikTok"
-                  stroke="#000000"
+                  stroke="#25F4EE"
                   strokeWidth={2}
-                  dot={{ fill: "#000000" }}
+                  dot={{ fill: "#25F4EE" }}
                 />
                 <Line
                   type="monotone"
