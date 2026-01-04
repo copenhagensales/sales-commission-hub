@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Clock, Calendar, Rocket, Trophy, TrendingUp, Lightbulb } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Clock, Calendar, Rocket, Trophy, TrendingUp, Lightbulb, ChevronDown } from "lucide-react";
 
 interface SalesExtraEffortSuggestionsProps {
   hourlyRate: number;
@@ -113,62 +115,73 @@ export function SalesExtraEffortSuggestions({
 
   const suggestions = getSuggestions();
 
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
     <Card className="bg-gradient-to-br from-muted/50 to-transparent border-border/50">
       <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="p-1.5 rounded-full bg-amber-500/20">
-            <Lightbulb className="h-4 w-4 text-amber-400" />
-          </div>
-          <p className="text-sm font-medium">
-            {isBehind ? "Sådan indhenter du målet" : "Push dit mål endnu højere!"}
-          </p>
-          {!isBehind && (
-            <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-              <TrendingUp className="h-3 w-3" />
-              {Math.round(hourlyRate).toLocaleString("da-DK")} kr/time
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          <CollapsibleTrigger className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-full bg-amber-500/20">
+                <Lightbulb className="h-4 w-4 text-amber-400" />
+              </div>
+              <p className="text-sm font-medium">
+                {isBehind ? "Sådan indhenter du målet" : "Push dit mål endnu højere!"}
+              </p>
             </div>
-          )}
-        </div>
-
-        {isBehind && (
-          <p className="text-sm text-muted-foreground mb-3">
-            Du mangler: <span className="font-medium text-foreground">{amountRemaining.toLocaleString("da-DK")} kr</span> til at nå målet
-          </p>
-        )}
-
-        <div className="space-y-2">
-          {suggestions.map((suggestion, index) => (
-            <div
-              key={index}
-              className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
-                suggestion.highlight
-                  ? "bg-primary/10 border-primary/30"
-                  : "bg-muted/30 border-border/50 hover:bg-muted/50"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <suggestion.icon className={`h-4 w-4 ${suggestion.highlight ? "text-primary" : "text-muted-foreground"}`} />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className={`text-sm font-medium ${suggestion.highlight ? "text-primary" : ""}`}>
-                      {suggestion.title}
-                    </p>
-                    {suggestion.badge && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
-                        {suggestion.badge}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{suggestion.subtitle}</p>
+            <div className="flex items-center gap-2">
+              {!isBehind && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <TrendingUp className="h-3 w-3" />
+                  {Math.round(hourlyRate).toLocaleString("da-DK")} kr/time
                 </div>
-              </div>
-              <div className={`text-sm font-bold ${suggestion.highlight ? "text-primary" : ""}`}>
-                +{suggestion.amount.toLocaleString("da-DK")} kr
-              </div>
+              )}
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
             </div>
-          ))}
-        </div>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent className="pt-3">
+            {isBehind && (
+              <p className="text-sm text-muted-foreground mb-3">
+                Du mangler: <span className="font-medium text-foreground">{amountRemaining.toLocaleString("da-DK")} kr</span> til at nå målet
+              </p>
+            )}
+
+            <div className="space-y-2">
+              {suggestions.map((suggestion, index) => (
+                <div
+                  key={index}
+                  className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                    suggestion.highlight
+                      ? "bg-primary/10 border-primary/30"
+                      : "bg-muted/30 border-border/50 hover:bg-muted/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <suggestion.icon className={`h-4 w-4 ${suggestion.highlight ? "text-primary" : "text-muted-foreground"}`} />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className={`text-sm font-medium ${suggestion.highlight ? "text-primary" : ""}`}>
+                          {suggestion.title}
+                        </p>
+                        {suggestion.badge && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
+                            {suggestion.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{suggestion.subtitle}</p>
+                    </div>
+                  </div>
+                  <div className={`text-sm font-bold ${suggestion.highlight ? "text-primary" : ""}`}>
+                    +{suggestion.amount.toLocaleString("da-DK")} kr
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </CardContent>
     </Card>
   );
