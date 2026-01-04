@@ -12,12 +12,8 @@ import { toast } from "sonner";
 import { Eye, Save, RotateCcw, Send, Loader2, CalendarCheck, XCircle, Gift } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-// CPH Sales official colors:
-// Light Blue: #e6f0f1 - Background + text + logo on dark background
-// Onyx: #2e3136 - Background + text + logo on light background
-// Emerald Green: #3BE086 - Primary for text + logo
-
-const createHtmlTemplate = (title: string, content: string) => `<!DOCTYPE html>
+// CPH Sales official colors for HTML preview wrapper
+const wrapInHtmlTemplate = (title: string, content: string) => `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -27,8 +23,7 @@ const createHtmlTemplate = (title: string, content: string) => `<!DOCTYPE html>
     .header { background: #2e3136; color: #e6f0f1; padding: 30px 20px; text-align: center; border-radius: 8px 8px 0 0; }
     .header h1 { margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px; color: #3BE086; }
     .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.9; color: #e6f0f1; }
-    .content { padding: 30px; background: #ffffff; }
-    .content p { margin: 12px 0; }
+    .content { padding: 30px; background: #ffffff; white-space: pre-line; }
     .footer { padding: 20px; text-align: center; color: #2e3136; font-size: 12px; background: #e6f0f1; border-radius: 0 0 8px 8px; }
   </style>
 </head>
@@ -38,9 +33,7 @@ const createHtmlTemplate = (title: string, content: string) => `<!DOCTYPE html>
       <h1>COPENHAGEN SALES</h1>
       <p>${title}</p>
     </div>
-    <div class="content">
-      ${content.split('\n').map(line => line ? `<p>${line}</p>` : '').join('\n      ')}
-    </div>
+    <div class="content">${content}</div>
     <div class="footer">
       <p>Copenhagen Sales | Rekruttering</p>
     </div>
@@ -48,9 +41,8 @@ const createHtmlTemplate = (title: string, content: string) => `<!DOCTYPE html>
 </body>
 </html>`;
 
-const DEFAULT_INVITATION = createHtmlTemplate(
-  "Invitation til samtale",
-  `Kære {{fornavn}},
+// Original default texts - exactly as stored in database
+const DEFAULT_INVITATION = `Kære {{fornavn}},
 
 Tak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.
 
@@ -61,12 +53,9 @@ Samtalen vil vare ca. 30 minutter og foregår på vores kontor i København.
 Venligst bekræft din deltagelse ved at svare på denne mail.
 
 Med venlig hilsen
-Copenhagen Sales`
-);
+Copenhagen Sales`;
 
-const DEFAULT_REJECTION = createHtmlTemplate(
-  "Vedrørende din ansøgning",
-  `Kære {{fornavn}},
+const DEFAULT_REJECTION = `Kære {{fornavn}},
 
 Tak for din interesse i Copenhagen Sales og for den tid, du har brugt på din ansøgning.
 
@@ -75,12 +64,9 @@ Desværre må vi meddele, at vi har valgt at gå videre med andre kandidater til
 Vi ønsker dig held og lykke med din videre jobsøgning.
 
 Med venlig hilsen
-Copenhagen Sales`
-);
+Copenhagen Sales`;
 
-const DEFAULT_JOB_OFFER = createHtmlTemplate(
-  "Jobtilbud",
-  `Kære {{fornavn}},
+const DEFAULT_JOB_OFFER = `Kære {{fornavn}},
 
 Det er os en glæde at kunne tilbyde dig ansættelse som {{rolle}} hos Copenhagen Sales!
 
@@ -91,8 +77,7 @@ Vedlagt finder du ansættelseskontrakten. Venligst gennemgå den og vend tilbage
 Vi glæder os til at høre fra dig!
 
 Med venlig hilsen
-Copenhagen Sales`
-);
+Copenhagen Sales`;
 
 interface EmailTemplate {
   id: string;
@@ -115,6 +100,7 @@ interface TemplateConfig {
   defaultContent: string;
   previewReplacements: Record<string, string>;
   badge: string;
+  previewTitle: string;
 }
 
 const TEMPLATE_CONFIGS: TemplateConfig[] = [
@@ -130,6 +116,7 @@ const TEMPLATE_CONFIGS: TemplateConfig[] = [
       "{{rolle}}": "Salgskonsulent",
     },
     badge: "Samtale invitation",
+    previewTitle: "Invitation til samtale",
   },
   {
     key: "afslag",
@@ -142,6 +129,7 @@ const TEMPLATE_CONFIGS: TemplateConfig[] = [
       "{{fornavn}}": "Maria",
     },
     badge: "Afslag",
+    previewTitle: "Vedrørende din ansøgning",
   },
   {
     key: "jobtilbud",
@@ -155,6 +143,7 @@ const TEMPLATE_CONFIGS: TemplateConfig[] = [
       "{{rolle}}": "Salgskonsulent",
     },
     badge: "Jobtilbud",
+    previewTitle: "Jobtilbud",
   },
 ];
 
@@ -195,23 +184,10 @@ export default function EmailTemplates() {
 
   const getCurrentContent = (key: TemplateKey) => {
     const config = getConfig(key);
-    const template = getTemplate(key);
-    
     if (editingContents[key] !== undefined && editingContents[key] !== null) {
       return editingContents[key];
     }
-    
-    // If template exists in DB, check if it's HTML or plain text
-    if (template?.content) {
-      // If it's already HTML, use it directly
-      if (template.content.trim().startsWith('<!DOCTYPE') || template.content.trim().startsWith('<html')) {
-        return template.content;
-      }
-      // Otherwise, wrap plain text in our HTML template
-      return createHtmlTemplate(config.badge, template.content);
-    }
-    
-    return config.defaultContent;
+    return getTemplate(key)?.content ?? config.defaultContent;
   };
 
   const saveMutation = useMutation({
@@ -294,11 +270,15 @@ export default function EmailTemplates() {
 
     setIsSendingTest(true);
     try {
+      const config = getConfig(key);
+      // Wrap plain text in HTML template for sending
+      const htmlContent = wrapInHtmlTemplate(config.previewTitle, getCurrentContent(key));
+      
       const { data, error } = await supabase.functions.invoke("send-test-email", {
         body: {
           recipientEmail: testEmail,
           subject: getCurrentSubject(key),
-          htmlContent: getCurrentContent(key),
+          htmlContent,
         },
       });
 
@@ -315,11 +295,15 @@ export default function EmailTemplates() {
 
   const getPreviewHtml = (key: TemplateKey) => {
     const config = getConfig(key);
-    let html = getCurrentContent(key);
+    let content = getCurrentContent(key);
+    
+    // Replace variables with preview values
     Object.entries(config.previewReplacements).forEach(([placeholder, value]) => {
-      html = html.replace(new RegExp(placeholder.replace(/[{}]/g, "\\$&"), "g"), value);
+      content = content.replace(new RegExp(placeholder.replace(/[{}]/g, "\\$&"), "g"), value);
     });
-    return html;
+    
+    // Wrap in HTML template for preview
+    return wrapInHtmlTemplate(config.previewTitle, content);
   };
 
   if (isLoading) {
@@ -402,13 +386,13 @@ export default function EmailTemplates() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>HTML indhold</Label>
+                      <Label>Besked</Label>
                       <Textarea
                         value={getCurrentContent(config.key)}
                         onChange={(e) => handleContentChange(config.key, e.target.value)}
-                        placeholder="HTML email indhold..."
-                        rows={20}
-                        className="font-mono text-xs resize-none"
+                        placeholder="Email indhold..."
+                        rows={16}
+                        className="resize-none"
                       />
                     </div>
                   </CardContent>
