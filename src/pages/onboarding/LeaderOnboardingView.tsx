@@ -5,13 +5,14 @@ import { useOnboardingDays, useCoachingTasks, useUpdateCoachingTask, useCoaching
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Users, ClipboardList, CheckCircle2, AlertTriangle, BarChart3, Calendar, MessageSquarePlus, FileText, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { format, formatDistanceToNow, isPast } from "date-fns";
 import { da } from "date-fns/locale";
 import { Progress } from "@/components/ui/progress";
 import { CoachingFeedbackModal } from "@/components/coaching/CoachingFeedbackModal";
 import { useCurrentEmployeeId } from "@/hooks/useOnboarding";
 import { Link } from "react-router-dom";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function LeaderOnboardingView() {
   const { data: days = [] } = useOnboardingDays();
@@ -47,10 +48,50 @@ export default function LeaderOnboardingView() {
       const { data } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name")
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .order("first_name");
+      return (data || []) as { id: string; first_name: string; last_name: string }[];
+    },
+  });
+
+  // Fetch team memberships separately
+  const { data: teamMemberships = [] } = useQuery({
+    queryKey: ["team-memberships-for-coaching"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("team_members")
+        .select("employee_id, team_id");
+      return (data || []) as { employee_id: string; team_id: string }[];
+    },
+  });
+
+  // Fetch all teams - explicit any to avoid TS2589 recursive type issue
+  const teamsQuery = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["teams-for-quick-coaching"],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const client = supabase as any;
+      const { data } = await client
+        .from("teams")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
       return data || [];
     },
   });
+  const teams = teamsQuery.data || [];
+
+  // State for quick coaching dropdowns
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+
+  // Filter employees by selected team
+  const employeesInSelectedTeam = useMemo(() => {
+    if (!selectedTeamId) return [];
+    const employeeIdsInTeam = teamMemberships
+      .filter(tm => tm.team_id === selectedTeamId)
+      .map(tm => tm.employee_id);
+    return allEmployees.filter(emp => employeeIdsInTeam.includes(emp.id));
+  }, [allEmployees, teamMemberships, selectedTeamId]);
 
   // Handle opening modal for task completion
   const handleOpenTaskModal = (taskId: string) => {
@@ -198,21 +239,58 @@ export default function LeaderOnboardingView() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {allEmployees.slice(0, 10).map(emp => (
-              <Button
-                key={emp.id}
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSelectedEmployeeForCoaching(emp.id);
-                  setShowCoachingModal(true);
+          <div className="flex items-end gap-4">
+            <div className="flex-1 space-y-2">
+              <label className="text-sm font-medium">Team</label>
+              <Select 
+                value={selectedTeamId || ""} 
+                onValueChange={(val) => {
+                  setSelectedTeamId(val || null);
+                  setSelectedEmployeeForCoaching(null);
                 }}
               >
-                <MessageSquarePlus className="h-4 w-4 mr-1" />
-                {emp.first_name}
-              </Button>
-            ))}
+                <SelectTrigger>
+                  <SelectValue placeholder="Vælg team..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {teams.map(team => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 space-y-2">
+              <label className="text-sm font-medium">Medarbejder</label>
+              <Select
+                value={selectedEmployeeForCoaching || ""}
+                onValueChange={(val) => setSelectedEmployeeForCoaching(val || null)}
+                disabled={!selectedTeamId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedTeamId ? "Vælg medarbejder..." : "Vælg team først"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {employeesInSelectedTeam.map(emp => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.first_name} {emp.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={() => {
+                if (selectedEmployeeForCoaching) {
+                  setShowCoachingModal(true);
+                }
+              }}
+              disabled={!selectedEmployeeForCoaching}
+            >
+              <MessageSquarePlus className="h-4 w-4 mr-2" />
+              Start Coaching
+            </Button>
           </div>
         </CardContent>
       </Card>
