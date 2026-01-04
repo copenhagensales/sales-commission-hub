@@ -1036,6 +1036,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     TDC Erhverv
                   </NavLink>
                 )}
+                {p.canViewDashboardTdcErhverv && (
+                  <NavLink to="/dashboards/tdc-erhverv-goals" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/tdc-erhverv-goals" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Target className="h-4 w-4" />
+                    TDC Erhverv Mål
+                  </NavLink>
+                )}
                 {p.canViewDashboardRelatel && (
                   <NavLink to="/dashboards/relatel" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
