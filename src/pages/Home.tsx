@@ -26,8 +26,11 @@ import {
   Trash2,
   Swords,
   Zap,
-  Info
+  Info,
+  Flame,
+  ArrowUpRight
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
@@ -631,6 +634,65 @@ const Home = () => {
     enabled: !!employee?.id,
   });
 
+  // Fetch employee's personal sales goal for the current payroll period
+  const { data: personalGoal } = useQuery({
+    queryKey: ["home-personal-goal", employee?.id, payrollPeriod.start.toISOString()],
+    queryFn: async () => {
+      if (!employee?.id) return null;
+      
+      const periodStartIso = payrollPeriod.start.toISOString().split('T')[0];
+      const periodEndIso = payrollPeriod.end.toISOString().split('T')[0];
+      
+      const { data } = await supabase
+        .from("employee_sales_goals")
+        .select("target_amount")
+        .eq("employee_id", employee.id)
+        .gte("period_start", periodStartIso)
+        .lte("period_end", periodEndIso)
+        .maybeSingle();
+      
+      return data;
+    },
+    enabled: !!employee?.id,
+  });
+
+  // Calculate daily goal stats
+  const dailyGoalStats = useMemo(() => {
+    if (!personalGoal?.target_amount || !personalStats) return null;
+    
+    const targetAmount = personalGoal.target_amount;
+    const { totalWorkingDays, elapsedWorkingDays } = workingDaysStats;
+    const remainingWorkingDays = Math.max(0, totalWorkingDays - elapsedWorkingDays);
+    
+    // Daily target based on linear progression
+    const dailyTarget = totalWorkingDays > 0 ? targetAmount / totalWorkingDays : 0;
+    
+    // Remaining to hit today's goal
+    const todayRemaining = Math.max(0, dailyTarget - personalStats.todayCommission);
+    
+    // Progress towards daily goal
+    const todayProgress = dailyTarget > 0 
+      ? Math.min((personalStats.todayCommission / dailyTarget) * 100, 150)
+      : 0;
+    
+    // Hit daily goal?
+    const hitDailyGoal = personalStats.todayCommission >= dailyTarget;
+    
+    // Status for styling
+    const status = todayProgress >= 100 ? 'ahead' 
+      : todayProgress >= 50 ? 'ontrack' 
+      : 'behind';
+    
+    return {
+      dailyTarget,
+      todayRemaining,
+      todayProgress,
+      hitDailyGoal,
+      remainingWorkingDays,
+      status
+    };
+  }, [personalGoal, personalStats, workingDaysStats]);
+
   // Fetch new employees (started this month)
   const { data: newEmployees = [] } = useQuery({
     queryKey: ["home-new-employees"],
@@ -1108,6 +1170,132 @@ const Home = () => {
                       <span className="font-semibold">{formatCommission(personalStats.todayCommission)}</span>
                     </div>
                   </div>
+
+                  {/* Daily Goal Section */}
+                  {dailyGoalStats ? (
+                    <div className="pt-4 border-t">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Flame className={`w-4 h-4 ${
+                          dailyGoalStats.hitDailyGoal 
+                            ? 'text-green-500' 
+                            : dailyGoalStats.todayProgress >= 50 
+                              ? 'text-yellow-500' 
+                              : 'text-red-500'
+                        }`} />
+                        <span className="text-sm font-medium">Dagsmål</span>
+                        {dailyGoalStats.hitDailyGoal && (
+                          <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs ml-auto">
+                            🎉 Nået!
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      {/* Progress Ring + Stats */}
+                      <div className="flex items-center gap-4">
+                        {/* Circular Progress */}
+                        <div className="relative w-20 h-20 flex-shrink-0">
+                          <svg className="w-20 h-20 transform -rotate-90">
+                            {/* Background circle */}
+                            <circle
+                              cx="40"
+                              cy="40"
+                              r="32"
+                              stroke="currentColor"
+                              strokeWidth="6"
+                              fill="none"
+                              className="text-muted/30"
+                            />
+                            {/* Progress circle */}
+                            <circle
+                              cx="40"
+                              cy="40"
+                              r="32"
+                              stroke="currentColor"
+                              strokeWidth="6"
+                              fill="none"
+                              strokeDasharray={`${Math.min(dailyGoalStats.todayProgress, 100) * 2.01} 201`}
+                              strokeLinecap="round"
+                              className={`transition-all duration-700 ease-out ${
+                                dailyGoalStats.hitDailyGoal 
+                                  ? 'text-green-500' 
+                                  : dailyGoalStats.todayProgress >= 50 
+                                    ? 'text-yellow-500' 
+                                    : 'text-red-500'
+                              }`}
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className={`text-lg font-bold ${
+                              dailyGoalStats.hitDailyGoal 
+                                ? 'text-green-600 dark:text-green-400' 
+                                : dailyGoalStats.todayProgress >= 50 
+                                  ? 'text-yellow-600 dark:text-yellow-400' 
+                                  : 'text-red-600 dark:text-red-400'
+                            }`}>
+                              {Math.round(dailyGoalStats.todayProgress)}%
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Stats */}
+                        <div className="flex-1 space-y-1.5">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">I dag</span>
+                            <span className="font-semibold">{formatCommission(personalStats.todayCommission)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Dagsmål</span>
+                            <span className="font-medium">{formatCommission(dailyGoalStats.dailyTarget)}</span>
+                          </div>
+                          {!dailyGoalStats.hitDailyGoal && (
+                            <div className="flex justify-between text-sm pt-1 border-t border-dashed">
+                              <span className="text-muted-foreground">Mangler</span>
+                              <span className={`font-semibold ${
+                                dailyGoalStats.todayProgress >= 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
+                              }`}>
+                                {formatCommission(dailyGoalStats.todayRemaining)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Motivational status */}
+                      <div className={`mt-3 text-center text-xs py-1.5 rounded-full ${
+                        dailyGoalStats.hitDailyGoal 
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                          : dailyGoalStats.todayProgress >= 75
+                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            : dailyGoalStats.todayProgress >= 50
+                              ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                              : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {dailyGoalStats.hitDailyGoal 
+                          ? '🔥 Fantastisk! Du har nået dit dagsmål!'
+                          : dailyGoalStats.todayProgress >= 75
+                            ? `💪 Næsten! Kun ${formatCommission(dailyGoalStats.todayRemaining)} tilbage`
+                            : dailyGoalStats.todayProgress >= 50
+                              ? `📈 Du er ${Math.round(dailyGoalStats.todayProgress)}% af vejen`
+                              : dailyGoalStats.todayProgress > 0
+                                ? `🎯 Fortsæt! ${formatCommission(dailyGoalStats.todayRemaining)} til målet`
+                                : `🚀 ${workingDaysStats.totalWorkingDays - workingDaysStats.elapsedWorkingDays} arbejdsdage tilbage`
+                        }
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="pt-4 border-t">
+                      <Link 
+                        to="/my-goals" 
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Target className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">Sæt dit personlige mål</span>
+                        </div>
+                        <ArrowUpRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                      </Link>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-6 text-muted-foreground">
