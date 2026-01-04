@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Mail, Phone, CheckCircle2, Send, CalendarClock, UserMinus, Users, Info, UserCheck, Briefcase } from "lucide-react";
+import { Mail, Phone, CheckCircle2, Send, CalendarClock, UserMinus, Users, Info, UserCheck, Briefcase, Crown } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -143,6 +143,23 @@ export default function ClosingShifts() {
       return (data || []).map(r => ({
         ...r,
         email: r.work_email
+      }));
+    },
+  });
+
+  // Fetch owners (only work_email)
+  const { data: owners = [] } = useQuery({
+    queryKey: ["owners-for-deactivation"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, work_email")
+        .eq("job_title", "Ejer")
+        .eq("is_active", true);
+      if (error) throw error;
+      return (data || []).map(o => ({
+        ...o,
+        email: o.work_email
       }));
     },
   });
@@ -554,6 +571,22 @@ export default function ClosingShifts() {
                     <UserCheck className="h-4 w-4" />
                     <span className="font-medium">Teamleder & Ass. Teamleder</span>
                     <span className="text-xs text-muted-foreground">(for det relevante team)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Crown className="h-4 w-4" />
+                    <span className="font-medium">Ejere:</span>
+                    {owners.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {owners.map(o => (
+                          <Badge key={o.id} variant="secondary" className="text-xs">
+                            {o.first_name} {o.last_name}
+                            {o.email && <span className="ml-1 opacity-70">({o.email})</span>}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">(ingen fundet med job_title "Ejer")</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Briefcase className="h-4 w-4" />
