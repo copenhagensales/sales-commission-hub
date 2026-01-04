@@ -373,7 +373,7 @@ export default function EmployeeMasterData() {
   };
 
   const toggleActiveMutation = useMutation({
-    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+    mutationFn: async ({ id, is_active, employee }: { id: string; is_active: boolean; employee?: EmployeeMasterDataRecord }) => {
       const today = new Date().toISOString().split("T")[0];
       const updateData = is_active
         ? { is_active, employment_start_date: today, employment_end_date: null }
@@ -384,6 +384,40 @@ export default function EmployeeMasterData() {
         .update(updateData)
         .eq("id", id);
       if (error) throw error;
+
+      // If deactivating, send deactivation reminder
+      if (!is_active && employee?.team_id) {
+        // Get config for this team
+        const { data: config } = await supabase
+          .from("deactivation_reminder_config")
+          .select("recipients")
+          .eq("team_id", employee.team_id)
+          .single();
+
+        if (config?.recipients) {
+          const recipientsList = config.recipients.split(",").map((r: string) => r.trim()).filter((r: string) => r);
+          if (recipientsList.length > 0) {
+            // Get team name
+            const { data: team } = await supabase
+              .from("teams")
+              .select("name")
+              .eq("id", employee.team_id)
+              .single();
+
+            await supabase.functions.invoke("send-deactivation-reminder", {
+              body: {
+                employee_id: id,
+                employee_name: `${employee.first_name} ${employee.last_name}`,
+                employee_email: employee.work_email || employee.private_email || "",
+                team_id: employee.team_id,
+                team_name: team?.name || "Ukendt team",
+                recipients: recipientsList,
+                is_followup: false,
+              },
+            });
+          }
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
@@ -1150,7 +1184,7 @@ export default function EmployeeMasterData() {
                       <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                         <Switch 
                           checked={employee.is_active} 
-                          onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: employee.id, is_active: checked })}
+                          onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: employee.id, is_active: checked, employee })}
                         />
                       </TableCell>
                       <TableCell className="py-3">
