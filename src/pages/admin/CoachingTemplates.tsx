@@ -20,7 +20,7 @@ import {
   CoachingTemplate 
 } from "@/hooks/useCoachingTemplates";
 import { useOnboardingDrills } from "@/hooks/useOnboarding";
-import { Plus, Pencil, Copy, Trash2, FileText, Loader2, Search } from "lucide-react";
+import { Plus, Pencil, Copy, Trash2, FileText, Loader2, Search, Video } from "lucide-react";
 import { toast } from "sonner";
 
 export default function CoachingTemplates() {
@@ -450,6 +450,21 @@ export default function CoachingTemplates() {
                     onChange={e => setEditingTemplate(t => t ? { ...t, tags: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } : null)}
                     placeholder="fx Top12, Onboarding Uge2..."
                   />
+                </div>
+
+                <div>
+                  <Label className="flex items-center gap-2">
+                    <Video className="h-4 w-4 text-muted-foreground" />
+                    Træningsvideo URL (valgfri)
+                  </Label>
+                  <Input
+                    value={editingTemplate.video_url_default || ""}
+                    onChange={e => setEditingTemplate(t => t ? { ...t, video_url_default: e.target.value || null } : null)}
+                    placeholder="YouTube, Vimeo eller SharePoint URL..."
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Link til en træningsvideo der automatisk tilknyttes feedback
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-2">
