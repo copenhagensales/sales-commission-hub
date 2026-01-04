@@ -48,6 +48,17 @@ serve(async (req: Request) => {
 
     console.log(`Found ${pendingFollowups?.length || 0} pending followups`);
 
+    // Get owner emails to exclude from followups (owners only receive initial email)
+    const { data: ownerData } = await supabase
+      .from("employee_master_data")
+      .select("work_email")
+      .eq("job_title", "Ejer")
+      .eq("is_active", true)
+      .neq("first_name", "Angel");
+    
+    const ownerEmails = new Set((ownerData || []).map(o => o.work_email).filter(Boolean));
+    console.log(`Excluding ${ownerEmails.size} owner emails from followups`);
+
     let sentCount = 0;
 
     for (const reminder of pendingFollowups || []) {
@@ -110,8 +121,20 @@ serve(async (req: Request) => {
         </html>
       `;
 
-      // Send email to all recipients
-      const recipients = reminder.recipients as string[];
+      // Send email to all recipients, excluding owners (they only get initial email)
+      const allRecipients = reminder.recipients as string[];
+      const recipients = allRecipients.filter(email => !ownerEmails.has(email));
+      
+      if (recipients.length === 0) {
+        console.log(`No non-owner recipients for ${reminder.id}, skipping followup`);
+        // Still mark as sent so we don't keep trying
+        await supabase
+          .from("deactivation_reminders_sent")
+          .update({ followup_sent_at: new Date().toISOString() })
+          .eq("id", reminder.id);
+        continue;
+      }
+      
       const { error: emailError } = await resend.emails.send({
         from: "CPH Sales <noreply@cph.sales>",
         to: recipients,
