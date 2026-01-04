@@ -33,7 +33,7 @@ import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, parseISO, differenceInYears, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subWeeks, addDays, isSameDay, isAfter, isBefore } from "date-fns";
+import { format, parseISO, differenceInYears, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subWeeks, addDays, isSameDay, isAfter, isBefore, isWeekend } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 
@@ -497,16 +497,39 @@ const Home = () => {
       toast.success("Teammål slettet");
     }
   });
+  // Helper to count working days (excluding weekends)
+  const getWorkingDaysInRange = (start: Date, end: Date): number => {
+    let count = 0;
+    let current = new Date(start);
+    while (current <= end) {
+      if (!isWeekend(current)) count++;
+      current = addDays(current, 1);
+    }
+    return count;
+  };
+
+  // Calculate working days stats for payroll period
+  const workingDaysStats = useMemo(() => {
+    const today = new Date();
+    const totalWorkingDays = getWorkingDaysInRange(payrollPeriod.start, payrollPeriod.end);
+    const elapsedWorkingDays = getWorkingDaysInRange(payrollPeriod.start, today > payrollPeriod.end ? payrollPeriod.end : today);
+    return { totalWorkingDays, elapsedWorkingDays };
+  }, [payrollPeriod]);
 
   // Team performance from team goal (using amounts)
   const teamPerformance = useMemo(() => {
-    if (!teamGoal) return { currentAmount: 0, targetAmount: 0, progress: 0 };
-    return { 
-      currentAmount: teamGoal.currentAmount || 0, 
-      targetAmount: teamGoal.target_amount || 0, 
-      progress: teamGoal.progress || 0 
-    };
-  }, [teamGoal]);
+    if (!teamGoal) return { currentAmount: 0, targetAmount: 0, progress: 0, progressVsExpected: 0 };
+    const currentAmount = teamGoal.currentAmount || 0;
+    const targetAmount = teamGoal.target_amount || 0;
+    const progress = teamGoal.progress || 0;
+    
+    // Calculate expected progress based on working days
+    const { totalWorkingDays, elapsedWorkingDays } = workingDaysStats;
+    const expectedNow = totalWorkingDays > 0 ? (elapsedWorkingDays / totalWorkingDays) * targetAmount : 0;
+    const progressVsExpected = expectedNow > 0 ? (currentAmount / expectedNow) * 100 : 0;
+    
+    return { currentAmount, targetAmount, progress, progressVsExpected };
+  }, [teamGoal, workingDaysStats]);
 
   // Fetch employee's personal sales stats via agent mapping
   const { data: personalStats } = useQuery({
@@ -1007,6 +1030,29 @@ const Home = () => {
                     <span>{formatCurrency(teamPerformance.currentAmount)}</span>
                     <span>Mål: {formatCurrency(teamPerformance.targetAmount)}</span>
                   </div>
+                  
+                  {/* Progress vs Expected bar */}
+                  <div className="mt-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs text-muted-foreground">
+                        Fremskridt vs. forventet (dag {workingDaysStats.elapsedWorkingDays} af {workingDaysStats.totalWorkingDays})
+                      </span>
+                      <span className={`text-sm font-semibold ${
+                        teamPerformance.progressVsExpected >= 100 ? 'text-green-600' :
+                        teamPerformance.progressVsExpected >= 85 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {teamPerformance.progressVsExpected.toFixed(0)}%
+                      </span>
+                    </div>
+                    <Progress 
+                      value={Math.min(teamPerformance.progressVsExpected, 100)} 
+                      className={`h-2 ${
+                        teamPerformance.progressVsExpected >= 100 ? '[&>div]:bg-green-500' :
+                        teamPerformance.progressVsExpected >= 85 ? '[&>div]:bg-yellow-500' : '[&>div]:bg-red-500'
+                      }`}
+                    />
+                  </div>
+                  
                   {(teamGoal as any).isFallback && (
                     <div className="mt-3 p-2 bg-muted/50 rounded text-xs text-muted-foreground flex items-center gap-2">
                       <Info className="h-3 w-3 flex-shrink-0" />
