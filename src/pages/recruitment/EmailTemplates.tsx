@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Mail, Eye, Save, RotateCcw, Send, Loader2, UserPlus, CalendarCheck } from "lucide-react";
+import { Eye, Save, RotateCcw, Send, Loader2, CalendarCheck, XCircle, Gift } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 // CPH Sales official colors:
@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 // Onyx: #2e3136 - Background + text + logo on light background
 // Emerald Green: #3BE086 - Primary for text + logo
 
-const DEFAULT_INTERVIEW_INVITATION = `<!DOCTYPE html>
+const createHtmlTemplate = (title: string, content: string) => `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -28,34 +28,18 @@ const DEFAULT_INTERVIEW_INVITATION = `<!DOCTYPE html>
     .header h1 { margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px; color: #3BE086; }
     .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.9; color: #e6f0f1; }
     .content { padding: 30px; background: #ffffff; }
-    .button { display: inline-block; background: #3BE086; color: #2e3136; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: 600; }
+    .content p { margin: 12px 0; }
     .footer { padding: 20px; text-align: center; color: #2e3136; font-size: 12px; background: #e6f0f1; border-radius: 0 0 8px 8px; }
-    .info-box { background: #e6f0f1; padding: 16px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3BE086; }
-    .info-box h3 { margin: 0 0 12px 0; color: #2e3136; }
-    .info-box p { margin: 8px 0; color: #2e3136; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
       <h1>COPENHAGEN SALES</h1>
-      <p>Invitation til samtale</p>
+      <p>${title}</p>
     </div>
     <div class="content">
-      <p>Kære {{fornavn}},</p>
-      <p>Tak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.</p>
-      <p>Vi vil gerne invitere dig til en samtale, hvor vi kan lære hinanden bedre at kende.</p>
-      
-      <div class="info-box">
-        <h3>Praktiske oplysninger:</h3>
-        <p><strong>Dato:</strong> {{dato}}</p>
-        <p><strong>Tidspunkt:</strong> {{tidspunkt}}</p>
-        <p><strong>Sted:</strong> {{adresse}}</p>
-      </div>
-      
-      <p>Bekræft venligst din deltagelse ved at svare på denne mail.</p>
-      <p>Vi glæder os til at møde dig!</p>
-      <p>Med venlig hilsen,<br>Copenhagen Sales</p>
+      ${content.split('\n').map(line => line ? `<p>${line}</p>` : '').join('\n      ')}
     </div>
     <div class="footer">
       <p>Copenhagen Sales | Rekruttering</p>
@@ -64,53 +48,51 @@ const DEFAULT_INTERVIEW_INVITATION = `<!DOCTYPE html>
 </body>
 </html>`;
 
-const DEFAULT_APPLICATION_CONFIRMATION = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #2e3136; margin: 0; padding: 0; background: #e6f0f1; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: #2e3136; color: #e6f0f1; padding: 30px 20px; text-align: center; border-radius: 8px 8px 0 0; }
-    .header h1 { margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px; color: #3BE086; }
-    .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.9; color: #e6f0f1; }
-    .content { padding: 30px; background: #ffffff; }
-    .footer { padding: 20px; text-align: center; color: #2e3136; font-size: 12px; background: #e6f0f1; border-radius: 0 0 8px 8px; }
-    .steps { background: #e6f0f1; border-radius: 8px; padding: 16px; margin: 20px 0; }
-    .steps h3 { margin: 0 0 12px 0; color: #2e3136; }
-    .steps ol { margin: 0; padding-left: 20px; }
-    .steps li { margin: 8px 0; color: #2e3136; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>COPENHAGEN SALES</h1>
-      <p>Tak for din ansøgning</p>
-    </div>
-    <div class="content">
-      <p>Kære {{fornavn}},</p>
-      <p>Tak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.</p>
-      <p>Vi har modtaget din ansøgning og vil gennemgå den hurtigst muligt.</p>
-      
-      <div class="steps">
-        <h3>Hvad sker der nu?</h3>
-        <ol>
-          <li>Vi gennemgår alle ansøgninger</li>
-          <li>Udvalgte kandidater kontaktes til samtale</li>
-          <li>Du hører fra os inden for 1-2 uger</li>
-        </ol>
-      </div>
-      
-      <p>Har du spørgsmål i mellemtiden, er du velkommen til at kontakte os.</p>
-      <p>Med venlig hilsen,<br>Copenhagen Sales</p>
-    </div>
-    <div class="footer">
-      <p>Copenhagen Sales | Rekruttering</p>
-    </div>
-  </div>
-</body>
-</html>`;
+const DEFAULT_INVITATION = createHtmlTemplate(
+  "Invitation til samtale",
+  `Kære {{fornavn}},
+
+Tak for din ansøgning til stillingen som {{rolle}} hos Copenhagen Sales.
+
+Vi vil meget gerne invitere dig til en samtale, hvor vi kan høre mere om dig og fortælle om mulighederne hos os.
+
+Samtalen vil vare ca. 30 minutter og foregår på vores kontor i København.
+
+Venligst bekræft din deltagelse ved at svare på denne mail.
+
+Med venlig hilsen
+Copenhagen Sales`
+);
+
+const DEFAULT_REJECTION = createHtmlTemplate(
+  "Vedrørende din ansøgning",
+  `Kære {{fornavn}},
+
+Tak for din interesse i Copenhagen Sales og for den tid, du har brugt på din ansøgning.
+
+Desværre må vi meddele, at vi har valgt at gå videre med andre kandidater til stillingen.
+
+Vi ønsker dig held og lykke med din videre jobsøgning.
+
+Med venlig hilsen
+Copenhagen Sales`
+);
+
+const DEFAULT_JOB_OFFER = createHtmlTemplate(
+  "Jobtilbud",
+  `Kære {{fornavn}},
+
+Det er os en glæde at kunne tilbyde dig ansættelse som {{rolle}} hos Copenhagen Sales!
+
+Vi var meget imponerede over din profil og samtale, og vi er overbeviste om, at du vil blive et værdifuldt medlem af vores team.
+
+Vedlagt finder du ansættelseskontrakten. Venligst gennemgå den og vend tilbage med eventuelle spørgsmål.
+
+Vi glæder os til at høre fra dig!
+
+Med venlig hilsen
+Copenhagen Sales`
+);
 
 interface EmailTemplate {
   id: string;
@@ -122,13 +104,13 @@ interface EmailTemplate {
   updated_at: string;
 }
 
-type TemplateKey = "recruitment_interview_invitation" | "recruitment_application_confirmation";
+type TemplateKey = "invitation_samtale" | "afslag" | "jobtilbud";
 
 interface TemplateConfig {
   key: TemplateKey;
   name: string;
   description: string;
-  icon: typeof Mail;
+  icon: typeof CalendarCheck;
   defaultSubject: string;
   defaultContent: string;
   previewReplacements: Record<string, string>;
@@ -137,39 +119,48 @@ interface TemplateConfig {
 
 const TEMPLATE_CONFIGS: TemplateConfig[] = [
   {
-    key: "recruitment_interview_invitation",
-    name: "Samtale invitation",
+    key: "invitation_samtale",
+    name: "Invitation til samtale",
     description: "Sendes når en kandidat inviteres til samtale",
     icon: CalendarCheck,
     defaultSubject: "Invitation til samtale hos Copenhagen Sales",
-    defaultContent: DEFAULT_INTERVIEW_INVITATION,
+    defaultContent: DEFAULT_INVITATION,
     previewReplacements: {
       "{{fornavn}}": "Maria",
       "{{rolle}}": "Salgskonsulent",
-      "{{dato}}": "Mandag d. 15. januar 2026",
-      "{{tidspunkt}}": "10:00",
-      "{{adresse}}": "Amagerbrogade 123, 2300 København S",
     },
     badge: "Samtale invitation",
   },
   {
-    key: "recruitment_application_confirmation",
-    name: "Ansøgning modtaget",
-    description: "Bekræftelse sendt ved modtagelse af ansøgning",
-    icon: UserPlus,
-    defaultSubject: "Tak for din ansøgning - Copenhagen Sales",
-    defaultContent: DEFAULT_APPLICATION_CONFIRMATION,
+    key: "afslag",
+    name: "Afslag",
+    description: "Sendes når en kandidat får afslag",
+    icon: XCircle,
+    defaultSubject: "Vedrørende din ansøgning hos Copenhagen Sales",
+    defaultContent: DEFAULT_REJECTION,
+    previewReplacements: {
+      "{{fornavn}}": "Maria",
+    },
+    badge: "Afslag",
+  },
+  {
+    key: "jobtilbud",
+    name: "Jobtilbud",
+    description: "Sendes når en kandidat tilbydes jobbet",
+    icon: Gift,
+    defaultSubject: "Jobtilbud fra Copenhagen Sales",
+    defaultContent: DEFAULT_JOB_OFFER,
     previewReplacements: {
       "{{fornavn}}": "Maria",
       "{{rolle}}": "Salgskonsulent",
     },
-    badge: "Ansøgningsbekræftelse",
+    badge: "Jobtilbud",
   },
 ];
 
 export default function EmailTemplates() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<TemplateKey>("recruitment_interview_invitation");
+  const [activeTab, setActiveTab] = useState<TemplateKey>("invitation_samtale");
   const [editingSubjects, setEditingSubjects] = useState<Record<string, string | null>>({});
   const [editingContents, setEditingContents] = useState<Record<string, string | null>>({});
   const [hasChanges, setHasChanges] = useState<Record<string, boolean>>({});
@@ -204,7 +195,23 @@ export default function EmailTemplates() {
 
   const getCurrentContent = (key: TemplateKey) => {
     const config = getConfig(key);
-    return editingContents[key] ?? getTemplate(key)?.content ?? config.defaultContent;
+    const template = getTemplate(key);
+    
+    if (editingContents[key] !== undefined && editingContents[key] !== null) {
+      return editingContents[key];
+    }
+    
+    // If template exists in DB, check if it's HTML or plain text
+    if (template?.content) {
+      // If it's already HTML, use it directly
+      if (template.content.trim().startsWith('<!DOCTYPE') || template.content.trim().startsWith('<html')) {
+        return template.content;
+      }
+      // Otherwise, wrap plain text in our HTML template
+      return createHtmlTemplate(config.badge, template.content);
+    }
+    
+    return config.defaultContent;
   };
 
   const saveMutation = useMutation({
