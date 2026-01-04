@@ -105,6 +105,7 @@ export const routes: RouteConfig[] = [
   { path: "/my-schedule", component: MySchedule, access: "protected" },
   { path: "/my-profile", component: MyProfile, access: "protected" },
   { path: "/my-goals", component: MyGoals, access: "protected" },
+  { path: "/my-goals/:employeeId", component: MyGoals, access: "protected" },
   { path: "/my-contracts", component: MyContracts, access: "protected" },
   { path: "/pulse-survey", component: PulseSurvey, access: "protected" },
   { path: "/career-wishes", component: CareerWishes, access: "protected" },

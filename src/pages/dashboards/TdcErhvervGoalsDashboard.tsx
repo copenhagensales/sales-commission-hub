@@ -518,7 +518,7 @@ export default function TdcErhvervGoalsDashboard() {
                           </Avatar>
                           <div className="flex items-center gap-1.5">
                             <Link 
-                              to={`/employee/${member.employeeId}`}
+                              to={`/my-goals/${member.employeeId}`}
                               className="font-medium hover:underline hover:text-primary transition-colors"
                             >
                               {member.firstName} {member.lastName}
