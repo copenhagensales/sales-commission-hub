@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X, UserX, Camera, User } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, MessageSquare, Loader2, ArrowRight, Check, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, UserPlus, Send, ArrowRightLeft, Clock, X, UserX, Camera, User, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
@@ -117,6 +118,11 @@ export default function EmployeeMasterData() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
+  const [teamFilter, setTeamFilter] = useState<string>("all");
+  const [sortColumn, setSortColumn] = useState<"name" | "position" | "team">("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [deactivatingEmployee, setDeactivatingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeMasterDataRecord | null>(null);
   const [formData, setFormData] = useState<NewEmployee>(defaultEmployee);
@@ -251,6 +257,37 @@ export default function EmployeeMasterData() {
     const memberships = teamMemberships.filter(tm => tm.employee_id === employeeId);
     if (memberships.length === 0) return "";
     return memberships.map(tm => tm.teams?.name).filter(Boolean).join(", ");
+  };
+
+  // Get unique teams for filter dropdown
+  const uniqueTeams = React.useMemo(() => {
+    const teams = new Set<string>();
+    teamMemberships.forEach(tm => {
+      if (tm.teams?.name) teams.add(tm.teams.name);
+    });
+    return Array.from(teams).sort((a, b) => a.localeCompare(b, 'da'));
+  }, [teamMemberships]);
+
+  // Keyboard shortcut for search (⌘K / Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Handle sort
+  const handleSort = (column: "name" | "position" | "team") => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
   };
 
   // Get contract status for an employee (prioritized: signed > pending > rejected > none)
@@ -643,16 +680,37 @@ export default function EmployeeMasterData() {
       if (statusFilter === "inactive") return !e.is_active;
       return true;
     })
+    .filter((e) => {
+      if (teamFilter === "all") return true;
+      const employeeTeams = getEmployeeTeams(e.id);
+      return employeeTeams.includes(teamFilter);
+    })
     .filter(
       (e) =>
         `${e.first_name} ${e.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.private_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.department?.toLowerCase().includes(searchTerm.toLowerCase())
+        e.job_title?.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
-      const nameA = `${a.first_name} ${a.last_name}`.toLowerCase();
-      const nameB = `${b.first_name} ${b.last_name}`.toLowerCase();
-      return nameA.localeCompare(nameB, 'da');
+      let comparison = 0;
+      switch (sortColumn) {
+        case "name":
+          const nameA = `${a.first_name} ${a.last_name}`.toLowerCase();
+          const nameB = `${b.first_name} ${b.last_name}`.toLowerCase();
+          comparison = nameA.localeCompare(nameB, 'da');
+          break;
+        case "position":
+          const posA = (a.job_title || "").toLowerCase();
+          const posB = (b.job_title || "").toLowerCase();
+          comparison = posA.localeCompare(posB, 'da');
+          break;
+        case "team":
+          const teamA = getEmployeeTeams(a.id).toLowerCase();
+          const teamB = getEmployeeTeams(b.id).toLowerCase();
+          comparison = teamA.localeCompare(teamB, 'da');
+          break;
+      }
+      return sortDirection === "asc" ? comparison : -comparison;
     });
 
   const activeCount = employees.filter((e) => e.is_active).length;
@@ -1041,14 +1099,29 @@ export default function EmployeeMasterData() {
                   {t("employees.filters.all")} ({employees.length})
                 </Button>
               </div>
-              <div className="relative w-56">
+              <Select value={teamFilter} onValueChange={setTeamFilter}>
+                <SelectTrigger className="w-36 h-9 bg-muted/50 border-0">
+                  <SelectValue placeholder="Alle teams" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  <SelectItem value="all">Alle teams</SelectItem>
+                  {uniqueTeams.map((team) => (
+                    <SelectItem key={team} value={team}>{team}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="relative w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
+                  ref={searchInputRef}
                   placeholder={t("employees.filters.searchPlaceholder")} 
                   value={searchTerm} 
                   onChange={(e) => setSearchTerm(e.target.value)} 
-                  className="pl-9 bg-muted/50 border-0 focus-visible:ring-1 h-9" 
+                  className="pl-9 pr-12 bg-muted/50 border-0 focus-visible:ring-1 h-9" 
                 />
+                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                  <span className="text-xs">⌘</span>K
+                </kbd>
               </div>
               <div className="flex items-center gap-2">
                 <EmployeeExcelImport />
@@ -1161,9 +1234,45 @@ export default function EmployeeMasterData() {
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-border/50">
-                    <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.name")}</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.position")}</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">Team</TableHead>
+                    <TableHead 
+                      className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                      onClick={() => handleSort("name")}
+                    >
+                      <div className="flex items-center gap-1">
+                        {t("employees.table.name")}
+                        {sortColumn === "name" ? (
+                          sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-40" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                      onClick={() => handleSort("position")}
+                    >
+                      <div className="flex items-center gap-1">
+                        {t("employees.table.position")}
+                        {sortColumn === "position" ? (
+                          sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-40" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                      onClick={() => handleSort("team")}
+                    >
+                      <div className="flex items-center gap-1">
+                        Team
+                        {sortColumn === "team" ? (
+                          sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-40" />
+                        )}
+                      </div>
+                    </TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.status")}</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
@@ -1222,35 +1331,17 @@ export default function EmployeeMasterData() {
                       <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                         <Switch 
                           checked={employee.is_active} 
-                          onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: employee.id, is_active: checked, employee })}
+                          onCheckedChange={(checked) => {
+                            if (!checked) {
+                              setDeactivatingEmployee(employee);
+                            } else {
+                              toggleActiveMutation.mutate({ id: employee.id, is_active: true, employee });
+                            }
+                          }}
                         />
                       </TableCell>
                       <TableCell className="py-3">
                         <div className="flex items-center gap-0.5">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8"
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              toast({ title: t("employees.actions.call"), description: t("employees.actions.softphoneComingSoon") });
-                            }}
-                            disabled={!employee.private_phone}
-                          >
-                            <Phone className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8"
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              toast({ title: t("employees.actions.sendSms"), description: t("employees.actions.smsComingSoon") });
-                            }}
-                            disabled={!employee.private_phone}
-                          >
-                            <MessageSquare className="h-3.5 w-3.5" />
-                          </Button>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button 
@@ -1282,33 +1373,65 @@ export default function EmployeeMasterData() {
                                 : t("employees.actions.sendInvitation")}
                             </TooltipContent>
                           </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8"
-                                onClick={(e) => { e.stopPropagation(); setMoveToStaffId(employee.id); }}
-                                disabled={moveToStaffMutation.isPending}
-                              >
-                                <ArrowRightLeft className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Flyt til stab</TooltipContent>
-                          </Tooltip>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleEdit(employee); }}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
-                          {canEditEmployees && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={(e) => { e.stopPropagation(); setDeleteEmployeeId(employee.id); }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-3.5 w-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-popover w-48">
+                              <DropdownMenuItem
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  if (employee.private_phone) {
+                                    window.location.href = `tel:${employee.private_phone}`;
+                                  } else {
+                                    toast({ title: t("employees.actions.call"), description: t("employees.actions.softphoneComingSoon") });
+                                  }
+                                }}
+                                disabled={!employee.private_phone}
+                              >
+                                <Phone className="h-4 w-4 mr-2" />
+                                Ring op
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  if (employee.private_phone) {
+                                    window.location.href = `sms:${employee.private_phone}`;
+                                  } else {
+                                    toast({ title: t("employees.actions.sendSms"), description: t("employees.actions.smsComingSoon") });
+                                  }
+                                }}
+                                disabled={!employee.private_phone}
+                              >
+                                <MessageSquare className="h-4 w-4 mr-2" />
+                                Send SMS
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={(e) => { e.stopPropagation(); setMoveToStaffId(employee.id); }}
+                              >
+                                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                Flyt til stab
+                              </DropdownMenuItem>
+                              {canEditEmployees && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={(e) => { e.stopPropagation(); setDeleteEmployeeId(employee.id); }}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Slet medarbejder
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1386,6 +1509,33 @@ export default function EmployeeMasterData() {
                 }}
               >
                 Flyt medarbejder
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Deactivation confirmation dialog */}
+        <AlertDialog open={!!deactivatingEmployee} onOpenChange={(open) => !open && setDeactivatingEmployee(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Deaktiver medarbejder</AlertDialogTitle>
+              <AlertDialogDescription>
+                Er du sikker på at du vil deaktivere <strong>{deactivatingEmployee?.first_name} {deactivatingEmployee?.last_name}</strong>? 
+                Medarbejderen vil ikke længere kunne logge ind og vil blive markeret som inaktiv.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuller</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => {
+                  if (deactivatingEmployee) {
+                    toggleActiveMutation.mutate({ id: deactivatingEmployee.id, is_active: false, employee: deactivatingEmployee });
+                    setDeactivatingEmployee(null);
+                  }
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Deaktiver
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
