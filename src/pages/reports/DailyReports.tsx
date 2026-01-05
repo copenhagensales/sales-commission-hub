@@ -265,18 +265,30 @@ export default function DailyReports() {
       }
 
       // Fetch fieldmarketing sales (linked directly to employee via seller_id)
+      // Fetch fieldmarketing sales (linked directly to employee via seller_id)
       const { data: fmSalesData } = await supabase
         .from("fieldmarketing_sales")
         .select(`
           id,
           seller_id,
           registered_at,
-          product_name,
-          products!fieldmarketing_sales_product_id_fkey(commission_dkk)
+          product_name
         `)
         .in("seller_id", employeeIds)
         .gte("registered_at", `${startStr}T00:00:00`)
         .lte("registered_at", `${endStr}T23:59:59`);
+      
+      console.log("[DailyReport] FM Sales fetched:", fmSalesData?.length);
+      
+      // Fetch all products to match commission by product_name
+      const { data: allProducts } = await supabase
+        .from("products")
+        .select("name, commission_dkk");
+      
+      const productCommissionMap = new Map<string, number>();
+      allProducts?.forEach(p => {
+        if (p.name) productCommissionMap.set(p.name.toLowerCase(), p.commission_dkk || 0);
+      });
 
       // Build report data - aggregate per employee with daily breakdown
       const report: EmployeeReportData[] = [];
@@ -363,10 +375,11 @@ export default function DailyReports() {
             });
           });
 
-          // Add fieldmarketing sales
+          // Add fieldmarketing sales - match commission by product_name
           empFmSales.forEach((sale: any) => {
             salesCount += 1;
-            commission += Number(sale.products?.commission_dkk) || 0;
+            const productName = (sale.product_name || "").toLowerCase();
+            commission += productCommissionMap.get(productName) || 0;
           });
 
           dailyEntries.push({
