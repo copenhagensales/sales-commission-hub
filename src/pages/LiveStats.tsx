@@ -118,10 +118,12 @@ export default function LiveStats() {
         }
       }
 
-      // Filter by client if selected
+      // Filter by client if selected - exclude sales without valid client_campaigns
       let filteredData = allSales;
       if (selectedClient !== "all") {
-        filteredData = filteredData.filter((s: any) => s.client_campaigns?.client_id === selectedClient);
+        filteredData = filteredData.filter((s: any) => 
+          s.client_campaigns && s.client_campaigns.client_id === selectedClient
+        );
       }
 
       return filteredData;
