@@ -53,6 +53,35 @@ const wrapInHtmlTemplate = (title: string, content: string) => {
 </html>`;
 };
 
+// Simple text-only wrapper for rejection emails (no header/branding)
+const wrapInSimpleTextTemplate = (content: string) => {
+  // Convert plain text line breaks to HTML
+  const htmlContent = content
+    .split('\n\n') // Split by double newlines (paragraphs)
+    .map(paragraph => `<p style="margin: 0 0 16px 0;">${paragraph.replace(/\n/g, '<br>')}</p>`)
+    .join('\n      ');
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; }
+    .content p { margin: 0 0 16px 0; }
+    .content p:last-child { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="content">
+      ${htmlContent}
+    </div>
+  </div>
+</body>
+</html>`;
+};
+
 // Original default texts - exactly as stored in database
 const DEFAULT_INVITATION = `Kære {{fornavn}},
 
@@ -283,8 +312,10 @@ export default function EmailTemplates() {
     setIsSendingTest(true);
     try {
       const config = getConfig(key);
-      // Wrap plain text in HTML template for sending
-      const htmlContent = wrapInHtmlTemplate(config.previewTitle, getCurrentContent(key));
+      // Use simple text template for rejection emails, full branding for others
+      const htmlContent = key === "afslag" 
+        ? wrapInSimpleTextTemplate(getCurrentContent(key))
+        : wrapInHtmlTemplate(config.previewTitle, getCurrentContent(key));
       
       const { data, error } = await supabase.functions.invoke("send-test-email", {
         body: {
@@ -314,7 +345,10 @@ export default function EmailTemplates() {
       content = content.replace(new RegExp(placeholder.replace(/[{}]/g, "\\$&"), "g"), value);
     });
     
-    // Wrap in HTML template for preview
+    // Use simple text template for rejection emails, full branding for others
+    if (key === "afslag") {
+      return wrapInSimpleTextTemplate(content);
+    }
     return wrapInHtmlTemplate(config.previewTitle, content);
   };
 
