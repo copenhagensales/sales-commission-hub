@@ -93,7 +93,7 @@ export default function ReferAFriend() {
             <div className="flex items-center gap-2 p-3 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-lg">
               <Clock className="h-5 w-5 flex-shrink-0" />
               <p className="text-sm">
-                <strong>Udbetaling:</strong> Bonus udbetales først, når den nye medarbejder har været ansat i 2 måneder.
+                <strong>Udbetaling:</strong> Bonus udbetales først, når den nye medarbejder har været ansat i 2 måneder. Du skal selv være ansat på udbetalingstidspunktet for at modtage bonussen.
               </p>
             </div>
           </CardContent>
