@@ -232,7 +232,7 @@ export default function DailyReports() {
 
       const agentNames = agentMappings?.map(m => (m.agents as any)?.name).filter(Boolean) || [];
 
-      // Fetch sales - matching agent_name to mapped agents
+      // Fetch sales with sale_items - same logic as KPI sales-count
       let salesData: any[] = [];
       if (agentNames.length > 0) {
         const { data: sales } = await supabase
@@ -240,13 +240,16 @@ export default function DailyReports() {
           .select(`
             id,
             agent_name,
-            status,
-            created_at,
-            sale_items(mapped_commission)
+            sale_datetime,
+            sale_items(
+              quantity,
+              mapped_commission,
+              products(counts_as_sale)
+            )
           `)
           .in("agent_name", agentNames)
-          .gte("created_at", `${startStr}T00:00:00`)
-          .lte("created_at", `${endStr}T23:59:59`);
+          .gte("sale_datetime", `${startStr}T00:00:00`)
+          .lte("sale_datetime", `${endStr}T23:59:59`);
         salesData = sales || [];
       }
 
@@ -303,17 +306,23 @@ export default function DailyReports() {
           const dayEnd = `${dayStr}T23:59:59`;
           const empSales = agentName 
             ? salesData.filter(s => {
-                const saleDate = s.created_at;
+                const saleDate = s.sale_datetime;
                 return s.agent_name === agentName && saleDate >= dayStart && saleDate <= dayEnd;
               })
             : [];
 
-          const salesCount = empSales.length;
-          const commission = empSales.reduce((sum, sale) => {
-            const saleCommission = sale.sale_items?.reduce((itemSum: number, item: any) => 
-              itemSum + (item.mapped_commission || 0), 0) || 0;
-            return sum + saleCommission;
-          }, 0);
+          // Count sales using sale_items with counts_as_sale (same as KPI)
+          let salesCount = 0;
+          let commission = 0;
+          empSales.forEach((sale: any) => {
+            (sale.sale_items || []).forEach((item: any) => {
+              const countsAsSale = item.products?.counts_as_sale !== false;
+              if (countsAsSale) {
+                salesCount += Number(item.quantity) || 1;
+              }
+              commission += Number(item.mapped_commission) || 0;
+            });
+          });
 
           dailyEntries.push({
             date: dayStr,
