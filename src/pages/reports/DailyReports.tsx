@@ -29,13 +29,12 @@ interface DailyReportData {
   employee_id: string;
   employee_name: string;
   team_name: string | null;
+  date: string;
   hours: number;
   is_sick: boolean;
   is_vacation: boolean;
   sales_count: number;
   commission: number;
-  clock_in: string | null;
-  clock_out: string | null;
 }
 
 export default function DailyReports() {
@@ -61,21 +60,26 @@ export default function DailyReports() {
   // Calculate date range based on period
   const dateRange = useMemo(() => {
     const now = new Date();
+    const today = startOfDay(now);
+    
     switch (period) {
       case "yesterday":
         const yesterday = subDays(now, 1);
         return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
       case "this_week":
-        return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+        return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfDay(today) };
       case "last_week":
         const lastWeekStart = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
         const lastWeekEnd = endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
         return { start: lastWeekStart, end: lastWeekEnd };
       case "this_month":
-        return { start: startOfMonth(now), end: endOfMonth(now) };
+        // Only up to today, not future dates
+        return { start: startOfMonth(now), end: endOfDay(today) };
       case "custom":
         if (customStartDate && customEndDate) {
-          return { start: startOfDay(customStartDate), end: endOfDay(customEndDate) };
+          // Cap end date to today if it's in the future
+          const cappedEnd = customEndDate > today ? today : customEndDate;
+          return { start: startOfDay(customStartDate), end: endOfDay(cappedEnd) };
         }
         return { start: startOfDay(now), end: endOfDay(now) };
       default: // today
@@ -230,6 +234,7 @@ export default function DailyReports() {
             id,
             agent_name,
             status,
+            created_at,
             sale_items(mapped_commission)
           `)
           .in("agent_name", agentNames)
@@ -239,102 +244,92 @@ export default function DailyReports() {
         salesData = sales || [];
       }
 
-      // Build report data
+      // Build report data - one entry per employee per day
       const report: DailyReportData[] = [];
+      const daysInRange = eachDayOfInterval({ start: dateRange.start, end: dateRange.end });
 
       for (const emp of filteredEmployees) {
         const empId = emp.id;
         const teamName = emp.team_members?.[0]?.team?.name || null;
-
-        // Check if employee has any registration (shift, time stamp, or standard shift)
-        const empShifts = shifts?.filter(s => s.employee_id === empId) || [];
-        const empTimeStamps = timeStamps?.filter(ts => ts.employee_id === empId) || [];
-        
-        // Check if employee has a standard shift for the date range
-        const empTeamMembership = teamMembers?.find(tm => tm.employee_id === empId);
-        const hasStandardShift = empTeamMembership && primaryShifts?.some(ps => ps.team_id === empTeamMembership.team_id);
-
-        // Only include employees who have some form of registration
-        if (empShifts.length === 0 && empTimeStamps.length === 0 && !hasStandardShift) {
-          continue;
-        }
-
-        // Calculate hours from team standard shifts based on days in period
-        let hours = 0;
         
         // Get the primary shift for this employee's team
+        const empTeamMembership = teamMembers?.find(tm => tm.employee_id === empId);
         const empPrimaryShift = empTeamMembership 
           ? primaryShifts?.find(ps => ps.team_id === empTeamMembership.team_id)
           : null;
-        
-        if (empPrimaryShift) {
-          const empShiftDays = shiftDays?.filter(sd => sd.shift_id === empPrimaryShift.id) || [];
-          
-          // Get all days in the date range
-          const daysInRange = eachDayOfInterval({ start: dateRange.start, end: dateRange.end });
-          
-          for (const day of daysInRange) {
-            // getDay returns 0 for Sunday, 1 for Monday, etc.
-            // Our day_of_week is 1 for Monday, 2 for Tuesday, etc.
-            const dayOfWeek = getDay(day);
-            const adjustedDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek; // Convert Sunday from 0 to 7
-            
-            const shiftForDay = empShiftDays.find(sd => sd.day_of_week === adjustedDayOfWeek);
-            
-            if (shiftForDay && shiftForDay.start_time && shiftForDay.end_time) {
-              // Calculate hours for this day
-              const [startH, startM] = shiftForDay.start_time.split(':').map(Number);
-              const [endH, endM] = shiftForDay.end_time.split(':').map(Number);
-              const dayHours = (endH + endM / 60) - (startH + startM / 60);
-              hours += dayHours;
-            }
-          }
-        }
-
-        // Check absences
-        const empAbsences = absences?.filter(a => a.employee_id === empId) || [];
-        const isSick = empAbsences.some(a => a.type === "sick");
-        const isVacation = empAbsences.some(a => a.type === "vacation");
-
-        // Get clock in/out for display
-        const firstClockIn = empTimeStamps.length > 0 
-          ? empTimeStamps.sort((a, b) => new Date(a.clock_in).getTime() - new Date(b.clock_in).getTime())[0].clock_in 
-          : null;
-        const lastClockOut = empTimeStamps.length > 0 
-          ? empTimeStamps
-              .filter(ts => ts.clock_out)
-              .sort((a, b) => new Date(b.clock_out!).getTime() - new Date(a.clock_out!).getTime())[0]?.clock_out 
-          : null;
-
-        // Get sales for this employee through agent mapping
-        const empAgentMapping = agentMappings?.find(m => m.employee_id === empId);
-        const agentName = (empAgentMapping?.agents as any)?.name;
-        const empSales = agentName 
-          ? salesData.filter(s => s.agent_name === agentName)
+        const empShiftDays = empPrimaryShift 
+          ? shiftDays?.filter(sd => sd.shift_id === empPrimaryShift.id) || []
           : [];
 
-        const salesCount = empSales.length;
-        const commission = empSales.reduce((sum, sale) => {
-          const saleCommission = sale.sale_items?.reduce((itemSum: number, item: any) => 
-            itemSum + (item.mapped_commission || 0), 0) || 0;
-          return sum + saleCommission;
-        }, 0);
+        // Get agent mapping for sales
+        const empAgentMapping = agentMappings?.find(m => m.employee_id === empId);
+        const agentName = (empAgentMapping?.agents as any)?.name;
 
-        report.push({
-          employee_id: empId,
-          employee_name: `${emp.first_name} ${emp.last_name}`,
-          team_name: teamName,
-          hours: Math.round(hours * 100) / 100,
-          is_sick: isSick,
-          is_vacation: isVacation,
-          sales_count: salesCount,
-          commission: Math.round(commission),
-          clock_in: firstClockIn,
-          clock_out: lastClockOut,
-        });
+        // Create entry for each day
+        for (const day of daysInRange) {
+          const dayStr = format(day, "yyyy-MM-dd");
+          const dayOfWeek = getDay(day);
+          const adjustedDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
+          
+          // Find shift for this day
+          const shiftForDay = empShiftDays.find(sd => sd.day_of_week === adjustedDayOfWeek);
+          
+          // Skip if no shift for this day (weekend or no standard shift)
+          if (!shiftForDay || !shiftForDay.start_time || !shiftForDay.end_time) {
+            continue;
+          }
+
+          // Calculate hours for this day
+          const [startH, startM] = shiftForDay.start_time.split(':').map(Number);
+          const [endH, endM] = shiftForDay.end_time.split(':').map(Number);
+          const hours = (endH + endM / 60) - (startH + startM / 60);
+
+          // Check absences for this specific day
+          const empAbsences = absences?.filter(a => 
+            a.employee_id === empId && 
+            a.start_date <= dayStr && 
+            a.end_date >= dayStr
+          ) || [];
+          const isSick = empAbsences.some(a => a.type === "sick");
+          const isVacation = empAbsences.some(a => a.type === "vacation");
+
+          // Get sales for this day
+          const dayStart = `${dayStr}T00:00:00`;
+          const dayEnd = `${dayStr}T23:59:59`;
+          const empSales = agentName 
+            ? salesData.filter(s => {
+                const saleDate = s.created_at;
+                return s.agent_name === agentName && saleDate >= dayStart && saleDate <= dayEnd;
+              })
+            : [];
+
+          const salesCount = empSales.length;
+          const commission = empSales.reduce((sum, sale) => {
+            const saleCommission = sale.sale_items?.reduce((itemSum: number, item: any) => 
+              itemSum + (item.mapped_commission || 0), 0) || 0;
+            return sum + saleCommission;
+          }, 0);
+
+          report.push({
+            employee_id: empId,
+            employee_name: `${emp.first_name} ${emp.last_name}`,
+            team_name: teamName,
+            date: dayStr,
+            hours: Math.round(hours * 100) / 100,
+            is_sick: isSick,
+            is_vacation: isVacation,
+            sales_count: salesCount,
+            commission: Math.round(commission),
+          });
+        }
       }
 
-      return report.sort((a, b) => a.employee_name.localeCompare(b.employee_name));
+      return report.sort((a, b) => {
+        // Sort by date descending, then by name
+        const dateCompare = b.date.localeCompare(a.date);
+        if (dateCompare !== 0) return dateCompare;
+        return a.employee_name.localeCompare(b.employee_name);
+      });
     },
     enabled: hasSearched,
   });
@@ -652,6 +647,7 @@ export default function DailyReports() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Dato</TableHead>
                       <TableHead>Medarbejder</TableHead>
                       <TableHead>Team</TableHead>
                       {selectedColumns.includes("hours") && <TableHead className="text-right">Timer</TableHead>}
@@ -662,9 +658,10 @@ export default function DailyReports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {reportData.map((row) => (
-                      <TableRow key={row.employee_id}>
-                        <TableCell className="font-medium">{row.employee_name}</TableCell>
+                    {reportData.map((row, idx) => (
+                      <TableRow key={`${row.employee_id}-${row.date}-${idx}`}>
+                        <TableCell className="font-medium">{format(parseISO(row.date), "d. MMM", { locale: da })}</TableCell>
+                        <TableCell>{row.employee_name}</TableCell>
                         <TableCell className="text-muted-foreground">{row.team_name || "-"}</TableCell>
                         {selectedColumns.includes("hours") && (
                           <TableCell className="text-right font-medium">
