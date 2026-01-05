@@ -10,10 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type ReportType = "sales" | "payroll";
-
 export default function ReportsAdmin() {
-  const [reportType, setReportType] = useState<ReportType>("sales");
   const [period, setPeriod] = useState<string>("this_month");
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
@@ -72,7 +69,6 @@ export default function ReportsAdmin() {
 
   const handleSearch = () => {
     const filters = {
-      reportType,
       period,
       team: selectedTeam,
       employee: selectedEmployee,
@@ -80,7 +76,7 @@ export default function ReportsAdmin() {
       campaign: selectedCampaign,
     };
     console.log("Searching with filters:", filters);
-    toast.success(`${reportType === "sales" ? "Salgsrapport" : "Lønrapport"} genereres...`);
+    toast.success("Rapport genereres...");
     setFilterOpen(false);
   };
 
@@ -115,17 +111,7 @@ export default function ReportsAdmin() {
             </p>
           </div>
           
-          <div className="flex items-center gap-3">
-            <Button variant="default" size="lg" className="gap-2">
-              <FileSpreadsheet className="h-4 w-4" />
-              Salgsrapport
-            </Button>
-            <Button variant="outline" size="lg" className="gap-2">
-              <Download className="h-4 w-4" />
-              Lønrapport
-            </Button>
-            
-            <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
+          <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" className="relative h-10 w-10">
                   <Search className="h-5 w-5" />
@@ -146,20 +132,6 @@ export default function ReportsAdmin() {
                   </SheetHeader>
                   
                   <div className="flex-1 space-y-4">
-                    {/* Rapporttype */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-white/70 font-medium">Rapporttype</label>
-                      <Select value={reportType} onValueChange={(v) => setReportType(v as ReportType)}>
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sales">Salgsrapport</SelectItem>
-                          <SelectItem value="payroll">Lønrapport</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
                     {/* Periode */}
                     <div className="space-y-1.5">
                       <label className="text-xs text-white/70 font-medium">Periode</label>
@@ -266,8 +238,7 @@ export default function ReportsAdmin() {
                   </Button>
                 </div>
               </SheetContent>
-            </Sheet>
-          </div>
+          </Sheet>
         </div>
 
         {/* Report Content Area */}
@@ -275,7 +246,7 @@ export default function ReportsAdmin() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileSpreadsheet className="h-5 w-5" />
-              {reportType === "sales" ? "Salgsrapport" : "Lønrapport"}
+              Rapport
             </CardTitle>
             <p className="text-sm text-muted-foreground">
               {periodOptions.find(p => p.value === period)?.label || "Denne måned"}
