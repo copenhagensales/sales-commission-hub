@@ -18,12 +18,18 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Twilio credentials
-    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')!;
-    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN')!;
-    const twilioNumber = Deno.env.get('TWILIO_PHONE_NUMBER')!;
+    const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const twilioNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
     const twimlAppSidRaw = Deno.env.get('TWILIO_TWIML_APP_SID');
 
+    // Debug logging (masked for security)
+    console.log('[initiate-call] TWILIO_ACCOUNT_SID:', accountSid ? `${accountSid.substring(0, 6)}...${accountSid.slice(-4)}` : 'NOT SET');
+    console.log('[initiate-call] TWILIO_AUTH_TOKEN:', authToken ? `${authToken.substring(0, 4)}...${authToken.slice(-4)} (length: ${authToken.length})` : 'NOT SET');
+    console.log('[initiate-call] TWILIO_PHONE_NUMBER:', twilioNumber || 'NOT SET');
+
     if (!accountSid || !authToken || !twilioNumber) {
+      console.error('[initiate-call] Missing credentials - accountSid:', !!accountSid, 'authToken:', !!authToken, 'twilioNumber:', !!twilioNumber);
       throw new Error('Missing Twilio credentials');
     }
 
