@@ -5,10 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { FileSpreadsheet, Download, SlidersHorizontal, Search } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { FileSpreadsheet, SlidersHorizontal, Search, ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const reportColumnOptions = [
+  { id: "hours", label: "Timer" },
+  { id: "shifts", label: "Vagter" },
+  { id: "sick_days", label: "Sygdage" },
+  { id: "vacation_days", label: "Feriedage" },
+  { id: "sales", label: "Salg" },
+  { id: "revenue", label: "Omsætning" },
+  { id: "commission", label: "Provision" },
+];
 
 export default function ReportsAdmin() {
   const [period, setPeriod] = useState<string>("this_month");
@@ -16,7 +28,16 @@ export default function ReportsAdmin() {
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
   const [selectedClient, setSelectedClient] = useState<string>("all");
   const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(["hours", "shifts", "sales", "commission"]);
   const [filterOpen, setFilterOpen] = useState(false);
+
+  const toggleColumn = (columnId: string) => {
+    setSelectedColumns(prev => 
+      prev.includes(columnId) 
+        ? prev.filter(id => id !== columnId)
+        : [...prev, columnId]
+    );
+  };
 
   // Fetch teams
   const { data: teams = [] } = useQuery({
@@ -74,6 +95,7 @@ export default function ReportsAdmin() {
       employee: selectedEmployee,
       client: selectedClient,
       campaign: selectedCampaign,
+      columns: selectedColumns,
     };
     console.log("Searching with filters:", filters);
     toast.success("Rapport genereres...");
@@ -225,6 +247,42 @@ export default function ReportsAdmin() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                    {/* Rapport kolonner */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-white/70 font-medium">Kolonner i rapport</label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="w-full justify-between bg-white/10 border-white/20 text-white hover:bg-white/20"
+                          >
+                            <span>
+                              {selectedColumns.length === 0 
+                                ? "Vælg kolonner" 
+                                : `${selectedColumns.length} valgt`}
+                            </span>
+                            <ChevronDown className="h-4 w-4 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[290px] p-2" align="start">
+                          <div className="space-y-1">
+                            {reportColumnOptions.map((column) => (
+                              <div 
+                                key={column.id}
+                                className="flex items-center space-x-3 p-2 rounded-md hover:bg-accent cursor-pointer"
+                                onClick={() => toggleColumn(column.id)}
+                              >
+                                <Checkbox 
+                                  checked={selectedColumns.includes(column.id)}
+                                  onCheckedChange={() => toggleColumn(column.id)}
+                                />
+                                <span className="text-sm">{column.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
 
