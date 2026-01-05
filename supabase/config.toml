@@ -142,7 +142,7 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.initiate-call]
-verify_jwt = true
+verify_jwt = false
 
 [functions.twilio-voice-token]
 verify_jwt = false
