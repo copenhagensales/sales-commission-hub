@@ -594,9 +594,9 @@ export default function DailyReports() {
             salesCount += 1;
             const productName = (sale.product_name || "").toLowerCase();
             commission += productCommissionMap.get(productName) || 0;
-            // FM sales client - use booking's client_id if available
-            if (sale.booking?.client_id) {
-              dayClientIds.add(sale.booking.client_id);
+            // FM sales have client_id directly on the record
+            if (sale.client_id) {
+              dayClientIds.add(sale.client_id);
             }
           });
 
