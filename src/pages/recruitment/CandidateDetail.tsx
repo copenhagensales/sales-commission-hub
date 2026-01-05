@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { SendSmsDialog } from "@/components/recruitment/SendSmsDialog";
 import { SendEmailDialog } from "@/components/recruitment/SendEmailDialog";
+import { CallModal } from "@/components/calls/CallModal";
 const statusLabels: Record<string, string> = {
   ny_ansoegning: "Ny ansøgning",
   new: "Ny ansøgning",
@@ -77,6 +78,8 @@ export default function CandidateDetail() {
   const [interviewTime, setInterviewTime] = useState("10:00");
   const [newNote, setNewNote] = useState("");
   const [isCallingCandidate, setIsCallingCandidate] = useState(false);
+  const [activeCallSid, setActiveCallSid] = useState<string | null>(null);
+  const [showCallModal, setShowCallModal] = useState(false);
   const [noteType, setNoteType] = useState("Generel observation");
   const {
     data: candidate,
@@ -264,6 +267,7 @@ export default function CandidateDetail() {
                   onClick={async () => {
                     if (!candidate.phone) return;
                     setIsCallingCandidate(true);
+                    setShowCallModal(true);
                     try {
                       const { data, error } = await supabase.functions.invoke('initiate-call', {
                         body: { 
@@ -273,11 +277,12 @@ export default function CandidateDetail() {
                       });
                       if (error) throw error;
                       if (data?.error) throw new Error(data.error);
-                      toast.success('Opkald startet');
+                      setActiveCallSid(data.callSid);
                       queryClient.invalidateQueries({ queryKey: ['candidate-communications', id] });
                     } catch (error: any) {
                       console.error('Call error:', error);
                       toast.error(error.message || 'Kunne ikke starte opkald');
+                      setShowCallModal(false);
                     } finally {
                       setIsCallingCandidate(false);
                     }
@@ -591,5 +596,17 @@ export default function CandidateDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Call Modal */}
+      <CallModal
+        isOpen={showCallModal}
+        onClose={() => {
+          setShowCallModal(false);
+          setActiveCallSid(null);
+        }}
+        callSid={activeCallSid}
+        phoneNumber={candidate?.phone || ''}
+        contactName={candidate ? `${candidate.first_name} ${candidate.last_name}` : undefined}
+      />
     </MainLayout>;
 }
