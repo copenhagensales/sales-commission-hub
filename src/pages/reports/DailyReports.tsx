@@ -971,14 +971,14 @@ export default function DailyReports() {
                           )}
                           {selectedColumns.includes("sales") && (
                             <TableCell className="text-right text-foreground">
-                              <span className={row.total_sales > 0 ? "font-medium text-green-600 dark:text-green-400" : ""}>
+                              <span className={row.total_sales > 0 ? "font-medium" : ""}>
                                 {row.total_sales}
                               </span>
                             </TableCell>
                           )}
                           {selectedColumns.includes("commission") && (
                             <TableCell className="text-right text-foreground">
-                              <span className={row.total_commission > 0 ? "font-medium text-green-600 dark:text-green-400" : ""}>
+                              <span className={row.total_commission > 0 ? "font-medium" : ""}>
                                 {row.total_commission.toLocaleString("da-DK")} kr.
                               </span>
                             </TableCell>
@@ -1060,14 +1060,14 @@ export default function DailyReports() {
                       )}
                       {selectedColumns.includes("sales") && (
                         <span className="flex items-center gap-1">
-                          <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-                          <span className="font-medium text-green-600 dark:text-green-400">{totals.sales} salg</span>
+                          <TrendingUp className="h-4 w-4 text-foreground" />
+                          <span className="font-medium text-foreground">{totals.sales} salg</span>
                         </span>
                       )}
                       {selectedColumns.includes("commission") && (
                         <span className="flex items-center gap-1">
-                          <Coins className="h-4 w-4 text-green-600 dark:text-green-400" />
-                          <span className="font-medium text-green-600 dark:text-green-400">{totals.commission.toLocaleString("da-DK")} kr.</span>
+                          <Coins className="h-4 w-4 text-foreground" />
+                          <span className="font-medium text-foreground">{totals.commission.toLocaleString("da-DK")} kr.</span>
                         </span>
                       )}
                       {selectedColumns.includes("revenue") && (
