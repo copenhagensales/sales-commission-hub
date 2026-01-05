@@ -305,13 +305,18 @@ export default function DailyReports() {
         const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         
         // Get emails only from unique identifiers (filter out numeric external IDs)
-        const emailIdentifiers = uniqueAgentIdentifiers.filter(id => id.includes("@"));
+        // Normalize to lowercase for case-insensitive matching
+        const emailIdentifiers = uniqueAgentIdentifiers
+          .filter(id => id.includes("@"))
+          .map(e => e.toLowerCase());
         
         if (emailIdentifiers.length > 0) {
           // Use !inner join when filtering by client to ensure proper filtering
           const joinType = selectedClient !== "all" ? "!inner" : "";
+          // Use multiple or conditions with ilike for case-insensitive email matching
+          const emailOrConditions = emailIdentifiers.map(e => `agent_email.ilike.${e}`).join(",");
           let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,agent_name,agent_email,sale_datetime,client_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,mapped_commission,products(counts_as_sale))`;
-          salesUrl += `&agent_email=in.(${emailIdentifiers.map(a => `"${a}"`).join(",")})`;
+          salesUrl += `&or=(${emailOrConditions})`;
           salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
           
           if (selectedClient !== "all") {
@@ -434,11 +439,13 @@ export default function DailyReports() {
           const dayStart = `${dayStr}T00:00:00`;
           const dayEnd = `${dayStr}T23:59:59`;
           
-          // Regular sales via agent mapping - match by agent_email
-          const empSales = empAgentIdentifiers.length > 0
+          // Regular sales via agent mapping - match by agent_email (case-insensitive)
+          const empAgentIdentifiersLower = empAgentIdentifiers.map(id => id.toLowerCase());
+          const empSales = empAgentIdentifiersLower.length > 0
             ? salesData.filter((s: any) => {
                 const saleDate = s.sale_datetime;
-                return empAgentIdentifiers.includes(s.agent_email) && saleDate >= dayStart && saleDate <= dayEnd;
+                const saleEmail = (s.agent_email || "").toLowerCase();
+                return empAgentIdentifiersLower.includes(saleEmail) && saleDate >= dayStart && saleDate <= dayEnd;
               })
             : [];
 
