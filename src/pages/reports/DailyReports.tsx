@@ -18,6 +18,52 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+// Helper function to fetch employees with activity on a specific client
+// Uses raw fetch to avoid TypeScript deep instantiation issues with large Supabase types
+async function fetchEmployeesWithClientActivity(clientId: string): Promise<string[]> {
+  if (clientId === "all") return [];
+  
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  
+  // Get sales agent names for this client
+  const salesRes = await fetch(
+    `${supabaseUrl}/rest/v1/sales?select=agent_name&client_id=eq.${clientId}`,
+    { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
+  );
+  const salesData: { agent_name: string }[] = await salesRes.json();
+  
+  // Get FM seller IDs for this client  
+  const fmRes = await fetch(
+    `${supabaseUrl}/rest/v1/fieldmarketing_sales?select=seller_id&client_id=eq.${clientId}`,
+    { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
+  );
+  const fmData: { seller_id: string }[] = await fmRes.json();
+  
+  // Get agent mappings
+  const mappingsRes = await fetch(
+    `${supabaseUrl}/rest/v1/employee_agent_mapping?select=employee_id,agents(email,external_dialer_id)`,
+    { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
+  );
+  const mappingsData: { employee_id: string; agents: { email?: string; external_dialer_id?: string } | null }[] = await mappingsRes.json();
+  
+  const agentNames = [...new Set(salesData.map(s => s.agent_name))];
+  const employeeIdsFromSales: string[] = [];
+  
+  mappingsData.forEach(m => {
+    const agent = m.agents;
+    if (agent?.email && agentNames.includes(agent.email)) {
+      employeeIdsFromSales.push(m.employee_id);
+    }
+    if (agent?.external_dialer_id && agentNames.includes(agent.external_dialer_id)) {
+      employeeIdsFromSales.push(m.employee_id);
+    }
+  });
+  
+  const fmEmployeeIds = fmData.map(s => s.seller_id);
+  return [...new Set([...employeeIdsFromSales, ...fmEmployeeIds])];
+}
+
 const reportColumnOptions = [
   { id: "hours", label: "Timer", icon: Clock },
   { id: "sick_days", label: "Sygdom", icon: Thermometer },
@@ -136,6 +182,20 @@ export default function DailyReports() {
       return data || [];
     },
   });
+
+  const { data: employeesWithClientActivity = [] } = useQuery({
+    queryKey: ["daily-report-employees-with-client-activity", selectedClient],
+    queryFn: () => fetchEmployeesWithClientActivity(selectedClient),
+    enabled: selectedClient !== "all",
+  });
+
+  // Filter employees based on selected client activity
+  const filteredEmployees = useMemo(() => {
+    if (selectedClient === "all") {
+      return employees;
+    }
+    return employees.filter(emp => employeesWithClientActivity.includes(emp.id));
+  }, [employees, selectedClient, employeesWithClientActivity]);
 
   // Fetch clients
   const { data: clients = [] } = useQuery({
@@ -615,7 +675,7 @@ export default function DailyReports() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Alle</SelectItem>
-                        {employees.map((emp) => (
+                        {filteredEmployees.map((emp) => (
                           <SelectItem key={emp.id} value={emp.id}>
                             {emp.first_name} {emp.last_name}
                           </SelectItem>
