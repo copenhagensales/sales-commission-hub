@@ -238,6 +238,9 @@ export default function DailyReports() {
         if (agent?.external_dialer_id) allAgentIdentifiers.push(agent.external_dialer_id);
       });
       const uniqueAgentIdentifiers = [...new Set(allAgentIdentifiers)];
+      
+      console.log("[DailyReport] Agent mappings found:", agentMappings?.length);
+      console.log("[DailyReport] Unique agent identifiers:", uniqueAgentIdentifiers);
 
       // Fetch sales with sale_items - same logic as KPI sales-count
       let salesData: any[] = [];
@@ -258,6 +261,7 @@ export default function DailyReports() {
           .gte("sale_datetime", `${startStr}T00:00:00`)
           .lte("sale_datetime", `${endStr}T23:59:59`);
         salesData = sales || [];
+        console.log("[DailyReport] Sales fetched:", salesData.length, salesData.map(s => ({ agent: s.agent_name, items: s.sale_items?.length })));
       }
 
       // Fetch fieldmarketing sales (linked directly to employee via seller_id)
