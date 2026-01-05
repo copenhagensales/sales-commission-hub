@@ -732,20 +732,16 @@ export default function DailyReports() {
                           )}
                           {selectedColumns.includes("sales") && (
                             <TableCell className="text-right">
-                              {row.total_sales > 0 ? (
-                                <span className="font-medium text-green-600 dark:text-green-400">
-                                  {row.total_sales}
-                                </span>
-                              ) : "-"}
+                              <span className={row.total_sales > 0 ? "font-medium text-green-600 dark:text-green-400" : ""}>
+                                {row.total_sales}
+                              </span>
                             </TableCell>
                           )}
                           {selectedColumns.includes("commission") && (
                             <TableCell className="text-right">
-                              {row.total_commission > 0 ? (
-                                <span className="font-medium text-green-600 dark:text-green-400">
-                                  {row.total_commission.toLocaleString("da-DK")} kr.
-                                </span>
-                              ) : "-"}
+                              <span className={row.total_commission > 0 ? "font-medium text-green-600 dark:text-green-400" : ""}>
+                                {row.total_commission.toLocaleString("da-DK")} kr.
+                              </span>
                             </TableCell>
                           )}
                         </TableRow>
@@ -785,12 +781,12 @@ export default function DailyReports() {
                             )}
                             {selectedColumns.includes("sales") && (
                               <TableCell className="text-right text-muted-foreground">
-                                {entry.sales_count > 0 ? entry.sales_count : "-"}
+                                {entry.sales_count}
                               </TableCell>
                             )}
                             {selectedColumns.includes("commission") && (
                               <TableCell className="text-right text-muted-foreground">
-                                {entry.commission > 0 ? `${entry.commission.toLocaleString("da-DK")} kr.` : "-"}
+                                {entry.commission.toLocaleString("da-DK")} kr.
                               </TableCell>
                             )}
                           </TableRow>
