@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, subWeeks, parseISO } from "date-fns";
+import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,8 +9,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, ChevronDown, Calendar, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal } from "lucide-react";
+import { Search, ChevronDown, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -39,6 +40,8 @@ interface DailyReportData {
 
 export default function DailyReports() {
   const [period, setPeriod] = useState<string>("today");
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
   const [selectedTeam, setSelectedTeam] = useState<string>("all");
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
   const [selectedClient, setSelectedClient] = useState<string>("all");
@@ -68,10 +71,17 @@ export default function DailyReports() {
         const lastWeekStart = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
         const lastWeekEnd = endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
         return { start: lastWeekStart, end: lastWeekEnd };
+      case "this_month":
+        return { start: startOfMonth(now), end: endOfMonth(now) };
+      case "custom":
+        if (customStartDate && customEndDate) {
+          return { start: startOfDay(customStartDate), end: endOfDay(customEndDate) };
+        }
+        return { start: startOfDay(now), end: endOfDay(now) };
       default: // today
         return { start: startOfDay(now), end: endOfDay(now) };
     }
-  }, [period]);
+  }, [period, customStartDate, customEndDate]);
 
   // Fetch teams
   const { data: teams = [] } = useQuery({
@@ -328,6 +338,8 @@ export default function DailyReports() {
     { value: "yesterday", label: "I går" },
     { value: "this_week", label: "Denne uge" },
     { value: "last_week", label: "Sidste uge" },
+    { value: "this_month", label: "Denne måned" },
+    { value: "custom", label: "Brugerdefineret" },
   ];
 
   const formatTime = (isoString: string | null) => {
@@ -381,6 +393,67 @@ export default function DailyReports() {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Custom date range */}
+                    {period === "custom" && (
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-white/70 font-medium">Fra dato</label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal bg-white/10 border-white/20 text-white hover:bg-white/20",
+                                  !customStartDate && "text-white/50"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {customStartDate ? format(customStartDate, "d. MMM yyyy", { locale: da }) : "Vælg startdato"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={customStartDate}
+                                onSelect={setCustomStartDate}
+                                initialFocus
+                                className="p-3 pointer-events-auto"
+                                locale={da}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-white/70 font-medium">Til dato</label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal bg-white/10 border-white/20 text-white hover:bg-white/20",
+                                  !customEndDate && "text-white/50"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {customEndDate ? format(customEndDate, "d. MMM yyyy", { locale: da }) : "Vælg slutdato"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={customEndDate}
+                                onSelect={setCustomEndDate}
+                                initialFocus
+                                className="p-3 pointer-events-auto"
+                                locale={da}
+                                disabled={(date) => customStartDate ? date < customStartDate : false}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Teams */}
                     <div className="space-y-1.5">
@@ -518,7 +591,7 @@ export default function DailyReports() {
         <Card className="min-h-[500px]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+              <CalendarIcon className="h-5 w-5" />
               Dagssedler
             </CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -533,7 +606,7 @@ export default function DailyReports() {
           <CardContent>
             {!hasSearched ? (
               <div className="flex flex-col items-center justify-center h-[350px] text-center text-muted-foreground">
-                <Calendar className="h-16 w-16 mb-4 opacity-20" />
+                <CalendarIcon className="h-16 w-16 mb-4 opacity-20" />
                 <p className="text-lg font-medium">Klik på søgeikonet for at filtrere</p>
                 <p className="text-sm mt-1">
                   Vælg filtre og klik "SØG" for at generere dagssedler
@@ -546,7 +619,7 @@ export default function DailyReports() {
               </div>
             ) : reportData.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-[350px] text-center text-muted-foreground">
-                <Calendar className="h-16 w-16 mb-4 opacity-20" />
+                <CalendarIcon className="h-16 w-16 mb-4 opacity-20" />
                 <p className="text-lg font-medium">Ingen registreringer fundet</p>
                 <p className="text-sm mt-1">
                   Der er ingen medarbejdere med vagtregistrering i den valgte periode
