@@ -231,13 +231,7 @@ export default function CandidateDetail() {
         <Card className="overflow-hidden">
           <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 sm:p-8">
             <div className="flex flex-col sm:flex-row gap-6">
-              {/* Avatar & Basic Info */}
               <div className="flex items-start gap-4">
-                <Avatar className="h-20 w-20 border-4 border-background shadow-lg">
-                  <AvatarFallback className="text-2xl font-bold bg-primary text-primary-foreground">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
                 <div className="flex-1 min-w-0">
                   <h1 className="text-2xl sm:text-3xl font-bold truncate">
                     {candidate.first_name} {candidate.last_name}
