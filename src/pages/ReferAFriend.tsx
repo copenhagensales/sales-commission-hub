@@ -96,6 +96,13 @@ export default function ReferAFriend() {
                 <strong>Vigtigt:</strong> Du skal dele dit personlige link med din ven. Hvis de ikke bruger linket, kan vi ikke spore henvisningen, og du vil ikke modtage bonus.
               </p>
             </div>
+
+            <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg">
+              <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              <p className="text-sm">
+                <strong>Vigtigt:</strong> Linket skal være udfyldt FØR jobsamtalen for at henvisningen er gældende.
+              </p>
+            </div>
             
             <div className="flex items-center gap-2 p-3 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-lg">
               <Clock className="h-5 w-5 flex-shrink-0" />
