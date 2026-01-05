@@ -67,11 +67,11 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Find employees with rekruttering role or job_title containing 'Rekruttering'
+    // Find employees with job_title containing 'Rekruttering'
     const { data: recruiters, error: recruitersError } = await supabase
       .from('employee_master_data')
       .select('private_email, first_name, last_name')
-      .or('job_title.ilike.%rekruttering%,job_title.eq.Ejer')
+      .ilike('job_title', '%rekruttering%')
       .eq('is_active', true);
 
     if (recruitersError) {
