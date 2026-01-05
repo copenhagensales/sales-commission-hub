@@ -33,21 +33,19 @@ serve(async (req) => {
 
     let twiml: string;
 
-    // For outbound calls (API-initiated), we dial the destination and connect both parties
+    // For outbound calls (API-initiated), we need to connect the caller to the destination
     if (direction === 'outbound-api') {
       // The 'To' field contains the destination number for outbound calls
       const destinationNumber = to || called;
       
       console.log('[twilio-voice-token] Outbound call - dialing:', destinationNumber);
       
-      // TwiML to dial the destination number with proper audio bridging
-      // The caller (initiator) hears ringing, then gets connected when the other party answers
+      // TwiML to dial the destination number
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${from}" timeout="30" record="record-from-answer-dual" action="${Deno.env.get('SUPABASE_URL')}/functions/v1/incoming-call">
+  <Dial callerId="${from}" timeout="30" action="${Deno.env.get('SUPABASE_URL')}/functions/v1/incoming-call">
     <Number>${destinationNumber}</Number>
   </Dial>
-  <Say language="da-DK" voice="Polly.Mads">Opkaldet blev afsluttet.</Say>
 </Response>`;
     } else {
       // For inbound calls, show the welcome message
