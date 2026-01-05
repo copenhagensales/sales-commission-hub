@@ -26,19 +26,24 @@ export default function MySchedule() {
   const monthEnd = endOfMonth(currentDate);
   
   // Generate weeks for the month (Mon-Fri only)
+  // Each week always has 5 elements (Mon-Fri), with null for days outside current month
   const generateWeeks = () => {
-    const weeks: Date[][] = [];
+    const weeks: (Date | null)[][] = [];
     let weekStart = startOfWeek(monthStart, { weekStartsOn: 1 });
     
     while (weekStart <= monthEnd) {
-      const weekDays: Date[] = [];
+      const weekDays: (Date | null)[] = [];
       for (let d = 0; d < 5; d++) { // Only Mon-Fri
         const day = addDays(weekStart, d);
+        // Include day if it's in current month, otherwise null
         if (day.getMonth() === currentDate.getMonth()) {
           weekDays.push(day);
+        } else {
+          weekDays.push(null);
         }
       }
-      if (weekDays.length > 0) {
+      // Only add week if it has at least one day from current month
+      if (weekDays.some(d => d !== null)) {
         weeks.push(weekDays);
       }
       weekStart = addWeeks(weekStart, 1);
@@ -208,8 +213,10 @@ export default function MySchedule() {
 
                 {/* Calendar weeks */}
                 {calendarWeeks.map((week, weekIndex) => {
-                  const weekNumber = week.length > 0 ? format(week[0], "w") : "";
-                  const isCurrentWeek = week.some(day => isToday(day));
+                  // Find first non-null day for week number
+                  const firstDay = week.find(d => d !== null);
+                  const weekNumber = firstDay ? format(firstDay, "w") : "";
+                  const isCurrentWeek = week.some(day => day && isToday(day));
 
                   return (
                     <div 
@@ -224,8 +231,18 @@ export default function MySchedule() {
                         {weekNumber}
                       </div>
 
-                      {/* Days */}
-                      {week.map(day => {
+                      {/* Days - always 5 cells (Mon-Fri) */}
+                      {week.map((day, dayIndex) => {
+                        // Empty cell for days not in this month
+                        if (!day) {
+                          return (
+                            <div 
+                              key={`empty-${dayIndex}`} 
+                              className="p-1.5 min-h-[56px] border-r last:border-r-0 bg-muted/30" 
+                            />
+                          );
+                        }
+
                         const shift = getShiftForDay(day);
                         const holiday = isHoliday(day);
                         const holidayName = getHolidayName(day);
@@ -327,11 +344,6 @@ export default function MySchedule() {
                           </div>
                         );
                       })}
-                      
-                      {/* Fill empty cells if week doesn't start on Monday */}
-                      {week.length < 5 && Array.from({ length: 5 - week.length }).map((_, i) => (
-                        <div key={`empty-${i}`} className="p-1.5 min-h-[56px] border-r last:border-r-0 bg-muted/30" />
-                      ))}
                     </div>
                   );
                 })}
