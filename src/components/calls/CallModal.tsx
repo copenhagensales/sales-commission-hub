@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Phone, PhoneOff, Mic, MicOff, User, PhoneCall, Volume2, VolumeX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -205,6 +205,8 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[380px] p-0 bg-gradient-to-b from-zinc-900 to-black border-none overflow-hidden">
+        <DialogTitle className="sr-only">Telefonopkald</DialogTitle>
+        <DialogDescription className="sr-only">Viser status og kontroller for et igangværende opkald.</DialogDescription>
         <div className="flex flex-col items-center min-h-[500px] text-white">
           {/* Status indicator animation */}
           <div className="absolute top-0 left-0 right-0 h-1">
