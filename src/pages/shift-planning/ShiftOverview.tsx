@@ -718,6 +718,7 @@ export default function ShiftOverview() {
                     const isLate = !!lateness;
                     const isWorking = !absenceDisplay && !lateness && !holiday;
                     const workTimes = getWorkTimesForEmployeeAndDay(employee.id, day) || employee.standard_start_time;
+                    const hasWorkTimes = !!(workTimes || hasShift);
                     const hasStatus = isVacation || isSick || isLate;
                     
                     return (
@@ -829,34 +830,27 @@ export default function ShiftOverview() {
                                 <AlarmClock className="h-4 w-4" />
                                 Forsinket
                               </Button>
-                              {hasShift ? (
+                              {hasWorkTimes && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   className="justify-start gap-2 h-8"
                                   onClick={() => {
-                                    setSelectedShift(dayShifts[0]);
-                                    setShiftDialogOpen(true);
+                                    if (hasShift) {
+                                      // Edit existing shift
+                                      setSelectedShift(dayShifts[0]);
+                                      setShiftDialogOpen(true);
+                                    } else {
+                                      // Create new shift based on standard times
+                                      setSelectedDate(day);
+                                      setSelectedEmployeeId(employee.id);
+                                      setCreateDialogOpen(true);
+                                    }
                                     setOpenPopoverKey(null);
                                   }}
                                 >
                                   <Clock className="h-4 w-4" />
                                   Ændre vagt
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="justify-start gap-2 h-8"
-                                  onClick={() => {
-                                    setSelectedDate(day);
-                                    setSelectedEmployeeId(employee.id);
-                                    setCreateDialogOpen(true);
-                                    setOpenPopoverKey(null);
-                                  }}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                  Opret vagt
                                 </Button>
                               )}
                               <Button
