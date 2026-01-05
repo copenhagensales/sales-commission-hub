@@ -574,29 +574,6 @@ export default function DailyReports() {
                     </Select>
                   </div>
 
-                  {/* Column selection */}
-                  <div className="space-y-1.5 pt-4 border-t border-white/20">
-                    <label className="text-xs text-white/70 font-medium">Vis kolonner</label>
-                    <div className="space-y-2">
-                      {reportColumnOptions.map((col) => (
-                        <div key={col.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={col.id}
-                            checked={selectedColumns.includes(col.id)}
-                            onCheckedChange={() => toggleColumn(col.id)}
-                            className="border-white/40 data-[state=checked]:bg-white data-[state=checked]:text-emerald-600"
-                          />
-                          <label
-                            htmlFor={col.id}
-                            className="text-sm text-white/90 flex items-center gap-2 cursor-pointer"
-                          >
-                            <col.icon className="h-4 w-4" />
-                            {col.label}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </div>
 
                 <div className="pt-6 border-t border-white/20">
