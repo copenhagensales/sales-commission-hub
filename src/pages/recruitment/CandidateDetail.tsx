@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp, X } from "lucide-react";
+import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp, X, Loader2 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -76,6 +76,7 @@ export default function CandidateDetail() {
   const [interviewDate, setInterviewDate] = useState<Date | undefined>(undefined);
   const [interviewTime, setInterviewTime] = useState("10:00");
   const [newNote, setNewNote] = useState("");
+  const [isCallingCandidate, setIsCallingCandidate] = useState(false);
   const [noteType, setNoteType] = useState("Generel observation");
   const {
     data: candidate,
@@ -257,9 +258,35 @@ export default function CandidateDetail() {
 
               {/* Quick Actions */}
               <div className="flex flex-wrap gap-2 sm:ml-auto sm:self-start">
-                <Button size="sm" variant="outline" onClick={() => candidate.phone && (window.location.href = `tel:${candidate.phone}`)} disabled={!candidate.phone} className="bg-background/80">
-                  <Phone className="h-4 w-4 mr-1.5" />
-                  Ring
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={async () => {
+                    if (!candidate.phone) return;
+                    setIsCallingCandidate(true);
+                    try {
+                      const { data, error } = await supabase.functions.invoke('initiate-call', {
+                        body: { 
+                          toNumber: candidate.phone,
+                          candidateId: id
+                        }
+                      });
+                      if (error) throw error;
+                      if (data?.error) throw new Error(data.error);
+                      toast.success('Opkald startet');
+                      queryClient.invalidateQueries({ queryKey: ['candidate-communications', id] });
+                    } catch (error: any) {
+                      console.error('Call error:', error);
+                      toast.error(error.message || 'Kunne ikke starte opkald');
+                    } finally {
+                      setIsCallingCandidate(false);
+                    }
+                  }} 
+                  disabled={!candidate.phone || isCallingCandidate} 
+                  className="bg-background/80"
+                >
+                  {isCallingCandidate ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Phone className="h-4 w-4 mr-1.5" />}
+                  {isCallingCandidate ? 'Ringer...' : 'Ring'}
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setShowSmsDialog(true)} disabled={!candidate.phone} className="bg-background/80">
                   <MessageSquare className="h-4 w-4 mr-1.5" />
