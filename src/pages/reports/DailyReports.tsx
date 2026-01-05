@@ -410,7 +410,10 @@ export default function DailyReports() {
 
           const [startH, startM] = shiftForDay.start_time.split(':').map(Number);
           const [endH, endM] = shiftForDay.end_time.split(':').map(Number);
-          const hours = (endH + endM / 60) - (startH + startM / 60);
+          const rawHours = (endH + endM / 60) - (startH + startM / 60);
+          // Standard 30 min break for shifts over 6 hours
+          const breakMinutes = rawHours > 6 ? 30 : 0;
+          const hours = rawHours - (breakMinutes / 60);
 
           const empAbsences = absences?.filter(a => 
             a.employee_id === empId && 
