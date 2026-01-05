@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Search, ChevronDown, ChevronRight, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal, DollarSign } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -67,6 +67,7 @@ const reportColumnOptions = [
   { id: "sick_days", label: "Sygdom", icon: Thermometer },
   { id: "vacation_days", label: "Ferie", icon: Palmtree },
   { id: "sales", label: "Salg", icon: TrendingUp },
+  { id: "revenue", label: "Omsætning", icon: DollarSign },
   { id: "commission", label: "Provision", icon: Coins },
 ];
 
@@ -76,6 +77,7 @@ interface DailyEntry {
   is_sick: boolean;
   is_vacation: boolean;
   sales_count: number;
+  revenue: number;
   commission: number;
 }
 
@@ -87,6 +89,7 @@ interface EmployeeReportData {
   sick_days: number;
   vacation_days: number;
   total_sales: number;
+  total_revenue: number;
   total_commission: number;
   daily_entries: DailyEntry[];
 }
@@ -99,7 +102,7 @@ export default function DailyReports() {
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
   const [selectedClient, setSelectedClient] = useState<string>("all");
   const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(["hours", "sick_days", "vacation_days", "sales", "commission"]);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(["hours", "sick_days", "vacation_days", "sales", "revenue", "commission"]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
@@ -399,7 +402,7 @@ export default function DailyReports() {
           const selectParts = [
             "id", "agent_name", "agent_email", "sale_datetime", "client_campaign_id",
             `client_campaigns${joinType}(client_id)`,
-            "sale_items(quantity,mapped_commission,products(counts_as_sale))"
+            "sale_items(quantity,mapped_commission,mapped_revenue,products(counts_as_sale))"
           ];
           const selectClause = selectParts.join(",");
           // Use eq for exact match (case-insensitive handled by lowercasing both sides)
@@ -512,6 +515,7 @@ export default function DailyReports() {
         let sickDays = 0;
         let vacationDays = 0;
         let totalSales = 0;
+        let totalRevenue = 0;
         let totalCommission = 0;
 
         for (const day of daysInRange) {
@@ -561,6 +565,7 @@ export default function DailyReports() {
 
           // Count regular sales using sale_items with counts_as_sale (same as KPI)
           let salesCount = 0;
+          let revenue = 0;
           let commission = 0;
           empSales.forEach((sale: any) => {
             (sale.sale_items || []).forEach((item: any) => {
@@ -568,6 +573,7 @@ export default function DailyReports() {
               if (countsAsSale) {
                 salesCount += Number(item.quantity) || 1;
               }
+              revenue += Number(item.mapped_revenue) || 0;
               commission += Number(item.mapped_commission) || 0;
             });
           });
@@ -577,6 +583,7 @@ export default function DailyReports() {
             salesCount += 1;
             const productName = (sale.product_name || "").toLowerCase();
             commission += productCommissionMap.get(productName) || 0;
+            // FM sales don't have mapped_revenue, so we skip revenue for those
           });
 
           dailyEntries.push({
@@ -585,6 +592,7 @@ export default function DailyReports() {
             is_sick: isSick,
             is_vacation: isVacation,
             sales_count: salesCount,
+            revenue: Math.round(revenue),
             commission: Math.round(commission),
           });
 
@@ -592,6 +600,7 @@ export default function DailyReports() {
           if (isSick) sickDays++;
           if (isVacation) vacationDays++;
           totalSales += salesCount;
+          totalRevenue += revenue;
           totalCommission += commission;
         }
 
@@ -604,6 +613,7 @@ export default function DailyReports() {
             sick_days: sickDays,
             vacation_days: vacationDays,
             total_sales: totalSales,
+            total_revenue: Math.round(totalRevenue),
             total_commission: Math.round(totalCommission),
             daily_entries: dailyEntries.sort((a, b) => b.date.localeCompare(a.date)),
           });
@@ -646,9 +656,10 @@ export default function DailyReports() {
       (acc, row) => ({
         hours: acc.hours + row.total_hours,
         sales: acc.sales + row.total_sales,
+        revenue: acc.revenue + row.total_revenue,
         commission: acc.commission + row.total_commission,
       }),
-      { hours: 0, sales: 0, commission: 0 }
+      { hours: 0, sales: 0, revenue: 0, commission: 0 }
     );
   }, [reportData]);
 
@@ -904,6 +915,7 @@ export default function DailyReports() {
                       {selectedColumns.includes("sick_days") && <TableHead className="text-center">Sygdom</TableHead>}
                       {selectedColumns.includes("vacation_days") && <TableHead className="text-center">Ferie</TableHead>}
                       {selectedColumns.includes("sales") && <TableHead className="text-right">Salg</TableHead>}
+                      {selectedColumns.includes("revenue") && <TableHead className="text-right">Omsætning</TableHead>}
                       {selectedColumns.includes("commission") && <TableHead className="text-right">Provision</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -964,6 +976,13 @@ export default function DailyReports() {
                               </span>
                             </TableCell>
                           )}
+                          {selectedColumns.includes("revenue") && (
+                            <TableCell className="text-right">
+                              <span className={row.total_revenue > 0 ? "font-medium" : ""}>
+                                {row.total_revenue.toLocaleString("da-DK")} kr.
+                              </span>
+                            </TableCell>
+                          )}
                           {selectedColumns.includes("commission") && (
                             <TableCell className="text-right">
                               <span className={row.total_commission > 0 ? "font-medium text-green-600 dark:text-green-400" : ""}>
@@ -1011,6 +1030,11 @@ export default function DailyReports() {
                                 {entry.sales_count}
                               </TableCell>
                             )}
+                            {selectedColumns.includes("revenue") && (
+                              <TableCell className="text-right text-muted-foreground">
+                                {entry.revenue.toLocaleString("da-DK")} kr.
+                              </TableCell>
+                            )}
                             {selectedColumns.includes("commission") && (
                               <TableCell className="text-right text-muted-foreground">
                                 {entry.commission.toLocaleString("da-DK")} kr.
@@ -1038,6 +1062,12 @@ export default function DailyReports() {
                         <span className="flex items-center gap-1">
                           <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
                           <span className="font-medium text-green-600 dark:text-green-400">{totals.sales} salg</span>
+                        </span>
+                      )}
+                      {selectedColumns.includes("revenue") && (
+                        <span className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{totals.revenue.toLocaleString("da-DK")} kr.</span>
                         </span>
                       )}
                       {selectedColumns.includes("commission") && (
