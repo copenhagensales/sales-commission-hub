@@ -132,9 +132,6 @@ export default function ReferAFriend() {
                     )}
                   </Button>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Din unikke kode: <code className="bg-muted px-2 py-1 rounded font-mono">{myInfo.referral_code}</code>
-                </p>
               </>
             ) : (
               <p className="text-muted-foreground">Kunne ikke finde dit henvisningslink. Kontakt din leder.</p>
