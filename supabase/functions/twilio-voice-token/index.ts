@@ -65,18 +65,11 @@ serve(async (req) => {
       const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
       
       if (accountSid && authToken) {
-        // Create TwiML for the destination to join the conference
-        const destinationTwiml = encodeURIComponent(`<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Conference beep="false" startConferenceOnEnter="true" endConferenceOnExit="true" waitUrl="">
-    ${conferenceRoom}
-  </Conference>
-</Response>`);
-
         const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`;
         
         const supabaseUrl = Deno.env.get('SUPABASE_URL');
-        const statusCallbackUrl = `${supabaseUrl}/functions/v1/incoming-call`;
+        // Pass the parent call SID as a query parameter so we can link status updates
+        const statusCallbackUrl = `${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(callSid)}`;
         
         const dialFormData = new URLSearchParams();
         dialFormData.append('To', destinationNumber);
