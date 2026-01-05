@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Search, ChevronDown, ChevronRight, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal, DollarSign } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal, DollarSign, Building2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -67,6 +67,7 @@ const reportColumnOptions = [
   { id: "sick_days", label: "Sygdom", icon: Thermometer },
   { id: "vacation_days", label: "Ferie", icon: Palmtree },
   { id: "sales", label: "Salg", icon: TrendingUp },
+  { id: "clients", label: "Kunder", icon: Building2 },
   { id: "commission", label: "Provision", icon: Coins },
   { id: "revenue", label: "Omsætning", icon: DollarSign },
 ];
@@ -79,6 +80,7 @@ interface DailyEntry {
   sales_count: number;
   revenue: number;
   commission: number;
+  clients: string[];
 }
 
 interface EmployeeReportData {
@@ -91,6 +93,7 @@ interface EmployeeReportData {
   total_sales: number;
   total_revenue: number;
   total_commission: number;
+  clients: string[];
   daily_entries: DailyEntry[];
 }
 
@@ -102,7 +105,7 @@ export default function DailyReports() {
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
   const [selectedClient, setSelectedClient] = useState<string>("all");
   const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(["hours", "sick_days", "vacation_days", "sales", "commission", "revenue"]);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(["hours", "sick_days", "vacation_days", "sales", "clients", "commission", "revenue"]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
@@ -567,7 +570,15 @@ export default function DailyReports() {
           let salesCount = 0;
           let revenue = 0;
           let commission = 0;
+          const dayClientIds = new Set<string>();
+          
           empSales.forEach((sale: any) => {
+            // Collect client_id from this sale
+            const clientId = sale.client_campaigns?.client_id;
+            if (clientId) {
+              dayClientIds.add(clientId);
+            }
+            
             (sale.sale_items || []).forEach((item: any) => {
               const countsAsSale = item.products?.counts_as_sale !== false;
               if (countsAsSale) {
@@ -583,8 +594,16 @@ export default function DailyReports() {
             salesCount += 1;
             const productName = (sale.product_name || "").toLowerCase();
             commission += productCommissionMap.get(productName) || 0;
-            // FM sales don't have mapped_revenue, so we skip revenue for those
+            // FM sales client - use booking's client_id if available
+            if (sale.booking?.client_id) {
+              dayClientIds.add(sale.booking.client_id);
+            }
           });
+
+          // Map client IDs to names
+          const dayClientNames = Array.from(dayClientIds)
+            .map(cid => clients.find((c: any) => c.id === cid)?.name)
+            .filter(Boolean) as string[];
 
           dailyEntries.push({
             date: dayStr,
@@ -594,6 +613,7 @@ export default function DailyReports() {
             sales_count: salesCount,
             revenue: Math.round(revenue),
             commission: Math.round(commission),
+            clients: dayClientNames,
           });
 
           totalHours += hours;
@@ -605,6 +625,10 @@ export default function DailyReports() {
         }
 
         if (dailyEntries.length > 0) {
+          // Collect all unique client names from all daily entries
+          const allClientNames = new Set<string>();
+          dailyEntries.forEach(entry => entry.clients.forEach(c => allClientNames.add(c)));
+          
           report.push({
             employee_id: empId,
             employee_name: `${emp.first_name} ${emp.last_name}`,
@@ -615,6 +639,7 @@ export default function DailyReports() {
             total_sales: totalSales,
             total_revenue: Math.round(totalRevenue),
             total_commission: Math.round(totalCommission),
+            clients: Array.from(allClientNames),
             daily_entries: dailyEntries.sort((a, b) => b.date.localeCompare(a.date)),
           });
         }
@@ -915,6 +940,7 @@ export default function DailyReports() {
                       {selectedColumns.includes("sick_days") && <TableHead className="text-center">Sygdom</TableHead>}
                       {selectedColumns.includes("vacation_days") && <TableHead className="text-center">Ferie</TableHead>}
                       {selectedColumns.includes("sales") && <TableHead className="text-right text-foreground">Salg</TableHead>}
+                      {selectedColumns.includes("clients") && <TableHead className="text-foreground">Kunder</TableHead>}
                       {selectedColumns.includes("commission") && <TableHead className="text-right text-foreground">Provision</TableHead>}
                       {selectedColumns.includes("revenue") && <TableHead className="text-right text-foreground">Omsætning</TableHead>}
                     </TableRow>
@@ -976,6 +1002,11 @@ export default function DailyReports() {
                               </span>
                             </TableCell>
                           )}
+                          {selectedColumns.includes("clients") && (
+                            <TableCell className="text-foreground">
+                              {row.clients.length > 0 ? row.clients.join(", ") : "-"}
+                            </TableCell>
+                          )}
                           {selectedColumns.includes("commission") && (
                             <TableCell className="text-right text-foreground">
                               <span className={row.total_commission > 0 ? "font-medium" : ""}>
@@ -1028,6 +1059,11 @@ export default function DailyReports() {
                             {selectedColumns.includes("sales") && (
                               <TableCell className="text-right text-foreground/70">
                                 {entry.sales_count}
+                              </TableCell>
+                            )}
+                            {selectedColumns.includes("clients") && (
+                              <TableCell className="text-foreground/70">
+                                {entry.clients.length > 0 ? entry.clients.join(", ") : "-"}
                               </TableCell>
                             )}
                             {selectedColumns.includes("commission") && (
