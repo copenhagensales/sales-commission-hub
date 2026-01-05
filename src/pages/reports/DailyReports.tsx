@@ -67,8 +67,8 @@ const reportColumnOptions = [
   { id: "sick_days", label: "Sygdom", icon: Thermometer },
   { id: "vacation_days", label: "Ferie", icon: Palmtree },
   { id: "sales", label: "Salg", icon: TrendingUp },
-  { id: "revenue", label: "Omsætning", icon: DollarSign },
   { id: "commission", label: "Provision", icon: Coins },
+  { id: "revenue", label: "Omsætning", icon: DollarSign },
 ];
 
 interface DailyEntry {
@@ -102,7 +102,7 @@ export default function DailyReports() {
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
   const [selectedClient, setSelectedClient] = useState<string>("all");
   const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(["hours", "sick_days", "vacation_days", "sales", "revenue", "commission"]);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(["hours", "sick_days", "vacation_days", "sales", "commission", "revenue"]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
@@ -914,9 +914,9 @@ export default function DailyReports() {
                       {selectedColumns.includes("hours") && <TableHead className="text-right">Timer</TableHead>}
                       {selectedColumns.includes("sick_days") && <TableHead className="text-center">Sygdom</TableHead>}
                       {selectedColumns.includes("vacation_days") && <TableHead className="text-center">Ferie</TableHead>}
-                      {selectedColumns.includes("sales") && <TableHead className="text-right">Salg</TableHead>}
-                      {selectedColumns.includes("revenue") && <TableHead className="text-right">Omsætning</TableHead>}
-                      {selectedColumns.includes("commission") && <TableHead className="text-right">Provision</TableHead>}
+                      {selectedColumns.includes("sales") && <TableHead className="text-right text-foreground">Salg</TableHead>}
+                      {selectedColumns.includes("commission") && <TableHead className="text-right text-foreground">Provision</TableHead>}
+                      {selectedColumns.includes("revenue") && <TableHead className="text-right text-foreground">Omsætning</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -970,23 +970,23 @@ export default function DailyReports() {
                             </TableCell>
                           )}
                           {selectedColumns.includes("sales") && (
-                            <TableCell className="text-right">
+                            <TableCell className="text-right text-foreground">
                               <span className={row.total_sales > 0 ? "font-medium text-green-600 dark:text-green-400" : ""}>
                                 {row.total_sales}
                               </span>
                             </TableCell>
                           )}
-                          {selectedColumns.includes("revenue") && (
-                            <TableCell className="text-right">
-                              <span className={row.total_revenue > 0 ? "font-medium" : ""}>
-                                {row.total_revenue.toLocaleString("da-DK")} kr.
+                          {selectedColumns.includes("commission") && (
+                            <TableCell className="text-right text-foreground">
+                              <span className={row.total_commission > 0 ? "font-medium text-green-600 dark:text-green-400" : ""}>
+                                {row.total_commission.toLocaleString("da-DK")} kr.
                               </span>
                             </TableCell>
                           )}
-                          {selectedColumns.includes("commission") && (
-                            <TableCell className="text-right">
-                              <span className={row.total_commission > 0 ? "font-medium text-green-600 dark:text-green-400" : ""}>
-                                {row.total_commission.toLocaleString("da-DK")} kr.
+                          {selectedColumns.includes("revenue") && (
+                            <TableCell className="text-right text-foreground">
+                              <span className={row.total_revenue > 0 ? "font-medium" : ""}>
+                                {row.total_revenue.toLocaleString("da-DK")} kr.
                               </span>
                             </TableCell>
                           )}
@@ -1026,18 +1026,18 @@ export default function DailyReports() {
                               </TableCell>
                             )}
                             {selectedColumns.includes("sales") && (
-                              <TableCell className="text-right text-muted-foreground">
+                              <TableCell className="text-right text-foreground/70">
                                 {entry.sales_count}
                               </TableCell>
                             )}
-                            {selectedColumns.includes("revenue") && (
-                              <TableCell className="text-right text-muted-foreground">
-                                {entry.revenue.toLocaleString("da-DK")} kr.
+                            {selectedColumns.includes("commission") && (
+                              <TableCell className="text-right text-foreground/70">
+                                {entry.commission.toLocaleString("da-DK")} kr.
                               </TableCell>
                             )}
-                            {selectedColumns.includes("commission") && (
-                              <TableCell className="text-right text-muted-foreground">
-                                {entry.commission.toLocaleString("da-DK")} kr.
+                            {selectedColumns.includes("revenue") && (
+                              <TableCell className="text-right text-foreground/70">
+                                {entry.revenue.toLocaleString("da-DK")} kr.
                               </TableCell>
                             )}
                           </TableRow>
@@ -1064,16 +1064,16 @@ export default function DailyReports() {
                           <span className="font-medium text-green-600 dark:text-green-400">{totals.sales} salg</span>
                         </span>
                       )}
-                      {selectedColumns.includes("revenue") && (
-                        <span className="flex items-center gap-1">
-                          <DollarSign className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{totals.revenue.toLocaleString("da-DK")} kr.</span>
-                        </span>
-                      )}
                       {selectedColumns.includes("commission") && (
                         <span className="flex items-center gap-1">
                           <Coins className="h-4 w-4 text-green-600 dark:text-green-400" />
                           <span className="font-medium text-green-600 dark:text-green-400">{totals.commission.toLocaleString("da-DK")} kr.</span>
+                        </span>
+                      )}
+                      {selectedColumns.includes("revenue") && (
+                        <span className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4 text-foreground" />
+                          <span className="font-medium text-foreground">{totals.revenue.toLocaleString("da-DK")} kr.</span>
                         </span>
                       )}
                     </div>
