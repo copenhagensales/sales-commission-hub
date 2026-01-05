@@ -19,19 +19,39 @@ serve(async (req) => {
     const to = formData.get('To') as string;
     const callStatus = formData.get('CallStatus') as string;
     const direction = formData.get('Direction') as string;
+    const called = formData.get('Called') as string; // The number being called
 
     console.log('[twilio-voice-token] Incoming voice request:', {
       callSid,
       from,
       to,
+      called,
       callStatus,
       direction,
       timestamp: new Date().toISOString()
     });
 
-    // Generate TwiML response
-    // This is a placeholder flow - can be extended for AI voice handling or routing
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+    let twiml: string;
+
+    // For outbound calls (API-initiated), we need to connect the caller to the destination
+    if (direction === 'outbound-api') {
+      // The 'To' field contains the destination number for outbound calls
+      const destinationNumber = to || called;
+      
+      console.log('[twilio-voice-token] Outbound call - dialing:', destinationNumber);
+      
+      // TwiML to dial the destination number
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial callerId="${from}" timeout="30" action="${Deno.env.get('SUPABASE_URL')}/functions/v1/incoming-call">
+    <Number>${destinationNumber}</Number>
+  </Dial>
+</Response>`;
+    } else {
+      // For inbound calls, show the welcome message
+      console.log('[twilio-voice-token] Inbound call - playing welcome message');
+      
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say language="da-DK" voice="Polly.Mads">Tak for dit opkald til CPH Sales. Vent venligst, mens vi forbinder dig.</Say>
   <Pause length="2"/>
@@ -40,6 +60,7 @@ serve(async (req) => {
   <Say language="da-DK" voice="Polly.Mads">Tak for din besked. Vi vender tilbage hurtigst muligt. Farvel.</Say>
   <Hangup/>
 </Response>`;
+    }
 
     console.log('[twilio-voice-token] Returning TwiML response');
 
