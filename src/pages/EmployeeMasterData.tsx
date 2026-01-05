@@ -1162,7 +1162,7 @@ export default function EmployeeMasterData() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-border/50">
                     <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.name")}</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.phone")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.position")}</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">Team</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.status")}</TableHead>
                     <TableHead></TableHead>
@@ -1213,7 +1213,7 @@ export default function EmployeeMasterData() {
                           <span>{employee.first_name} {employee.last_name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="py-3 text-sm">{employee.private_phone || <span className="text-muted-foreground/50">-</span>}</TableCell>
+                      <TableCell className="py-3 text-sm">{employee.job_title || <span className="text-muted-foreground/50">-</span>}</TableCell>
                       <TableCell className="py-3">
                         {getEmployeeTeams(employee.id) ? (
                           <Badge variant="secondary" className="text-xs font-normal">{getEmployeeTeams(employee.id)}</Badge>
