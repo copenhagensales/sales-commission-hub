@@ -265,14 +265,14 @@ export default function DailyReports() {
       }
 
       // Fetch fieldmarketing sales (linked directly to employee via seller_id)
-      // Fetch fieldmarketing sales (linked directly to employee via seller_id)
       const { data: fmSalesData } = await supabase
         .from("fieldmarketing_sales")
         .select(`
           id,
           seller_id,
           registered_at,
-          product_name
+          product_name,
+          client_id
         `)
         .in("seller_id", employeeIds)
         .gte("registered_at", `${startStr}T00:00:00`)
@@ -280,14 +280,35 @@ export default function DailyReports() {
       
       console.log("[DailyReport] FM Sales fetched:", fmSalesData?.length);
       
-      // Fetch all products to match commission by product_name
+      // Fetch products with campaign overrides for FM commission lookup
+      // First get all products
       const { data: allProducts } = await supabase
         .from("products")
-        .select("name, commission_dkk");
+        .select("id, name, commission_dkk");
       
+      // Get campaign overrides - use the first override found per product (simplification)
+      const { data: campaignOverrides } = await supabase
+        .from("product_campaign_overrides")
+        .select("product_id, commission_dkk");
+      
+      // Build commission map: prefer campaign override, fallback to base commission
       const productCommissionMap = new Map<string, number>();
+      const overrideByProductId = new Map<string, number>();
+      
+      campaignOverrides?.forEach(o => {
+        // Take first override found (highest commission to be generous)
+        const existing = overrideByProductId.get(o.product_id);
+        if (!existing || o.commission_dkk > existing) {
+          overrideByProductId.set(o.product_id, o.commission_dkk);
+        }
+      });
+      
       allProducts?.forEach(p => {
-        if (p.name) productCommissionMap.set(p.name.toLowerCase(), p.commission_dkk || 0);
+        if (p.name) {
+          const override = overrideByProductId.get(p.id);
+          const commission = override ?? p.commission_dkk ?? 0;
+          productCommissionMap.set(p.name.toLowerCase(), commission);
+        }
       });
 
       // Build report data - aggregate per employee with daily breakdown
