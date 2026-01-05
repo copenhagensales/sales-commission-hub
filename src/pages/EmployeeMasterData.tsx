@@ -234,6 +234,25 @@ export default function EmployeeMasterData() {
     },
   });
 
+  // Fetch team memberships
+  const { data: teamMemberships = [] } = useQuery({
+    queryKey: ["employee-team-memberships"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_members")
+        .select("employee_id, teams:team_id(name)");
+      if (error) throw error;
+      return data as { employee_id: string; teams: { name: string } | null }[];
+    },
+  });
+
+  // Get teams for an employee
+  const getEmployeeTeams = (employeeId: string): string => {
+    const memberships = teamMemberships.filter(tm => tm.employee_id === employeeId);
+    if (memberships.length === 0) return "";
+    return memberships.map(tm => tm.teams?.name).filter(Boolean).join(", ");
+  };
+
   // Get contract status for an employee (prioritized: signed > pending > rejected > none)
   const getContractStatus = (employeeId: string): 'signed' | 'pending' | 'rejected' | 'none' => {
     const employeeContracts = contracts.filter(c => c.employee_id === employeeId);
@@ -1143,11 +1162,8 @@ export default function EmployeeMasterData() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-border/50">
                     <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.name")}</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.email")}</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.phone")}</TableHead>
-                    
-                    <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.position")}</TableHead>
-                    <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.salaryType")}</TableHead>
+                    <TableHead className="text-xs font-medium text-muted-foreground">Team</TableHead>
                     <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.status")}</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
@@ -1160,70 +1176,48 @@ export default function EmployeeMasterData() {
                       onClick={() => navigate(`/employees/${employee.id}`)}
                     >
                       <TableCell className="font-medium py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-                            {employee.first_name?.[0]}{employee.last_name?.[0]}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="relative">
-                                  {getContractStatus(employee.id) === 'signed' ? (
-                                    <div className="flex items-center">
-                                      <FileText className="h-3.5 w-3.5 text-green-500" />
-                                      <Check className="h-2.5 w-2.5 text-green-500 absolute -right-1 -bottom-0.5" />
-                                    </div>
-                                  ) : getContractStatus(employee.id) === 'pending' ? (
-                                    <div className="flex items-center">
-                                      <FileText className="h-3.5 w-3.5 text-amber-500" />
-                                      <Clock className="h-2.5 w-2.5 text-amber-500 absolute -right-1 -bottom-0.5" />
-                                    </div>
-                                  ) : getContractStatus(employee.id) === 'rejected' ? (
-                                    <div className="flex items-center">
-                                      <FileText className="h-3.5 w-3.5 text-red-500" />
-                                      <X className="h-2.5 w-2.5 text-red-500 absolute -right-1 -bottom-0.5" />
-                                    </div>
-                                  ) : (
-                                    <FileText className="h-3.5 w-3.5 text-muted-foreground/30" />
-                                  )}
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {getContractStatus(employee.id) === 'signed' 
-                                  ? t("employees.table.contractSigned")
-                                  : getContractStatus(employee.id) === 'pending'
-                                  ? "Afventer underskrift"
-                                  : getContractStatus(employee.id) === 'rejected'
-                                  ? "Kontrakt afvist"
-                                  : t("employees.table.noContractSigned")}
-                              </TooltipContent>
-                            </Tooltip>
-                            <span>{employee.first_name} {employee.last_name}</span>
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="relative">
+                                {getContractStatus(employee.id) === 'signed' ? (
+                                  <div className="flex items-center">
+                                    <FileText className="h-3.5 w-3.5 text-green-500" />
+                                    <Check className="h-2.5 w-2.5 text-green-500 absolute -right-1 -bottom-0.5" />
+                                  </div>
+                                ) : getContractStatus(employee.id) === 'pending' ? (
+                                  <div className="flex items-center">
+                                    <FileText className="h-3.5 w-3.5 text-amber-500" />
+                                    <Clock className="h-2.5 w-2.5 text-amber-500 absolute -right-1 -bottom-0.5" />
+                                  </div>
+                                ) : getContractStatus(employee.id) === 'rejected' ? (
+                                  <div className="flex items-center">
+                                    <FileText className="h-3.5 w-3.5 text-red-500" />
+                                    <X className="h-2.5 w-2.5 text-red-500 absolute -right-1 -bottom-0.5" />
+                                  </div>
+                                ) : (
+                                  <FileText className="h-3.5 w-3.5 text-muted-foreground/30" />
+                                )}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {getContractStatus(employee.id) === 'signed' 
+                                ? t("employees.table.contractSigned")
+                                : getContractStatus(employee.id) === 'pending'
+                                ? "Afventer underskrift"
+                                : getContractStatus(employee.id) === 'rejected'
+                                ? "Kontrakt afvist"
+                                : t("employees.table.noContractSigned")}
+                            </TooltipContent>
+                          </Tooltip>
+                          <span>{employee.first_name} {employee.last_name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
-                        {(employee.work_email || employee.private_email) ? (
-                          <a 
-                            href={`mailto:${employee.work_email || employee.private_email}`} 
-                            className="text-primary hover:underline text-sm"
-                          >
-                            {employee.work_email || employee.private_email}
-                          </a>
-                        ) : <span className="text-muted-foreground/50">-</span>}
-                      </TableCell>
                       <TableCell className="py-3 text-sm">{employee.private_phone || <span className="text-muted-foreground/50">-</span>}</TableCell>
-                      
                       <TableCell className="py-3">
-                        {employee.job_title ? (
-                          <Badge variant="secondary" className="text-xs font-normal">{employee.job_title}</Badge>
+                        {getEmployeeTeams(employee.id) ? (
+                          <Badge variant="secondary" className="text-xs font-normal">{getEmployeeTeams(employee.id)}</Badge>
                         ) : <span className="text-muted-foreground/50">-</span>}
-                      </TableCell>
-                      <TableCell className="py-3 text-sm">
-                        {employee.salary_type === "provision" && t("employees.salaryTypes.provision")}
-                        {employee.salary_type === "fixed" && t("employees.salaryTypes.fixed")}
-                        {employee.salary_type === "hourly" && t("employees.salaryTypes.hourly")}
-                        {!employee.salary_type && <span className="text-muted-foreground/50">-</span>}
                       </TableCell>
                       <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                         <Switch 
@@ -1321,7 +1315,7 @@ export default function EmployeeMasterData() {
                   ))}
                   {filteredEmployees.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                         {t("employees.table.noEmployeesFound")}
                       </TableCell>
                     </TableRow>
