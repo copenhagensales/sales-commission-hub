@@ -2,38 +2,24 @@ import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { CalendarIcon, FileSpreadsheet, Download, Filter, X, Users, Building2, Target, Briefcase } from "lucide-react";
-import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
-import { da } from "date-fns/locale";
+import { FileSpreadsheet, Download, SlidersHorizontal, Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type ReportType = "sales" | "payroll";
 
-interface DateRange {
-  from: Date;
-  to: Date;
-}
-
 export default function ReportsAdmin() {
   const [reportType, setReportType] = useState<ReportType>("sales");
-  const [dateRange, setDateRange] = useState<DateRange>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
-  const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
-  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
-  const [selectedClients, setSelectedClients] = useState<string[]>([]);
-  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
+  const [period, setPeriod] = useState<string>("this_month");
+  const [selectedTeam, setSelectedTeam] = useState<string>("all");
+  const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
+  const [selectedClient, setSelectedClient] = useState<string>("all");
+  const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
+  const [filterOpen, setFilterOpen] = useState(false);
 
   // Fetch teams
   const { data: teams = [] } = useQuery({
@@ -84,352 +70,231 @@ export default function ReportsAdmin() {
     },
   });
 
-  const handleToggleTeam = (teamId: string) => {
-    setSelectedTeams(prev => 
-      prev.includes(teamId) ? prev.filter(id => id !== teamId) : [...prev, teamId]
-    );
-  };
-
-  const handleToggleEmployee = (employeeId: string) => {
-    setSelectedEmployees(prev => 
-      prev.includes(employeeId) ? prev.filter(id => id !== employeeId) : [...prev, employeeId]
-    );
-  };
-
-  const handleToggleClient = (clientId: string) => {
-    setSelectedClients(prev => 
-      prev.includes(clientId) ? prev.filter(id => id !== clientId) : [...prev, clientId]
-    );
-  };
-
-  const handleToggleCampaign = (campaignId: string) => {
-    setSelectedCampaigns(prev => 
-      prev.includes(campaignId) ? prev.filter(id => id !== campaignId) : [...prev, campaignId]
-    );
-  };
-
-  const clearAllFilters = () => {
-    setSelectedTeams([]);
-    setSelectedEmployees([]);
-    setSelectedClients([]);
-    setSelectedCampaigns([]);
-  };
-
-  const hasFilters = selectedTeams.length > 0 || selectedEmployees.length > 0 || 
-    selectedClients.length > 0 || selectedCampaigns.length > 0;
-
-  const handleGenerateReport = () => {
+  const handleSearch = () => {
     const filters = {
       reportType,
-      dateRange: {
-        from: format(dateRange.from, "yyyy-MM-dd"),
-        to: format(dateRange.to, "yyyy-MM-dd"),
-      },
-      teams: selectedTeams,
-      employees: selectedEmployees,
-      clients: selectedClients,
-      campaigns: selectedCampaigns,
+      period,
+      team: selectedTeam,
+      employee: selectedEmployee,
+      client: selectedClient,
+      campaign: selectedCampaign,
     };
-    console.log("Generating report with filters:", filters);
+    console.log("Searching with filters:", filters);
     toast.success(`${reportType === "sales" ? "Salgsrapport" : "Lønrapport"} genereres...`);
-    // TODO: Implement actual report generation
+    setFilterOpen(false);
   };
 
-  const quickDateRanges = [
-    { label: "Denne måned", from: startOfMonth(new Date()), to: endOfMonth(new Date()) },
-    { label: "Sidste måned", from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) },
-    { label: "Sidste 3 måneder", from: startOfMonth(subMonths(new Date(), 2)), to: endOfMonth(new Date()) },
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (selectedTeam !== "all") count++;
+    if (selectedEmployee !== "all") count++;
+    if (selectedClient !== "all") count++;
+    if (selectedCampaign !== "all") count++;
+    return count;
+  };
+
+  const periodOptions = [
+    { value: "today", label: "I dag" },
+    { value: "yesterday", label: "I går" },
+    { value: "this_week", label: "Denne uge" },
+    { value: "last_week", label: "Sidste uge" },
+    { value: "this_month", label: "Denne måned" },
+    { value: "last_month", label: "Sidste måned" },
+    { value: "last_3_months", label: "Sidste 3 måneder" },
+    { value: "this_year", label: "I år" },
   ];
 
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Rapporter Admin</h1>
-          <p className="text-muted-foreground">
-            Træk administrative rapporter og oversigter
-          </p>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[350px_1fr]">
-          {/* Filter sidebar */}
-          <div className="space-y-4">
-            {/* Report Type */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileSpreadsheet className="h-4 w-4" />
-                  Rapporttype
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div 
-                  onClick={() => setReportType("sales")}
-                  className={cn(
-                    "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
-                    reportType === "sales" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
-                  )}
-                >
-                  <Target className="h-5 w-5 text-primary" />
-                  <div>
-                    <p className="font-medium">Salgsrapport</p>
-                    <p className="text-xs text-muted-foreground">Omsætning, provision og salgstal</p>
-                  </div>
-                </div>
-                <div 
-                  onClick={() => setReportType("payroll")}
-                  className={cn(
-                    "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
-                    reportType === "payroll" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
-                  )}
-                >
-                  <Briefcase className="h-5 w-5 text-primary" />
-                  <div>
-                    <p className="font-medium">Lønrapport</p>
-                    <p className="text-xs text-muted-foreground">Løn, timer og tillæg</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Date Range */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4" />
-                  Periode
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {quickDateRanges.map((range) => (
-                    <Badge
-                      key={range.label}
-                      variant={dateRange.from.getTime() === range.from.getTime() && dateRange.to.getTime() === range.to.getTime() ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => setDateRange({ from: range.from, to: range.to })}
-                    >
-                      {range.label}
-                    </Badge>
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="justify-start text-left font-normal h-9 text-sm">
-                        <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                        {format(dateRange.from, "d. MMM yyyy", { locale: da })}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dateRange.from}
-                        onSelect={(date) => date && setDateRange(prev => ({ ...prev, from: date }))}
-                        locale={da}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="justify-start text-left font-normal h-9 text-sm">
-                        <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                        {format(dateRange.to, "d. MMM yyyy", { locale: da })}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dateRange.to}
-                        onSelect={(date) => date && setDateRange(prev => ({ ...prev, to: date }))}
-                        locale={da}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Filters */}
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Filter className="h-4 w-4" />
-                    Filtre
-                  </CardTitle>
-                  {hasFilters && (
-                    <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-7 text-xs">
-                      <X className="h-3 w-3 mr-1" />
-                      Ryd alle
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Teams Filter */}
-                <div className="space-y-2">
-                  <Label className="text-sm flex items-center gap-2">
-                    <Users className="h-3.5 w-3.5" />
-                    Teams
-                    {selectedTeams.length > 0 && (
-                      <Badge variant="secondary" className="ml-auto">{selectedTeams.length}</Badge>
-                    )}
-                  </Label>
-                  <ScrollArea className="h-32 rounded-md border p-2">
-                    {teams.map((team) => (
-                      <div key={team.id} className="flex items-center space-x-2 py-1">
-                        <Checkbox
-                          id={`team-${team.id}`}
-                          checked={selectedTeams.includes(team.id)}
-                          onCheckedChange={() => handleToggleTeam(team.id)}
-                        />
-                        <label htmlFor={`team-${team.id}`} className="text-sm cursor-pointer flex-1">
-                          {team.name}
-                        </label>
-                      </div>
-                    ))}
-                    {teams.length === 0 && (
-                      <p className="text-xs text-muted-foreground py-2">Ingen teams fundet</p>
-                    )}
-                  </ScrollArea>
-                </div>
-
-                {/* Employees Filter */}
-                <div className="space-y-2">
-                  <Label className="text-sm flex items-center gap-2">
-                    <Users className="h-3.5 w-3.5" />
-                    Medarbejdere
-                    {selectedEmployees.length > 0 && (
-                      <Badge variant="secondary" className="ml-auto">{selectedEmployees.length}</Badge>
-                    )}
-                  </Label>
-                  <ScrollArea className="h-32 rounded-md border p-2">
-                    {employees.map((emp) => (
-                      <div key={emp.id} className="flex items-center space-x-2 py-1">
-                        <Checkbox
-                          id={`emp-${emp.id}`}
-                          checked={selectedEmployees.includes(emp.id)}
-                          onCheckedChange={() => handleToggleEmployee(emp.id)}
-                        />
-                        <label htmlFor={`emp-${emp.id}`} className="text-sm cursor-pointer flex-1">
-                          {emp.first_name} {emp.last_name}
-                        </label>
-                      </div>
-                    ))}
-                    {employees.length === 0 && (
-                      <p className="text-xs text-muted-foreground py-2">Ingen medarbejdere fundet</p>
-                    )}
-                  </ScrollArea>
-                </div>
-
-                {/* Clients Filter */}
-                <div className="space-y-2">
-                  <Label className="text-sm flex items-center gap-2">
-                    <Building2 className="h-3.5 w-3.5" />
-                    Kunder
-                    {selectedClients.length > 0 && (
-                      <Badge variant="secondary" className="ml-auto">{selectedClients.length}</Badge>
-                    )}
-                  </Label>
-                  <ScrollArea className="h-32 rounded-md border p-2">
-                    {clients.map((client) => (
-                      <div key={client.id} className="flex items-center space-x-2 py-1">
-                        <Checkbox
-                          id={`client-${client.id}`}
-                          checked={selectedClients.includes(client.id)}
-                          onCheckedChange={() => handleToggleClient(client.id)}
-                        />
-                        <label htmlFor={`client-${client.id}`} className="text-sm cursor-pointer flex-1">
-                          {client.name}
-                        </label>
-                      </div>
-                    ))}
-                    {clients.length === 0 && (
-                      <p className="text-xs text-muted-foreground py-2">Ingen kunder fundet</p>
-                    )}
-                  </ScrollArea>
-                </div>
-
-                {/* Campaigns Filter */}
-                <div className="space-y-2">
-                  <Label className="text-sm flex items-center gap-2">
-                    <Target className="h-3.5 w-3.5" />
-                    Kampagner
-                    {selectedCampaigns.length > 0 && (
-                      <Badge variant="secondary" className="ml-auto">{selectedCampaigns.length}</Badge>
-                    )}
-                  </Label>
-                  <ScrollArea className="h-32 rounded-md border p-2">
-                    {campaigns.map((campaign) => (
-                      <div key={campaign.id} className="flex items-center space-x-2 py-1">
-                        <Checkbox
-                          id={`campaign-${campaign.id}`}
-                          checked={selectedCampaigns.includes(campaign.id)}
-                          onCheckedChange={() => handleToggleCampaign(campaign.id)}
-                        />
-                        <label htmlFor={`campaign-${campaign.id}`} className="text-sm cursor-pointer flex-1">
-                          <span>{campaign.name}</span>
-                          {campaign.clients && (
-                            <span className="text-xs text-muted-foreground ml-1">
-                              ({(campaign.clients as { name: string }).name})
-                            </span>
-                          )}
-                        </label>
-                      </div>
-                    ))}
-                    {campaigns.length === 0 && (
-                      <p className="text-xs text-muted-foreground py-2">Ingen kampagner fundet</p>
-                    )}
-                  </ScrollArea>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Generate Button */}
-            <Button onClick={handleGenerateReport} className="w-full" size="lg">
-              <Download className="h-4 w-4 mr-2" />
-              Generér rapport
-            </Button>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Rapporter</h1>
+            <p className="text-muted-foreground">
+              Træk administrative rapporter og oversigter
+            </p>
           </div>
+          
+          <div className="flex items-center gap-3">
+            <Button variant="default" size="lg" className="gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              Salgsrapport
+            </Button>
+            <Button variant="outline" size="lg" className="gap-2">
+              <Download className="h-4 w-4" />
+              Lønrapport
+            </Button>
+            
+            <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon" className="relative h-10 w-10">
+                  <Search className="h-5 w-5" />
+                  {getActiveFilterCount() > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                      {getActiveFilterCount()}
+                    </Badge>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent 
+                side="right" 
+                className="w-[340px] p-0 border-0 bg-gradient-to-b from-emerald-600 via-teal-600 to-cyan-700"
+              >
+                <div className="flex flex-col h-full p-6">
+                  <SheetHeader className="mb-6">
+                    <SheetTitle className="text-white text-lg">Filtre</SheetTitle>
+                  </SheetHeader>
+                  
+                  <div className="flex-1 space-y-4">
+                    {/* Rapporttype */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-white/70 font-medium">Rapporttype</label>
+                      <Select value={reportType} onValueChange={(v) => setReportType(v as ReportType)}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sales">Salgsrapport</SelectItem>
+                          <SelectItem value="payroll">Lønrapport</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-          {/* Report Preview Area */}
-          <Card className="min-h-[600px]">
-            <CardHeader>
-              <CardTitle>
-                {reportType === "sales" ? "Salgsrapport" : "Lønrapport"}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {format(dateRange.from, "d. MMMM yyyy", { locale: da })} - {format(dateRange.to, "d. MMMM yyyy", { locale: da })}
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center h-[400px] text-center text-muted-foreground">
-                <FileSpreadsheet className="h-16 w-16 mb-4 opacity-20" />
-                <p className="text-lg font-medium">Vælg filtre og klik "Generér rapport"</p>
-                <p className="text-sm mt-1">
-                  Rapporten vil blive vist her
-                </p>
-                {hasFilters && (
-                  <div className="flex flex-wrap gap-2 mt-4 justify-center max-w-md">
-                    {selectedTeams.length > 0 && (
-                      <Badge variant="outline">{selectedTeams.length} teams</Badge>
-                    )}
-                    {selectedEmployees.length > 0 && (
-                      <Badge variant="outline">{selectedEmployees.length} medarbejdere</Badge>
-                    )}
-                    {selectedClients.length > 0 && (
-                      <Badge variant="outline">{selectedClients.length} kunder</Badge>
-                    )}
-                    {selectedCampaigns.length > 0 && (
-                      <Badge variant="outline">{selectedCampaigns.length} kampagner</Badge>
-                    )}
+                    {/* Periode */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-white/70 font-medium">Periode</label>
+                      <Select value={period} onValueChange={setPeriod}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {periodOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Teams */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-white/70 font-medium">Teams</label>
+                      <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                          <div className="flex items-center justify-between w-full">
+                            <SelectValue placeholder="Alle" />
+                            <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">"Alle"</SelectItem>
+                          {teams.map((team) => (
+                            <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Medarbejdere */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-white/70 font-medium">Medarbejdere</label>
+                      <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                          <div className="flex items-center justify-between w-full">
+                            <SelectValue placeholder="Alle" />
+                            <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">"Alle"</SelectItem>
+                          {employees.map((emp) => (
+                            <SelectItem key={emp.id} value={emp.id}>
+                              {emp.first_name} {emp.last_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Kunder */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-white/70 font-medium">Kunder</label>
+                      <Select value={selectedClient} onValueChange={setSelectedClient}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                          <div className="flex items-center justify-between w-full">
+                            <SelectValue placeholder="Alle" />
+                            <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">"Alle"</SelectItem>
+                          {clients.map((client) => (
+                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Kampagner */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-white/70 font-medium">Kampagner</label>
+                      <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                          <div className="flex items-center justify-between w-full">
+                            <SelectValue placeholder="Alle" />
+                            <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">"Alle"</SelectItem>
+                          {campaigns.map((campaign) => (
+                            <SelectItem key={campaign.id} value={campaign.id}>
+                              {campaign.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+
+                  {/* Search Button */}
+                  <Button 
+                    onClick={handleSearch} 
+                    className="w-full mt-6 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-6"
+                    size="lg"
+                  >
+                    SØG
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
+
+        {/* Report Content Area */}
+        <Card className="min-h-[500px]">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              {reportType === "sales" ? "Salgsrapport" : "Lønrapport"}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {periodOptions.find(p => p.value === period)?.label || "Denne måned"}
+              {selectedTeam !== "all" && ` • ${teams.find(t => t.id === selectedTeam)?.name}`}
+              {selectedEmployee !== "all" && ` • ${employees.find(e => e.id === selectedEmployee)?.first_name} ${employees.find(e => e.id === selectedEmployee)?.last_name}`}
+              {selectedClient !== "all" && ` • ${clients.find(c => c.id === selectedClient)?.name}`}
+              {selectedCampaign !== "all" && ` • ${campaigns.find(c => c.id === selectedCampaign)?.name}`}
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center h-[350px] text-center text-muted-foreground">
+              <FileSpreadsheet className="h-16 w-16 mb-4 opacity-20" />
+              <p className="text-lg font-medium">Klik på søgeikonet for at filtrere</p>
+              <p className="text-sm mt-1">
+                Vælg filtre og klik "SØG" for at generere rapporten
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </MainLayout>
   );
