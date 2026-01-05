@@ -221,34 +221,117 @@ export default function DailyReports() {
     queryFn: async () => {
       const startStr = format(dateRange.start, "yyyy-MM-dd");
       const endStr = format(dateRange.end, "yyyy-MM-dd");
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-      let employeeQuery = supabase
-        .from("employee_master_data")
-        .select(`
-          id,
-          first_name,
-          last_name,
-          team_members(team:teams(id, name))
-        `)
-        .eq("is_active", true);
+      let employeeIds: string[] = [];
+      let filteredEmployees: any[] = [];
+      let agentMappings: any[] = [];
 
-      if (selectedEmployee !== "all") {
-        employeeQuery = employeeQuery.eq("id", selectedEmployee);
-      }
+      // When a specific client is selected, find employees who have sales for that client
+      // This handles employees without team assignments
+      if (selectedClient !== "all") {
+        // First, fetch all sales for this client in the date range to get agent emails
+        const salesForClientUrl = `${supabaseUrl}/rest/v1/sales?select=agent_email,client_campaigns!inner(client_id)&client_campaigns.client_id=eq.${selectedClient}&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+        const salesForClientRes = await fetch(salesForClientUrl, {
+          headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
+        });
+        const salesForClient = await salesForClientRes.json();
+        
+        // Get unique agent emails from these sales
+        const agentEmails = [...new Set(
+          (salesForClient || [])
+            .map((s: any) => s.agent_email?.toLowerCase())
+            .filter(Boolean)
+        )] as string[];
+        
+        console.log("[DailyReport] Client sales agent emails:", agentEmails);
+        
+        if (agentEmails.length > 0) {
+          // Find agents matching these emails
+          const { data: agentsData } = await supabase
+            .from("agents")
+            .select("id, email, external_dialer_id");
+          
+          // Filter agents by email (case-insensitive)
+          const matchingAgents = (agentsData || []).filter(a => 
+            agentEmails.includes(a.email?.toLowerCase())
+          );
+          const matchingAgentIds = matchingAgents.map(a => a.id);
+          
+          // Get employee mappings for these agents
+          if (matchingAgentIds.length > 0) {
+            const { data: mappings } = await supabase
+              .from("employee_agent_mapping")
+              .select("employee_id, agent_id")
+              .in("agent_id", matchingAgentIds);
+            
+            employeeIds = [...new Set((mappings || []).map(m => m.employee_id))];
+            
+            // Build agent mappings structure for later use
+            agentMappings = (mappings || []).map(m => {
+              const agent = matchingAgents.find(a => a.id === m.agent_id);
+              return {
+                employee_id: m.employee_id,
+                agent_id: m.agent_id,
+                agents: agent ? { email: agent.email, external_dialer_id: agent.external_dialer_id } : null
+              };
+            });
+          }
+          
+          // Fetch employee details for these IDs
+          if (employeeIds.length > 0) {
+            const { data: empData } = await supabase
+              .from("employee_master_data")
+              .select(`id, first_name, last_name, team_members(team:teams(id, name))`)
+              .in("id", employeeIds)
+              .eq("is_active", true);
+            
+            filteredEmployees = empData || [];
+          }
+        }
+        
+        console.log("[DailyReport] Employees found for client:", filteredEmployees.length);
+      } else {
+        // Original logic: fetch all active employees and filter by team
+        let employeeQuery = supabase
+          .from("employee_master_data")
+          .select(`
+            id,
+            first_name,
+            last_name,
+            team_members(team:teams(id, name))
+          `)
+          .eq("is_active", true);
 
-      const { data: employeesData, error: empError } = await employeeQuery;
-      if (empError) throw empError;
+        if (selectedEmployee !== "all") {
+          employeeQuery = employeeQuery.eq("id", selectedEmployee);
+        }
 
-      let filteredEmployees = employeesData || [];
-      if (selectedTeam !== "all") {
-        filteredEmployees = filteredEmployees.filter(emp => 
-          emp.team_members?.some((tm: any) => tm.team?.id === selectedTeam)
-        );
+        const { data: employeesData, error: empError } = await employeeQuery;
+        if (empError) throw empError;
+
+        filteredEmployees = employeesData || [];
+        if (selectedTeam !== "all") {
+          filteredEmployees = filteredEmployees.filter(emp => 
+            emp.team_members?.some((tm: any) => tm.team?.id === selectedTeam)
+          );
+        }
+
+        employeeIds = filteredEmployees.map(e => e.id);
+        
+        // Fetch agent mappings for all filtered employees
+        if (employeeIds.length > 0) {
+          const { data: mappingsData } = await supabase
+            .from("employee_agent_mapping")
+            .select("employee_id, agent_id, agents(email, external_dialer_id)")
+            .in("employee_id", employeeIds);
+          
+          agentMappings = mappingsData || [];
+        }
       }
 
       if (filteredEmployees.length === 0) return [];
-
-      const employeeIds = filteredEmployees.map(e => e.id);
 
       // Fetch absences
       const { data: absences } = await supabase
@@ -278,12 +361,6 @@ export default function DailyReports() {
         .select("shift_id, day_of_week, start_time, end_time")
         .in("shift_id", primaryShifts?.map(s => s.id) || []);
 
-      // Get employee-agent mappings - fetch email for matching sales.agent_name
-      const { data: agentMappings } = await supabase
-        .from("employee_agent_mapping")
-        .select("employee_id, agent_id, agents(email, external_dialer_id)")
-        .in("employee_id", employeeIds);
-
       // Build list of all possible agent identifiers for fetching sales
       const allAgentIdentifiers: string[] = [];
       agentMappings?.forEach(m => {
@@ -301,9 +378,6 @@ export default function DailyReports() {
       // Match on agent_email (contains email) rather than agent_name (contains full name)
       let salesData: any[] = [];
       if (uniqueAgentIdentifiers.length > 0) {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-        
         // Get emails only from unique identifiers (filter out numeric external IDs)
         // Normalize to lowercase for case-insensitive matching
         const emailIdentifiers = uniqueAgentIdentifiers
@@ -312,8 +386,6 @@ export default function DailyReports() {
         
         if (emailIdentifiers.length > 0) {
           // Use REST API directly to support dynamic !inner join for client filtering
-          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-          const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
           const joinType = selectedClient !== "all" ? "!inner" : "";
           
           // Build query with proper URL encoding
