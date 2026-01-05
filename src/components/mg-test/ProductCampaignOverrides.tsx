@@ -197,15 +197,23 @@ export function ProductCampaignOverrides({
         <p className="text-sm text-muted-foreground">Ingen kampagner fundet.</p>
       ) : (
         <div className="space-y-2 max-h-64 overflow-y-auto">
-          {campaigns.map((campaign) => {
+        {campaigns.map((campaign) => {
             const override = getOverrideForCampaign(campaign.id);
+            const savedCommission = override ? String(override.commission_dkk) : "";
+            const savedRevenue = override ? String(override.revenue_dkk) : "";
             const edited = editedOverrides[campaign.id] ?? {
-              commission: override ? String(override.commission_dkk) : "",
-              revenue: override ? String(override.revenue_dkk) : "",
+              commission: savedCommission,
+              revenue: savedRevenue,
             };
-            const hasChanged =
-              edited.commission !== (override ? String(override.commission_dkk) : "") ||
-              edited.revenue !== (override ? String(override.revenue_dkk) : "");
+            
+            // Check if values have changed from saved state
+            const commissionValue = edited.commission || "";
+            const revenueValue = edited.revenue || "";
+            const hasChanged = commissionValue !== savedCommission || revenueValue !== savedRevenue;
+            
+            // Enable save if there's a change OR if there are values to save
+            const hasValues = commissionValue.trim() !== "" || revenueValue.trim() !== "";
+            const canSave = hasChanged || (hasValues && !override);
 
             return (
               <div
@@ -247,7 +255,7 @@ export function ProductCampaignOverrides({
                     size="icon"
                     className="h-7 w-7"
                     onClick={() => handleSave(campaign.id)}
-                    disabled={!hasChanged && !edited.commission && !edited.revenue}
+                    disabled={!canSave}
                   >
                     <Save className="h-3 w-3" />
                   </Button>
