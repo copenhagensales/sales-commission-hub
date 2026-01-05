@@ -74,7 +74,10 @@ serve(async (req) => {
         const dialFormData = new URLSearchParams();
         dialFormData.append('To', destinationNumber);
         dialFormData.append('From', from);
-        dialFormData.append('Twiml', `<?xml version="1.0" encoding="UTF-8"?><Response><Conference beep="false" startConferenceOnEnter="true" endConferenceOnExit="true" waitUrl="">${conferenceRoom}</Conference></Response>`);
+        dialFormData.append(
+          'Twiml',
+          `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference beep="false" startConferenceOnEnter="true" endConferenceOnExit="true" waitUrl="">${conferenceRoom}</Conference></Dial></Response>`
+        );
         // Add status callbacks for the destination call leg
         dialFormData.append('StatusCallback', statusCallbackUrl);
         dialFormData.append('StatusCallbackMethod', 'POST');
