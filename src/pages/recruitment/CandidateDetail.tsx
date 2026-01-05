@@ -7,10 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp, X } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
@@ -67,6 +70,9 @@ export default function CandidateDetail() {
   const queryClient = useQueryClient();
   const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showInterviewDialog, setShowInterviewDialog] = useState(false);
+  const [interviewDate, setInterviewDate] = useState("");
+  const [interviewTime, setInterviewTime] = useState("10:00");
   const [newNote, setNewNote] = useState("");
   const [noteType, setNoteType] = useState("Generel observation");
   const {
@@ -153,6 +159,33 @@ export default function CandidateDetail() {
     },
     onError: () => {
       toast.error("Kunne ikke tilføje note");
+    }
+  });
+
+  const scheduleInterviewMutation = useMutation({
+    mutationFn: async () => {
+      if (!interviewDate || !interviewTime) {
+        throw new Error("Vælg dato og tidspunkt");
+      }
+      const dateTime = `${interviewDate}T${interviewTime}:00`;
+      const { error } = await supabase
+        .from("candidates")
+        .update({ 
+          interview_date: dateTime,
+          status: "interview_scheduled"
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["candidate", id] });
+      setShowInterviewDialog(false);
+      setInterviewDate("");
+      setInterviewTime("10:00");
+      toast.success("Samtale planlagt");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Kunne ikke planlægge samtale");
     }
   });
   if (isLoading) {
@@ -332,7 +365,7 @@ export default function CandidateDetail() {
                         })}
                           </p>
                         </div>
-                      </div> : <Button variant="outline" className="w-full justify-start">
+                      </div> : <Button variant="outline" className="w-full justify-start" onClick={() => setShowInterviewDialog(true)}>
                         <Calendar className="h-4 w-4 mr-2" />
                         Planlæg samtale
                       </Button>}
@@ -493,5 +526,46 @@ export default function CandidateDetail() {
       email: candidate.email,
       applied_position: candidate.applied_position
     }} />
+
+      {/* Schedule Interview Dialog */}
+      <Dialog open={showInterviewDialog} onOpenChange={setShowInterviewDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Planlæg jobsamtale</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="interview-date">Dato</Label>
+              <Input
+                id="interview-date"
+                type="date"
+                value={interviewDate}
+                onChange={(e) => setInterviewDate(e.target.value)}
+                min={new Date().toISOString().split("T")[0]}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="interview-time">Tidspunkt</Label>
+              <Input
+                id="interview-time"
+                type="time"
+                value={interviewTime}
+                onChange={(e) => setInterviewTime(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInterviewDialog(false)}>
+              Annuller
+            </Button>
+            <Button 
+              onClick={() => scheduleInterviewMutation.mutate()}
+              disabled={!interviewDate || scheduleInterviewMutation.isPending}
+            >
+              {scheduleInterviewMutation.isPending ? "Gemmer..." : "Planlæg samtale"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>;
 }
