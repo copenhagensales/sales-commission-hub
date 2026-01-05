@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Gift, Copy, Check, Users, Clock, DollarSign, ExternalLink, AlertCircle } from "lucide-react";
+import { Gift, Copy, Check, Users, Clock, DollarSign, ExternalLink, Info, CheckCircle2 } from "lucide-react";
 import { useMyReferralCode, useMyReferrals } from "@/hooks/useReferrals";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -90,25 +90,25 @@ export default function ReferAFriend() {
               Del dit personlige link herunder. Når din ven udfylder formularen via dit link, registreres henvisningen automatisk på dig.
             </p>
             
-            <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg">
-              <AlertCircle className="h-5 w-5 flex-shrink-0" />
-              <p className="text-sm">
-                <strong>Vigtigt:</strong> Du skal dele dit personlige link med din ven. Hvis de ikke bruger linket, kan vi ikke spore henvisningen, og du vil ikke modtage bonus.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg">
-              <AlertCircle className="h-5 w-5 flex-shrink-0" />
-              <p className="text-sm">
-                <strong>Vigtigt:</strong> Linket skal være udfyldt FØR jobsamtalen for at henvisningen er gældende.
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-2 p-3 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-lg">
-              <Clock className="h-5 w-5 flex-shrink-0" />
-              <p className="text-sm">
-                <strong>Udbetaling:</strong> Bonus udbetales først, når den nye medarbejder har været ansat i 2 måneder. Du skal selv være ansat på udbetalingstidspunktet for at modtage bonussen.
-              </p>
+            <div className="p-4 bg-muted/50 border border-border rounded-lg space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Info className="h-4 w-4 text-primary" />
+                Sådan fungerer det:
+              </div>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                  <span>Del dit personlige link med din ven – vi sporer automatisk henvisningen via linket</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                  <span>Din ven skal udfylde formularen <strong className="text-foreground">før jobsamtalen</strong> for at henvisningen er gældende</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                  <span>Bonus udbetales efter 2 måneder – du skal stadig være ansat på udbetalingstidspunktet</span>
+                </li>
+              </ul>
             </div>
           </CardContent>
         </Card>
