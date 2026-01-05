@@ -132,6 +132,9 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
+      // Use inner join on client_campaigns when filtering by client
+      const clientCampaignsJoin = selectedClientId ? 'client_campaigns!inner' : 'client_campaigns';
+      
       let query = supabase
         .from("sales")
         .select(`
@@ -142,9 +145,11 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
           customer_phone,
           customer_company,
           validation_status,
-          client_campaigns (
+          client_campaign_id,
+          ${clientCampaignsJoin} (
             id,
             name,
+            client_id,
             clients (id, name)
           ),
           sale_items (
@@ -180,9 +185,9 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
         }
       }
 
-      // Client filter via client_campaigns - must have a valid client_campaign_id that matches
+      // Client filter - with inner join, just filter on client_id
       if (selectedClientId) {
-        query = query.not('client_campaign_id', 'is', null).eq('client_campaigns.client_id', selectedClientId);
+        query = query.eq('client_campaigns.client_id', selectedClientId);
       }
 
       const { data, error, count } = await query.range(from, to);
