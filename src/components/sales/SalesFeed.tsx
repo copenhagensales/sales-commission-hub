@@ -180,9 +180,9 @@ export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
         }
       }
 
-      // Client filter via client_campaigns
+      // Client filter via client_campaigns - must have a valid client_campaign_id that matches
       if (selectedClientId) {
-        query = query.eq('client_campaigns.client_id', selectedClientId);
+        query = query.not('client_campaign_id', 'is', null).eq('client_campaigns.client_id', selectedClientId);
       }
 
       const { data, error, count } = await query.range(from, to);
