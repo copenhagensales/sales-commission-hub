@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, parseISO, eachDayOfInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -259,20 +259,36 @@ export default function DailyReports() {
           continue;
         }
 
-        // Calculate hours - prefer time stamps, fallback to planned_hours from shifts
+        // Calculate hours from team standard shifts based on days in period
         let hours = 0;
-        if (empTimeStamps.length > 0) {
-          hours = empTimeStamps.reduce((sum, ts) => {
-            if (ts.effective_hours) return sum + ts.effective_hours;
-            if (ts.clock_in && ts.clock_out) {
-              const diffMs = new Date(ts.clock_out).getTime() - new Date(ts.clock_in).getTime();
-              return sum + diffMs / (1000 * 60 * 60);
+        
+        // Get the primary shift for this employee's team
+        const empPrimaryShift = empTeamMembership 
+          ? primaryShifts?.find(ps => ps.team_id === empTeamMembership.team_id)
+          : null;
+        
+        if (empPrimaryShift) {
+          const empShiftDays = shiftDays?.filter(sd => sd.shift_id === empPrimaryShift.id) || [];
+          
+          // Get all days in the date range
+          const daysInRange = eachDayOfInterval({ start: dateRange.start, end: dateRange.end });
+          
+          for (const day of daysInRange) {
+            // getDay returns 0 for Sunday, 1 for Monday, etc.
+            // Our day_of_week is 1 for Monday, 2 for Tuesday, etc.
+            const dayOfWeek = getDay(day);
+            const adjustedDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek; // Convert Sunday from 0 to 7
+            
+            const shiftForDay = empShiftDays.find(sd => sd.day_of_week === adjustedDayOfWeek);
+            
+            if (shiftForDay && shiftForDay.start_time && shiftForDay.end_time) {
+              // Calculate hours for this day
+              const [startH, startM] = shiftForDay.start_time.split(':').map(Number);
+              const [endH, endM] = shiftForDay.end_time.split(':').map(Number);
+              const dayHours = (endH + endM / 60) - (startH + startM / 60);
+              hours += dayHours;
             }
-            return sum;
-          }, 0);
-        } else if (empShifts.length > 0) {
-          // Use planned hours from shifts if no time stamps
-          hours = empShifts.reduce((sum, s) => sum + (s.planned_hours || 0), 0);
+          }
         }
 
         // Check absences
