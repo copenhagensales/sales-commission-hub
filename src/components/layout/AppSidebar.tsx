@@ -220,6 +220,25 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
     refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
 
+  // Fetch pending referrals count (for recruiters)
+  const { data: pendingReferralsCount = 0 } = useQuery({
+    queryKey: ["pending-referrals-count"],
+    queryFn: async () => {
+      if (!p.canViewCandidates) return 0;
+
+      const { count } = await supabase
+        .from("employee_referrals")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
+
+      return count || 0;
+    },
+    enabled: p.canViewCandidates,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60000, // Auto-refresh every 60 seconds
+  });
+
   const pendingContractsCount = employeeData?.pendingContracts ?? 0;
   const employeeName = employeeData?.name;
 
@@ -1283,7 +1302,14 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     <UserPlus className="h-5 w-5" />
                     {t("sidebar.recruitment")}
                   </div>
-                  {recruitmentOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <div className="flex items-center gap-1">
+                    {pendingReferralsCount > 0 && (
+                      <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                        {pendingReferralsCount > 99 ? "99+" : pendingReferralsCount}
+                      </Badge>
+                    )}
+                    {recruitmentOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </div>
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent className="pl-4 space-y-1 mt-1">
@@ -1361,11 +1387,18 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 )}
                 {p.canViewCandidates && (
                   <NavLink to="/recruitment/referrals" onClick={handleNavClick} className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                     location.pathname === "/recruitment/referrals" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                   )}>
-                    <Gift className="h-4 w-4" />
-                    Henvisninger
+                    <div className="flex items-center gap-3">
+                      <Gift className="h-4 w-4" />
+                      Henvisninger
+                    </div>
+                    {pendingReferralsCount > 0 && (
+                      <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                        {pendingReferralsCount > 99 ? "99+" : pendingReferralsCount}
+                      </Badge>
+                    )}
                   </NavLink>
                 )}
               </CollapsibleContent>
