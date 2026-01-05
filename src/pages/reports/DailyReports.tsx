@@ -388,11 +388,17 @@ export default function DailyReports() {
           // Use REST API directly to support dynamic !inner join for client filtering
           const joinType = selectedClient !== "all" ? "!inner" : "";
           
-          // Build query with proper URL encoding
-          const selectClause = `id,agent_name,agent_email,sale_datetime,client_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,mapped_commission,products(counts_as_sale))`;
+          // Build query - don't encode !inner as it needs to be literal for PostgREST
+          const selectParts = [
+            "id", "agent_name", "agent_email", "sale_datetime", "client_campaign_id",
+            `client_campaigns${joinType}(client_id)`,
+            "sale_items(quantity,mapped_commission,products(counts_as_sale))"
+          ];
+          const selectClause = selectParts.join(",");
           const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${encodeURIComponent(e)}`).join(",");
           
-          let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${encodeURIComponent(selectClause)}`;
+          // Build URL without encoding the select clause (PostgREST needs literal !inner)
+          let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${selectClause}`;
           salesUrl += `&or=(${emailOrFilter})`;
           salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
           
