@@ -21,10 +21,21 @@ serve(async (req) => {
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')!;
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN')!;
     const twilioNumber = Deno.env.get('TWILIO_PHONE_NUMBER')!;
-    const twimlAppSid = Deno.env.get('TWILIO_TWIML_APP_SID');
+    const twimlAppSidRaw = Deno.env.get('TWILIO_TWIML_APP_SID');
 
     if (!accountSid || !authToken || !twilioNumber) {
       throw new Error('Missing Twilio credentials');
+    }
+
+    // Only include ApplicationSid if it looks like a real TwiML App SID (starts with "AP").
+    // Misconfigured values (often starting with "SK") will cause Twilio to return:
+    // "Invalid application sid".
+    const twimlAppSid = (twimlAppSidRaw && twimlAppSidRaw.startsWith('AP'))
+      ? twimlAppSidRaw
+      : null;
+
+    if (twimlAppSidRaw && !twimlAppSid) {
+      console.warn('[initiate-call] Ignoring invalid TWILIO_TWIML_APP_SID (expected prefix AP).');
     }
 
     const { toNumber, candidateId, employeeId } = await req.json();
@@ -56,7 +67,6 @@ serve(async (req) => {
     if (twimlAppSid) {
       formData.append('ApplicationSid', twimlAppSid);
     }
-
     const twilioResponse = await fetch(twilioUrl, {
       method: 'POST',
       headers: {
