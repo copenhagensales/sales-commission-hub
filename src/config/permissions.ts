@@ -47,6 +47,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: "Adgang til at udfylde karriereønsker",
         hasEditOption: false,
       },
+      {
+        key: "menu_refer_a_friend",
+        label: "Anbefal en ven",
+        description: "Adgang til at dele referral link og se egne anbefalinger",
+        hasEditOption: false,
+      },
     ],
   },
 
@@ -327,6 +333,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         key: "menu_email_templates",
         label: "Email-skabeloner",
         description: "Adgang til email skabeloner",
+        hasEditOption: true,
+      },
+      {
+        key: "menu_referrals",
+        label: "Henvisninger",
+        description: "Adgang til at administrere medarbejderanbefalinger",
         hasEditOption: true,
       },
     ],
