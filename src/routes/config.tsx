@@ -82,6 +82,7 @@ import {
   DashboardSettings,
   DesignDashboard,
   TdcErhvervGoalsDashboard,
+  FieldmarketingGoalsDashboard,
   Messages,
   OnboardingAdmin,
   OnboardingDashboard,
@@ -303,6 +304,12 @@ export const routes: RouteConfig[] = [
     component: TdcErhvervGoalsDashboard,
     access: "role",
     positionPermission: "menu_dashboard_tdc_erhverv",
+  },
+  {
+    path: "/dashboards/fieldmarketing-goals",
+    component: FieldmarketingGoalsDashboard,
+    access: "role",
+    positionPermission: "menu_dashboard_fieldmarketing",
   },
   {
     path: "/dashboards/relatel",

@@ -96,6 +96,7 @@ export const CphSalesDashboard = lazyPage(() => import("@/pages/dashboards/CphSa
 export const DashboardSettings = lazyPage(() => import("@/pages/dashboards/DashboardSettings"));
 export const DesignDashboard = lazyPage(() => import("@/pages/dashboards/DesignDashboard"));
 export const TdcErhvervGoalsDashboard = lazyPage(() => import("@/pages/dashboards/TdcErhvervGoalsDashboard"));
+export const FieldmarketingGoalsDashboard = lazyPage(() => import("@/pages/dashboards/FieldmarketingGoalsDashboard"));
 
 export const Messages = lazyPage(() => import("@/pages/Messages"));
 
