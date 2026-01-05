@@ -308,7 +308,9 @@ export default function DailyReports() {
         const emailIdentifiers = uniqueAgentIdentifiers.filter(id => id.includes("@"));
         
         if (emailIdentifiers.length > 0) {
-          let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,agent_name,agent_email,sale_datetime,client_campaign_id,client_campaigns(client_id),sale_items(quantity,mapped_commission,products(counts_as_sale))`;
+          // Use !inner join when filtering by client to ensure proper filtering
+          const joinType = selectedClient !== "all" ? "!inner" : "";
+          let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,agent_name,agent_email,sale_datetime,client_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,mapped_commission,products(counts_as_sale))`;
           salesUrl += `&agent_email=in.(${emailIdentifiers.map(a => `"${a}"`).join(",")})`;
           salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
           
