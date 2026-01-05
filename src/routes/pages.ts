@@ -121,3 +121,8 @@ export const HeadToHead = lazyPage(() => import("@/pages/HeadToHead"));
 // Coaching Templates Admin
 export const CoachingTemplates = lazyPage(() => import("@/pages/admin/CoachingTemplates"));
 
+// Referral Program
+export const ReferAFriend = lazyPage(() => import("@/pages/ReferAFriend"));
+export const PublicReferralForm = lazyPage(() => import("@/pages/PublicReferralForm"));
+export const Referrals = lazyPage(() => import("@/pages/recruitment/Referrals"));
+
