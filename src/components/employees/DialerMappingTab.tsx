@@ -133,11 +133,13 @@ export function DialerMappingTab() {
     return mappings.filter((m) => m.employee_id === employeeId);
   };
 
+  // Get all mapped agent IDs (an agent can only be mapped to ONE employee)
+  const allMappedAgentIds = mappings.map((m) => m.agent_id);
+
   const getAvailableAgents = (employeeId: string) => {
-    const existingAgentIds = getMappingsForEmployee(employeeId).map((m) => m.agent_id);
-    // Filter out excluded email domains and already mapped agents
+    // Filter out excluded email domains and ALL already mapped agents (not just for this employee)
     const nonExcludedAgents = filterExcludedEmails(agents);
-    return nonExcludedAgents.filter((a) => !existingAgentIds.includes(a.id));
+    return nonExcludedAgents.filter((a) => !allMappedAgentIds.includes(a.id));
   };
 
   // Get unmapped agents (agents without any employee mapping)
