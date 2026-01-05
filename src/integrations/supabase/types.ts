@@ -566,6 +566,7 @@ export type Database = {
       call_records: {
         Row: {
           candidate_id: string | null
+          connected_at: string | null
           direction: string
           duration_seconds: number | null
           employee_id: string | null
@@ -581,6 +582,7 @@ export type Database = {
         }
         Insert: {
           candidate_id?: string | null
+          connected_at?: string | null
           direction: string
           duration_seconds?: number | null
           employee_id?: string | null
@@ -596,6 +598,7 @@ export type Database = {
         }
         Update: {
           candidate_id?: string | null
+          connected_at?: string | null
           direction?: string
           duration_seconds?: number | null
           employee_id?: string | null

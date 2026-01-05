@@ -6,6 +6,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Map Twilio status to normalized DB status
+// Twilio can send "answered" which should be mapped to "in-progress"
+const mapTwilioStatusToDbStatus = (status: string): string => {
+  const mapping: Record<string, string> = {
+    'initiated': 'initiated',
+    'queued': 'initiated',
+    'ringing': 'ringing',
+    'answered': 'in-progress',  // Twilio sends "answered" when call is picked up
+    'in-progress': 'in-progress',
+    'completed': 'completed',
+    'busy': 'busy',
+    'no-answer': 'no-answer',
+    'failed': 'failed',
+    'canceled': 'canceled'
+  };
+  return mapping[status?.toLowerCase()] || status;
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -28,7 +46,7 @@ serve(async (req) => {
     const callSid = formData.get('CallSid') as string;
     const from = formData.get('From') as string;
     const to = formData.get('To') as string;
-    const callStatus = formData.get('CallStatus') as string;
+    const rawCallStatus = formData.get('CallStatus') as string;
     const rawDirection = formData.get('Direction') as string || 'inbound';
     const callDuration = formData.get('CallDuration') as string;
     const recordingUrl = formData.get('RecordingUrl') as string;
@@ -39,6 +57,9 @@ serve(async (req) => {
     const parentCallSid = parentCallSidFromQuery || parentCallSidFromForm;
     const answeredBy = formData.get('AnsweredBy') as string;
 
+    // Normalize status: map Twilio "answered" to "in-progress"
+    const callStatus = mapTwilioStatusToDbStatus(rawCallStatus);
+    
     // Normalize direction: Twilio sends 'outbound-api' but our DB only allows 'inbound' or 'outbound'
     const direction = rawDirection === 'outbound-api' ? 'outbound' : rawDirection;
 
@@ -47,7 +68,8 @@ serve(async (req) => {
       parentCallSid,
       from,
       to,
-      callStatus,
+      rawCallStatus,
+      callStatus, // normalized
       direction,
       rawDirection,
       callDuration,
@@ -59,12 +81,12 @@ serve(async (req) => {
     // If this is a destination call (has parent), we only want to update the parent's status
     // The key status changes are: ringing -> in-progress (answered) -> completed
     if (parentCallSid) {
-      console.log('[incoming-call] Destination call status update for parent:', parentCallSid, 'status:', callStatus);
+      console.log('[incoming-call] Destination call status update for parent:', parentCallSid, 'raw status:', rawCallStatus, 'normalized:', callStatus);
       
       // Find the parent call record
       const { data: parentCall } = await supabase
         .from('call_records')
-        .select('id, status')
+        .select('id, status, connected_at')
         .eq('twilio_call_sid', parentCallSid)
         .maybeSingle();
       
@@ -72,6 +94,12 @@ serve(async (req) => {
         const updateData: Record<string, unknown> = {
           status: callStatus,
         };
+
+        // When call becomes in-progress (answered), set connected_at
+        if (callStatus === 'in-progress' && !parentCall.connected_at) {
+          updateData.connected_at = new Date().toISOString();
+          console.log('[incoming-call] Call answered - setting connected_at');
+        }
 
         if (callDuration) {
           updateData.duration_seconds = parseInt(callDuration, 10);
@@ -93,7 +121,7 @@ serve(async (req) => {
           throw updateError;
         }
 
-        console.log('[incoming-call] Updated parent call record:', parentCall.id, 'with status:', callStatus);
+        console.log('[incoming-call] Updated parent call record:', parentCall.id, 'with status:', callStatus, 'data:', updateData);
       } else {
         console.log('[incoming-call] Parent call record not found for:', parentCallSid);
       }
@@ -136,6 +164,21 @@ serve(async (req) => {
         status: callStatus,
       };
 
+      // When call becomes in-progress, set connected_at
+      if (callStatus === 'in-progress') {
+        // Check if connected_at is already set
+        const { data: currentRecord } = await supabase
+          .from('call_records')
+          .select('connected_at')
+          .eq('id', existingCall.id)
+          .single();
+        
+        if (!currentRecord?.connected_at) {
+          updateData.connected_at = new Date().toISOString();
+          console.log('[incoming-call] Call answered - setting connected_at for existing record');
+        }
+      }
+
       if (callDuration) {
         updateData.duration_seconds = parseInt(callDuration, 10);
       }
@@ -156,7 +199,7 @@ serve(async (req) => {
         throw updateError;
       }
 
-      console.log('[incoming-call] Updated call record:', existingCall.id, 'with status:', callStatus);
+      console.log('[incoming-call] Updated call record:', existingCall.id, 'with status:', callStatus, 'data:', updateData);
     } else {
       // Create new call record
       const { error: insertError } = await supabase

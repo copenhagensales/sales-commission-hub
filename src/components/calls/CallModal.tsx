@@ -76,6 +76,7 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
       'queued': 'initiating',
       'initiated': 'initiating',
       'ringing': 'ringing',
+      'answered': 'in-progress', // Twilio sends "answered"
       'in-progress': 'in-progress',
       'completed': 'completed',
       'busy': 'busy',
@@ -86,15 +87,15 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
     return statusMap[twilioStatus?.toLowerCase()] || 'initiating';
   }, []);
 
-  // Subscribe to real-time updates for this call
+  // Subscribe to real-time updates for this call with polling fallback
   useEffect(() => {
     if (!callSid || !isOpen) return;
 
-    // Fetch initial call status
+    // Fetch call status from database
     const fetchCallStatus = async () => {
       const { data } = await supabase
         .from('call_records')
-        .select('status, started_at, ended_at, duration_seconds')
+        .select('status, started_at, ended_at, duration_seconds, connected_at')
         .eq('twilio_call_sid', callSid)
         .single();
 
@@ -102,7 +103,10 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
         const newStatus = mapTwilioStatus(data.status || 'initiating');
         setStatus(newStatus);
         
-        if (data.started_at && newStatus === 'in-progress') {
+        // Use connected_at for when call was actually answered
+        if (data.connected_at && newStatus === 'in-progress') {
+          setCallStartTime(new Date(data.connected_at));
+        } else if (data.started_at && newStatus === 'in-progress') {
           setCallStartTime(new Date(data.started_at));
         }
         
@@ -126,25 +130,32 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
           filter: `twilio_call_sid=eq.${callSid}`,
         },
         (payload) => {
-          const record = payload.new as any;
+          const record = payload.new as Record<string, unknown>;
           if (record) {
-            const newStatus = mapTwilioStatus(record.status);
+            const newStatus = mapTwilioStatus(record.status as string);
             setStatus(newStatus);
             
-            if (record.started_at && newStatus === 'in-progress' && !callStartTime) {
-              setCallStartTime(new Date(record.started_at));
+            // Use connected_at for when call was actually answered
+            if (record.connected_at && newStatus === 'in-progress' && !callStartTime) {
+              setCallStartTime(new Date(record.connected_at as string));
+            } else if (record.started_at && newStatus === 'in-progress' && !callStartTime) {
+              setCallStartTime(new Date(record.started_at as string));
             }
             
             if (record.duration_seconds) {
-              setDuration(record.duration_seconds);
+              setDuration(record.duration_seconds as number);
             }
           }
         }
       )
       .subscribe();
 
+    // Polling fallback - check every 2 seconds in case realtime fails
+    const pollInterval = setInterval(fetchCallStatus, 2000);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
   }, [callSid, isOpen, mapTwilioStatus, callStartTime]);
 
