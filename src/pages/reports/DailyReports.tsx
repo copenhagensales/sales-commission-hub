@@ -297,17 +297,18 @@ export default function DailyReports() {
       console.log("[DailyReport] Unique agent identifiers:", uniqueAgentIdentifiers);
 
       // Fetch sales with sale_items - same logic as KPI sales-count
+      // Sales are linked to clients via client_campaign_id -> client_campaigns.client_id
       let salesData: any[] = [];
       if (uniqueAgentIdentifiers.length > 0) {
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         
-        let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,agent_name,sale_datetime,client_id,sale_items(quantity,mapped_commission,products(counts_as_sale))`;
+        let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,agent_name,sale_datetime,client_campaign_id,client_campaigns!inner(client_id),sale_items(quantity,mapped_commission,products(counts_as_sale))`;
         salesUrl += `&agent_name=in.(${uniqueAgentIdentifiers.map(a => `"${a}"`).join(",")})`;
         salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
         
         if (selectedClient !== "all") {
-          salesUrl += `&client_id=eq.${selectedClient}`;
+          salesUrl += `&client_campaigns.client_id=eq.${selectedClient}`;
         }
         
         const salesRes = await fetch(salesUrl, {
