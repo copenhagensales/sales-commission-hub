@@ -75,12 +75,22 @@ serve(async (req) => {
 
         const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`;
         
+        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        const statusCallbackUrl = `${supabaseUrl}/functions/v1/incoming-call`;
+        
         const dialFormData = new URLSearchParams();
         dialFormData.append('To', destinationNumber);
         dialFormData.append('From', from);
         dialFormData.append('Twiml', `<?xml version="1.0" encoding="UTF-8"?><Response><Conference beep="false" startConferenceOnEnter="true" endConferenceOnExit="true" waitUrl="">${conferenceRoom}</Conference></Response>`);
+        // Add status callbacks for the destination call leg
+        dialFormData.append('StatusCallback', statusCallbackUrl);
+        dialFormData.append('StatusCallbackMethod', 'POST');
+        dialFormData.append('StatusCallbackEvent', 'initiated');
+        dialFormData.append('StatusCallbackEvent', 'ringing');
+        dialFormData.append('StatusCallbackEvent', 'answered');
+        dialFormData.append('StatusCallbackEvent', 'completed');
         
-        console.log('[twilio-voice-token] Dialing destination into conference:', destinationNumber);
+        console.log('[twilio-voice-token] Dialing destination into conference:', destinationNumber, 'with status callback:', statusCallbackUrl);
         
         try {
           const dialResponse = await fetch(twilioUrl, {
