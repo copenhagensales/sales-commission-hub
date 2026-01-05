@@ -19,38 +19,40 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 // Helper function to fetch employees with activity on a specific client
-// Uses agent_id from sales which references agents table, then maps to employees via employee_agent_mapping
+// Uses agent_name (email) from sales, matches to agents, then maps to employees via employee_agent_mapping
 async function fetchEmployeesWithClientActivity(clientId: string): Promise<string[]> {
   if (clientId === "all") return [];
   
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
   
-  // Get unique agent_ids from sales for this client
+  // Get unique agent_names (emails) from sales for this client
   const salesRes = await fetch(
-    `${supabaseUrl}/rest/v1/sales?select=agent_id&client_id=eq.${clientId}&agent_id=not.is.null`,
-    { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
+    `${supabaseUrl}/rest/v1/sales?select=agent_name&client_id=eq.${clientId}`,
+    { headers }
   );
-  const salesData: { agent_id: string }[] = await salesRes.json();
-  const agentIds = [...new Set(salesData.map(s => s.agent_id))];
+  const salesData: { agent_name: string }[] = await salesRes.json();
+  const agentEmails = [...new Set(salesData.map(s => s.agent_name).filter(Boolean))];
   
   // Get FM seller IDs for this client  
   const fmRes = await fetch(
     `${supabaseUrl}/rest/v1/fieldmarketing_sales?select=seller_id&client_id=eq.${clientId}`,
-    { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
+    { headers }
   );
   const fmData: { seller_id: string }[] = await fmRes.json();
   
-  // Get employee_ids from mappings where agent_id matches
-  const employeeIdsFromSales: string[] = [];
-  if (agentIds.length > 0) {
-    const mappingsRes = await fetch(
-      `${supabaseUrl}/rest/v1/employee_agent_mapping?select=employee_id&agent_id=in.(${agentIds.join(",")})`,
-      { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
-    );
-    const mappingsData: { employee_id: string }[] = await mappingsRes.json();
-    employeeIdsFromSales.push(...mappingsData.map(m => m.employee_id));
-  }
+  // Get all agent mappings with agent email info
+  const mappingsRes = await fetch(
+    `${supabaseUrl}/rest/v1/employee_agent_mapping?select=employee_id,agents(email)`,
+    { headers }
+  );
+  const mappingsData: { employee_id: string; agents: { email: string } | null }[] = await mappingsRes.json();
+  
+  // Find employee_ids where agent email matches sales agent_name
+  const employeeIdsFromSales = mappingsData
+    .filter(m => m.agents?.email && agentEmails.includes(m.agents.email))
+    .map(m => m.employee_id);
   
   const fmEmployeeIds = fmData.map(s => s.seller_id);
   return [...new Set([...employeeIdsFromSales, ...fmEmployeeIds])];
