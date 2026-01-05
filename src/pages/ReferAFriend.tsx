@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Gift, Copy, Check, Users, Clock, DollarSign, ExternalLink } from "lucide-react";
+import { Gift, Copy, Check, Users, Clock, DollarSign, ExternalLink, AlertCircle } from "lucide-react";
 import { useMyReferralCode, useMyReferrals } from "@/hooks/useReferrals";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -89,6 +89,13 @@ export default function ReferAFriend() {
             <p className="text-muted-foreground">
               Del dit personlige link herunder. Når din ven udfylder formularen via dit link, registreres henvisningen automatisk på dig.
             </p>
+            
+            <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg">
+              <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              <p className="text-sm">
+                <strong>Vigtigt:</strong> Du skal dele dit personlige link med din ven. Hvis de ikke bruger linket, kan vi ikke spore henvisningen, og du vil ikke modtage bonus.
+              </p>
+            </div>
             
             <div className="flex items-center gap-2 p-3 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-lg">
               <Clock className="h-5 w-5 flex-shrink-0" />
