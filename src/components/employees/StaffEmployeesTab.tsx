@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, Loader2, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, Send, ArrowRightLeft } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, Loader2, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, Send, ArrowRightLeft, Clock, X, Check, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -24,6 +24,9 @@ export function StaffEmployeesTab() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
+  const [teamFilter, setTeamFilter] = useState<string>("all");
+  const [sortColumn, setSortColumn] = useState<"name" | "position" | "team">("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createData, setCreateData] = useState({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
   const [creatingEmployee, setCreatingEmployee] = useState(false);
@@ -31,7 +34,9 @@ export function StaffEmployeesTab() {
   const [deleteEmployeeId, setDeleteEmployeeId] = useState<string | null>(null);
   const [moveToRegularId, setMoveToRegularId] = useState<string | null>(null);
   const [sendingResetTo, setSendingResetTo] = useState<string | null>(null);
+  const [deactivatingEmployee, setDeactivatingEmployee] = useState<StaffEmployee | null>(null);
   const { canEditEmployees } = usePermissions();
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   interface StaffEmployee {
     id: string;
@@ -80,15 +85,69 @@ export function StaffEmployeesTab() {
       const { data, error } = await supabase
         .from("contracts")
         .select("employee_id, status")
-        .eq("status", "signed")
         .returns<{ employee_id: string; status: string }[]>();
       if (error) throw error;
       return data ?? [];
     },
   });
 
-  const hasSignedContract = (employeeId: string) => {
-    return contracts.some(c => c.employee_id === employeeId);
+  // Fetch team memberships
+  const { data: teamMemberships = [] } = useQuery({
+    queryKey: ["staff-employee-team-memberships"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_members")
+        .select("employee_id, teams:team_id(name)");
+      if (error) throw error;
+      return data as { employee_id: string; teams: { name: string } | null }[];
+    },
+  });
+
+  // Get teams for an employee
+  const getEmployeeTeams = (employeeId: string): string => {
+    const memberships = teamMemberships.filter(tm => tm.employee_id === employeeId);
+    if (memberships.length === 0) return "";
+    return memberships.map(tm => tm.teams?.name).filter(Boolean).join(", ");
+  };
+
+  // Get unique teams for filter dropdown
+  const uniqueTeams = React.useMemo(() => {
+    const teams = new Set<string>();
+    teamMemberships.forEach(tm => {
+      if (tm.teams?.name) teams.add(tm.teams.name);
+    });
+    return Array.from(teams).sort((a, b) => a.localeCompare(b, 'da'));
+  }, [teamMemberships]);
+
+  // Keyboard shortcut for search (⌘K / Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Handle sort
+  const handleSort = (column: "name" | "position" | "team") => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  // Get contract status for an employee (prioritized: signed > pending > rejected > none)
+  const getContractStatus = (employeeId: string): 'signed' | 'pending' | 'rejected' | 'none' => {
+    const employeeContracts = contracts.filter(c => c.employee_id === employeeId);
+    if (employeeContracts.some(c => c.status === 'signed')) return 'signed';
+    if (employeeContracts.some(c => c.status === 'pending_employee')) return 'pending';
+    if (employeeContracts.some(c => c.status === 'rejected')) return 'rejected';
+    return 'none';
   };
 
   const toggleActiveMutation = useMutation({
@@ -184,6 +243,7 @@ export function StaffEmployeesTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff-employees"] });
+      setDeactivatingEmployee(null);
       toast({ title: t("employees.toast.statusUpdated") });
     },
     onError: (error) => {
@@ -202,7 +262,8 @@ export function StaffEmployeesTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff-employees"] });
       queryClient.invalidateQueries({ queryKey: ["employee-master-data"] });
-      toast({ title: "Medarbejder flyttet", description: "Medarbejderen er nu en almindelig medarbejder" });
+      queryClient.invalidateQueries({ queryKey: ["staff-employee-count"] });
+      toast({ title: "Medarbejder flyttet" });
     },
     onError: (error) => {
       toast({ title: t("employees.toast.error"), description: error.message, variant: "destructive" });
@@ -219,8 +280,8 @@ export function StaffEmployeesTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff-employees"] });
-      toast({ title: t("employees.toast.deleted") });
       setDeleteEmployeeId(null);
+      toast({ title: t("employees.toast.deleted") });
     },
     onError: (error) => {
       toast({ title: t("employees.toast.error"), description: error.message, variant: "destructive" });
@@ -228,101 +289,87 @@ export function StaffEmployeesTab() {
   });
 
   const handleCreateEmployee = async () => {
-    if (!createData.first_name || !createData.email || !createData.password || !createData.job_title) {
-      toast({ title: t("employees.toast.fillRequired"), variant: "destructive" });
+    if (!createData.first_name.trim()) {
+      toast({ title: "Fornavn er påkrævet", variant: "destructive" });
       return;
     }
-
-    if (createData.password.length < 6) {
-      toast({ title: t("employees.toast.passwordTooShort"), variant: "destructive" });
+    if (!createData.email.trim()) {
+      toast({ title: "Email er påkrævet", variant: "destructive" });
+      return;
+    }
+    if (!createData.password.trim() || createData.password.length < 6) {
+      toast({ title: "Kodeord skal være mindst 6 tegn", variant: "destructive" });
+      return;
+    }
+    if (!createData.job_title) {
+      toast({ title: "Vælg en stilling", variant: "destructive" });
       return;
     }
 
     setCreatingEmployee(true);
     try {
-      const response = await supabase.functions.invoke("create-employee-user", {
+      const { data: result, error } = await supabase.functions.invoke("create-employee-user", {
         body: {
-          email: createData.email,
+          first_name: createData.first_name.trim(),
+          last_name: createData.last_name.trim(),
+          email: createData.email.trim().toLowerCase(),
           password: createData.password,
-          firstName: createData.first_name,
-          lastName: createData.last_name,
+          job_title: createData.job_title,
+          is_staff_employee: true,
         },
       });
 
-      if (response.data?.error) {
-        throw new Error(response.data.error);
-      }
-
-      if (response.error) {
-        throw new Error(response.error.message || t("employees.toast.couldNotCreate"));
-      }
-
-      if (!response.data?.success) {
-        throw new Error(t("employees.toast.couldNotCreate"));
-      }
-
-      const { error: createError } = await supabase
-        .from("employee_master_data")
-        .insert({
-          first_name: createData.first_name,
-          last_name: createData.last_name || "",
-          private_email: createData.email,
-          job_title: createData.job_title,
-          is_active: true,
-          employment_start_date: new Date().toISOString().split("T")[0],
-          is_staff_employee: true,
-        });
-
-      if (createError) throw createError;
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
 
       queryClient.invalidateQueries({ queryKey: ["staff-employees"] });
-      toast({ 
-        title: t("employees.toast.created"), 
-        description: t("employees.toast.userCreated", { email: createData.email }) 
-      });
+      queryClient.invalidateQueries({ queryKey: ["staff-employee-count"] });
       setCreateDialogOpen(false);
       setCreateData({ first_name: "", last_name: "", email: "", password: "", job_title: "" });
+      toast({ title: "Backoffice medarbejder oprettet", description: "Medarbejderen kan nu logge ind med den angivne email og kodeord." });
     } catch (error) {
-      console.error("Create error:", error);
-      toast({
-        title: t("employees.toast.error"),
-        description: error instanceof Error ? error.message : t("employees.toast.couldNotCreate"),
-        variant: "destructive",
+      console.error("Create employee error:", error);
+      toast({ 
+        title: "Fejl ved oprettelse", 
+        description: error instanceof Error ? error.message : "Der opstod en fejl", 
+        variant: "destructive" 
       });
     } finally {
       setCreatingEmployee(false);
     }
   };
 
-  const handleSendInvitation = async (employee: typeof staffEmployees[0]) => {
-    if (!employee.private_email) {
-      toast({ title: t("employees.toast.noEmail"), description: t("employees.toast.noEmailRegistered"), variant: "destructive" });
+  const handleSendInvitation = async (employee: StaffEmployee) => {
+    const email = employee.private_email || employee.work_email;
+    if (!email) {
+      toast({
+        title: t("employees.toast.noEmail"),
+        variant: "destructive",
+      });
       return;
     }
 
     setSendingResetTo(employee.id);
     try {
-      const response = await supabase.functions.invoke("send-employee-invitation", {
+      const { error } = await supabase.functions.invoke("send-employee-invitation", {
         body: {
-          employeeId: employee.id,
-          email: employee.private_email,
-          firstName: employee.first_name,
-          lastName: employee.last_name,
+          employee_id: employee.id,
+          email: email,
+          name: `${employee.first_name} ${employee.last_name}`,
         },
       });
 
-      if (response.data?.error) {
-        throw new Error(response.data.error);
-      }
+      if (error) throw error;
 
-      if (response.error) {
-        throw new Error(response.error.message || t("employees.toast.couldNotSendEmail"));
-      }
+      await supabase
+        .from("employee_master_data")
+        .update({ invitation_status: "pending" })
+        .eq("id", employee.id);
 
       queryClient.invalidateQueries({ queryKey: ["staff-employees"] });
-      toast({ 
-        title: t("employees.toast.invitationSent"), 
-        description: t("employees.toast.invitationSentDesc", { email: employee.private_email }) 
+      toast({
+        title: t("employees.toast.invitationSent"),
+        description: `${t("employees.toast.sentTo")} ${email}`,
       });
     } catch (error) {
       console.error("Send invitation error:", error);
@@ -342,12 +389,35 @@ export function StaffEmployeesTab() {
       if (statusFilter === "inactive") return !e.is_active;
       return true;
     })
+    .filter((e) => {
+      if (teamFilter === "all") return true;
+      const employeeTeams = getEmployeeTeams(e.id);
+      return employeeTeams.includes(teamFilter);
+    })
     .filter(
       (e) =>
         `${e.first_name} ${e.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.private_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.department?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+        e.job_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getEmployeeTeams(e.id).toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      let comparison = 0;
+      if (sortColumn === "name") {
+        const nameA = `${a.last_name} ${a.first_name}`.toLowerCase();
+        const nameB = `${b.last_name} ${b.first_name}`.toLowerCase();
+        comparison = nameA.localeCompare(nameB, 'da');
+      } else if (sortColumn === "position") {
+        const posA = a.job_title || "";
+        const posB = b.job_title || "";
+        comparison = posA.localeCompare(posB, 'da');
+      } else if (sortColumn === "team") {
+        const teamA = getEmployeeTeams(a.id) || "";
+        const teamB = getEmployeeTeams(b.id) || "";
+        comparison = teamA.localeCompare(teamB, 'da');
+      }
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
 
   const activeCount = staffEmployees.filter((e) => e.is_active).length;
   const inactiveCount = staffEmployees.length - activeCount;
@@ -408,14 +478,29 @@ export function StaffEmployeesTab() {
                 Alle ({staffEmployees.length})
               </Button>
             </div>
-            <div className="relative w-56">
+            <Select value={teamFilter} onValueChange={setTeamFilter}>
+              <SelectTrigger className="w-36 h-9 bg-muted/50 border-0">
+                <SelectValue placeholder="Alle teams" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover">
+                <SelectItem value="all">Alle teams</SelectItem>
+                {uniqueTeams.map((team) => (
+                  <SelectItem key={team} value={team}>{team}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="relative w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
+                ref={searchInputRef}
                 placeholder="Søg backoffice..." 
                 value={searchTerm} 
                 onChange={(e) => setSearchTerm(e.target.value)} 
-                className="pl-9 bg-muted/50 border-0 focus-visible:ring-1 h-9" 
+                className="pl-9 pr-12 bg-muted/50 border-0 focus-visible:ring-1 h-9" 
               />
+              <kbd className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                <span className="text-xs">⌘</span>K
+              </kbd>
             </div>
             <Dialog open={createDialogOpen} onOpenChange={(open) => {
               setCreateDialogOpen(open);
@@ -519,10 +604,45 @@ export function StaffEmployeesTab() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-b border-border/50">
-                  <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.name")}</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.email")}</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.phone")}</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.position")}</TableHead>
+                  <TableHead 
+                    className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                    onClick={() => handleSort("name")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("employees.table.name")}
+                      {sortColumn === "name" ? (
+                        sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3 opacity-40" />
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                    onClick={() => handleSort("position")}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t("employees.table.position")}
+                      {sortColumn === "position" ? (
+                        sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3 opacity-40" />
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                    onClick={() => handleSort("team")}
+                  >
+                    <div className="flex items-center gap-1">
+                      Team
+                      {sortColumn === "team" ? (
+                        sortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3 opacity-40" />
+                      )}
+                    </div>
+                  </TableHead>
                   <TableHead className="text-xs font-medium text-muted-foreground">{t("employees.table.status")}</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -535,53 +655,63 @@ export function StaffEmployeesTab() {
                     onClick={() => navigate(`/employees/${employee.id}`)}
                   >
                     <TableCell className="font-medium py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-                          {employee.first_name?.[0]}{employee.last_name?.[0]}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <FileText className={`h-3.5 w-3.5 ${hasSignedContract(employee.id) ? "text-green-500" : "text-muted-foreground/30"}`} />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {hasSignedContract(employee.id) ? t("employees.table.contractSigned") : t("employees.table.noContractSigned")}
-                            </TooltipContent>
-                          </Tooltip>
-                          <span>{employee.first_name} {employee.last_name}</span>
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="relative">
+                              {getContractStatus(employee.id) === 'signed' ? (
+                                <div className="flex items-center">
+                                  <FileText className="h-3.5 w-3.5 text-green-500" />
+                                  <Check className="h-2.5 w-2.5 text-green-500 absolute -right-1 -bottom-0.5" />
+                                </div>
+                              ) : getContractStatus(employee.id) === 'pending' ? (
+                                <div className="flex items-center">
+                                  <FileText className="h-3.5 w-3.5 text-amber-500" />
+                                  <Clock className="h-2.5 w-2.5 text-amber-500 absolute -right-1 -bottom-0.5" />
+                                </div>
+                              ) : getContractStatus(employee.id) === 'rejected' ? (
+                                <div className="flex items-center">
+                                  <FileText className="h-3.5 w-3.5 text-red-500" />
+                                  <X className="h-2.5 w-2.5 text-red-500 absolute -right-1 -bottom-0.5" />
+                                </div>
+                              ) : (
+                                <FileText className="h-3.5 w-3.5 text-muted-foreground/30" />
+                              )}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {getContractStatus(employee.id) === 'signed' 
+                              ? t("employees.table.contractSigned")
+                              : getContractStatus(employee.id) === 'pending'
+                              ? "Afventer underskrift"
+                              : getContractStatus(employee.id) === 'rejected'
+                              ? "Kontrakt afvist"
+                              : t("employees.table.noContractSigned")}
+                          </TooltipContent>
+                        </Tooltip>
+                        <span>{employee.first_name} {employee.last_name}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
-                      {employee.private_email ? (
-                        <a href={`mailto:${employee.private_email}`} className="text-primary hover:underline text-sm">
-                          {employee.private_email}
-                        </a>
-                      ) : <span className="text-muted-foreground/50">-</span>}
-                    </TableCell>
-                    <TableCell className="py-3 text-sm">{employee.private_phone || <span className="text-muted-foreground/50">-</span>}</TableCell>
+                    <TableCell className="py-3 text-sm">{employee.job_title || <span className="text-muted-foreground/50">-</span>}</TableCell>
                     <TableCell className="py-3">
-                      {employee.job_title ? (
-                        <Badge variant="secondary" className="text-xs font-normal">{employee.job_title}</Badge>
+                      {getEmployeeTeams(employee.id) ? (
+                        <Badge variant="secondary" className="text-xs font-normal">{getEmployeeTeams(employee.id)}</Badge>
                       ) : <span className="text-muted-foreground/50">-</span>}
                     </TableCell>
                     <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                       <Switch 
                         checked={employee.is_active} 
-                        onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: employee.id, is_active: checked, employee })}
+                        onCheckedChange={(checked) => {
+                          if (!checked) {
+                            setDeactivatingEmployee(employee);
+                          } else {
+                            toggleActiveMutation.mutate({ id: employee.id, is_active: true, employee });
+                          }
+                        }}
                       />
                     </TableCell>
                     <TableCell className="py-3">
                       <div className="flex items-center gap-0.5">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8"
-                          onClick={(e) => e.stopPropagation()}
-                          disabled={!employee.private_phone}
-                        >
-                          <Phone className="h-3.5 w-3.5" />
-                        </Button>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button 
@@ -646,7 +776,7 @@ export function StaffEmployeesTab() {
                 ))}
                 {filteredEmployees.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                       Ingen backoffice medarbejdere fundet
                     </TableCell>
                   </TableRow>
@@ -656,6 +786,26 @@ export function StaffEmployeesTab() {
           )}
         </div>
       </div>
+
+      {/* Deactivation confirmation dialog */}
+      <AlertDialog open={!!deactivatingEmployee} onOpenChange={(open) => !open && setDeactivatingEmployee(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deaktiver medarbejder</AlertDialogTitle>
+            <AlertDialogDescription>
+              Er du sikker på at du vil deaktivere {deactivatingEmployee?.first_name} {deactivatingEmployee?.last_name}?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deactivatingEmployee && toggleActiveMutation.mutate({ id: deactivatingEmployee.id, is_active: false, employee: deactivatingEmployee })}
+            >
+              Deaktiver
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deleteEmployeeId} onOpenChange={(open) => !open && setDeleteEmployeeId(null)}>
         <AlertDialogContent>
