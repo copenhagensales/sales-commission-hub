@@ -101,6 +101,7 @@ import {
   ReportsAdmin,
   ReportsManagement,
   ReportsEmployee,
+  DailyReports,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -382,6 +383,7 @@ export const routes: RouteConfig[] = [
   { path: "/reports/admin", component: ReportsAdmin, access: "role", positionPermission: "menu_reports_admin" },
   { path: "/reports/management", component: ReportsManagement, access: "role", positionPermission: "menu_reports_management" },
   { path: "/reports/employee", component: ReportsEmployee, access: "role", positionPermission: "menu_reports_employee" },
+  { path: "/reports/daily", component: DailyReports, access: "role", positionPermission: "menu_reports_admin" },
 
   { path: "*", component: NotFound, access: "public" },
 ];

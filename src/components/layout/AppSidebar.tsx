@@ -1259,6 +1259,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     Rapporter Admin
                   </NavLink>
                 )}
+                {p.canViewReportsAdmin && (
+                  <NavLink to="/reports/daily" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/reports/daily" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Calendar className="h-4 w-4" />
+                    Dagsrapporter
+                  </NavLink>
+                )}
                 {p.canViewReportsManagement && (
                   <NavLink to="/reports/management" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
