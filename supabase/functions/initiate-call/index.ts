@@ -12,6 +12,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Only accept POST requests
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ 
+      error: 'Method not allowed. Use POST with JSON body: { toNumber, candidateId, employeeId }' 
+    }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
