@@ -224,7 +224,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const { data: pendingReferralsCount = 0 } = useQuery({
     queryKey: ["pending-referrals-count"],
     queryFn: async () => {
-      if (!p.canViewCandidates) return 0;
+      if (!p.canViewReferrals) return 0;
 
       const { count } = await supabase
         .from("employee_referrals")
@@ -233,7 +233,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
 
       return count || 0;
     },
-    enabled: p.canViewCandidates,
+    enabled: p.canViewReferrals,
     staleTime: 30000,
     refetchOnWindowFocus: true,
     refetchInterval: 60000, // Auto-refresh every 60 seconds
@@ -516,17 +516,19 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               </NavLink>
               
               {/* Anbefal en ven */}
-              <NavLink
-                to="/refer-a-friend"
-                onClick={handleNavClick}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                  location.pathname === "/refer-a-friend" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )}
-              >
-                <Gift className="h-4 w-4" />
-                Anbefal en ven
-              </NavLink>
+              {p.canViewReferAFriend && (
+                <NavLink
+                  to="/refer-a-friend"
+                  onClick={handleNavClick}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/refer-a-friend" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}
+                >
+                  <Gift className="h-4 w-4" />
+                  Anbefal en ven
+                </NavLink>
+              )}
             </CollapsibleContent>
           </Collapsible>
           
@@ -1394,7 +1396,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     {t("sidebar.emailTemplates")}
                   </NavLink>
                 )}
-                {p.canViewCandidates && (
+                {p.canViewReferrals && (
                   <NavLink to="/recruitment/referrals" onClick={handleNavClick} className={cn(
                     "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                     location.pathname === "/recruitment/referrals" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"

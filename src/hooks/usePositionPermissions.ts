@@ -280,6 +280,8 @@ export function usePermissions() {
     canViewMessages: canView("menu_messages"),
     canViewSmsTemplates: canView("menu_sms_templates"),
     canViewEmailTemplates: canView("menu_email_templates"),
+    canViewReferrals: canView("menu_referrals"),
+    canEditReferrals: canEdit("menu_referrals"),
     // Boards menu
     canViewBoardsTest: hasPermission("menu_boards_test"),
     canViewBoardsEconomic: hasPermission("menu_boards_economic"),
@@ -301,6 +303,7 @@ export function usePermissions() {
     canViewMyProfile: canView("menu_my_profile"),
     canViewMyContracts: hasPermission("menu_my_contracts"),
     canViewCareerWishes: hasPermission("menu_career_wishes"),
+    canViewReferAFriend: hasPermission("menu_refer_a_friend"),
     canViewTimeStamp: hasPermission("menu_time_stamp"),
     // System menu
     canViewSettings: canView("menu_settings"),
