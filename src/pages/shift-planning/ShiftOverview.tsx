@@ -829,7 +829,7 @@ export default function ShiftOverview() {
                                 <AlarmClock className="h-4 w-4" />
                                 Forsinket
                               </Button>
-                              {hasShift && (
+                              {hasShift ? (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -842,6 +842,21 @@ export default function ShiftOverview() {
                                 >
                                   <Clock className="h-4 w-4" />
                                   Ændre vagt
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="justify-start gap-2 h-8"
+                                  onClick={() => {
+                                    setSelectedDate(day);
+                                    setSelectedEmployeeId(employee.id);
+                                    setCreateDialogOpen(true);
+                                    setOpenPopoverKey(null);
+                                  }}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  Opret vagt
                                 </Button>
                               )}
                               <Button
