@@ -2742,6 +2742,7 @@ export type Database = {
           private_email: string | null
           private_phone: string | null
           referral_bonus: number | null
+          referral_code: string | null
           salary_amount: number | null
           salary_deduction: number | null
           salary_deduction_note: string | null
@@ -2794,6 +2795,7 @@ export type Database = {
           private_email?: string | null
           private_phone?: string | null
           referral_bonus?: number | null
+          referral_code?: string | null
           salary_amount?: number | null
           salary_deduction?: number | null
           salary_deduction_note?: string | null
@@ -2846,6 +2848,7 @@ export type Database = {
           private_email?: string | null
           private_phone?: string | null
           referral_bonus?: number | null
+          referral_code?: string | null
           salary_amount?: number | null
           salary_deduction?: number | null
           salary_deduction_note?: string | null
@@ -2951,6 +2954,74 @@ export type Database = {
             columns: ["onboarding_day_id"]
             isOneToOne: false
             referencedRelation: "onboarding_days"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_referrals: {
+        Row: {
+          bonus_amount: number | null
+          bonus_eligible_date: string | null
+          bonus_paid_date: string | null
+          candidate_email: string
+          candidate_first_name: string
+          candidate_last_name: string
+          candidate_phone: string | null
+          created_at: string
+          hired_date: string | null
+          id: string
+          message: string | null
+          notes: string | null
+          referral_code: string
+          referrer_employee_id: string
+          referrer_name_provided: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          bonus_amount?: number | null
+          bonus_eligible_date?: string | null
+          bonus_paid_date?: string | null
+          candidate_email: string
+          candidate_first_name: string
+          candidate_last_name: string
+          candidate_phone?: string | null
+          created_at?: string
+          hired_date?: string | null
+          id?: string
+          message?: string | null
+          notes?: string | null
+          referral_code: string
+          referrer_employee_id: string
+          referrer_name_provided: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          bonus_amount?: number | null
+          bonus_eligible_date?: string | null
+          bonus_paid_date?: string | null
+          candidate_email?: string
+          candidate_first_name?: string
+          candidate_last_name?: string
+          candidate_phone?: string | null
+          created_at?: string
+          hired_date?: string | null
+          id?: string
+          message?: string | null
+          notes?: string | null
+          referral_code?: string
+          referrer_employee_id?: string
+          referrer_name_provided?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_referrals_referrer_employee_id_fkey"
+            columns: ["referrer_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
             referencedColumns: ["id"]
           },
         ]
