@@ -84,13 +84,9 @@ export default function ReferAFriend() {
               Du får en bonus på <strong className="text-foreground">3.000 kr.</strong>, hvis du anbefaler en kandidat, der bliver ansat hos os.
             </p>
             
-            <div className="bg-background/50 rounded-lg p-4 space-y-2">
-              <p className="font-medium">For at anbefalingen er gyldig, skal begge punkter være opfyldt:</p>
-              <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                <li>Kandidaten skal søge via dit personlige henvisningslink</li>
-                <li>Kandidaten skal i ansøgningen tydeligt skrive dit navn (for- og efternavn)</li>
-              </ol>
-            </div>
+            <p className="text-muted-foreground">
+              Del dit personlige link herunder. Når din ven udfylder formularen via dit link, registreres henvisningen automatisk på dig.
+            </p>
             
             <div className="flex items-center gap-2 p-3 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-lg">
               <Clock className="h-5 w-5 flex-shrink-0" />

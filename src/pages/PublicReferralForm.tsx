@@ -15,7 +15,6 @@ interface FormData {
   lastName: string;
   email: string;
   phone: string;
-  referrerName: string;
   message: string;
 }
 
@@ -33,7 +32,6 @@ export default function PublicReferralForm() {
       lastName: '',
       email: '',
       phone: '',
-      referrerName: '',
       message: '',
     }
   });
@@ -52,7 +50,7 @@ export default function PublicReferralForm() {
         candidate_last_name: data.lastName,
         candidate_email: data.email,
         candidate_phone: data.phone || undefined,
-        referrer_name_provided: data.referrerName,
+        referrer_name_provided: `${referrer.first_name} ${referrer.last_name}`,
         message: data.message || undefined,
       });
       
@@ -188,20 +186,6 @@ export default function PublicReferralForm() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="referrerName">Hvem anbefalede dig? *</Label>
-              <Input
-                id="referrerName"
-                {...register("referrerName", { required: "Skriv navnet på den der anbefalede dig" })}
-                placeholder="For- og efternavn på den der anbefalede dig"
-              />
-              {errors.referrerName && (
-                <p className="text-sm text-destructive">{errors.referrerName.message}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Vigtigt: Skriv det fulde navn på personen, der anbefalede dig
-              </p>
-            </div>
 
             <div className="space-y-2">
               <Label htmlFor="message">Kort om dig selv (valgfrit)</Label>
