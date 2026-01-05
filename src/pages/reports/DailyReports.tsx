@@ -25,7 +25,11 @@ async function fetchEmployeesWithClientActivity(clientId: string): Promise<strin
   
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const headers = { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` };
+  
+  // Get user's auth token for RLS-protected tables
+  const { data: { session } } = await supabase.auth.getSession();
+  const authToken = session?.access_token || supabaseKey;
+  const headers = { apikey: supabaseKey, Authorization: `Bearer ${authToken}` };
   
   // Get unique agent_names (emails) from sales for this client
   const salesRes = await fetch(
@@ -223,7 +227,10 @@ export default function DailyReports() {
       const endStr = format(dateRange.end, "yyyy-MM-dd");
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
+      
+      // Get user's auth token for RLS-protected tables like sales
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token || supabaseKey;
       let employeeIds: string[] = [];
       let filteredEmployees: any[] = [];
       let agentMappings: any[] = [];
@@ -234,7 +241,7 @@ export default function DailyReports() {
         // First, fetch all sales for this client in the date range to get agent emails
         const salesForClientUrl = `${supabaseUrl}/rest/v1/sales?select=agent_email,client_campaigns!inner(client_id)&client_campaigns.client_id=eq.${selectedClient}&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
         const salesForClientRes = await fetch(salesForClientUrl, {
-          headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
+          headers: { apikey: supabaseKey, Authorization: `Bearer ${authToken}` }
         });
         const salesForClient = await salesForClientRes.json();
         
@@ -395,6 +402,8 @@ export default function DailyReports() {
             "sale_items(quantity,mapped_commission,products(counts_as_sale))"
           ];
           const selectClause = selectParts.join(",");
+          // Use eq for exact match (case-insensitive handled by lowercasing both sides)
+          // The agent_email in sales is stored in various cases, so match lowercase
           const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${encodeURIComponent(e)}`).join(",");
           
           // Build URL without encoding the select clause (PostgREST needs literal !inner)
@@ -411,7 +420,7 @@ export default function DailyReports() {
           const salesRes = await fetch(salesUrl, {
             headers: { 
               apikey: supabaseKey, 
-              Authorization: `Bearer ${supabaseKey}`,
+              Authorization: `Bearer ${authToken}`,
               Accept: "application/json"
             }
           });
