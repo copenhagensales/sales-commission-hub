@@ -225,24 +225,7 @@ serve(async (req) => {
       emailHtml
     );
 
-    // Send copy to admin
-    const adminCopyEmail = "km@copenhagensales.dk";
-    const adminEmailHtml = `
-      <div style="background: #fef3c7; padding: 12px; margin-bottom: 20px; border-radius: 6px; border-left: 4px solid #f59e0b;">
-        <strong>Kopi af invitation sendt til:</strong> ${email}<br>
-        <strong>Medarbejder:</strong> ${firstName} ${lastName || ""}
-      </div>
-      ${emailHtml}
-    `;
-    
-    await sendEmail(
-      accessToken,
-      adminCopyEmail,
-      `[KOPI] Invitation sendt til ${firstName} ${lastName || ""} (${email})`,
-      adminEmailHtml
-    );
-
-    console.log(`Invitation sent to ${email} for employee ${employeeId}, copy sent to ${adminCopyEmail}`);
+    console.log(`Invitation sent to ${email} for employee ${employeeId}`);
 
     return new Response(
       JSON.stringify({ success: true, message: "Invitation sent successfully" }),
