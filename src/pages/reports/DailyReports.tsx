@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, parseISO, eachDayOfInterval, getDay } from "date-fns";
+import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, parseISO, eachDayOfInterval, getDay, isSameDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, ChevronDown, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Search, ChevronDown, ChevronRight, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -25,16 +26,25 @@ const reportColumnOptions = [
   { id: "commission", label: "Provision", icon: Coins },
 ];
 
-interface DailyReportData {
-  employee_id: string;
-  employee_name: string;
-  team_name: string | null;
+interface DailyEntry {
   date: string;
   hours: number;
   is_sick: boolean;
   is_vacation: boolean;
   sales_count: number;
   commission: number;
+}
+
+interface EmployeeReportData {
+  employee_id: string;
+  employee_name: string;
+  team_name: string | null;
+  total_hours: number;
+  sick_days: number;
+  vacation_days: number;
+  total_sales: number;
+  total_commission: number;
+  daily_entries: DailyEntry[];
 }
 
 export default function DailyReports() {
@@ -48,6 +58,7 @@ export default function DailyReports() {
   const [selectedColumns, setSelectedColumns] = useState<string[]>(["hours", "sick_days", "vacation_days", "sales", "commission"]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
 
   const toggleColumn = (columnId: string) => {
     setSelectedColumns(prev => 
@@ -55,6 +66,18 @@ export default function DailyReports() {
         ? prev.filter(id => id !== columnId)
         : [...prev, columnId]
     );
+  };
+
+  const toggleEmployeeExpanded = (employeeId: string) => {
+    setExpandedEmployees(prev => {
+      const next = new Set(prev);
+      if (next.has(employeeId)) {
+        next.delete(employeeId);
+      } else {
+        next.add(employeeId);
+      }
+      return next;
+    });
   };
 
   // Calculate date range based on period
@@ -73,11 +96,9 @@ export default function DailyReports() {
         const lastWeekEnd = endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
         return { start: lastWeekStart, end: lastWeekEnd };
       case "this_month":
-        // Only up to today, not future dates
         return { start: startOfMonth(now), end: endOfDay(today) };
       case "custom":
         if (customStartDate && customEndDate) {
-          // Cap end date to today if it's in the future
           const cappedEnd = customEndDate > today ? today : customEndDate;
           return { start: startOfDay(customStartDate), end: endOfDay(cappedEnd) };
         }
@@ -86,6 +107,10 @@ export default function DailyReports() {
         return { start: startOfDay(now), end: endOfDay(now) };
     }
   }, [period, customStartDate, customEndDate]);
+
+  const isMultipleDays = useMemo(() => {
+    return !isSameDay(dateRange.start, dateRange.end);
+  }, [dateRange]);
 
   // Fetch teams
   const { data: teams = [] } = useQuery({
@@ -136,14 +161,13 @@ export default function DailyReports() {
     },
   });
 
-  // Fetch report data when search is triggered
+  // Fetch report data
   const { data: reportData = [], isLoading: isLoadingReport, refetch: fetchReport } = useQuery({
     queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeam, selectedEmployee],
     queryFn: async () => {
       const startStr = format(dateRange.start, "yyyy-MM-dd");
       const endStr = format(dateRange.end, "yyyy-MM-dd");
 
-      // Get employees with time stamps in the date range
       let employeeQuery = supabase
         .from("employee_master_data")
         .select(`
@@ -161,7 +185,6 @@ export default function DailyReports() {
       const { data: employeesData, error: empError } = await employeeQuery;
       if (empError) throw empError;
 
-      // Filter by team if selected
       let filteredEmployees = employeesData || [];
       if (selectedTeam !== "all") {
         filteredEmployees = filteredEmployees.filter(emp => 
@@ -173,14 +196,6 @@ export default function DailyReports() {
 
       const employeeIds = filteredEmployees.map(e => e.id);
 
-      // Fetch time stamps
-      const { data: timeStamps } = await supabase
-        .from("time_stamps")
-        .select("employee_id, clock_in, clock_out, effective_hours")
-        .in("employee_id", employeeIds)
-        .gte("clock_in", `${startStr}T00:00:00`)
-        .lte("clock_in", `${endStr}T23:59:59`);
-
       // Fetch absences
       const { data: absences } = await supabase
         .from("absence_request_v2")
@@ -190,15 +205,7 @@ export default function DailyReports() {
         .gte("end_date", startStr)
         .eq("status", "approved");
 
-      // Fetch shifts to identify employees with registrations
-      const { data: shifts } = await supabase
-        .from("shift")
-        .select("employee_id, date, start_time, end_time, planned_hours")
-        .in("employee_id", employeeIds)
-        .gte("date", startStr)
-        .lte("date", endStr);
-
-      // Fetch team standard shift data for employees without explicit shifts
+      // Fetch team standard shift data
       const { data: teamMembers } = await supabase
         .from("team_members")
         .select("employee_id, team_id")
@@ -225,7 +232,7 @@ export default function DailyReports() {
 
       const agentNames = agentMappings?.map(m => (m.agents as any)?.name).filter(Boolean) || [];
 
-      // Fetch sales - join through agent mapping
+      // Fetch sales
       let salesData: any[] = [];
       if (agentNames.length > 0) {
         const { data: sales } = await supabase
@@ -244,15 +251,14 @@ export default function DailyReports() {
         salesData = sales || [];
       }
 
-      // Build report data - one entry per employee per day
-      const report: DailyReportData[] = [];
+      // Build report data - aggregate per employee with daily breakdown
+      const report: EmployeeReportData[] = [];
       const daysInRange = eachDayOfInterval({ start: dateRange.start, end: dateRange.end });
 
       for (const emp of filteredEmployees) {
         const empId = emp.id;
         const teamName = emp.team_members?.[0]?.team?.name || null;
         
-        // Get the primary shift for this employee's team
         const empTeamMembership = teamMembers?.find(tm => tm.employee_id === empId);
         const empPrimaryShift = empTeamMembership 
           ? primaryShifts?.find(ps => ps.team_id === empTeamMembership.team_id)
@@ -261,30 +267,31 @@ export default function DailyReports() {
           ? shiftDays?.filter(sd => sd.shift_id === empPrimaryShift.id) || []
           : [];
 
-        // Get agent mapping for sales
         const empAgentMapping = agentMappings?.find(m => m.employee_id === empId);
         const agentName = (empAgentMapping?.agents as any)?.name;
 
-        // Create entry for each day
+        const dailyEntries: DailyEntry[] = [];
+        let totalHours = 0;
+        let sickDays = 0;
+        let vacationDays = 0;
+        let totalSales = 0;
+        let totalCommission = 0;
+
         for (const day of daysInRange) {
           const dayStr = format(day, "yyyy-MM-dd");
           const dayOfWeek = getDay(day);
           const adjustedDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
           
-          // Find shift for this day
           const shiftForDay = empShiftDays.find(sd => sd.day_of_week === adjustedDayOfWeek);
           
-          // Skip if no shift for this day (weekend or no standard shift)
           if (!shiftForDay || !shiftForDay.start_time || !shiftForDay.end_time) {
             continue;
           }
 
-          // Calculate hours for this day
           const [startH, startM] = shiftForDay.start_time.split(':').map(Number);
           const [endH, endM] = shiftForDay.end_time.split(':').map(Number);
           const hours = (endH + endM / 60) - (startH + startM / 60);
 
-          // Check absences for this specific day
           const empAbsences = absences?.filter(a => 
             a.employee_id === empId && 
             a.start_date <= dayStr && 
@@ -293,7 +300,6 @@ export default function DailyReports() {
           const isSick = empAbsences.some(a => a.type === "sick");
           const isVacation = empAbsences.some(a => a.type === "vacation");
 
-          // Get sales for this day
           const dayStart = `${dayStr}T00:00:00`;
           const dayEnd = `${dayStr}T23:59:59`;
           const empSales = agentName 
@@ -310,10 +316,7 @@ export default function DailyReports() {
             return sum + saleCommission;
           }, 0);
 
-          report.push({
-            employee_id: empId,
-            employee_name: `${emp.first_name} ${emp.last_name}`,
-            team_name: teamName,
+          dailyEntries.push({
             date: dayStr,
             hours: Math.round(hours * 100) / 100,
             is_sick: isSick,
@@ -321,21 +324,37 @@ export default function DailyReports() {
             sales_count: salesCount,
             commission: Math.round(commission),
           });
+
+          totalHours += hours;
+          if (isSick) sickDays++;
+          if (isVacation) vacationDays++;
+          totalSales += salesCount;
+          totalCommission += commission;
+        }
+
+        if (dailyEntries.length > 0) {
+          report.push({
+            employee_id: empId,
+            employee_name: `${emp.first_name} ${emp.last_name}`,
+            team_name: teamName,
+            total_hours: Math.round(totalHours * 100) / 100,
+            sick_days: sickDays,
+            vacation_days: vacationDays,
+            total_sales: totalSales,
+            total_commission: Math.round(totalCommission),
+            daily_entries: dailyEntries.sort((a, b) => b.date.localeCompare(a.date)),
+          });
         }
       }
 
-      return report.sort((a, b) => {
-        // Sort by date descending, then by name
-        const dateCompare = b.date.localeCompare(a.date);
-        if (dateCompare !== 0) return dateCompare;
-        return a.employee_name.localeCompare(b.employee_name);
-      });
+      return report.sort((a, b) => a.employee_name.localeCompare(b.employee_name));
     },
     enabled: hasSearched,
   });
 
   const handleSearch = () => {
     setHasSearched(true);
+    setExpandedEmployees(new Set());
     fetchReport();
     toast.success("Dagsrapport genereres...");
     setFilterOpen(false);
@@ -359,10 +378,16 @@ export default function DailyReports() {
     { value: "custom", label: "Brugerdefineret" },
   ];
 
-  const formatTime = (isoString: string | null) => {
-    if (!isoString) return "-";
-    return format(parseISO(isoString), "HH:mm");
-  };
+  const totals = useMemo(() => {
+    return reportData.reduce(
+      (acc, row) => ({
+        hours: acc.hours + row.total_hours,
+        sales: acc.sales + row.total_sales,
+        commission: acc.commission + row.total_commission,
+      }),
+      { hours: 0, sales: 0, commission: 0 }
+    );
+  }, [reportData]);
 
   return (
     <MainLayout>
@@ -376,231 +401,215 @@ export default function DailyReports() {
           </div>
           
           <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="icon" className="relative h-10 w-10">
-                  <Search className="h-5 w-5" />
-                  {getActiveFilterCount() > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                      {getActiveFilterCount()}
-                    </Badge>
-                  )}
-                </Button>
-              </SheetTrigger>
-              <SheetContent 
-                side="right" 
-                className="w-[340px] p-0 border-0 bg-gradient-to-b from-emerald-600 via-teal-600 to-cyan-700"
-              >
-                <div className="flex flex-col h-full p-6">
-                  <SheetHeader className="mb-6">
-                    <SheetTitle className="text-white text-lg">Filtre</SheetTitle>
-                  </SheetHeader>
-                  
-                  <div className="flex-1 space-y-4">
-                    {/* Periode */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-white/70 font-medium">Periode</label>
-                      <Select value={period} onValueChange={setPeriod}>
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {periodOptions.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Custom date range */}
-                    {period === "custom" && (
-                      <div className="space-y-3">
-                        <div className="space-y-1.5">
-                          <label className="text-xs text-white/70 font-medium">Fra dato</label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full justify-start text-left font-normal bg-white/10 border-white/20 text-white hover:bg-white/20",
-                                  !customStartDate && "text-white/50"
-                                )}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {customStartDate ? format(customStartDate, "d. MMM yyyy", { locale: da }) : "Vælg startdato"}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <CalendarComponent
-                                mode="single"
-                                selected={customStartDate}
-                                onSelect={setCustomStartDate}
-                                initialFocus
-                                className="p-3 pointer-events-auto"
-                                locale={da}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-xs text-white/70 font-medium">Til dato</label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full justify-start text-left font-normal bg-white/10 border-white/20 text-white hover:bg-white/20",
-                                  !customEndDate && "text-white/50"
-                                )}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {customEndDate ? format(customEndDate, "d. MMM yyyy", { locale: da }) : "Vælg slutdato"}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <CalendarComponent
-                                mode="single"
-                                selected={customEndDate}
-                                onSelect={setCustomEndDate}
-                                initialFocus
-                                className="p-3 pointer-events-auto"
-                                locale={da}
-                                disabled={(date) => customStartDate ? date < customStartDate : false}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Teams */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-white/70 font-medium">Teams</label>
-                      <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                          <div className="flex items-center justify-between w-full">
-                            <SelectValue placeholder="Alle" />
-                            <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
-                          </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Alle</SelectItem>
-                          {teams.map((team) => (
-                            <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Medarbejdere */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-white/70 font-medium">Medarbejdere</label>
-                      <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                          <div className="flex items-center justify-between w-full">
-                            <SelectValue placeholder="Alle" />
-                            <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
-                          </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Alle</SelectItem>
-                          {employees.map((emp) => (
-                            <SelectItem key={emp.id} value={emp.id}>
-                              {emp.first_name} {emp.last_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Kunder */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-white/70 font-medium">Kunder</label>
-                      <Select value={selectedClient} onValueChange={setSelectedClient}>
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                          <div className="flex items-center justify-between w-full">
-                            <SelectValue placeholder="Alle" />
-                            <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
-                          </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Alle</SelectItem>
-                          {clients.map((client) => (
-                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Kampagner */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-white/70 font-medium">Kampagner</label>
-                      <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                          <div className="flex items-center justify-between w-full">
-                            <SelectValue placeholder="Alle" />
-                            <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
-                          </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Alle</SelectItem>
-                          {campaigns.map((campaign) => (
-                            <SelectItem key={campaign.id} value={campaign.id}>
-                              {campaign.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Rapport kolonner */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-white/70 font-medium">Kolonner i rapport</label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            className="w-full justify-between bg-white/10 border-white/20 text-white hover:bg-white/20"
-                          >
-                            <span>
-                              {selectedColumns.length === 0 
-                                ? "Vælg kolonner" 
-                                : `${selectedColumns.length} valgt`}
-                            </span>
-                            <ChevronDown className="h-4 w-4 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[290px] p-2" align="start">
-                          <div className="space-y-1">
-                            {reportColumnOptions.map((column) => (
-                              <div 
-                                key={column.id}
-                                className="flex items-center space-x-3 p-2 rounded-md hover:bg-accent cursor-pointer"
-                                onClick={() => toggleColumn(column.id)}
-                              >
-                                <Checkbox 
-                                  checked={selectedColumns.includes(column.id)}
-                                  onCheckedChange={() => toggleColumn(column.id)}
-                                />
-                                <column.icon className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm">{column.label}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" className="relative h-10 w-10">
+                <Search className="h-5 w-5" />
+                {getActiveFilterCount() > 0 && (
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                    {getActiveFilterCount()}
+                  </Badge>
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent 
+              side="right" 
+              className="w-[340px] p-0 border-0 bg-gradient-to-b from-emerald-600 via-teal-600 to-cyan-700"
+            >
+              <div className="flex flex-col h-full p-6">
+                <SheetHeader className="mb-6">
+                  <SheetTitle className="text-white text-lg">Filtre</SheetTitle>
+                </SheetHeader>
+                
+                <div className="flex-1 space-y-4">
+                  {/* Periode */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-white/70 font-medium">Periode</label>
+                    <Select value={period} onValueChange={setPeriod}>
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {periodOptions.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {/* Search Button */}
+                  {/* Custom date range */}
+                  {period === "custom" && (
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs text-white/70 font-medium">Fra dato</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal bg-white/10 border-white/20 text-white hover:bg-white/20",
+                                !customStartDate && "text-white/50"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {customStartDate ? format(customStartDate, "d. MMM yyyy", { locale: da }) : "Vælg startdato"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <CalendarComponent
+                              mode="single"
+                              selected={customStartDate}
+                              onSelect={setCustomStartDate}
+                              initialFocus
+                              className="p-3 pointer-events-auto"
+                              locale={da}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs text-white/70 font-medium">Til dato</label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal bg-white/10 border-white/20 text-white hover:bg-white/20",
+                                !customEndDate && "text-white/50"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {customEndDate ? format(customEndDate, "d. MMM yyyy", { locale: da }) : "Vælg slutdato"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <CalendarComponent
+                              mode="single"
+                              selected={customEndDate}
+                              onSelect={setCustomEndDate}
+                              initialFocus
+                              className="p-3 pointer-events-auto"
+                              locale={da}
+                              disabled={(date) => customStartDate ? date < customStartDate : false}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Teams */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-white/70 font-medium">Teams</label>
+                    <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                        <div className="flex items-center justify-between w-full">
+                          <SelectValue placeholder="Alle" />
+                          <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle</SelectItem>
+                        {teams.map((team) => (
+                          <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Medarbejdere */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-white/70 font-medium">Medarbejdere</label>
+                    <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                        <div className="flex items-center justify-between w-full">
+                          <SelectValue placeholder="Alle" />
+                          <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle</SelectItem>
+                        {employees.map((emp) => (
+                          <SelectItem key={emp.id} value={emp.id}>
+                            {emp.first_name} {emp.last_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Kunder */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-white/70 font-medium">Kunder</label>
+                    <Select value={selectedClient} onValueChange={setSelectedClient}>
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                        <div className="flex items-center justify-between w-full">
+                          <SelectValue placeholder="Alle" />
+                          <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle</SelectItem>
+                        {clients.map((client) => (
+                          <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Kampagner */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-white/70 font-medium">Kampagner</label>
+                    <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+                      <SelectTrigger className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                        <div className="flex items-center justify-between w-full">
+                          <SelectValue placeholder="Alle" />
+                          <SlidersHorizontal className="h-4 w-4 ml-2 opacity-50" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle</SelectItem>
+                        {campaigns.map((campaign) => (
+                          <SelectItem key={campaign.id} value={campaign.id}>{campaign.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Column selection */}
+                  <div className="space-y-1.5 pt-4 border-t border-white/20">
+                    <label className="text-xs text-white/70 font-medium">Vis kolonner</label>
+                    <div className="space-y-2">
+                      {reportColumnOptions.map((col) => (
+                        <div key={col.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={col.id}
+                            checked={selectedColumns.includes(col.id)}
+                            onCheckedChange={() => toggleColumn(col.id)}
+                            className="border-white/40 data-[state=checked]:bg-white data-[state=checked]:text-emerald-600"
+                          />
+                          <label
+                            htmlFor={col.id}
+                            className="text-sm text-white/90 flex items-center gap-2 cursor-pointer"
+                          >
+                            <col.icon className="h-4 w-4" />
+                            {col.label}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-white/20">
                   <Button 
-                    onClick={handleSearch} 
-                    className="w-full mt-6 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-6"
-                    size="lg"
+                    onClick={handleSearch}
+                    className="w-full bg-white text-emerald-700 hover:bg-white/90 font-semibold"
                   >
                     SØG
                   </Button>
                 </div>
-              </SheetContent>
+              </div>
+            </SheetContent>
           </Sheet>
         </div>
 
@@ -615,7 +624,7 @@ export default function DailyReports() {
               {periodOptions.find(p => p.value === period)?.label || "I dag"}
               {" • "}
               {format(dateRange.start, "d. MMM", { locale: da })}
-              {period.includes("week") && ` - ${format(dateRange.end, "d. MMM", { locale: da })}`}
+              {isMultipleDays && ` - ${format(dateRange.end, "d. MMM", { locale: da })}`}
               {selectedTeam !== "all" && ` • ${teams.find(t => t.id === selectedTeam)?.name}`}
               {selectedEmployee !== "all" && ` • ${employees.find(e => e.id === selectedEmployee)?.first_name} ${employees.find(e => e.id === selectedEmployee)?.last_name}`}
             </p>
@@ -647,7 +656,8 @@ export default function DailyReports() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Dato</TableHead>
+                      {isMultipleDays && <TableHead className="w-8"></TableHead>}
+                      {!isMultipleDays && <TableHead>Dato</TableHead>}
                       <TableHead>Medarbejder</TableHead>
                       <TableHead>Team</TableHead>
                       {selectedColumns.includes("hours") && <TableHead className="text-right">Timer</TableHead>}
@@ -658,86 +668,146 @@ export default function DailyReports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {reportData.map((row, idx) => (
-                      <TableRow key={`${row.employee_id}-${row.date}-${idx}`}>
-                        <TableCell className="font-medium">{format(parseISO(row.date), "d. MMM", { locale: da })}</TableCell>
-                        <TableCell>{row.employee_name}</TableCell>
-                        <TableCell className="text-muted-foreground">{row.team_name || "-"}</TableCell>
-                        {selectedColumns.includes("hours") && (
-                          <TableCell className="text-right font-medium">
-                            {row.hours > 0 ? `${row.hours.toFixed(1)}t` : "-"}
-                          </TableCell>
-                        )}
-                        {selectedColumns.includes("sick_days") && (
-                          <TableCell className="text-center">
-                            {row.is_sick ? (
-                              <Badge variant="destructive" className="gap-1">
-                                <Thermometer className="h-3 w-3" />
-                                Syg
-                              </Badge>
-                            ) : "-"}
-                          </TableCell>
-                        )}
-                        {selectedColumns.includes("vacation_days") && (
-                          <TableCell className="text-center">
-                            {row.is_vacation ? (
-                              <Badge className="gap-1 bg-amber-500 hover:bg-amber-600">
-                                <Palmtree className="h-3 w-3" />
-                                Ferie
-                              </Badge>
-                            ) : "-"}
-                          </TableCell>
-                        )}
-                        {selectedColumns.includes("sales") && (
-                          <TableCell className="text-right">
-                            {row.sales_count > 0 ? (
-                              <span className="font-medium text-green-600 dark:text-green-400">
-                                {row.sales_count}
-                              </span>
-                            ) : "-"}
-                          </TableCell>
-                        )}
-                        {selectedColumns.includes("commission") && (
-                          <TableCell className="text-right">
-                            {row.commission > 0 ? (
-                              <span className="font-medium text-green-600 dark:text-green-400">
-                                {row.commission.toLocaleString("da-DK")} kr.
-                              </span>
-                            ) : "-"}
-                          </TableCell>
-                        )}
-                      </TableRow>
+                    {reportData.map((row) => (
+                      <>
+                        {/* Main row - aggregated or single day */}
+                        <TableRow 
+                          key={row.employee_id}
+                          className={cn(isMultipleDays && "cursor-pointer hover:bg-muted/50")}
+                          onClick={isMultipleDays ? () => toggleEmployeeExpanded(row.employee_id) : undefined}
+                        >
+                          {isMultipleDays && (
+                            <TableCell className="w-8 p-2">
+                              {expandedEmployees.has(row.employee_id) ? (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </TableCell>
+                          )}
+                          {!isMultipleDays && (
+                            <TableCell className="font-medium">
+                              {format(parseISO(row.daily_entries[0]?.date || format(dateRange.start, "yyyy-MM-dd")), "d. MMM", { locale: da })}
+                            </TableCell>
+                          )}
+                          <TableCell className="font-medium">{row.employee_name}</TableCell>
+                          <TableCell className="text-muted-foreground">{row.team_name || "-"}</TableCell>
+                          {selectedColumns.includes("hours") && (
+                            <TableCell className="text-right font-medium">
+                              {row.total_hours > 0 ? `${row.total_hours.toFixed(1)}t` : "-"}
+                            </TableCell>
+                          )}
+                          {selectedColumns.includes("sick_days") && (
+                            <TableCell className="text-center">
+                              {row.sick_days > 0 ? (
+                                <Badge variant="destructive" className="gap-1">
+                                  <Thermometer className="h-3 w-3" />
+                                  {row.sick_days} {row.sick_days === 1 ? "dag" : "dage"}
+                                </Badge>
+                              ) : "-"}
+                            </TableCell>
+                          )}
+                          {selectedColumns.includes("vacation_days") && (
+                            <TableCell className="text-center">
+                              {row.vacation_days > 0 ? (
+                                <Badge className="gap-1 bg-amber-500 hover:bg-amber-600">
+                                  <Palmtree className="h-3 w-3" />
+                                  {row.vacation_days} {row.vacation_days === 1 ? "dag" : "dage"}
+                                </Badge>
+                              ) : "-"}
+                            </TableCell>
+                          )}
+                          {selectedColumns.includes("sales") && (
+                            <TableCell className="text-right">
+                              {row.total_sales > 0 ? (
+                                <span className="font-medium text-green-600 dark:text-green-400">
+                                  {row.total_sales}
+                                </span>
+                              ) : "-"}
+                            </TableCell>
+                          )}
+                          {selectedColumns.includes("commission") && (
+                            <TableCell className="text-right">
+                              {row.total_commission > 0 ? (
+                                <span className="font-medium text-green-600 dark:text-green-400">
+                                  {row.total_commission.toLocaleString("da-DK")} kr.
+                                </span>
+                              ) : "-"}
+                            </TableCell>
+                          )}
+                        </TableRow>
+
+                        {/* Expanded daily details */}
+                        {isMultipleDays && expandedEmployees.has(row.employee_id) && row.daily_entries.map((entry) => (
+                          <TableRow key={`${row.employee_id}-${entry.date}`} className="bg-muted/30">
+                            <TableCell></TableCell>
+                            <TableCell className="text-muted-foreground pl-6">
+                              {format(parseISO(entry.date), "EEEE d. MMM", { locale: da })}
+                            </TableCell>
+                            <TableCell></TableCell>
+                            {selectedColumns.includes("hours") && (
+                              <TableCell className="text-right text-muted-foreground">
+                                {entry.hours > 0 ? `${entry.hours.toFixed(1)}t` : "-"}
+                              </TableCell>
+                            )}
+                            {selectedColumns.includes("sick_days") && (
+                              <TableCell className="text-center">
+                                {entry.is_sick ? (
+                                  <Badge variant="destructive" className="gap-1 text-xs">
+                                    <Thermometer className="h-3 w-3" />
+                                    Syg
+                                  </Badge>
+                                ) : "-"}
+                              </TableCell>
+                            )}
+                            {selectedColumns.includes("vacation_days") && (
+                              <TableCell className="text-center">
+                                {entry.is_vacation ? (
+                                  <Badge className="gap-1 bg-amber-500 hover:bg-amber-600 text-xs">
+                                    <Palmtree className="h-3 w-3" />
+                                    Ferie
+                                  </Badge>
+                                ) : "-"}
+                              </TableCell>
+                            )}
+                            {selectedColumns.includes("sales") && (
+                              <TableCell className="text-right text-muted-foreground">
+                                {entry.sales_count > 0 ? entry.sales_count : "-"}
+                              </TableCell>
+                            )}
+                            {selectedColumns.includes("commission") && (
+                              <TableCell className="text-right text-muted-foreground">
+                                {entry.commission > 0 ? `${entry.commission.toLocaleString("da-DK")} kr.` : "-"}
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                      </>
                     ))}
                   </TableBody>
                 </Table>
 
                 {/* Summary row */}
                 <div className="border-t bg-muted/30 p-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{reportData.length} medarbejdere</span>
-                    <div className="flex gap-6">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">Total ({reportData.length} medarbejdere)</span>
+                    <div className="flex items-center gap-6 text-sm">
                       {selectedColumns.includes("hours") && (
-                        <span>
-                          <span className="text-muted-foreground">Total timer:</span>{" "}
-                          <span className="font-medium">
-                            {reportData.reduce((sum, r) => sum + r.hours, 0).toFixed(1)}t
-                          </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{totals.hours.toFixed(1)}t</span>
                         </span>
                       )}
                       {selectedColumns.includes("sales") && (
-                        <span>
-                          <span className="text-muted-foreground">Total salg:</span>{" "}
-                          <span className="font-medium text-green-600 dark:text-green-400">
-                            {reportData.reduce((sum, r) => sum + r.sales_count, 0)}
-                          </span>
+                        <span className="flex items-center gap-1">
+                          <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          <span className="font-medium text-green-600 dark:text-green-400">{totals.sales} salg</span>
                         </span>
                       )}
                       {selectedColumns.includes("commission") && (
-                        <span>
-                          <span className="text-muted-foreground">Total provision:</span>{" "}
-                          <span className="font-medium text-green-600 dark:text-green-400">
-                            {reportData.reduce((sum, r) => sum + r.commission, 0).toLocaleString("da-DK")} kr.
-                          </span>
+                        <span className="flex items-center gap-1">
+                          <Coins className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          <span className="font-medium text-green-600 dark:text-green-400">{totals.commission.toLocaleString("da-DK")} kr.</span>
                         </span>
                       )}
                     </div>
