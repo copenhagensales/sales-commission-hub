@@ -217,7 +217,7 @@ export default function DailyReports() {
 
   // Fetch report data
   const { data: reportData = [], isLoading: isLoadingReport, refetch: fetchReport } = useQuery({
-    queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeam, selectedEmployee],
+    queryKey: ["daily-report-data", format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd"), selectedTeam, selectedEmployee, selectedClient],
     queryFn: async () => {
       const startStr = format(dateRange.start, "yyyy-MM-dd");
       const endStr = format(dateRange.end, "yyyy-MM-dd");
@@ -299,23 +299,22 @@ export default function DailyReports() {
       // Fetch sales with sale_items - same logic as KPI sales-count
       let salesData: any[] = [];
       if (uniqueAgentIdentifiers.length > 0) {
-        const { data: sales } = await supabase
-          .from("sales")
-          .select(`
-            id,
-            agent_name,
-            sale_datetime,
-            sale_items(
-              quantity,
-              mapped_commission,
-              products(counts_as_sale)
-            )
-          `)
-          .in("agent_name", uniqueAgentIdentifiers)
-          .gte("sale_datetime", `${startStr}T00:00:00`)
-          .lte("sale_datetime", `${endStr}T23:59:59`);
-        salesData = sales || [];
-        console.log("[DailyReport] Sales fetched:", salesData.length, salesData.map(s => ({ agent: s.agent_name, items: s.sale_items?.length })));
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        
+        let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,agent_name,sale_datetime,client_id,sale_items(quantity,mapped_commission,products(counts_as_sale))`;
+        salesUrl += `&agent_name=in.(${uniqueAgentIdentifiers.map(a => `"${a}"`).join(",")})`;
+        salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+        
+        if (selectedClient !== "all") {
+          salesUrl += `&client_id=eq.${selectedClient}`;
+        }
+        
+        const salesRes = await fetch(salesUrl, {
+          headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
+        });
+        salesData = await salesRes.json();
+        console.log("[DailyReport] Sales fetched:", salesData.length, salesData.map((s: any) => ({ agent: s.agent_name, items: s.sale_items?.length })));
       }
 
       // Fetch fieldmarketing sales (linked directly to employee via seller_id)
