@@ -98,6 +98,9 @@ import {
   ReferAFriend,
   PublicReferralForm,
   Referrals,
+  ReportsAdmin,
+  ReportsManagement,
+  ReportsEmployee,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -374,6 +377,11 @@ export const routes: RouteConfig[] = [
 
   // Live Stats (hidden from sidebar, accessible via URL only)
   { path: "/live-stats", component: LiveStats, access: "protected" },
+
+  // Reports
+  { path: "/reports/admin", component: ReportsAdmin, access: "role", positionPermission: "menu_reports_admin" },
+  { path: "/reports/management", component: ReportsManagement, access: "role", positionPermission: "menu_reports_management" },
+  { path: "/reports/employee", component: ReportsEmployee, access: "role", positionPermission: "menu_reports_employee" },
 
   { path: "*", component: NotFound, access: "public" },
 ];

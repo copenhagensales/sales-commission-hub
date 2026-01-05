@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift, FileBarChart } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,6 +60,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   );
   const [onboardingOpen, setOnboardingOpen] = useState(
     location.pathname.startsWith("/onboarding-program") || location.pathname === "/onboarding-program/kursus" || location.pathname === "/coaching-templates"
+  );
+  const [reportsOpen, setReportsOpen] = useState(
+    location.pathname.startsWith("/reports")
   );
 
   // Fetch employee name and pending contracts count
@@ -332,7 +335,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   
   // Check if any Onboarding items are visible - only show for admin users (system not ready for employees yet)
   const showOnboardingMenu = p.canViewOnboardingAdmin;
-  
+
+  // Check if any Reports menu items are visible
+  const showReportsMenu = p.canViewReportsAdmin || p.canViewReportsManagement || p.canViewReportsEmployee;
   return (
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
@@ -1225,6 +1230,51 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   )}>
                     <BarChart3 className="h-4 w-4" />
                     {t("sidebar.pulseSurveyResults")}
+                  </NavLink>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Rapporter menu */}
+          {showReportsMenu && (
+            <Collapsible open={reportsOpen} onOpenChange={setReportsOpen}>
+              <CollapsibleTrigger className={cn(
+                "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                location.pathname.startsWith("/reports") ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}>
+                <div className="flex items-center gap-3">
+                  <FileBarChart className="h-5 w-5" />
+                  Rapporter
+                </div>
+                {reportsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 space-y-1 mt-1">
+                {p.canViewReportsAdmin && (
+                  <NavLink to="/reports/admin" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/reports/admin" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Crown className="h-4 w-4" />
+                    Rapporter Admin
+                  </NavLink>
+                )}
+                {p.canViewReportsManagement && (
+                  <NavLink to="/reports/management" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/reports/management" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Users className="h-4 w-4" />
+                    Rapporter Ledelse
+                  </NavLink>
+                )}
+                {p.canViewReportsEmployee && (
+                  <NavLink to="/reports/employee" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/reports/employee" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <User className="h-4 w-4" />
+                    Rapporter Medarbejder
                   </NavLink>
                 )}
               </CollapsibleContent>
