@@ -136,9 +136,12 @@ export function CallsAnalytics({ dateRange, selectedClientId }: CallsAnalyticsPr
         }
       }
 
-      // Filter by client if needed
-      if (allowedCampaignIds && allowedCampaignIds.size > 0) {
-        return allCalls.filter((c) => allowedCampaignIds.has(c.campaign_external_id));
+      // Filter by client if needed - if client selected but no mappings, return empty
+      if (selectedClientId) {
+        if (!allowedCampaignIds || allowedCampaignIds.size === 0) {
+          return [];
+        }
+        return allCalls.filter((c) => c.campaign_external_id && allowedCampaignIds.has(c.campaign_external_id));
       }
 
       return allCalls;
