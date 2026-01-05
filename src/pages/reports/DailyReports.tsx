@@ -253,6 +253,20 @@ export default function DailyReports() {
         salesData = sales || [];
       }
 
+      // Fetch fieldmarketing sales (linked directly to employee via seller_id)
+      const { data: fmSalesData } = await supabase
+        .from("fieldmarketing_sales")
+        .select(`
+          id,
+          seller_id,
+          registered_at,
+          product_name,
+          products!fieldmarketing_sales_product_id_fkey(commission_dkk)
+        `)
+        .in("seller_id", employeeIds)
+        .gte("registered_at", `${startStr}T00:00:00`)
+        .lte("registered_at", `${endStr}T23:59:59`);
+
       // Build report data - aggregate per employee with daily breakdown
       const report: EmployeeReportData[] = [];
       const daysInRange = eachDayOfInterval({ start: dateRange.start, end: dateRange.end });
@@ -304,6 +318,8 @@ export default function DailyReports() {
 
           const dayStart = `${dayStr}T00:00:00`;
           const dayEnd = `${dayStr}T23:59:59`;
+          
+          // Regular sales via agent mapping
           const empSales = agentName 
             ? salesData.filter(s => {
                 const saleDate = s.sale_datetime;
@@ -311,7 +327,13 @@ export default function DailyReports() {
               })
             : [];
 
-          // Count sales using sale_items with counts_as_sale (same as KPI)
+          // Fieldmarketing sales via seller_id
+          const empFmSales = (fmSalesData || []).filter((s: any) => {
+            const saleDate = s.registered_at;
+            return s.seller_id === empId && saleDate >= dayStart && saleDate <= dayEnd;
+          });
+
+          // Count regular sales using sale_items with counts_as_sale (same as KPI)
           let salesCount = 0;
           let commission = 0;
           empSales.forEach((sale: any) => {
@@ -322,6 +344,12 @@ export default function DailyReports() {
               }
               commission += Number(item.mapped_commission) || 0;
             });
+          });
+
+          // Add fieldmarketing sales
+          empFmSales.forEach((sale: any) => {
+            salesCount += 1;
+            commission += Number(sale.products?.commission_dkk) || 0;
           });
 
           dailyEntries.push({
