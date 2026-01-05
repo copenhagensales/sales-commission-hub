@@ -13,9 +13,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp, X } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { SendSmsDialog } from "@/components/recruitment/SendSmsDialog";
 import { SendEmailDialog } from "@/components/recruitment/SendEmailDialog";
@@ -71,7 +73,7 @@ export default function CandidateDetail() {
   const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showInterviewDialog, setShowInterviewDialog] = useState(false);
-  const [interviewDate, setInterviewDate] = useState("");
+  const [interviewDate, setInterviewDate] = useState<Date | undefined>(undefined);
   const [interviewTime, setInterviewTime] = useState("10:00");
   const [newNote, setNewNote] = useState("");
   const [noteType, setNoteType] = useState("Generel observation");
@@ -167,7 +169,8 @@ export default function CandidateDetail() {
       if (!interviewDate || !interviewTime) {
         throw new Error("Vælg dato og tidspunkt");
       }
-      const dateTime = `${interviewDate}T${interviewTime}:00`;
+      const dateStr = format(interviewDate, "yyyy-MM-dd");
+      const dateTime = `${dateStr}T${interviewTime}:00`;
       const { error } = await supabase
         .from("candidates")
         .update({ 
@@ -180,7 +183,7 @@ export default function CandidateDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["candidate", id] });
       setShowInterviewDialog(false);
-      setInterviewDate("");
+      setInterviewDate(undefined);
       setInterviewTime("10:00");
       toast.success("Samtale planlagt");
     },
@@ -521,7 +524,6 @@ export default function CandidateDetail() {
       applied_position: candidate.applied_position
     }} />
 
-      {/* Schedule Interview Dialog */}
       <Dialog open={showInterviewDialog} onOpenChange={setShowInterviewDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -529,13 +531,14 @@ export default function CandidateDetail() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="interview-date">Dato</Label>
-              <Input
-                id="interview-date"
-                type="date"
-                value={interviewDate}
-                onChange={(e) => setInterviewDate(e.target.value)}
-                min={new Date().toISOString().split("T")[0]}
+              <Label>Dato</Label>
+              <CalendarComponent
+                mode="single"
+                selected={interviewDate}
+                onSelect={setInterviewDate}
+                disabled={(date) => date < new Date()}
+                locale={da}
+                className={cn("rounded-md border pointer-events-auto")}
               />
             </div>
             <div className="space-y-2">
