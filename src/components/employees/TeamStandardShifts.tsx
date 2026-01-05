@@ -487,10 +487,28 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       toast({ title: "Udfyld navn og tidspunkter", variant: "destructive" });
       return;
     }
+    
+    // If using "Samme tider" mode, update all enabled dayConfigs to use the general times
+    let finalDayConfigs = dayConfigs;
+    if (!useDifferentTimes) {
+      finalDayConfigs = { ...dayConfigs };
+      Object.keys(finalDayConfigs).forEach(day => {
+        const dayNum = parseInt(day);
+        if (finalDayConfigs[dayNum].enabled) {
+          finalDayConfigs[dayNum] = {
+            ...finalDayConfigs[dayNum],
+            start_time: formData.start_time,
+            end_time: formData.end_time,
+            breaks: [], // Clear day-specific breaks when using same times
+          };
+        }
+      });
+    }
+    
     if (editingShift) {
-      updateMutation.mutate({ ...formData, id: editingShift.id, breaks, dayConfigs });
+      updateMutation.mutate({ ...formData, id: editingShift.id, breaks, dayConfigs: finalDayConfigs });
     } else {
-      createMutation.mutate({ ...formData, breaks, dayConfigs });
+      createMutation.mutate({ ...formData, breaks, dayConfigs: finalDayConfigs });
     }
   };
 
