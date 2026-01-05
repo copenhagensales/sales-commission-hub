@@ -346,7 +346,6 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
                     <TableHead>Sælger</TableHead>
                     <TableHead>Lokation</TableHead>
                     <TableHead>Produkt</TableHead>
-                    <TableHead>Telefon</TableHead>
                     <TableHead className="text-right">Provision</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -361,7 +360,6 @@ const ClientDashboard = ({ clientId, clientName, selectedDate }: { clientId: str
                       </TableCell>
                       <TableCell>{sale.location?.name || "-"}</TableCell>
                       <TableCell>{sale.product_name}</TableCell>
-                      <TableCell className="font-mono">{sale.phone_number}</TableCell>
                       <TableCell className="text-right font-mono">
                         {sale.commission.toLocaleString("da-DK")} kr
                       </TableCell>
