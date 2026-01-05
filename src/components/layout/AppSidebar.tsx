@@ -1072,6 +1072,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     Fieldmarketing
                   </NavLink>
                 )}
+                {p.canViewDashboardFieldmarketing && (
+                  <NavLink to="/dashboards/fieldmarketing-goals" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/dashboards/fieldmarketing-goals" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Target className="h-4 w-4" />
+                    Fieldmarketing Mål
+                  </NavLink>
+                )}
                 {p.canViewDashboardEesyTm && (
                   <NavLink to="/dashboards/eesy-tm" onClick={handleNavClick} className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
