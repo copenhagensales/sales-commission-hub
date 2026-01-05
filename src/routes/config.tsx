@@ -94,6 +94,9 @@ import {
   LiveStats,
   HeadToHead,
   CoachingTemplates,
+  ReferAFriend,
+  PublicReferralForm,
+  Referrals,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -118,7 +121,9 @@ export const routes: RouteConfig[] = [
   { path: "/extra-work", component: ExtraWork, access: "protected" },
   { path: "/some", component: Some, access: "protected" },
   { path: "/messages", component: Messages, access: "protected" },
+  { path: "/refer-a-friend", component: ReferAFriend, access: "protected" },
 
+  { path: "/refer/:code", component: PublicReferralForm, access: "public" },
   { path: "/contract/:id", component: ContractSign, access: "public" },
   { path: "/contract/sign/:id", component: ContractSign, access: "public" },
 
@@ -263,6 +268,12 @@ export const routes: RouteConfig[] = [
     component: UpcomingHires,
     access: "role",
     positionPermission: "menu_upcoming_hires",
+  },
+  {
+    path: "/recruitment/referrals",
+    component: Referrals,
+    access: "role",
+    positionPermission: "menu_candidates",
   },
 
   { path: "/client-sales-overview", component: ClientSalesOverview, access: "role", positionPermission: "menu_sales" },

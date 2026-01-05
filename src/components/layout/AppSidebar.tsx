@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingCart, Wallet, Settings, LogOut, Percent, Shield, Building2, Calendar, MapPin, ChevronDown, ChevronRight, Car, Clock, UserCheck, Receipt, Database, ListChecks, ClipboardList, Timer, FileText, Crown, User, HeartHandshake, BarChart3, Sparkles, UserPlus, CalendarClock, UserCog, Video, Monitor, Phone, FlaskConical, Lock, Home, RefreshCcw, CalendarDays, MessageSquare, GraduationCap, Palette, Target, Activity, Swords, Mail, Gift } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,7 +39,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
   
   const [mitHjemOpen, setMitHjemOpen] = useState(
-    ["/home", "/head-to-head", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes"].some(path => location.pathname === path || location.pathname.startsWith(path))
+    ["/home", "/head-to-head", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes", "/my-feedback", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
   );
   const [shiftPlanningOpen, setShiftPlanningOpen] = useState(location.pathname.startsWith("/shift-planning") || location.pathname === "/time-stamp" || location.pathname === "/closing-shifts");
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
@@ -332,8 +332,8 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
           <Collapsible open={mitHjemOpen} onOpenChange={setMitHjemOpen}>
             <CollapsibleTrigger className={cn(
               "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-              ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes", "/my-feedback", "/head-to-head"].some(path => location.pathname === path || location.pathname.startsWith(path))
-                ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+              ["/home", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes", "/my-feedback", "/head-to-head", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}>
               <div className="flex items-center gap-3">
@@ -494,6 +494,19 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
               >
                 <MessageSquare className="h-4 w-4" />
                 Min Feedback
+              </NavLink>
+              
+              {/* Anbefal en ven */}
+              <NavLink
+                to="/refer-a-friend"
+                onClick={handleNavClick}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  location.pathname === "/refer-a-friend" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                )}
+              >
+                <Gift className="h-4 w-4" />
+                Anbefal en ven
               </NavLink>
             </CollapsibleContent>
           </Collapsible>
@@ -1344,6 +1357,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   )}>
                     <FileText className="h-4 w-4" />
                     {t("sidebar.emailTemplates")}
+                  </NavLink>
+                )}
+                {p.canViewCandidates && (
+                  <NavLink to="/recruitment/referrals" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/recruitment/referrals" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Gift className="h-4 w-4" />
+                    Henvisninger
                   </NavLink>
                 )}
               </CollapsibleContent>
