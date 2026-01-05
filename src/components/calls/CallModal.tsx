@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Phone, PhoneOff, Mic, MicOff, User, PhoneCall } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, User, PhoneCall, Volume2, VolumeX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { useRingingSound } from '@/hooks/useRingingSound';
 
 type CallStatus = 'initiating' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer' | 'canceled';
 
@@ -42,6 +43,13 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [callStartTime, setCallStartTime] = useState<Date | null>(null);
+  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
+
+  // Determine if we should play the ringing sound
+  const shouldPlayRinging = isOpen && isSoundEnabled && (status === 'initiating' || status === 'ringing');
+  
+  // Use the ringing sound hook
+  const { stop: stopRinging } = useRingingSound(shouldPlayRinging);
 
   // Format duration as MM:SS
   const formatDuration = (seconds: number) => {
@@ -159,8 +167,12 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
       setDuration(0);
       setIsMuted(false);
       setCallStartTime(null);
+      setIsSoundEnabled(true);
+    } else {
+      // Ensure sound stops when modal closes
+      stopRinging();
     }
-  }, [isOpen]);
+  }, [isOpen, stopRinging]);
 
   const isCallActive = status === 'initiating' || status === 'ringing' || status === 'in-progress';
   const isCallEnded = status === 'completed' || status === 'failed' || status === 'busy' || status === 'no-answer' || status === 'canceled';
@@ -247,7 +259,21 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
           {/* Call controls */}
           <div className="w-full px-8 pb-10 pt-4 bg-zinc-900/50">
             <div className="flex items-center justify-center gap-8">
-              {/* Mute button (visual only) */}
+              {/* Sound toggle button - shown during ringing states */}
+              {(status === 'initiating' || status === 'ringing') && (
+                <button
+                  onClick={() => setIsSoundEnabled(!isSoundEnabled)}
+                  className={cn(
+                    "w-14 h-14 rounded-full flex items-center justify-center transition-colors",
+                    !isSoundEnabled ? "bg-white text-black" : "bg-zinc-700 text-white hover:bg-zinc-600"
+                  )}
+                  title={isSoundEnabled ? 'Slå lyd fra' : 'Slå lyd til'}
+                >
+                  {isSoundEnabled ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
+                </button>
+              )}
+
+              {/* Mute button (visual only) - shown during call */}
               {status === 'in-progress' && (
                 <button
                   onClick={() => setIsMuted(!isMuted)}
@@ -277,8 +303,8 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
                 )}
               </Button>
 
-              {/* Placeholder for symmetry when not in call */}
-              {status === 'in-progress' && (
+              {/* Placeholder for symmetry */}
+              {(status === 'initiating' || status === 'ringing' || status === 'in-progress') && (
                 <div className="w-14 h-14 rounded-full bg-zinc-700/50 flex items-center justify-center">
                   <PhoneCall className="w-6 h-6 text-zinc-500" />
                 </div>
