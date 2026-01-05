@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, Save } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface CampaignMapping {
@@ -199,29 +200,36 @@ export function ProductCampaignOverrides({
         <div className="space-y-2 max-h-64 overflow-y-auto">
         {campaigns.map((campaign) => {
             const override = getOverrideForCampaign(campaign.id);
-            const savedCommission = override ? String(override.commission_dkk) : "";
-            const savedRevenue = override ? String(override.revenue_dkk) : "";
+            const isEnabled = !!override;
             const edited = editedOverrides[campaign.id] ?? {
-              commission: savedCommission,
-              revenue: savedRevenue,
+              commission: override ? String(override.commission_dkk) : String(baseCommission),
+              revenue: override ? String(override.revenue_dkk) : String(baseRevenue),
             };
-            
-            // Check if values have changed from saved state
-            const commissionValue = edited.commission || "";
-            const revenueValue = edited.revenue || "";
-            const hasChanged = commissionValue !== savedCommission || revenueValue !== savedRevenue;
-            
-            // Enable save if there's a change OR if there are values to save
-            const hasValues = commissionValue.trim() !== "" || revenueValue.trim() !== "";
-            const canSave = hasChanged || (hasValues && !override);
+
+            const handleToggle = (checked: boolean) => {
+              if (checked) {
+                // Enable: save with current values (or defaults)
+                const commission = parseFloat(String(edited.commission).replace(",", ".")) || baseCommission;
+                const revenue = parseFloat(String(edited.revenue).replace(",", ".")) || baseRevenue;
+                upsertOverride.mutate({ campaignMappingId: campaign.id, commission, revenue });
+              } else {
+                // Disable: delete override
+                deleteOverride.mutate(campaign.id);
+              }
+            };
 
             return (
               <div
                 key={campaign.id}
                 className={`flex items-center gap-2 p-2 rounded ${
-                  hasOverride(campaign.id) ? "bg-primary/5 border border-primary/20" : "bg-background"
+                  isEnabled ? "bg-primary/5 border border-primary/20" : "bg-background"
                 }`}
               >
+                <Checkbox
+                  checked={isEnabled}
+                  onCheckedChange={handleToggle}
+                  className="h-4 w-4"
+                />
                 <div className="flex-1 min-w-0">
                   <span className="text-xs font-medium truncate block">
                     {campaign.adversus_campaign_name || campaign.adversus_campaign_id}
@@ -237,6 +245,7 @@ export function ProductCampaignOverrides({
                       placeholder={String(baseCommission)}
                       value={edited.commission}
                       onChange={(e) => handleInputChange(campaign.id, "commission", e.target.value)}
+                      disabled={!isEnabled}
                     />
                   </div>
                   <div className="flex items-center gap-1">
@@ -248,17 +257,23 @@ export function ProductCampaignOverrides({
                       placeholder={String(baseRevenue)}
                       value={edited.revenue}
                       onChange={(e) => handleInputChange(campaign.id, "revenue", e.target.value)}
+                      disabled={!isEnabled}
                     />
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => handleSave(campaign.id)}
-                    disabled={!canSave}
-                  >
-                    <Save className="h-3 w-3" />
-                  </Button>
+                  {isEnabled && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => {
+                        const commission = parseFloat(String(edited.commission).replace(",", ".")) || 0;
+                        const revenue = parseFloat(String(edited.revenue).replace(",", ".")) || 0;
+                        upsertOverride.mutate({ campaignMappingId: campaign.id, commission, revenue });
+                      }}
+                    >
+                      <Save className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               </div>
             );
