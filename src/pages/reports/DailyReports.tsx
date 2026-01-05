@@ -298,24 +298,30 @@ export default function DailyReports() {
 
       // Fetch sales with sale_items - same logic as KPI sales-count
       // Sales are linked to clients via client_campaign_id -> client_campaigns.client_id
+      // Match on agent_email (contains email) rather than agent_name (contains full name)
       let salesData: any[] = [];
       if (uniqueAgentIdentifiers.length > 0) {
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         
-        let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,agent_name,sale_datetime,client_campaign_id,client_campaigns!inner(client_id),sale_items(quantity,mapped_commission,products(counts_as_sale))`;
-        salesUrl += `&agent_name=in.(${uniqueAgentIdentifiers.map(a => `"${a}"`).join(",")})`;
-        salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+        // Get emails only from unique identifiers (filter out numeric external IDs)
+        const emailIdentifiers = uniqueAgentIdentifiers.filter(id => id.includes("@"));
         
-        if (selectedClient !== "all") {
-          salesUrl += `&client_campaigns.client_id=eq.${selectedClient}`;
+        if (emailIdentifiers.length > 0) {
+          let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,agent_name,agent_email,sale_datetime,client_campaign_id,client_campaigns(client_id),sale_items(quantity,mapped_commission,products(counts_as_sale))`;
+          salesUrl += `&agent_email=in.(${emailIdentifiers.map(a => `"${a}"`).join(",")})`;
+          salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
+          
+          if (selectedClient !== "all") {
+            salesUrl += `&client_campaigns.client_id=eq.${selectedClient}`;
+          }
+          
+          const salesRes = await fetch(salesUrl, {
+            headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
+          });
+          salesData = await salesRes.json();
+          console.log("[DailyReport] Sales fetched:", salesData.length, salesData.map((s: any) => ({ agent: s.agent_email, items: s.sale_items?.length })));
         }
-        
-        const salesRes = await fetch(salesUrl, {
-          headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
-        });
-        salesData = await salesRes.json();
-        console.log("[DailyReport] Sales fetched:", salesData.length, salesData.map((s: any) => ({ agent: s.agent_name, items: s.sale_items?.length })));
       }
 
       // Fetch fieldmarketing sales (linked directly to employee via seller_id)
@@ -426,11 +432,11 @@ export default function DailyReports() {
           const dayStart = `${dayStr}T00:00:00`;
           const dayEnd = `${dayStr}T23:59:59`;
           
-          // Regular sales via agent mapping - match by any agent identifier (email or external_dialer_id)
+          // Regular sales via agent mapping - match by agent_email
           const empSales = empAgentIdentifiers.length > 0
-            ? salesData.filter(s => {
+            ? salesData.filter((s: any) => {
                 const saleDate = s.sale_datetime;
-                return empAgentIdentifiers.includes(s.agent_name) && saleDate >= dayStart && saleDate <= dayEnd;
+                return empAgentIdentifiers.includes(s.agent_email) && saleDate >= dayStart && saleDate <= dayEnd;
               })
             : [];
 
