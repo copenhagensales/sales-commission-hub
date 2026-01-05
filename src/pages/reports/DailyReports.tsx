@@ -259,15 +259,21 @@ export default function DailyReports() {
           continue;
         }
 
-        // Calculate hours from time stamps
-        const hours = empTimeStamps.reduce((sum, ts) => {
-          if (ts.effective_hours) return sum + ts.effective_hours;
-          if (ts.clock_in && ts.clock_out) {
-            const diffMs = new Date(ts.clock_out).getTime() - new Date(ts.clock_in).getTime();
-            return sum + diffMs / (1000 * 60 * 60);
-          }
-          return sum;
-        }, 0);
+        // Calculate hours - prefer time stamps, fallback to planned_hours from shifts
+        let hours = 0;
+        if (empTimeStamps.length > 0) {
+          hours = empTimeStamps.reduce((sum, ts) => {
+            if (ts.effective_hours) return sum + ts.effective_hours;
+            if (ts.clock_in && ts.clock_out) {
+              const diffMs = new Date(ts.clock_out).getTime() - new Date(ts.clock_in).getTime();
+              return sum + diffMs / (1000 * 60 * 60);
+            }
+            return sum;
+          }, 0);
+        } else if (empShifts.length > 0) {
+          // Use planned hours from shifts if no time stamps
+          hours = empShifts.reduce((sum, s) => sum + (s.planned_hours || 0), 0);
+        }
 
         // Check absences
         const empAbsences = absences?.filter(a => a.employee_id === empId) || [];
@@ -632,8 +638,6 @@ export default function DailyReports() {
                     <TableRow>
                       <TableHead>Medarbejder</TableHead>
                       <TableHead>Team</TableHead>
-                      <TableHead>Ind</TableHead>
-                      <TableHead>Ud</TableHead>
                       {selectedColumns.includes("hours") && <TableHead className="text-right">Timer</TableHead>}
                       {selectedColumns.includes("sick_days") && <TableHead className="text-center">Sygdom</TableHead>}
                       {selectedColumns.includes("vacation_days") && <TableHead className="text-center">Ferie</TableHead>}
@@ -646,8 +650,6 @@ export default function DailyReports() {
                       <TableRow key={row.employee_id}>
                         <TableCell className="font-medium">{row.employee_name}</TableCell>
                         <TableCell className="text-muted-foreground">{row.team_name || "-"}</TableCell>
-                        <TableCell>{formatTime(row.clock_in)}</TableCell>
-                        <TableCell>{formatTime(row.clock_out)}</TableCell>
                         {selectedColumns.includes("hours") && (
                           <TableCell className="text-right font-medium">
                             {row.hours > 0 ? `${row.hours.toFixed(1)}t` : "-"}
