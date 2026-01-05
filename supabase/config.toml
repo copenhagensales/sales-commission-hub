@@ -140,3 +140,12 @@ verify_jwt = true
 
 [functions.send-deactivation-followups]
 verify_jwt = false
+
+[functions.twilio-voice-token]
+verify_jwt = false
+
+[functions.incoming-call]
+verify_jwt = false
+
+[functions.receive-sms]
+verify_jwt = false
