@@ -224,17 +224,24 @@ export default function DailyReports() {
         .select("shift_id, day_of_week, start_time, end_time")
         .in("shift_id", primaryShifts?.map(s => s.id) || []);
 
-      // Get employee-agent mappings
+      // Get employee-agent mappings - fetch email for matching sales.agent_name
       const { data: agentMappings } = await supabase
         .from("employee_agent_mapping")
-        .select("employee_id, agent_id, agents(name)")
+        .select("employee_id, agent_id, agents(email, external_dialer_id)")
         .in("employee_id", employeeIds);
 
-      const agentNames = agentMappings?.map(m => (m.agents as any)?.name).filter(Boolean) || [];
+      // Build list of all possible agent identifiers for fetching sales
+      const allAgentIdentifiers: string[] = [];
+      agentMappings?.forEach(m => {
+        const agent = m.agents as any;
+        if (agent?.email) allAgentIdentifiers.push(agent.email);
+        if (agent?.external_dialer_id) allAgentIdentifiers.push(agent.external_dialer_id);
+      });
+      const uniqueAgentIdentifiers = [...new Set(allAgentIdentifiers)];
 
       // Fetch sales with sale_items - same logic as KPI sales-count
       let salesData: any[] = [];
-      if (agentNames.length > 0) {
+      if (uniqueAgentIdentifiers.length > 0) {
         const { data: sales } = await supabase
           .from("sales")
           .select(`
@@ -247,7 +254,7 @@ export default function DailyReports() {
               products(counts_as_sale)
             )
           `)
-          .in("agent_name", agentNames)
+          .in("agent_name", uniqueAgentIdentifiers)
           .gte("sale_datetime", `${startStr}T00:00:00`)
           .lte("sale_datetime", `${endStr}T23:59:59`);
         salesData = sales || [];
@@ -283,8 +290,14 @@ export default function DailyReports() {
           ? shiftDays?.filter(sd => sd.shift_id === empPrimaryShift.id) || []
           : [];
 
-        const empAgentMapping = agentMappings?.find(m => m.employee_id === empId);
-        const agentName = (empAgentMapping?.agents as any)?.name;
+        // Get all agent identifiers for this employee
+        const empAgentMappings = agentMappings?.filter(m => m.employee_id === empId) || [];
+        const empAgentIdentifiers: string[] = [];
+        empAgentMappings.forEach(m => {
+          const agent = m.agents as any;
+          if (agent?.email) empAgentIdentifiers.push(agent.email);
+          if (agent?.external_dialer_id) empAgentIdentifiers.push(agent.external_dialer_id);
+        });
 
         const dailyEntries: DailyEntry[] = [];
         let totalHours = 0;
@@ -319,11 +332,11 @@ export default function DailyReports() {
           const dayStart = `${dayStr}T00:00:00`;
           const dayEnd = `${dayStr}T23:59:59`;
           
-          // Regular sales via agent mapping
-          const empSales = agentName 
+          // Regular sales via agent mapping - match by any agent identifier (email or external_dialer_id)
+          const empSales = empAgentIdentifiers.length > 0
             ? salesData.filter(s => {
                 const saleDate = s.sale_datetime;
-                return s.agent_name === agentName && saleDate >= dayStart && saleDate <= dayEnd;
+                return empAgentIdentifiers.includes(s.agent_name) && saleDate >= dayStart && saleDate <= dayEnd;
               })
             : [];
 
