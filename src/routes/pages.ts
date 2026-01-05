@@ -131,4 +131,5 @@ export const Referrals = lazyPage(() => import("@/pages/recruitment/Referrals"))
 export const ReportsAdmin = lazyPage(() => import("@/pages/reports/ReportsAdmin"));
 export const ReportsManagement = lazyPage(() => import("@/pages/reports/ReportsManagement"));
 export const ReportsEmployee = lazyPage(() => import("@/pages/reports/ReportsEmployee"));
+export const DailyReports = lazyPage(() => import("@/pages/reports/DailyReports"));
 
