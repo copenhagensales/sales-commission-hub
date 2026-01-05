@@ -311,22 +311,39 @@ export default function DailyReports() {
           .map(e => e.toLowerCase());
         
         if (emailIdentifiers.length > 0) {
-          // Use !inner join when filtering by client to ensure proper filtering
+          // Use REST API directly to support dynamic !inner join for client filtering
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
           const joinType = selectedClient !== "all" ? "!inner" : "";
-          // Use multiple or conditions with ilike for case-insensitive email matching
-          const emailOrConditions = emailIdentifiers.map(e => `agent_email.ilike.${e}`).join(",");
-          let salesUrl = `${supabaseUrl}/rest/v1/sales?select=id,agent_name,agent_email,sale_datetime,client_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,mapped_commission,products(counts_as_sale))`;
-          salesUrl += `&or=(${emailOrConditions})`;
+          
+          // Build query with proper URL encoding
+          const selectClause = `id,agent_name,agent_email,sale_datetime,client_campaign_id,client_campaigns${joinType}(client_id),sale_items(quantity,mapped_commission,products(counts_as_sale))`;
+          const emailOrFilter = emailIdentifiers.map(e => `agent_email.ilike.${encodeURIComponent(e)}`).join(",");
+          
+          let salesUrl = `${supabaseUrl}/rest/v1/sales?select=${encodeURIComponent(selectClause)}`;
+          salesUrl += `&or=(${emailOrFilter})`;
           salesUrl += `&sale_datetime=gte.${startStr}T00:00:00&sale_datetime=lte.${endStr}T23:59:59`;
           
           if (selectedClient !== "all") {
             salesUrl += `&client_campaigns.client_id=eq.${selectedClient}`;
           }
           
+          console.log("[DailyReport] Sales URL:", salesUrl);
+          
           const salesRes = await fetch(salesUrl, {
-            headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
+            headers: { 
+              apikey: supabaseKey, 
+              Authorization: `Bearer ${supabaseKey}`,
+              Accept: "application/json"
+            }
           });
-          salesData = await salesRes.json();
+          
+          if (!salesRes.ok) {
+            console.error("[DailyReport] Sales fetch failed:", salesRes.status, await salesRes.text());
+            salesData = [];
+          } else {
+            salesData = await salesRes.json();
+          }
           console.log("[DailyReport] Sales fetched:", salesData.length, salesData.map((s: any) => ({ agent: s.agent_email, items: s.sale_items?.length })));
         }
       }
