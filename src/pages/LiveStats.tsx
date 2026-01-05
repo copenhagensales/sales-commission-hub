@@ -487,14 +487,14 @@ export default function LiveStats() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <SalesFeed />
+                <SalesFeed selectedClientId={selectedClient !== "all" ? selectedClient : undefined} />
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Calls Analytics Tab */}
           <TabsContent value="calls">
-            <CallsAnalytics dateRange={dateRange} />
+            <CallsAnalytics dateRange={dateRange} selectedClientId={selectedClient !== "all" ? selectedClient : undefined} />
           </TabsContent>
 
           {/* Sales Tab */}

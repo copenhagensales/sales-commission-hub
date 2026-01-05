@@ -43,6 +43,7 @@ import {
 
 interface CallsAnalyticsProps {
   dateRange: { from: Date; to: Date };
+  selectedClientId?: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -61,13 +62,41 @@ const STATUS_ICONS: Record<string, typeof Phone> = {
   OTHER: Phone,
 };
 
-export function CallsAnalytics({ dateRange }: CallsAnalyticsProps) {
+export function CallsAnalytics({ dateRange, selectedClientId }: CallsAnalyticsProps) {
   const startISO = format(dateRange.from, "yyyy-MM-dd") + "T00:00:00";
   const endISO = format(dateRange.to, "yyyy-MM-dd") + "T23:59:59";
 
+  // Fetch campaign mappings to filter by client
+  const { data: campaignMappings } = useQuery({
+    queryKey: ["campaign-mappings-for-calls"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("adversus_campaign_mappings")
+        .select(`
+          adversus_campaign_id,
+          client_campaign_id,
+          client_campaigns (client_id)
+        `);
+      return data || [];
+    },
+    enabled: !!selectedClientId,
+  });
+
+  // Build set of campaign_external_ids for the selected client
+  const allowedCampaignIds = useMemo(() => {
+    if (!selectedClientId || !campaignMappings) return null;
+    const ids = new Set<string>();
+    campaignMappings.forEach((m: any) => {
+      if (m.client_campaigns?.client_id === selectedClientId) {
+        ids.add(m.adversus_campaign_id);
+      }
+    });
+    return ids;
+  }, [selectedClientId, campaignMappings]);
+
   // Fetch all calls in date range with pagination
   const { data: callsData, isLoading } = useQuery({
-    queryKey: ["calls-analytics", startISO, endISO],
+    queryKey: ["calls-analytics", startISO, endISO, selectedClientId],
     queryFn: async () => {
       const allCalls: any[] = [];
       let from = 0;
@@ -106,6 +135,12 @@ export function CallsAnalytics({ dateRange }: CallsAnalyticsProps) {
           hasMore = false;
         }
       }
+
+      // Filter by client if needed
+      if (allowedCampaignIds && allowedCampaignIds.size > 0) {
+        return allCalls.filter((c) => allowedCampaignIds.has(c.campaign_external_id));
+      }
+
       return allCalls;
     },
   });
