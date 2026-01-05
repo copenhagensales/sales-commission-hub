@@ -442,7 +442,7 @@ export default function DailyReports() {
       }
 
       // Fetch fieldmarketing sales (linked directly to employee via seller_id)
-      const { data: fmSalesData } = await supabase
+      let fmSalesQuery = supabase
         .from("fieldmarketing_sales")
         .select(`
           id,
@@ -454,6 +454,13 @@ export default function DailyReports() {
         .in("seller_id", employeeIds)
         .gte("registered_at", `${startStr}T00:00:00`)
         .lte("registered_at", `${endStr}T23:59:59`);
+      
+      // Filter by client if selected
+      if (selectedClient !== "all") {
+        fmSalesQuery = fmSalesQuery.eq("client_id", selectedClient);
+      }
+      
+      const { data: fmSalesData } = await fmSalesQuery;
       
       console.log("[DailyReport] FM Sales fetched:", fmSalesData?.length);
       
