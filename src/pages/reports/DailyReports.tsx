@@ -232,7 +232,7 @@ export default function DailyReports() {
 
       const agentNames = agentMappings?.map(m => (m.agents as any)?.name).filter(Boolean) || [];
 
-      // Fetch sales
+      // Fetch sales - matching agent_name to mapped agents
       let salesData: any[] = [];
       if (agentNames.length > 0) {
         const { data: sales } = await supabase
@@ -246,8 +246,7 @@ export default function DailyReports() {
           `)
           .in("agent_name", agentNames)
           .gte("created_at", `${startStr}T00:00:00`)
-          .lte("created_at", `${endStr}T23:59:59`)
-          .eq("status", "approved");
+          .lte("created_at", `${endStr}T23:59:59`);
         salesData = sales || [];
       }
 
