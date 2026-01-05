@@ -33,8 +33,10 @@ export default function ReferAFriend() {
   const { data: myInfo, isLoading: isLoadingCode } = useMyReferralCode();
   const { data: referrals, isLoading: isLoadingReferrals } = useMyReferrals();
 
+  // Use published URL for shareable referral link
+  const publishedBaseUrl = 'https://cph-salg.lovable.app';
   const referralLink = myInfo?.referral_code 
-    ? `${window.location.origin}/refer/${myInfo.referral_code}`
+    ? `${publishedBaseUrl}/refer/${myInfo.referral_code}`
     : '';
 
   const handleCopy = async () => {
