@@ -100,16 +100,19 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
         .single();
 
       if (data) {
-        const newStatus = mapTwilioStatus(data.status || 'initiating');
-        setStatus(newStatus);
-        
-        // Use connected_at for when call was actually answered
-        if (data.connected_at && newStatus === 'in-progress') {
+        // If connected_at is set, the callee has answered even if Twilio still reports "ringing"
+        const inferredStatus: CallStatus = data.connected_at && !data.ended_at
+          ? 'in-progress'
+          : mapTwilioStatus(data.status || 'initiating');
+
+        setStatus(inferredStatus);
+
+        if (data.connected_at && inferredStatus === 'in-progress') {
           setCallStartTime(new Date(data.connected_at));
-        } else if (data.started_at && newStatus === 'in-progress') {
+        } else if (data.started_at && inferredStatus === 'in-progress') {
           setCallStartTime(new Date(data.started_at));
         }
-        
+
         if (data.duration_seconds) {
           setDuration(data.duration_seconds);
         }
@@ -132,16 +135,22 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
         (payload) => {
           const record = payload.new as Record<string, unknown>;
           if (record) {
-            const newStatus = mapTwilioStatus(record.status as string);
-            setStatus(newStatus);
-            
-            // Use connected_at for when call was actually answered
-            if (record.connected_at && newStatus === 'in-progress' && !callStartTime) {
-              setCallStartTime(new Date(record.connected_at as string));
-            } else if (record.started_at && newStatus === 'in-progress' && !callStartTime) {
+            const connectedAt = record.connected_at as string | null | undefined;
+            const endedAt = record.ended_at as string | null | undefined;
+
+            // Same inference as in polling: connected_at means "answered"
+            const inferredStatus: CallStatus = connectedAt && !endedAt
+              ? 'in-progress'
+              : mapTwilioStatus(record.status as string);
+
+            setStatus(inferredStatus);
+
+            if (connectedAt && inferredStatus === 'in-progress' && !callStartTime) {
+              setCallStartTime(new Date(connectedAt));
+            } else if (record.started_at && inferredStatus === 'in-progress' && !callStartTime) {
               setCallStartTime(new Date(record.started_at as string));
             }
-            
+
             if (record.duration_seconds) {
               setDuration(record.duration_seconds as number);
             }
