@@ -9,8 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useShifts, useDepartments, useEmployeesForShifts, useDanishHolidays, useAbsencesForDateRange, Shift, AbsenceRequest } from "@/hooks/useShiftPlanning";
+import { useShifts, useDepartments, useEmployeesForShifts, useDanishHolidays, useAbsencesForDateRange, useUpdateShift, useDeleteShift, Shift, AbsenceRequest } from "@/hooks/useShiftPlanning";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { CreateShiftDialog } from "@/components/shift-planning/CreateShiftDialog";
+import { EditShiftDialog } from "@/components/shift-planning/EditShiftDialog";
 import { ShiftCard } from "@/components/shift-planning/ShiftCard";
 import { EditTimeStampDialog } from "@/components/shift-planning/EditTimeStampDialog";
 import { ShiftDetailDialog } from "@/components/shift-planning/ShiftDetailDialog";
@@ -57,6 +60,8 @@ export default function ShiftOverview() {
   const [selectedDetailEmployee, setSelectedDetailEmployee] = useState<{ id: string; first_name: string; last_name: string; department: string | null; salary_type: string | null; salary_amount: number | null; standard_start_time: string | null } | null>(null);
   const [selectedDetailDate, setSelectedDetailDate] = useState<Date | null>(null);
   const [selectedDetailTimeStamp, setSelectedDetailTimeStamp] = useState<TimeStampData | null>(null);
+  const [shiftDialogOpen, setShiftDialogOpen] = useState(false);
+  const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -824,6 +829,21 @@ export default function ShiftOverview() {
                                 <AlarmClock className="h-4 w-4" />
                                 Forsinket
                               </Button>
+                              {hasShift && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="justify-start gap-2 h-8"
+                                  onClick={() => {
+                                    setSelectedShift(dayShifts[0]);
+                                    setShiftDialogOpen(true);
+                                    setOpenPopoverKey(null);
+                                  }}
+                                >
+                                  <Clock className="h-4 w-4" />
+                                  Ændre vagt
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1011,6 +1031,15 @@ export default function ShiftOverview() {
           date={selectedDetailDate}
           timeStamp={selectedDetailTimeStamp}
         />
+
+        {/* Edit Shift Dialog */}
+        {selectedShift && (
+          <EditShiftDialog
+            open={shiftDialogOpen}
+            onOpenChange={setShiftDialogOpen}
+            shift={selectedShift}
+          />
+        )}
       </div>
     </MainLayout>
   );
