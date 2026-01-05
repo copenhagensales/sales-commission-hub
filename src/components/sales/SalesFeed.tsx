@@ -95,7 +95,11 @@ function getDateRangeFromPreset(preset: DatePreset): { start: Date; end: Date } 
   }
 }
 
-export default function SalesFeed() {
+interface SalesFeedProps {
+  selectedClientId?: string;
+}
+
+export default function SalesFeed({ selectedClientId }: SalesFeedProps) {
   const [isPaused, setIsPaused] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
@@ -123,7 +127,7 @@ export default function SalesFeed() {
   // Fetch paginated sales data
   const dateRange = getEffectiveDateRange();
   const { data, isLoading } = useQuery({
-    queryKey: ["sales-feed", currentPage, searchQuery, datePreset, validationStatusFilter, salesStatusFilter, customDateRange.from?.toISOString(), customDateRange.to?.toISOString()],
+    queryKey: ["sales-feed", currentPage, searchQuery, datePreset, validationStatusFilter, salesStatusFilter, customDateRange.from?.toISOString(), customDateRange.to?.toISOString(), selectedClientId],
     queryFn: async () => {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
@@ -174,6 +178,11 @@ export default function SalesFeed() {
         } else {
           query = query.eq('status', salesStatusFilter);
         }
+      }
+
+      // Client filter via client_campaigns
+      if (selectedClientId) {
+        query = query.eq('client_campaigns.client_id', selectedClientId);
       }
 
       const { data, error, count } = await query.range(from, to);
@@ -258,7 +267,7 @@ export default function SalesFeed() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, datePreset, validationStatusFilter, salesStatusFilter, customDateRange]);
+  }, [searchQuery, datePreset, validationStatusFilter, salesStatusFilter, customDateRange, selectedClientId]);
 
   // Copy phone number
   const copyPhone = useCallback((phone: string, saleId: string) => {
