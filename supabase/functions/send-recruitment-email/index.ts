@@ -63,24 +63,31 @@ Deno.serve(async (req) => {
     // Send email via Microsoft Graph
     const sendMailUrl = `https://graph.microsoft.com/v1.0/users/${senderEmail}/sendMail`;
 
+    // Use simple text-only format for rejection emails (afslag), full branding for others
+    const isRejection = templateKey === 'afslag';
+    
+    const emailContent = isRejection
+      ? `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; line-height: 1.6; color: #333;">
+          ${content}
+        </div>`
+      : `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="padding: 20px 0; border-bottom: 1px solid #eee;">
+            <h2 style="margin: 0; color: #333;">COPENHAGEN SALES</h2>
+          </div>
+          <div style="padding: 20px 0;">
+            ${content}
+          </div>
+          <div style="padding: 20px 0; border-top: 1px solid #eee; font-size: 12px; color: #666;">
+            <p>Med venlig hilsen,<br>Copenhagen Sales</p>
+          </div>
+        </div>`;
+
     const emailPayload = {
       message: {
         subject: subject,
         body: {
           contentType: 'HTML',
-          content: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <div style="padding: 20px 0; border-bottom: 1px solid #eee;">
-                <h2 style="margin: 0; color: #333;">COPENHAGEN SALES</h2>
-              </div>
-              <div style="padding: 20px 0;">
-                ${content}
-              </div>
-              <div style="padding: 20px 0; border-top: 1px solid #eee; font-size: 12px; color: #666;">
-                <p>Med venlig hilsen,<br>Copenhagen Sales</p>
-              </div>
-            </div>
-          `,
+          content: emailContent,
         },
         toRecipients: [{ emailAddress: { address: email } }],
       },
