@@ -313,5 +313,9 @@ export function usePermissions() {
     canEditOnboarding: canEdit("menu_onboarding"),
     canViewOnboardingLeader: canView("menu_onboarding_leader"),
     canViewOnboardingAdmin: canView("menu_onboarding_admin"),
+    // Reports menu
+    canViewReportsAdmin: canView("menu_reports_admin"),
+    canViewReportsManagement: canView("menu_reports_management"),
+    canViewReportsEmployee: canView("menu_reports_employee"),
   };
 }

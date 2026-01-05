@@ -127,3 +127,8 @@ export const ReferAFriend = lazyPage(() => import("@/pages/ReferAFriend"));
 export const PublicReferralForm = lazyPage(() => import("@/pages/PublicReferralForm"));
 export const Referrals = lazyPage(() => import("@/pages/recruitment/Referrals"));
 
+// Reports
+export const ReportsAdmin = lazyPage(() => import("@/pages/reports/ReportsAdmin"));
+export const ReportsManagement = lazyPage(() => import("@/pages/reports/ReportsManagement"));
+export const ReportsEmployee = lazyPage(() => import("@/pages/reports/ReportsEmployee"));
+

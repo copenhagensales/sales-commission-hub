@@ -691,6 +691,33 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
 
+  // ==================== RAPPORTER MENU ====================
+  {
+    key: "menu_reports",
+    label: "Rapporter menu",
+    icon: "📈",
+    permissions: [
+      {
+        key: "menu_reports_admin",
+        label: "Rapporter Admin",
+        description: "Adgang til administrative rapporter",
+        hasEditOption: false,
+      },
+      {
+        key: "menu_reports_management",
+        label: "Rapporter Ledelse",
+        description: "Adgang til ledelsesrapporter",
+        hasEditOption: false,
+      },
+      {
+        key: "menu_reports_employee",
+        label: "Rapporter Medarbejder",
+        description: "Adgang til medarbejderrapporter",
+        hasEditOption: false,
+      },
+    ],
+  },
+
   // ==================== HOVEDMENUER (TOP LEVEL) ====================
   {
     key: "menu_main",
