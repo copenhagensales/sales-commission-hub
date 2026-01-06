@@ -36,31 +36,26 @@ serve(async (req) => {
     // For outbound calls (API-initiated), dial directly to the destination number
     // The Twilio API call already connects, this TwiML tells Twilio what to do when answered
     if (direction === 'outbound-api') {
-      const destinationNumber = to || called;
+      const url = new URL(req.url);
+      const dialToParam = url.searchParams.get('dialTo');
+      const destinationNumber = dialToParam || to || called;
+
       const supabaseUrl = Deno.env.get('SUPABASE_URL');
       const twilioCallerIdRaw = Deno.env.get('TWILIO_PHONE_NUMBER');
       const twilioCallerId = twilioCallerIdRaw?.replace(/[^\d+]/g, '');
-      const fromNormalized = from?.replace(/[^\d+]/g, '');
-      const callerId = (twilioCallerId && twilioCallerId.startsWith('+'))
-        ? twilioCallerId
-        : (fromNormalized?.startsWith('+') ? fromNormalized : undefined);
+      const callerId = (twilioCallerId && twilioCallerId.startsWith('+')) ? twilioCallerId : undefined;
 
-      console.log('[twilio-voice-token] Outbound call - dialing directly to:', {
+      console.log('[twilio-voice-token] Outbound call - dialing to:', {
         destinationNumber,
-        from,
         callerId,
+        dialToParam,
       });
 
-      // Keep TwiML minimal: <Dial><Number/></Dial>
-      // Avoid <Dial action="..."> because that endpoint returns JSON (not TwiML).
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30">
-    <Number statusCallback="${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(callSid)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">
-      ${destinationNumber}
-    </Number>
+    <Number statusCallback="${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(callSid)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">${destinationNumber}</Number>
   </Dial>
-  <Hangup/>
 </Response>`;
 
       console.log('[twilio-voice-token] Generated TwiML for direct dial');

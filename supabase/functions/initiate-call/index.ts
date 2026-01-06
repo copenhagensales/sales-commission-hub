@@ -24,8 +24,10 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const publishableKey = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     const normalizePhone = (value: unknown) =>
       String(value ?? '')
@@ -52,31 +54,60 @@ serve(async (req) => {
       throw new Error('TWILIO_PHONE_NUMBER must be in E.164 format (e.g. +15551234567)');
     }
 
-    // NOTE: We intentionally do NOT use ApplicationSid here.
-    // When both Url and ApplicationSid are provided, Twilio's ApplicationSid 
-    // takes precedence, and if its Voice URL is misconfigured, the call fails.
-    // By using only the Url parameter, we have direct control over the TwiML.
+    const authHeader = req.headers.get('authorization') || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : '';
+    if (!token || !publishableKey) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const authClient = createClient(supabaseUrl, publishableKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+    const authUserId = claimsData?.claims?.sub;
+    if (claimsError || !authUserId) {
+      console.error('[initiate-call] Auth failed', { claimsError });
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const { toNumber: toNumberRaw, candidateId, employeeId } = await req.json();
 
     const toNumber = normalizePhone(toNumberRaw);
-    if (!toNumber) {
-      throw new Error('toNumber is required');
+    if (!toNumber) throw new Error('toNumber is required');
+    if (!toNumber.startsWith('+')) throw new Error('toNumber must be in E.164 format (e.g. +15551234567)');
+
+    // Lookup the employee phone (prefer explicit employeeId, fallback to logged-in user)
+    const employeeLookup = employeeId
+      ? supabaseAdmin.from('employee_master_data').select('id, private_phone, work_email').eq('id', employeeId).maybeSingle()
+      : supabaseAdmin.from('employee_master_data').select('id, private_phone, work_email').eq('auth_user_id', authUserId).maybeSingle();
+
+    const { data: employee, error: employeeErr } = await employeeLookup;
+    if (employeeErr) {
+      console.error('[initiate-call] Failed to load employee', employeeErr);
+      throw new Error('Could not load employee');
     }
-    if (!toNumber.startsWith('+')) {
-      throw new Error('toNumber must be in E.164 format (e.g. +15551234567)');
+
+    const employeePhone = normalizePhone(employee?.private_phone);
+    if (!employeePhone || !employeePhone.startsWith('+')) {
+      throw new Error('Your employee phone (private_phone) must be set in E.164 format (e.g. +15551234567)');
     }
 
-    console.log('[initiate-call] Starting call to:', toNumber, 'for candidate:', candidateId);
+    console.log('[initiate-call] Starting click-to-call:', { employeePhone, toNumber, candidateId });
 
-    // Build TwiML URL for the call
-    const twimlUrl = `${supabaseUrl}/functions/v1/twilio-voice-token`;
+    // TwiML URL tells Twilio: when employee answers, dial the candidate
+    const twimlUrl = `${supabaseUrl}/functions/v1/twilio-voice-token?dialTo=${encodeURIComponent(toNumber)}`;
 
-    // Initiate call via Twilio REST API
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`;
-    
+
     const formData = new URLSearchParams();
-    formData.append('To', toNumber);
+    formData.append('To', employeePhone);
     formData.append('From', twilioNumber);
     formData.append('Url', twimlUrl);
     formData.append('Method', 'POST');
@@ -107,7 +138,7 @@ serve(async (req) => {
     console.log('[initiate-call] Call initiated:', twilioData.sid);
 
     // Store call record
-    const { error: insertError } = await supabase
+    const { error: insertError } = await supabaseAdmin
       .from('call_records')
       .insert({
         twilio_call_sid: twilioData.sid,
@@ -117,7 +148,7 @@ serve(async (req) => {
         status: twilioData.status || 'initiated',
         started_at: new Date().toISOString(),
         candidate_id: candidateId || null,
-        employee_id: employeeId || null,
+        employee_id: employee?.id || employeeId || null,
       });
 
     if (insertError) {
