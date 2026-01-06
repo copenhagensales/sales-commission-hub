@@ -178,10 +178,10 @@ export default function DailyReports() {
   const { data: employees = [] } = useQuery({
     queryKey: ["daily-report-employees"],
     queryFn: async () => {
+      // Use secure view that only exposes non-sensitive columns
       const { data } = await supabase
-        .from("employee_master_data")
+        .from("employee_basic_info")
         .select("id, first_name, last_name")
-        .eq("is_active", true)
         .order("first_name");
       return data || [];
     },
