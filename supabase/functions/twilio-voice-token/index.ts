@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,10 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
     // Parse form data from Twilio
     const formData = await req.formData();
     const callSid = formData.get('CallSid') as string;
@@ -34,13 +39,11 @@ serve(async (req) => {
     let twiml: string;
 
     // For outbound calls (API-initiated), dial directly to the destination number
-    // The Twilio API call already connects, this TwiML tells Twilio what to do when answered
     if (direction === 'outbound-api') {
       const url = new URL(req.url);
       const dialToParam = url.searchParams.get('dialTo');
       const destinationNumber = dialToParam || to || called;
 
-      const supabaseUrl = Deno.env.get('SUPABASE_URL');
       const twilioCallerIdRaw = Deno.env.get('TWILIO_PHONE_NUMBER');
       const twilioCallerId = twilioCallerIdRaw?.replace(/[^\d+]/g, '');
       const callerId = (twilioCallerId && twilioCallerId.startsWith('+')) ? twilioCallerId : undefined;
@@ -60,18 +63,42 @@ serve(async (req) => {
 
       console.log('[twilio-voice-token] Generated TwiML for direct dial');
     } else {
-      // For inbound calls, show the welcome message
-      console.log('[twilio-voice-token] Inbound call - playing welcome message');
+      // For inbound calls, try to route to connected browser clients
+      console.log('[twilio-voice-token] Inbound call - routing to browser clients');
       
-      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      // Look up all active employees to ring their browser clients
+      // In a real implementation, you might want to route to specific agents based on business logic
+      const { data: employees } = await supabaseClient
+        .from('employee_master_data')
+        .select('id')
+        .eq('is_active', true)
+        .limit(10);
+
+      if (employees && employees.length > 0) {
+        // Create Client elements for each potential agent
+        const clientElements = employees
+          .map(emp => `    <Client>agent_${emp.id}</Client>`)
+          .join('\n');
+
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say language="da-DK" voice="Polly.Mads">Tak for dit opkald til CPH Sales. Vent venligst, mens vi forbinder dig.</Say>
-  <Pause length="2"/>
-  <Say language="da-DK" voice="Polly.Mads">Vi kan desværre ikke besvare dit opkald lige nu. Efterlad venligst en besked efter tonen.</Say>
+  <Dial timeout="30" action="${supabaseUrl}/functions/v1/incoming-call" method="POST">
+${clientElements}
+  </Dial>
+  <Say language="da-DK" voice="Polly.Mads">Ingen agenter er tilgængelige. Efterlad venligst en besked efter tonen.</Say>
   <Record maxLength="120" transcribe="false" playBeep="true" />
-  <Say language="da-DK" voice="Polly.Mads">Tak for din besked. Vi vender tilbage hurtigst muligt. Farvel.</Say>
-  <Hangup/>
+  <Say language="da-DK" voice="Polly.Mads">Tak for din besked. Vi vender tilbage hurtigst muligt.</Say>
 </Response>`;
+      } else {
+        // No agents available, go to voicemail
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say language="da-DK" voice="Polly.Mads">Tak for dit opkald til CPH Sales. Der er ingen agenter tilgængelige lige nu.</Say>
+  <Say language="da-DK" voice="Polly.Mads">Efterlad venligst en besked efter tonen.</Say>
+  <Record maxLength="120" transcribe="false" playBeep="true" />
+  <Say language="da-DK" voice="Polly.Mads">Tak for din besked. Vi vender tilbage hurtigst muligt.</Say>
+</Response>`;
+      }
     }
 
     console.log('[twilio-voice-token] Returning TwiML response');
