@@ -2739,6 +2739,7 @@ export type Database = {
           last_name: string
           manager_id: string | null
           must_change_password: boolean | null
+          onboarding_data_complete: boolean | null
           parking_monthly_cost: number | null
           parking_spot_id: string | null
           position_id: string | null
@@ -2792,6 +2793,7 @@ export type Database = {
           last_name: string
           manager_id?: string | null
           must_change_password?: boolean | null
+          onboarding_data_complete?: boolean | null
           parking_monthly_cost?: number | null
           parking_spot_id?: string | null
           position_id?: string | null
@@ -2845,6 +2847,7 @@ export type Database = {
           last_name?: string
           manager_id?: string | null
           must_change_password?: boolean | null
+          onboarding_data_complete?: boolean | null
           parking_monthly_cost?: number | null
           parking_spot_id?: string | null
           position_id?: string | null
@@ -6203,20 +6206,6 @@ export type Database = {
         Returns: boolean
       }
       complete_invitation_password: { Args: { _token: string }; Returns: Json }
-      complete_onboarding: {
-        Args: {
-          _address_city: string
-          _address_postal_code: string
-          _address_street: string
-          _bank_account_number: string
-          _bank_reg_number: string
-          _cpr_number: string
-          _first_name: string
-          _last_name: string
-          _token: string
-        }
-        Returns: Json
-      }
       consume_password_reset_token: {
         Args: { _token_hash: string }
         Returns: boolean
@@ -6362,19 +6351,12 @@ export type Database = {
       get_invitation_by_token_v2: {
         Args: { _token: string }
         Returns: {
-          address_city: string
-          address_postal_code: string
-          address_street: string
-          bank_account_number: string
-          bank_reg_number: string
-          cpr_number: string
           email: string
           employee_id: string
           expires_at: string
           first_name: string
           id: string
           last_name: string
-          onboarding_completed_at: string
           password_set_at: string
           status: string
         }[]

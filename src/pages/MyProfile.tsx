@@ -30,11 +30,82 @@ function DisplayField({ value, displayValue }: { value: string | number | null |
   );
 }
 
-// Masked read-only field for sensitive data
+// Masked read-only field for sensitive data (when already set)
 function MaskedDisplayField({ value }: { value: string | null }) {
   return (
     <div className="py-2 px-3 bg-muted/30 rounded-md min-h-[40px] flex items-center">
       <span className="font-medium">{value ? "••••••••" : "-"}</span>
+    </div>
+  );
+}
+
+// Editable sensitive field - shows masked value when set, allows editing
+function EditableSensitiveField({ 
+  value, 
+  onSave, 
+  placeholder,
+  maskWhenSet = true
+}: { 
+  value: string | null; 
+  onSave: (value: string | null) => void;
+  placeholder?: string;
+  maskWhenSet?: boolean;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+
+  const handleSave = () => {
+    onSave(editValue || null);
+    setIsEditing(false);
+    setEditValue("");
+  };
+
+  const handleCancel = () => {
+    setEditValue("");
+    setIsEditing(false);
+  };
+
+  const handleStartEdit = () => {
+    setEditValue(value || "");
+    setIsEditing(true);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleSave();
+    if (e.key === "Escape") handleCancel();
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="h-9 flex-1"
+          placeholder={placeholder}
+          autoFocus
+        />
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleSave}>
+          <Check className="h-4 w-4 text-green-600" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleCancel}>
+          <X className="h-4 w-4 text-destructive" />
+        </Button>
+      </div>
+    );
+  }
+
+  const displayValue = value ? (maskWhenSet ? "••••••••" : value) : "-";
+
+  return (
+    <div 
+      className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md cursor-pointer hover:bg-muted/50 transition-colors group min-h-[40px]"
+      onClick={handleStartEdit}
+    >
+      <span className="font-medium">{displayValue}</span>
+      <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
     </div>
   );
 }
@@ -953,6 +1024,40 @@ export default function MyProfile() {
     }
   };
 
+  // Handler for sensitive data (CPR, bank) - also checks if profile should be marked complete
+  const handleSaveSensitiveData = async (field: string, value: string | null) => {
+    if (!employee?.id) return;
+    try {
+      const updateData: Record<string, string | boolean | null> = { [field]: value };
+      
+      // Check if all required sensitive fields are now filled
+      const updatedEmployee = { ...employee, [field]: value };
+      const hasCpr = !!(field === "cpr_number" ? value : updatedEmployee.cpr_number);
+      const hasAddress = !!updatedEmployee.address_street && !!updatedEmployee.address_postal_code && !!updatedEmployee.address_city;
+      const hasBank = !!(field === "bank_reg_number" ? value : updatedEmployee.bank_reg_number) && 
+                      !!(field === "bank_account_number" ? value : updatedEmployee.bank_account_number);
+      
+      // If all fields are filled, mark onboarding as complete
+      if (hasCpr && hasAddress && hasBank) {
+        updateData.onboarding_data_complete = true;
+      }
+      
+      const { error } = await supabase
+        .from("employee_master_data")
+        .update(updateData)
+        .eq("id", employee.id);
+      
+      if (error) throw error;
+      
+      toast.success("Oplysninger opdateret");
+      queryClient.invalidateQueries({ queryKey: ["my-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["profile-completion-status"] });
+    } catch (error) {
+      console.error("Error saving:", error);
+      toast.error("Kunne ikke gemme ændringer");
+    }
+  };
+
   const formatDate = (date: string | null) => {
     if (!date) return "-";
     return format(new Date(date), "d. MMMM yyyy", { locale: da });
@@ -1078,8 +1183,12 @@ export default function MyProfile() {
                           </div>
                         </div>
                         <div>
-                          <label className="text-xs text-muted-foreground">CPR-nr.</label>
-                          <MaskedDisplayField value={employee.cpr_number} />
+                          <label className="text-xs text-muted-foreground">CPR-nr. (kan redigeres)</label>
+                          <EditableSensitiveField 
+                            value={employee.cpr_number} 
+                            placeholder="DDMMÅÅ-XXXX"
+                            onSave={(v) => handleSaveSensitiveData("cpr_number", v)} 
+                          />
                         </div>
                       </div>
 
@@ -1226,12 +1335,20 @@ export default function MyProfile() {
                         </div>
                       )}
                       <div>
-                        <label className="text-xs text-muted-foreground">Reg.nr.</label>
-                        <MaskedDisplayField value={employee.bank_reg_number} />
+                        <label className="text-xs text-muted-foreground">Reg.nr. (kan redigeres)</label>
+                        <EditableSensitiveField 
+                          value={employee.bank_reg_number} 
+                          placeholder="4 cifre"
+                          onSave={(v) => handleSaveSensitiveData("bank_reg_number", v)} 
+                        />
                       </div>
                       <div>
-                        <label className="text-xs text-muted-foreground">Kontonummer</label>
-                        <MaskedDisplayField value={employee.bank_account_number} />
+                        <label className="text-xs text-muted-foreground">Kontonummer (kan redigeres)</label>
+                        <EditableSensitiveField 
+                          value={employee.bank_account_number} 
+                          placeholder="Op til 10 cifre"
+                          onSave={(v) => handleSaveSensitiveData("bank_account_number", v)} 
+                        />
                       </div>
                     </div>
 
