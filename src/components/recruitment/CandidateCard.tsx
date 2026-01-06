@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,13 +24,15 @@ import {
   ChevronDown,
   Clock,
   FileText,
-  Trash2
+  Trash2,
+  PhoneCall
 } from "lucide-react";
 import { format, differenceInHours, differenceInDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { toast } from "sonner";
 import { SendSmsDialog } from "./SendSmsDialog";
 import { SendEmailDialog } from "./SendEmailDialog";
+import { useTwilioDeviceContext } from "@/contexts/TwilioDeviceContext";
 
 interface Application {
   id: string;
@@ -119,6 +121,7 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const queryClient = useQueryClient();
+  const { makeCall, callState, isDeviceReady, initializeDevice } = useTwilioDeviceContext();
 
   const getTimeSinceApplication = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -175,14 +178,35 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
     },
   });
 
-  const handlePhoneClick = (e: React.MouseEvent) => {
+  const handlePhoneClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (candidate.phone) {
-      window.location.href = `tel:${candidate.phone}`;
-    } else {
+    if (!candidate.phone) {
       toast.error("Ingen telefonnummer");
+      return;
+    }
+    
+    try {
+      // Initialize device if not ready
+      if (!isDeviceReady) {
+        toast.info("Forbinder til telefon...");
+        await initializeDevice();
+      }
+      
+      // Format phone number
+      let phoneNumber = candidate.phone.replace(/\s+/g, '');
+      if (!phoneNumber.startsWith('+')) {
+        phoneNumber = '+45' + phoneNumber;
+      }
+      
+      await makeCall(phoneNumber);
+      toast.success(`Ringer op til ${candidate.first_name} ${candidate.last_name}...`);
+    } catch (error) {
+      console.error('Error making call:', error);
+      toast.error("Kunne ikke starte opkald");
     }
   };
+
+  const isInCall = callState === 'connecting' || callState === 'connected';
 
   const handleCardClick = () => {
     navigate(`/recruitment/candidates/${candidate.id}`);
@@ -285,12 +309,17 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
                 <div className="flex flex-wrap items-center gap-1.5 md:gap-2 mt-2 md:mt-3">
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant={isInCall ? "default" : "outline"}
                     onClick={handlePhoneClick}
-                    className="h-7 md:h-8 text-xs"
+                    className={`h-7 md:h-8 text-xs ${isInCall ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
+                    disabled={!candidate.phone || isInCall}
                   >
-                    <Phone className="h-3 w-3 md:h-3.5 md:w-3.5 md:mr-1.5" />
-                    <span className="hidden sm:inline ml-1">Ring op</span>
+                    {isInCall ? (
+                      <PhoneCall className="h-3 w-3 md:h-3.5 md:w-3.5 animate-pulse md:mr-1.5" />
+                    ) : (
+                      <Phone className="h-3 w-3 md:h-3.5 md:w-3.5 md:mr-1.5" />
+                    )}
+                    <span className="hidden sm:inline ml-1">{isInCall ? 'I gang...' : 'Ring op'}</span>
                   </Button>
                   <Button
                     size="sm"
