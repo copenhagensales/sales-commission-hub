@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +49,7 @@ const roleLabels: Record<string, string> = {
 
 export default function UpcomingInterviews() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: upcomingInterviews = [], isLoading } = useQuery({
     queryKey: ["upcoming-interviews"],
@@ -174,30 +176,37 @@ export default function UpcomingInterviews() {
                     {group.interviews.map((interview) => (
                       <div
                         key={interview.id}
-                        className="flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+                        className="flex items-center justify-between p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                        onClick={() => navigate(`/recruitment/candidates/${interview.candidate.id}`)}
                       >
                         <div className="flex-1">
-                          <p className="font-medium">
+                          <p className="font-medium group-hover:text-primary transition-colors">
                             {interview.candidate.first_name} {interview.candidate.last_name}
                           </p>
                           <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                             {interview.candidate.phone && (
-                              <a 
-                                href={`tel:${interview.candidate.phone}`}
+                              <span 
                                 className="flex items-center gap-1 hover:text-foreground"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.location.href = `tel:${interview.candidate.phone}`;
+                                }}
                               >
                                 <Phone className="h-3 w-3" />
                                 {interview.candidate.phone}
-                              </a>
+                              </span>
                             )}
                             {interview.candidate.email && (
-                              <a 
-                                href={`mailto:${interview.candidate.email}`}
+                              <span 
                                 className="flex items-center gap-1 hover:text-foreground"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.location.href = `mailto:${interview.candidate.email}`;
+                                }}
                               >
                                 <Mail className="h-3 w-3" />
                                 {interview.candidate.email}
-                              </a>
+                              </span>
                             )}
                           </div>
                         </div>
@@ -214,6 +223,7 @@ export default function UpcomingInterviews() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
