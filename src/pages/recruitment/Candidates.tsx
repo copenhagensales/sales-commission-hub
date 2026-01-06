@@ -6,9 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Search, Plus, SlidersHorizontal } from "lucide-react";
+import { Search, Plus, SlidersHorizontal, Phone, MessageSquare, PhoneIncoming, PhoneOutgoing } from "lucide-react";
 import { CandidateCard } from "@/components/recruitment/CandidateCard";
 import { NewCandidateDialog } from "@/components/recruitment/NewCandidateDialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { da } from "date-fns/locale";
 
 interface Application {
   id: string;
@@ -32,6 +37,27 @@ interface Candidate {
   applications?: Application[];
 }
 
+interface CallLog {
+  id: string;
+  candidate_id: string | null;
+  employee_id: string | null;
+  direction: string;
+  from_number: string | null;
+  to_number: string | null;
+  status: string | null;
+  started_at: string;
+  duration_seconds: number | null;
+}
+
+interface SmsLog {
+  id: string;
+  phone_number: string | null;
+  content: string | null;
+  direction: string;
+  type: string;
+  created_at: string;
+}
+
 export default function Candidates() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewCandidateDialog, setShowNewCandidateDialog] = useState(false);
@@ -48,6 +74,36 @@ export default function Candidates() {
       
       if (error) throw error;
       return data as Candidate[];
+    },
+  });
+
+  // Fetch call logs
+  const { data: callLogs = [] } = useQuery({
+    queryKey: ["recruitment-call-logs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("call_records")
+        .select("*")
+        .order("started_at", { ascending: false })
+        .limit(50);
+      
+      if (error) throw error;
+      return data as CallLog[];
+    },
+  });
+
+  // Fetch SMS/communication logs
+  const { data: smsLogs = [] } = useQuery({
+    queryKey: ["recruitment-sms-logs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("communication_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      
+      if (error) throw error;
+      return data as SmsLog[];
     },
   });
 
@@ -83,6 +139,23 @@ export default function Candidates() {
     0
   );
 
+  // Helper to find candidate name by phone
+  const findCandidateByPhone = (phone: string | null) => {
+    if (!phone) return null;
+    const cleaned = phone.replace(/[\s\-\+\(\)]/g, '');
+    return candidatesWithApps.find(c => {
+      const cPhone = c.phone?.replace(/[\s\-\+\(\)]/g, '') || '';
+      return cPhone.includes(cleaned) || cleaned.includes(cPhone);
+    });
+  };
+
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   if (isLoading) {
     return (
       <MainLayout>
@@ -95,94 +168,193 @@ export default function Candidates() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Kandidater</h1>
-            <p className="text-sm md:text-base text-muted-foreground">
-              {candidatesWithApps.length} kandidater · {totalApplications} ansøgninger
-            </p>
-          </div>
-          <Button onClick={() => setShowNewCandidateDialog(true)} className="w-full md:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            Tilføj kandidat
-          </Button>
-        </div>
-
-        <NewCandidateDialog
-          open={showNewCandidateDialog}
-          onOpenChange={setShowNewCandidateDialog}
-        />
-
-        <div className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Søg efter navn, email eller telefon..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-background border-border"
-            />
+      <div className="flex gap-6">
+        {/* Main candidates list */}
+        <div className="flex-1 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Kandidater</h1>
+              <p className="text-sm md:text-base text-muted-foreground">
+                {candidatesWithApps.length} kandidater · {totalApplications} ansøgninger
+              </p>
+            </div>
+            <Button onClick={() => setShowNewCandidateDialog(true)} className="w-full md:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Tilføj kandidat
+            </Button>
           </div>
 
-          <div className="flex items-start gap-4 flex-col md:flex-row">
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Filtre:</span>
-            </div>
+          <NewCandidateDialog
+            open={showNewCandidateDialog}
+            onOpenChange={setShowNewCandidateDialog}
+          />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 w-full">
-              <div className="space-y-2">
-                <Label htmlFor="status-filter" className="text-sm">Status</Label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger id="status-filter" className="bg-background border-border">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border">
-                    <SelectItem value="all">Alle statuser</SelectItem>
-                    <SelectItem value="new">Ny ansøgning</SelectItem>
-                    <SelectItem value="contacted">Kontaktet</SelectItem>
-                    <SelectItem value="interview_scheduled">Samtale planlagt</SelectItem>
-                    <SelectItem value="interviewed">Samtale afholdt</SelectItem>
-                    <SelectItem value="hired">Ansat</SelectItem>
-                    <SelectItem value="rejected">Afvist</SelectItem>
-                    <SelectItem value="ghostet">Ghostet</SelectItem>
-                    <SelectItem value="takket_nej">Takket nej</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="sort-by" className="text-sm">Sortering</Label>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger id="sort-by" className="bg-background border-border">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border">
-                    <SelectItem value="newest">Nyeste ansøgninger først</SelectItem>
-                    <SelectItem value="oldest">Ældste ansøgninger først</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-3">
-          {filteredCandidates.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">Ingen kandidater fundet</p>
-            </div>
-          ) : (
-            filteredCandidates.map((candidate) => (
-              <CandidateCard
-                key={candidate.id}
-                candidate={candidate}
-                applications={candidate.applications}
-                onUpdate={refetch}
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Søg efter navn, email eller telefon..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-background border-border"
               />
-            ))
-          )}
+            </div>
+
+            <div className="flex items-start gap-4 flex-col md:flex-row">
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Filtre:</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 w-full">
+                <div className="space-y-2">
+                  <Label htmlFor="status-filter" className="text-sm">Status</Label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger id="status-filter" className="bg-background border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border-border">
+                      <SelectItem value="all">Alle statuser</SelectItem>
+                      <SelectItem value="new">Ny ansøgning</SelectItem>
+                      <SelectItem value="contacted">Kontaktet</SelectItem>
+                      <SelectItem value="interview_scheduled">Samtale planlagt</SelectItem>
+                      <SelectItem value="interviewed">Samtale afholdt</SelectItem>
+                      <SelectItem value="hired">Ansat</SelectItem>
+                      <SelectItem value="rejected">Afvist</SelectItem>
+                      <SelectItem value="ghostet">Ghostet</SelectItem>
+                      <SelectItem value="takket_nej">Takket nej</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="sort-by" className="text-sm">Sortering</Label>
+                  <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger id="sort-by" className="bg-background border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border-border">
+                      <SelectItem value="newest">Nyeste ansøgninger først</SelectItem>
+                      <SelectItem value="oldest">Ældste ansøgninger først</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3">
+            {filteredCandidates.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">Ingen kandidater fundet</p>
+              </div>
+            ) : (
+              filteredCandidates.map((candidate) => (
+                <CandidateCard
+                  key={candidate.id}
+                  candidate={candidate}
+                  applications={candidate.applications}
+                  onUpdate={refetch}
+                />
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Right sidebar with Call Logs and Chat History */}
+        <div className="hidden lg:flex flex-col w-80 gap-4">
+          {/* Call Logs */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                Opkaldslog ({callLogs.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <ScrollArea className="h-[300px]">
+                {callLogs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Ingen opkald endnu</p>
+                ) : (
+                  <div className="space-y-2">
+                    {callLogs.map((log) => {
+                      const candidate = findCandidateByPhone(log.direction === 'outbound' ? log.to_number : log.from_number);
+                      return (
+                        <div key={log.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                            log.direction === 'outbound' ? 'bg-blue-500/20' : 'bg-green-500/20'
+                          }`}>
+                            {log.direction === 'outbound' ? (
+                              <PhoneOutgoing className="w-4 h-4 text-blue-500" />
+                            ) : (
+                              <PhoneIncoming className="w-4 h-4 text-green-500" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {candidate ? `${candidate.first_name} ${candidate.last_name}` : (log.to_number || log.from_number || 'Ukendt')}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>{format(new Date(log.started_at), 'dd MMM HH:mm', { locale: da })}</span>
+                              <span>·</span>
+                              <span>{formatDuration(log.duration_seconds)}</span>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] shrink-0">
+                            {log.status || 'completed'}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          {/* SMS/Chat History */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Beskeder ({smsLogs.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <ScrollArea className="h-[300px]">
+                {smsLogs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Ingen beskeder endnu</p>
+                ) : (
+                  <div className="space-y-2">
+                    {smsLogs.map((log) => {
+                      const candidate = findCandidateByPhone(log.phone_number);
+                      return (
+                        <div key={log.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                            log.direction === 'outbound' ? 'bg-blue-500/20' : 'bg-green-500/20'
+                          }`}>
+                            <MessageSquare className={`w-4 h-4 ${log.direction === 'outbound' ? 'text-blue-500' : 'text-green-500'}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {candidate ? `${candidate.first_name} ${candidate.last_name}` : (log.phone_number || 'Ukendt')}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">{log.content}</p>
+                            <span className="text-[10px] text-muted-foreground">
+                              {format(new Date(log.created_at), 'dd MMM HH:mm', { locale: da })}
+                            </span>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] shrink-0">
+                            {log.type}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </MainLayout>
