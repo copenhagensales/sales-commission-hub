@@ -214,6 +214,58 @@ export type Database = {
           },
         ]
       }
+      agent_presence: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          identity: string
+          is_online: boolean
+          last_seen_at: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          identity: string
+          is_online?: boolean
+          last_seen_at?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          identity?: string
+          is_online?: boolean
+          last_seen_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_presence_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_presence_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_presence_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents: {
         Row: {
           base_salary_monthly: number | null

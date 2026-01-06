@@ -149,31 +149,30 @@ serve(async (req) => {
       // For inbound calls, try to route to connected browser clients
       console.log(`[twilio-voice-token][${requestId}] Inbound call - routing to browser clients`);
       
-      // Wrap database query in try/catch to prevent failures from breaking calls
-      let employees: { id: string }[] = [];
+      // Query ONLY agents who are currently online (presence tracking)
+      let onlineAgents: { identity: string }[] = [];
       try {
         const { data, error } = await supabaseClient
-          .from('employee_master_data')
-          .select('id')
-          .eq('is_active', true)
-          .limit(5); // Reduced limit for more reliable dialing
+          .from('agent_presence')
+          .select('identity')
+          .eq('is_online', true);
 
         if (error) {
-          console.error(`[twilio-voice-token][${requestId}] DB query error:`, error);
+          console.error(`[twilio-voice-token][${requestId}] Presence query error:`, error);
         } else {
-          employees = data || [];
+          onlineAgents = data || [];
         }
       } catch (dbError) {
-        console.error(`[twilio-voice-token][${requestId}] DB query exception:`, dbError);
-        // Continue with empty employees - will use voicemail fallback
+        console.error(`[twilio-voice-token][${requestId}] Presence query exception:`, dbError);
       }
 
-      console.log(`[twilio-voice-token][${requestId}] Found ${employees.length} active employees to dial`);
+      console.log(`[twilio-voice-token][${requestId}] Found ${onlineAgents.length} online agents:`, 
+        onlineAgents.map(a => a.identity));
 
-      if (employees.length > 0) {
-        // Create Client elements for each potential agent
-        const clientElements = employees
-          .map(emp => `    <Client>agent_${emp.id}</Client>`)
+      if (onlineAgents.length > 0) {
+        // Create Client elements for each online agent
+        const clientElements = onlineAgents
+          .map(agent => `    <Client>${escapeXml(agent.identity)}</Client>`)
           .join('\n');
 
         const actionUrl = `${supabaseUrl}/functions/v1/incoming-call`;
@@ -188,10 +187,10 @@ ${clientElements}
   <Say language="da-DK">Tak for din besked. Vi vender tilbage hurtigst muligt.</Say>
 </Response>`;
 
-        console.log(`[twilio-voice-token][${requestId}] Generated inbound TwiML with ${employees.length} client targets`);
+        console.log(`[twilio-voice-token][${requestId}] Generated inbound TwiML with ${onlineAgents.length} online client targets`);
       } else {
-        // No agents available, go to voicemail
-        console.log(`[twilio-voice-token][${requestId}] No active employees, generating voicemail TwiML`);
+        // No agents online, go to voicemail
+        console.log(`[twilio-voice-token][${requestId}] No online agents, generating voicemail TwiML`);
         twiml = generateVoicemailTwiml('Tak for dit opkald til CPH Sales. Der er ingen agenter tilgængelige lige nu.');
       }
     }
