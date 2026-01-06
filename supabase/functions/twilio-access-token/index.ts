@@ -31,7 +31,8 @@ async function hmacSign(key: string, data: string): Promise<string> {
 
 async function createTwilioAccessToken(
   accountSid: string,
-  authToken: string,
+  apiKeySid: string,
+  apiKeySecret: string,
   identity: string,
   twimlAppSid: string
 ): Promise<string> {
@@ -45,8 +46,8 @@ async function createTwilioAccessToken(
   };
 
   const payload = {
-    jti: `${accountSid}-${now}`,
-    iss: accountSid,
+    jti: `${apiKeySid}-${now}`,
+    iss: apiKeySid,
     sub: accountSid,
     nbf: now,
     exp: now + ttl,
@@ -68,7 +69,7 @@ async function createTwilioAccessToken(
   const payloadB64 = base64url(encoder.encode(JSON.stringify(payload)));
   
   const signatureInput = `${headerB64}.${payloadB64}`;
-  const signature = await hmacSign(authToken, signatureInput);
+  const signature = await hmacSign(apiKeySecret, signatureInput);
   
   return `${headerB64}.${payloadB64}.${signature}`;
 }
@@ -127,11 +128,17 @@ serve(async (req) => {
     }
 
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const authTokenTwilio = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const apiKeySid = Deno.env.get('TWILIO_API_KEY_SID');
+    const apiKeySecret = Deno.env.get('TWILIO_API_KEY_SECRET');
     const twimlAppSid = Deno.env.get('TWILIO_TWIML_APP_SID');
 
-    if (!accountSid || !authTokenTwilio || !twimlAppSid) {
-      console.error('Missing Twilio credentials');
+    if (!accountSid || !apiKeySid || !apiKeySecret || !twimlAppSid) {
+      console.error('Missing Twilio credentials:', { 
+        hasAccountSid: !!accountSid, 
+        hasApiKeySid: !!apiKeySid, 
+        hasApiKeySecret: !!apiKeySecret, 
+        hasTwimlAppSid: !!twimlAppSid 
+      });
       return new Response(
         JSON.stringify({ error: 'Missing Twilio configuration' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -145,7 +152,8 @@ serve(async (req) => {
 
     const accessToken = await createTwilioAccessToken(
       accountSid,
-      authTokenTwilio,
+      apiKeySid,
+      apiKeySecret,
       identity,
       twimlAppSid
     );
