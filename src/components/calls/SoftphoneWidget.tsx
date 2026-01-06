@@ -65,12 +65,6 @@ interface Contact {
 export function SoftphoneWidget() {
   const { position, isLoading: permissionsLoading } = usePermissions();
   
-  // Check if user has access to softphone based on position
-  const hasAccess = useMemo(() => {
-    if (!position?.name) return false;
-    return SOFTPHONE_ALLOWED_POSITIONS.includes(position.name.toLowerCase());
-  }, [position?.name]);
-
   const {
     deviceState,
     callState,
@@ -93,9 +87,11 @@ export function SoftphoneWidget() {
   const [autoConnectAttempted, setAutoConnectAttempted] = useState(false);
   const [showContacts, setShowContacts] = useState(false);
 
-  // Don't render anything if user doesn't have access
-  if (permissionsLoading) return null;
-  if (!hasAccess) return null;
+  // Check if user has access to softphone based on position
+  const hasAccess = useMemo(() => {
+    if (!position?.name) return false;
+    return SOFTPHONE_ALLOWED_POSITIONS.includes(position.name.toLowerCase());
+  }, [position?.name]);
 
   // Fetch employees and candidates for contact lookup
   const { data: employees = [] } = useQuery({
@@ -107,6 +103,7 @@ export function SoftphoneWidget() {
         .not('private_phone', 'is', null);
       return data || [];
     },
+    enabled: hasAccess, // Only fetch if user has access
   });
 
   const { data: candidates = [] } = useQuery({
@@ -118,6 +115,7 @@ export function SoftphoneWidget() {
         .not('phone', 'is', null);
       return data || [];
     },
+    enabled: hasAccess, // Only fetch if user has access
   });
 
   // Combine and normalize contacts
@@ -168,22 +166,23 @@ export function SoftphoneWidget() {
 
   // Auto-connect softphone on mount so we can receive incoming calls
   useEffect(() => {
+    if (!hasAccess) return; // Don't auto-connect if no access
     if (!autoConnectAttempted && deviceState === 'disconnected') {
       setAutoConnectAttempted(true);
       console.log('[SoftphoneWidget] Auto-connecting softphone for incoming calls...');
       initializeDevice();
     }
-  }, [deviceState, autoConnectAttempted, initializeDevice]);
+  }, [deviceState, autoConnectAttempted, initializeDevice, hasAccess]);
 
   // Handle input change - only allow numbers, +, *, #
-  const handleDialNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDialNumberChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Only allow digits, +, *, # and spaces
     const filtered = value.replace(/[^\d+*#\s]/g, '');
     setDialNumber(filtered);
-  };
+  }, []);
 
-  const handleDial = (numberToDial?: string) => {
+  const handleDial = useCallback((numberToDial?: string) => {
     const number = numberToDial || dialNumber.trim();
     if (number) {
       const normalized = normalizePhoneNumber(number);
@@ -194,9 +193,9 @@ export function SoftphoneWidget() {
         setDialNumber('');
       }
     }
-  };
+  }, [dialNumber, makeCall]);
 
-  const handleContactSelect = (contact: Contact) => {
+  const handleContactSelect = useCallback((contact: Contact) => {
     const normalized = normalizePhoneNumber(contact.phone);
     if (normalized) {
       makeCall(normalized);
@@ -204,15 +203,15 @@ export function SoftphoneWidget() {
       setShowContacts(false);
       setDialNumber('');
     }
-  };
+  }, [makeCall]);
 
-  const handleDialPadPress = (digit: string) => {
+  const handleDialPadPress = useCallback((digit: string) => {
     setDialNumber(prev => prev + digit);
-  };
+  }, []);
 
-  const handleBackspace = () => {
+  const handleBackspace = useCallback(() => {
     setDialNumber(prev => prev.slice(0, -1));
-  };
+  }, []);
 
   const shouldShowCallUI = callState === 'incoming' || callState === 'connecting' || callState === 'connected';
   const isIncomingCall = callState === 'incoming' && currentCall;
@@ -225,6 +224,10 @@ export function SoftphoneWidget() {
       console.error('[SoftphoneWidget] Failed to answer:', err);
     }
   }, [answerCall]);
+
+  // Don't render anything if user doesn't have access (AFTER all hooks)
+  if (permissionsLoading) return null;
+  if (!hasAccess) return null;
 
   return (
     <>
