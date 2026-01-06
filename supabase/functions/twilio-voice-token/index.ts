@@ -94,7 +94,9 @@ serve(async (req) => {
     if (direction === 'outbound-api' || isOutboundFromClient) {
       const url = new URL(req.url);
       const dialToParam = url.searchParams.get('dialTo');
-      const destinationNumber = dialToParam || to || called;
+      // Clean phone number: remove spaces and ensure proper formatting
+      const rawNumber = dialToParam || to || called;
+      const destinationNumber = rawNumber.replace(/\s+/g, '');
 
       const twilioCallerIdRaw = Deno.env.get('TWILIO_PHONE_NUMBER');
       const twilioCallerId = twilioCallerIdRaw?.replace(/[^\d+]/g, '');
