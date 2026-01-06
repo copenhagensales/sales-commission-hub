@@ -346,52 +346,9 @@ export function SoftphoneWidget() {
               </div>
             </div>
             
-            {/* Dial Pad - Always visible */}
-            <div className="w-full">
-              <div className="flex gap-2 mb-3">
-                <Input
-                  value={dialNumber}
-                  onChange={handleDialNumberChange}
-                  placeholder="+45..."
-                  className="text-center text-lg font-mono"
-                  inputMode="tel"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleBackspace}
-                  disabled={!dialNumber}
-                >
-                  <Delete className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 mb-3">
-                {dialPadButtons.flat().map((digit) => (
-                  <Button
-                    key={digit}
-                    variant="outline"
-                    className="h-12 text-lg font-semibold"
-                    onClick={() => handleDialPadPress(digit)}
-                  >
-                    {digit}
-                  </Button>
-                ))}
-              </div>
-
-              <Button
-                onClick={() => handleDial()}
-                disabled={!dialNumber.trim()}
-                className="w-full bg-green-500 hover:bg-green-600"
-              >
-                <Phone className="w-4 h-4 mr-2" />
-                Call
-              </Button>
-            </div>
-
-            {/* Contacts Panel - Expandable below */}
+            {/* Contacts Panel - Above dial pad */}
             {showContacts && (
-              <div className="mt-4 border rounded-lg overflow-hidden">
+              <div className="mb-4 border rounded-lg overflow-hidden">
                 <div className="bg-muted/50 px-3 py-2 border-b">
                   <span className="text-sm font-medium flex items-center gap-2">
                     <Users className="w-4 h-4" />
@@ -435,6 +392,49 @@ export function SoftphoneWidget() {
                 </ScrollArea>
               </div>
             )}
+
+            {/* Dial Pad - Always visible */}
+            <div className="w-full">
+              <div className="flex gap-2 mb-3">
+                <Input
+                  value={dialNumber}
+                  onChange={handleDialNumberChange}
+                  placeholder="+45..."
+                  className="text-center text-lg font-mono"
+                  inputMode="tel"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleBackspace}
+                  disabled={!dialNumber}
+                >
+                  <Delete className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {dialPadButtons.flat().map((digit) => (
+                  <Button
+                    key={digit}
+                    variant="outline"
+                    className="h-12 text-lg font-semibold"
+                    onClick={() => handleDialPadPress(digit)}
+                  >
+                    {digit}
+                  </Button>
+                ))}
+              </div>
+
+              <Button
+                onClick={() => handleDial()}
+                disabled={!dialNumber.trim()}
+                className="w-full bg-green-500 hover:bg-green-600"
+              >
+                <Phone className="w-4 h-4 mr-2" />
+                Call
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
