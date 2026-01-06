@@ -160,13 +160,19 @@ serve(async (req) => {
 
     if (existingCall) {
       // Update existing call record
-      const updateData: Record<string, unknown> = {
-        status: callStatus,
-      };
+      // IMPORTANT: For parent calls (outbound-api), do NOT set connected_at here!
+      // connected_at should ONLY be set by the destination leg callback when the candidate actually answers
+      // The parent call goes "in-progress" as soon as TwiML starts executing, not when the candidate answers
+      const updateData: Record<string, unknown> = {};
+      
+      // Only update status for terminal states or if it's an inbound call
+      // For outbound-api calls, the destination leg will update the parent's status
+      if (rawDirection !== 'outbound-api' || callStatus === 'completed' || callStatus === 'busy' || callStatus === 'no-answer' || callStatus === 'failed' || callStatus === 'canceled') {
+        updateData.status = callStatus;
+      }
 
-      // When call becomes in-progress, set connected_at
-      if (callStatus === 'in-progress') {
-        // Check if connected_at is already set
+      // For inbound calls, set connected_at when answered
+      if (rawDirection === 'inbound' && callStatus === 'in-progress') {
         const { data: currentRecord } = await supabase
           .from('call_records')
           .select('connected_at')
@@ -175,7 +181,7 @@ serve(async (req) => {
         
         if (!currentRecord?.connected_at) {
           updateData.connected_at = new Date().toISOString();
-          console.log('[incoming-call] Call answered - setting connected_at for existing record');
+          console.log('[incoming-call] Inbound call answered - setting connected_at');
         }
       }
 
@@ -189,17 +195,22 @@ serve(async (req) => {
         updateData.ended_at = new Date().toISOString();
       }
 
-      const { error: updateError } = await supabase
-        .from('call_records')
-        .update(updateData)
-        .eq('id', existingCall.id);
+      // Only update if there's something to update
+      if (Object.keys(updateData).length > 0) {
+        const { error: updateError } = await supabase
+          .from('call_records')
+          .update(updateData)
+          .eq('id', existingCall.id);
 
-      if (updateError) {
-        console.error('[incoming-call] Error updating call:', updateError);
-        throw updateError;
+        if (updateError) {
+          console.error('[incoming-call] Error updating call:', updateError);
+          throw updateError;
+        }
+
+        console.log('[incoming-call] Updated call record:', existingCall.id, 'with data:', updateData);
+      } else {
+        console.log('[incoming-call] No update needed for parent outbound-api call in-progress state (waiting for destination leg)');
       }
-
-      console.log('[incoming-call] Updated call record:', existingCall.id, 'with status:', callStatus, 'data:', updateData);
     } else {
       // Create new call record
       const { error: insertError } = await supabase
