@@ -5,6 +5,7 @@ import { Phone, PhoneOff, Mic, MicOff, User, PhoneCall, Volume2, VolumeX } from 
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useRingingSound } from '@/hooks/useRingingSound';
+import { toast } from 'sonner';
 
 type CallStatus = 'initiating' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer' | 'canceled';
 
@@ -44,6 +45,7 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
   const [isMuted, setIsMuted] = useState(false);
   const [callStartTime, setCallStartTime] = useState<Date | null>(null);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
+  const [isEnding, setIsEnding] = useState(false);
 
   // Determine if we should play the ringing sound
   const shouldPlayRinging = isOpen && isSoundEnabled && (status === 'initiating' || status === 'ringing');
@@ -212,9 +214,39 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
   const isCallActive = status === 'initiating' || status === 'ringing' || status === 'in-progress';
   const isCallEnded = status === 'completed' || status === 'failed' || status === 'busy' || status === 'no-answer' || status === 'canceled';
 
-  const handleEndCall = () => {
-    // For now, just close the modal - actual call termination would require Twilio API
-    onClose();
+  const handleEndCall = async () => {
+    if (!callSid) {
+      onClose();
+      return;
+    }
+
+    if (isEnding) return;
+
+    // If the call is still active, actually end it in the backend; otherwise just close.
+    if (!isCallActive) {
+      onClose();
+      return;
+    }
+
+    try {
+      setIsEnding(true);
+      toast.loading('Afslutter opkald...', { id: 'end-call' });
+
+      const { data, error } = await supabase.functions.invoke('end-call', {
+        body: { callSid },
+      });
+
+      if (error) throw error;
+      if (!data?.ok) throw new Error('Kunne ikke afslutte opkald');
+
+      toast.success('Opkald afsluttet', { id: 'end-call' });
+      onClose();
+    } catch (e: any) {
+      console.error('[CallModal] end-call failed', e);
+      toast.error(e?.message || 'Kunne ikke afslutte opkald', { id: 'end-call' });
+    } finally {
+      setIsEnding(false);
+    }
   };
 
   return (
@@ -326,11 +358,13 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
               {/* End/Close call button */}
               <Button
                 onClick={handleEndCall}
+                disabled={isEnding}
                 className={cn(
                   "w-16 h-16 rounded-full transition-all",
-                  isCallActive 
-                    ? "bg-red-600 hover:bg-red-700" 
-                    : "bg-zinc-700 hover:bg-zinc-600"
+                  isCallActive
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-zinc-700 hover:bg-zinc-600",
+                  isEnding && "opacity-70"
                 )}
               >
                 {isCallActive ? (
