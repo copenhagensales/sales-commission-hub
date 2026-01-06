@@ -320,8 +320,9 @@ export function SoftphoneWidget() {
 
       {/* Dial Pad with Contacts Panel */}
       {showDialer && deviceState === 'ready' && !shouldShowCallUI && (
-        <Card className={cn("mb-4 shadow-lg transition-all", showContacts ? "w-[320px] sm:w-[560px]" : "w-[320px]")}>
+        <Card className="mb-4 shadow-lg w-[320px]">
           <CardContent className="p-3 sm:p-4">
+            {/* Fixed Header */}
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-medium">Softphone</span>
               <div className="flex items-center gap-1">
@@ -345,97 +346,95 @@ export function SoftphoneWidget() {
               </div>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-4">
-              {/* Left: All Contacts - toggle visibility */}
-              {showContacts && (
-                <div className="w-full sm:w-1/2 border rounded-lg overflow-hidden">
-                  <div className="bg-muted/50 px-3 py-2 border-b">
-                    <span className="text-sm font-medium flex items-center gap-2">
-                      <Users className="w-4 h-4" />
-                      Contacts ({allContacts.length})
-                    </span>
-                  </div>
-                  <ScrollArea className="h-[320px]">
-                    <div className="p-2 space-y-1">
-                      {allContacts.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">No contacts found</p>
-                      ) : (
-                        allContacts.map((contact) => (
-                          <button
-                            key={`${contact.type}-${contact.id}`}
-                            onClick={() => handleContactSelect(contact)}
-                            className="w-full flex items-center gap-2 p-2 hover:bg-muted rounded-md text-left transition-colors"
-                          >
-                            <div className={cn(
-                              "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                              contact.type === 'employee' ? "bg-blue-500/20" : "bg-green-500/20"
-                            )}>
-                              {contact.type === 'employee' ? (
-                                <Users className="w-4 h-4 text-blue-500" />
-                              ) : (
-                                <User className="w-4 h-4 text-green-500" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{contact.name}</p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {formatPhoneForDisplay(contact.phone)}
-                              </p>
-                            </div>
-                            <Badge variant="outline" className="text-[10px] shrink-0">
-                              {contact.type === 'employee' ? 'Staff' : 'Cand'}
-                            </Badge>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </ScrollArea>
-                </div>
-              )}
-
-              {/* Right: Dial Pad */}
-              <div className={cn("w-full", showContacts && "sm:w-1/2")}>
-                <div className="flex gap-2 mb-3">
-                  <Input
-                    value={dialNumber}
-                    onChange={handleDialNumberChange}
-                    placeholder="+45..."
-                    className="text-center text-lg font-mono"
-                    inputMode="tel"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleBackspace}
-                    disabled={!dialNumber}
-                  >
-                    <Delete className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  {dialPadButtons.flat().map((digit) => (
-                    <Button
-                      key={digit}
-                      variant="outline"
-                      className="h-12 text-lg font-semibold"
-                      onClick={() => handleDialPadPress(digit)}
-                    >
-                      {digit}
-                    </Button>
-                  ))}
-                </div>
-
+            {/* Dial Pad - Always visible */}
+            <div className="w-full">
+              <div className="flex gap-2 mb-3">
+                <Input
+                  value={dialNumber}
+                  onChange={handleDialNumberChange}
+                  placeholder="+45..."
+                  className="text-center text-lg font-mono"
+                  inputMode="tel"
+                />
                 <Button
-                  onClick={() => handleDial()}
-                  disabled={!dialNumber.trim()}
-                  className="w-full bg-green-500 hover:bg-green-600"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleBackspace}
+                  disabled={!dialNumber}
                 >
-                  <Phone className="w-4 h-4 mr-2" />
-                  Call
+                  <Delete className="w-4 h-4" />
                 </Button>
               </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {dialPadButtons.flat().map((digit) => (
+                  <Button
+                    key={digit}
+                    variant="outline"
+                    className="h-12 text-lg font-semibold"
+                    onClick={() => handleDialPadPress(digit)}
+                  >
+                    {digit}
+                  </Button>
+                ))}
+              </div>
+
+              <Button
+                onClick={() => handleDial()}
+                disabled={!dialNumber.trim()}
+                className="w-full bg-green-500 hover:bg-green-600"
+              >
+                <Phone className="w-4 h-4 mr-2" />
+                Call
+              </Button>
             </div>
+
+            {/* Contacts Panel - Expandable below */}
+            {showContacts && (
+              <div className="mt-4 border rounded-lg overflow-hidden">
+                <div className="bg-muted/50 px-3 py-2 border-b">
+                  <span className="text-sm font-medium flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Contacts ({allContacts.length})
+                  </span>
+                </div>
+                <ScrollArea className="h-[200px]">
+                  <div className="p-2 space-y-1">
+                    {allContacts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">No contacts found</p>
+                    ) : (
+                      allContacts.map((contact) => (
+                        <button
+                          key={`${contact.type}-${contact.id}`}
+                          onClick={() => handleContactSelect(contact)}
+                          className="w-full flex items-center gap-2 p-2 hover:bg-muted rounded-md text-left transition-colors"
+                        >
+                          <div className={cn(
+                            "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                            contact.type === 'employee' ? "bg-blue-500/20" : "bg-green-500/20"
+                          )}>
+                            {contact.type === 'employee' ? (
+                              <Users className="w-4 h-4 text-blue-500" />
+                            ) : (
+                              <User className="w-4 h-4 text-green-500" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{contact.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {formatPhoneForDisplay(contact.phone)}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] shrink-0">
+                            {contact.type === 'employee' ? 'Staff' : 'Cand'}
+                          </Badge>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
