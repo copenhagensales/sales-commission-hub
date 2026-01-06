@@ -149,8 +149,9 @@ export function CandidateChatHistory({ candidatePhone, candidateId, maxHeight = 
     <ScrollArea className="pr-4" style={{ maxHeight }} ref={scrollRef}>
       <div className="space-y-3">
         {messages.map((msg: any) => {
-          const isOutgoing = msg.direction === "outgoing";
-          const isSms = msg.type === "sms";
+          const direction = String(msg.direction || "").toLowerCase();
+          const isOutgoing = ["outgoing", "outbound", "sent", "send"].includes(direction);
+          const isSms = String(msg.type || "").toLowerCase() === "sms";
           
           return (
             <div
