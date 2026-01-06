@@ -73,7 +73,10 @@ export function MfaVerifyDialog({
             </DialogTitle>
           </div>
           <DialogDescription>
-            Indtast koden fra din authenticator-app for at fortsætte
+            Indtast koden fra din authenticator-app for at fortsætte.
+            <span className="block mt-1 text-xs">
+              Vi anbefaler <strong>Microsoft Authenticator</strong>, da den også bruges til vores øvrige systemer.
+            </span>
           </DialogDescription>
         </DialogHeader>
 
