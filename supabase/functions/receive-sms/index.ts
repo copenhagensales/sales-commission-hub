@@ -20,30 +20,51 @@ serve(async (req) => {
     // Parse form data from Twilio
     const formData = await req.formData();
     
-    // Extract SMS metadata
+    // Extract SMS metadata from Twilio webhook
     const messageSid = formData.get('MessageSid') as string;
     const from = formData.get('From') as string;
     const to = formData.get('To') as string;
     const body = formData.get('Body') as string;
     const numMedia = formData.get('NumMedia') as string;
     const accountSid = formData.get('AccountSid') as string;
+    const fromCity = formData.get('FromCity') as string;
+    const fromCountry = formData.get('FromCountry') as string;
 
-    console.log('[receive-sms] Received SMS:', {
+    console.log('[receive-sms] Received inbound SMS:', {
       messageSid,
       from,
       to,
       bodyPreview: body?.substring(0, 50),
       numMedia,
+      fromCity,
+      fromCountry,
       timestamp: new Date().toISOString()
     });
 
-    // Try to find matching candidate by phone number
+    // Idempotency check - skip if we've already processed this MessageSid
+    if (messageSid) {
+      const { data: existingMessage } = await supabase
+        .from('communication_logs')
+        .select('id')
+        .eq('twilio_sid', messageSid)
+        .maybeSingle();
+
+      if (existingMessage) {
+        console.log('[receive-sms] Duplicate webhook - MessageSid already processed:', messageSid);
+        return new Response(
+          `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`,
+          { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
+        );
+      }
+    }
+
+    // Normalize phone number for matching (last 8 digits for Danish numbers)
     const normalizedPhone = from?.replace(/\D/g, '').slice(-8);
     
-    let candidateId: string | null = null;
     let applicationId: string | null = null;
     
     if (normalizedPhone) {
+      // Try to find matching candidate by phone number
       const { data: candidate } = await supabase
         .from('candidates')
         .select('id')
@@ -51,66 +72,66 @@ serve(async (req) => {
         .maybeSingle();
       
       if (candidate) {
-        candidateId = candidate.id;
-        console.log('[receive-sms] Matched to candidate:', candidateId);
+        console.log('[receive-sms] Matched to candidate:', candidate.id);
         
         // Find most recent application for this candidate
         const { data: application } = await supabase
           .from('applications')
           .select('id')
-          .eq('candidate_id', candidateId)
+          .eq('candidate_id', candidate.id)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
         
         if (application) {
           applicationId = application.id;
+          console.log('[receive-sms] Linked to application:', applicationId);
         }
+      } else {
+        console.log('[receive-sms] No candidate match found for phone:', normalizedPhone);
       }
     }
 
     // Store SMS as immutable record in communication_logs
-    const { error: insertError } = await supabase
+    const { data: insertedLog, error: insertError } = await supabase
       .from('communication_logs')
       .insert({
         application_id: applicationId,
         type: 'sms',
         direction: 'inbound',
         content: body,
+        phone_number: from,
         twilio_sid: messageSid,
         read: false,
-      });
+      })
+      .select('id')
+      .single();
 
     if (insertError) {
       console.error('[receive-sms] Error inserting SMS:', insertError);
       throw insertError;
     }
 
-    console.log('[receive-sms] Stored SMS for application:', applicationId || 'no match');
+    console.log('[receive-sms] Stored inbound SMS:', {
+      logId: insertedLog?.id,
+      applicationId: applicationId || 'no match',
+      from,
+      bodyLength: body?.length
+    });
 
     // Return empty TwiML (no auto-reply)
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response></Response>`;
-
-    return new Response(twiml, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/xml',
-      },
-    });
+    return new Response(
+      `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`,
+      { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
+    );
 
   } catch (error) {
     console.error('[receive-sms] Error:', error);
     
-    // Return empty TwiML even on error
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response></Response>`;
-
-    return new Response(twiml, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/xml',
-      },
-    });
+    // Return empty TwiML even on error to acknowledge receipt
+    return new Response(
+      `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`,
+      { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
+    );
   }
 });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -18,7 +18,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, MessageSquare } from "lucide-react";
+import { Loader2, MessageSquare, Send, ArrowDown } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { format } from "date-fns";
+import { da } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface Candidate {
   id: string;
@@ -34,10 +38,79 @@ interface SendSmsDialogProps {
   candidate: Candidate;
 }
 
+interface SmsMessage {
+  id: string;
+  content: string | null;
+  direction: string;
+  created_at: string;
+  phone_number: string | null;
+  read: boolean;
+}
+
 export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogProps) {
   const [message, setMessage] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const queryClient = useQueryClient();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Normalize phone for matching
+  const normalizedPhone = candidate.phone?.replace(/\D/g, '').slice(-8) || '';
+
+  // Fetch SMS conversation history for this candidate
+  const { data: smsHistory = [], isLoading: historyLoading } = useQuery({
+    queryKey: ["sms_history", candidate.id, normalizedPhone],
+    queryFn: async () => {
+      if (!normalizedPhone) return [];
+      
+      const { data, error } = await supabase
+        .from("communication_logs")
+        .select("id, content, direction, created_at, phone_number, read")
+        .eq("type", "sms")
+        .or(`phone_number.ilike.%${normalizedPhone}`)
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      return data as SmsMessage[];
+    },
+    enabled: open && !!normalizedPhone,
+    refetchInterval: 5000, // Fallback polling every 5s while dialog is open
+  });
+
+  // Subscribe to realtime updates
+  useEffect(() => {
+    if (!open || !normalizedPhone) return;
+
+    const channel = supabase
+      .channel('sms-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'communication_logs',
+          filter: `type=eq.sms`
+        },
+        (payload) => {
+          const newMessage = payload.new as SmsMessage;
+          // Check if this message belongs to our conversation
+          if (newMessage.phone_number?.includes(normalizedPhone)) {
+            queryClient.invalidateQueries({ queryKey: ["sms_history", candidate.id, normalizedPhone] });
+            queryClient.invalidateQueries({ queryKey: ["communication_logs"] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [open, normalizedPhone, candidate.id, queryClient]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [smsHistory]);
 
   const { data: templates = [] } = useQuery({
     queryKey: ["sms_templates"],
@@ -54,29 +127,28 @@ export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogPr
 
   const sendSmsMutation = useMutation({
     mutationFn: async () => {
-      // Log the communication
-      const { error: logError } = await supabase
-        .from("communication_logs")
-        .insert({
-          type: "sms",
-          direction: "outbound",
-          content: message,
-        });
+      const { data, error } = await supabase.functions.invoke('send-recruitment-sms', {
+        body: {
+          candidateId: candidate.id,
+          phoneNumber: candidate.phone,
+          message: message.trim(),
+        }
+      });
 
-      if (logError) throw logError;
-
-      // In a real implementation, this would call an edge function to send via Twilio
-      console.log("SMS would be sent to:", candidate.phone, "Message:", message);
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["communication_logs"] });
-      toast.success("SMS sendt (simuleret)");
-      onOpenChange(false);
+      queryClient.invalidateQueries({ queryKey: ["sms_history", candidate.id, normalizedPhone] });
+      toast.success("SMS sendt");
       setMessage("");
       setSelectedTemplate("");
     },
-    onError: () => {
-      toast.error("Kunne ikke sende SMS");
+    onError: (error: Error) => {
+      toast.error(`Kunne ikke sende SMS: ${error.message}`);
     },
   });
 
@@ -96,7 +168,18 @@ export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogPr
       toast.error("Indtast en besked");
       return;
     }
+    if (!candidate.phone) {
+      toast.error("Kandidaten har intet telefonnummer");
+      return;
+    }
     sendSmsMutation.mutate();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   const charCount = message.length;
@@ -104,58 +187,108 @@ export function SendSmsDialog({ open, onOpenChange, candidate }: SendSmsDialogPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border max-w-md">
-        <DialogHeader>
+      <DialogContent className="bg-card border-border max-w-md sm:max-w-lg h-[80vh] max-h-[700px] flex flex-col p-0">
+        <DialogHeader className="p-4 pb-2 border-b border-border shrink-0">
           <DialogTitle className="text-foreground flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />
-            Send SMS til {candidate.first_name}
+            SMS med {candidate.first_name} {candidate.last_name}
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">{candidate.phone || 'Intet nummer'}</p>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="p-3 rounded-lg bg-muted/30 border border-border">
-            <p className="text-sm text-muted-foreground">Til:</p>
-            <p className="font-medium text-foreground">{candidate.phone}</p>
+        {/* Message History */}
+        <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+          <div className="space-y-3">
+            {historyLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : smsHistory.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>Ingen beskeder endnu</p>
+                <p className="text-sm">Start en samtale nedenfor</p>
+              </div>
+            ) : (
+              smsHistory.map((sms) => (
+                <div
+                  key={sms.id}
+                  className={cn(
+                    "flex",
+                    sms.direction === "outbound" ? "justify-end" : "justify-start"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "max-w-[80%] rounded-2xl px-4 py-2 text-sm",
+                      sms.direction === "outbound"
+                        ? "bg-primary text-primary-foreground rounded-br-md"
+                        : "bg-muted text-foreground rounded-bl-md"
+                    )}
+                  >
+                    <p className="whitespace-pre-wrap break-words">{sms.content}</p>
+                    <p className={cn(
+                      "text-xs mt-1",
+                      sms.direction === "outbound" 
+                        ? "text-primary-foreground/70" 
+                        : "text-muted-foreground"
+                    )}>
+                      {format(new Date(sms.created_at), "d. MMM HH:mm", { locale: da })}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+            <div ref={messagesEndRef} />
           </div>
+        </ScrollArea>
 
-          <div className="space-y-2">
-            <Label>Skabelon (valgfri)</Label>
-            <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
-              <SelectTrigger className="bg-background border-border">
-                <SelectValue placeholder="Vælg en skabelon" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border">
-                {templates.map(template => (
-                  <SelectItem key={template.id} value={template.id}>
-                    {template.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Compose Area */}
+        <div className="border-t border-border p-4 space-y-3 shrink-0 bg-background/50">
+          {templates.length > 0 && (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Skabelon</Label>
+              <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
+                <SelectTrigger className="bg-background border-border h-9">
+                  <SelectValue placeholder="Vælg skabelon..." />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border">
+                  {templates.map(template => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-          <div className="space-y-2">
-            <Label>Besked</Label>
+          <div className="flex gap-2">
             <Textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="bg-background border-border min-h-[120px]"
-              placeholder="Skriv din besked her..."
+              onKeyDown={handleKeyDown}
+              className="bg-background border-border min-h-[60px] max-h-[120px] resize-none flex-1"
+              placeholder="Skriv besked..."
+              disabled={!candidate.phone}
             />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{charCount} tegn</span>
-              <span>{smsCount} SMS</span>
-            </div>
+            <Button 
+              onClick={handleSend} 
+              disabled={sendSmsMutation.isPending || !message.trim() || !candidate.phone}
+              size="icon"
+              className="h-[60px] w-[60px] shrink-0"
+            >
+              {sendSmsMutation.isPending ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+            </Button>
           </div>
-
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Annuller
-            </Button>
-            <Button onClick={handleSend} disabled={sendSmsMutation.isPending}>
-              {sendSmsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Send SMS
-            </Button>
+          
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{charCount} tegn</span>
+            <span>{smsCount} SMS{smsCount > 1 ? 'er' : ''}</span>
           </div>
         </div>
       </DialogContent>

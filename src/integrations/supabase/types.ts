@@ -1896,6 +1896,7 @@ export type Database = {
           direction: string
           id: string
           outcome: string | null
+          phone_number: string | null
           read: boolean
           twilio_sid: string | null
           type: string
@@ -1907,6 +1908,7 @@ export type Database = {
           direction: string
           id?: string
           outcome?: string | null
+          phone_number?: string | null
           read?: boolean
           twilio_sid?: string | null
           type: string
@@ -1918,6 +1920,7 @@ export type Database = {
           direction?: string
           id?: string
           outcome?: string | null
+          phone_number?: string | null
           read?: boolean
           twilio_sid?: string | null
           type?: string
