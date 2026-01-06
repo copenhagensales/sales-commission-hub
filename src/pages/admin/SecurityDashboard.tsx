@@ -3,11 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -21,6 +23,9 @@ import {
   Users,
   Activity,
   KeyRound,
+  Globe,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -48,10 +53,22 @@ interface Position {
   name: string;
 }
 
+interface TrustedIpRange {
+  id: string;
+  name: string;
+  ip_range: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
 export default function SecurityDashboard() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPositionId, setSelectedPositionId] = useState<string>("all");
+  const [newIpName, setNewIpName] = useState("");
+  const [newIpRange, setNewIpRange] = useState("");
+  const [newIpDescription, setNewIpDescription] = useState("");
 
   // Fetch positions for dropdown
   const { data: positions = [] } = useQuery({
@@ -350,6 +367,16 @@ export default function SecurityDashboard() {
         </CardContent>
       </Card>
 
+      {/* Global Trusted IP Ranges Card */}
+      <TrustedIpRangesCard 
+        newIpName={newIpName}
+        setNewIpName={setNewIpName}
+        newIpRange={newIpRange}
+        setNewIpRange={setNewIpRange}
+        newIpDescription={newIpDescription}
+        setNewIpDescription={setNewIpDescription}
+      />
+
       <Tabs defaultValue="attempts" className="space-y-4">
         <TabsList>
           <TabsTrigger value="attempts" className="gap-2">
@@ -540,5 +567,207 @@ export default function SecurityDashboard() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// Separate component for Trusted IP Ranges
+function TrustedIpRangesCard({
+  newIpName,
+  setNewIpName,
+  newIpRange,
+  setNewIpRange,
+  newIpDescription,
+  setNewIpDescription,
+}: {
+  newIpName: string;
+  setNewIpName: (v: string) => void;
+  newIpRange: string;
+  setNewIpRange: (v: string) => void;
+  newIpDescription: string;
+  setNewIpDescription: (v: string) => void;
+}) {
+  const queryClient = useQueryClient();
+
+  // Fetch global trusted IP ranges
+  const { data: trustedIpRanges = [], isLoading } = useQuery({
+    queryKey: ["global-trusted-ip-ranges"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trusted_ip_ranges")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data as TrustedIpRange[];
+    },
+  });
+
+  // Add IP range mutation
+  const addMutation = useMutation({
+    mutationFn: async (data: { name: string; ip_range: string; description: string }) => {
+      const { error } = await supabase.from("trusted_ip_ranges").insert({
+        name: data.name,
+        ip_range: data.ip_range,
+        description: data.description || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["global-trusted-ip-ranges"] });
+      setNewIpName("");
+      setNewIpRange("");
+      setNewIpDescription("");
+      toast.success("IP-range tilføjet");
+    },
+    onError: (error: Error) => {
+      toast.error("Kunne ikke tilføje IP-range: " + error.message);
+    },
+  });
+
+  // Toggle active mutation
+  const toggleMutation = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase
+        .from("trusted_ip_ranges")
+        .update({ is_active, updated_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["global-trusted-ip-ranges"] });
+    },
+    onError: (error: Error) => {
+      toast.error("Kunne ikke opdatere: " + error.message);
+    },
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("trusted_ip_ranges").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["global-trusted-ip-ranges"] });
+      toast.success("IP-range slettet");
+    },
+    onError: (error: Error) => {
+      toast.error("Kunne ikke slette: " + error.message);
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Globe className="h-5 w-5" />
+          Globale betroede IP-adresser
+        </CardTitle>
+        <CardDescription>
+          IP-adresser der automatisk springer MFA over for alle stillinger.
+          Understøtter enkelt IP, CIDR-notation (f.eks. 82.103.140.0/24), eller wildcard (f.eks. 82.103.*.*).
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Existing IP ranges */}
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Indlæser...</p>
+        ) : trustedIpRanges.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Ingen globale IP-adresser konfigureret</p>
+        ) : (
+          <div className="space-y-2">
+            {trustedIpRanges.map((range) => (
+              <div
+                key={range.id}
+                className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+              >
+                <div className="flex items-center gap-4">
+                  <Switch
+                    checked={range.is_active}
+                    onCheckedChange={(checked) =>
+                      toggleMutation.mutate({ id: range.id, is_active: checked })
+                    }
+                  />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{range.name}</span>
+                      {!range.is_active && (
+                        <Badge variant="secondary" className="text-xs">Deaktiveret</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <code className="bg-muted px-1.5 py-0.5 rounded font-mono text-xs">
+                        {range.ip_range}
+                      </code>
+                      {range.description && (
+                        <span>• {range.description}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    if (confirm("Er du sikker på at du vil slette denne IP-range?")) {
+                      deleteMutation.mutate(range.id);
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add new IP range */}
+        <div className="border-t pt-4 space-y-4">
+          <h4 className="text-sm font-medium">Tilføj ny IP-adresse</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Navn *</Label>
+              <Input
+                placeholder="F.eks. Hovedkontor"
+                value={newIpName}
+                onChange={(e) => setNewIpName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">IP/CIDR *</Label>
+              <Input
+                placeholder="F.eks. 82.103.140.0/24"
+                value={newIpRange}
+                onChange={(e) => setNewIpRange(e.target.value)}
+                className="font-mono"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Beskrivelse</Label>
+              <Input
+                placeholder="Valgfri beskrivelse"
+                value={newIpDescription}
+                onChange={(e) => setNewIpDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <Button
+            onClick={() => {
+              if (newIpName.trim() && newIpRange.trim()) {
+                addMutation.mutate({
+                  name: newIpName.trim(),
+                  ip_range: newIpRange.trim(),
+                  description: newIpDescription.trim(),
+                });
+              }
+            }}
+            disabled={!newIpName.trim() || !newIpRange.trim() || addMutation.isPending}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Tilføj IP-adresse
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

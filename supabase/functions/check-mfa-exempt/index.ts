@@ -135,25 +135,38 @@ Deno.serve(async (req) => {
       .eq("name", employee.job_title)
       .maybeSingle();
 
-    if (posError || !position) {
-      console.log("Position not found:", posError);
-      return new Response(
-        JSON.stringify({ exempt: false, ip: clientIp }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (posError) {
+      console.log("Position query error:", posError);
     }
 
-    const trustedRanges = (position.trusted_ip_ranges || []) as TrustedIpRange[];
+    // Also fetch global trusted IP ranges
+    const { data: globalRanges, error: globalError } = await supabase
+      .from("trusted_ip_ranges")
+      .select("name, ip_range")
+      .eq("is_active", true);
+
+    if (globalError) {
+      console.log("Global ranges query error:", globalError);
+    }
+
+    // Combine position-specific and global IP ranges
+    const positionRanges = (position?.trusted_ip_ranges || []) as TrustedIpRange[];
+    const globalTrustedRanges = (globalRanges || []).map((r: { name: string; ip_range: string }) => ({
+      name: r.name,
+      ip: r.ip_range,
+    }));
     
-    if (trustedRanges.length === 0) {
+    const allTrustedRanges = [...positionRanges, ...globalTrustedRanges];
+    
+    if (allTrustedRanges.length === 0) {
       return new Response(
         JSON.stringify({ exempt: false, ip: clientIp }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Check if client IP matches any trusted range
-    for (const range of trustedRanges) {
+    // Check if client IP matches any trusted range (position or global)
+    for (const range of allTrustedRanges) {
       if (matchIp(clientIp, range.ip)) {
         console.log(`IP ${clientIp} matches trusted range "${range.name}" (${range.ip})`);
         return new Response(
