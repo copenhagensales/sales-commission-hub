@@ -217,8 +217,8 @@ export function CandidateCallLogs({ candidatePhone, candidateId, maxHeight = "40
   }
 
   return (
-    <ScrollArea className="pr-4" style={{ maxHeight }}>
-      <div className="space-y-2">
+    <ScrollArea className="h-full pr-4" style={{ height: maxHeight }}>
+      <div className="space-y-2 pb-4">
         {calls.map((call: any) => (
           <div
             key={call.id}
