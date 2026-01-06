@@ -33,84 +33,30 @@ serve(async (req) => {
 
     let twiml: string;
 
-    // For outbound calls (API-initiated), use a conference bridge
-    // This ensures both parties (initiator and recipient) can hear each other
+    // For outbound calls (API-initiated), dial directly to the destination number
+    // The Twilio API call already connects, this TwiML tells Twilio what to do when answered
     if (direction === 'outbound-api') {
       const destinationNumber = to || called;
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
       
-      // Create a unique conference room name based on the call SID
-      const conferenceRoom = `call-${callSid}`;
-      
-      console.log('[twilio-voice-token] Outbound call - creating conference bridge:', {
-        conferenceRoom,
+      console.log('[twilio-voice-token] Outbound call - dialing directly to:', {
         destinationNumber,
         callerId: from
       });
       
-      // TwiML: Join the initiator to a conference, then dial the destination into the same conference
-      // The <Dial> with callerId ensures the recipient sees the correct caller ID
+      // Simple approach: Just dial the destination number directly
+      // When the call is answered, both parties will be connected
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${from}" timeout="30" action="${Deno.env.get('SUPABASE_URL')}/functions/v1/incoming-call">
-    <Conference beep="false" startConferenceOnEnter="true" endConferenceOnExit="true" waitUrl="">
-      ${conferenceRoom}
-    </Conference>
+  <Dial callerId="${from}" timeout="30" action="${supabaseUrl}/functions/v1/incoming-call">
+    <Number statusCallback="${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(callSid)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">
+      ${destinationNumber}
+    </Number>
   </Dial>
   <Say language="da-DK" voice="Polly.Mads">Opkaldet blev afsluttet.</Say>
 </Response>`;
-
-      // Also need to dial the destination number into the conference
-      // This is done by making a second call to the destination
-      const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-      const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
       
-      if (accountSid && authToken) {
-        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`;
-        
-        const supabaseUrl = Deno.env.get('SUPABASE_URL');
-        // Pass the parent call SID as a query parameter so we can link status updates
-        const statusCallbackUrl = `${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(callSid)}`;
-        
-        const dialFormData = new URLSearchParams();
-        dialFormData.append('To', destinationNumber);
-        dialFormData.append('From', from);
-        dialFormData.append(
-          'Twiml',
-          `<?xml version="1.0" encoding="UTF-8"?><Response><Dial><Conference beep="false" startConferenceOnEnter="true" endConferenceOnExit="true" waitUrl="">${conferenceRoom}</Conference></Dial></Response>`
-        );
-        // Add status callbacks for the destination call leg
-        dialFormData.append('StatusCallback', statusCallbackUrl);
-        dialFormData.append('StatusCallbackMethod', 'POST');
-        dialFormData.append('StatusCallbackEvent', 'initiated');
-        dialFormData.append('StatusCallbackEvent', 'ringing');
-        dialFormData.append('StatusCallbackEvent', 'answered');
-        dialFormData.append('StatusCallbackEvent', 'completed');
-        
-        console.log('[twilio-voice-token] Dialing destination into conference:', destinationNumber, 'with status callback:', statusCallbackUrl);
-        
-        try {
-          const dialResponse = await fetch(twilioUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Basic ' + btoa(`${accountSid}:${authToken}`),
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: dialFormData.toString(),
-          });
-          
-          const dialResult = await dialResponse.json();
-          
-          if (dialResponse.ok) {
-            console.log('[twilio-voice-token] Destination call initiated:', dialResult.sid);
-          } else {
-            console.error('[twilio-voice-token] Failed to dial destination:', dialResult);
-          }
-        } catch (dialError) {
-          console.error('[twilio-voice-token] Error dialing destination:', dialError);
-        }
-      } else {
-        console.warn('[twilio-voice-token] Missing Twilio credentials for conference bridge');
-      }
+      console.log('[twilio-voice-token] Generated TwiML for direct dial');
     } else {
       // For inbound calls, show the welcome message
       console.log('[twilio-voice-token] Inbound call - playing welcome message');
