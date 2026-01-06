@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Phone, PhoneOff, PhoneIncoming, PhoneOutgoing, Mic, MicOff, Loader2, Volume2, X, Delete } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -65,6 +65,16 @@ export function SoftphoneWidget() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDialer, setShowDialer] = useState(false);
   const [dialNumber, setDialNumber] = useState('');
+  const [autoConnectAttempted, setAutoConnectAttempted] = useState(false);
+
+  // Auto-connect softphone on mount so we can receive incoming calls
+  useEffect(() => {
+    if (!autoConnectAttempted && deviceState === 'disconnected') {
+      setAutoConnectAttempted(true);
+      console.log('[SoftphoneWidget] Auto-connecting softphone for incoming calls...');
+      initializeDevice();
+    }
+  }, [deviceState, autoConnectAttempted, initializeDevice]);
 
   const handleDial = () => {
     if (dialNumber.trim()) {
