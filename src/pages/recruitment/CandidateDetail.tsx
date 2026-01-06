@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { SendSmsDialog } from "@/components/recruitment/SendSmsDialog";
 import { SendEmailDialog } from "@/components/recruitment/SendEmailDialog";
 import { CallModal } from "@/components/calls/CallModal";
+import { useTwilioDeviceContext } from "@/contexts/TwilioDeviceContext";
 const statusLabels: Record<string, string> = {
   ny_ansoegning: "Ny ansøgning",
   new: "Ny ansøgning",
@@ -71,6 +72,7 @@ export default function CandidateDetail() {
   }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { makeCall, deviceState, initializeDevice, callState } = useTwilioDeviceContext();
   const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showInterviewDialog, setShowInterviewDialog] = useState(false);
@@ -266,32 +268,32 @@ export default function CandidateDetail() {
                   variant="outline" 
                   onClick={async () => {
                     if (!candidate.phone) return;
-                    setIsCallingCandidate(true);
-                    setShowCallModal(true);
-                    try {
-                      const { data, error } = await supabase.functions.invoke('initiate-call', {
-                        body: { 
-                          toNumber: candidate.phone,
-                          candidateId: id
-                        }
-                      });
-                      if (error) throw error;
-                      if (data?.error) throw new Error(data.error);
-                      setActiveCallSid(data.callSid);
-                      queryClient.invalidateQueries({ queryKey: ['candidate-communications', id] });
-                    } catch (error: any) {
-                      console.error('Call error:', error);
-                      toast.error(error.message || 'Kunne ikke starte opkald');
-                      setShowCallModal(false);
-                    } finally {
-                      setIsCallingCandidate(false);
+                    
+                    // If softphone not ready, initialize it first
+                    if (deviceState === 'disconnected' || deviceState === 'error') {
+                      toast.info('Starter softphone...');
+                      await initializeDevice();
+                      // Give it a moment to initialize, then make call
+                      setTimeout(() => {
+                        makeCall(candidate.phone);
+                      }, 1500);
+                    } else if (deviceState === 'ready') {
+                      makeCall(candidate.phone);
+                    } else if (deviceState === 'busy') {
+                      toast.error('Softphone er optaget med et andet opkald');
+                    } else {
+                      toast.info('Softphone forbinder...');
                     }
                   }} 
-                  disabled={!candidate.phone || isCallingCandidate} 
+                  disabled={!candidate.phone || callState === 'connecting' || callState === 'connected'} 
                   className="bg-background/80"
                 >
-                  {isCallingCandidate ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Phone className="h-4 w-4 mr-1.5" />}
-                  {isCallingCandidate ? 'Ringer...' : 'Ring'}
+                  {(callState === 'connecting' || deviceState === 'connecting') ? (
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <Phone className="h-4 w-4 mr-1.5" />
+                  )}
+                  {callState === 'connecting' ? 'Ringer...' : 'Ring'}
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setShowSmsDialog(true)} disabled={!candidate.phone} className="bg-background/80">
                   <MessageSquare className="h-4 w-4 mr-1.5" />

@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { useTwilioDevice, DeviceState } from '@/hooks/useTwilioDevice';
+import { useTwilioDeviceContext } from '@/contexts/TwilioDeviceContext';
+import { DeviceState } from '@/hooks/useTwilioDevice';
 import { cn } from '@/lib/utils';
 
 function formatDuration(seconds: number): string {
@@ -59,7 +60,7 @@ export function SoftphoneWidget() {
     toggleMute,
     makeCall,
     disconnectDevice,
-  } = useTwilioDevice();
+  } = useTwilioDeviceContext();
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDialer, setShowDialer] = useState(false);

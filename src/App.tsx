@@ -6,6 +6,7 @@ import { BrowserRouter } from "react-router-dom";
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AppRouter } from "@/routes/AppRouter";
 import { RolePreviewProvider } from "@/contexts/RolePreviewContext";
+import { TwilioDeviceProvider } from "@/contexts/TwilioDeviceContext";
 
 const queryClient = new QueryClient();
 
@@ -59,11 +60,13 @@ const App = () => (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <RolePreviewProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AppRouter />
-          </BrowserRouter>
+          <TwilioDeviceProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AppRouter />
+            </BrowserRouter>
+          </TwilioDeviceProvider>
         </RolePreviewProvider>
       </TooltipProvider>
     </QueryClientProvider>
