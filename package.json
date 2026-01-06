@@ -54,7 +54,6 @@
     "@tiptap/extension-underline": "^3.12.1",
     "@tiptap/react": "^3.12.1",
     "@tiptap/starter-kit": "^3.12.1",
-    "@twilio/voice-sdk": "^2.18.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

@@ -152,9 +152,3 @@ verify_jwt = false
 
 [functions.receive-sms]
 verify_jwt = false
-
-[functions.twilio-access-token]
-verify_jwt = false
-
-[functions.end-call]
-verify_jwt = false

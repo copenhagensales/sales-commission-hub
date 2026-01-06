@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,23 +12,14 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const twilioCallerIdRaw = Deno.env.get('TWILIO_PHONE_NUMBER');
-    const twilioCallerId = twilioCallerIdRaw?.replace(/[^\d+]/g, '');
-    const callerId = (twilioCallerId && twilioCallerId.startsWith('+')) ? twilioCallerId : undefined;
-
-    // Parse form data from Twilio (this is called by Twilio when a call is made via TwiML App)
+    // Parse form data from Twilio
     const formData = await req.formData();
     const callSid = formData.get('CallSid') as string;
     const from = formData.get('From') as string;
-    const to = formData.get('To') as string; // This is the "To" parameter from the Twilio Device connect
+    const to = formData.get('To') as string;
     const callStatus = formData.get('CallStatus') as string;
     const direction = formData.get('Direction') as string;
     const called = formData.get('Called') as string;
-    
-    // Get custom parameters passed from the browser
-    const candidateId = formData.get('candidateId') as string;
 
     console.log('[twilio-voice-token] Incoming voice request:', {
       callSid,
@@ -38,56 +28,67 @@ serve(async (req) => {
       called,
       callStatus,
       direction,
-      candidateId,
       timestamp: new Date().toISOString()
     });
 
-    // Normalize the destination number
-    const destinationNumber = to?.replace(/[^\d+]/g, '') || '';
+    let twiml: string;
 
-    if (!destinationNumber || !destinationNumber.startsWith('+')) {
-      console.error('[twilio-voice-token] Invalid destination number:', to);
-      const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>
+    const url = new URL(req.url);
+    const dialToParam = url.searchParams.get('dialTo');
+    const modeParam = url.searchParams.get('mode');
+
+    // For outbound calls (API-initiated), dial directly to the destination number
+    // The Twilio API call already connects, this TwiML tells Twilio what to do when answered
+    if (direction === 'outbound-api') {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const twilioCallerIdRaw = Deno.env.get('TWILIO_PHONE_NUMBER');
+      const twilioCallerId = twilioCallerIdRaw?.replace(/[^\d+]/g, '');
+      const callerId = (twilioCallerId && twilioCallerId.startsWith('+')) ? twilioCallerId : undefined;
+
+      // "direct" mode: just keep the call open for tracking (no bridge)
+      if (modeParam === 'direct') {
+        console.log('[twilio-voice-token] Direct mode - keeping call open for tracking');
+        
+        // Use a long pause to keep the call alive; Twilio will end it when the other party hangs up
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say language="da-DK">Ugyldigt telefonnummer. Prøv venligst igen.</Say>
-  <Hangup/>
+  <Pause length="3600"/>
 </Response>`;
-      return new Response(errorTwiml, {
-        headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
-      });
-    }
+      } else if (dialToParam) {
+        // "callback" mode: dial the candidate when employee answers
+        console.log('[twilio-voice-token] Callback mode - dialing to:', { dialToParam, callerId });
 
-    // Create a call record for tracking
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-    
-    const { error: insertError } = await supabaseAdmin
-      .from('call_records')
-      .insert({
-        twilio_call_sid: callSid,
-        from_number: callerId || from,
-        to_number: destinationNumber,
-        direction: 'outbound',
-        status: 'initiated',
-        started_at: new Date().toISOString(),
-        candidate_id: candidateId || null,
-      });
-
-    if (insertError) {
-      console.error('[twilio-voice-token] Error creating call record:', insertError);
-    }
-
-    console.log('[twilio-voice-token] Dialing:', destinationNumber, 'with callerId:', callerId);
-
-    // Generate TwiML to dial the destination number
-    // The browser is already connected via WebRTC, this TwiML bridges to the destination
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30" answerOnBridge="true">
-    <Number statusCallback="${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(callSid)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">${destinationNumber}</Number>
+  <Say language="da-DK" voice="Polly.Mads">Forbinder dig nu.</Say>
+  <Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30">
+    <Number statusCallback="${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(callSid)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">${dialToParam}</Number>
   </Dial>
 </Response>`;
+      } else {
+        // Fallback: keep call open
+        console.log('[twilio-voice-token] No dialTo param - keeping call open');
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Pause length="3600"/>
+</Response>`;
+      }
+    } else {
+      // For inbound calls, show the welcome message
+      console.log('[twilio-voice-token] Inbound call - playing welcome message');
+      
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say language="da-DK" voice="Polly.Mads">Tak for dit opkald til CPH Sales. Vent venligst, mens vi forbinder dig.</Say>
+  <Pause length="2"/>
+  <Say language="da-DK" voice="Polly.Mads">Vi kan desværre ikke besvare dit opkald lige nu. Efterlad venligst en besked efter tonen.</Say>
+  <Record maxLength="120" transcribe="false" playBeep="true" />
+  <Say language="da-DK" voice="Polly.Mads">Tak for din besked. Vi vender tilbage hurtigst muligt. Farvel.</Say>
+  <Hangup/>
+</Response>`;
+    }
 
-    console.log('[twilio-voice-token] Returning TwiML for outbound dial');
+    console.log('[twilio-voice-token] Returning TwiML response');
 
     return new Response(twiml, {
       headers: {
