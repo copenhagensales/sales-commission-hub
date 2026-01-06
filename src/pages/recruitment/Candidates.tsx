@@ -344,7 +344,7 @@ export default function Candidates() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
@@ -413,7 +413,7 @@ export default function Candidates() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
