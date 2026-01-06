@@ -7,6 +7,7 @@ import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AppRouter } from "@/routes/AppRouter";
 import { RolePreviewProvider } from "@/contexts/RolePreviewContext";
 import { TwilioDeviceProvider } from "@/contexts/TwilioDeviceContext";
+import { SessionTimeoutProvider } from "@/contexts/SessionTimeoutContext";
 
 const queryClient = new QueryClient();
 
@@ -64,7 +65,9 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <AppRouter />
+              <SessionTimeoutProvider>
+                <AppRouter />
+              </SessionTimeoutProvider>
             </BrowserRouter>
           </TwilioDeviceProvider>
         </RolePreviewProvider>

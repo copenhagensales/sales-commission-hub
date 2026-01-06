@@ -3031,6 +3031,7 @@ export type Database = {
       }
       employee_master_data: {
         Row: {
+          account_locked: boolean | null
           address_city: string | null
           address_country: string | null
           address_postal_code: string | null
@@ -3047,6 +3048,7 @@ export type Database = {
           department: string | null
           employment_end_date: string | null
           employment_start_date: string | null
+          failed_login_count: number | null
           first_name: string
           freelance_company_address: string | null
           freelance_company_name: string | null
@@ -3059,7 +3061,9 @@ export type Database = {
           is_staff_employee: boolean
           job_title: string | null
           last_name: string
+          locked_at: string | null
           manager_id: string | null
+          mfa_enabled: boolean | null
           must_change_password: boolean | null
           onboarding_data_complete: boolean | null
           parking_monthly_cost: number | null
@@ -3085,6 +3089,7 @@ export type Database = {
           working_hours_model: string | null
         }
         Insert: {
+          account_locked?: boolean | null
           address_city?: string | null
           address_country?: string | null
           address_postal_code?: string | null
@@ -3101,6 +3106,7 @@ export type Database = {
           department?: string | null
           employment_end_date?: string | null
           employment_start_date?: string | null
+          failed_login_count?: number | null
           first_name: string
           freelance_company_address?: string | null
           freelance_company_name?: string | null
@@ -3113,7 +3119,9 @@ export type Database = {
           is_staff_employee?: boolean
           job_title?: string | null
           last_name: string
+          locked_at?: string | null
           manager_id?: string | null
+          mfa_enabled?: boolean | null
           must_change_password?: boolean | null
           onboarding_data_complete?: boolean | null
           parking_monthly_cost?: number | null
@@ -3139,6 +3147,7 @@ export type Database = {
           working_hours_model?: string | null
         }
         Update: {
+          account_locked?: boolean | null
           address_city?: string | null
           address_country?: string | null
           address_postal_code?: string | null
@@ -3155,6 +3164,7 @@ export type Database = {
           department?: string | null
           employment_end_date?: string | null
           employment_start_date?: string | null
+          failed_login_count?: number | null
           first_name?: string
           freelance_company_address?: string | null
           freelance_company_name?: string | null
@@ -3167,7 +3177,9 @@ export type Database = {
           is_staff_employee?: boolean
           job_title?: string | null
           last_name?: string
+          locked_at?: string | null
           manager_id?: string | null
+          mfa_enabled?: boolean | null
           must_change_password?: boolean | null
           onboarding_data_complete?: boolean | null
           parking_monthly_cost?: number | null
@@ -3756,6 +3768,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      failed_login_attempts: {
+        Row: {
+          attempted_at: string | null
+          email: string
+          failure_reason: string | null
+          id: string
+          ip_address: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          attempted_at?: string | null
+          email: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          attempted_at?: string | null
+          email?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
       }
       fieldmarketing_sales: {
         Row: {
@@ -4426,8 +4465,11 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean | null
+          max_session_hours: number | null
           name: string
           permissions: Json
+          requires_mfa: boolean | null
+          session_timeout_minutes: number | null
           updated_at: string | null
         }
         Insert: {
@@ -4436,8 +4478,11 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          max_session_hours?: number | null
           name: string
           permissions?: Json
+          requires_mfa?: boolean | null
+          session_timeout_minutes?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -4446,8 +4491,11 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          max_session_hours?: number | null
           name?: string
           permissions?: Json
+          requires_mfa?: boolean | null
+          session_timeout_minutes?: number | null
           updated_at?: string | null
         }
         Relationships: []
