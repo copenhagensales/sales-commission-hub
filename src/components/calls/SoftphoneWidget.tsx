@@ -324,12 +324,12 @@ export function SoftphoneWidget() {
         </Card>
       )}
 
-      {/* Dial Pad */}
+      {/* Dial Pad with Contacts Panel */}
       {showDialer && deviceState === 'ready' && !shouldShowCallUI && (
-        <Card className="mb-4 w-80 shadow-lg">
+        <Card className="mb-4 w-[560px] shadow-lg">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium">Dial Number</span>
+              <span className="text-sm font-medium">Softphone</span>
               <Button
                 variant="ghost"
                 size="icon"
@@ -340,80 +340,124 @@ export function SoftphoneWidget() {
               </Button>
             </div>
             
-            <div className="flex gap-2 mb-3">
-              <Input
-                value={dialNumber}
-                onChange={handleDialNumberChange}
-                placeholder="+45..."
-                className="text-center text-lg font-mono"
-                inputMode="tel"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleBackspace}
-                disabled={!dialNumber}
-              >
-                <Delete className="w-4 h-4" />
-              </Button>
-            </div>
+            <div className="flex gap-4">
+              {/* Left: All Contacts */}
+              <div className="w-1/2 border rounded-lg overflow-hidden">
+                <div className="bg-muted/50 px-3 py-2 border-b">
+                  <span className="text-sm font-medium flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Contacts ({allContacts.length})
+                  </span>
+                </div>
+                <ScrollArea className="h-[320px]">
+                  <div className="p-2 space-y-1">
+                    {allContacts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">No contacts found</p>
+                    ) : (
+                      allContacts.map((contact) => (
+                        <button
+                          key={`${contact.type}-${contact.id}`}
+                          onClick={() => handleContactSelect(contact)}
+                          className="w-full flex items-center gap-2 p-2 hover:bg-muted rounded-md text-left transition-colors"
+                        >
+                          <div className={cn(
+                            "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                            contact.type === 'employee' ? "bg-blue-500/20" : "bg-green-500/20"
+                          )}>
+                            {contact.type === 'employee' ? (
+                              <Users className="w-4 h-4 text-blue-500" />
+                            ) : (
+                              <User className="w-4 h-4 text-green-500" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{contact.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {formatPhoneForDisplay(contact.phone)}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] shrink-0">
+                            {contact.type === 'employee' ? 'Staff' : 'Cand'}
+                          </Badge>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
 
-            {/* Contact suggestions */}
-            {showContacts && filteredContacts.length > 0 && (
-              <ScrollArea className="max-h-32 mb-3 border rounded-md">
-                <div className="p-1">
-                  {filteredContacts.map((contact) => (
-                    <button
-                      key={`${contact.type}-${contact.id}`}
-                      onClick={() => handleContactSelect(contact)}
-                      className="w-full flex items-center gap-2 p-2 hover:bg-muted rounded-md text-left transition-colors"
+              {/* Right: Dial Pad */}
+              <div className="w-1/2">
+                <div className="flex gap-2 mb-3">
+                  <Input
+                    value={dialNumber}
+                    onChange={handleDialNumberChange}
+                    placeholder="+45..."
+                    className="text-center text-lg font-mono"
+                    inputMode="tel"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleBackspace}
+                    disabled={!dialNumber}
+                  >
+                    <Delete className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {/* Contact suggestions when typing */}
+                {showContacts && filteredContacts.length > 0 && (
+                  <ScrollArea className="max-h-24 mb-3 border rounded-md">
+                    <div className="p-1">
+                      {filteredContacts.map((contact) => (
+                        <button
+                          key={`filtered-${contact.type}-${contact.id}`}
+                          onClick={() => handleContactSelect(contact)}
+                          className="w-full flex items-center gap-2 p-1.5 hover:bg-muted rounded-md text-left transition-colors"
+                        >
+                          <div className={cn(
+                            "w-6 h-6 rounded-full flex items-center justify-center",
+                            contact.type === 'employee' ? "bg-blue-500/20" : "bg-green-500/20"
+                          )}>
+                            {contact.type === 'employee' ? (
+                              <Users className="w-3 h-3 text-blue-500" />
+                            ) : (
+                              <User className="w-3 h-3 text-green-500" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium truncate">{contact.name}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  {dialPadButtons.flat().map((digit) => (
+                    <Button
+                      key={digit}
+                      variant="outline"
+                      className="h-12 text-lg font-semibold"
+                      onClick={() => handleDialPadPress(digit)}
                     >
-                      <div className={cn(
-                        "w-8 h-8 rounded-full flex items-center justify-center",
-                        contact.type === 'employee' ? "bg-blue-500/20" : "bg-green-500/20"
-                      )}>
-                        {contact.type === 'employee' ? (
-                          <Users className="w-4 h-4 text-blue-500" />
-                        ) : (
-                          <User className="w-4 h-4 text-green-500" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{contact.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {formatPhoneForDisplay(contact.phone)}
-                        </p>
-                      </div>
-                      <Badge variant="outline" className="text-xs">
-                        {contact.type === 'employee' ? 'Medarbejder' : 'Kandidat'}
-                      </Badge>
-                    </button>
+                      {digit}
+                    </Button>
                   ))}
                 </div>
-              </ScrollArea>
-            )}
 
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              {dialPadButtons.flat().map((digit) => (
                 <Button
-                  key={digit}
-                  variant="outline"
-                  className="h-12 text-lg font-semibold"
-                  onClick={() => handleDialPadPress(digit)}
+                  onClick={() => handleDial()}
+                  disabled={!dialNumber.trim()}
+                  className="w-full bg-green-500 hover:bg-green-600"
                 >
-                  {digit}
+                  <Phone className="w-4 h-4 mr-2" />
+                  Call
                 </Button>
-              ))}
+              </div>
             </div>
-
-            <Button
-              onClick={() => handleDial()}
-              disabled={!dialNumber.trim()}
-              className="w-full bg-green-500 hover:bg-green-600"
-            >
-              <Phone className="w-4 h-4 mr-2" />
-              Call
-            </Button>
           </CardContent>
         </Card>
       )}
