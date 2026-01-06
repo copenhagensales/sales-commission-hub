@@ -472,11 +472,11 @@ export default function CandidateDetail() {
                     <p className="text-[10px] sm:text-xs text-muted-foreground">Ansøgninger</p>
                   </div>
                   <div className="text-center p-2 sm:p-3 bg-muted/50 rounded-lg">
-                    <p className="text-lg sm:text-2xl font-bold text-primary">{communications.filter(c => c.type === "call").length}</p>
+                    <p className="text-lg sm:text-2xl font-bold text-primary">{callRecordsCount}</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">Opkald</p>
                   </div>
                   <div className="text-center p-2 sm:p-3 bg-muted/50 rounded-lg">
-                    <p className="text-lg sm:text-2xl font-bold text-primary">{communications.filter(c => c.type === "email" || c.type === "sms").length}</p>
+                    <p className="text-lg sm:text-2xl font-bold text-primary">{smsEmailCount}</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">Beskeder</p>
                   </div>
                 </div>
