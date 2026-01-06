@@ -754,8 +754,8 @@ export function PositionsTab() {
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="security" className="flex-1 px-6 py-4 overflow-auto">
-              <div className="space-y-6 max-w-xl">
+            <TabsContent value="security" className="px-6 py-4 overflow-auto">
+              <div className="space-y-4 max-w-xl">
                 {/* MFA Settings */}
                 <Card>
                   <CardHeader className="pb-3">
