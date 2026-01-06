@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { SoftphoneWidget } from "@/components/calls/SoftphoneWidget";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 
 interface DashboardLayoutProps {
@@ -51,6 +52,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {children}
         </div>
       </main>
+      
+      {/* Softphone Widget */}
+      <SoftphoneWidget />
     </div>
   );
 }
