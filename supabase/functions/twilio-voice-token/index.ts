@@ -38,8 +38,12 @@ serve(async (req) => {
 
     let twiml: string;
 
-    // For outbound calls (API-initiated), dial directly to the destination number
-    if (direction === 'outbound-api') {
+    // Check if this is an outbound call from a browser client (To parameter will be the destination)
+    // When a Twilio Device connects with params, the 'To' field contains the custom parameter
+    const isOutboundFromClient = from?.startsWith('client:') && to && !to.startsWith('client:');
+    
+    // For outbound calls (API-initiated or from browser client)
+    if (direction === 'outbound-api' || isOutboundFromClient) {
       const url = new URL(req.url);
       const dialToParam = url.searchParams.get('dialTo');
       const destinationNumber = dialToParam || to || called;
@@ -52,6 +56,7 @@ serve(async (req) => {
         destinationNumber,
         callerId,
         dialToParam,
+        isOutboundFromClient,
       });
 
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
