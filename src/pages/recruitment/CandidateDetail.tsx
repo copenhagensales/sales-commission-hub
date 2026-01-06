@@ -149,6 +149,42 @@ export default function CandidateDetail() {
     },
     enabled: !!id && !!candidate
   });
+
+  // Separate query for call records count
+  const { data: callRecordsCount = 0 } = useQuery({
+    queryKey: ["candidate-call-records-count", id, candidate?.phone],
+    queryFn: async (): Promise<number> => {
+      if (!id) return 0;
+      
+      const phone = candidate?.phone;
+      const normalizedPhone = phone ? phone.replace(/\D/g, '').replace(/^45/, '').replace(/^\+45/, '') : null;
+      
+      // Get count from call_records by candidate_id
+      const { count: idCount } = await supabase
+        .from("call_records")
+        .select("*", { count: 'exact', head: true })
+        .eq("candidate_id", id);
+      
+      let totalCount = idCount || 0;
+      
+      // Also count by phone if available
+      if (normalizedPhone) {
+        const { count: phoneCount } = await supabase
+          .from("call_records")
+          .select("*", { count: 'exact', head: true })
+          .or(`to_number.ilike.%${normalizedPhone}%,from_number.ilike.%${normalizedPhone}%`)
+          .neq("candidate_id", id); // Avoid double counting
+        
+        totalCount += (phoneCount || 0);
+      }
+      
+      return totalCount;
+    },
+    enabled: !!id && !!candidate
+  });
+
+  // Count SMS/email from communication_logs
+  const smsEmailCount = communications.filter(c => c.type === 'sms' || c.type === 'email').length;
   const {
     data: teams = []
   } = useQuery({
@@ -462,18 +498,18 @@ export default function CandidateDetail() {
                     <TabsTrigger value="chat" className="flex items-center gap-2">
                       <MessageSquare className="h-4 w-4" />
                       Beskeder
-                      {communications.filter(c => c.type === 'sms' || c.type === 'email').length > 0 && (
+                      {smsEmailCount > 0 && (
                         <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-                          {communications.filter(c => c.type === 'sms' || c.type === 'email').length}
+                          {smsEmailCount}
                         </Badge>
                       )}
                     </TabsTrigger>
                     <TabsTrigger value="calls" className="flex items-center gap-2">
                       <PhoneCall className="h-4 w-4" />
                       Opkald
-                      {communications.filter(c => c.type === 'call').length > 0 && (
+                      {callRecordsCount > 0 && (
                         <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-                          {communications.filter(c => c.type === 'call').length}
+                          {callRecordsCount}
                         </Badge>
                       )}
                     </TabsTrigger>
