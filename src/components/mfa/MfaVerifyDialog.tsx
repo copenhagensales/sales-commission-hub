@@ -17,12 +17,14 @@ interface MfaVerifyDialogProps {
   isOpen: boolean;
   onSuccess: () => void;
   onCancel: () => void;
+  isRequired?: boolean;
 }
 
 export function MfaVerifyDialog({
   isOpen,
   onSuccess,
   onCancel,
+  isRequired = false,
 }: MfaVerifyDialogProps) {
   const { verifyCode } = useMfa();
   const [code, setCode] = useState("");
@@ -60,7 +62,7 @@ export function MfaVerifyDialog({
 
   return (
     <Dialog open={isOpen}>
-      <DialogContent className="max-w-sm" hideCloseButton>
+      <DialogContent className="max-w-sm" hideCloseButton={isRequired || true}>
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
             <div className="p-3 rounded-full bg-primary/10">
@@ -111,16 +113,18 @@ export function MfaVerifyDialog({
           )}
 
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={onCancel}
-              className="flex-1"
-            >
-              Annuller
-            </Button>
+            {!isRequired && (
+              <Button
+                variant="outline"
+                onClick={onCancel}
+                className="flex-1"
+              >
+                Annuller
+              </Button>
+            )}
             <Button
               onClick={handleVerify}
-              className="flex-1"
+              className={isRequired ? "w-full" : "flex-1"}
               disabled={code.length !== 6 || isLoading}
             >
               {isLoading ? (

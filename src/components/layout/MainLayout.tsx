@@ -3,10 +3,12 @@ import { AppSidebar } from "./AppSidebar";
 import { PreviewSidebar } from "./PreviewSidebar";
 import { ContractLockOverlay } from "./ContractLockOverlay";
 import { CarQuizLockOverlay } from "./CarQuizLockOverlay";
+import { MfaLockOverlay } from "./MfaLockOverlay";
 import { RolePreviewBanner } from "./RolePreviewBanner";
 import { CompleteProfileBanner } from "./CompleteProfileBanner";
 import { usePendingContractLock } from "@/hooks/usePendingContractLock";
 import { useCarQuizLock } from "@/hooks/useCarQuiz";
+import { useMfa } from "@/hooks/useMfa";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PendingAbsencePopup } from "@/components/absence/PendingAbsencePopup";
@@ -23,10 +25,12 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const { isLocked: isContractLocked, contract, isLoading: contractLoading } = usePendingContractLock();
   const { isLocked: isQuizLocked, isLoading: quizLoading } = useCarQuizLock();
+  const { isRequired: isMfaRequired, isVerified: isMfaVerified, isLoading: mfaLoading, isEnabled: isMfaEnabled } = useMfa();
   const { isPreviewMode } = useRolePreview();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mfaVerified, setMfaVerified] = useState(false);
 
   // Don't show car quiz lock if we're already on the car-quiz page
   const showQuizLock = isQuizLocked && location.pathname !== "/car-quiz";
@@ -34,9 +38,13 @@ export function MainLayout({ children }: MainLayoutProps) {
   // Skip locks in preview mode
   const showContractLock = isContractLocked && !isPreviewMode;
   const showCarQuizLock = showQuizLock && !isContractLocked && !isPreviewMode;
+  
+  // Show MFA lock if required but not verified (and not in preview mode)
+  // Only show after other locks are resolved
+  const showMfaLock = isMfaRequired && !isMfaVerified && !mfaVerified && !isPreviewMode && !showContractLock && !showCarQuizLock;
 
   // Show loading state while checking locks (skip in preview mode)
-  if ((contractLoading || quizLoading) && !isPreviewMode) {
+  if ((contractLoading || quizLoading || mfaLoading) && !isPreviewMode) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Indlæser...</div>
@@ -63,6 +71,9 @@ export function MainLayout({ children }: MainLayoutProps) {
       )}
       {showCarQuizLock && (
         <CarQuizLockOverlay />
+      )}
+      {showMfaLock && (
+        <MfaLockOverlay onSuccess={() => setMfaVerified(true)} />
       )}
       
       {/* Desktop sidebar */}
