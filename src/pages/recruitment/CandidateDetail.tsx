@@ -265,40 +265,39 @@ export default function CandidateDetail() {
   // Parse notes for display
   const notesArray = candidate.notes?.split('\n\n').filter(Boolean) || [];
   return <MainLayout>
-      <div className="space-y-6 max-w-7xl mx-auto">
+      <div className="space-y-4 md:space-y-6 max-w-7xl mx-auto px-0">
         {/* Back button */}
         <Button variant="ghost" onClick={() => navigate("/recruitment/candidates")} className="w-fit -ml-2">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Tilbage til kandidater
+          <span className="hidden sm:inline">Tilbage til kandidater</span>
+          <span className="sm:hidden">Tilbage</span>
         </Button>
 
         {/* Hero Profile Card */}
         <Card className="overflow-hidden">
-          <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 sm:p-8">
-            <div className="flex flex-col sm:flex-row gap-6">
-              <div className="flex items-start gap-4">
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-2xl sm:text-3xl font-bold truncate">
-                    {candidate.first_name} {candidate.last_name}
-                  </h1>
-                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <Badge className={`${roleColors[position] || "bg-muted"} font-medium`} variant="outline">
-                      <Briefcase className="h-3 w-3 mr-1" />
-                      {roleLabels[position] || candidate.applied_position || "Ikke angivet"}
-                    </Badge>
-                    <Badge className={`${statusColors[candidate.status] || ""} font-medium`} variant="outline">
-                      {statusLabels[candidate.status] || candidate.status}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    <Clock className="h-3 w-3 inline mr-1" />
-                    I pipeline: {timeInPipeline}
-                  </p>
+          <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4 sm:p-6 md:p-8">
+            <div className="flex flex-col gap-4">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold truncate">
+                  {candidate.first_name} {candidate.last_name}
+                </h1>
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <Badge className={`${roleColors[position] || "bg-muted"} font-medium text-xs`} variant="outline">
+                    <Briefcase className="h-3 w-3 mr-1" />
+                    {roleLabels[position] || candidate.applied_position || "Ikke angivet"}
+                  </Badge>
+                  <Badge className={`${statusColors[candidate.status] || ""} font-medium text-xs`} variant="outline">
+                    {statusLabels[candidate.status] || candidate.status}
+                  </Badge>
                 </div>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-2">
+                  <Clock className="h-3 w-3 inline mr-1" />
+                  I pipeline: {timeInPipeline}
+                </p>
               </div>
 
-              {/* Quick Actions */}
-              <div className="flex flex-wrap gap-2 sm:ml-auto sm:self-start">
+              {/* Quick Actions - Grid on mobile */}
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
                 <Button 
                   size="sm" 
                   variant="outline" 
@@ -310,7 +309,6 @@ export default function CandidateDetail() {
                       return;
                     }
                     
-                    // makeCall handles device initialization internally
                     makeCall(candidate.phone);
                   }} 
                   disabled={!candidate.phone || callState === 'connecting' || callState === 'connected'} 
@@ -321,7 +319,7 @@ export default function CandidateDetail() {
                   ) : (
                     <Phone className="h-4 w-4 mr-1.5" />
                   )}
-                  {callState === 'connecting' ? 'Ringer...' : 'Ring'}
+                  <span className="truncate">{callState === 'connecting' ? 'Ringer...' : 'Ring'}</span>
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setShowSmsDialog(true)} disabled={!candidate.phone} className="bg-background/80">
                   <MessageSquare className="h-4 w-4 mr-1.5" />
@@ -340,30 +338,30 @@ export default function CandidateDetail() {
           </div>
 
           {/* Contact & Stats Bar */}
-          <div className="border-t bg-muted/30 px-6 py-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="border-t bg-muted/30 px-4 sm:px-6 py-3 sm:py-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
               {/* Contact Info */}
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Email</p>
-                <p className="text-sm font-medium truncate" title={candidate.email || ""}>
+              <div className="space-y-0.5 sm:space-y-1">
+                <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Email</p>
+                <p className="text-xs sm:text-sm font-medium truncate" title={candidate.email || ""}>
                   {candidate.email || <span className="text-muted-foreground italic">Ikke angivet</span>}
                 </p>
               </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Telefon</p>
-                <p className="text-sm font-medium">
+              <div className="space-y-0.5 sm:space-y-1">
+                <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Telefon</p>
+                <p className="text-xs sm:text-sm font-medium">
                   {candidate.phone || <span className="text-muted-foreground italic">Ikke angivet</span>}
                 </p>
               </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Kilde</p>
-                <p className="text-sm font-medium">
+              <div className="space-y-0.5 sm:space-y-1">
+                <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Kilde</p>
+                <p className="text-xs sm:text-sm font-medium">
                   {sourceLabels[candidate.source?.toLowerCase() || ""] || candidate.source || <span className="text-muted-foreground italic">Ukendt</span>}
                 </p>
               </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Ansøgningsdato</p>
-                <p className="text-sm font-medium">
+              <div className="space-y-0.5 sm:space-y-1">
+                <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">Ansøgningsdato</p>
+                <p className="text-xs sm:text-sm font-medium">
                   {format(new Date(candidate.created_at), "d. MMM yyyy", {
                   locale: da
                 })}
@@ -374,9 +372,9 @@ export default function CandidateDetail() {
         </Card>
 
         {/* Main Content - 2 Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Left Column - Wider */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 md:space-y-6">
             {/* Status & Interview Card */}
             <Card>
               <CardHeader className="pb-3">
@@ -432,18 +430,18 @@ export default function CandidateDetail() {
                 </div>
 
                 {/* Stats Row */}
-                <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
-                  <div className="text-center p-3 bg-muted/50 rounded-lg">
-                    <p className="text-2xl font-bold text-primary">{applications.length || 1}</p>
-                    <p className="text-xs text-muted-foreground">Ansøgninger</p>
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t">
+                  <div className="text-center p-2 sm:p-3 bg-muted/50 rounded-lg">
+                    <p className="text-lg sm:text-2xl font-bold text-primary">{applications.length || 1}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">Ansøgninger</p>
                   </div>
-                  <div className="text-center p-3 bg-muted/50 rounded-lg">
-                    <p className="text-2xl font-bold text-primary">{communications.filter(c => c.type === "call").length}</p>
-                    <p className="text-xs text-muted-foreground">Opkald</p>
+                  <div className="text-center p-2 sm:p-3 bg-muted/50 rounded-lg">
+                    <p className="text-lg sm:text-2xl font-bold text-primary">{communications.filter(c => c.type === "call").length}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">Opkald</p>
                   </div>
-                  <div className="text-center p-3 bg-muted/50 rounded-lg">
-                    <p className="text-2xl font-bold text-primary">{communications.filter(c => c.type === "email" || c.type === "sms").length}</p>
-                    <p className="text-xs text-muted-foreground">Beskeder</p>
+                  <div className="text-center p-2 sm:p-3 bg-muted/50 rounded-lg">
+                    <p className="text-lg sm:text-2xl font-bold text-primary">{communications.filter(c => c.type === "email" || c.type === "sms").length}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">Beskeder</p>
                   </div>
                 </div>
               </CardContent>
@@ -546,7 +544,7 @@ export default function CandidateDetail() {
           </div>
 
           {/* Right Column - Notes */}
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             {/* Quick Note Input */}
             <Card>
               <CardHeader className="pb-3">
