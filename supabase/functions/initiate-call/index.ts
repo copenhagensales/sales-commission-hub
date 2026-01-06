@@ -83,7 +83,7 @@ serve(async (req) => {
     if (!toNumber) throw new Error('toNumber is required');
     if (!toNumber.startsWith('+')) throw new Error('toNumber must be in E.164 format (e.g. +15551234567)');
 
-    // Lookup the employee (prefer explicit employeeId, fallback to logged-in user)
+    // Lookup the employee phone (prefer explicit employeeId, fallback to logged-in user)
     const employeeLookup = employeeId
       ? supabaseAdmin.from('employee_master_data').select('id, private_phone, work_email').eq('id', employeeId).maybeSingle()
       : supabaseAdmin.from('employee_master_data').select('id, private_phone, work_email').eq('auth_user_id', authUserId).maybeSingle();
@@ -91,37 +91,25 @@ serve(async (req) => {
     const { data: employee, error: employeeErr } = await employeeLookup;
     if (employeeErr) {
       console.error('[initiate-call] Failed to load employee', employeeErr);
-      // Non-fatal - we can still make a direct call
+      throw new Error('Could not load employee');
     }
 
     const employeePhone = normalizePhone(employee?.private_phone);
-    const hasValidEmployeePhone = employeePhone && employeePhone.startsWith('+');
-
-    // Decide on call mode:
-    // - "callback": Twilio calls employee first, then bridges to candidate (click-to-call)
-    // - "direct": Twilio calls candidate directly (for tracking/recording only)
-    const callMode = hasValidEmployeePhone ? 'callback' : 'direct';
-
-    console.log('[initiate-call] Call mode:', callMode, { employeePhone: employeePhone || 'none', toNumber, candidateId });
-
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`;
-    const formData = new URLSearchParams();
-
-    if (callMode === 'callback') {
-      // Callback mode: call employee first, then bridge to candidate
-      const twimlUrl = `${supabaseUrl}/functions/v1/twilio-voice-token?dialTo=${encodeURIComponent(toNumber)}`;
-      formData.append('To', employeePhone);
-      formData.append('From', twilioNumber);
-      formData.append('Url', twimlUrl);
-    } else {
-      // Direct mode: call candidate directly (simpler, but no two-way bridge)
-      // TwiML will just play a message to keep the call alive for status tracking
-      const twimlUrl = `${supabaseUrl}/functions/v1/twilio-voice-token?mode=direct`;
-      formData.append('To', toNumber);
-      formData.append('From', twilioNumber);
-      formData.append('Url', twimlUrl);
+    if (!employeePhone || !employeePhone.startsWith('+')) {
+      throw new Error('Your employee phone (private_phone) must be set in E.164 format (e.g. +15551234567)');
     }
 
+    console.log('[initiate-call] Starting click-to-call:', { employeePhone, toNumber, candidateId });
+
+    // TwiML URL tells Twilio: when employee answers, dial the candidate
+    const twimlUrl = `${supabaseUrl}/functions/v1/twilio-voice-token?dialTo=${encodeURIComponent(toNumber)}`;
+
+    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`;
+
+    const formData = new URLSearchParams();
+    formData.append('To', employeePhone);
+    formData.append('From', twilioNumber);
+    formData.append('Url', twimlUrl);
     formData.append('Method', 'POST');
     formData.append('StatusCallback', `${supabaseUrl}/functions/v1/incoming-call`);
     formData.append('StatusCallbackMethod', 'POST');
