@@ -131,6 +131,12 @@ serve(async (req) => {
       console.log(`New user created: ${email}`);
     }
 
+    // Mark invitation as used (security fix 2.1: single-use tokens)
+    await supabase
+      .from("employee_invitations")
+      .update({ used_at: new Date().toISOString() })
+      .eq("token", token);
+
     // Mark invitation password as set and complete
     const { data: completeResult } = await supabase.rpc("complete_invitation_password", { _token: token });
     

@@ -87,7 +87,7 @@ export function useReferrerByCode(code: string | undefined) {
   });
 }
 
-// Hook to submit a referral (public form)
+// Hook to submit a referral (public form) - uses secure edge function
 export function useSubmitReferral() {
   return useMutation({
     mutationFn: async (data: {
@@ -100,51 +100,28 @@ export function useSubmitReferral() {
       referrer_name_provided: string;
       message?: string;
     }) => {
-      // Insert the referral
-      const { data: referral, error } = await supabase
-        .from('employee_referrals')
-        .insert({
-          referral_code: data.referral_code.toUpperCase(),
-          referrer_employee_id: data.referrer_employee_id,
+      // Use edge function for secure submission (bypasses anon RLS restrictions)
+      const { data: result, error } = await supabase.functions.invoke('submit-referral', {
+        body: {
+          referral_code: data.referral_code,
           candidate_first_name: data.candidate_first_name,
           candidate_last_name: data.candidate_last_name,
           candidate_email: data.candidate_email,
-          candidate_phone: data.candidate_phone || null,
+          candidate_phone: data.candidate_phone,
           referrer_name_provided: data.referrer_name_provided,
-          message: data.message || null,
-          status: 'pending',
-        })
-        .select()
-        .single();
+          message: data.message,
+        },
+      });
 
-      if (error) throw error;
-
-      // Get referrer name for the notification
-      const { data: referrer } = await supabase
-        .from('employee_master_data')
-        .select('first_name, last_name')
-        .eq('id', data.referrer_employee_id)
-        .single();
-
-      // Send notification email (don't fail if this fails)
-      try {
-        await supabase.functions.invoke('notify-referral-received', {
-          body: {
-            referralId: referral.id,
-            candidateFirstName: data.candidate_first_name,
-            candidateLastName: data.candidate_last_name,
-            candidateEmail: data.candidate_email,
-            candidatePhone: data.candidate_phone,
-            referrerName: data.referrer_name_provided,
-            referrerEmployeeName: referrer ? `${referrer.first_name} ${referrer.last_name}` : 'Ukendt',
-            message: data.message,
-          },
-        });
-      } catch (emailError) {
-        console.error('Failed to send notification email:', emailError);
+      if (error) {
+        throw new Error(error.message || 'Kunne ikke sende henvisning');
       }
 
-      return referral;
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      return result.referral;
     },
   });
 }

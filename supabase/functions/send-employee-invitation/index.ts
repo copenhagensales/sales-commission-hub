@@ -125,8 +125,8 @@ serve(async (req) => {
       .eq("employee_id", employeeId)
       .eq("status", "pending");
 
-    // Create invitation record with 7 day expiry
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    // Create invitation record with 48 hour expiry (security fix 2.2)
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
     
     const { error: insertError } = await supabase
       .from("employee_invitations")
@@ -205,7 +205,7 @@ serve(async (req) => {
             
             <a href="${invitationUrl}" class="button">Start registrering</a>
             
-            <p><strong>Vigtigt:</strong> Linket er gyldigt i 7 dage.</p>
+            <p><strong>Vigtigt:</strong> Linket er gyldigt i 48 timer.</p>
             <p>Hvis du har spørgsmål, er du velkommen til at kontakte os.</p>
             <p>Med venlig hilsen,<br>Copenhagen Sales</p>
           </div>
