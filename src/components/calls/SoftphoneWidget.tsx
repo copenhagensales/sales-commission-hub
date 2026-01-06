@@ -326,8 +326,8 @@ export function SoftphoneWidget() {
 
       {/* Dial Pad with Contacts Panel */}
       {showDialer && deviceState === 'ready' && !shouldShowCallUI && (
-        <Card className="mb-4 w-[560px] shadow-lg">
-          <CardContent className="p-4">
+        <Card className="mb-4 w-[320px] sm:w-[560px] shadow-lg">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-medium">Softphone</span>
               <Button
@@ -340,9 +340,9 @@ export function SoftphoneWidget() {
               </Button>
             </div>
             
-            <div className="flex gap-4">
-              {/* Left: All Contacts */}
-              <div className="w-1/2 border rounded-lg overflow-hidden">
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Left: All Contacts - hidden on mobile */}
+              <div className="hidden sm:block sm:w-1/2 border rounded-lg overflow-hidden">
                 <div className="bg-muted/50 px-3 py-2 border-b">
                   <span className="text-sm font-medium flex items-center gap-2">
                     <Users className="w-4 h-4" />
@@ -387,7 +387,7 @@ export function SoftphoneWidget() {
               </div>
 
               {/* Right: Dial Pad */}
-              <div className="w-1/2">
+              <div className="w-full sm:w-1/2">
                 <div className="flex gap-2 mb-3">
                   <Input
                     value={dialNumber}
