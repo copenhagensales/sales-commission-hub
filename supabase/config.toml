@@ -161,3 +161,9 @@ verify_jwt = false
 
 [functions.check-mfa-exempt]
 verify_jwt = false
+
+[functions.submit-referral]
+verify_jwt = false
+
+[functions.check-account-locked]
+verify_jwt = false

@@ -2980,6 +2980,7 @@ export type Database = {
           password_set_at: string | null
           status: string
           token: string
+          used_at: string | null
         }
         Insert: {
           completed_at?: string | null
@@ -2992,6 +2993,7 @@ export type Database = {
           password_set_at?: string | null
           status?: string
           token: string
+          used_at?: string | null
         }
         Update: {
           completed_at?: string | null
@@ -3004,6 +3006,7 @@ export type Database = {
           password_set_at?: string | null
           status?: string
           token?: string
+          used_at?: string | null
         }
         Relationships: [
           {

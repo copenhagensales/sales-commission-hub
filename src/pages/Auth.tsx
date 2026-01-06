@@ -166,6 +166,26 @@ export default function Auth() {
           authEmail = privateEmail;
         }
         
+        // PRE-LOGIN SECURITY: Check if account is locked BEFORE attempting login
+        try {
+          const { data: lockCheck } = await supabase.functions.invoke('check-account-locked', {
+            body: { email: authEmail }
+          });
+          
+          if (lockCheck?.locked) {
+            toast({
+              title: "Konto låst",
+              description: lockCheck.message || "Din konto er midlertidigt låst. Kontakt din teamleder.",
+              variant: "destructive",
+            });
+            setLoading(false);
+            return;
+          }
+        } catch (lockCheckError) {
+          // If lock check fails, proceed with login (fail-open)
+          console.warn("Could not check account lock status:", lockCheckError);
+        }
+        
         const { error } = await supabase.auth.signInWithPassword({
           email: authEmail,
           password,
