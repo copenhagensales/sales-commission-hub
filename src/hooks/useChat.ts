@@ -85,9 +85,10 @@ export function useConversations() {
     queryFn: async () => {
       const currentEmployeeId = await getCurrentEmployeeId();
       
+      // Use secure view for employee data
       const { data, error } = await supabase
         .from("chat_conversations")
-        .select(`*, members:chat_conversation_members(*, employee:employee_master_data(id, first_name, last_name))`)
+        .select(`*, members:chat_conversation_members(*, employee:employee_basic_info(id, first_name, last_name))`)
         .order("updated_at", { ascending: false }) as any;
 
       if (error) throw error;
@@ -154,11 +155,12 @@ export function useMessages(conversationId: string | null) {
     queryFn: async () => {
       if (!conversationId) return [];
       
+      // Use secure view for sender data
       const { data, error } = await supabase
         .from("chat_messages")
         .select(`
           *,
-          sender:employee_master_data!chat_messages_sender_id_fkey(id, first_name, last_name)
+          sender:employee_basic_info!chat_messages_sender_id_fkey(id, first_name, last_name)
         `)
         .eq("conversation_id", conversationId)
         .is("deleted_at", null)
@@ -171,13 +173,13 @@ export function useMessages(conversationId: string | null) {
       
       const { data: reactions } = await supabase
         .from("chat_message_reactions")
-        .select(`*, employee:employee_master_data(id, first_name, last_name)`)
+        .select(`*, employee:employee_basic_info(id, first_name, last_name)`)
         .in("message_id", messageIds) as any;
       
       // Fetch read receipts for all messages
       const { data: readReceipts } = await supabase
         .from("chat_message_read_receipts")
-        .select(`*, employee:employee_master_data(id, first_name, last_name)`)
+        .select(`*, employee:employee_basic_info(id, first_name, last_name)`)
         .in("message_id", messageIds) as any;
       
       // Fetch reply_to messages
@@ -185,7 +187,7 @@ export function useMessages(conversationId: string | null) {
       const { data: replyMessages } = replyToIds.length > 0 
         ? await supabase
             .from("chat_messages")
-            .select(`*, sender:employee_master_data!chat_messages_sender_id_fkey(id, first_name, last_name)`)
+            .select(`*, sender:employee_basic_info!chat_messages_sender_id_fkey(id, first_name, last_name)`)
             .in("id", replyToIds) as any
         : { data: [] };
       
@@ -458,7 +460,7 @@ export function useSearchMessages() {
         .from("chat_messages")
         .select(`
           *,
-          sender:employee_master_data!chat_messages_sender_id_fkey(id, first_name, last_name),
+          sender:employee_basic_info!chat_messages_sender_id_fkey(id, first_name, last_name),
           conversation:chat_conversations(id, name, is_group)
         `)
         .is("deleted_at", null)
@@ -632,10 +634,10 @@ export function useEmployeesForChat() {
   return useQuery({
     queryKey: ["employees-for-chat"],
     queryFn: async () => {
+      // Use secure view that only exposes non-sensitive columns
       const { data, error } = await supabase
-        .from("employee_master_data")
+        .from("employee_basic_info")
         .select("id, first_name, last_name")
-        .eq("is_active", true)
         .order("first_name") as any;
 
       if (error) throw error;
