@@ -14,11 +14,11 @@ export default function HeadToHead() {
       if (!user?.email) return null;
       
       const lowerEmail = user.email.toLowerCase();
+      // Use secure view that only exposes non-sensitive columns
       const { data } = await supabase
-        .from("employee_master_data")
-        .select("id, first_name, last_name")
-        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
-        .eq("is_active", true)
+        .from("employee_basic_info")
+        .select("id, first_name, last_name, work_email")
+        .eq("work_email", lowerEmail)
         .maybeSingle();
       
       return data;

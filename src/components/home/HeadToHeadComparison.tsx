@@ -305,27 +305,31 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
   const { data: employees = [] } = useQuery({
     queryKey: ["h2h-employees"],
     queryFn: async (): Promise<EmployeeForH2H[]> => {
+      // Use secure view that only exposes non-sensitive columns
       const { data: employeesData } = await supabase
-        .from("employee_master_data")
+        .from("employee_basic_info")
         .select(`
           id, 
           first_name, 
           last_name,
-          team_members(team_id, teams(name))
+          team_id
         `)
-        .eq("is_active", true)
         .order("first_name");
       
+      // Get team names separately
+      const teamIds = [...new Set((employeesData || []).map(e => e.team_id).filter(Boolean))];
+      const { data: teams } = teamIds.length > 0 
+        ? await supabase.from("teams").select("id, name").in("id", teamIds)
+        : { data: [] };
+      
+      const teamMap = new Map((teams || []).map(t => [t.id, t.name]));
+      
       return (employeesData || [])
-        .map(emp => {
-          const teamMember = (emp.team_members as any)?.[0];
-          const teamName = teamMember?.teams?.name || null;
-          return {
-            id: emp.id,
-            name: `${emp.first_name} ${emp.last_name}`,
-            teamName
-          };
-        })
+        .map(emp => ({
+          id: emp.id,
+          name: `${emp.first_name} ${emp.last_name}`,
+          teamName: emp.team_id ? teamMap.get(emp.team_id) || null : null
+        }))
         // Exclude Stab employees from duel opponents
         .filter(emp => emp.teamName !== "Stab");
     },
