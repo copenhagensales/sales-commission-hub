@@ -790,73 +790,91 @@ export function PositionsTab() {
 
                 {/* Trusted IP Ranges - only show when MFA is enabled */}
                 {formData.requires_mfa && (
-                  <Card>
-                    <CardHeader className="pb-3">
+                  <Card className="border-dashed">
+                    <CardHeader className="pb-2">
                       <CardTitle className="text-base flex items-center gap-2">
-                        <Globe className="h-4 w-4" />
-                        Betroede IP-adresser
+                        <Globe className="h-4 w-4 text-primary" />
+                        Betroede IP-adresser (undtaget fra MFA)
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <p className="text-xs text-muted-foreground">
-                        Brugere på disse netværk springer MFA over automatisk.
-                        Understøtter enkelt IP (82.103.140.55), CIDR (82.103.140.0/24), eller wildcard (82.103.*.*).
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Brugere på disse netværk springer MFA over automatisk ved login.
                       </p>
                       
                       {/* List of existing IP ranges */}
-                      {formData.trusted_ip_ranges.length > 0 && (
-                        <div className="space-y-2">
+                      {formData.trusted_ip_ranges.length > 0 ? (
+                        <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
                           {formData.trusted_ip_ranges.map((range, index) => (
-                            <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+                            <div key={index} className="flex items-center justify-between p-2.5 bg-background rounded-md border">
                               <div className="flex items-center gap-3">
-                                <Globe className="h-4 w-4 text-muted-foreground" />
+                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <Globe className="h-4 w-4 text-primary" />
+                                </div>
                                 <div>
                                   <div className="text-sm font-medium">{range.name}</div>
-                                  <div className="text-xs text-muted-foreground font-mono">{range.ip}</div>
+                                  <code className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                    {range.ip}
+                                  </code>
                                 </div>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    trusted_ip_ranges: prev.trusted_ip_ranges.filter((_, i) => i !== index)
-                                  }));
-                                }}
-                                disabled={editingPosition && isOwnerPosition(editingPosition.name)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {!(editingPosition && isOwnerPosition(editingPosition.name)) && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  onClick={() => {
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      trusted_ip_ranges: prev.trusted_ip_ranges.filter((_, i) => i !== index)
+                                    }));
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-dashed p-4 text-center">
+                          <Globe className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                          <p className="text-sm text-muted-foreground">
+                            Ingen betroede IP-adresser tilføjet endnu
+                          </p>
                         </div>
                       )}
 
                       {/* Add new IP range */}
                       {!(editingPosition && isOwnerPosition(editingPosition.name)) && (
-                        <div className="space-y-3 pt-2 border-t">
+                        <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
+                          <div className="text-sm font-medium flex items-center gap-2">
+                            <Plus className="h-4 w-4" />
+                            Tilføj ny IP-adresse
+                          </div>
                           <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <Label className="text-xs">Navn</Label>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">Navn</Label>
                               <Input
                                 placeholder="F.eks. Hovedkontor"
                                 value={newIpName}
                                 onChange={(e) => setNewIpName(e.target.value)}
                               />
                             </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs">IP/CIDR</Label>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">IP/CIDR</Label>
                               <Input
-                                placeholder="F.eks. 82.103.140.0/24"
+                                placeholder="82.103.140.0/24"
                                 value={newIpAddress}
                                 onChange={(e) => setNewIpAddress(e.target.value)}
                                 className="font-mono"
                               />
                             </div>
                           </div>
+                          <p className="text-xs text-muted-foreground">
+                            Format: Enkelt IP, CIDR (82.103.140.0/24), eller wildcard (82.103.*.*)
+                          </p>
                           <Button
-                            variant="outline"
                             size="sm"
                             onClick={() => {
                               if (newIpName.trim() && newIpAddress.trim()) {
@@ -874,7 +892,7 @@ export function PositionsTab() {
                             disabled={!newIpName.trim() || !newIpAddress.trim()}
                           >
                             <Plus className="h-4 w-4 mr-2" />
-                            Tilføj IP-adresse
+                            Tilføj
                           </Button>
                         </div>
                       )}
