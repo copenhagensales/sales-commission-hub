@@ -38,24 +38,27 @@ serve(async (req) => {
     if (direction === 'outbound-api') {
       const destinationNumber = to || called;
       const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      
+      const twilioCallerId = Deno.env.get('TWILIO_PHONE_NUMBER');
+      const callerId = twilioCallerId || (from?.startsWith('+') ? from : undefined);
+
       console.log('[twilio-voice-token] Outbound call - dialing directly to:', {
         destinationNumber,
-        callerId: from
+        from,
+        callerId,
       });
-      
-      // Simple approach: Just dial the destination number directly
-      // When the call is answered, both parties will be connected
+
+      // Keep TwiML minimal: <Dial><Number/></Dial>
+      // Avoid <Dial action="..."> because that endpoint returns JSON (not TwiML).
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${from}" timeout="30" action="${supabaseUrl}/functions/v1/incoming-call">
+  <Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30">
     <Number statusCallback="${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(callSid)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">
       ${destinationNumber}
     </Number>
   </Dial>
-  <Say language="da-DK" voice="Polly.Mads">Opkaldet blev afsluttet.</Say>
+  <Hangup/>
 </Response>`;
-      
+
       console.log('[twilio-voice-token] Generated TwiML for direct dial');
     } else {
       // For inbound calls, show the welcome message
