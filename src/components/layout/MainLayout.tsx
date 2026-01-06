@@ -9,6 +9,7 @@ import { useCarQuizLock } from "@/hooks/useCarQuiz";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PendingAbsencePopup } from "@/components/absence/PendingAbsencePopup";
+import { SoftphoneWidget } from "@/components/calls/SoftphoneWidget";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -95,6 +96,9 @@ export function MainLayout({ children }: MainLayoutProps) {
       
       {/* Popup for pending absence requests - shown to team leaders (skip in preview mode) */}
       {!isPreviewMode && <PendingAbsencePopup />}
+      
+      {/* Softphone Widget */}
+      <SoftphoneWidget />
     </div>
   );
 }
