@@ -89,7 +89,9 @@ export function useTwilioDevice() {
 
       device.on('incoming', (call: Call) => {
         console.log('[useTwilioDevice] Incoming call from:', call.parameters.From);
+        console.log('[useTwilioDevice] Incoming call parameters:', call.parameters);
         activeCallRef.current = call;
+        setDeviceState('busy');
         setCallState('incoming');
         setCurrentCall({
           from: call.parameters.From || 'Unknown',
@@ -97,8 +99,14 @@ export function useTwilioDevice() {
           direction: 'incoming',
         });
 
-        // Set up call event handlers
+        // Set up call event handlers for the incoming call
         setupCallHandlers(call);
+        
+        // Play ringing sound or notify user
+        toast({
+          title: 'Incoming Call',
+          description: `Call from ${call.parameters.From || 'Unknown'}`,
+        });
       });
 
       device.on('tokenWillExpire', async () => {
