@@ -33,32 +33,46 @@ serve(async (req) => {
 
     let twiml: string;
 
+    const url = new URL(req.url);
+    const dialToParam = url.searchParams.get('dialTo');
+    const modeParam = url.searchParams.get('mode');
+
     // For outbound calls (API-initiated), dial directly to the destination number
     // The Twilio API call already connects, this TwiML tells Twilio what to do when answered
     if (direction === 'outbound-api') {
-      const url = new URL(req.url);
-      const dialToParam = url.searchParams.get('dialTo');
-      const destinationNumber = dialToParam || to || called;
-
       const supabaseUrl = Deno.env.get('SUPABASE_URL');
       const twilioCallerIdRaw = Deno.env.get('TWILIO_PHONE_NUMBER');
       const twilioCallerId = twilioCallerIdRaw?.replace(/[^\d+]/g, '');
       const callerId = (twilioCallerId && twilioCallerId.startsWith('+')) ? twilioCallerId : undefined;
 
-      console.log('[twilio-voice-token] Outbound call - dialing to:', {
-        destinationNumber,
-        callerId,
-        dialToParam,
-      });
-
-      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      // "direct" mode: just keep the call open for tracking (no bridge)
+      if (modeParam === 'direct') {
+        console.log('[twilio-voice-token] Direct mode - keeping call open for tracking');
+        
+        // Use a long pause to keep the call alive; Twilio will end it when the other party hangs up
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
+  <Pause length="3600"/>
+</Response>`;
+      } else if (dialToParam) {
+        // "callback" mode: dial the candidate when employee answers
+        console.log('[twilio-voice-token] Callback mode - dialing to:', { dialToParam, callerId });
+
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say language="da-DK" voice="Polly.Mads">Forbinder dig nu.</Say>
   <Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30">
-    <Number statusCallback="${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(callSid)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">${destinationNumber}</Number>
+    <Number statusCallback="${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(callSid)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">${dialToParam}</Number>
   </Dial>
 </Response>`;
-
-      console.log('[twilio-voice-token] Generated TwiML for direct dial');
+      } else {
+        // Fallback: keep call open
+        console.log('[twilio-voice-token] No dialTo param - keeping call open');
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Pause length="3600"/>
+</Response>`;
+      }
     } else {
       // For inbound calls, show the welcome message
       console.log('[twilio-voice-token] Inbound call - playing welcome message');
