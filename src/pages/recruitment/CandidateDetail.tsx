@@ -106,48 +106,28 @@ export default function CandidateDetail() {
   } = useQuery({
     queryKey: ["candidate-communications", id, candidate?.phone],
     queryFn: async (): Promise<any[]> => {
-      if (!id) return [];
-      
       const phone = candidate?.phone;
-      const normalizedPhone = phone ? phone.replace(/\D/g, '').replace(/^45/, '').replace(/^\+45/, '') : null;
+      if (!phone) return [];
       
-      // Build a simple query - use candidate_id as primary filter
+      // Normalize phone - remove all non-digits and country codes
+      const normalizedPhone = phone.replace(/\D/g, '').replace(/^45/, '').replace(/^1/, '');
+      
+      if (!normalizedPhone || normalizedPhone.length < 7) return [];
+      
+      // Query by phone number only (communication_logs doesn't have candidate_id column)
       // @ts-ignore - Supabase type chain too deep
       const result = await supabase
         .from("communication_logs")
         .select("*")
-        .eq("candidate_id", id)
+        .ilike("phone_number", `%${normalizedPhone}%`)
+        .in("type", ["sms", "email"])
         .order("created_at", { ascending: false })
         .limit(50);
 
       if (result.error) throw result.error;
-      const data = result.data || [];
-      
-      // If we have a phone number, also fetch by phone and merge
-      if (normalizedPhone) {
-        // @ts-ignore - Supabase type chain too deep
-        const phoneResult = await supabase
-          .from("communication_logs")
-          .select("*")
-          .ilike("phone_number", `%${normalizedPhone}%`)
-          .order("created_at", { ascending: false })
-          .limit(50);
-        
-        const phoneData = phoneResult.data || [];
-        
-        // Merge and dedupe by id
-        const allData = [...data, ...phoneData];
-        const uniqueById = allData.filter((item: any, index: number, self: any[]) => 
-          index === self.findIndex((t: any) => t.id === item.id)
-        );
-        return uniqueById.sort((a: any, b: any) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-      }
-      
-      return data;
+      return result.data || [];
     },
-    enabled: !!id && !!candidate
+    enabled: !!id && !!candidate?.phone
   });
 
   // Separate query for call records count
