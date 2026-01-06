@@ -66,25 +66,22 @@ export function useAllReferrals() {
   });
 }
 
-// Hook to get referrer info by referral code
+// Hook to get referrer info by referral code (uses secure function for anon access)
 export function useReferrerByCode(code: string | undefined) {
   return useQuery({
     queryKey: ['referrer-by-code', code],
     queryFn: async () => {
       if (!code) return null;
       
+      // Use secure function that only exposes necessary fields
       const { data, error } = await supabase
-        .from('employee_master_data')
-        .select('id, first_name, last_name, referral_code')
-        .eq('referral_code', code.toUpperCase())
-        .eq('is_active', true)
-        .single();
+        .rpc('get_referrer_by_code', { p_referral_code: code });
 
-      if (error) {
-        if (error.code === 'PGRST116') return null; // Not found
-        throw error;
-      }
-      return data;
+      if (error) throw error;
+      
+      // Function returns array, get first result
+      const result = Array.isArray(data) ? data[0] : data;
+      return result || null;
     },
     enabled: !!code,
   });
