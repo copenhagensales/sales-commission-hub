@@ -8,40 +8,18 @@ import { Mail, Lock, Wifi, WifiOff, RefreshCw, ArrowLeft, AlertTriangle, KeyRoun
 import cphSalesLogo from "@/assets/cph-sales-logo-dark.png";
 import { useAuth } from "@/hooks/useAuth";
 
-// Microsoft icon component
-const MicrosoftIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 21 21">
-    <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-    <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-    <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-    <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
-  </svg>
-);
-
 export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [microsoftLoading, setMicrosoftLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [isNewPasswordMode, setIsNewPasswordMode] = useState(false);
   const [isForcedPasswordChange, setIsForcedPasswordChange] = useState(false);
   const [expiredLinkError, setExpiredLinkError] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const { toast } = useToast();
-  const { mustChangePassword, clearMustChangePassword, user, ssoAccessDenied } = useAuth();
-
-  // Show error toast when SSO access is denied
-  useEffect(() => {
-    if (ssoAccessDenied) {
-      toast({
-        title: "Adgang nægtet",
-        description: "Din email er ikke registreret som medarbejder. Kontakt din leder.",
-        variant: "destructive",
-      });
-    }
-  }, [ssoAccessDenied, toast]);
+  const { mustChangePassword, clearMustChangePassword, user } = useAuth();
 
   // Check if user must change password after login
   useEffect(() => {
@@ -93,26 +71,6 @@ export default function Auth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleMicrosoftLogin = async () => {
-    setMicrosoftLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'azure',
-        options: {
-          scopes: 'openid email profile',
-          redirectTo: `${window.location.origin}/auth`,
-        },
-      });
-      if (error) throw error;
-    } catch (error: any) {
-      toast({
-        title: "Microsoft login fejlede",
-        description: error.message,
-        variant: "destructive",
-      });
-      setMicrosoftLoading(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,7 +219,6 @@ export default function Auth() {
   };
 
   const showPasswordChangeForm = isForcedPasswordChange || isNewPasswordMode;
-  const showMicrosoftLogin = !isResetMode && !showPasswordChangeForm;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -352,34 +309,6 @@ export default function Auth() {
             {getTitle()}
           </h2>
 
-          {/* Microsoft 365 SSO Button */}
-          {showMicrosoftLogin && (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full mb-4 h-11 gap-3"
-                onClick={handleMicrosoftLogin}
-                disabled={microsoftLoading || connectionStatus === 'error'}
-              >
-                {microsoftLoading ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <MicrosoftIcon />
-                )}
-                Log ind med Microsoft 365
-              </Button>
-
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-border" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">eller med email</span>
-                </div>
-              </div>
-            </>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email field - only show for login and reset request */}
