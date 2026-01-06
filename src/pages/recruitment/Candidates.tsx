@@ -205,82 +205,85 @@ export default function Candidates() {
 
   return (
     <MainLayout>
-      <div className="flex gap-6">
-        {/* Main candidates list */}
-        <div className="flex-1 space-y-6">
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Kandidater</h1>
-              <p className="text-sm md:text-base text-muted-foreground">
-                {candidatesWithApps.length} kandidater · {totalApplications} ansøgninger
-              </p>
-            </div>
-            <Button onClick={() => setShowNewCandidateDialog(true)} className="w-full md:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              Tilføj kandidat
-            </Button>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Kandidater</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
+              {candidatesWithApps.length} kandidater · {totalApplications} ansøgninger
+            </p>
+          </div>
+          <Button onClick={() => setShowNewCandidateDialog(true)} className="w-full md:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            Tilføj kandidat
+          </Button>
+        </div>
+
+        <NewCandidateDialog
+          open={showNewCandidateDialog}
+          onOpenChange={setShowNewCandidateDialog}
+        />
+
+        {/* Search & Filters */}
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Søg efter navn, email eller telefon..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-background border-border"
+            />
           </div>
 
-          <NewCandidateDialog
-            open={showNewCandidateDialog}
-            onOpenChange={setShowNewCandidateDialog}
-          />
-
-          <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Søg efter navn, email eller telefon..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-background border-border"
-              />
+          <div className="flex items-start gap-4 flex-col md:flex-row">
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Filtre:</span>
             </div>
 
-            <div className="flex items-start gap-4 flex-col md:flex-row">
-              <div className="flex items-center gap-2 w-full md:w-auto">
-                <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Filtre:</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 w-full">
+              <div className="space-y-2">
+                <Label htmlFor="status-filter" className="text-sm">Status</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger id="status-filter" className="bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border">
+                    <SelectItem value="all">Alle statuser</SelectItem>
+                    <SelectItem value="new">Ny ansøgning</SelectItem>
+                    <SelectItem value="contacted">Kontaktet</SelectItem>
+                    <SelectItem value="interview_scheduled">Samtale planlagt</SelectItem>
+                    <SelectItem value="interviewed">Samtale afholdt</SelectItem>
+                    <SelectItem value="hired">Ansat</SelectItem>
+                    <SelectItem value="rejected">Afvist</SelectItem>
+                    <SelectItem value="ghostet">Ghostet</SelectItem>
+                    <SelectItem value="takket_nej">Takket nej</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 w-full">
-                <div className="space-y-2">
-                  <Label htmlFor="status-filter" className="text-sm">Status</Label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger id="status-filter" className="bg-background border-border">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover border-border">
-                      <SelectItem value="all">Alle statuser</SelectItem>
-                      <SelectItem value="new">Ny ansøgning</SelectItem>
-                      <SelectItem value="contacted">Kontaktet</SelectItem>
-                      <SelectItem value="interview_scheduled">Samtale planlagt</SelectItem>
-                      <SelectItem value="interviewed">Samtale afholdt</SelectItem>
-                      <SelectItem value="hired">Ansat</SelectItem>
-                      <SelectItem value="rejected">Afvist</SelectItem>
-                      <SelectItem value="ghostet">Ghostet</SelectItem>
-                      <SelectItem value="takket_nej">Takket nej</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="sort-by" className="text-sm">Sortering</Label>
-                  <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger id="sort-by" className="bg-background border-border">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover border-border">
-                      <SelectItem value="newest">Nyeste ansøgninger først</SelectItem>
-                      <SelectItem value="oldest">Ældste ansøgninger først</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="sort-by" className="text-sm">Sortering</Label>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger id="sort-by" className="bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border">
+                    <SelectItem value="newest">Nyeste ansøgninger først</SelectItem>
+                    <SelectItem value="oldest">Ældste ansøgninger først</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="grid gap-3">
+        {/* Main Grid: Candidates + Sidebar */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Candidates List - Takes 2 columns on large screens */}
+          <div className="lg:col-span-2 space-y-3">
             {filteredCandidates.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-muted-foreground">Ingen kandidater fundet</p>
@@ -296,152 +299,152 @@ export default function Candidates() {
               ))
             )}
           </div>
-        </div>
 
-        {/* Right sidebar with Call Logs and Chat History */}
-        <div className="hidden lg:flex flex-col w-80 gap-4">
-          {/* Call Logs */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                Opkaldslog ({callLogs.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <ScrollArea className="h-[300px]">
-                {callLogs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Ingen opkald endnu</p>
-                ) : (
-                  <div className="space-y-2">
-                    {callLogs.map((log) => {
-                      const candidate = findCandidateByPhone(log.direction === 'outbound' ? log.to_number : log.from_number);
-                      return (
-                        <div key={log.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors group">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                            log.direction === 'outbound' ? 'bg-blue-500/20' : 'bg-green-500/20'
-                          }`}>
-                            {log.direction === 'outbound' ? (
-                              <PhoneOutgoing className="w-4 h-4 text-blue-500" />
-                            ) : (
-                              <PhoneIncoming className="w-4 h-4 text-green-500" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">
-                              {candidate ? `${candidate.first_name} ${candidate.last_name}` : (log.to_number || log.from_number || 'Ukendt')}
-                            </p>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span>{format(new Date(log.started_at), 'dd MMM HH:mm', { locale: da })}</span>
-                              <span>·</span>
-                              <span>{formatDuration(log.duration_seconds)}</span>
+          {/* Right sidebar with Call Logs and Chat History - Visible on all screens */}
+          <div className="space-y-4 order-first lg:order-last">
+            {/* Call Logs */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  Opkaldslog ({callLogs.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <ScrollArea className="h-[200px] lg:h-[300px]">
+                  {callLogs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">Ingen opkald endnu</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {callLogs.map((log) => {
+                        const candidate = findCandidateByPhone(log.direction === 'outbound' ? log.to_number : log.from_number);
+                        return (
+                          <div key={log.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors group">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                              log.direction === 'outbound' ? 'bg-blue-500/20' : 'bg-green-500/20'
+                            }`}>
+                              {log.direction === 'outbound' ? (
+                                <PhoneOutgoing className="w-4 h-4 text-blue-500" />
+                              ) : (
+                                <PhoneIncoming className="w-4 h-4 text-green-500" />
+                              )}
                             </div>
-                          </div>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Slet opkald?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Er du sikker på, at du vil slette dette opkald? Denne handling kan ikke fortrydes.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annuller</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteCallLog(log.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {candidate ? `${candidate.first_name} ${candidate.last_name}` : (log.to_number || log.from_number || 'Ukendt')}
+                              </p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>{format(new Date(log.started_at), 'dd MMM HH:mm', { locale: da })}</span>
+                                <span>·</span>
+                                <span>{formatDuration(log.duration_seconds)}</span>
+                              </div>
+                            </div>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
                                 >
-                                  Slet
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Slet opkald?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Er du sikker på, at du vil slette dette opkald? Denne handling kan ikke fortrydes.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annuller</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteCallLog(log.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Slet
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
 
-          {/* SMS/Chat History */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                Beskeder ({smsLogs.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <ScrollArea className="h-[300px]">
-                {smsLogs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Ingen beskeder endnu</p>
-                ) : (
-                  <div className="space-y-2">
-                    {smsLogs.map((log) => {
-                      const candidate = findCandidateByPhone(log.phone_number);
-                      return (
-                        <div key={log.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors group">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                            log.direction === 'outbound' ? 'bg-blue-500/20' : 'bg-green-500/20'
-                          }`}>
-                            <MessageSquare className={`w-4 h-4 ${log.direction === 'outbound' ? 'text-blue-500' : 'text-green-500'}`} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">
-                              {candidate ? `${candidate.first_name} ${candidate.last_name}` : (log.phone_number || 'Ukendt')}
-                            </p>
-                            <p className="text-xs text-muted-foreground truncate">{log.content}</p>
-                            <span className="text-[10px] text-muted-foreground">
-                              {format(new Date(log.created_at), 'dd MMM HH:mm', { locale: da })}
-                            </span>
-                          </div>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Slet besked?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Er du sikker på, at du vil slette denne besked? Denne handling kan ikke fortrydes.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annuller</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteSmsLog(log.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            {/* SMS/Chat History */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Beskeder ({smsLogs.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <ScrollArea className="h-[200px] lg:h-[300px]">
+                  {smsLogs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">Ingen beskeder endnu</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {smsLogs.map((log) => {
+                        const candidate = findCandidateByPhone(log.phone_number);
+                        return (
+                          <div key={log.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors group">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                              log.direction === 'outbound' ? 'bg-blue-500/20' : 'bg-green-500/20'
+                            }`}>
+                              <MessageSquare className={`w-4 h-4 ${log.direction === 'outbound' ? 'text-blue-500' : 'text-green-500'}`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {candidate ? `${candidate.first_name} ${candidate.last_name}` : (log.phone_number || 'Ukendt')}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">{log.content}</p>
+                              <span className="text-[10px] text-muted-foreground">
+                                {format(new Date(log.created_at), 'dd MMM HH:mm', { locale: da })}
+                              </span>
+                            </div>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
                                 >
-                                  Slet
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Slet besked?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Er du sikker på, at du vil slette denne besked? Denne handling kan ikke fortrydes.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annuller</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteSmsLog(log.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Slet
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </MainLayout>
