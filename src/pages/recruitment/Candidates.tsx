@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,7 @@ interface SmsLog {
 }
 
 export default function Candidates() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewCandidateDialog, setShowNewCandidateDialog] = useState(false);
@@ -319,7 +321,11 @@ export default function Candidates() {
                       {callLogs.map((log) => {
                         const candidate = findCandidateByPhone(log.direction === 'outbound' ? log.to_number : log.from_number);
                         return (
-                          <div key={log.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors group">
+                          <div 
+                            key={log.id} 
+                            className={`flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors group ${candidate ? 'cursor-pointer' : ''}`}
+                            onClick={() => candidate && navigate(`/recruitment/candidates/${candidate.id}`)}
+                          >
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                               log.direction === 'outbound' ? 'bg-blue-500/20' : 'bg-green-500/20'
                             }`}>
@@ -345,6 +351,7 @@ export default function Candidates() {
                                   variant="ghost"
                                   size="icon"
                                   className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
@@ -393,7 +400,11 @@ export default function Candidates() {
                       {smsLogs.map((log) => {
                         const candidate = findCandidateByPhone(log.phone_number);
                         return (
-                          <div key={log.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors group">
+                          <div 
+                            key={log.id} 
+                            className={`flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors group ${candidate ? 'cursor-pointer' : ''}`}
+                            onClick={() => candidate && navigate(`/recruitment/candidates/${candidate.id}`)}
+                          >
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                               log.direction === 'outbound' ? 'bg-blue-500/20' : 'bg-green-500/20'
                             }`}>
@@ -414,6 +425,7 @@ export default function Candidates() {
                                   variant="ghost"
                                   size="icon"
                                   className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
