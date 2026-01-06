@@ -315,7 +315,7 @@ export default function Candidates() {
                   {callLogs.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">Ingen opkald endnu</p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-2 pr-3">
                       {callLogs.map((log) => {
                         const candidate = findCandidateByPhone(log.direction === 'outbound' ? log.to_number : log.from_number);
                         return (
@@ -389,7 +389,7 @@ export default function Candidates() {
                   {smsLogs.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">Ingen beskeder endnu</p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-2 pr-3">
                       {smsLogs.map((log) => {
                         const candidate = findCandidateByPhone(log.phone_number);
                         return (
