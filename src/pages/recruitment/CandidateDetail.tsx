@@ -14,7 +14,8 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp, X, Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp, X, Loader2, PhoneCall } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,8 @@ import { SendSmsDialog } from "@/components/recruitment/SendSmsDialog";
 import { SendEmailDialog } from "@/components/recruitment/SendEmailDialog";
 import { CallModal } from "@/components/calls/CallModal";
 import { useTwilioDeviceContext } from "@/contexts/TwilioDeviceContext";
+import { CandidateChatHistory } from "@/components/recruitment/CandidateChatHistory";
+import { CandidateCallLogs } from "@/components/recruitment/CandidateCallLogs";
 const statusLabels: Record<string, string> = {
   ny_ansoegning: "Ny ansøgning",
   new: "Ny ansøgning",
@@ -101,17 +104,50 @@ export default function CandidateDetail() {
   const {
     data: communications = []
   } = useQuery({
-    queryKey: ["candidate-communications", id],
-    queryFn: async () => {
-      const {
-        data,
-        error
-      } = await supabase.from("communication_logs").select("*").order("created_at", {
-        ascending: false
-      }).limit(20);
-      if (error) throw error;
+    queryKey: ["candidate-communications", id, candidate?.phone],
+    queryFn: async (): Promise<any[]> => {
+      if (!id) return [];
+      
+      const phone = candidate?.phone;
+      const normalizedPhone = phone ? phone.replace(/\D/g, '').replace(/^45/, '').replace(/^\+45/, '') : null;
+      
+      // Build a simple query - use candidate_id as primary filter
+      // @ts-ignore - Supabase type chain too deep
+      const result = await supabase
+        .from("communication_logs")
+        .select("*")
+        .eq("candidate_id", id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (result.error) throw result.error;
+      const data = result.data || [];
+      
+      // If we have a phone number, also fetch by phone and merge
+      if (normalizedPhone) {
+        // @ts-ignore - Supabase type chain too deep
+        const phoneResult = await supabase
+          .from("communication_logs")
+          .select("*")
+          .ilike("phone_number", `%${normalizedPhone}%`)
+          .order("created_at", { ascending: false })
+          .limit(50);
+        
+        const phoneData = phoneResult.data || [];
+        
+        // Merge and dedupe by id
+        const allData = [...data, ...phoneData];
+        const uniqueById = allData.filter((item: any, index: number, self: any[]) => 
+          index === self.findIndex((t: any) => t.id === item.id)
+        );
+        return uniqueById.sort((a: any, b: any) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      }
+      
       return data;
-    }
+    },
+    enabled: !!id && !!candidate
   });
   const {
     data: teams = []
@@ -413,60 +449,98 @@ export default function CandidateDetail() {
               </CardContent>
             </Card>
 
-            {/* Communication History */}
+            {/* Communication History with Tabs */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <History className="h-5 w-5 text-primary" />
                   Kommunikationshistorik
                 </CardTitle>
-                <CardDescription>Seneste kontakt med kandidaten</CardDescription>
+                <CardDescription>Chat og opkaldslog med kandidaten</CardDescription>
               </CardHeader>
               <CardContent>
-                {communications.length === 0 ? <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                      <MessageSquare className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <p className="text-muted-foreground">Ingen kommunikation registreret</p>
-                    <p className="text-sm text-muted-foreground mt-1">Send en email eller SMS for at starte</p>
-                    <div className="flex gap-2 mt-4">
-                      <Button size="sm" variant="outline" onClick={() => setShowEmailDialog(true)} disabled={!candidate.email}>
-                        <Mail className="h-4 w-4 mr-1.5" />
-                        Send email
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setShowSmsDialog(true)} disabled={!candidate.phone}>
+                <Tabs defaultValue="chat" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-4">
+                    <TabsTrigger value="chat" className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Beskeder
+                      {communications.filter(c => c.type === 'sms' || c.type === 'email').length > 0 && (
+                        <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                          {communications.filter(c => c.type === 'sms' || c.type === 'email').length}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="calls" className="flex items-center gap-2">
+                      <PhoneCall className="h-4 w-4" />
+                      Opkald
+                      {communications.filter(c => c.type === 'call').length > 0 && (
+                        <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                          {communications.filter(c => c.type === 'call').length}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="chat" className="mt-0">
+                    <CandidateChatHistory 
+                      candidatePhone={candidate.phone} 
+                      candidateId={candidate.id}
+                      maxHeight="350px"
+                    />
+                    <div className="flex gap-2 mt-4 pt-4 border-t">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => setShowSmsDialog(true)} 
+                        disabled={!candidate.phone}
+                        className="flex-1"
+                      >
                         <MessageSquare className="h-4 w-4 mr-1.5" />
                         Send SMS
                       </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => setShowEmailDialog(true)} 
+                        disabled={!candidate.email}
+                        className="flex-1"
+                      >
+                        <Mail className="h-4 w-4 mr-1.5" />
+                        Send email
+                      </Button>
                     </div>
-                  </div> : <div className="space-y-3">
-                    {communications.slice(0, 5).map((comm: any) => <div key={comm.id} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className={`h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 ${comm.type === "sms" ? "bg-blue-500/10" : comm.type === "email" ? "bg-purple-500/10" : "bg-green-500/10"}`}>
-                          {comm.type === "sms" && <MessageSquare className="h-4 w-4 text-blue-600" />}
-                          {comm.type === "email" && <Mail className="h-4 w-4 text-purple-600" />}
-                          {comm.type === "call" && <Phone className="h-4 w-4 text-green-600" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant="outline" className="text-xs capitalize">{comm.type}</Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {format(new Date(comm.created_at), "d. MMM yyyy HH:mm", {
-                          locale: da
-                        })}
-                            </span>
-                            <Badge variant="secondary" className="text-xs">
-                              {comm.direction === "outgoing" ? "Udgående" : "Indgående"}
-                            </Badge>
-                          </div>
-                          {comm.content && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                              {comm.content}
-                            </p>}
-                        </div>
-                      </div>)}
-                    {communications.length > 5 && <Button variant="ghost" className="w-full text-muted-foreground">
-                        Se alle {communications.length} beskeder
-                      </Button>}
-                  </div>}
+                  </TabsContent>
+
+                  <TabsContent value="calls" className="mt-0">
+                    <CandidateCallLogs 
+                      candidatePhone={candidate.phone} 
+                      candidateId={candidate.id}
+                      maxHeight="350px"
+                    />
+                    <div className="mt-4 pt-4 border-t">
+                      <Button 
+                        size="sm" 
+                        onClick={() => {
+                          if (!candidate.phone) return;
+                          if (deviceState === 'busy') {
+                            toast.error('Softphone er optaget med et andet opkald');
+                            return;
+                          }
+                          makeCall(candidate.phone);
+                        }} 
+                        disabled={!candidate.phone || callState === 'connecting' || callState === 'connected'} 
+                        className="w-full"
+                      >
+                        {(callState === 'connecting' || deviceState === 'connecting') ? (
+                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                        ) : (
+                          <Phone className="h-4 w-4 mr-1.5" />
+                        )}
+                        {callState === 'connecting' ? 'Ringer...' : 'Ring til kandidat'}
+                      </Button>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           </div>
