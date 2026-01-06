@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Phone, PhoneOff, Mic, MicOff, User, PhoneCall, Volume2, VolumeX } from 'lucide-react';
@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useRingingSound } from '@/hooks/useRingingSound';
 import { toast } from 'sonner';
+import { useTwilioDevice } from '@/hooks/useTwilioDevice';
 
 type CallStatus = 'initiating' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer' | 'canceled';
 
@@ -15,10 +16,11 @@ interface CallModalProps {
   callSid: string | null;
   phoneNumber: string;
   contactName?: string;
+  candidateId?: string;
 }
 
 const statusLabels: Record<CallStatus, string> = {
-  'initiating': 'Ringer op...',
+  'initiating': 'Forbinder...',
   'ringing': 'Ringer...',
   'in-progress': 'I opkald',
   'completed': 'Opkald afsluttet',
@@ -39,18 +41,29 @@ const statusColors: Record<CallStatus, string> = {
   'canceled': 'text-muted-foreground',
 };
 
-export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }: CallModalProps) {
+export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName, candidateId }: CallModalProps) {
   const [status, setStatus] = useState<CallStatus>('initiating');
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [callStartTime, setCallStartTime] = useState<Date | null>(null);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
-  const [isEnding, setIsEnding] = useState(false);
+  const hasInitiatedCall = useRef(false);
+
+  // Use the Twilio device hook for WebRTC calling
+  const { 
+    isReady, 
+    isInitializing, 
+    activeCall, 
+    callStatus: deviceCallStatus, 
+    error: deviceError,
+    initDevice,
+    makeCall, 
+    endCall, 
+    toggleMute 
+  } = useTwilioDevice();
 
   // Determine if we should play the ringing sound
   const shouldPlayRinging = isOpen && isSoundEnabled && (status === 'initiating' || status === 'ringing');
-  
-  // Use the ringing sound hook
   const { stop: stopRinging } = useRingingSound(shouldPlayRinging);
 
   // Format duration as MM:SS
@@ -72,118 +85,64 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
     return phone;
   };
 
-  // Map Twilio status to our CallStatus
-  const mapTwilioStatus = useCallback((twilioStatus: string): CallStatus => {
-    const statusMap: Record<string, CallStatus> = {
-      'queued': 'initiating',
-      'initiated': 'initiating',
-      'ringing': 'ringing',
-      'answered': 'in-progress', // Twilio sends "answered"
-      'in-progress': 'in-progress',
-      'completed': 'completed',
-      'busy': 'busy',
-      'failed': 'failed',
-      'no-answer': 'no-answer',
-      'canceled': 'canceled',
-    };
-    return statusMap[twilioStatus?.toLowerCase()] || 'initiating';
-  }, []);
-
-  // Subscribe to real-time updates for this call with polling fallback
+  // Sync device call status to our status
   useEffect(() => {
-    if (!callSid || !isOpen) return;
+    if (deviceCallStatus === 'connecting') {
+      setStatus('initiating');
+    } else if (deviceCallStatus === 'ringing') {
+      setStatus('ringing');
+    } else if (deviceCallStatus === 'in-progress') {
+      setStatus('in-progress');
+      if (!callStartTime) {
+        setCallStartTime(new Date());
+      }
+    } else if (deviceCallStatus === 'completed') {
+      setStatus('completed');
+    } else if (deviceCallStatus === 'failed') {
+      setStatus('failed');
+    } else if (deviceCallStatus === 'canceled' || deviceCallStatus === 'rejected') {
+      setStatus('canceled');
+    }
+  }, [deviceCallStatus, callStartTime]);
 
-    // Helper: only treat connected_at as "in-progress" if Twilio status is also in-progress.
-    // This prevents false "connected" states when connected_at was set incorrectly or early.
-    const inferStatus = (params: {
-      dbStatus: string | null;
-      connectedAt?: string | null;
-      endedAt?: string | null;
-    }): CallStatus => {
-      const mapped = mapTwilioStatus(params.dbStatus || 'initiating');
-      if (params.connectedAt && !params.endedAt && mapped === 'in-progress') return 'in-progress';
-      return mapped;
-    };
+  // Handle device errors
+  useEffect(() => {
+    if (deviceError && isOpen) {
+      console.error('[CallModal] Device error:', deviceError);
+      toast.error('Telefon fejl: ' + deviceError);
+    }
+  }, [deviceError, isOpen]);
 
-    // Fetch call status from database
-    const fetchCallStatus = async () => {
-      const { data } = await supabase
-        .from('call_records')
-        .select('status, started_at, ended_at, duration_seconds, connected_at')
-        .eq('twilio_call_sid', callSid)
-        .single();
+  // Initiate the call when modal opens
+  useEffect(() => {
+    if (!isOpen || !phoneNumber || hasInitiatedCall.current) return;
 
-      if (data) {
-        const inferredStatus = inferStatus({
-          dbStatus: data.status,
-          connectedAt: data.connected_at,
-          endedAt: data.ended_at,
+    const initiateCall = async () => {
+      hasInitiatedCall.current = true;
+      setStatus('initiating');
+
+      try {
+        console.log('[CallModal] Initiating WebRTC call to:', phoneNumber);
+        
+        // Initialize device if not ready
+        if (!isReady && !isInitializing) {
+          await initDevice();
+        }
+
+        // Make the call via WebRTC
+        await makeCall(phoneNumber, {
+          candidateId: candidateId || '',
         });
 
-        setStatus(inferredStatus);
-
-        if (data.connected_at && inferredStatus === 'in-progress') {
-          setCallStartTime(new Date(data.connected_at));
-        } else if (data.started_at && inferredStatus === 'in-progress') {
-          setCallStartTime(new Date(data.started_at));
-        }
-
-        if (data.duration_seconds) {
-          setDuration(data.duration_seconds);
-        }
+      } catch (error) {
+        console.error('[CallModal] Failed to initiate call:', error);
+        setStatus('failed');
+        toast.error('Kunne ikke starte opkald');
       }
     };
 
-    fetchCallStatus();
-
-    // Subscribe to real-time changes
-    const channel = supabase
-      .channel(`call-${callSid}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'call_records',
-          filter: `twilio_call_sid=eq.${callSid}`,
-        },
-        (payload) => {
-          const record = payload.new as Record<string, unknown>;
-          if (record) {
-            const connectedAt = record.connected_at as string | null | undefined;
-            const endedAt = record.ended_at as string | null | undefined;
-            const dbStatus = (record.status as string | null | undefined) ?? null;
-
-            const inferredStatus = inferStatus({
-              dbStatus,
-              connectedAt,
-              endedAt,
-            });
-
-            setStatus(inferredStatus);
-
-            if (connectedAt && inferredStatus === 'in-progress' && !callStartTime) {
-              setCallStartTime(new Date(connectedAt));
-            } else if (record.started_at && inferredStatus === 'in-progress' && !callStartTime) {
-              setCallStartTime(new Date(record.started_at as string));
-            }
-
-            if (record.duration_seconds) {
-              setDuration(record.duration_seconds as number);
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    // Polling fallback - check every 2 seconds in case realtime fails
-    const pollInterval = setInterval(fetchCallStatus, 2000);
-
-    return () => {
-      supabase.removeChannel(channel);
-      clearInterval(pollInterval);
-    };
-  }, [callSid, isOpen, mapTwilioStatus, callStartTime]);
+    initiateCall();
+  }, [isOpen, phoneNumber, candidateId, isReady, isInitializing, initDevice, makeCall]);
 
   // Update duration timer when in-progress
   useEffect(() => {
@@ -197,60 +156,45 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
     return () => clearInterval(interval);
   }, [status, callStartTime]);
 
-  // Reset state when modal opens
+  // Reset state when modal closes
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      stopRinging();
+      hasInitiatedCall.current = false;
       setStatus('initiating');
       setDuration(0);
       setIsMuted(false);
       setCallStartTime(null);
       setIsSoundEnabled(true);
-    } else {
-      // Ensure sound stops when modal closes
-      stopRinging();
     }
   }, [isOpen, stopRinging]);
+
+  // Sync mute state with active call
+  useEffect(() => {
+    if (activeCall) {
+      setIsMuted(activeCall.isMuted());
+    }
+  }, [activeCall]);
 
   const isCallActive = status === 'initiating' || status === 'ringing' || status === 'in-progress';
   const isCallEnded = status === 'completed' || status === 'failed' || status === 'busy' || status === 'no-answer' || status === 'canceled';
 
-  const handleEndCall = async () => {
-    if (!callSid) {
-      onClose();
-      return;
+  const handleEndCall = () => {
+    if (isCallActive && activeCall) {
+      endCall();
     }
+    onClose();
+  };
 
-    if (isEnding) return;
-
-    // If the call is still active, actually end it in the backend; otherwise just close.
-    if (!isCallActive) {
-      onClose();
-      return;
-    }
-
-    try {
-      setIsEnding(true);
-      toast.loading('Afslutter opkald...', { id: 'end-call' });
-
-      const { data, error } = await supabase.functions.invoke('end-call', {
-        body: { callSid },
-      });
-
-      if (error) throw error;
-      if (!data?.ok) throw new Error('Kunne ikke afslutte opkald');
-
-      toast.success('Opkald afsluttet', { id: 'end-call' });
-      onClose();
-    } catch (e: any) {
-      console.error('[CallModal] end-call failed', e);
-      toast.error(e?.message || 'Kunne ikke afslutte opkald', { id: 'end-call' });
-    } finally {
-      setIsEnding(false);
+  const handleToggleMute = () => {
+    if (activeCall) {
+      const newMuteState = toggleMute();
+      setIsMuted(newMuteState);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleEndCall()}>
       <DialogContent className="sm:max-w-[380px] p-0 bg-gradient-to-b from-zinc-900 to-black border-none overflow-hidden">
         <DialogTitle className="sr-only">Telefonopkald</DialogTitle>
         <DialogDescription className="sr-only">Viser status og kontroller for et igangværende opkald.</DialogDescription>
@@ -323,6 +267,11 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
                 {formatDuration(duration)}
               </p>
             )}
+
+            {/* Device status indicator */}
+            {isInitializing && (
+              <p className="text-sm text-zinc-500 mt-2">Initialiserer telefon...</p>
+            )}
           </div>
 
           {/* Call controls */}
@@ -342,10 +291,10 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
                 </button>
               )}
 
-              {/* Mute button (visual only) - shown during call */}
+              {/* Mute button - shown during call */}
               {status === 'in-progress' && (
                 <button
-                  onClick={() => setIsMuted(!isMuted)}
+                  onClick={handleToggleMute}
                   className={cn(
                     "w-14 h-14 rounded-full flex items-center justify-center transition-colors",
                     isMuted ? "bg-white text-black" : "bg-zinc-700 text-white hover:bg-zinc-600"
@@ -358,13 +307,11 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
               {/* End/Close call button */}
               <Button
                 onClick={handleEndCall}
-                disabled={isEnding}
                 className={cn(
                   "w-16 h-16 rounded-full transition-all",
                   isCallActive
                     ? "bg-red-600 hover:bg-red-700"
-                    : "bg-zinc-700 hover:bg-zinc-600",
-                  isEnding && "opacity-70"
+                    : "bg-zinc-700 hover:bg-zinc-600"
                 )}
               >
                 {isCallActive ? (
@@ -385,7 +332,7 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
             {/* Hint text */}
             <p className="text-center text-zinc-500 text-sm mt-6">
               {isCallActive 
-                ? 'Opkaldet håndteres via ekstern telefon' 
+                ? 'Opkald via browser' 
                 : 'Tryk for at lukke'
               }
             </p>
