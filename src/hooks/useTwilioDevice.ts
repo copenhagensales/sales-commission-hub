@@ -211,21 +211,59 @@ export function useTwilioDevice() {
     }
   }, []);
 
-  // Make outbound call
+  // Make outbound call - auto-initializes device if needed
   const makeCall = useCallback(async (toNumber: string) => {
-    if (!deviceRef.current || deviceState !== 'ready') {
-      toast({
-        title: 'Cannot Make Call',
-        description: 'Softphone is not ready. Please go online first.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     try {
-      // Request microphone permission
+      // Request microphone permission first
       await navigator.mediaDevices.getUserMedia({ audio: true });
       
+      // Auto-initialize device if not ready
+      if (!deviceRef.current || deviceState === 'disconnected' || deviceState === 'error') {
+        console.log('[useTwilioDevice] Device not ready, initializing...');
+        setDeviceState('connecting');
+        setError(null);
+
+        // Get access token from edge function
+        const { data, error: tokenError } = await supabase.functions.invoke('twilio-access-token');
+        
+        if (tokenError || !data?.token) {
+          throw new Error(tokenError?.message || 'Failed to get access token');
+        }
+
+        console.log('[useTwilioDevice] Got access token, creating device...');
+
+        // Create new device
+        const device = new Device(data.token, {
+          logLevel: 1,
+          codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
+        });
+
+        // Set up minimal event handlers
+        device.on('error', (twilioError) => {
+          console.error('[useTwilioDevice] Device error:', twilioError);
+          setError(twilioError.message);
+          setDeviceState('error');
+        });
+
+        device.on('tokenWillExpire', async () => {
+          try {
+            const { data: newData } = await supabase.functions.invoke('twilio-access-token');
+            if (newData?.token) {
+              device.updateToken(newData.token);
+            }
+          } catch (err) {
+            console.error('[useTwilioDevice] Failed to refresh token:', err);
+          }
+        });
+
+        // Register device and wait for it
+        await device.register();
+        deviceRef.current = device;
+        setDeviceState('ready');
+        console.log('[useTwilioDevice] Device registered and ready');
+      }
+
+      // Now make the call
       setCallState('connecting');
       setDeviceState('busy');
       setCurrentCall({
@@ -238,7 +276,7 @@ export function useTwilioDevice() {
       console.log('[useTwilioDevice] Making outbound call to:', toNumber);
 
       // Connect call using Twilio Device
-      const call = await deviceRef.current.connect({
+      const call = await deviceRef.current!.connect({
         params: {
           To: toNumber,
         },
@@ -250,7 +288,7 @@ export function useTwilioDevice() {
     } catch (err) {
       console.error('[useTwilioDevice] Failed to make call:', err);
       setCallState('idle');
-      setDeviceState('ready');
+      setDeviceState(deviceRef.current ? 'ready' : 'disconnected');
       setCurrentCall(null);
       toast({
         title: 'Call Failed',
