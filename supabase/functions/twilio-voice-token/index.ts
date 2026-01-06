@@ -38,8 +38,12 @@ serve(async (req) => {
     if (direction === 'outbound-api') {
       const destinationNumber = to || called;
       const supabaseUrl = Deno.env.get('SUPABASE_URL');
-      const twilioCallerId = Deno.env.get('TWILIO_PHONE_NUMBER');
-      const callerId = twilioCallerId || (from?.startsWith('+') ? from : undefined);
+      const twilioCallerIdRaw = Deno.env.get('TWILIO_PHONE_NUMBER');
+      const twilioCallerId = twilioCallerIdRaw?.replace(/[^\d+]/g, '');
+      const fromNormalized = from?.replace(/[^\d+]/g, '');
+      const callerId = (twilioCallerId && twilioCallerId.startsWith('+'))
+        ? twilioCallerId
+        : (fromNormalized?.startsWith('+') ? fromNormalized : undefined);
 
       console.log('[twilio-voice-token] Outbound call - dialing directly to:', {
         destinationNumber,

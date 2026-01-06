@@ -27,10 +27,16 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    const normalizePhone = (value: unknown) =>
+      String(value ?? '')
+        .trim()
+        .replace(/[^\d+]/g, '');
+
     // Twilio credentials
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const twilioNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
+    const twilioNumberRaw = Deno.env.get('TWILIO_PHONE_NUMBER');
+    const twilioNumber = normalizePhone(twilioNumberRaw);
 
     // Debug logging (masked for security)
     console.log('[initiate-call] TWILIO_ACCOUNT_SID:', accountSid ? `${accountSid.substring(0, 6)}...${accountSid.slice(-4)}` : 'NOT SET');
@@ -42,15 +48,23 @@ serve(async (req) => {
       throw new Error('Missing Twilio credentials');
     }
 
+    if (!twilioNumber.startsWith('+')) {
+      throw new Error('TWILIO_PHONE_NUMBER must be in E.164 format (e.g. +15551234567)');
+    }
+
     // NOTE: We intentionally do NOT use ApplicationSid here.
     // When both Url and ApplicationSid are provided, Twilio's ApplicationSid 
     // takes precedence, and if its Voice URL is misconfigured, the call fails.
     // By using only the Url parameter, we have direct control over the TwiML.
 
-    const { toNumber, candidateId, employeeId } = await req.json();
+    const { toNumber: toNumberRaw, candidateId, employeeId } = await req.json();
 
+    const toNumber = normalizePhone(toNumberRaw);
     if (!toNumber) {
       throw new Error('toNumber is required');
+    }
+    if (!toNumber.startsWith('+')) {
+      throw new Error('toNumber must be in E.164 format (e.g. +15551234567)');
     }
 
     console.log('[initiate-call] Starting call to:', toNumber, 'for candidate:', candidateId);
