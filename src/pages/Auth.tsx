@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Mail, Lock, Wifi, WifiOff, RefreshCw, ArrowLeft, AlertTriangle, KeyRound } from "lucide-react";
 import cphSalesLogo from "@/assets/cph-sales-logo-dark.png";
 import { useAuth } from "@/hooks/useAuth";
+import { PasswordStrengthIndicator } from "@/components/password/PasswordStrengthIndicator";
+import { validatePassword } from "@/lib/password-validation";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
@@ -100,10 +102,11 @@ export default function Auth() {
           return;
         }
 
-        if (password.length < 6) {
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.isValid) {
           toast({
             title: "Fejl",
-            description: "Adgangskoden skal være mindst 6 tegn.",
+            description: "Adgangskoden opfylder ikke alle sikkerhedskrav.",
             variant: "destructive",
           });
           setLoading(false);
@@ -219,6 +222,12 @@ export default function Auth() {
   };
 
   const showPasswordChangeForm = isForcedPasswordChange || isNewPasswordMode;
+  
+  // Password validation for submit button
+  const passwordValidation = useMemo(() => validatePassword(password), [password]);
+  const canSubmitPasswordChange = showPasswordChangeForm 
+    ? passwordValidation.isValid && password === confirmPassword && password.length > 0
+    : true;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -352,6 +361,11 @@ export default function Auth() {
               </div>
             )}
 
+            {/* Password strength indicator - for password change modes */}
+            {showPasswordChangeForm && password.length > 0 && (
+              <PasswordStrengthIndicator password={password} />
+            )}
+
             {/* Confirm password - for password change modes */}
             {showPasswordChangeForm && (
               <div className="space-y-2">
@@ -366,16 +380,18 @@ export default function Auth() {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="pl-10"
                     required
-                    minLength={6}
                   />
                 </div>
+                {confirmPassword.length > 0 && password !== confirmPassword && (
+                  <p className="text-xs text-destructive">Adgangskoderne matcher ikke</p>
+                )}
               </div>
             )}
 
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={loading || connectionStatus === 'error'}
+              disabled={loading || connectionStatus === 'error' || (showPasswordChangeForm && !canSubmitPasswordChange)}
             >
               {getButtonText()}
             </Button>
