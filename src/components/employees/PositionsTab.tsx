@@ -61,6 +61,9 @@ interface JobPosition {
   permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope>;
   is_active: boolean;
   created_at: string;
+  requires_mfa: boolean;
+  session_timeout_minutes: number;
+  max_session_hours: number;
 }
 
 interface FormData {
@@ -68,6 +71,9 @@ interface FormData {
   description: string;
   default_landing_page: string;
   permissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope>;
+  requires_mfa: boolean;
+  session_timeout_minutes: number;
+  max_session_hours: number;
 }
 
 interface Employee {
@@ -88,6 +94,9 @@ export function PositionsTab() {
     description: "",
     default_landing_page: "/home",
     permissions: {},
+    requires_mfa: false,
+    session_timeout_minutes: 60,
+    max_session_hours: 10,
   });
   const [permissionSearch, setPermissionSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -147,6 +156,9 @@ export function PositionsTab() {
         description: data.description || null,
         default_landing_page: data.default_landing_page || "/home",
         permissions: data.permissions as unknown as Json,
+        requires_mfa: data.requires_mfa,
+        session_timeout_minutes: data.session_timeout_minutes,
+        max_session_hours: data.max_session_hours,
       });
       if (error) throw error;
     },
@@ -171,6 +183,9 @@ export function PositionsTab() {
           description: data.description || null,
           default_landing_page: data.default_landing_page || "/home",
           permissions: data.permissions as unknown as Json,
+          requires_mfa: data.requires_mfa,
+          session_timeout_minutes: data.session_timeout_minutes,
+          max_session_hours: data.max_session_hours,
           updated_at: new Date().toISOString(),
         })
         .eq("id", id);
@@ -210,6 +225,9 @@ export function PositionsTab() {
       description: "",
       default_landing_page: "/home",
       permissions: {},
+      requires_mfa: false,
+      session_timeout_minutes: 60,
+      max_session_hours: 10,
     });
     setPermissionSearch("");
     setActiveCategory(null);
@@ -224,6 +242,9 @@ export function PositionsTab() {
       description: position.description || "",
       default_landing_page: position.default_landing_page || "/home",
       permissions: isOwner ? generateAllPermissions() : position.permissions,
+      requires_mfa: isOwner ? true : position.requires_mfa ?? false,
+      session_timeout_minutes: position.session_timeout_minutes ?? 60,
+      max_session_hours: position.max_session_hours ?? 10,
     });
     setPermissionSearch("");
     setActiveCategory(null);
@@ -233,7 +254,15 @@ export function PositionsTab() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingPosition(null);
-    setFormData({ name: "", description: "", default_landing_page: "/home", permissions: {} });
+    setFormData({
+      name: "",
+      description: "",
+      default_landing_page: "/home",
+      permissions: {},
+      requires_mfa: false,
+      session_timeout_minutes: 60,
+      max_session_hours: 10,
+    });
     setPermissionSearch("");
     setActiveCategory(null);
   };
@@ -497,6 +526,10 @@ export function PositionsTab() {
                   {countActivePermissions(formData.permissions)}/{getTotalPermissions()}
                 </Badge>
               </TabsTrigger>
+              <TabsTrigger value="security" className="gap-2">
+                <Lock className="h-4 w-4" />
+                Sikkerhed
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="basic" className="flex-1 px-6 py-4 overflow-auto">
@@ -698,6 +731,92 @@ export function PositionsTab() {
                   </div>
                 </TooltipProvider>
               </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="security" className="flex-1 px-6 py-4 overflow-auto">
+              <div className="space-y-6 max-w-xl">
+                {/* MFA Settings */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      To-faktor-godkendelse (MFA)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="requires-mfa">Kræv MFA for denne stilling</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Medarbejdere med denne stilling skal bruge en authenticator-app ved login
+                        </p>
+                      </div>
+                      <Switch
+                        id="requires-mfa"
+                        checked={formData.requires_mfa}
+                        onCheckedChange={(checked) => setFormData({ ...formData, requires_mfa: checked })}
+                        disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                      />
+                    </div>
+                    {editingPosition && isOwnerPosition(editingPosition.name) && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
+                        <Info className="h-3.5 w-3.5" />
+                        Ejer-stillingen har altid MFA aktiveret
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Session Timeout Settings */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      Session-indstillinger
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="session-timeout">Inaktivitets-timeout (minutter)</Label>
+                        <Input
+                          id="session-timeout"
+                          type="number"
+                          min={5}
+                          max={480}
+                          value={formData.session_timeout_minutes}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            session_timeout_minutes: Math.max(5, Math.min(480, parseInt(e.target.value) || 60))
+                          })}
+                          disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Tid før automatisk logout ved inaktivitet
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="max-session">Max session-varighed (timer)</Label>
+                        <Input
+                          id="max-session"
+                          type="number"
+                          min={1}
+                          max={24}
+                          value={formData.max_session_hours}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            max_session_hours: Math.max(1, Math.min(24, parseInt(e.target.value) || 10))
+                          })}
+                          disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Maksimal tid før tvungen logout
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
           </Tabs>
 

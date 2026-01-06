@@ -122,6 +122,9 @@ export const HeadToHead = lazyPage(() => import("@/pages/HeadToHead"));
 // Coaching Templates Admin
 export const CoachingTemplates = lazyPage(() => import("@/pages/admin/CoachingTemplates"));
 
+// Security Dashboard
+export const SecurityDashboard = lazyPage(() => import("@/pages/admin/SecurityDashboard"));
+
 // Referral Program
 export const ReferAFriend = lazyPage(() => import("@/pages/ReferAFriend"));
 export const PublicReferralForm = lazyPage(() => import("@/pages/PublicReferralForm"));
