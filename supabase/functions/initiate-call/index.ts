@@ -47,22 +47,47 @@ serve(async (req) => {
     // takes precedence, and if its Voice URL is misconfigured, the call fails.
     // By using only the Url parameter, we have direct control over the TwiML.
 
-    const { toNumber, candidateId, employeeId } = await req.json();
+    const { toNumber, candidateId, employeeId, employeePhone } = await req.json();
 
     if (!toNumber) {
       throw new Error('toNumber is required');
     }
 
-    console.log('[initiate-call] Starting call to:', toNumber, 'for candidate:', candidateId);
+    // Get the employee's phone number to call first
+    // If not provided in request, try to fetch from employee_master_data
+    let callerPhone = employeePhone;
+    
+    if (!callerPhone && employeeId) {
+      const { data: employee } = await supabase
+        .from('employee_master_data')
+        .select('private_phone')
+        .eq('id', employeeId)
+        .single();
+      
+      if (employee?.private_phone) {
+        callerPhone = employee.private_phone;
+      }
+    }
+    
+    if (!callerPhone) {
+      throw new Error('Employee phone number is required. Please add your phone number to your profile.');
+    }
 
-    // Build TwiML URL for the call
-    const twimlUrl = `${supabaseUrl}/functions/v1/twilio-voice-token`;
+    console.log('[initiate-call] Starting two-leg call:', {
+      employeePhone: callerPhone,
+      candidatePhone: toNumber,
+      candidateId
+    });
 
-    // Initiate call via Twilio REST API
+    // Build TwiML URL for the call - pass candidateNumber so we know who to dial after employee answers
+    const twimlUrl = `${supabaseUrl}/functions/v1/twilio-voice-token?candidateNumber=${encodeURIComponent(toNumber)}`;
+
+    // Initiate call to EMPLOYEE first (not candidate)
+    // When employee answers, TwiML will dial the candidate
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`;
     
     const formData = new URLSearchParams();
-    formData.append('To', toNumber);
+    formData.append('To', callerPhone);  // Call the employee first!
     formData.append('From', twilioNumber);
     formData.append('Url', twimlUrl);
     formData.append('Method', 'POST');
@@ -92,18 +117,19 @@ serve(async (req) => {
 
     console.log('[initiate-call] Call initiated:', twilioData.sid);
 
-    // Store call record
+    // Store call record - note: to_number is the candidate (final destination)
     const { error: insertError } = await supabase
       .from('call_records')
       .insert({
         twilio_call_sid: twilioData.sid,
         from_number: twilioNumber,
-        to_number: toNumber,
+        to_number: toNumber,  // Candidate number (final destination)
         direction: 'outbound',
         status: twilioData.status || 'initiated',
         started_at: new Date().toISOString(),
         candidate_id: candidateId || null,
         employee_id: employeeId || null,
+        notes: `Two-leg call: Employee ${callerPhone} -> Candidate ${toNumber}`,
       });
 
     if (insertError) {

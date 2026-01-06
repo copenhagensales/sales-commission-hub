@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,23 @@ export default function CandidateDetail() {
   }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  // Get current employee's ID for two-leg calling
+  const { data: currentEmployee } = useQuery({
+    queryKey: ["current-employee", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, private_phone")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id
+  });
   const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showInterviewDialog, setShowInterviewDialog] = useState(false);
@@ -266,13 +284,19 @@ export default function CandidateDetail() {
                   variant="outline" 
                   onClick={async () => {
                     if (!candidate.phone) return;
+                    if (!currentEmployee?.private_phone) {
+                      toast.error('Dit telefonnummer mangler. Tilføj det i din profil.');
+                      return;
+                    }
                     setIsCallingCandidate(true);
                     setShowCallModal(true);
                     try {
                       const { data, error } = await supabase.functions.invoke('initiate-call', {
                         body: { 
                           toNumber: candidate.phone,
-                          candidateId: id
+                          candidateId: id,
+                          employeeId: currentEmployee.id,
+                          employeePhone: currentEmployee.private_phone
                         }
                       });
                       if (error) throw error;
@@ -286,8 +310,8 @@ export default function CandidateDetail() {
                     } finally {
                       setIsCallingCandidate(false);
                     }
-                  }} 
-                  disabled={!candidate.phone || isCallingCandidate} 
+                  }}
+                  disabled={!candidate.phone || isCallingCandidate || !currentEmployee?.private_phone} 
                   className="bg-background/80"
                 >
                   {isCallingCandidate ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Phone className="h-4 w-4 mr-1.5" />}

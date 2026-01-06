@@ -12,6 +12,38 @@ serve(async (req) => {
   }
 
   try {
+    const url = new URL(req.url);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    
+    // Check if this is a request to dial the candidate (after employee answered)
+    const destinationNumber = url.searchParams.get('dialTo');
+    const parentCallSid = url.searchParams.get('parentCallSid');
+    const callerId = url.searchParams.get('callerId');
+    
+    if (destinationNumber && parentCallSid && callerId) {
+      // This is the second step: employee has answered, now dial the candidate
+      console.log('[twilio-voice-token] Employee answered - now dialing candidate:', {
+        destinationNumber,
+        parentCallSid,
+        callerId
+      });
+      
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say language="da-DK" voice="Polly.Mads">Forbinder dig nu til kandidaten.</Say>
+  <Dial callerId="${callerId}" timeout="30" action="${supabaseUrl}/functions/v1/incoming-call">
+    <Number statusCallback="${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(parentCallSid)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">
+      ${destinationNumber}
+    </Number>
+  </Dial>
+  <Say language="da-DK" voice="Polly.Mads">Kandidaten svarede ikke. Opkaldet afsluttes.</Say>
+</Response>`;
+      
+      return new Response(twiml, {
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
+      });
+    }
+
     // Parse form data from Twilio
     const formData = await req.formData();
     const callSid = formData.get('CallSid') as string;
@@ -33,30 +65,40 @@ serve(async (req) => {
 
     let twiml: string;
 
-    // For outbound calls (API-initiated), dial directly to the destination number
-    // The Twilio API call already connects, this TwiML tells Twilio what to do when answered
+    // For outbound calls (API-initiated to employee), employee will hear a prompt
+    // When they press 1 or just answer, we'll connect them to the candidate
     if (direction === 'outbound-api') {
-      const destinationNumber = to || called;
-      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      // Get the candidate number from query params (passed from initiate-call)
+      const candidateNumber = url.searchParams.get('candidateNumber');
       
-      console.log('[twilio-voice-token] Outbound call - dialing directly to:', {
-        destinationNumber,
-        callerId: from
-      });
-      
-      // Simple approach: Just dial the destination number directly
-      // When the call is answered, both parties will be connected
-      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      if (!candidateNumber) {
+        console.error('[twilio-voice-token] Missing candidateNumber for outbound call');
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
+  <Say language="da-DK" voice="Polly.Mads">Der opstod en fejl. Kandidatnummeret mangler.</Say>
+  <Hangup/>
+</Response>`;
+      } else {
+        console.log('[twilio-voice-token] Outbound call to employee - will dial candidate:', {
+          candidateNumber,
+          callerId: from
+        });
+        
+        // When employee answers, immediately connect to candidate
+        // We use a Dial action to connect the employee to the candidate
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say language="da-DK" voice="Polly.Mads">Forbinder dig til kandidaten.</Say>
   <Dial callerId="${from}" timeout="30" action="${supabaseUrl}/functions/v1/incoming-call">
     <Number statusCallback="${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(callSid)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">
-      ${destinationNumber}
+      ${candidateNumber}
     </Number>
   </Dial>
-  <Say language="da-DK" voice="Polly.Mads">Opkaldet blev afsluttet.</Say>
+  <Say language="da-DK" voice="Polly.Mads">Kandidaten svarede ikke. Opkaldet afsluttes.</Say>
 </Response>`;
+      }
       
-      console.log('[twilio-voice-token] Generated TwiML for direct dial');
+      console.log('[twilio-voice-token] Generated TwiML for employee-first flow');
     } else {
       // For inbound calls, show the welcome message
       console.log('[twilio-voice-token] Inbound call - playing welcome message');
