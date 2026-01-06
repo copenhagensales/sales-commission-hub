@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Phone, PhoneOff, PhoneIncoming, PhoneOutgoing, Mic, MicOff, Loader2, Volume2, X, Delete, PhoneCall } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Phone, PhoneOff, PhoneIncoming, PhoneOutgoing, Mic, MicOff, Loader2, Volume2, X, Delete, PhoneCall, User, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,10 @@ import { DeviceState } from '@/hooks/useTwilioDevice';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useRingingSound } from '@/hooks/useRingingSound';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { normalizePhoneNumber, formatPhoneForDisplay } from '@/lib/phone-utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -47,6 +51,13 @@ const dialPadButtons = [
   ['*', '0', '#'],
 ];
 
+interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  type: 'employee' | 'candidate';
+}
+
 export function SoftphoneWidget() {
   const {
     deviceState,
@@ -68,6 +79,72 @@ export function SoftphoneWidget() {
   const [showDialer, setShowDialer] = useState(false);
   const [dialNumber, setDialNumber] = useState('');
   const [autoConnectAttempted, setAutoConnectAttempted] = useState(false);
+  const [showContacts, setShowContacts] = useState(false);
+
+  // Fetch employees and candidates for contact lookup
+  const { data: employees = [] } = useQuery({
+    queryKey: ['softphone-employees'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('employee_master_data')
+        .select('id, first_name, last_name, private_phone')
+        .not('private_phone', 'is', null);
+      return data || [];
+    },
+  });
+
+  const { data: candidates = [] } = useQuery({
+    queryKey: ['softphone-candidates'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('candidates')
+        .select('id, first_name, last_name, phone')
+        .not('phone', 'is', null);
+      return data || [];
+    },
+  });
+
+  // Combine and normalize contacts
+  const allContacts: Contact[] = useMemo(() => {
+    const contacts: Contact[] = [];
+    
+    employees.forEach(emp => {
+      if (emp.private_phone) {
+        contacts.push({
+          id: emp.id,
+          name: `${emp.first_name || ''} ${emp.last_name || ''}`.trim(),
+          phone: emp.private_phone,
+          type: 'employee',
+        });
+      }
+    });
+    
+    candidates.forEach(cand => {
+      if (cand.phone) {
+        contacts.push({
+          id: cand.id,
+          name: `${cand.first_name || ''} ${cand.last_name || ''}`.trim(),
+          phone: cand.phone,
+          type: 'candidate',
+        });
+      }
+    });
+    
+    return contacts;
+  }, [employees, candidates]);
+
+  // Filter contacts based on dial number
+  const filteredContacts = useMemo(() => {
+    if (!dialNumber.trim()) return [];
+    
+    const searchTerm = dialNumber.toLowerCase().replace(/[\s\-\+]/g, '');
+    
+    return allContacts.filter(contact => {
+      const normalizedPhone = (contact.phone || '').replace(/[\s\-\+]/g, '').toLowerCase();
+      const normalizedName = contact.name.toLowerCase();
+      return normalizedPhone.includes(searchTerm) || normalizedName.includes(searchTerm);
+    }).slice(0, 5); // Limit to 5 results
+  }, [dialNumber, allContacts]);
 
   // Play ringing sound for incoming calls
   const isIncomingRinging = callState === 'incoming';
@@ -82,19 +159,49 @@ export function SoftphoneWidget() {
     }
   }, [deviceState, autoConnectAttempted, initializeDevice]);
 
-  const handleDial = () => {
-    if (dialNumber.trim()) {
-      makeCall(dialNumber.trim());
+  // Handle input change - only allow numbers, +, *, #
+  const handleDialNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Only allow digits, +, *, # and spaces
+    const filtered = value.replace(/[^\d+*#\s]/g, '');
+    setDialNumber(filtered);
+    setShowContacts(filtered.length > 0);
+  };
+
+  const handleDial = (numberToDial?: string) => {
+    const number = numberToDial || dialNumber.trim();
+    if (number) {
+      const normalized = normalizePhoneNumber(number);
+      if (normalized) {
+        makeCall(normalized);
+        setShowDialer(false);
+        setShowContacts(false);
+        setDialNumber('');
+      }
+    }
+  };
+
+  const handleContactSelect = (contact: Contact) => {
+    const normalized = normalizePhoneNumber(contact.phone);
+    if (normalized) {
+      makeCall(normalized);
       setShowDialer(false);
+      setShowContacts(false);
+      setDialNumber('');
     }
   };
 
   const handleDialPadPress = (digit: string) => {
     setDialNumber(prev => prev + digit);
+    setShowContacts(true);
   };
 
   const handleBackspace = () => {
-    setDialNumber(prev => prev.slice(0, -1));
+    setDialNumber(prev => {
+      const newVal = prev.slice(0, -1);
+      setShowContacts(newVal.length > 0);
+      return newVal;
+    });
   };
 
   const shouldShowCallUI = callState === 'incoming' || callState === 'connecting' || callState === 'connected';
@@ -236,9 +343,10 @@ export function SoftphoneWidget() {
             <div className="flex gap-2 mb-3">
               <Input
                 value={dialNumber}
-                onChange={(e) => setDialNumber(e.target.value)}
+                onChange={handleDialNumberChange}
                 placeholder="+45..."
                 className="text-center text-lg font-mono"
+                inputMode="tel"
               />
               <Button
                 variant="ghost"
@@ -249,6 +357,41 @@ export function SoftphoneWidget() {
                 <Delete className="w-4 h-4" />
               </Button>
             </div>
+
+            {/* Contact suggestions */}
+            {showContacts && filteredContacts.length > 0 && (
+              <ScrollArea className="max-h-32 mb-3 border rounded-md">
+                <div className="p-1">
+                  {filteredContacts.map((contact) => (
+                    <button
+                      key={`${contact.type}-${contact.id}`}
+                      onClick={() => handleContactSelect(contact)}
+                      className="w-full flex items-center gap-2 p-2 hover:bg-muted rounded-md text-left transition-colors"
+                    >
+                      <div className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center",
+                        contact.type === 'employee' ? "bg-blue-500/20" : "bg-green-500/20"
+                      )}>
+                        {contact.type === 'employee' ? (
+                          <Users className="w-4 h-4 text-blue-500" />
+                        ) : (
+                          <User className="w-4 h-4 text-green-500" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{contact.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {formatPhoneForDisplay(contact.phone)}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {contact.type === 'employee' ? 'Medarbejder' : 'Kandidat'}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
 
             <div className="grid grid-cols-3 gap-2 mb-3">
               {dialPadButtons.flat().map((digit) => (
@@ -264,7 +407,7 @@ export function SoftphoneWidget() {
             </div>
 
             <Button
-              onClick={handleDial}
+              onClick={() => handleDial()}
               disabled={!dialNumber.trim()}
               className="w-full bg-green-500 hover:bg-green-600"
             >
