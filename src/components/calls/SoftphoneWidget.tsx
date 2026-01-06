@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Phone, PhoneOff, PhoneIncoming, Mic, MicOff, Loader2, Volume2 } from 'lucide-react';
+import { Phone, PhoneOff, PhoneIncoming, PhoneOutgoing, Mic, MicOff, Loader2, Volume2, X, Delete } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useTwilioDevice, DeviceState, CallState } from '@/hooks/useTwilioDevice';
+import { Input } from '@/components/ui/input';
+import { useTwilioDevice, DeviceState } from '@/hooks/useTwilioDevice';
 import { cn } from '@/lib/utils';
 
 function formatDuration(seconds: number): string {
@@ -14,9 +15,7 @@ function formatDuration(seconds: number): string {
 
 function formatPhoneNumber(number: string): string {
   if (!number) return 'Unknown';
-  // Remove any prefix like 'client:'
   const cleaned = number.replace(/^client:/, '');
-  // If it's a phone number, try to format it
   if (cleaned.startsWith('+')) {
     return cleaned;
   }
@@ -38,11 +37,18 @@ function getDeviceStatusBadge(state: DeviceState) {
   }
 }
 
+const dialPadButtons = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['*', '0', '#'],
+];
+
 export function SoftphoneWidget() {
   const {
     deviceState,
     callState,
-    incomingCall,
+    currentCall,
     isMuted,
     callDuration,
     error,
@@ -51,19 +57,35 @@ export function SoftphoneWidget() {
     rejectCall,
     hangUp,
     toggleMute,
+    makeCall,
     disconnectDevice,
-    isDeviceReady,
   } = useTwilioDevice();
 
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showDialer, setShowDialer] = useState(false);
+  const [dialNumber, setDialNumber] = useState('');
 
-  // Auto-expand when there's an incoming call
+  const handleDial = () => {
+    if (dialNumber.trim()) {
+      makeCall(dialNumber.trim());
+      setShowDialer(false);
+    }
+  };
+
+  const handleDialPadPress = (digit: string) => {
+    setDialNumber(prev => prev + digit);
+  };
+
+  const handleBackspace = () => {
+    setDialNumber(prev => prev.slice(0, -1));
+  };
+
   const shouldShowCallUI = callState === 'incoming' || callState === 'connecting' || callState === 'connected';
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
       {/* Incoming Call Modal */}
-      {callState === 'incoming' && incomingCall && (
+      {callState === 'incoming' && currentCall && (
         <Card className="mb-4 w-80 border-2 border-primary animate-pulse shadow-lg">
           <CardContent className="p-4">
             <div className="flex items-center gap-3 mb-4">
@@ -72,7 +94,7 @@ export function SoftphoneWidget() {
               </div>
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">Incoming Call</p>
-                <p className="font-semibold">{formatPhoneNumber(incomingCall.from)}</p>
+                <p className="font-semibold">{formatPhoneNumber(currentCall.from)}</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -107,15 +129,21 @@ export function SoftphoneWidget() {
               )}>
                 {callState === 'connecting' ? (
                   <Loader2 className="w-6 h-6 text-amber-500 animate-spin" />
+                ) : currentCall?.direction === 'outgoing' ? (
+                  <PhoneOutgoing className="w-6 h-6 text-green-500" />
                 ) : (
                   <Volume2 className="w-6 h-6 text-green-500" />
                 )}
               </div>
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">
-                  {callState === 'connecting' ? 'Connecting...' : 'Connected'}
+                  {callState === 'connecting' ? 'Calling...' : 'Connected'}
                 </p>
-                <p className="font-semibold">{formatPhoneNumber(incomingCall?.from || '')}</p>
+                <p className="font-semibold">
+                  {currentCall?.direction === 'outgoing' 
+                    ? formatPhoneNumber(currentCall?.to || '') 
+                    : formatPhoneNumber(currentCall?.from || '')}
+                </p>
                 {callState === 'connected' && (
                   <p className="text-sm text-muted-foreground font-mono">
                     {formatDuration(callDuration)}
@@ -145,13 +173,71 @@ export function SoftphoneWidget() {
         </Card>
       )}
 
+      {/* Dial Pad */}
+      {showDialer && deviceState === 'ready' && !shouldShowCallUI && (
+        <Card className="mb-4 w-80 shadow-lg">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium">Dial Number</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setShowDialer(false)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="flex gap-2 mb-3">
+              <Input
+                value={dialNumber}
+                onChange={(e) => setDialNumber(e.target.value)}
+                placeholder="+45..."
+                className="text-center text-lg font-mono"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleBackspace}
+                disabled={!dialNumber}
+              >
+                <Delete className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {dialPadButtons.flat().map((digit) => (
+                <Button
+                  key={digit}
+                  variant="outline"
+                  className="h-12 text-lg font-semibold"
+                  onClick={() => handleDialPadPress(digit)}
+                >
+                  {digit}
+                </Button>
+              ))}
+            </div>
+
+            <Button
+              onClick={handleDial}
+              disabled={!dialNumber.trim()}
+              className="w-full bg-green-500 hover:bg-green-600"
+            >
+              <Phone className="w-4 h-4 mr-2" />
+              Call
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Status Widget */}
       <Card 
         className={cn(
           "shadow-lg cursor-pointer transition-all",
           isExpanded ? "w-80" : "w-auto"
         )}
-        onClick={() => !shouldShowCallUI && setIsExpanded(!isExpanded)}
+        onClick={() => !shouldShowCallUI && !showDialer && setIsExpanded(!isExpanded)}
       >
         <CardContent className="p-3">
           {isExpanded ? (
@@ -188,19 +274,31 @@ export function SoftphoneWidget() {
                     Connecting...
                   </Button>
                 ) : (
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      disconnectDevice();
-                    }}
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    disabled={deviceState === 'busy'}
-                  >
-                    <PhoneOff className="w-4 h-4 mr-2" />
-                    Go Offline
-                  </Button>
+                  <>
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowDialer(!showDialer);
+                      }}
+                      size="sm"
+                      className="flex-1 bg-green-500 hover:bg-green-600"
+                      disabled={deviceState === 'busy'}
+                    >
+                      <Phone className="w-4 h-4 mr-2" />
+                      Dial
+                    </Button>
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        disconnectDevice();
+                      }}
+                      size="sm"
+                      variant="outline"
+                      disabled={deviceState === 'busy'}
+                    >
+                      <PhoneOff className="w-4 h-4" />
+                    </Button>
+                  </>
                 )}
               </div>
             </div>

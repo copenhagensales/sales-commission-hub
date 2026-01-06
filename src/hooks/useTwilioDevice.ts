@@ -6,9 +6,11 @@ import { useToast } from '@/hooks/use-toast';
 export type DeviceState = 'disconnected' | 'connecting' | 'ready' | 'busy' | 'error';
 export type CallState = 'idle' | 'incoming' | 'connecting' | 'connected' | 'disconnected';
 
-interface IncomingCallInfo {
+interface CallInfo {
   from: string;
+  to?: string;
   callSid: string;
+  direction: 'incoming' | 'outgoing';
 }
 
 export function useTwilioDevice() {
@@ -18,7 +20,7 @@ export function useTwilioDevice() {
   
   const [deviceState, setDeviceState] = useState<DeviceState>('disconnected');
   const [callState, setCallState] = useState<CallState>('idle');
-  const [incomingCall, setIncomingCall] = useState<IncomingCallInfo | null>(null);
+  const [currentCall, setCurrentCall] = useState<CallInfo | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -89,9 +91,10 @@ export function useTwilioDevice() {
         console.log('[useTwilioDevice] Incoming call from:', call.parameters.From);
         activeCallRef.current = call;
         setCallState('incoming');
-        setIncomingCall({
+        setCurrentCall({
           from: call.parameters.From || 'Unknown',
           callSid: call.parameters.CallSid || '',
+          direction: 'incoming',
         });
 
         // Set up call event handlers
@@ -139,7 +142,7 @@ export function useTwilioDevice() {
       console.log('[useTwilioDevice] Call disconnected');
       setCallState('disconnected');
       setDeviceState('ready');
-      setIncomingCall(null);
+      setCurrentCall(null);
       setIsMuted(false);
       clearDurationTimer();
       activeCallRef.current = null;
@@ -152,7 +155,7 @@ export function useTwilioDevice() {
       console.log('[useTwilioDevice] Call cancelled');
       setCallState('idle');
       setDeviceState('ready');
-      setIncomingCall(null);
+      setCurrentCall(null);
       activeCallRef.current = null;
     });
 
@@ -160,7 +163,7 @@ export function useTwilioDevice() {
       console.log('[useTwilioDevice] Call rejected');
       setCallState('idle');
       setDeviceState('ready');
-      setIncomingCall(null);
+      setCurrentCall(null);
       activeCallRef.current = null;
     });
 
@@ -203,10 +206,59 @@ export function useTwilioDevice() {
     if (activeCallRef.current) {
       activeCallRef.current.reject();
       setCallState('idle');
-      setIncomingCall(null);
+      setCurrentCall(null);
       activeCallRef.current = null;
     }
   }, []);
+
+  // Make outbound call
+  const makeCall = useCallback(async (toNumber: string) => {
+    if (!deviceRef.current || deviceState !== 'ready') {
+      toast({
+        title: 'Cannot Make Call',
+        description: 'Softphone is not ready. Please go online first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      // Request microphone permission
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      setCallState('connecting');
+      setDeviceState('busy');
+      setCurrentCall({
+        from: 'You',
+        to: toNumber,
+        callSid: '',
+        direction: 'outgoing',
+      });
+
+      console.log('[useTwilioDevice] Making outbound call to:', toNumber);
+
+      // Connect call using Twilio Device
+      const call = await deviceRef.current.connect({
+        params: {
+          To: toNumber,
+        },
+      });
+
+      activeCallRef.current = call;
+      setupCallHandlers(call);
+
+    } catch (err) {
+      console.error('[useTwilioDevice] Failed to make call:', err);
+      setCallState('idle');
+      setDeviceState('ready');
+      setCurrentCall(null);
+      toast({
+        title: 'Call Failed',
+        description: err instanceof Error ? err.message : 'Failed to connect call',
+        variant: 'destructive',
+      });
+    }
+  }, [deviceState, setupCallHandlers, toast]);
 
   // Hang up call
   const hangUp = useCallback(() => {
@@ -233,7 +285,7 @@ export function useTwilioDevice() {
     }
     setDeviceState('disconnected');
     setCallState('idle');
-    setIncomingCall(null);
+    setCurrentCall(null);
     clearDurationTimer();
   }, [clearDurationTimer]);
 
@@ -247,7 +299,7 @@ export function useTwilioDevice() {
   return {
     deviceState,
     callState,
-    incomingCall,
+    currentCall,
     isMuted,
     callDuration,
     error,
@@ -256,6 +308,7 @@ export function useTwilioDevice() {
     rejectCall,
     hangUp,
     toggleMute,
+    makeCall,
     disconnectDevice,
     isDeviceReady: deviceState === 'ready' || deviceState === 'busy',
   };
