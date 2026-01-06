@@ -102,14 +102,24 @@ serve(async (req) => {
       );
     }
 
-    // Get employee data for identity
+    // Get employee data for identity (match by email)
+    const userEmail = user.email?.toLowerCase();
+    if (!userEmail) {
+      return new Response(
+        JSON.stringify({ error: 'User email not found' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { data: employee } = await supabaseClient
       .from('employee_master_data')
       .select('id, first_name, last_name')
-      .eq('user_id', user.id)
-      .single();
+      .or(`private_email.ilike.${userEmail},work_email.ilike.${userEmail}`)
+      .eq('is_active', true)
+      .maybeSingle();
 
     if (!employee) {
+      console.error('[twilio-access-token] Employee not found for email:', userEmail);
       return new Response(
         JSON.stringify({ error: 'Employee not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
