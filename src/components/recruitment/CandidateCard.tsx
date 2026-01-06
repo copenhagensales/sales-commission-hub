@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { SendSmsDialog } from "./SendSmsDialog";
 import { SendEmailDialog } from "./SendEmailDialog";
 import { useTwilioDeviceContext } from "@/contexts/TwilioDeviceContext";
+import { normalizePhoneNumber, isValidPhoneNumber } from "@/lib/phone-utils";
 
 interface Application {
   id: string;
@@ -180,8 +181,11 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
 
   const handlePhoneClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!candidate.phone) {
-      toast.error("Ingen telefonnummer");
+    
+    const normalizedPhone = normalizePhoneNumber(candidate.phone);
+    
+    if (!normalizedPhone || !isValidPhoneNumber(candidate.phone)) {
+      toast.error("Ugyldigt telefonnummer");
       return;
     }
     
@@ -192,13 +196,7 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
         await initializeDevice();
       }
       
-      // Format phone number
-      let phoneNumber = candidate.phone.replace(/\s+/g, '');
-      if (!phoneNumber.startsWith('+')) {
-        phoneNumber = '+45' + phoneNumber;
-      }
-      
-      await makeCall(phoneNumber);
+      await makeCall(normalizedPhone);
       toast.success(`Ringer op til ${candidate.first_name} ${candidate.last_name}...`);
     } catch (error) {
       console.error('Error making call:', error);
