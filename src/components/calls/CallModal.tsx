@@ -91,6 +91,18 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
   useEffect(() => {
     if (!callSid || !isOpen) return;
 
+    // Helper: only treat connected_at as "in-progress" if Twilio status is also in-progress.
+    // This prevents false "connected" states when connected_at was set incorrectly or early.
+    const inferStatus = (params: {
+      dbStatus: string | null;
+      connectedAt?: string | null;
+      endedAt?: string | null;
+    }): CallStatus => {
+      const mapped = mapTwilioStatus(params.dbStatus || 'initiating');
+      if (params.connectedAt && !params.endedAt && mapped === 'in-progress') return 'in-progress';
+      return mapped;
+    };
+
     // Fetch call status from database
     const fetchCallStatus = async () => {
       const { data } = await supabase
@@ -100,10 +112,11 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
         .single();
 
       if (data) {
-        // If connected_at is set, the callee has answered even if Twilio still reports "ringing"
-        const inferredStatus: CallStatus = data.connected_at && !data.ended_at
-          ? 'in-progress'
-          : mapTwilioStatus(data.status || 'initiating');
+        const inferredStatus = inferStatus({
+          dbStatus: data.status,
+          connectedAt: data.connected_at,
+          endedAt: data.ended_at,
+        });
 
         setStatus(inferredStatus);
 
@@ -137,11 +150,13 @@ export function CallModal({ isOpen, onClose, callSid, phoneNumber, contactName }
           if (record) {
             const connectedAt = record.connected_at as string | null | undefined;
             const endedAt = record.ended_at as string | null | undefined;
+            const dbStatus = (record.status as string | null | undefined) ?? null;
 
-            // Same inference as in polling: connected_at means "answered"
-            const inferredStatus: CallStatus = connectedAt && !endedAt
-              ? 'in-progress'
-              : mapTwilioStatus(record.status as string);
+            const inferredStatus = inferStatus({
+              dbStatus,
+              connectedAt,
+              endedAt,
+            });
 
             setStatus(inferredStatus);
 
