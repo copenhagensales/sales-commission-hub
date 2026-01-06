@@ -315,7 +315,7 @@ export default function Candidates() {
                   {callLogs.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">Ingen opkald endnu</p>
                   ) : (
-                    <div className="space-y-2 pr-8">
+                    <div className="space-y-2">
                       {callLogs.map((log) => {
                         const candidate = findCandidateByPhone(log.direction === 'outbound' ? log.to_number : log.from_number);
                         return (
@@ -344,7 +344,7 @@ export default function Candidates() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                                  className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
@@ -389,7 +389,7 @@ export default function Candidates() {
                   {smsLogs.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">Ingen beskeder endnu</p>
                   ) : (
-                    <div className="space-y-2 pr-8">
+                    <div className="space-y-2">
                       {smsLogs.map((log) => {
                         const candidate = findCandidateByPhone(log.phone_number);
                         return (
@@ -413,7 +413,7 @@ export default function Candidates() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                                  className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
