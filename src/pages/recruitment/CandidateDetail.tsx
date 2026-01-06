@@ -72,7 +72,7 @@ export default function CandidateDetail() {
   }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { makeCall, deviceState, initializeDevice, callState } = useTwilioDeviceContext();
+  const { makeCall, deviceState, callState } = useTwilioDeviceContext();
   const [showSmsDialog, setShowSmsDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showInterviewDialog, setShowInterviewDialog] = useState(false);
@@ -266,24 +266,16 @@ export default function CandidateDetail() {
                 <Button 
                   size="sm" 
                   variant="outline" 
-                  onClick={async () => {
+                  onClick={() => {
                     if (!candidate.phone) return;
                     
-                    // If softphone not ready, initialize it first
-                    if (deviceState === 'disconnected' || deviceState === 'error') {
-                      toast.info('Starter softphone...');
-                      await initializeDevice();
-                      // Give it a moment to initialize, then make call
-                      setTimeout(() => {
-                        makeCall(candidate.phone);
-                      }, 1500);
-                    } else if (deviceState === 'ready') {
-                      makeCall(candidate.phone);
-                    } else if (deviceState === 'busy') {
+                    if (deviceState === 'busy') {
                       toast.error('Softphone er optaget med et andet opkald');
-                    } else {
-                      toast.info('Softphone forbinder...');
+                      return;
                     }
+                    
+                    // makeCall handles device initialization internally
+                    makeCall(candidate.phone);
                   }} 
                   disabled={!candidate.phone || callState === 'connecting' || callState === 'connected'} 
                   className="bg-background/80"
