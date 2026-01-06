@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { 
   Phone, 
   PhoneCall, 
@@ -9,10 +10,22 @@ import {
   PhoneOutgoing, 
   PhoneMissed,
   Clock,
-  User
+  Trash2
 } from "lucide-react";
-import { format, formatDuration, intervalToDuration } from "date-fns";
+import { format, intervalToDuration } from "date-fns";
 import { da } from "date-fns/locale";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface CandidateCallLogsProps {
   candidatePhone: string | null;
@@ -21,6 +34,8 @@ interface CandidateCallLogsProps {
 }
 
 export function CandidateCallLogs({ candidatePhone, candidateId, maxHeight = "400px" }: CandidateCallLogsProps) {
+  const queryClient = useQueryClient();
+
   // Normalize phone number for matching
   const normalizePhone = (phone: string | null) => {
     if (!phone) return null;
@@ -102,6 +117,22 @@ export function CandidateCallLogs({ candidatePhone, candidateId, maxHeight = "40
     enabled: !!normalizedPhone || !!candidateId,
   });
 
+  const handleDeleteCall = async (callId: string, source: string) => {
+    try {
+      const table = source === 'call_records' ? 'call_records' : 'communication_logs';
+      const { error } = await supabase.from(table).delete().eq('id', callId);
+      
+      if (error) throw error;
+      
+      toast.success("Opkald slettet");
+      queryClient.invalidateQueries({ queryKey: ["candidate-calls"] });
+      queryClient.invalidateQueries({ queryKey: ["recruitment-call-logs"] });
+    } catch (error) {
+      console.error("Error deleting call:", error);
+      toast.error("Kunne ikke slette opkald");
+    }
+  };
+
   const formatCallDuration = (seconds: number | null) => {
     if (!seconds) return null;
     const duration = intervalToDuration({ start: 0, end: seconds * 1000 });
@@ -174,7 +205,7 @@ export function CandidateCallLogs({ candidatePhone, candidateId, maxHeight = "40
         {calls.map((call: any) => (
           <div
             key={call.id}
-            className="flex items-start gap-4 p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors border border-border/50"
+            className="flex items-start gap-4 p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors border border-border/50 group"
           >
             {/* Phone icon with status */}
             <div className="flex-shrink-0 relative">
@@ -215,6 +246,36 @@ export function CandidateCallLogs({ candidatePhone, candidateId, maxHeight = "40
                 </p>
               )}
             </div>
+
+            {/* Delete button */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Slet opkald?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Er du sikker på, at du vil slette dette opkald? Denne handling kan ikke fortrydes.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuller</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleDeleteCall(call.id, call.source)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Slet
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         ))}
       </div>
