@@ -39,10 +39,12 @@ export function useMfa(): UseMfaReturn {
         }
 
         // Check if user has MFA enabled in employee_master_data
+        const lowerEmail = session.user.email.toLowerCase();
         const { data: employee } = await supabase
           .from("employee_master_data")
           .select("mfa_enabled, job_title")
-          .eq("private_email", session.user.email)
+          .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+          .eq("is_active", true)
           .maybeSingle();
 
         // Check if position requires MFA
@@ -146,10 +148,11 @@ export function useMfa(): UseMfaReturn {
       // Update employee_master_data
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email) {
+        const lowerEmail = session.user.email.toLowerCase();
         await supabase
           .from("employee_master_data")
           .update({ mfa_enabled: true })
-          .eq("private_email", session.user.email);
+          .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`);
       }
 
       setState(prev => ({ ...prev, isEnabled: true, isVerified: true }));
@@ -203,10 +206,11 @@ export function useMfa(): UseMfaReturn {
       // Update employee_master_data
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.email) {
+        const lowerEmail = session.user.email.toLowerCase();
         await supabase
           .from("employee_master_data")
           .update({ mfa_enabled: false })
-          .eq("private_email", session.user.email);
+          .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`);
       }
 
       setState(prev => ({ ...prev, isEnabled: false, isVerified: false }));
@@ -222,10 +226,12 @@ export function useMfa(): UseMfaReturn {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user?.email) return false;
 
+      const lowerEmail = session.user.email.toLowerCase();
       const { data: employee } = await supabase
         .from("employee_master_data")
         .select("job_title, mfa_enabled")
-        .eq("private_email", session.user.email)
+        .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`)
+        .eq("is_active", true)
         .maybeSingle();
 
       if (!employee?.job_title) return false;
