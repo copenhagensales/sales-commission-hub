@@ -13,6 +13,10 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizePhoneNumber, formatPhoneForDisplay } from '@/lib/phone-utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { usePermissions } from '@/hooks/usePositionPermissions';
+
+// Positions allowed to use Softphone
+const SOFTPHONE_ALLOWED_POSITIONS = ['ejer', 'rekruttering'];
 
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -59,6 +63,14 @@ interface Contact {
 }
 
 export function SoftphoneWidget() {
+  const { position, isLoading: permissionsLoading } = usePermissions();
+  
+  // Check if user has access to softphone based on position
+  const hasAccess = useMemo(() => {
+    if (!position?.name) return false;
+    return SOFTPHONE_ALLOWED_POSITIONS.includes(position.name.toLowerCase());
+  }, [position?.name]);
+
   const {
     deviceState,
     callState,
@@ -80,6 +92,10 @@ export function SoftphoneWidget() {
   const [dialNumber, setDialNumber] = useState('');
   const [autoConnectAttempted, setAutoConnectAttempted] = useState(false);
   const [showContacts, setShowContacts] = useState(false);
+
+  // Don't render anything if user doesn't have access
+  if (permissionsLoading) return null;
+  if (!hasAccess) return null;
 
   // Fetch employees and candidates for contact lookup
   const { data: employees = [] } = useQuery({
