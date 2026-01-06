@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Search, Plus, SlidersHorizontal, Phone, MessageSquare, PhoneIncoming, PhoneOutgoing } from "lucide-react";
+import { Search, Plus, SlidersHorizontal, Phone, MessageSquare, PhoneIncoming, PhoneOutgoing, Trash2 } from "lucide-react";
 import { CandidateCard } from "@/components/recruitment/CandidateCard";
 import { NewCandidateDialog } from "@/components/recruitment/NewCandidateDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Application {
   id: string;
@@ -59,6 +71,7 @@ interface SmsLog {
 }
 
 export default function Candidates() {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewCandidateDialog, setShowNewCandidateDialog] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -154,6 +167,30 @@ export default function Candidates() {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleDeleteCallLog = async (id: string) => {
+    try {
+      const { error } = await supabase.from("call_records").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Opkald slettet");
+      queryClient.invalidateQueries({ queryKey: ["recruitment-call-logs"] });
+    } catch (error) {
+      console.error("Error deleting call log:", error);
+      toast.error("Kunne ikke slette opkald");
+    }
+  };
+
+  const handleDeleteSmsLog = async (id: string) => {
+    try {
+      const { error } = await supabase.from("communication_logs").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Besked slettet");
+      queryClient.invalidateQueries({ queryKey: ["recruitment-sms-logs"] });
+    } catch (error) {
+      console.error("Error deleting message:", error);
+      toast.error("Kunne ikke slette besked");
+    }
   };
 
   if (isLoading) {
@@ -280,7 +317,7 @@ export default function Candidates() {
                     {callLogs.map((log) => {
                       const candidate = findCandidateByPhone(log.direction === 'outbound' ? log.to_number : log.from_number);
                       return (
-                        <div key={log.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
+                        <div key={log.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors group">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                             log.direction === 'outbound' ? 'bg-blue-500/20' : 'bg-green-500/20'
                           }`}>
@@ -300,9 +337,34 @@ export default function Candidates() {
                               <span>{formatDuration(log.duration_seconds)}</span>
                             </div>
                           </div>
-                          <Badge variant="outline" className="text-[10px] shrink-0">
-                            {log.status || 'completed'}
-                          </Badge>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Slet opkald?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Er du sikker på, at du vil slette dette opkald? Denne handling kan ikke fortrydes.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annuller</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteCallLog(log.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Slet
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       );
                     })}
@@ -329,7 +391,7 @@ export default function Candidates() {
                     {smsLogs.map((log) => {
                       const candidate = findCandidateByPhone(log.phone_number);
                       return (
-                        <div key={log.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
+                        <div key={log.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors group">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                             log.direction === 'outbound' ? 'bg-blue-500/20' : 'bg-green-500/20'
                           }`}>
@@ -344,9 +406,34 @@ export default function Candidates() {
                               {format(new Date(log.created_at), 'dd MMM HH:mm', { locale: da })}
                             </span>
                           </div>
-                          <Badge variant="outline" className="text-[10px] shrink-0">
-                            {log.type}
-                          </Badge>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Slet besked?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Er du sikker på, at du vil slette denne besked? Denne handling kan ikke fortrydes.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annuller</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteSmsLog(log.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Slet
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       );
                     })}
