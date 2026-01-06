@@ -6,6 +6,8 @@ interface MfaState {
   isRequired: boolean;
   isVerified: boolean;
   isLoading: boolean;
+  isIpExempt: boolean;
+  exemptRangeName: string | null;
 }
 
 interface UseMfaReturn extends MfaState {
@@ -22,6 +24,8 @@ export function useMfa(): UseMfaReturn {
     isRequired: false,
     isVerified: false,
     isLoading: true,
+    isIpExempt: false,
+    exemptRangeName: null,
   });
 
   // Check if MFA is set up for current user
@@ -58,11 +62,31 @@ export function useMfa(): UseMfaReturn {
         const totpFactors = factors?.totp || [];
         const hasVerifiedFactor = totpFactors.some(f => f.status === "verified");
 
+        // Check IP exemption
+        let isIpExempt = false;
+        let exemptRangeName: string | null = null;
+
+        if (positionRequiresMfa) {
+          try {
+            const { data: exemptData, error: exemptError } = await supabase.functions.invoke("check-mfa-exempt");
+            
+            if (!exemptError && exemptData?.exempt) {
+              isIpExempt = true;
+              exemptRangeName = exemptData.matched_range || null;
+              console.log(`MFA exemption granted: IP matches "${exemptRangeName}"`);
+            }
+          } catch (err) {
+            console.error("Error checking IP exemption:", err);
+          }
+        }
+
         setState({
           isEnabled: employee?.mfa_enabled || hasVerifiedFactor,
           isRequired: positionRequiresMfa,
-          isVerified: hasVerifiedFactor,
+          isVerified: hasVerifiedFactor || isIpExempt,
           isLoading: false,
+          isIpExempt,
+          exemptRangeName,
         });
       } catch (error) {
         console.error("Error checking MFA status:", error);

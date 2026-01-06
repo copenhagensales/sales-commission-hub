@@ -4470,6 +4470,7 @@ export type Database = {
           permissions: Json
           requires_mfa: boolean | null
           session_timeout_minutes: number | null
+          trusted_ip_ranges: Json | null
           updated_at: string | null
         }
         Insert: {
@@ -4483,6 +4484,7 @@ export type Database = {
           permissions?: Json
           requires_mfa?: boolean | null
           session_timeout_minutes?: number | null
+          trusted_ip_ranges?: Json | null
           updated_at?: string | null
         }
         Update: {
@@ -4496,6 +4498,7 @@ export type Database = {
           permissions?: Json
           requires_mfa?: boolean | null
           session_timeout_minutes?: number | null
+          trusted_ip_ranges?: Json | null
           updated_at?: string | null
         }
         Relationships: []

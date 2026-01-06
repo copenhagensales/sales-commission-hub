@@ -66,6 +66,11 @@ interface JobPosition {
   max_session_hours: number;
 }
 
+interface TrustedIpRange {
+  name: string;
+  ip: string;
+}
+
 interface FormData {
   name: string;
   description: string;
@@ -74,6 +79,7 @@ interface FormData {
   requires_mfa: boolean;
   session_timeout_minutes: number;
   max_session_hours: number;
+  trusted_ip_ranges: TrustedIpRange[];
 }
 
 interface Employee {
@@ -97,7 +103,10 @@ export function PositionsTab() {
     requires_mfa: false,
     session_timeout_minutes: 60,
     max_session_hours: 10,
+    trusted_ip_ranges: [],
   });
+  const [newIpName, setNewIpName] = useState("");
+  const [newIpAddress, setNewIpAddress] = useState("");
   const [permissionSearch, setPermissionSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
@@ -159,6 +168,7 @@ export function PositionsTab() {
         requires_mfa: data.requires_mfa,
         session_timeout_minutes: data.session_timeout_minutes,
         max_session_hours: data.max_session_hours,
+        trusted_ip_ranges: data.trusted_ip_ranges as unknown as Json,
       });
       if (error) throw error;
     },
@@ -186,6 +196,7 @@ export function PositionsTab() {
           requires_mfa: data.requires_mfa,
           session_timeout_minutes: data.session_timeout_minutes,
           max_session_hours: data.max_session_hours,
+          trusted_ip_ranges: data.trusted_ip_ranges as unknown as Json,
           updated_at: new Date().toISOString(),
         })
         .eq("id", id);
@@ -228,7 +239,10 @@ export function PositionsTab() {
       requires_mfa: false,
       session_timeout_minutes: 60,
       max_session_hours: 10,
+      trusted_ip_ranges: [],
     });
+    setNewIpName("");
+    setNewIpAddress("");
     setPermissionSearch("");
     setActiveCategory(null);
     setIsDialogOpen(true);
@@ -237,6 +251,7 @@ export function PositionsTab() {
   const handleOpenEdit = (position: JobPosition) => {
     const isOwner = isOwnerPosition(position.name);
     setEditingPosition(position);
+    const existingRanges = (position as unknown as { trusted_ip_ranges?: TrustedIpRange[] }).trusted_ip_ranges || [];
     setFormData({
       name: position.name,
       description: position.description || "",
@@ -245,7 +260,10 @@ export function PositionsTab() {
       requires_mfa: isOwner ? true : position.requires_mfa ?? false,
       session_timeout_minutes: position.session_timeout_minutes ?? 60,
       max_session_hours: position.max_session_hours ?? 10,
+      trusted_ip_ranges: existingRanges,
     });
+    setNewIpName("");
+    setNewIpAddress("");
     setPermissionSearch("");
     setActiveCategory(null);
     setIsDialogOpen(true);
@@ -262,7 +280,10 @@ export function PositionsTab() {
       requires_mfa: false,
       session_timeout_minutes: 60,
       max_session_hours: 10,
+      trusted_ip_ranges: [],
     });
+    setNewIpName("");
+    setNewIpAddress("");
     setPermissionSearch("");
     setActiveCategory(null);
   };
@@ -766,6 +787,100 @@ export function PositionsTab() {
                     )}
                   </CardContent>
                 </Card>
+
+                {/* Trusted IP Ranges - only show when MFA is enabled */}
+                {formData.requires_mfa && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Globe className="h-4 w-4" />
+                        Betroede IP-adresser
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-xs text-muted-foreground">
+                        Brugere på disse netværk springer MFA over automatisk.
+                        Understøtter enkelt IP (82.103.140.55), CIDR (82.103.140.0/24), eller wildcard (82.103.*.*).
+                      </p>
+                      
+                      {/* List of existing IP ranges */}
+                      {formData.trusted_ip_ranges.length > 0 && (
+                        <div className="space-y-2">
+                          {formData.trusted_ip_ranges.map((range, index) => (
+                            <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+                              <div className="flex items-center gap-3">
+                                <Globe className="h-4 w-4 text-muted-foreground" />
+                                <div>
+                                  <div className="text-sm font-medium">{range.name}</div>
+                                  <div className="text-xs text-muted-foreground font-mono">{range.ip}</div>
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    trusted_ip_ranges: prev.trusted_ip_ranges.filter((_, i) => i !== index)
+                                  }));
+                                }}
+                                disabled={editingPosition && isOwnerPosition(editingPosition.name)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Add new IP range */}
+                      {!(editingPosition && isOwnerPosition(editingPosition.name)) && (
+                        <div className="space-y-3 pt-2 border-t">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Navn</Label>
+                              <Input
+                                placeholder="F.eks. Hovedkontor"
+                                value={newIpName}
+                                onChange={(e) => setNewIpName(e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">IP/CIDR</Label>
+                              <Input
+                                placeholder="F.eks. 82.103.140.0/24"
+                                value={newIpAddress}
+                                onChange={(e) => setNewIpAddress(e.target.value)}
+                                className="font-mono"
+                              />
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (newIpName.trim() && newIpAddress.trim()) {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  trusted_ip_ranges: [
+                                    ...prev.trusted_ip_ranges,
+                                    { name: newIpName.trim(), ip: newIpAddress.trim() }
+                                  ]
+                                }));
+                                setNewIpName("");
+                                setNewIpAddress("");
+                              }
+                            }}
+                            disabled={!newIpName.trim() || !newIpAddress.trim()}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Tilføj IP-adresse
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Session Timeout Settings */}
                 <Card>

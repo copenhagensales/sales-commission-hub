@@ -158,3 +158,6 @@ verify_jwt = false
 
 [functions.twilio-access-token]
 verify_jwt = false
+
+[functions.check-mfa-exempt]
+verify_jwt = false
