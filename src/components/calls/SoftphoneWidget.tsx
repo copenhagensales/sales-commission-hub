@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Phone, PhoneOff, PhoneIncoming, PhoneOutgoing, Mic, MicOff, Loader2, Volume2, X, Delete } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Phone, PhoneOff, PhoneIncoming, PhoneOutgoing, Mic, MicOff, Loader2, Volume2, X, Delete, PhoneCall } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { useTwilioDeviceContext } from '@/contexts/TwilioDeviceContext';
 import { DeviceState } from '@/hooks/useTwilioDevice';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { useRingingSound } from '@/hooks/useRingingSound';
 
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -67,6 +69,10 @@ export function SoftphoneWidget() {
   const [dialNumber, setDialNumber] = useState('');
   const [autoConnectAttempted, setAutoConnectAttempted] = useState(false);
 
+  // Play ringing sound for incoming calls
+  const isIncomingRinging = callState === 'incoming';
+  useRingingSound(isIncomingRinging);
+
   // Auto-connect softphone on mount so we can receive incoming calls
   useEffect(() => {
     if (!autoConnectAttempted && deviceState === 'disconnected') {
@@ -92,42 +98,69 @@ export function SoftphoneWidget() {
   };
 
   const shouldShowCallUI = callState === 'incoming' || callState === 'connecting' || callState === 'connected';
+  const isIncomingCall = callState === 'incoming' && currentCall;
+
+  // Handle answer with permission check
+  const handleAnswer = useCallback(async () => {
+    try {
+      await answerCall();
+    } catch (err) {
+      console.error('[SoftphoneWidget] Failed to answer:', err);
+    }
+  }, [answerCall]);
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
-      {/* Incoming Call Modal */}
-      {callState === 'incoming' && currentCall && (
-        <Card className="mb-4 w-80 border-2 border-primary animate-pulse shadow-lg">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                <PhoneIncoming className="w-6 h-6 text-primary animate-bounce" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground">Incoming Call</p>
-                <p className="font-semibold">{formatPhoneNumber(currentCall.from)}</p>
+    <>
+      {/* Full-screen Incoming Call Modal */}
+      <Dialog open={!!isIncomingCall} onOpenChange={() => {}}>
+        <DialogContent
+          className="sm:max-w-md w-[95vw] max-w-[400px] p-0 border-0 bg-gradient-to-b from-primary/10 to-background"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <div className="p-6 sm:p-8 flex flex-col items-center text-center">
+            {/* Animated phone icon */}
+            <div className="relative mb-6">
+              <div className="absolute inset-0 bg-green-500/20 rounded-full animate-ping" />
+              <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-green-500/20 flex items-center justify-center">
+                <PhoneCall className="w-10 h-10 sm:w-12 sm:h-12 text-green-500 animate-bounce" />
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={answerCall}
-                className="flex-1 bg-green-500 hover:bg-green-600"
-              >
-                <Phone className="w-4 h-4 mr-2" />
-                Answer
-              </Button>
+
+            {/* Call info */}
+            <p className="text-sm text-muted-foreground mb-1">Incoming Call</p>
+            <p className="text-2xl sm:text-3xl font-bold mb-2">
+              {formatPhoneNumber(currentCall?.from || '')}
+            </p>
+            <p className="text-sm text-muted-foreground mb-8">
+              Swipe or tap to answer
+            </p>
+
+            {/* Action buttons */}
+            <div className="flex gap-4 w-full max-w-xs">
               <Button
                 onClick={rejectCall}
                 variant="destructive"
-                className="flex-1"
+                size="lg"
+                className="flex-1 h-14 sm:h-16 rounded-full text-lg"
               >
-                <PhoneOff className="w-4 h-4 mr-2" />
-                Reject
+                <PhoneOff className="w-6 h-6 sm:mr-2" />
+                <span className="hidden sm:inline">Decline</span>
+              </Button>
+              <Button
+                onClick={handleAnswer}
+                size="lg"
+                className="flex-1 h-14 sm:h-16 rounded-full bg-green-500 hover:bg-green-600 text-lg"
+              >
+                <Phone className="w-6 h-6 sm:mr-2" />
+                <span className="hidden sm:inline">Answer</span>
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <div className="fixed bottom-4 right-4 z-50">
 
       {/* Active Call UI */}
       {(callState === 'connecting' || callState === 'connected') && (
@@ -326,6 +359,7 @@ export function SoftphoneWidget() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </>
   );
 }
