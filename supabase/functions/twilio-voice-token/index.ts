@@ -6,15 +6,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper to generate voicemail TwiML
+// Helper to escape XML special characters
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+// Helper to generate voicemail TwiML - using plain voice without Polly
 function generateVoicemailTwiml(introMessage: string): string {
+  const escapedMessage = escapeXml(introMessage);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say language="da-DK" voice="Polly.Mads">${introMessage}</Say>
+  <Say language="da-DK">${escapedMessage}</Say>
   <Pause length="1"/>
-  <Say language="da-DK" voice="Polly.Mads">Efterlad venligst en besked efter tonen.</Say>
+  <Say language="da-DK">Efterlad venligst en besked efter tonen.</Say>
   <Record maxLength="120" transcribe="false" playBeep="true"/>
-  <Say language="da-DK" voice="Polly.Mads">Tak for din besked. Vi vender tilbage hurtigst muligt.</Say>
+  <Say language="da-DK">Tak for din besked. Vi vender tilbage hurtigst muligt.</Say>
 </Response>`;
 }
 
@@ -34,11 +45,18 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Log incoming request details
+  // Log incoming request details including protocol info
   const requestId = crypto.randomUUID().slice(0, 8);
+  const forwardedProto = req.headers.get('x-forwarded-proto') || 'unknown';
+  const host = req.headers.get('host') || 'unknown';
+  const userAgent = req.headers.get('user-agent') || 'unknown';
+  
   console.log(`[twilio-voice-token][${requestId}] Incoming request:`, {
     method: req.method,
     url: req.url,
+    host,
+    forwardedProto,
+    userAgent: userAgent.substring(0, 100),
     contentType: req.headers.get('content-type'),
     timestamp: new Date().toISOString()
   });
@@ -90,6 +108,13 @@ serve(async (req) => {
     // Check if this is an outbound call from a browser client
     const isOutboundFromClient = from?.startsWith('client:') && to && !to.startsWith('client:');
     
+    console.log(`[twilio-voice-token][${requestId}] Call type detection:`, {
+      direction,
+      isOutboundFromClient,
+      fromStartsWithClient: from?.startsWith('client:'),
+      toStartsWithClient: to?.startsWith('client:')
+    });
+
     // For outbound calls (API-initiated or from browser client)
     if (direction === 'outbound-api' || isOutboundFromClient) {
       const url = new URL(req.url);
@@ -109,10 +134,13 @@ serve(async (req) => {
         isOutboundFromClient,
       });
 
+      const escapedDestination = escapeXml(destinationNumber);
+      const statusCallbackUrl = `${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(callSid)}`;
+
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial${callerId ? ` callerId="${callerId}"` : ''} timeout="30">
-    <Number statusCallback="${supabaseUrl}/functions/v1/incoming-call?parentCallSid=${encodeURIComponent(callSid)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">${destinationNumber}</Number>
+  <Dial${callerId ? ` callerId="${escapeXml(callerId)}"` : ''} timeout="30">
+    <Number statusCallback="${escapeXml(statusCallbackUrl)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST">${escapedDestination}</Number>
   </Dial>
 </Response>`;
 
@@ -128,7 +156,7 @@ serve(async (req) => {
           .from('employee_master_data')
           .select('id')
           .eq('is_active', true)
-          .limit(10);
+          .limit(5); // Reduced limit for more reliable dialing
 
         if (error) {
           console.error(`[twilio-voice-token][${requestId}] DB query error:`, error);
@@ -140,7 +168,7 @@ serve(async (req) => {
         // Continue with empty employees - will use voicemail fallback
       }
 
-      console.log(`[twilio-voice-token][${requestId}] Found ${employees.length} active employees`);
+      console.log(`[twilio-voice-token][${requestId}] Found ${employees.length} active employees to dial`);
 
       if (employees.length > 0) {
         // Create Client elements for each potential agent
@@ -148,26 +176,31 @@ serve(async (req) => {
           .map(emp => `    <Client>agent_${emp.id}</Client>`)
           .join('\n');
 
+        const actionUrl = `${supabaseUrl}/functions/v1/incoming-call`;
+
         twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial timeout="30" action="${supabaseUrl}/functions/v1/incoming-call" method="POST">
+  <Dial timeout="20" action="${escapeXml(actionUrl)}" method="POST">
 ${clientElements}
   </Dial>
-  <Say language="da-DK" voice="Polly.Mads">Ingen agenter er tilgængelige. Efterlad venligst en besked efter tonen.</Say>
+  <Say language="da-DK">Ingen agenter er tilgængelige. Efterlad venligst en besked efter tonen.</Say>
   <Record maxLength="120" transcribe="false" playBeep="true"/>
-  <Say language="da-DK" voice="Polly.Mads">Tak for din besked. Vi vender tilbage hurtigst muligt.</Say>
+  <Say language="da-DK">Tak for din besked. Vi vender tilbage hurtigst muligt.</Say>
 </Response>`;
+
+        console.log(`[twilio-voice-token][${requestId}] Generated inbound TwiML with ${employees.length} client targets`);
       } else {
         // No agents available, go to voicemail
+        console.log(`[twilio-voice-token][${requestId}] No active employees, generating voicemail TwiML`);
         twiml = generateVoicemailTwiml('Tak for dit opkald til CPH Sales. Der er ingen agenter tilgængelige lige nu.');
       }
     }
 
-    console.log(`[twilio-voice-token][${requestId}] Returning TwiML response`);
+    console.log(`[twilio-voice-token][${requestId}] Returning TwiML response (length: ${twiml.length})`);
     return twimlResponse(twiml);
 
   } catch (error) {
-    console.error(`[twilio-voice-token] Unhandled error:`, error);
+    console.error(`[twilio-voice-token][${requestId}] Unhandled error:`, error);
     
     // Return graceful error TwiML that keeps call alive with voicemail option
     const errorTwiml = generateVoicemailTwiml('Tak for dit opkald. Der opstod en teknisk fejl.');
