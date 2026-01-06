@@ -31,7 +31,6 @@ serve(async (req) => {
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     const twilioNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
-    const twimlAppSidRaw = Deno.env.get('TWILIO_TWIML_APP_SID');
 
     // Debug logging (masked for security)
     console.log('[initiate-call] TWILIO_ACCOUNT_SID:', accountSid ? `${accountSid.substring(0, 6)}...${accountSid.slice(-4)}` : 'NOT SET');
@@ -43,16 +42,10 @@ serve(async (req) => {
       throw new Error('Missing Twilio credentials');
     }
 
-    // Only include ApplicationSid if it looks like a real TwiML App SID (starts with "AP").
-    // Misconfigured values (often starting with "SK") will cause Twilio to return:
-    // "Invalid application sid".
-    const twimlAppSid = (twimlAppSidRaw && twimlAppSidRaw.startsWith('AP'))
-      ? twimlAppSidRaw
-      : null;
-
-    if (twimlAppSidRaw && !twimlAppSid) {
-      console.warn('[initiate-call] Ignoring invalid TWILIO_TWIML_APP_SID (expected prefix AP).');
-    }
+    // NOTE: We intentionally do NOT use ApplicationSid here.
+    // When both Url and ApplicationSid are provided, Twilio's ApplicationSid 
+    // takes precedence, and if its Voice URL is misconfigured, the call fails.
+    // By using only the Url parameter, we have direct control over the TwiML.
 
     const { toNumber, candidateId, employeeId } = await req.json();
 
@@ -80,9 +73,7 @@ serve(async (req) => {
     formData.append('StatusCallbackEvent', 'answered');
     formData.append('StatusCallbackEvent', 'completed');
 
-    if (twimlAppSid) {
-      formData.append('ApplicationSid', twimlAppSid);
-    }
+    // NOTE: We no longer include ApplicationSid - see comment above
     const twilioResponse = await fetch(twilioUrl, {
       method: 'POST',
       headers: {
