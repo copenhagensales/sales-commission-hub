@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { SendContractDialog } from "@/components/contracts/SendContractDialog";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
 import { TeamLeaderTeams } from "@/components/employees/TeamLeaderTeams";
-import { EditableRow, ContactRow, SelectRow, TableSection } from "@/components/employee/EmployeeDetailFields";
+import { EditableRow, ContactRow, SelectRow, TableSection, DateRow } from "@/components/employee/EmployeeDetailFields";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
@@ -756,8 +756,8 @@ export default function EmployeeDetail() {
                 </TableSection>
 
                 <TableSection title="Ansættelse">
-                  <EditableRow label="Startdato" value={employee.employment_start_date} field="employment_start_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_start_date)} />
-                  <EditableRow label="Slutdato" value={employee.employment_end_date} field="employment_end_date" type="date" onSave={handleSave} displayValue={formatDate(employee.employment_end_date)} />
+                  <DateRow label="Startdato" value={employee.employment_start_date} field="employment_start_date" onSave={handleSave} />
+                  <DateRow label="Slutdato" value={employee.employment_end_date} field="employment_end_date" onSave={handleSave} />
                   <EditableRow label="Timer/uge" value={employee.weekly_hours} field="weekly_hours" type="number" onSave={handleSave} displayValue={employee.weekly_hours ? `${employee.weekly_hours} timer` : null} />
                   <SelectRow 
                     label="Mødetid" 

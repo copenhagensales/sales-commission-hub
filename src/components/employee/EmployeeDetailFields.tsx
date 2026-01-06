@@ -2,7 +2,12 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, Pencil, Phone, Mail } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Check, X, Pencil, Phone, Mail, CalendarIcon } from "lucide-react";
+import { format, parse, isValid } from "date-fns";
+import { da } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface EditableRowProps {
   label: string;
@@ -76,6 +81,78 @@ export function EditableRow({ label, value, field, type = "text", onSave, displa
           <span>{displayText}</span>
           <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
+      </td>
+    </tr>
+  );
+}
+
+interface DateRowProps {
+  label: string;
+  value: string | null;
+  field: string;
+  onSave: (field: string, value: string | null) => void;
+}
+
+export function DateRow({ label, value, field, onSave }: DateRowProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const dateValue = value ? parse(value, "yyyy-MM-dd", new Date()) : undefined;
+  const isValidDate = dateValue && isValid(dateValue);
+
+  const handleSelect = (date: Date | undefined) => {
+    if (date) {
+      onSave(field, format(date, "yyyy-MM-dd"));
+    } else {
+      onSave(field, null);
+    }
+    setIsOpen(false);
+  };
+
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onSave(field, null);
+    setIsOpen(false);
+  };
+
+  return (
+    <tr className="border-b border-border/50 last:border-0 group">
+      <td className="py-2.5 pr-4 text-sm text-muted-foreground w-1/3">{label}</td>
+      <td className="py-2.5 text-sm font-medium">
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
+          <PopoverTrigger asChild>
+            <div className="flex items-center justify-between cursor-pointer">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className={cn(!isValidDate && "text-muted-foreground")}>
+                  {isValidDate ? format(dateValue, "d. MMMM yyyy", { locale: da }) : "-"}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {isValidDate && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={handleClear}
+                  >
+                    <X className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                )}
+                <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </div>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={isValidDate ? dateValue : undefined}
+              onSelect={handleSelect}
+              locale={da}
+              initialFocus
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
       </td>
     </tr>
   );
