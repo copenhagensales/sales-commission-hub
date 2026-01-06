@@ -13,10 +13,35 @@ interface CallInfo {
   direction: 'incoming' | 'outgoing';
 }
 
+// Update agent presence in database
+async function updateAgentPresence(employeeId: string, identity: string, isOnline: boolean) {
+  try {
+    console.log(`[useTwilioDevice] Updating presence: ${identity} -> ${isOnline ? 'online' : 'offline'}`);
+    
+    const { error } = await supabase
+      .from('agent_presence')
+      .upsert({
+        employee_id: employeeId,
+        identity,
+        is_online: isOnline,
+        last_seen_at: new Date().toISOString(),
+      }, {
+        onConflict: 'employee_id',
+      });
+
+    if (error) {
+      console.error('[useTwilioDevice] Failed to update presence:', error);
+    }
+  } catch (err) {
+    console.error('[useTwilioDevice] Presence update error:', err);
+  }
+}
+
 export function useTwilioDevice() {
   const { toast } = useToast();
   const deviceRef = useRef<Device | null>(null);
   const activeCallRef = useRef<Call | null>(null);
+  const currentIdentityRef = useRef<{ employeeId: string; identity: string } | null>(null);
   
   const [deviceState, setDeviceState] = useState<DeviceState>('disconnected');
   const [callState, setCallState] = useState<CallState>('idle');
@@ -58,6 +83,10 @@ export function useTwilioDevice() {
       }
 
       console.log('[useTwilioDevice] Got access token for identity:', data.identity);
+      
+      // Store identity info for presence tracking
+      const employeeId = data.identity?.replace('agent_', '') || '';
+      currentIdentityRef.current = { employeeId, identity: data.identity };
 
       // Create new device
       const device = new Device(data.token, {
@@ -67,13 +96,21 @@ export function useTwilioDevice() {
 
       // Device event handlers
       device.on('registered', () => {
-        console.log('[useTwilioDevice] Device registered');
+        console.log('[useTwilioDevice] Device registered with identity:', data.identity);
         setDeviceState('ready');
+        // Mark agent as online
+        if (currentIdentityRef.current) {
+          updateAgentPresence(currentIdentityRef.current.employeeId, currentIdentityRef.current.identity, true);
+        }
       });
 
       device.on('unregistered', () => {
         console.log('[useTwilioDevice] Device unregistered');
         setDeviceState('disconnected');
+        // Mark agent as offline
+        if (currentIdentityRef.current) {
+          updateAgentPresence(currentIdentityRef.current.employeeId, currentIdentityRef.current.identity, false);
+        }
       });
 
       device.on('error', (twilioError) => {
@@ -324,11 +361,17 @@ export function useTwilioDevice() {
 
   // Disconnect device
   const disconnectDevice = useCallback(() => {
+    // Mark agent as offline before disconnecting
+    if (currentIdentityRef.current) {
+      updateAgentPresence(currentIdentityRef.current.employeeId, currentIdentityRef.current.identity, false);
+    }
+    
     if (deviceRef.current) {
       deviceRef.current.unregister();
       deviceRef.current.destroy();
       deviceRef.current = null;
     }
+    currentIdentityRef.current = null;
     setDeviceState('disconnected');
     setCallState('idle');
     setCurrentCall(null);
