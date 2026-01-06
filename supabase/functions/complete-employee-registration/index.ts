@@ -138,12 +138,14 @@ serve(async (req) => {
       console.warn("Failed to mark invitation complete, but account was created");
     }
 
-    // Update employee with auth_user_id
+    // Update employee with auth_user_id and mark onboarding data as incomplete
+    // User will fill in CPR, address, bank details after logging in
     await supabase
       .from("employee_master_data")
       .update({ 
         auth_user_id: authUserId,
-        invitation_status: "completed"
+        invitation_status: "completed",
+        onboarding_data_complete: false
       })
       .eq("id", employee_id);
 

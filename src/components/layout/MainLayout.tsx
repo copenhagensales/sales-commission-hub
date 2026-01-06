@@ -4,6 +4,7 @@ import { PreviewSidebar } from "./PreviewSidebar";
 import { ContractLockOverlay } from "./ContractLockOverlay";
 import { CarQuizLockOverlay } from "./CarQuizLockOverlay";
 import { RolePreviewBanner } from "./RolePreviewBanner";
+import { CompleteProfileBanner } from "./CompleteProfileBanner";
 import { usePendingContractLock } from "@/hooks/usePendingContractLock";
 import { useCarQuizLock } from "@/hooks/useCarQuiz";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
@@ -50,6 +51,9 @@ export function MainLayout({ children }: MainLayoutProps) {
     <div className="min-h-screen bg-background">
       {/* Preview banner at very top */}
       <RolePreviewBanner />
+      
+      {/* Complete profile banner for new employees */}
+      {!isPreviewMode && <CompleteProfileBanner />}
       
       {showContractLock && contract && (
         <ContractLockOverlay 
