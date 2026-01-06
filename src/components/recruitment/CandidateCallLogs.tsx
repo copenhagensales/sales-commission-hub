@@ -78,6 +78,8 @@ export function CandidateCallLogs({ candidatePhone, candidateId, maxHeight = "40
 
       // Also get from call_records if exists
       let callRecords: any[] = [];
+      
+      // First try by candidate_id
       if (candidateId) {
         const { data } = await supabase
           .from("call_records")
@@ -85,6 +87,21 @@ export function CandidateCallLogs({ candidatePhone, candidateId, maxHeight = "40
           .eq("candidate_id", candidateId)
           .order("started_at", { ascending: false });
         callRecords = data || [];
+      }
+
+      // Also fetch call_records by phone number (for calls without candidate_id)
+      if (normalizedPhone) {
+        const { data: phoneCallRecords } = await supabase
+          .from("call_records")
+          .select("*")
+          .or(`to_number.ilike.%${normalizedPhone}%,from_number.ilike.%${normalizedPhone}%`)
+          .order("started_at", { ascending: false });
+        
+        // Merge and dedupe
+        const mergedRecords = [...callRecords, ...(phoneCallRecords || [])];
+        callRecords = mergedRecords.filter((item, index, self) => 
+          index === self.findIndex((t) => t.id === item.id)
+        );
       }
 
       // Combine and dedupe
