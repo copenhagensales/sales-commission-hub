@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { 
@@ -18,6 +20,7 @@ import {
   RefreshCw,
   Users,
   Activity,
+  KeyRound,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,9 +43,69 @@ interface LockedAccount {
   account_locked: boolean;
 }
 
+interface Position {
+  id: string;
+  name: string;
+}
+
 export default function SecurityDashboard() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedPositionId, setSelectedPositionId] = useState<string>("all");
+
+  // Fetch positions for dropdown
+  const { data: positions = [] } = useQuery({
+    queryKey: ["positions-for-password-reset"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("job_positions")
+        .select("id, name")
+        .order("name");
+
+      if (error) throw error;
+      return data as Position[];
+    },
+  });
+
+  // Fetch password change stats
+  const { data: passwordStats } = useQuery({
+    queryKey: ["password-change-stats"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, must_change_password")
+        .eq("is_active", true);
+
+      if (error) throw error;
+      
+      const total = data?.length || 0;
+      const mustChange = data?.filter(e => e.must_change_password).length || 0;
+      
+      return { total, mustChange };
+    },
+  });
+
+  // Force password reset mutation
+  const forcePasswordResetMutation = useMutation({
+    mutationFn: async (scope: "all" | "position") => {
+      const { data, error } = await supabase.functions.invoke("force-password-reset", {
+        body: { 
+          scope, 
+          position_id: scope === "position" ? selectedPositionId : undefined 
+        },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["password-change-stats"] });
+      toast.success(data.message);
+    },
+    onError: (error: Error) => {
+      toast.error("Kunne ikke tvinge password-ændring: " + error.message);
+    },
+  });
 
   // Fetch failed login attempts
   const { data: failedAttempts = [], isLoading: loadingAttempts } = useQuery({
@@ -185,6 +248,107 @@ export default function SecurityDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Password Security Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound className="h-5 w-5" />
+            Password-sikkerhed
+          </CardTitle>
+          <CardDescription>
+            Tving medarbejdere til at skifte til en stærkere adgangskode ved næste login
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground">Aktive medarbejdere</p>
+              <p className="text-2xl font-bold">{passwordStats?.total || 0}</p>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground">Afventer password-ændring</p>
+              <p className="text-2xl font-bold text-amber-600">{passwordStats?.mustChange || 0}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <KeyRound className="h-4 w-4" />
+                  Tving alle til at skifte password
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Tving alle til at skifte password?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Alle {passwordStats?.total || 0} aktive medarbejdere vil blive bedt om at vælge en ny, 
+                    stærkere adgangskode ved næste login. Denne handling kan ikke fortrydes.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuller</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => forcePasswordResetMutation.mutate("all")}
+                    disabled={forcePasswordResetMutation.isPending}
+                  >
+                    {forcePasswordResetMutation.isPending ? "Opdaterer..." : "Bekræft"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <div className="flex items-center gap-2">
+              <Select value={selectedPositionId} onValueChange={setSelectedPositionId}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Vælg stilling" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" disabled>Vælg stilling...</SelectItem>
+                  {positions.map((pos) => (
+                    <SelectItem key={pos.id} value={pos.id}>
+                      {pos.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="secondary" 
+                    disabled={selectedPositionId === "all"}
+                    className="gap-2"
+                  >
+                    <KeyRound className="h-4 w-4" />
+                    Tving stilling
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Tving stillingen til at skifte password?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Alle aktive medarbejdere i den valgte stilling vil blive bedt om at vælge en ny, 
+                      stærkere adgangskode ved næste login.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuller</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => forcePasswordResetMutation.mutate("position")}
+                      disabled={forcePasswordResetMutation.isPending}
+                    >
+                      {forcePasswordResetMutation.isPending ? "Opdaterer..." : "Bekræft"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="attempts" className="space-y-4">
         <TabsList>
