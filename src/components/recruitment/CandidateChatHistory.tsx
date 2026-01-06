@@ -40,43 +40,20 @@ export function CandidateChatHistory({ candidatePhone, candidateId, maxHeight = 
   const { data: messages = [], isLoading } = useQuery({
     queryKey: ["candidate-messages", candidateId, normalizedPhone],
     queryFn: async (): Promise<any[]> => {
-      if (!normalizedPhone && !candidateId) return [];
+      if (!normalizedPhone || normalizedPhone.length < 7) return [];
       
-      // Build queries separately to avoid type chain issues
+      // Query by phone number only (communication_logs doesn't have candidate_id column)
       // @ts-ignore - Supabase type chain too deep
       const result = await supabase
         .from("communication_logs")
         .select("*")
-        .eq("candidate_id", candidateId)
+        .ilike("phone_number", `%${normalizedPhone}%`)
         .in("type", ["sms", "email"])
         .order("created_at", { ascending: true });
 
-      let data = result.data || [];
-      
-      // Also fetch by phone if available
-      if (normalizedPhone) {
-        // @ts-ignore - Supabase type chain too deep
-        const phoneResult = await supabase
-          .from("communication_logs")
-          .select("*")
-          .ilike("phone_number", `%${normalizedPhone}%`)
-          .in("type", ["sms", "email"])
-          .order("created_at", { ascending: true });
-        
-        const phoneData = phoneResult.data || [];
-        
-        // Merge and dedupe
-        const allData = [...data, ...phoneData];
-        data = allData.filter((item: any, index: number, self: any[]) => 
-          index === self.findIndex((t: any) => t.id === item.id)
-        ).sort((a: any, b: any) => 
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        );
-      }
-
-      return data;
+      return result.data || [];
     },
-    enabled: !!normalizedPhone || !!candidateId,
+    enabled: !!normalizedPhone && normalizedPhone.length >= 7,
   });
 
   const handleDeleteMessage = async (messageId: string) => {
