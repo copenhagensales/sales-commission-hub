@@ -62,6 +62,12 @@ interface EditFormData {
   client_id: string;
 }
 
+interface GroupEditFormData {
+  seller_id: string;
+  location_id: string;
+  client_id: string;
+}
+
 export default function EditSalesRegistrations() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
@@ -82,6 +88,17 @@ export default function EditSalesRegistrations() {
     phone_number: "",
     comment: "",
     registered_at: "",
+    location_id: "",
+    client_id: "",
+  });
+
+  // Group edit dialog state
+  const [groupEditDialog, setGroupEditDialog] = useState<{ open: boolean; group: GroupedSales | null }>({
+    open: false,
+    group: null,
+  });
+  const [groupEditForm, setGroupEditForm] = useState<GroupEditFormData>({
+    seller_id: "",
     location_id: "",
     client_id: "",
   });
@@ -242,6 +259,30 @@ export default function EditSalesRegistrations() {
     },
   });
 
+  // Update group mutation - updates all sales in a group
+  const updateGroup = useMutation({
+    mutationFn: async ({ saleIds, updates }: { saleIds: string[]; updates: GroupEditFormData }) => {
+      const updateData: Record<string, unknown> = {};
+      if (updates.seller_id) updateData.seller_id = updates.seller_id;
+      if (updates.location_id) updateData.location_id = updates.location_id;
+      if (updates.client_id) updateData.client_id = updates.client_id;
+      
+      const { error } = await supabase
+        .from("fieldmarketing_sales")
+        .update(updateData)
+        .in("id", saleIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Alle salg i gruppen opdateret");
+      queryClient.invalidateQueries({ queryKey: ["fm-sales-edit"] });
+      setGroupEditDialog({ open: false, group: null });
+    },
+    onError: (error: Error) => {
+      toast.error(`Kunne ikke opdatere gruppe: ${error.message}`);
+    },
+  });
+
   const openEditDialog = (sale: SaleRecord) => {
     setEditForm({
       product_name: sale.product_name || "",
@@ -254,11 +295,30 @@ export default function EditSalesRegistrations() {
     setEditDialog({ open: true, sale });
   };
 
+  const openGroupEditDialog = (group: GroupedSales) => {
+    const firstSale = group.sales[0];
+    setGroupEditForm({
+      seller_id: firstSale?.seller_id || "",
+      location_id: firstSale?.location_id || "",
+      client_id: firstSale?.client_id || "",
+    });
+    setGroupEditDialog({ open: true, group });
+  };
+
   const handleSave = () => {
     if (!editDialog.sale) return;
     updateSale.mutate({
       id: editDialog.sale.id,
       updates: editForm,
+    });
+  };
+
+  const handleGroupSave = () => {
+    if (!groupEditDialog.group) return;
+    const saleIds = groupEditDialog.group.sales.map(s => s.id);
+    updateGroup.mutate({
+      saleIds,
+      updates: groupEditForm,
     });
   };
 
@@ -518,6 +578,18 @@ export default function EditSalesRegistrations() {
                                 </div>
                               </div>
                             </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openGroupEditDialog(group);
+                              }}
+                              className="ml-2"
+                            >
+                              <Pencil className="h-3 w-3 mr-1" />
+                              Rediger gruppe
+                            </Button>
                           </div>
                         </div>
                       </CollapsibleTrigger>
@@ -687,6 +759,95 @@ export default function EditSalesRegistrations() {
             <Button onClick={handleSave} disabled={updateSale.isPending}>
               {updateSale.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Gem ændringer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Group Edit Dialog */}
+      <Dialog open={groupEditDialog.open} onOpenChange={(open) => setGroupEditDialog({ open, group: open ? groupEditDialog.group : null })}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Rediger hele salgsgruppen</DialogTitle>
+          </DialogHeader>
+
+          {groupEditDialog.group && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <div className="text-sm text-muted-foreground mb-2">
+                  Ændringer vil blive anvendt på alle <span className="font-medium text-foreground">{groupEditDialog.group.salesCount}</span> salg i denne gruppe
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Dato:</span> {format(parseISO(groupEditDialog.group.date), "dd/MM/yyyy", { locale: da })}
+                </div>
+              </div>
+
+              <div>
+                <Label>Sælger</Label>
+                <Select
+                  value={groupEditForm.seller_id}
+                  onValueChange={(value) => setGroupEditForm((prev) => ({ ...prev, seller_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg sælger" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sellers?.map((seller) => (
+                      <SelectItem key={seller.id} value={seller.id}>
+                        {seller.first_name} {seller.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Lokation</Label>
+                <Select
+                  value={groupEditForm.location_id}
+                  onValueChange={(value) => setGroupEditForm((prev) => ({ ...prev, location_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg lokation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations?.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Kunde</Label>
+                <Select
+                  value={groupEditForm.client_id}
+                  onValueChange={(value) => setGroupEditForm((prev) => ({ ...prev, client_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vælg kunde" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients?.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGroupEditDialog({ open: false, group: null })}>
+              Annuller
+            </Button>
+            <Button onClick={handleGroupSave} disabled={updateGroup.isPending}>
+              {updateGroup.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Gem ændringer ({groupEditDialog.group?.salesCount} salg)
             </Button>
           </DialogFooter>
         </DialogContent>
