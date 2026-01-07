@@ -744,6 +744,7 @@ export type Database = {
           resume_url: string | null
           source: string | null
           status: string
+          team_id: string | null
           updated_at: string
         }
         Insert: {
@@ -763,6 +764,7 @@ export type Database = {
           resume_url?: string | null
           source?: string | null
           status?: string
+          team_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -782,6 +784,7 @@ export type Database = {
           resume_url?: string | null
           source?: string | null
           status?: string
+          team_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -804,6 +807,13 @@ export type Database = {
             columns: ["assigned_to"]
             isOneToOne: false
             referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidates_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]

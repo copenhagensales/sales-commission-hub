@@ -31,7 +31,7 @@ interface AssignCohortDialogProps {
   onOpenChange: (open: boolean) => void;
   candidateId: string;
   candidateName: string;
-  onConfirm: (cohortId: string | null, availableFrom: Date | null) => void;
+  onConfirm: (cohortId: string | null, availableFrom: Date | null, teamId: string | null) => void;
   onSkip: () => void;
 }
 
@@ -44,6 +44,7 @@ export function AssignCohortDialog({
   onSkip,
 }: AssignCohortDialogProps) {
   const [selectedCohortId, setSelectedCohortId] = useState<string | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [availableFrom, setAvailableFrom] = useState<Date | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -59,10 +60,22 @@ export function AssignCohortDialog({
     },
   });
 
+  const { data: teams = [], isLoading: isLoadingTeams } = useQuery({
+    queryKey: ["teams-for-assignment"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const handleConfirm = async () => {
     setIsSubmitting(true);
     try {
-      onConfirm(selectedCohortId, availableFrom || null);
+      onConfirm(selectedCohortId, availableFrom || null, selectedTeamId);
     } finally {
       setIsSubmitting(false);
     }
@@ -89,29 +102,38 @@ export function AssignCohortDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {isLoadingCohorts ? (
+          {(isLoadingCohorts || isLoadingTeams) ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : noCohorts ? (
-            <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-              <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-amber-700">
-                  Ingen opstartshold oprettet
-                </p>
-                <p className="text-xs text-amber-600">
-                  Du kan stadig ansætte kandidaten og tildele et hold senere.
-                </p>
-              </div>
-            </div>
           ) : (
             <>
+              {/* Team selector */}
               <div className="space-y-2">
-                <Label htmlFor="cohort">Opstartshold</Label>
+                <Label htmlFor="team">Team</Label>
+                <Select
+                  value={selectedTeamId || ""}
+                  onValueChange={setSelectedTeamId}
+                >
+                  <SelectTrigger id="team">
+                    <SelectValue placeholder="Vælg team..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Cohort selector - now optional */}
+              <div className="space-y-2">
+                <Label htmlFor="cohort">Opstartshold (valgfrit)</Label>
                 <Select
                   value={selectedCohortId || ""}
-                  onValueChange={setSelectedCohortId}
+                  onValueChange={(value) => setSelectedCohortId(value || null)}
                 >
                   <SelectTrigger id="cohort">
                     <SelectValue placeholder="Vælg et hold..." />
@@ -131,8 +153,14 @@ export function AssignCohortDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {noCohorts && (
+                  <p className="text-xs text-muted-foreground">
+                    Ingen opstartshold oprettet endnu.
+                  </p>
+                )}
               </div>
 
+              {/* Available from date */}
               <div className="space-y-2">
                 <Label>Første mulige arbejdsdag</Label>
                 <Popover>
@@ -171,15 +199,13 @@ export function AssignCohortDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isSubmitting || (!noCohorts && !selectedCohortId)}
+            disabled={isSubmitting || (!selectedCohortId && !availableFrom)}
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Gemmer...
               </>
-            ) : noCohorts ? (
-              "Ansæt uden hold"
             ) : (
               "Bekræft ansættelse"
             )}
