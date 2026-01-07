@@ -49,7 +49,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [ledelseOpen, setLedelseOpen] = useState(
     ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates", "/admin/security"].some(path => location.pathname.startsWith(path))
   );
-  const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log");
+  const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log" || location.pathname === "/upcoming-starts");
   const [mgOpen, setMgOpen] = useState(
     ["/payroll", "/tdc-erhverv", "/tdc-erhverv-dashboard", "/relatel-dashboard", "/tryg-dashboard", "/ase-dashboard", "/codan", "/mg-test", "/mg-test-dashboard", "/dialer-data", "/adversus-data", "/calls-data", "/team-overview"].includes(location.pathname)
   );
@@ -309,7 +309,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const showSomeMenu = p.canViewSome || p.canViewExtraWork;
 
   // Check if any Personnel menu items are visible
-  const showPersonnelMenu = p.canViewEmployees || p.canViewTeams || p.canViewLoginLog;
+  const showPersonnelMenu = p.canViewEmployees || p.canViewTeams || p.canViewLoginLog || p.canViewUpcomingStarts;
   
   // Check if any Ledelse menu items are visible
   const showLedelseMenu = p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard;
@@ -646,6 +646,19 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   >
                     <Clock className="h-4 w-4" />
                     {t("sidebar.loginLog")}
+                  </NavLink>
+                )}
+                {p.canViewUpcomingStarts && (
+                  <NavLink
+                    to="/upcoming-starts"
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                      location.pathname === "/upcoming-starts" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Kommende Opstarter
                   </NavLink>
                 )}
               </CollapsibleContent>

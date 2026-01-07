@@ -127,6 +127,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         scopeKey: "scope_employees",
       },
       { key: "menu_login_log", label: "Login Log", description: "Adgang til login log", hasEditOption: false },
+      {
+        key: "menu_upcoming_starts",
+        label: "Kommende Opstarter",
+        description: "Adgang til kommende opstartshold",
+        hasEditOption: true,
+      },
     ],
   },
   {

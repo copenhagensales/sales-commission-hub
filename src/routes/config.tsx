@@ -104,6 +104,7 @@ import {
   ReportsEmployee,
   DailyReports,
   SecurityDashboard,
+  UpcomingStarts,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -152,6 +153,7 @@ export const routes: RouteConfig[] = [
   { path: "/employees", component: EmployeeMasterData, access: "role", positionPermission: "menu_employees" },
   { path: "/employees/:id", component: EmployeeDetail, access: "role", positionPermission: "menu_employees" },
   { path: "/login-log", component: LoginLog, access: "role", positionPermission: "menu_login_log" },
+  { path: "/upcoming-starts", component: UpcomingStarts, access: "role", positionPermission: "menu_upcoming_starts" },
 
   { path: "/settings", component: Settings, access: "role", positionPermission: "menu_settings" },
 

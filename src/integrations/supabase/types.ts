@@ -1782,6 +1782,75 @@ export type Database = {
           },
         ]
       }
+      cohort_members: {
+        Row: {
+          candidate_id: string | null
+          cohort_id: string
+          created_at: string
+          employee_id: string | null
+          id: string
+          notes: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          candidate_id?: string | null
+          cohort_id: string
+          created_at?: string
+          employee_id?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          candidate_id?: string | null
+          cohort_id?: string
+          created_at?: string
+          employee_id?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cohort_members_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cohort_members_cohort_id_fkey"
+            columns: ["cohort_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_cohorts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cohort_members_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cohort_members_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cohort_members_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_transactions: {
         Row: {
           agent_name: string
@@ -5127,6 +5196,83 @@ export type Database = {
             columns: ["onboarding_day_id"]
             isOneToOne: false
             referencedRelation: "onboarding_days"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_cohorts: {
+        Row: {
+          client_campaign: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          location: string | null
+          max_capacity: number | null
+          name: string
+          notes: string | null
+          start_date: string
+          start_time: string | null
+          status: string
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_campaign?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location?: string | null
+          max_capacity?: number | null
+          name: string
+          notes?: string | null
+          start_date: string
+          start_time?: string | null
+          status?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_campaign?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location?: string | null
+          max_capacity?: number | null
+          name?: string
+          notes?: string | null
+          start_date?: string
+          start_time?: string | null
+          status?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_cohorts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_cohorts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_cohorts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_cohorts_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
