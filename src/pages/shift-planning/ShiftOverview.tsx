@@ -505,6 +505,15 @@ export default function ShiftOverview() {
     return { remaining: Math.max(0, bonusConfig.bonus_days - paidCount), total: bonusConfig.bonus_days };
   }, [teamMemberships, dailyBonusConfigs, paidBonuses]);
 
+  // Check if employee has started on or before a given date
+  const isEmployeeActiveOnDate = useCallback((employeeId: string, date: Date): boolean => {
+    const empData = employeeStartDates?.find(e => e.id === employeeId);
+    if (!empData?.employment_start_date) return true; // Show shifts if no start date set
+    
+    const startDate = parseISO(empData.employment_start_date);
+    return date >= startDate;
+  }, [employeeStartDates]);
+
   const totalPlannedHours = useMemo(() => {
     return shifts?.reduce((sum, s) => sum + (s.planned_hours || 0), 0) || 0;
   }, [shifts]);
@@ -862,7 +871,8 @@ export default function ShiftOverview() {
                     const isSick = absenceDisplay?.type === "sick";
                     const isLate = !!lateness;
                     const isWorking = !absenceDisplay && !lateness && !holiday;
-                    const workTimes = getWorkTimesForEmployeeAndDay(employee.id, day) || employee.standard_start_time;
+                    const isActive = isEmployeeActiveOnDate(employee.id, day);
+                    const workTimes = isActive ? (getWorkTimesForEmployeeAndDay(employee.id, day) || employee.standard_start_time) : null;
                     const hasWorkTimes = !!(workTimes || hasShift);
                     const hasStatus = isVacation || isSick || isLate;
                     
