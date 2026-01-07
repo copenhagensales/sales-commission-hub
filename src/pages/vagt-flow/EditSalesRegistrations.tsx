@@ -204,13 +204,13 @@ export default function EditSalesRegistrations() {
     },
   });
 
-  // Fetch locations for edit dialog
+  // Fetch locations for edit dialog (include all to allow editing existing sales with inactive locations)
   const { data: locations } = useQuery<{ id: string; name: string }[]>({
     queryKey: ["fm-locations-edit"],
     queryFn: async () => {
       // Use raw query to avoid type issues with 'location' table name
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/location?is_active=eq.true&select=id,name&order=name`,
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/location?select=id,name&order=name`,
         {
           headers: {
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
