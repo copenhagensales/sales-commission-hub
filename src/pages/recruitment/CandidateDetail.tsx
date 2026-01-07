@@ -27,6 +27,8 @@ import { useTwilioDeviceContext } from "@/contexts/TwilioDeviceContext";
 import { CandidateChatHistory } from "@/components/recruitment/CandidateChatHistory";
 import { CandidateCallLogs } from "@/components/recruitment/CandidateCallLogs";
 import { AssignCohortDialog } from "@/components/recruitment/AssignCohortDialog";
+import { combineDateAndDanishTime } from "@/lib/danish-time-utils";
+
 const statusLabels: Record<string, string> = {
   ny_ansoegning: "Ny ansøgning",
   new: "Ny ansøgning",
@@ -229,11 +231,8 @@ export default function CandidateDetail() {
       if (!interviewDate || !interviewTime) {
         throw new Error("Vælg dato og tidspunkt");
       }
-      const dateStr = format(interviewDate, "yyyy-MM-dd");
-      // Create a proper local datetime and convert to ISO with timezone
-      const [hours, minutes] = interviewTime.split(':').map(Number);
-      const localDateTime = new Date(interviewDate);
-      localDateTime.setHours(hours, minutes, 0, 0);
+      // Create a proper local datetime using Danish time utility
+      const localDateTime = combineDateAndDanishTime(interviewDate, interviewTime);
       
       const { error } = await supabase
         .from("candidates")
