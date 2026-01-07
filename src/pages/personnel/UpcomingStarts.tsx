@@ -4,7 +4,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Users, Plus, Clock, MapPin, Building2, UserPlus } from "lucide-react";
+import { Calendar, Users, Plus, Clock, MapPin, Building2, UserPlus, Mail, Loader2 } from "lucide-react";
 import { format, isToday, isTomorrow, isThisWeek, isPast, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { useState } from "react";
@@ -24,6 +24,8 @@ interface CohortMember {
     first_name: string;
     last_name: string;
     applied_position: string | null;
+    email: string | null;
+    phone: string | null;
   } | null;
   employee?: {
     id: string;
@@ -42,6 +44,7 @@ interface Cohort {
   notes: string | null;
   status: string;
   max_capacity: number | null;
+  team_id: string | null;
   team?: {
     id: string;
     name: string;
@@ -103,7 +106,7 @@ export default function UpcomingStarts() {
             .from("cohort_members")
             .select(`
               *,
-              candidate:candidates(id, first_name, last_name, applied_position),
+              candidate:candidates(id, first_name, last_name, applied_position, email, phone),
               employee:employee_master_data(id, first_name, last_name)
             `)
             .eq("cohort_id", cohort.id);
@@ -146,6 +149,124 @@ export default function UpcomingStarts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["onboarding-cohorts"] });
       toast({ title: "Status opdateret" });
+    },
+  });
+
+  // Start cohort and send invitations mutation
+  const startCohortAndInviteMutation = useMutation({
+    mutationFn: async (cohort: Cohort) => {
+      const results = { sent: 0, skipped: 0, errors: [] as string[] };
+      
+      // Get members that have a candidate but no employee yet
+      const membersToProcess = cohort.members.filter(
+        m => m.candidate && !m.employee_id && m.status !== "cancelled"
+      );
+
+      for (const member of membersToProcess) {
+        const candidate = member.candidate!;
+        
+        // Skip if no email
+        if (!candidate.email) {
+          results.skipped++;
+          results.errors.push(`${candidate.first_name} ${candidate.last_name} mangler email`);
+          continue;
+        }
+
+        try {
+          // 1. Create employee record
+          const { data: employee, error: empError } = await supabase
+            .from("employee_master_data")
+            .insert({
+              first_name: candidate.first_name,
+              last_name: candidate.last_name,
+              private_email: candidate.email,
+              private_phone: candidate.phone,
+              job_title: candidate.applied_position,
+              employment_start_date: cohort.start_date,
+              team_id: cohort.team_id,
+              is_active: true,
+              invitation_status: "pending",
+            })
+            .select()
+            .single();
+
+          if (empError) throw empError;
+
+          // 2. Update cohort member with employee_id
+          const { error: memberError } = await supabase
+            .from("cohort_members")
+            .update({ 
+              employee_id: employee.id,
+              status: "confirmed" 
+            })
+            .eq("id", member.id);
+
+          if (memberError) throw memberError;
+
+          // 3. Send invitation email
+          const { error: inviteError } = await supabase.functions.invoke(
+            "send-employee-invitation",
+            {
+              body: {
+                employeeId: employee.id,
+                email: candidate.email,
+                name: `${candidate.first_name} ${candidate.last_name}`,
+              },
+            }
+          );
+
+          if (inviteError) throw inviteError;
+
+          // 4. Update candidate status
+          const { error: candError } = await supabase
+            .from("candidates")
+            .update({ 
+              status: "onboarding",
+              cohort_assignment_status: "started" 
+            })
+            .eq("id", candidate.id);
+
+          if (candError) throw candError;
+
+          results.sent++;
+        } catch (err: any) {
+          results.errors.push(`Fejl ved ${candidate.first_name}: ${err.message}`);
+        }
+      }
+
+      // 5. Update cohort status to in_progress
+      const { error: cohortError } = await supabase
+        .from("onboarding_cohorts")
+        .update({ status: "in_progress" })
+        .eq("id", cohort.id);
+
+      if (cohortError) throw cohortError;
+
+      return results;
+    },
+    onSuccess: (results) => {
+      queryClient.invalidateQueries({ queryKey: ["onboarding-cohorts"] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-hired-candidates"] });
+      
+      if (results.errors.length > 0) {
+        toast({
+          title: `${results.sent} invitationer sendt`,
+          description: `${results.skipped} sprunget over. ${results.errors.join(", ")}`,
+          variant: results.sent === 0 ? "destructive" : "default",
+        });
+      } else {
+        toast({ 
+          title: "Hold startet!", 
+          description: `${results.sent} invitationer sendt` 
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Fejl",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -296,11 +417,17 @@ export default function UpcomingStarts() {
           {canEdit && cohort.status === "planned" && (
             <div className="flex gap-2 mt-4 pt-3 border-t">
               <Button
-                variant="outline"
+                variant="default"
                 size="sm"
-                onClick={() => updateStatusMutation.mutate({ cohortId: cohort.id, status: "in_progress" })}
+                onClick={() => startCohortAndInviteMutation.mutate(cohort)}
+                disabled={startCohortAndInviteMutation.isPending}
               >
-                Start ophold
+                {startCohortAndInviteMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4 mr-2" />
+                )}
+                Start hold og send invitationer
               </Button>
             </div>
           )}
