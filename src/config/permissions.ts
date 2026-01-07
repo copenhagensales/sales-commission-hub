@@ -320,6 +320,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: "Kan modtage indgående opkald og returkald",
         hasEditOption: false,
       },
+      {
+        key: "employee_sms",
+        label: "SMS til medarbejdere",
+        description: "Kan sende SMS til medarbejdere fra medarbejderoversigten",
+        hasEditOption: false,
+      },
     ],
   },
 

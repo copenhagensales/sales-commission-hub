@@ -141,7 +141,7 @@ export default function EmployeeMasterData() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
   const [smsEmployee, setSmsEmployee] = useState<EmployeeMasterDataRecord | null>(null);
-  const { canEditEmployees, hasPermission } = usePermissions();
+  const { canEditEmployees, hasPermission, canSendEmployeeSms } = usePermissions();
   const { makeCall, isDeviceReady } = useTwilioDevice();
   const hasOutboundSoftphone = hasPermission("softphone_outbound");
 
@@ -1405,17 +1405,19 @@ export default function EmployeeMasterData() {
                                 <Phone className="h-4 w-4 mr-2" />
                                 Ring op
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  setSmsEmployee(employee);
-                                  setSmsDialogOpen(true);
-                                }}
-                                disabled={!employee.private_phone}
-                              >
-                                <MessageSquare className="h-4 w-4 mr-2" />
-                                Send SMS
-                              </DropdownMenuItem>
+                              {canSendEmployeeSms && (
+                                <DropdownMenuItem
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    setSmsEmployee(employee);
+                                    setSmsDialogOpen(true);
+                                  }}
+                                  disabled={!employee.private_phone}
+                                >
+                                  <MessageSquare className="h-4 w-4 mr-2" />
+                                  Send SMS
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onClick={(e) => { e.stopPropagation(); setMoveToStaffId(employee.id); }}
