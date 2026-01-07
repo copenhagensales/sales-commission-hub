@@ -706,9 +706,10 @@ export default function CandidateDetail() {
         onConfirm={async (cohortId, availableFrom, teamId) => {
           try {
             // Update candidate status, available_from, and team_id
+            // cohort_assignment_status valid values: 'assigned', 'not_yet_assigned', 'available_from'
             const updateData: Record<string, unknown> = { 
               status: "hired",
-              cohort_assignment_status: cohortId ? "assigned" : "pending"
+              cohort_assignment_status: cohortId ? "assigned" : (availableFrom ? "available_from" : "not_yet_assigned")
             };
             if (availableFrom) {
               updateData.available_from = availableFrom.toISOString().split('T')[0];
