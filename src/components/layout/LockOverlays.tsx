@@ -40,21 +40,23 @@ export function LockOverlays({ children }: LockOverlaysProps) {
     );
   }
 
-  return (
-    <>
-      {showContractLock && contract && (
-        <ContractLockOverlay 
-          contractId={contract.id} 
-          contractTitle={contract.title} 
-        />
-      )}
-      {showCarQuizLock && (
-        <CarQuizLockOverlay />
-      )}
-      {showMfaLock && (
-        <MfaLockOverlay onSuccess={() => setMfaVerified(true)} />
-      )}
-      {children}
-    </>
-  );
+  // Return ONLY the lock overlay when locked - don't render children at all
+  if (showContractLock && contract) {
+    return (
+      <ContractLockOverlay 
+        contractId={contract.id} 
+        contractTitle={contract.title} 
+      />
+    );
+  }
+
+  if (showCarQuizLock) {
+    return <CarQuizLockOverlay />;
+  }
+
+  if (showMfaLock) {
+    return <MfaLockOverlay onSuccess={() => setMfaVerified(true)} />;
+  }
+
+  return <>{children}</>;
 }
