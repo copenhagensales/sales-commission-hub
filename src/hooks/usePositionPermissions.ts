@@ -318,5 +318,7 @@ export function usePermissions() {
     canViewReportsAdmin: canView("menu_reports_admin"),
     canViewReportsManagement: canView("menu_reports_management"),
     canViewReportsEmployee: canView("menu_reports_employee"),
+    // Employee SMS permission
+    canSendEmployeeSms: canView("employee_sms"),
   };
 }

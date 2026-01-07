@@ -76,7 +76,7 @@ export default function EmployeeDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { canEditEmployees, hasPermission } = usePermissions();
+  const { canEditEmployees, hasPermission, canSendEmployeeSms } = usePermissions();
   const { makeCall, isDeviceReady } = useTwilioDevice();
   const hasOutboundSoftphone = hasPermission("softphone_outbound");
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
@@ -521,14 +521,16 @@ export default function EmployeeDetail() {
                   <Phone className="h-4 w-4 mr-2" />
                   Ring op
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setSmsDialogOpen(true)}
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Send SMS
-                </Button>
+                {canSendEmployeeSms && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setSmsDialogOpen(true)}
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Send SMS
+                  </Button>
+                )}
               </>
             )}
             <Button 
