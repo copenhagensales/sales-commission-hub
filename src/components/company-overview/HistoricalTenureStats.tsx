@@ -1,14 +1,20 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { differenceInDays, parseISO, subDays, format } from "date-fns";
+import { differenceInDays, parseISO, subDays, format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { da } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Minus, Info } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Info, CalendarIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 interface CombinedEmployee {
   id: string;
@@ -44,7 +50,69 @@ const TEAM_COLORS: Record<string, string> = {
   "Ukendt": "#888888",
 };
 
+// Period presets for filtering
+type PeriodPreset = "all" | "last30" | "last90" | "last180" | "thisMonth" | "lastMonth" | "custom";
+
+interface PeriodOption {
+  label: string;
+  value: PeriodPreset;
+  getRange: () => { from: Date | null; to: Date };
+}
+
+const periodOptions: PeriodOption[] = [
+  { 
+    label: "Alle data", 
+    value: "all", 
+    getRange: () => ({ from: null, to: new Date() }) 
+  },
+  { 
+    label: "Sidste 30 dage", 
+    value: "last30", 
+    getRange: () => ({ from: subDays(new Date(), 30), to: new Date() }) 
+  },
+  { 
+    label: "Sidste 90 dage", 
+    value: "last90", 
+    getRange: () => ({ from: subDays(new Date(), 90), to: new Date() }) 
+  },
+  { 
+    label: "Sidste 180 dage", 
+    value: "last180", 
+    getRange: () => ({ from: subDays(new Date(), 180), to: new Date() }) 
+  },
+  { 
+    label: "Denne måned", 
+    value: "thisMonth", 
+    getRange: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }) 
+  },
+  { 
+    label: "Forrige måned", 
+    value: "lastMonth", 
+    getRange: () => ({ 
+      from: startOfMonth(subMonths(new Date(), 1)), 
+      to: endOfMonth(subMonths(new Date(), 1)) 
+    }) 
+  },
+];
+
 export function HistoricalTenureStats() {
+  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("all");
+  const [customFrom, setCustomFrom] = useState<Date | undefined>(undefined);
+  const [customTo, setCustomTo] = useState<Date | undefined>(undefined);
+
+  // Calculate the active date range based on selection
+  const dateRange = useMemo(() => {
+    if (periodPreset === "custom") {
+      return {
+        from: customFrom || null,
+        to: customTo || new Date(),
+      };
+    }
+    const option = periodOptions.find(o => o.value === periodPreset);
+    return option ? option.getRange() : { from: null, to: new Date() };
+  }, [periodPreset, customFrom, customTo]);
+
+  // Fetch historical employees (those who left)
   // Fetch historical employees (those who left)
   const { data: historicalData, isLoading: loadingHistorical } = useQuery({
     queryKey: ["historical-employment-stats"],
@@ -130,17 +198,39 @@ export function HistoricalTenureStats() {
   }
 
   // Combine both datasets
-  const allEmployees: CombinedEmployee[] = [
+  const allEmployeesRaw: CombinedEmployee[] = [
     ...(historicalData || []),
     ...(currentData || [])
   ];
 
-  if (allEmployees.length === 0) {
+  // Filter employees based on date range (for the detailed table)
+  // We filter historical employees by their end_date, current employees are always included
+  const filteredEmployees = useMemo(() => {
+    return allEmployeesRaw.filter(emp => {
+      if (emp.is_current) {
+        // For current employees, filter by hire_date if a "from" date is set
+        if (dateRange.from && emp.hire_date) {
+          const hireDate = parseISO(emp.hire_date);
+          return hireDate >= dateRange.from && hireDate <= dateRange.to;
+        }
+        return true;
+      } else {
+        // For historical employees, filter by end_date
+        if (dateRange.from && emp.end_date) {
+          const endDate = parseISO(emp.end_date);
+          return endDate >= dateRange.from && endDate <= dateRange.to;
+        }
+        return !dateRange.from; // Include all if no "from" date
+      }
+    });
+  }, [allEmployeesRaw, dateRange]);
+
+  if (allEmployeesRaw.length === 0) {
     return null;
   }
 
-  const historicalOnly = allEmployees.filter(e => !e.is_current);
-  const currentOnly = allEmployees.filter(e => e.is_current);
+  const historicalOnly = filteredEmployees.filter(e => !e.is_current);
+  const currentOnly = filteredEmployees.filter(e => e.is_current);
 
   // Date boundaries for trend calculation (last 90 days vs previous 90 days)
   const now = new Date();
@@ -162,7 +252,7 @@ export function HistoricalTenureStats() {
     leaversPrev90d: number;
   }>();
   
-  allEmployees.forEach(emp => {
+  filteredEmployees.forEach(emp => {
     if (!teamStats.has(emp.team_name)) {
       teamStats.set(emp.team_name, { 
         totalDays: 0, count: 0, churned30: 0, churned60: 0, 
@@ -244,11 +334,11 @@ export function HistoricalTenureStats() {
     }).sort((a, b) => b.avgTenureDays - a.avgTenureDays);
 
   // Overall stats
-  const totalEmployees = allEmployees.length;
+  const totalEmployees = filteredEmployees.length;
   const totalCurrent = currentOnly.length;
   const totalLeft = historicalOnly.length;
-  const totalDays = allEmployees.reduce((sum, e) => sum + e.tenure_days, 0);
-  const avgTenureDays = Math.round(totalDays / totalEmployees);
+  const totalDays = filteredEmployees.reduce((sum, e) => sum + e.tenure_days, 0);
+  const avgTenureDays = totalEmployees > 0 ? Math.round(totalDays / totalEmployees) : 0;
   const avgTenureMonths = Math.round((avgTenureDays / 30) * 10) / 10;
   const churned30 = historicalOnly.filter(e => e.tenure_days <= 30).length;
   const churned60 = historicalOnly.filter(e => e.tenure_days <= 60).length;
@@ -288,7 +378,7 @@ export function HistoricalTenureStats() {
   
   const tenureDistribution = tenureBuckets.map(bucket => ({
     label: bucket.label,
-    count: allEmployees.filter(e => e.tenure_days >= bucket.min && e.tenure_days <= bucket.max).length,
+    count: filteredEmployees.filter(e => e.tenure_days >= bucket.min && e.tenure_days <= bucket.max).length,
     current: currentOnly.filter(e => e.tenure_days >= bucket.min && e.tenure_days <= bucket.max).length,
     left: historicalOnly.filter(e => e.tenure_days >= bucket.min && e.tenure_days <= bucket.max).length,
   }));
@@ -422,11 +512,86 @@ export function HistoricalTenureStats() {
       {/* Team breakdown table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+          <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <span>Detaljeret teamoversigt (alle ansatte)</span>
-            <span className="text-sm font-normal text-muted-foreground">
-              Trend: sidste 90 dage vs. forrige 90 dage
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select 
+                value={periodPreset} 
+                onValueChange={(value: PeriodPreset) => setPeriodPreset(value)}
+              >
+                <SelectTrigger className="w-[160px] h-9">
+                  <SelectValue placeholder="Vælg periode" />
+                </SelectTrigger>
+                <SelectContent>
+                  {periodOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom">Brugerdefineret</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {periodPreset === "custom" && (
+                <div className="flex items-center gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "w-[130px] justify-start text-left font-normal",
+                          !customFrom && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {customFrom ? format(customFrom, "dd/MM/yyyy") : "Fra"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={customFrom}
+                        onSelect={setCustomFrom}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <span className="text-muted-foreground">-</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "w-[130px] justify-start text-left font-normal",
+                          !customTo && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {customTo ? format(customTo, "dd/MM/yyyy") : "Til"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={customTo}
+                        onSelect={setCustomTo}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
+              
+              {dateRange.from && (
+                <Badge variant="secondary" className="text-xs">
+                  {format(dateRange.from, "dd/MM/yyyy", { locale: da })} - {format(dateRange.to, "dd/MM/yyyy", { locale: da })}
+                </Badge>
+              )}
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
