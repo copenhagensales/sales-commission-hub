@@ -725,8 +725,8 @@ export function TeamsTab() {
           
           <Tabs defaultValue="team" className="w-full flex flex-col">
             {/* Tab Navigation */}
-            <div className="px-6 pt-4 pb-2 border-b bg-muted/30">
-              <TabsList className="h-auto p-1 bg-transparent gap-1">
+            <div className="px-6 pt-4 pb-2 border-b bg-muted/30 overflow-x-auto">
+              <TabsList className="h-auto p-1 bg-transparent gap-1 flex-wrap">
                 <TabsTrigger 
                   value="team" 
                   className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 py-2 text-sm font-medium"
