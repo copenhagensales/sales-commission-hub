@@ -104,6 +104,7 @@ export function useMfa(): UseMfaReturn {
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: "totp",
         friendlyName: "Authenticator App",
+        issuer: "Copenhagen Sales",
       });
 
       if (error) throw error;
