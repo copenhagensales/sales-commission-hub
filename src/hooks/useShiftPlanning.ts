@@ -511,6 +511,8 @@ export function useEmployeesForShifts(teamId?: string) {
       // Get current employee id
       const { data: currentEmployeeId } = await supabase.rpc("get_current_employee_id");
       
+      console.log("[useEmployeesForShifts] isOwner:", isOwner, "currentEmployeeId:", currentEmployeeId, "teamId:", teamId);
+      
       // Fetch all team memberships with team names for enriching employee data
       const { data: allTeamMemberships } = await supabase
         .from("team_members")
@@ -556,18 +558,21 @@ export function useEmployeesForShifts(teamId?: string) {
         if (tmError) throw tmError;
         
         const employeeIds = (teamMembers || []).map(tm => tm.employee_id);
+        console.log("[useEmployeesForShifts] Team filter - found", employeeIds.length, "employees");
         return fetchEmployeesByIds(employeeIds);
       }
       
-      // No team selected - for teamledere, get employees from teams they lead
-      if (!isOwner && currentEmployeeId) {
+      // For non-owners, get employees from teams they lead
+      if (isOwner !== true && currentEmployeeId) {
         // Get teams where current user is team_leader
         const { data: ledTeams, error: teamsError } = await supabase
           .from("teams")
-          .select("id")
+          .select("id, name")
           .eq("team_leader_id", currentEmployeeId);
         
         if (teamsError) throw teamsError;
+        
+        console.log("[useEmployeesForShifts] Led teams:", ledTeams);
         
         if (ledTeams && ledTeams.length > 0) {
           const teamIds = ledTeams.map(t => t.id);
@@ -584,10 +589,12 @@ export function useEmployeesForShifts(teamId?: string) {
           const employeeIds = [...new Set((teamMembers || []).map(tm => tm.employee_id))]
             .filter(id => id !== currentEmployeeId);
           
+          console.log("[useEmployeesForShifts] Found", employeeIds.length, "team members in led teams");
           return fetchEmployeesByIds(employeeIds);
         }
         
         // Fallback: filter by manager_id if no teams led
+        console.log("[useEmployeesForShifts] No led teams, trying manager_id fallback");
         const { data, error } = await supabase
           .from("employee_master_data")
           .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
@@ -605,6 +612,7 @@ export function useEmployeesForShifts(teamId?: string) {
       }
       
       // Owner - get all active employees
+      console.log("[useEmployeesForShifts] Owner mode - fetching all employees");
       const { data, error } = await supabase
         .from("employee_master_data")
         .select("id, first_name, last_name, standard_start_time, weekly_hours, manager_id, salary_type, salary_amount, team_id")
