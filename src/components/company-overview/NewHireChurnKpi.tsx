@@ -92,13 +92,19 @@ export function NewHireChurnKpi() {
         .select("id, employee_name, team_name, tenure_days");
       if (histError) throw histError;
       
-      const historicalEmployees = (historicalData || []).map(emp => ({
-        id: emp.id,
-        team_name: normalizeTeamName(emp.team_name),
-        tenure_days: emp.tenure_days,
-        is_current: false,
-        left_within_60: emp.tenure_days <= 60
-      }));
+      const historicalEmployees = (historicalData || [])
+        .filter(emp => {
+          // Data quality validation - exclude invalid records
+          if (emp.tenure_days < 0) return false;
+          return true;
+        })
+        .map(emp => ({
+          id: emp.id,
+          team_name: normalizeTeamName(emp.team_name),
+          tenure_days: emp.tenure_days,
+          is_current: false,
+          left_within_60: emp.tenure_days <= 60
+        }));
 
       // Combine all employees
       const allEmployees = [...currentEmployees, ...historicalEmployees];

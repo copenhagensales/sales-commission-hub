@@ -67,7 +67,13 @@ export function ChurnTrendChart() {
           const teamName = normalizeTeamName(emp.team_name);
           if (EXCLUDED_TEAMS.includes(teamName)) return false;
           if (!emp.start_date) return false;
+          
+          // Data quality validation
           const startDate = parseISO(emp.start_date);
+          const now = new Date();
+          if (startDate > now) return false; // Exclude future start dates
+          if (emp.tenure_days < 0) return false; // Exclude negative tenure
+          
           return startDate >= monthStart && startDate <= monthEnd;
         });
 
