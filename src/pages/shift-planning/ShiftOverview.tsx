@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins } from "lucide-react";
@@ -716,6 +716,53 @@ export default function ShiftOverview() {
     setPendingDelayCell(null);
   };
 
+  // Track which bonuses we've already auto-created to prevent duplicates
+  const autoCreatedBonusesRef = useRef<Set<string>>(new Set());
+
+  // Auto-trigger daily bonus when eligibility conditions are met
+  useEffect(() => {
+    if (!employees || !weekDays || !timeStamps || !paidBonuses) return;
+
+    // Check each employee/day combination for auto-bonus eligibility
+    employees.forEach(employee => {
+      weekDays.forEach(day => {
+        const dateStr = format(day, "yyyy-MM-dd");
+        const bonusKey = `${employee.id}-${dateStr}`;
+        
+        // Skip if already processed in this session
+        if (autoCreatedBonusesRef.current.has(bonusKey)) return;
+        
+        // Skip if already paid
+        const bonusPaid = paidBonuses.find(b => b.employee_id === employee.id && b.date === dateStr);
+        if (bonusPaid) return;
+        
+        const timeStamp = timeStamps.find(ts => {
+          const tsDate = ts.clock_in.split("T")[0];
+          return ts.employee_id === employee.id && tsDate === dateStr;
+        });
+        
+        // Only auto-trigger if there's a completed timestamp (clock_out exists)
+        if (!timeStamp?.clock_out) return;
+        
+        const workTimes = getWorkTimesForEmployeeAndDay(employee.id, day) || employee.standard_start_time;
+        const dayShifts = shiftsByEmployeeAndDate.get(employee.id)?.get(dateStr) || [];
+        const hasShift = dayShifts.length > 0;
+        
+        const eligibility = getDailyBonusEligibility(employee.id, day, workTimes, hasShift, timeStamp);
+        
+        // Auto-create bonus if eligible (amount > 0 and no blocking reason)
+        if (eligibility && eligibility.amount > 0 && !eligibility.reason) {
+          autoCreatedBonusesRef.current.add(bonusKey);
+          createDailyBonus.mutate({
+            employeeId: employee.id,
+            date: dateStr,
+            amount: eligibility.amount,
+            timeStampId: timeStamp.id,
+          });
+        }
+      });
+    });
+  }, [employees, weekDays, timeStamps, paidBonuses, getDailyBonusEligibility, getWorkTimesForEmployeeAndDay, shiftsByEmployeeAndDate, createDailyBonus]);
 
   return (
     <MainLayout>
