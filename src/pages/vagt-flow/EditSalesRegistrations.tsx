@@ -696,7 +696,6 @@ export default function EditSalesRegistrations() {
                                 <TableHead className="text-right">Provi</TableHead>
                                 <TableHead className="text-right">Oms</TableHead>
                                 <TableHead>Kommentar</TableHead>
-                                <TableHead className="text-right">Handlinger</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -721,32 +720,6 @@ export default function EditSalesRegistrations() {
                                   </TableCell>
                                   <TableCell className="max-w-[150px] truncate text-muted-foreground">
                                     {sale.comment || "-"}
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          openEditDialog(sale);
-                                        }}
-                                        className="h-8 w-8"
-                                      >
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDelete(sale.id, sale.product_name || "salg");
-                                        }}
-                                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
                                   </TableCell>
                                 </TableRow>
                               ))}
