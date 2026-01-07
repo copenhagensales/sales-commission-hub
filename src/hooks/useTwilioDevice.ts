@@ -75,6 +75,12 @@ export function useTwilioDevice() {
       setDeviceState('connecting');
       setError(null);
 
+      // Check for active session first
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated - please log in first');
+      }
+
       // Get access token from edge function
       const { data, error: tokenError } = await supabase.functions.invoke('twilio-access-token');
       
@@ -149,6 +155,11 @@ export function useTwilioDevice() {
       device.on('tokenWillExpire', async () => {
         console.log('[useTwilioDevice] Token will expire, refreshing...');
         try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            console.error('[useTwilioDevice] No active session, cannot refresh token');
+            return;
+          }
           const { data: newData } = await supabase.functions.invoke('twilio-access-token');
           if (newData?.token) {
             device.updateToken(newData.token);
@@ -268,6 +279,12 @@ export function useTwilioDevice() {
         setDeviceState('connecting');
         setError(null);
 
+        // Check for active session first
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error('Not authenticated - please log in first');
+        }
+
         // Get access token from edge function
         const { data, error: tokenError } = await supabase.functions.invoke('twilio-access-token');
         
@@ -292,6 +309,11 @@ export function useTwilioDevice() {
 
         device.on('tokenWillExpire', async () => {
           try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+              console.error('[useTwilioDevice] No active session, cannot refresh token');
+              return;
+            }
             const { data: newData } = await supabase.functions.invoke('twilio-access-token');
             if (newData?.token) {
               device.updateToken(newData.token);
