@@ -319,6 +319,7 @@ export function usePermissions() {
     canViewOnboardingAdmin: canView("menu_onboarding_admin"),
     // Reports menu
     canViewReportsAdmin: canView("menu_reports_admin"),
+    canViewReportsDailyReports: canView("menu_reports_daily"),
     canViewReportsManagement: canView("menu_reports_management"),
     canViewReportsEmployee: canView("menu_reports_employee"),
     // Employee SMS permission

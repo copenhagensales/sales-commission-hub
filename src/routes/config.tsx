@@ -388,7 +388,7 @@ export const routes: RouteConfig[] = [
   { path: "/reports/admin", component: ReportsAdmin, access: "role", positionPermission: "menu_reports_admin" },
   { path: "/reports/management", component: ReportsManagement, access: "role", positionPermission: "menu_reports_management" },
   { path: "/reports/employee", component: ReportsEmployee, access: "role", positionPermission: "menu_reports_employee" },
-  { path: "/reports/daily", component: DailyReports, access: "role", positionPermission: "menu_reports_admin" },
+  { path: "/reports/daily", component: DailyReports, access: "role", positionPermission: "menu_reports_daily" },
 
   // Security Dashboard
   { path: "/admin/security", component: SecurityDashboard, access: "role", positionPermission: "menu_security_dashboard" },

@@ -749,6 +749,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         hasEditOption: false,
       },
       {
+        key: "menu_reports_daily",
+        label: "Dagsrapporter",
+        description: "Adgang til daglige rapporter med vagtregistrering",
+        hasEditOption: false,
+      },
+      {
         key: "menu_reports_management",
         label: "Rapporter Ledelse",
         description: "Adgang til ledelsesrapporter",
