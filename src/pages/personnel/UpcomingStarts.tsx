@@ -127,7 +127,7 @@ export default function UpcomingStarts() {
         .from("candidates")
         .select("id, first_name, last_name, applied_position, available_from, cohort_assignment_status, updated_at")
         .eq("status", "hired")
-        .or("cohort_assignment_status.is.null,cohort_assignment_status.eq.pending")
+        .not("cohort_assignment_status", "eq", "assigned")
         .order("updated_at", { ascending: false });
 
       if (error) throw error;
