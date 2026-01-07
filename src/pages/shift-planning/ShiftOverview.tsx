@@ -739,18 +739,9 @@ export default function ShiftOverview() {
 
   // Auto-trigger daily bonus when eligibility conditions are met
   useEffect(() => {
-    if (!employees || !weekDays || !timeStamps || paidBonuses === undefined) {
-      console.log("[AutoBonus] Skipping - missing data:", { 
-        hasEmployees: !!employees, 
-        hasWeekDays: !!weekDays, 
-        hasTimeStamps: !!timeStamps, 
-        hasPaidBonuses: paidBonuses !== undefined 
-      });
+    if (!employees || !weekDays || paidBonuses === undefined) {
       return;
     }
-
-    console.log("[AutoBonus] Running check for", employees.length, "employees and", weekDays.length, "days");
-    console.log("[AutoBonus] TimeStamps available:", timeStamps.length);
 
     // Check each employee/day combination for auto-bonus eligibility
     employees.forEach(employee => {
@@ -764,28 +755,34 @@ export default function ShiftOverview() {
         // Skip if already paid
         const bonusPaid = paidBonuses?.find(b => b.employee_id === employee.id && b.date === dateStr);
         if (bonusPaid) return;
+
+        // Skip future dates
+        if (day > new Date()) return;
         
-        const timeStamp = timeStamps.find(ts => {
+        const timeStamp = timeStamps?.find(ts => {
           const tsDate = ts.clock_in.split("T")[0];
           return ts.employee_id === employee.id && tsDate === dateStr;
         });
+
+        // Get hours source for this employee's team
+        const hoursSource = getHoursSourceForEmployee(employee.id);
         
-        // Only auto-trigger if there's a completed timestamp (clock_out exists)
-        if (!timeStamp?.clock_out) {
-          // Log only for today to avoid spam
-          if (format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")) {
-            console.log(`[AutoBonus] ${employee.first_name} on ${dateStr}: No clock_out yet`);
-          }
+        // For timestamp-based teams: require clock_out
+        // For shift-based teams: can trigger without timestamp
+        if (hoursSource === 'timestamp' && !timeStamp?.clock_out) {
           return;
         }
         
         const workTimes = getWorkTimesForEmployeeAndDay(employee.id, day) || employee.standard_start_time;
         const dayShifts = shiftsByEmployeeAndDate.get(employee.id)?.get(dateStr) || [];
         const hasShift = dayShifts.length > 0;
+
+        // For shift-based: need work times or shift to trigger
+        if (hoursSource !== 'timestamp' && !workTimes && !hasShift) {
+          return;
+        }
         
-        const eligibility = getDailyBonusEligibility(employee.id, day, workTimes, hasShift, timeStamp);
-        
-        console.log(`[AutoBonus] ${employee.first_name} on ${dateStr}:`, { eligibility, hasShift, workTimes: !!workTimes });
+        const eligibility = getDailyBonusEligibility(employee.id, day, workTimes, hasShift, timeStamp || null);
         
         // Auto-create bonus if eligible (amount > 0 and no blocking reason)
         if (eligibility && eligibility.amount > 0 && !eligibility.reason) {
@@ -795,12 +792,12 @@ export default function ShiftOverview() {
             employeeId: employee.id,
             date: dateStr,
             amount: eligibility.amount,
-            timeStampId: timeStamp.id,
+            timeStampId: timeStamp?.id,
           });
         }
       });
     });
-  }, [employees, weekDays, timeStamps, paidBonuses, getDailyBonusEligibility, getWorkTimesForEmployeeAndDay, shiftsByEmployeeAndDate, createDailyBonus]);
+  }, [employees, weekDays, timeStamps, paidBonuses, getDailyBonusEligibility, getWorkTimesForEmployeeAndDay, shiftsByEmployeeAndDate, createDailyBonus, getHoursSourceForEmployee]);
 
   return (
     <MainLayout>
