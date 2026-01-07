@@ -730,6 +730,8 @@ export type Database = {
         Row: {
           applied_position: string | null
           assigned_to: string | null
+          available_from: string | null
+          cohort_assignment_status: string | null
           created_at: string
           email: string | null
           first_name: string
@@ -747,6 +749,8 @@ export type Database = {
         Insert: {
           applied_position?: string | null
           assigned_to?: string | null
+          available_from?: string | null
+          cohort_assignment_status?: string | null
           created_at?: string
           email?: string | null
           first_name: string
@@ -764,6 +768,8 @@ export type Database = {
         Update: {
           applied_position?: string | null
           assigned_to?: string | null
+          available_from?: string | null
+          cohort_assignment_status?: string | null
           created_at?: string
           email?: string | null
           first_name?: string

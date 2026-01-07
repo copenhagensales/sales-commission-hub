@@ -21,7 +21,7 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { TrendingUp, Users, Calendar, Package, Trophy } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 const TAB_TO_CLIENT_ID: Record<string, string> = {
   "eesy-fm": FIELDMARKETING_CLIENTS.EESY_FM,
   "yousee": FIELDMARKETING_CLIENTS.YOUSEE,
@@ -351,7 +351,7 @@ const FieldmarketingDashboardFull = () => {
   const activeClient = clients?.find(c => c.id === activeClientId);
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <DashboardLayout>
       <DashboardHeader 
         title="Fieldmarketing Dashboard" 
         subtitle="Oversigt over salg fra fieldmarketing events"
@@ -390,7 +390,7 @@ const FieldmarketingDashboardFull = () => {
           />
         </TabsContent>
       </Tabs>
-    </div>
+    </DashboardLayout>
   );
 };
 

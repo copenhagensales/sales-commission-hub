@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { Users, TrendingUp, Phone, Target, Award, Activity } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 interface TvDashboardData {
   date: string;
   timestamp: string;
@@ -171,15 +171,16 @@ export default function CphSalesDashboard() {
   const displayStaffEmployees = tvMode && tvData ? tvData.employees.staff : staffEmployees;
   const displayCalls = tvMode && tvData ? tvData.calls.today : todayCalls;
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-6">
+  // Skip layout wrapper in TV mode to avoid lock checks
+  const content = (
+    <div className="space-y-6">
       <DashboardHeader 
         title="Dagsboard CPH Sales" 
         subtitle={format(today, "EEEE d. MMMM yyyy", { locale: da })}
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Salg i dag</CardTitle>
@@ -241,7 +242,7 @@ export default function CphSalesDashboard() {
       </div>
 
       {/* Sales by Client */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -314,5 +315,20 @@ export default function CphSalesDashboard() {
         <p>CPH Sales Dashboard • {format(today, "HH:mm", { locale: da })}</p>
       </div>
     </div>
+  );
+
+  // In TV mode, render without layout to skip lock checks
+  if (tvMode) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 p-6">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <DashboardLayout>
+      {content}
+    </DashboardLayout>
   );
 }
