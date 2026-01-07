@@ -339,7 +339,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const showOnboardingMenu = p.canViewOnboardingAdmin;
 
   // Check if any Reports menu items are visible
-  const showReportsMenu = p.canViewReportsAdmin || p.canViewReportsManagement || p.canViewReportsEmployee;
+  const showReportsMenu = p.canViewReportsAdmin || p.canViewReportsDailyReports || p.canViewReportsManagement || p.canViewReportsEmployee;
   return (
     <aside className={sidebarClasses}>
       <div className="flex h-full flex-col">
