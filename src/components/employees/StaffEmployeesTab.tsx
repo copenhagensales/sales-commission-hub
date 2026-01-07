@@ -10,12 +10,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Search, Users, Phone, Loader2, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, Send, ArrowRightLeft, Clock, X, Check, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Pencil, Search, Users, Phone, Loader2, FileText, Trash2, Eye, EyeOff, Mail, UserCheck, Send, ArrowRightLeft, Clock, X, Check, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, MoreHorizontal } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { useTwilioDeviceContext } from "@/contexts/TwilioDeviceContext";
+import { SendEmployeeSmsDialog } from "@/components/employees/SendEmployeeSmsDialog";
 
 export function StaffEmployeesTab() {
   const { t } = useTranslation();
@@ -35,7 +38,11 @@ export function StaffEmployeesTab() {
   const [moveToRegularId, setMoveToRegularId] = useState<string | null>(null);
   const [sendingResetTo, setSendingResetTo] = useState<string | null>(null);
   const [deactivatingEmployee, setDeactivatingEmployee] = useState<StaffEmployee | null>(null);
-  const { canEditEmployees } = usePermissions();
+  const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+  const [smsEmployee, setSmsEmployee] = useState<StaffEmployee | null>(null);
+  const { canEditEmployees, canSendEmployeeSms, hasPermission } = usePermissions();
+  const hasOutboundSoftphone = hasPermission("softphone_outbound");
+  const { makeCall, isDeviceReady } = useTwilioDeviceContext();
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   interface StaffEmployee {
@@ -743,33 +750,65 @@ export function StaffEmployeesTab() {
                               : t("employees.actions.sendInvitation")}
                           </TooltipContent>
                         </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8"
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-popover w-48">
+                            <DropdownMenuItem
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                if (employee.private_phone) {
+                                  if (hasOutboundSoftphone && isDeviceReady) {
+                                    makeCall(employee.private_phone);
+                                  } else {
+                                    window.location.href = `tel:${employee.private_phone}`;
+                                  }
+                                }
+                              }}
+                              disabled={!employee.private_phone}
+                            >
+                              <Phone className="h-4 w-4 mr-2" />
+                              Ring op
+                            </DropdownMenuItem>
+                            {canSendEmployeeSms && (
+                              <DropdownMenuItem
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  setSmsEmployee(employee);
+                                  setSmsDialogOpen(true);
+                                }}
+                                disabled={!employee.private_phone}
+                              >
+                                <MessageSquare className="h-4 w-4 mr-2" />
+                                Send SMS
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
                               onClick={(e) => { e.stopPropagation(); setMoveToRegularId(employee.id); }}
                               disabled={moveToRegularMutation.isPending}
                             >
-                              <ArrowRightLeft className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Flyt til medarbejdere</TooltipContent>
-                        </Tooltip>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); navigate(`/employees/${employee.id}`); }}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        {canEditEmployees && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={(e) => { e.stopPropagation(); setDeleteEmployeeId(employee.id); }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
+                              <ArrowRightLeft className="h-4 w-4 mr-2" />
+                              Flyt til medarbejdere
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/employees/${employee.id}`); }}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Rediger
+                            </DropdownMenuItem>
+                            {canEditEmployees && (
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={(e) => { e.stopPropagation(); setDeleteEmployeeId(employee.id); }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Slet
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -850,6 +889,15 @@ export function StaffEmployeesTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* SMS Dialog */}
+      {smsEmployee && (
+        <SendEmployeeSmsDialog
+          open={smsDialogOpen}
+          onOpenChange={setSmsDialogOpen}
+          employee={smsEmployee}
+        />
+      )}
     </div>
   );
 }
