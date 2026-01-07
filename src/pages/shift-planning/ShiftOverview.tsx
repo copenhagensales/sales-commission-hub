@@ -739,7 +739,18 @@ export default function ShiftOverview() {
 
   // Auto-trigger daily bonus when eligibility conditions are met
   useEffect(() => {
-    if (!employees || !weekDays || !timeStamps || paidBonuses === undefined) return;
+    if (!employees || !weekDays || !timeStamps || paidBonuses === undefined) {
+      console.log("[AutoBonus] Skipping - missing data:", { 
+        hasEmployees: !!employees, 
+        hasWeekDays: !!weekDays, 
+        hasTimeStamps: !!timeStamps, 
+        hasPaidBonuses: paidBonuses !== undefined 
+      });
+      return;
+    }
+
+    console.log("[AutoBonus] Running check for", employees.length, "employees and", weekDays.length, "days");
+    console.log("[AutoBonus] TimeStamps available:", timeStamps.length);
 
     // Check each employee/day combination for auto-bonus eligibility
     employees.forEach(employee => {
@@ -760,7 +771,13 @@ export default function ShiftOverview() {
         });
         
         // Only auto-trigger if there's a completed timestamp (clock_out exists)
-        if (!timeStamp?.clock_out) return;
+        if (!timeStamp?.clock_out) {
+          // Log only for today to avoid spam
+          if (format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")) {
+            console.log(`[AutoBonus] ${employee.first_name} on ${dateStr}: No clock_out yet`);
+          }
+          return;
+        }
         
         const workTimes = getWorkTimesForEmployeeAndDay(employee.id, day) || employee.standard_start_time;
         const dayShifts = shiftsByEmployeeAndDate.get(employee.id)?.get(dateStr) || [];
@@ -768,9 +785,11 @@ export default function ShiftOverview() {
         
         const eligibility = getDailyBonusEligibility(employee.id, day, workTimes, hasShift, timeStamp);
         
+        console.log(`[AutoBonus] ${employee.first_name} on ${dateStr}:`, { eligibility, hasShift, workTimes: !!workTimes });
+        
         // Auto-create bonus if eligible (amount > 0 and no blocking reason)
         if (eligibility && eligibility.amount > 0 && !eligibility.reason) {
-          console.log(`[AutoBonus] Creating bonus for ${employee.first_name} on ${dateStr}:`, eligibility);
+          console.log(`[AutoBonus] CREATING bonus for ${employee.first_name} on ${dateStr}:`, eligibility);
           autoCreatedBonusesRef.current.add(bonusKey);
           createDailyBonus.mutate({
             employeeId: employee.id,
