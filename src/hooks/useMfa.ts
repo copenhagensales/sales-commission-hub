@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface MfaState {
@@ -27,6 +27,9 @@ export function useMfa(): UseMfaReturn {
     isIpExempt: false,
     exemptRangeName: null,
   });
+  
+  // Store the factor ID from enrollment to use in verification
+  const pendingFactorIdRef = useRef<string | null>(null);
 
   // Check if MFA is set up for current user
   useEffect(() => {
@@ -139,7 +142,9 @@ export function useMfa(): UseMfaReturn {
         throw error;
       }
       
-      console.log("[MFA] Enrollment created successfully");
+      // Store the factor ID for use in verification
+      pendingFactorIdRef.current = data.id;
+      console.log("[MFA] Enrollment created successfully, factor ID:", data.id);
 
       return {
         qrCode: data.totp.qr_code,
@@ -160,34 +165,41 @@ export function useMfa(): UseMfaReturn {
     try {
       console.log("[MFA] Starting enrollment verification with code length:", code.length);
       
-      // Get the current unverified factor
-      const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
+      // Use the stored factor ID from enrollment
+      let factorId = pendingFactorIdRef.current;
       
-      if (listError) {
-        console.error("[MFA] Error listing factors:", listError);
-        return false;
+      if (!factorId) {
+        console.log("[MFA] No pending factor ID, trying to find from listFactors...");
+        // Fallback: try to find from listFactors
+        const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
+        
+        if (listError) {
+          console.error("[MFA] Error listing factors:", listError);
+          return false;
+        }
+        
+        console.log("[MFA] Current factors:", factors?.totp?.map(f => ({ 
+          id: f.id, 
+          status: f.status, 
+          friendlyName: f.friendly_name 
+        })));
+        
+        const unverifiedFactor = factors?.totp?.find(f => f.status !== "verified");
+        
+        if (!unverifiedFactor) {
+          console.error("[MFA] No unverified factor found and no pending factor ID. All factors:", factors?.totp);
+          return false;
+        }
+        
+        factorId = unverifiedFactor.id;
       }
       
-      console.log("[MFA] Current factors:", factors?.totp?.map(f => ({ 
-        id: f.id, 
-        status: f.status, 
-        friendlyName: f.friendly_name 
-      })));
-      
-      // Find factor that is not verified yet (could be unverified status)
-      const unverifiedFactor = factors?.totp?.find(f => f.status !== "verified");
-      
-      if (!unverifiedFactor) {
-        console.error("[MFA] No unverified factor found. All factors:", factors?.totp);
-        return false;
-      }
-      
-      console.log("[MFA] Found unverified factor:", unverifiedFactor.id, "status:", unverifiedFactor.status);
+      console.log("[MFA] Using factor ID for verification:", factorId);
 
       // Create challenge and verify
-      console.log("[MFA] Creating challenge for factor:", unverifiedFactor.id);
+      console.log("[MFA] Creating challenge for factor:", factorId);
       const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
-        factorId: unverifiedFactor.id,
+        factorId: factorId,
       });
 
       if (challengeError) {
@@ -203,7 +215,7 @@ export function useMfa(): UseMfaReturn {
 
       console.log("[MFA] Verifying code...");
       const { data: verifyData, error: verifyError } = await supabase.auth.mfa.verify({
-        factorId: unverifiedFactor.id,
+        factorId: factorId,
         challengeId: challenge.id,
         code,
       });
@@ -216,6 +228,9 @@ export function useMfa(): UseMfaReturn {
         });
         throw verifyError;
       }
+      
+      // Clear the pending factor ID after successful verification
+      pendingFactorIdRef.current = null;
       
       console.log("[MFA] Verification successful!");
 
