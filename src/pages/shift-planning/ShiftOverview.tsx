@@ -153,15 +153,15 @@ export default function ShiftOverview() {
     },
   });
 
-  // Fetch employee start dates and team_id for bonus eligibility
+  // Fetch employee start dates, team_id and daily_bonus_client_id for bonus eligibility
   const { data: employeeStartDates } = useQuery({
     queryKey: ["employee-start-dates"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("employee_master_data")
-        .select("id, employment_start_date, team_id");
+        .select("id, employment_start_date, team_id, daily_bonus_client_id");
       if (error) throw error;
-      return data as { id: string; employment_start_date: string | null; team_id: string | null }[];
+      return data as { id: string; employment_start_date: string | null; team_id: string | null; daily_bonus_client_id: string | null }[];
     },
   });
 
@@ -476,15 +476,21 @@ export default function ShiftOverview() {
     hasShift: boolean,
     timeStamp: typeof timeStamps extends (infer T)[] | undefined ? T : never | null
   ): { amount: number; reason?: string } | null => {
-    // 1. Check if employee has a team with daily bonus configured
+    // 1. Check if employee has a team with daily bonus configured for their client
     const membership = teamMemberships?.find(m => m.employee_id === employeeId);
     if (!membership) return null;
 
-    const bonusConfig = dailyBonusConfigs?.find(c => c.team_id === membership.team_id);
+    // Get employee's daily_bonus_client_id (used ONLY for bonus calculation)
+    const empData = employeeStartDates?.find(e => e.id === employeeId);
+    const clientId = empData?.daily_bonus_client_id;
+
+    // Match bonus config on BOTH team AND client
+    const bonusConfig = dailyBonusConfigs?.find(c => 
+      c.team_id === membership.team_id && c.client_id === clientId
+    );
     if (!bonusConfig || bonusConfig.bonus_amount <= 0 || bonusConfig.bonus_days <= 0) return null;
 
     // 2. Check employee start date (only 2026+ employees are eligible)
-    const empData = employeeStartDates?.find(e => e.id === employeeId);
     if (!empData?.employment_start_date) return null;
 
     const startDate = parseISO(empData.employment_start_date);
@@ -547,11 +553,17 @@ export default function ShiftOverview() {
     const membership = teamMemberships?.find(m => m.employee_id === employeeId);
     if (!membership) return null;
 
-    const bonusConfig = dailyBonusConfigs?.find(c => c.team_id === membership.team_id);
+    // Get employee's daily_bonus_client_id (used ONLY for bonus calculation)
+    const empData = employeeStartDates?.find(e => e.id === employeeId);
+    const clientId = empData?.daily_bonus_client_id;
+
+    // Match bonus config on BOTH team AND client
+    const bonusConfig = dailyBonusConfigs?.find(c => 
+      c.team_id === membership.team_id && c.client_id === clientId
+    );
     if (!bonusConfig || bonusConfig.bonus_days <= 0) return null;
 
-    // Get employee start date to calculate bonus period
-    const empData = employeeStartDates?.find(e => e.id === employeeId);
+    // Check employee start date
     if (!empData?.employment_start_date) return null;
 
     const startDate = parseISO(empData.employment_start_date);

@@ -30,6 +30,7 @@ interface CohortMember {
   notes: string | null;
   candidate_id: string | null;
   employee_id: string | null;
+  daily_bonus_client_id: string | null;
   candidate?: {
     id: string;
     first_name: string;
@@ -230,7 +231,7 @@ export default function UpcomingStarts() {
         }
 
         try {
-          // 1. Create employee record
+          // 1. Create employee record with daily_bonus_client_id
           const { data: employee, error: empError } = await supabase
             .from("employee_master_data")
             .insert({
@@ -243,6 +244,7 @@ export default function UpcomingStarts() {
               team_id: cohort.team_id,
               is_active: true,
               invitation_status: "pending",
+              daily_bonus_client_id: member.daily_bonus_client_id,
             })
             .select()
             .single();

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -11,6 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Search, User } from "lucide-react";
 
@@ -25,6 +33,45 @@ export function AddMemberDialog({ open, onOpenChange, cohortId }: AddMemberDialo
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+
+  // Fetch the cohort to get its team_id
+  const { data: cohort } = useQuery({
+    queryKey: ["cohort-for-client-selection", cohortId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("onboarding_cohorts")
+        .select("team_id")
+        .eq("id", cohortId!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: open && !!cohortId,
+  });
+
+  // Fetch clients for the cohort's team (for daily bonus)
+  const { data: teamClients = [] } = useQuery({
+    queryKey: ["team-clients-for-cohort", cohort?.team_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_clients")
+        .select("client_id, client:clients(id, name)")
+        .eq("team_id", cohort!.team_id!);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!cohort?.team_id,
+  });
+
+  const availableClients = teamClients.filter(tc => tc.client?.id);
+
+  // Auto-select client if only one is available
+  useEffect(() => {
+    if (availableClients.length === 1 && !selectedClientId) {
+      setSelectedClientId(availableClients[0].client_id);
+    }
+  }, [availableClients, selectedClientId]);
 
   // Fetch hired candidates not already in a cohort
   const { data: availableCandidates = [], isLoading } = useQuery({
@@ -59,6 +106,7 @@ export function AddMemberDialog({ open, onOpenChange, cohortId }: AddMemberDialo
         cohort_id: cohortId!,
         candidate_id: candidateId,
         status: "assigned" as const,
+        daily_bonus_client_id: selectedClientId,
       }));
 
       const { error: insertError } = await supabase.from("cohort_members").insert(members);
@@ -78,6 +126,7 @@ export function AddMemberDialog({ open, onOpenChange, cohortId }: AddMemberDialo
       onOpenChange(false);
       setSelectedIds([]);
       setSearch("");
+      setSelectedClientId(null);
     },
     onError: (error) => {
       toast({
@@ -117,6 +166,33 @@ export function AddMemberDialog({ open, onOpenChange, cohortId }: AddMemberDialo
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Client selector for daily bonus (if team has clients) */}
+          {availableClients.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="daily-bonus-client">
+                Kunde (til dagsbonus)
+              </Label>
+              <Select
+                value={selectedClientId || ""}
+                onValueChange={setSelectedClientId}
+              >
+                <SelectTrigger id="daily-bonus-client">
+                  <SelectValue placeholder="Vælg kunde..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableClients.map((tc) => (
+                    <SelectItem key={tc.client_id} value={tc.client_id}>
+                      {tc.client?.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Bruges kun til at beregne dagsbonus
+              </p>
+            </div>
+          )}
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
