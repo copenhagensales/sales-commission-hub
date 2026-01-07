@@ -180,6 +180,35 @@ export default function UpcomingStarts() {
     },
   });
 
+  // Remove member from cohort (makes them available for reassignment)
+  const removeCohortMemberMutation = useMutation({
+    mutationFn: async ({ memberId, candidateId }: { memberId: string; candidateId: string | null }) => {
+      // Delete the cohort member record
+      const { error: memberError } = await supabase
+        .from("cohort_members")
+        .delete()
+        .eq("id", memberId);
+      if (memberError) throw memberError;
+
+      // Reset candidate's cohort_assignment_status so they can be reassigned
+      if (candidateId) {
+        const { error: candidateError } = await supabase
+          .from("candidates")
+          .update({ cohort_assignment_status: null })
+          .eq("id", candidateId);
+        if (candidateError) throw candidateError;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["onboarding-cohorts"] });
+      queryClient.invalidateQueries({ queryKey: ["unassigned-hired-candidates"] });
+      toast({ title: "Deltager fjernet fra holdet" });
+    },
+    onError: () => {
+      toast({ title: "Kunne ikke fjerne deltager", variant: "destructive" });
+    },
+  });
+
   // Start cohort and send invitations mutation
   const startCohortAndInviteMutation = useMutation({
     mutationFn: async (cohort: Cohort) => {
@@ -419,6 +448,7 @@ export default function UpcomingStarts() {
                       ? `${member.employee.first_name} ${member.employee.last_name}`
                       : "Ukendt";
                   const position = member.candidate?.applied_position;
+                  const canRemove = canEdit && cohort.status === "planned" && member.status !== "started";
                   
                   return (
                     <div 
@@ -431,9 +461,43 @@ export default function UpcomingStarts() {
                           <p className="text-sm text-muted-foreground truncate">{position}</p>
                         )}
                       </div>
-                      <Badge variant="outline" className="ml-2 text-xs shrink-0">
-                        {memberStatusLabels[member.status]}
-                      </Badge>
+                      <div className="flex items-center gap-2 ml-2">
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          {memberStatusLabels[member.status]}
+                        </Badge>
+                        {canRemove && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Fjern fra hold?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  {name} vil blive fjernet fra holdet og kan tilføjes til et andet hold.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annuller</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => removeCohortMemberMutation.mutate({ 
+                                    memberId: member.id, 
+                                    candidateId: member.candidate_id 
+                                  })}
+                                >
+                                  Fjern
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
