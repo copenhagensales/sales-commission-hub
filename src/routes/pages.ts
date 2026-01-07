@@ -43,6 +43,7 @@ export const VagtBilling = lazyPage(() => import("@/pages/vagt-flow/Billing"));
 export const VagtSalesRegistration = lazyPage(() => import("@/pages/vagt-flow/SalesRegistration"));
 export const VagtFieldmarketingDashboard = lazyPage(() => import("@/pages/vagt-flow/FieldmarketingDashboard"));
 export const VagtTravelExpenses = lazyPage(() => import("@/pages/vagt-flow/TravelExpenses"));
+export const VagtEditSalesRegistrations = lazyPage(() => import("@/pages/vagt-flow/EditSalesRegistrations"));
 
 export const ShiftOverview = lazyPage(() => import("@/pages/shift-planning/ShiftOverview"));
 export const MySchedule = lazyPage(() => import("@/pages/shift-planning/MySchedule"));

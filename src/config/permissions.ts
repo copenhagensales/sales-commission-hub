@@ -286,6 +286,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         hasEditOption: true,
       },
       {
+        key: "menu_fm_edit_sales",
+        label: "Ret salgsregistrering (Leder)",
+        description: "Adgang til at redigere alle fieldmarketing salgsregistreringer",
+        hasEditOption: true,
+      },
+      {
         key: "menu_fm_travel_expenses",
         label: "Rejsekort og diæter",
         description: "Adgang til rejsekort og diætregler",

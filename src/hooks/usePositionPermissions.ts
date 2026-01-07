@@ -274,6 +274,8 @@ export function usePermissions() {
     canEditFmTimeOff: canEdit("menu_fm_time_off"),
     canViewFmSalesRegistration: canView("menu_fm_sales_registration"),
     canEditFmSalesRegistration: canEdit("menu_fm_sales_registration"),
+    canViewFmEditSales: canView("menu_fm_edit_sales"),
+    canEditFmEditSales: canEdit("menu_fm_edit_sales"),
     canViewFmTravelExpenses: canView("menu_fm_travel_expenses"),
     // Recruitment menu
     canViewRecruitmentDashboard: canView("menu_recruitment_dashboard"),
