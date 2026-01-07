@@ -101,20 +101,57 @@ export function useMfa(): UseMfaReturn {
 
   const startEnrollment = async (): Promise<{ qrCode: string; secret: string } | null> => {
     try {
+      console.log("[MFA] Starting enrollment...");
+      
+      // First, clean up any existing unverified factors
+      const { data: existingFactors, error: listError } = await supabase.auth.mfa.listFactors();
+      
+      if (listError) {
+        console.error("[MFA] Error listing factors:", listError);
+      } else if (existingFactors?.totp) {
+        // Remove any unverified factors to allow fresh enrollment
+        for (const factor of existingFactors.totp) {
+          if (factor.status !== "verified") {
+            console.log("[MFA] Removing unverified factor:", factor.id);
+            try {
+              await supabase.auth.mfa.unenroll({ factorId: factor.id });
+              console.log("[MFA] Successfully removed unverified factor");
+            } catch (unenrollErr) {
+              console.error("[MFA] Error removing unverified factor:", unenrollErr);
+            }
+          }
+        }
+      }
+      
+      console.log("[MFA] Creating new enrollment...");
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: "totp",
         friendlyName: "Authenticator App",
         issuer: "provision.copenhagensales.dk",
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("[MFA] Enrollment error:", {
+          message: error.message,
+          status: error.status,
+          code: error.code
+        });
+        throw error;
+      }
+      
+      console.log("[MFA] Enrollment created successfully");
 
       return {
         qrCode: data.totp.qr_code,
         secret: data.totp.secret,
       };
-    } catch (error) {
-      console.error("Error starting MFA enrollment:", error);
+    } catch (error: any) {
+      console.error("[MFA] Error starting MFA enrollment:", {
+        message: error?.message,
+        status: error?.status,
+        code: error?.code,
+        full: error
+      });
       return null;
     }
   };
