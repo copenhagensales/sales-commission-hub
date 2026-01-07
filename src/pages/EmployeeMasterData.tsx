@@ -26,6 +26,8 @@ import { DialerMappingTab } from "@/components/employees/DialerMappingTab";
 import { TeamsTab } from "@/components/employees/TeamsTab";
 import { PositionsTab } from "@/components/employees/PositionsTab";
 import { StaffEmployeesTab } from "@/components/employees/StaffEmployeesTab";
+import { SendEmployeeSmsDialog } from "@/components/employees/SendEmployeeSmsDialog";
+import { useTwilioDevice } from "@/hooks/useTwilioDevice";
 
 
 interface EmployeeMasterDataRecord {
@@ -137,7 +139,11 @@ export default function EmployeeMasterData() {
   const [moveToStaffId, setMoveToStaffId] = useState<string | null>(null);
   const [sendingResetTo, setSendingResetTo] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const { canEditEmployees } = usePermissions();
+  const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+  const [smsEmployee, setSmsEmployee] = useState<EmployeeMasterDataRecord | null>(null);
+  const { canEditEmployees, hasPermission } = usePermissions();
+  const { makeCall, isDeviceReady } = useTwilioDevice();
+  const hasOutboundSoftphone = hasPermission("softphone_outbound");
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1387,9 +1393,11 @@ export default function EmployeeMasterData() {
                                 onClick={(e) => { 
                                   e.stopPropagation(); 
                                   if (employee.private_phone) {
-                                    window.location.href = `tel:${employee.private_phone}`;
-                                  } else {
-                                    toast({ title: t("employees.actions.call"), description: t("employees.actions.softphoneComingSoon") });
+                                    if (hasOutboundSoftphone && isDeviceReady) {
+                                      makeCall(employee.private_phone);
+                                    } else {
+                                      window.location.href = `tel:${employee.private_phone}`;
+                                    }
                                   }
                                 }}
                                 disabled={!employee.private_phone}
@@ -1400,11 +1408,8 @@ export default function EmployeeMasterData() {
                               <DropdownMenuItem
                                 onClick={(e) => { 
                                   e.stopPropagation(); 
-                                  if (employee.private_phone) {
-                                    window.location.href = `sms:${employee.private_phone}`;
-                                  } else {
-                                    toast({ title: t("employees.actions.sendSms"), description: t("employees.actions.smsComingSoon") });
-                                  }
+                                  setSmsEmployee(employee);
+                                  setSmsDialogOpen(true);
                                 }}
                                 disabled={!employee.private_phone}
                               >
@@ -1540,6 +1545,15 @@ export default function EmployeeMasterData() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* SMS Dialog for employee communication */}
+        {smsEmployee && (
+          <SendEmployeeSmsDialog
+            open={smsDialogOpen}
+            onOpenChange={setSmsDialogOpen}
+            employee={smsEmployee}
+          />
+        )}
       </div>
     </MainLayout>
   );

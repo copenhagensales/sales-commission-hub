@@ -18,11 +18,13 @@ import { SendContractDialog } from "@/components/contracts/SendContractDialog";
 import { EmployeeCalendar } from "@/components/employee/EmployeeCalendar";
 import { TeamLeaderTeams } from "@/components/employees/TeamLeaderTeams";
 import { EditableRow, ContactRow, SelectRow, TableSection, DateRow } from "@/components/employee/EmployeeDetailFields";
+import { SendEmployeeSmsDialog } from "@/components/employees/SendEmployeeSmsDialog";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/usePositionPermissions";
+import { useTwilioDevice } from "@/hooks/useTwilioDevice";
 interface EmployeeMasterDataRecord {
   id: string;
   first_name: string;
@@ -74,12 +76,15 @@ export default function EmployeeDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { canEditEmployees } = usePermissions();
+  const { canEditEmployees, hasPermission } = usePermissions();
+  const { makeCall, isDeviceReady } = useTwilioDevice();
+  const hasOutboundSoftphone = hasPermission("softphone_outbound");
   const [absencePeriod, setAbsencePeriod] = useState<"2" | "6" | "12">("2");
   const [sendContractOpen, setSendContractOpen] = useState(false);
   const [setPasswordOpen, setSetPasswordOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [isSettingPassword, setIsSettingPassword] = useState(false);
+  const [smsDialogOpen, setSmsDialogOpen] = useState(false);
 
   const { data: employee, isLoading, error } = useQuery({
     queryKey: ["employee-detail", id],
@@ -502,17 +507,27 @@ export default function EmployeeDetail() {
           <div className="flex flex-wrap items-center gap-2">
             {employee.private_phone && (
               <>
-                <Button variant="outline" size="sm" asChild>
-                  <a href={`tel:${employee.private_phone}`}>
-                    <Phone className="h-4 w-4 mr-2" />
-                    Ring op
-                  </a>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    if (hasOutboundSoftphone && isDeviceReady) {
+                      makeCall(employee.private_phone!);
+                    } else {
+                      window.location.href = `tel:${employee.private_phone}`;
+                    }
+                  }}
+                >
+                  <Phone className="h-4 w-4 mr-2" />
+                  Ring op
                 </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <a href={`sms:${employee.private_phone}`}>
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Send SMS
-                  </a>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setSmsDialogOpen(true)}
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Send SMS
                 </Button>
               </>
             )}
@@ -1428,6 +1443,13 @@ export default function EmployeeDetail() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* SMS Dialog for employee communication */}
+        <SendEmployeeSmsDialog
+          open={smsDialogOpen}
+          onOpenChange={setSmsDialogOpen}
+          employee={employee}
+        />
       </div>
     </MainLayout>
   );

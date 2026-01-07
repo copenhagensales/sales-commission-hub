@@ -1895,36 +1895,45 @@ export type Database = {
         Row: {
           application_id: string | null
           content: string | null
+          context_type: string | null
           created_at: string
           direction: string
           id: string
           outcome: string | null
           phone_number: string | null
           read: boolean
+          sender_employee_id: string | null
+          target_employee_id: string | null
           twilio_sid: string | null
           type: string
         }
         Insert: {
           application_id?: string | null
           content?: string | null
+          context_type?: string | null
           created_at?: string
           direction: string
           id?: string
           outcome?: string | null
           phone_number?: string | null
           read?: boolean
+          sender_employee_id?: string | null
+          target_employee_id?: string | null
           twilio_sid?: string | null
           type: string
         }
         Update: {
           application_id?: string | null
           content?: string | null
+          context_type?: string | null
           created_at?: string
           direction?: string
           id?: string
           outcome?: string | null
           phone_number?: string | null
           read?: boolean
+          sender_employee_id?: string | null
+          target_employee_id?: string | null
           twilio_sid?: string | null
           type?: string
         }
@@ -1934,6 +1943,48 @@ export type Database = {
             columns: ["application_id"]
             isOneToOne: false
             referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_logs_sender_employee_id_fkey"
+            columns: ["sender_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_logs_sender_employee_id_fkey"
+            columns: ["sender_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_logs_sender_employee_id_fkey"
+            columns: ["sender_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_logs_target_employee_id_fkey"
+            columns: ["target_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_logs_target_employee_id_fkey"
+            columns: ["target_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_logs_target_employee_id_fkey"
+            columns: ["target_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
             referencedColumns: ["id"]
           },
         ]
