@@ -703,15 +703,18 @@ export default function CandidateDetail() {
         onOpenChange={setShowAssignCohortDialog}
         candidateId={id || ""}
         candidateName={candidate ? `${candidate.first_name} ${candidate.last_name}` : ""}
-        onConfirm={async (cohortId, availableFrom) => {
+        onConfirm={async (cohortId, availableFrom, teamId) => {
           try {
-            // Update candidate status and available_from
-            const updateData: any = { 
+            // Update candidate status, available_from, and team_id
+            const updateData: Record<string, unknown> = { 
               status: "hired",
               cohort_assignment_status: cohortId ? "assigned" : "pending"
             };
             if (availableFrom) {
               updateData.available_from = availableFrom.toISOString().split('T')[0];
+            }
+            if (teamId) {
+              updateData.team_id = teamId;
             }
             
             await supabase.from("candidates").update(updateData).eq("id", id);
