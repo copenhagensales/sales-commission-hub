@@ -172,7 +172,7 @@ export default function ShiftOverview() {
       // Get all primary shifts
       const { data: shifts, error } = await supabase
         .from("team_standard_shifts")
-        .select("id, team_id, name, start_time, end_time")
+        .select("id, team_id, name, start_time, end_time, hours_source")
         .eq("is_primary", true);
       if (error) throw error;
       if (!shifts || shifts.length === 0) return { shifts: [], days: [] };
@@ -186,7 +186,7 @@ export default function ShiftOverview() {
       if (daysError) throw daysError;
 
       return { 
-        shifts: shifts as { id: string; team_id: string; name: string; start_time: string; end_time: string }[],
+        shifts: shifts as { id: string; team_id: string; name: string; start_time: string; end_time: string; hours_source: 'timestamp' | 'shift' }[],
         days: (days || []) as { shift_id: string; day_of_week: number; start_time: string; end_time: string }[]
       };
     },
@@ -460,7 +460,22 @@ export default function ShiftOverview() {
     return (endMinutes - startMinutes) / 60;
   }, []);
 
-  const getDailyBonusEligibility = useCallback((employeeId: string, date: Date, workTimes: string | null, hasShift: boolean): { amount: number; reason?: string } | null => {
+  // Get hours source for employee's team
+  const getHoursSourceForEmployee = useCallback((employeeId: string): 'timestamp' | 'shift' => {
+    const membership = teamMemberships?.find(m => m.employee_id === employeeId);
+    if (!membership) return 'shift';
+    
+    const primaryShift = primaryShiftsData?.shifts.find(s => s.team_id === membership.team_id);
+    return primaryShift?.hours_source || 'shift';
+  }, [teamMemberships, primaryShiftsData]);
+
+  const getDailyBonusEligibility = useCallback((
+    employeeId: string, 
+    date: Date, 
+    workTimes: string | null, 
+    hasShift: boolean,
+    timeStamp: typeof timeStamps extends (infer T)[] | undefined ? T : never | null
+  ): { amount: number; reason?: string } | null => {
     // 1. Check if employee has a team with daily bonus configured
     const membership = teamMemberships?.find(m => m.employee_id === employeeId);
     if (!membership) return null;
@@ -486,14 +501,39 @@ export default function ShiftOverview() {
     // 5. Check if employee has a shift or standard work times
     if (!workTimes && !hasShift) return null;
 
-    // 6. Calculate planned hours from work times
-    const plannedHours = getPlannedHoursFromWorkTimes(workTimes);
-    if (plannedHours < 5) {
-      return { amount: 0, reason: `Kun ${plannedHours.toFixed(1)}t planlagt (kræver 5t)` };
+    // 6. Get hours source setting for this team
+    const hoursSource = getHoursSourceForEmployee(employeeId);
+
+    // 7. Calculate hours based on source
+    if (hoursSource === 'timestamp') {
+      // Use timestamp hours
+      if (!timeStamp?.effective_hours && !timeStamp?.clock_out) {
+        return { amount: bonusConfig.bonus_amount, reason: "Afventer indstempling" };
+      }
+
+      let workedHours = timeStamp?.effective_hours || 0;
+      if (!workedHours && timeStamp?.clock_in && timeStamp?.clock_out) {
+        const clockIn = new Date(timeStamp.clock_in);
+        const clockOut = new Date(timeStamp.clock_out);
+        workedHours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+        if (timeStamp.break_minutes) {
+          workedHours -= timeStamp.break_minutes / 60;
+        }
+      }
+
+      if (workedHours < 5) {
+        return { amount: 0, reason: `Kun ${workedHours.toFixed(1)}t (kræver 5t)` };
+      }
+    } else {
+      // Use planned shift hours
+      const plannedHours = getPlannedHoursFromWorkTimes(workTimes);
+      if (plannedHours < 5) {
+        return { amount: 0, reason: `Kun ${plannedHours.toFixed(1)}t planlagt (kræver 5t)` };
+      }
     }
 
     return { amount: bonusConfig.bonus_amount };
-  }, [teamMemberships, dailyBonusConfigs, employeeStartDates, paidBonuses, getPlannedHoursFromWorkTimes]);
+  }, [teamMemberships, dailyBonusConfigs, employeeStartDates, paidBonuses, getPlannedHoursFromWorkTimes, getHoursSourceForEmployee]);
 
   // Get count of remaining bonus days for employee
   const getRemainingBonusDays = useCallback((employeeId: string): { remaining: number; total: number } | null => {
@@ -880,7 +920,7 @@ export default function ShiftOverview() {
                     
                     // Daily bonus data
                     const bonusPaid = getBonusPaidForDate(employee.id, day);
-                    const bonusEligibility = !bonusPaid ? getDailyBonusEligibility(employee.id, day, workTimes, hasShift) : null;
+                    const bonusEligibility = !bonusPaid ? getDailyBonusEligibility(employee.id, day, workTimes, hasShift, timeStamp) : null;
                     const remainingBonusDays = getRemainingBonusDays(employee.id);
                     const hasBonusEligibility = bonusEligibility && bonusEligibility.amount > 0 && !bonusEligibility.reason;
                     

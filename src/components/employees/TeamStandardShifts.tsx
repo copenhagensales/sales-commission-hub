@@ -19,6 +19,7 @@ interface StandardShift {
   start_time: string;
   end_time: string;
   is_primary: boolean;
+  hours_source: 'timestamp' | 'shift';
 }
 
 interface ShiftDay {
@@ -98,6 +99,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
     name: "",
     start_time: "08:00",
     end_time: "16:00",
+    hours_source: "shift" as 'timestamp' | 'shift',
   });
   const [breaks, setBreaks] = useState<BreakInput[]>([]);
   const [useDifferentTimes, setUseDifferentTimes] = useState(false);
@@ -179,6 +181,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       name: string; 
       start_time: string; 
       end_time: string; 
+      hours_source: 'timestamp' | 'shift';
       breaks: BreakInput[];
       dayConfigs: Record<number, DayConfig>;
     }) => {
@@ -190,6 +193,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
           name: data.name,
           start_time: data.start_time,
           end_time: data.end_time,
+          hours_source: data.hours_source,
         })
         .select()
         .single();
@@ -267,6 +271,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       name: string; 
       start_time: string; 
       end_time: string; 
+      hours_source: 'timestamp' | 'shift';
       breaks: BreakInput[];
       dayConfigs: Record<number, DayConfig>;
     }) => {
@@ -277,6 +282,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
           name: data.name,
           start_time: data.start_time,
           end_time: data.end_time,
+          hours_source: data.hours_source,
         })
         .eq("id", data.id);
       if (shiftError) throw shiftError;
@@ -406,6 +412,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       name: "",
       start_time: "08:00",
       end_time: "16:00",
+      hours_source: "shift",
     });
     setBreaks([]);
     setUseDifferentTimes(false);
@@ -432,6 +439,7 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
       name: shift.name,
       start_time: shift.start_time.slice(0, 5),
       end_time: shift.end_time.slice(0, 5),
+      hours_source: shift.hours_source || "shift",
     });
     // Get general breaks (day_of_week is null)
     const generalBreaks = shiftBreaks.filter(b => b.day_of_week === null);
@@ -995,6 +1003,40 @@ export function TeamStandardShifts({ teamId }: TeamStandardShiftsProps) {
             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
               <span className="text-sm font-medium">Samlet arbejdstid (ekskl. pause)</span>
               <Badge variant="default">{formatDuration(workingMinutes)}</Badge>
+            </div>
+
+            {/* Hours source selection */}
+            <div className="space-y-2 border-t pt-4">
+              <Label className="text-sm font-medium">Timer registreres ud fra</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, hours_source: "shift" })}
+                  className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                    formData.hours_source === "shift"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background hover:bg-muted border-border"
+                  }`}
+                >
+                  Vagtplan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, hours_source: "timestamp" })}
+                  className={`flex-1 px-3 py-2 text-sm rounded-md border transition-colors ${
+                    formData.hours_source === "timestamp"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background hover:bg-muted border-border"
+                  }`}
+                >
+                  Indstempling
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {formData.hours_source === "shift" 
+                  ? "Timer beregnes ud fra planlagte vagttider" 
+                  : "Timer beregnes ud fra faktiske ind-/udstemplinger"}
+              </p>
             </div>
           </div>
           <DialogFooter>

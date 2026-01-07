@@ -6828,6 +6828,7 @@ export type Database = {
         Row: {
           created_at: string
           end_time: string
+          hours_source: string
           id: string
           is_primary: boolean
           name: string
@@ -6838,6 +6839,7 @@ export type Database = {
         Insert: {
           created_at?: string
           end_time: string
+          hours_source?: string
           id?: string
           is_primary?: boolean
           name: string
@@ -6848,6 +6850,7 @@ export type Database = {
         Update: {
           created_at?: string
           end_time?: string
+          hours_source?: string
           id?: string
           is_primary?: boolean
           name?: string
