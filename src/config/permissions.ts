@@ -188,6 +188,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         hasEditOption: true,
         scopeKey: "scope_career_wishes",
       },
+      {
+        key: "menu_security_dashboard",
+        label: "Sikkerhedsoversigt",
+        description: "Adgang til sikkerhedsdashboard (MFA reset, kontolåsning)",
+        hasEditOption: false,
+      },
     ],
   },
   {

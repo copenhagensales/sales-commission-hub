@@ -231,6 +231,7 @@ export function usePermissions() {
     canEditContracts: canEdit("menu_contracts"),
     canViewPermissions: canView("menu_permissions"),
     canViewCareerWishesOverview: canView("menu_career_wishes_overview"),
+    canViewSecurityDashboard: canView("menu_security_dashboard"),
     // Test menu
     canViewCarQuizAdmin: canView("menu_car_quiz_admin"),
     canViewCocAdmin: canView("menu_coc_admin"),
