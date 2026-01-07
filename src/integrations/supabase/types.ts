@@ -216,6 +216,7 @@ export type Database = {
       }
       agent_presence: {
         Row: {
+          can_receive_calls: boolean | null
           created_at: string
           employee_id: string
           id: string
@@ -225,6 +226,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          can_receive_calls?: boolean | null
           created_at?: string
           employee_id: string
           id?: string
@@ -234,6 +236,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          can_receive_calls?: boolean | null
           created_at?: string
           employee_id?: string
           id?: string

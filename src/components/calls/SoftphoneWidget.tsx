@@ -73,7 +73,9 @@ export function SoftphoneWidget() {
     toggleMute,
     makeCall,
     disconnectDevice,
-    hasAccess,
+    hasOutboundAccess,
+    hasInboundAccess,
+    hasAnyAccess,
   } = useTwilioDeviceContext();
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -92,7 +94,7 @@ export function SoftphoneWidget() {
         .not('private_phone', 'is', null);
       return data || [];
     },
-    enabled: hasAccess, // Only fetch if user has access
+    enabled: hasAnyAccess, // Only fetch if user has access
   });
 
   const { data: candidates = [] } = useQuery({
@@ -104,7 +106,7 @@ export function SoftphoneWidget() {
         .not('phone', 'is', null);
       return data || [];
     },
-    enabled: hasAccess, // Only fetch if user has access
+    enabled: hasAnyAccess, // Only fetch if user has access
   });
 
   // Combine and normalize contacts
@@ -153,15 +155,15 @@ export function SoftphoneWidget() {
   const isIncomingRinging = callState === 'incoming';
   useRingingSound(isIncomingRinging);
 
-  // Auto-connect softphone on mount so we can receive incoming calls
+  // Auto-connect softphone on mount only if user has inbound access
   useEffect(() => {
-    if (!hasAccess) return; // Don't auto-connect if no access
+    if (!hasInboundAccess) return; // Only auto-connect if user can receive calls
     if (!autoConnectAttempted && deviceState === 'disconnected') {
       setAutoConnectAttempted(true);
       console.log('[SoftphoneWidget] Auto-connecting softphone for incoming calls...');
       initializeDevice();
     }
-  }, [deviceState, autoConnectAttempted, initializeDevice, hasAccess]);
+  }, [deviceState, autoConnectAttempted, initializeDevice, hasInboundAccess]);
 
   // Handle input change - only allow numbers, +, *, #
   const handleDialNumberChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -214,13 +216,13 @@ export function SoftphoneWidget() {
     }
   }, [answerCall]);
 
-  // Don't render anything if user doesn't have access (AFTER all hooks)
-  if (!hasAccess) return null;
+  // Don't render anything if user doesn't have any access (AFTER all hooks)
+  if (!hasAnyAccess) return null;
 
   return (
     <>
-      {/* Full-screen Incoming Call Modal */}
-      <Dialog open={!!isIncomingCall} onOpenChange={() => {}}>
+      {/* Full-screen Incoming Call Modal - Only for inbound users */}
+      {hasInboundAccess && <Dialog open={!!isIncomingCall} onOpenChange={() => {}}>
         <DialogContent
           className="sm:max-w-md w-[95vw] max-w-[400px] p-0 border-0 bg-gradient-to-b from-primary/10 to-background"
           onPointerDownOutside={(e) => e.preventDefault()}
@@ -266,7 +268,7 @@ export function SoftphoneWidget() {
             </div>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog>}
 
       <div className="fixed bottom-4 right-4 z-50">
 
@@ -325,8 +327,8 @@ export function SoftphoneWidget() {
         </Card>
       )}
 
-      {/* Dial Pad with Contacts Panel */}
-      {showDialer && deviceState === 'ready' && !shouldShowCallUI && (
+      {/* Dial Pad with Contacts Panel - Only for outbound users */}
+      {hasOutboundAccess && showDialer && deviceState === 'ready' && !shouldShowCallUI && (
         <Card className="mb-4 shadow-lg w-[320px]">
           <CardContent className="p-3 sm:p-4">
             {/* Fixed Header */}
@@ -468,17 +470,33 @@ export function SoftphoneWidget() {
 
               <div className="flex gap-2">
                 {deviceState === 'disconnected' || deviceState === 'error' ? (
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      initializeDevice();
-                    }}
-                    size="sm"
-                    className="flex-1"
-                  >
-                    <Phone className="w-4 h-4 mr-2" />
-                    Go Online
-                  </Button>
+                  // Show Go Online only if user has inbound access (needs to register for calls)
+                  // OR has outbound access (will auto-register when dialing)
+                  hasInboundAccess ? (
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        initializeDevice();
+                      }}
+                      size="sm"
+                      className="flex-1"
+                    >
+                      <Phone className="w-4 h-4 mr-2" />
+                      Go Online
+                    </Button>
+                  ) : hasOutboundAccess ? (
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowDialer(!showDialer);
+                      }}
+                      size="sm"
+                      className="flex-1 bg-green-500 hover:bg-green-600"
+                    >
+                      <Phone className="w-4 h-4 mr-2" />
+                      Dial
+                    </Button>
+                  ) : null
                 ) : deviceState === 'connecting' ? (
                   <Button
                     size="sm"
@@ -490,29 +508,33 @@ export function SoftphoneWidget() {
                   </Button>
                 ) : (
                   <>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowDialer(!showDialer);
-                      }}
-                      size="sm"
-                      className="flex-1 bg-green-500 hover:bg-green-600"
-                      disabled={deviceState === 'busy'}
-                    >
-                      <Phone className="w-4 h-4 mr-2" />
-                      Dial
-                    </Button>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        disconnectDevice();
-                      }}
-                      size="sm"
-                      variant="outline"
-                      disabled={deviceState === 'busy'}
-                    >
-                      <PhoneOff className="w-4 h-4" />
-                    </Button>
+                    {hasOutboundAccess && (
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowDialer(!showDialer);
+                        }}
+                        size="sm"
+                        className="flex-1 bg-green-500 hover:bg-green-600"
+                        disabled={deviceState === 'busy'}
+                      >
+                        <Phone className="w-4 h-4 mr-2" />
+                        Dial
+                      </Button>
+                    )}
+                    {hasInboundAccess && (
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          disconnectDevice();
+                        }}
+                        size="sm"
+                        variant="outline"
+                        disabled={deviceState === 'busy'}
+                      >
+                        <PhoneOff className="w-4 h-4" />
+                      </Button>
+                    )}
                   </>
                 )}
               </div>

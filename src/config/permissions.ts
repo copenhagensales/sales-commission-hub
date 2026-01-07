@@ -302,6 +302,27 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ],
   },
 
+  // ==================== SOFTPHONE ====================
+  {
+    key: "menu_softphone",
+    label: "Softphone",
+    icon: "📞",
+    permissions: [
+      {
+        key: "softphone_outbound",
+        label: "Udgående opkald",
+        description: "Kan foretage udgående opkald via softphone",
+        hasEditOption: false,
+      },
+      {
+        key: "softphone_inbound",
+        label: "Indgående opkald",
+        description: "Kan modtage indgående opkald og returkald",
+        hasEditOption: false,
+      },
+    ],
+  },
+
   // ==================== REKRUTTERING MENU ====================
   {
     key: "menu_recruitment",
