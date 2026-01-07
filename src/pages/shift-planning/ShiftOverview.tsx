@@ -490,8 +490,11 @@ export default function ShiftOverview() {
     const startDate = parseISO(empData.employment_start_date);
     if (date < startDate) return null;
 
-    // 3. Check how many bonuses have already been paid to this employee
-    const paidCount = paidBonuses?.filter(b => b.employee_id === employeeId).length || 0;
+    // 3. Check how many bonuses have already been paid to this employee (within bonus period)
+    const startDateStr = format(startDate, "yyyy-MM-dd");
+    const paidCount = paidBonuses?.filter(b => 
+      b.employee_id === employeeId && b.date >= startDateStr
+    ).length || 0;
     if (paidCount >= bonusConfig.bonus_days) return null;
 
     // 4. Check if employee has absence on this date
@@ -736,7 +739,7 @@ export default function ShiftOverview() {
 
   // Auto-trigger daily bonus when eligibility conditions are met
   useEffect(() => {
-    if (!employees || !weekDays || !timeStamps || !paidBonuses) return;
+    if (!employees || !weekDays || !timeStamps || paidBonuses === undefined) return;
 
     // Check each employee/day combination for auto-bonus eligibility
     employees.forEach(employee => {
@@ -748,7 +751,7 @@ export default function ShiftOverview() {
         if (autoCreatedBonusesRef.current.has(bonusKey)) return;
         
         // Skip if already paid
-        const bonusPaid = paidBonuses.find(b => b.employee_id === employee.id && b.date === dateStr);
+        const bonusPaid = paidBonuses?.find(b => b.employee_id === employee.id && b.date === dateStr);
         if (bonusPaid) return;
         
         const timeStamp = timeStamps.find(ts => {
@@ -767,6 +770,7 @@ export default function ShiftOverview() {
         
         // Auto-create bonus if eligible (amount > 0 and no blocking reason)
         if (eligibility && eligibility.amount > 0 && !eligibility.reason) {
+          console.log(`[AutoBonus] Creating bonus for ${employee.first_name} on ${dateStr}:`, eligibility);
           autoCreatedBonusesRef.current.add(bonusKey);
           createDailyBonus.mutate({
             employeeId: employee.id,
