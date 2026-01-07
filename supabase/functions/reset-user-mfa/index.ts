@@ -69,17 +69,40 @@ Deno.serve(async (req) => {
     });
 
     // Find the target user by email in auth.users
-    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    if (listError) {
-      console.error("Error listing users:", listError);
-      return new Response(
-        JSON.stringify({ error: "Kunne ikke hente brugerliste" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Use pagination to find the user if there are many users
+    let targetUser = null;
+    let page = 1;
+    const perPage = 1000;
+    
+    while (!targetUser) {
+      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage,
+      });
+      
+      if (listError) {
+        console.error("Error listing users:", listError);
+        return new Response(
+          JSON.stringify({ error: "Kunne ikke hente brugerliste" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!users || users.length === 0) {
+        break; // No more users to check
+      }
+
+      targetUser = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+      
+      if (users.length < perPage) {
+        break; // This was the last page
+      }
+      
+      page++;
     }
 
-    const targetUser = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
     if (!targetUser) {
+      console.error(`User not found with email: ${email}`);
       return new Response(
         JSON.stringify({ error: "Bruger ikke fundet" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
