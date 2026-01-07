@@ -4,7 +4,18 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Users, Plus, Clock, MapPin, Building2, UserPlus, Mail, Loader2 } from "lucide-react";
+import { Calendar, Users, Plus, Clock, MapPin, Building2, UserPlus, Mail, Loader2, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { format, isToday, isTomorrow, isThisWeek, isPast, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { useState } from "react";
@@ -149,6 +160,23 @@ export default function UpcomingStarts() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["onboarding-cohorts"] });
       toast({ title: "Status opdateret" });
+    },
+  });
+
+  const deleteCandidateMutation = useMutation({
+    mutationFn: async (candidateId: string) => {
+      const { error } = await supabase
+        .from("candidates")
+        .delete()
+        .eq("id", candidateId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["unassigned-hired-candidates"] });
+      toast({ title: "Kandidat slettet" });
+    },
+    onError: () => {
+      toast({ title: "Kunne ikke slette kandidat", variant: "destructive" });
     },
   });
 
@@ -518,9 +546,41 @@ export default function UpcomingStarts() {
                         </p>
                       )}
                     </div>
-                    <Badge variant="outline" className="ml-2 text-xs shrink-0 bg-amber-50 text-amber-700 border-amber-300">
-                      Afventer
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs shrink-0 bg-amber-50 text-amber-700 border-amber-300">
+                        Afventer
+                      </Badge>
+                      {canEdit && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Slet kandidat</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Er du sikker på, at du vil slette {candidate.first_name} {candidate.last_name}? Denne handling kan ikke fortrydes.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annuller</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteCandidateMutation.mutate(candidate.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Slet
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
