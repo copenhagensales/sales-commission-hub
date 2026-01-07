@@ -76,7 +76,7 @@ export default function Candidates() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewCandidateDialog, setShowNewCandidateDialog] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("active");
   const [sortBy, setSortBy] = useState<string>("newest");
 
   const { data: candidatesWithApps = [], isLoading, refetch } = useQuery({
@@ -122,6 +122,11 @@ export default function Candidates() {
     },
   });
 
+  // Define finished statuses that should be hidden in "active" view
+  const finishedStatuses = ['hired', 'rejected', 'ghostet', 'takket_nej', 'ansat', 'ikke_ansat', 'ikke_kvalificeret'];
+
+  const activeCandidates = candidatesWithApps.filter(c => !finishedStatuses.includes(c.status));
+
   const filteredCandidates = candidatesWithApps
     .filter((candidate) => {
       // Search filter
@@ -136,6 +141,7 @@ export default function Candidates() {
 
       // Status filter
       if (statusFilter === "all") return true;
+      if (statusFilter === "active") return !finishedStatuses.includes(candidate.status);
       return candidate.status === statusFilter;
     })
     .sort((a, b) => {
@@ -213,7 +219,7 @@ export default function Candidates() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Kandidater</h1>
             <p className="text-sm md:text-base text-muted-foreground">
-              {candidatesWithApps.length} kandidater · {totalApplications} ansøgninger
+              {activeCandidates.length} igangværende · {candidatesWithApps.length} total · {totalApplications} ansøgninger
             </p>
           </div>
           <Button onClick={() => setShowNewCandidateDialog(true)} className="w-full md:w-auto">
@@ -253,6 +259,7 @@ export default function Candidates() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-popover border-border">
+                    <SelectItem value="active">Igangværende</SelectItem>
                     <SelectItem value="all">Alle statuser</SelectItem>
                     <SelectItem value="new">Ny ansøgning</SelectItem>
                     <SelectItem value="contacted">Kontaktet</SelectItem>
