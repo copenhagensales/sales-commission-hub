@@ -385,7 +385,7 @@ export default function DailyReports() {
       
       const { data: primaryShifts } = await supabase
         .from("team_standard_shifts")
-        .select("id, team_id, start_time, end_time")
+        .select("id, team_id, start_time, end_time, hours_source")
         .in("team_id", teamIds)
         .eq("is_primary", true);
 
@@ -393,6 +393,25 @@ export default function DailyReports() {
         .from("team_standard_shift_days")
         .select("shift_id, day_of_week, start_time, end_time")
         .in("shift_id", primaryShifts?.map(s => s.id) || []);
+
+      // Fetch time_stamps for employees if any team uses 'timestamp' hours_source
+      const teamsUsingTimestamps = primaryShifts?.filter(s => s.hours_source === 'timestamp').map(s => s.team_id) || [];
+      let timeStampsData: any[] = [];
+      if (teamsUsingTimestamps.length > 0) {
+        const employeesWithTimestampTeams = teamMembers
+          ?.filter(tm => teamsUsingTimestamps.includes(tm.team_id))
+          .map(tm => tm.employee_id) || [];
+        
+        if (employeesWithTimestampTeams.length > 0) {
+          const { data: stamps } = await supabase
+            .from("time_stamps")
+            .select("employee_id, date, clock_in, clock_out, break_minutes")
+            .in("employee_id", employeesWithTimestampTeams)
+            .gte("date", startStr)
+            .lte("date", endStr);
+          timeStampsData = stamps || [];
+        }
+      }
 
       // Build list of all possible agent identifiers for fetching sales
       const allAgentIdentifiers: string[] = [];
@@ -536,6 +555,7 @@ export default function DailyReports() {
         const empShiftDays = empPrimaryShift 
           ? shiftDays?.filter(sd => sd.shift_id === empPrimaryShift.id) || []
           : [];
+        const hoursSource = empPrimaryShift?.hours_source || 'shift';
 
         // Get all agent identifiers for this employee
         const empAgentMappings = agentMappings?.filter(m => m.employee_id === empId) || [];
@@ -561,16 +581,36 @@ export default function DailyReports() {
           
           const shiftForDay = empShiftDays.find(sd => sd.day_of_week === adjustedDayOfWeek);
           
-          if (!shiftForDay || !shiftForDay.start_time || !shiftForDay.end_time) {
+          // Calculate hours based on hours_source setting
+          let hours = 0;
+          
+          if (hoursSource === 'timestamp') {
+            // Use actual timestamp data
+            const empTimestamp = timeStampsData.find(ts => ts.employee_id === empId && ts.date === dayStr);
+            if (empTimestamp?.clock_in && empTimestamp?.clock_out) {
+              const [inH, inM] = empTimestamp.clock_in.split(':').map(Number);
+              const [outH, outM] = empTimestamp.clock_out.split(':').map(Number);
+              const rawHours = (outH + outM / 60) - (inH + inM / 60);
+              const breakMins = empTimestamp.break_minutes || 0;
+              hours = Math.max(0, rawHours - (breakMins / 60));
+            }
+          } else {
+            // Use planned shift times (original logic)
+            if (!shiftForDay || !shiftForDay.start_time || !shiftForDay.end_time) {
+              continue;
+            }
+            const [startH, startM] = shiftForDay.start_time.split(':').map(Number);
+            const [endH, endM] = shiftForDay.end_time.split(':').map(Number);
+            const rawHours = (endH + endM / 60) - (startH + startM / 60);
+            // Standard 30 min break for shifts over 6 hours
+            const breakMinutes = rawHours > 6 ? 30 : 0;
+            hours = rawHours - (breakMinutes / 60);
+          }
+          
+          // Skip days with no hours (for shift-based) or continue for timestamp-based
+          if (hoursSource === 'shift' && hours === 0) {
             continue;
           }
-
-          const [startH, startM] = shiftForDay.start_time.split(':').map(Number);
-          const [endH, endM] = shiftForDay.end_time.split(':').map(Number);
-          const rawHours = (endH + endM / 60) - (startH + startM / 60);
-          // Standard 30 min break for shifts over 6 hours
-          const breakMinutes = rawHours > 6 ? 30 : 0;
-          const hours = rawHours - (breakMinutes / 60);
 
           const empAbsences = absences?.filter(a => 
             a.employee_id === empId && 
