@@ -61,8 +61,15 @@ export function AddMemberDialog({ open, onOpenChange, cohortId }: AddMemberDialo
         status: "assigned" as const,
       }));
 
-      const { error } = await supabase.from("cohort_members").insert(members);
-      if (error) throw error;
+      const { error: insertError } = await supabase.from("cohort_members").insert(members);
+      if (insertError) throw insertError;
+
+      // Update candidates' cohort_assignment_status to 'assigned'
+      const { error: updateError } = await supabase
+        .from("candidates")
+        .update({ cohort_assignment_status: "assigned" })
+        .in("id", candidateIds);
+      if (updateError) throw updateError;
     },
     onSuccess: () => {
       toast({ title: "Deltagere tilføjet" });
