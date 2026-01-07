@@ -58,41 +58,61 @@ serve(async (req) => {
       }
     }
 
-    // Normalize phone number for matching (last 8 digits for Danish numbers)
-    const normalizedPhone = from?.replace(/\D/g, '').slice(-8);
-    
-    let applicationId: string | null = null;
-    
-    if (normalizedPhone) {
-      // Try to find matching candidate by phone number
-      const { data: candidate } = await supabase
-        .from('candidates')
-        .select('id')
-        .or(`phone.ilike.%${normalizedPhone}`)
-        .maybeSingle();
+    // Smart routing: Find the most recent outbound message to this phone number
+    // to determine context (candidate vs employee) and sender
+    const { data: lastOutbound } = await supabase
+      .from('communication_logs')
+      .select('sender_employee_id, context_type, target_employee_id, application_id')
+      .eq('phone_number', from)
+      .eq('direction', 'outbound')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Inherit context from last outbound message
+    const contextType = lastOutbound?.context_type || 'candidate';
+    const senderEmployeeId = lastOutbound?.sender_employee_id || null;
+    const targetEmployeeId = lastOutbound?.target_employee_id || null;
+    let applicationId: string | null = lastOutbound?.application_id || null;
+
+    console.log('[receive-sms] Context from last outbound:', {
+      contextType,
+      senderEmployeeId,
+      targetEmployeeId,
+      applicationId
+    });
+
+    // For candidate context, try to match candidate if no application found
+    if (contextType === 'candidate' && !applicationId) {
+      const normalizedPhone = from?.replace(/\D/g, '').slice(-8);
       
-      if (candidate) {
-        console.log('[receive-sms] Matched to candidate:', candidate.id);
-        
-        // Find most recent application for this candidate
-        const { data: application } = await supabase
-          .from('applications')
+      if (normalizedPhone) {
+        const { data: candidate } = await supabase
+          .from('candidates')
           .select('id')
-          .eq('candidate_id', candidate.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
+          .or(`phone.ilike.%${normalizedPhone}`)
           .maybeSingle();
         
-        if (application) {
-          applicationId = application.id;
-          console.log('[receive-sms] Linked to application:', applicationId);
+        if (candidate) {
+          console.log('[receive-sms] Matched to candidate:', candidate.id);
+          
+          const { data: application } = await supabase
+            .from('applications')
+            .select('id')
+            .eq('candidate_id', candidate.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (application) {
+            applicationId = application.id;
+            console.log('[receive-sms] Linked to application:', applicationId);
+          }
         }
-      } else {
-        console.log('[receive-sms] No candidate match found for phone:', normalizedPhone);
       }
     }
 
-    // Store SMS as immutable record in communication_logs
+    // Store SMS as immutable record in communication_logs with context
     const { data: insertedLog, error: insertError } = await supabase
       .from('communication_logs')
       .insert({
@@ -103,6 +123,9 @@ serve(async (req) => {
         phone_number: from,
         twilio_sid: messageSid,
         read: false,
+        context_type: contextType,
+        sender_employee_id: senderEmployeeId,
+        target_employee_id: targetEmployeeId,
       })
       .select('id')
       .single();

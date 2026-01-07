@@ -167,3 +167,33 @@ verify_jwt = false
 
 [functions.check-account-locked]
 verify_jwt = false
+
+[functions.send-employee-sms]
+verify_jwt = true
+
+[functions.notify-referral-received]
+verify_jwt = false
+
+[functions.log-failed-login]
+verify_jwt = false
+
+[functions.log-login-event]
+verify_jwt = false
+
+[functions.set-user-password]
+verify_jwt = true
+
+[functions.unlock-account]
+verify_jwt = true
+
+[functions.force-password-reset]
+verify_jwt = true
+
+[functions.sync-contracts-to-sharepoint]
+verify_jwt = true
+
+[functions.send-test-email]
+verify_jwt = true
+
+[functions.client-sales-overview]
+verify_jwt = false
