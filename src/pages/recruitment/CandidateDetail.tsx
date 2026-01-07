@@ -230,11 +230,15 @@ export default function CandidateDetail() {
         throw new Error("Vælg dato og tidspunkt");
       }
       const dateStr = format(interviewDate, "yyyy-MM-dd");
-      const dateTime = `${dateStr}T${interviewTime}:00`;
+      // Create a proper local datetime and convert to ISO with timezone
+      const [hours, minutes] = interviewTime.split(':').map(Number);
+      const localDateTime = new Date(interviewDate);
+      localDateTime.setHours(hours, minutes, 0, 0);
+      
       const { error } = await supabase
         .from("candidates")
         .update({ 
-          interview_date: dateTime,
+          interview_date: localDateTime.toISOString(),
           status: "interview_scheduled"
         })
         .eq("id", id);
