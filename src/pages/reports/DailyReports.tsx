@@ -464,34 +464,40 @@ export default function DailyReports() {
       
       console.log("[DailyReport] FM Sales fetched:", fmSalesData?.length);
       
-      // Fetch products with campaign overrides for FM commission lookup
+      // Fetch products with campaign overrides for FM commission and revenue lookup
       // First get all products
       const { data: allProducts } = await supabase
         .from("products")
-        .select("id, name, commission_dkk");
+        .select("id, name, commission_dkk, revenue_dkk");
       
       // Get campaign overrides - use the first override found per product (simplification)
       const { data: campaignOverrides } = await supabase
         .from("product_campaign_overrides")
-        .select("product_id, commission_dkk");
+        .select("product_id, commission_dkk, revenue_dkk");
       
-      // Build commission map: prefer campaign override, fallback to base commission
+      // Build commission and revenue maps: prefer campaign override, fallback to base values
       const productCommissionMap = new Map<string, number>();
-      const overrideByProductId = new Map<string, number>();
+      const productRevenueMap = new Map<string, number>();
+      const overrideByProductId = new Map<string, { commission: number; revenue: number }>();
       
       campaignOverrides?.forEach(o => {
         // Take first override found (highest commission to be generous)
         const existing = overrideByProductId.get(o.product_id);
-        if (!existing || o.commission_dkk > existing) {
-          overrideByProductId.set(o.product_id, o.commission_dkk);
+        if (!existing || (o.commission_dkk ?? 0) > (existing.commission ?? 0)) {
+          overrideByProductId.set(o.product_id, { 
+            commission: o.commission_dkk ?? 0, 
+            revenue: o.revenue_dkk ?? 0 
+          });
         }
       });
       
       allProducts?.forEach(p => {
         if (p.name) {
           const override = overrideByProductId.get(p.id);
-          const commission = override ?? p.commission_dkk ?? 0;
+          const commission = override?.commission ?? p.commission_dkk ?? 0;
+          const revenue = override?.revenue ?? p.revenue_dkk ?? 0;
           productCommissionMap.set(p.name.toLowerCase(), commission);
+          productRevenueMap.set(p.name.toLowerCase(), revenue);
         }
       });
 
@@ -596,11 +602,12 @@ export default function DailyReports() {
             });
           });
 
-          // Add fieldmarketing sales - match commission by product_name
+          // Add fieldmarketing sales - match commission and revenue by product_name
           empFmSales.forEach((sale: any) => {
             salesCount += 1;
             const productName = (sale.product_name || "").toLowerCase();
             commission += productCommissionMap.get(productName) || 0;
+            revenue += productRevenueMap.get(productName) || 0;
             // FM sales have client_id directly on the record
             if (sale.client_id) {
               dayClientIds.add(sale.client_id);
