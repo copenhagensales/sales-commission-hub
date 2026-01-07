@@ -446,7 +446,21 @@ export default function ShiftOverview() {
 
   // Get daily bonus eligibility for an employee on a given date
   // Returns bonus amount if eligible, null if not
-  const getDailyBonusEligibility = useCallback((employeeId: string, date: Date, timeStamp: typeof timeStamps extends (infer T)[] | undefined ? T : never | null): { amount: number; reason?: string } | null => {
+  // Calculate planned hours from work times string (e.g., "08:30-16:30")
+  const getPlannedHoursFromWorkTimes = useCallback((workTimes: string | null): number => {
+    if (!workTimes) return 0;
+    const match = workTimes.match(/(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})/);
+    if (!match) return 0;
+    const startHour = parseInt(match[1], 10);
+    const startMin = parseInt(match[2], 10);
+    const endHour = parseInt(match[3], 10);
+    const endMin = parseInt(match[4], 10);
+    const startMinutes = startHour * 60 + startMin;
+    const endMinutes = endHour * 60 + endMin;
+    return (endMinutes - startMinutes) / 60;
+  }, []);
+
+  const getDailyBonusEligibility = useCallback((employeeId: string, date: Date, workTimes: string | null, hasShift: boolean): { amount: number; reason?: string } | null => {
     // 1. Check if employee has a team with daily bonus configured
     const membership = teamMemberships?.find(m => m.employee_id === employeeId);
     if (!membership) return null;
@@ -469,29 +483,17 @@ export default function ShiftOverview() {
     const absence = isDateInAbsence(employeeId, date);
     if (absence) return { amount: 0, reason: absence.type === "sick" ? "Syg" : "Ferie" };
 
-    // 5. Check if employee worked more than 5 hours
-    if (!timeStamp?.effective_hours && !timeStamp?.clock_out) {
-      return { amount: bonusConfig.bonus_amount, reason: "Afventer arbejdstimer" };
-    }
+    // 5. Check if employee has a shift or standard work times
+    if (!workTimes && !hasShift) return null;
 
-    // Calculate hours from timestamp
-    let workedHours = timeStamp?.effective_hours || 0;
-    if (!workedHours && timeStamp?.clock_in && timeStamp?.clock_out) {
-      const clockIn = new Date(timeStamp.clock_in);
-      const clockOut = new Date(timeStamp.clock_out);
-      workedHours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
-      // Subtract break
-      if (timeStamp.break_minutes) {
-        workedHours -= timeStamp.break_minutes / 60;
-      }
-    }
-
-    if (workedHours < 5) {
-      return { amount: 0, reason: `Kun ${workedHours.toFixed(1)}t (kræver 5t)` };
+    // 6. Calculate planned hours from work times
+    const plannedHours = getPlannedHoursFromWorkTimes(workTimes);
+    if (plannedHours < 5) {
+      return { amount: 0, reason: `Kun ${plannedHours.toFixed(1)}t planlagt (kræver 5t)` };
     }
 
     return { amount: bonusConfig.bonus_amount };
-  }, [teamMemberships, dailyBonusConfigs, employeeStartDates, paidBonuses]);
+  }, [teamMemberships, dailyBonusConfigs, employeeStartDates, paidBonuses, getPlannedHoursFromWorkTimes]);
 
   // Get count of remaining bonus days for employee
   const getRemainingBonusDays = useCallback((employeeId: string): { remaining: number; total: number } | null => {
@@ -878,7 +880,7 @@ export default function ShiftOverview() {
                     
                     // Daily bonus data
                     const bonusPaid = getBonusPaidForDate(employee.id, day);
-                    const bonusEligibility = !bonusPaid ? getDailyBonusEligibility(employee.id, day, timeStamp) : null;
+                    const bonusEligibility = !bonusPaid ? getDailyBonusEligibility(employee.id, day, workTimes, hasShift) : null;
                     const remainingBonusDays = getRemainingBonusDays(employee.id);
                     const hasBonusEligibility = bonusEligibility && bonusEligibility.amount > 0 && !bonusEligibility.reason;
                     
