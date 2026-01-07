@@ -149,13 +149,14 @@ serve(async (req) => {
       // For inbound calls, try to route to connected browser clients
       console.log(`[twilio-voice-token][${requestId}] Inbound call - routing to browser clients`);
       
-      // Query ONLY agents who are currently online (presence tracking)
+      // Query ONLY agents who are currently online AND can receive calls
       let onlineAgents: { identity: string }[] = [];
       try {
         const { data, error } = await supabaseClient
           .from('agent_presence')
           .select('identity')
-          .eq('is_online', true);
+          .eq('is_online', true)
+          .eq('can_receive_calls', true);
 
         if (error) {
           console.error(`[twilio-voice-token][${requestId}] Presence query error:`, error);

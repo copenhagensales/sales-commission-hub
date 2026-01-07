@@ -14,9 +14,14 @@ interface CallInfo {
 }
 
 // Update agent presence in database
-async function updateAgentPresence(employeeId: string, identity: string, isOnline: boolean) {
+async function updateAgentPresence(
+  employeeId: string, 
+  identity: string, 
+  isOnline: boolean,
+  canReceiveCalls: boolean = false
+) {
   try {
-    console.log(`[useTwilioDevice] Updating presence: ${identity} -> ${isOnline ? 'online' : 'offline'}`);
+    console.log(`[useTwilioDevice] Updating presence: ${identity} -> ${isOnline ? 'online' : 'offline'}, canReceiveCalls: ${canReceiveCalls}`);
     
     const { error } = await supabase
       .from('agent_presence')
@@ -24,6 +29,7 @@ async function updateAgentPresence(employeeId: string, identity: string, isOnlin
         employee_id: employeeId,
         identity,
         is_online: isOnline,
+        can_receive_calls: canReceiveCalls,
         last_seen_at: new Date().toISOString(),
       }, {
         onConflict: 'employee_id',
@@ -37,11 +43,18 @@ async function updateAgentPresence(employeeId: string, identity: string, isOnlin
   }
 }
 
+// Store canReceiveCalls flag with identity
+interface IdentityInfo {
+  employeeId: string;
+  identity: string;
+  canReceiveCalls: boolean;
+}
+
 export function useTwilioDevice() {
   const { toast } = useToast();
   const deviceRef = useRef<Device | null>(null);
   const activeCallRef = useRef<Call | null>(null);
-  const currentIdentityRef = useRef<{ employeeId: string; identity: string } | null>(null);
+  const currentIdentityRef = useRef<IdentityInfo | null>(null);
   
   const [deviceState, setDeviceState] = useState<DeviceState>('disconnected');
   const [callState, setCallState] = useState<CallState>('idle');
@@ -69,8 +82,8 @@ export function useTwilioDevice() {
     }, 1000);
   }, [clearDurationTimer]);
 
-  // Initialize device
-  const initializeDevice = useCallback(async () => {
+  // Initialize device with optional canReceiveCalls flag
+  const initializeDevice = useCallback(async (canReceiveCalls: boolean = false) => {
     try {
       setDeviceState('connecting');
       setError(null);
@@ -92,7 +105,7 @@ export function useTwilioDevice() {
       
       // Store identity info for presence tracking
       const employeeId = data.identity?.replace('agent_', '') || '';
-      currentIdentityRef.current = { employeeId, identity: data.identity };
+      currentIdentityRef.current = { employeeId, identity: data.identity, canReceiveCalls };
 
       // Create new device
       const device = new Device(data.token, {
@@ -104,9 +117,14 @@ export function useTwilioDevice() {
       device.on('registered', () => {
         console.log('[useTwilioDevice] Device registered with identity:', data.identity);
         setDeviceState('ready');
-        // Mark agent as online
+        // Mark agent as online with canReceiveCalls flag
         if (currentIdentityRef.current) {
-          updateAgentPresence(currentIdentityRef.current.employeeId, currentIdentityRef.current.identity, true);
+          updateAgentPresence(
+            currentIdentityRef.current.employeeId, 
+            currentIdentityRef.current.identity, 
+            true,
+            currentIdentityRef.current.canReceiveCalls
+          );
         }
       });
 
@@ -268,7 +286,7 @@ export function useTwilioDevice() {
   }, []);
 
   // Make outbound call - auto-initializes device if needed
-  const makeCall = useCallback(async (toNumber: string) => {
+  const makeCall = useCallback(async (toNumber: string, canReceiveCalls: boolean = false) => {
     try {
       // Request microphone permission first
       await navigator.mediaDevices.getUserMedia({ audio: true });
