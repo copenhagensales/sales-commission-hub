@@ -73,7 +73,8 @@
     "timeOff": "Time Off Requests",
     "permissions": "Permissions",
     "management": "Management",
-    "personnel": "Personnel"
+    "personnel": "Personnel",
+    "security": "Security"
   },
   "dialerIntegrations": {
     "title": "Dialer Integrations",

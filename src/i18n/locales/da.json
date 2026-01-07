@@ -75,7 +75,8 @@
     "permissions": "Rettigheder",
     "management": "Ledelse",
     "personnel": "Personale",
-    "loginLog": "Login Log"
+    "loginLog": "Login Log",
+    "security": "Sikkerhed"
   },
   "dialerIntegrations": {
     "title": "Dialer Integrationer",

@@ -47,7 +47,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const [vagtFlowOpen, setVagtFlowOpen] = useState(location.pathname.startsWith("/vagt-flow"));
   const [recruitmentOpen, setRecruitmentOpen] = useState(location.pathname.startsWith("/recruitment"));
   const [ledelseOpen, setLedelseOpen] = useState(
-    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates"].some(path => location.pathname.startsWith(path))
+    ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates", "/admin/security"].some(path => location.pathname.startsWith(path))
   );
   const [personnelOpen, setPersonnelOpen] = useState(location.pathname.startsWith("/employees") || location.pathname === "/login-log");
   const [mgOpen, setMgOpen] = useState(
@@ -312,7 +312,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const showPersonnelMenu = p.canViewEmployees || p.canViewTeams || p.canViewLoginLog;
   
   // Check if any Ledelse menu items are visible
-  const showLedelseMenu = p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview;
+  const showLedelseMenu = p.canViewContracts || p.canViewPermissions || p.canViewCareerWishesOverview || p.canViewSecurityDashboard;
   
   // Check if any MG menu items are visible
   const showMgMenu = p.canViewPayroll || p.canViewMgTest || p.canViewTestDashboard || 
@@ -657,7 +657,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
             <Collapsible open={ledelseOpen} onOpenChange={setLedelseOpen}>
               <CollapsibleTrigger className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
-                ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates"].some(path => location.pathname.startsWith(path)) 
+                ["/contracts", "/permissions", "/career-wishes-overview", "/company-overview", "/email-templates", "/admin/security"].some(path => location.pathname.startsWith(path)) 
                   ? "bg-sidebar-accent text-sidebar-accent-foreground" 
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50"
               )}>
@@ -711,6 +711,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   )}>
                     <Mail className="h-4 w-4" />
                     Skabeloner
+                  </NavLink>
+                )}
+                {p.canViewSecurityDashboard && (
+                  <NavLink to="/admin/security" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/admin/security" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <Lock className="h-4 w-4" />
+                    {t("sidebar.security")}
                   </NavLink>
                 )}
               </CollapsibleContent>
