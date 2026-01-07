@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { VagtFlowLayout } from "@/components/vagt-flow/VagtFlowLayout";
@@ -11,10 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Pencil, Trash2, Search, Calendar, X } from "lucide-react";
+import { Loader2, Pencil, Trash2, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface SaleRecord {
   id: string;
@@ -36,6 +37,20 @@ interface SaleRecord {
   client: {
     name: string;
   } | null;
+  commission_dkk?: number;
+  revenue_dkk?: number;
+}
+
+interface GroupedSales {
+  key: string;
+  sellerName: string;
+  clientName: string;
+  locationName: string;
+  date: string;
+  salesCount: number;
+  totalCommission: number;
+  totalRevenue: number;
+  sales: SaleRecord[];
 }
 
 interface EditFormData {
@@ -52,6 +67,7 @@ export default function EditSalesRegistrations() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSellerId, setSelectedSellerId] = useState<string>("all");
   const [selectedClientId, setSelectedClientId] = useState<string>("all");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [dateRange, setDateRange] = useState({
     from: format(startOfMonth(new Date()), "yyyy-MM-dd"),
     to: format(endOfMonth(new Date()), "yyyy-MM-dd"),
@@ -68,6 +84,18 @@ export default function EditSalesRegistrations() {
     registered_at: "",
     location_id: "",
     client_id: "",
+  });
+
+  // Fetch products for commission/revenue lookup
+  const { data: products } = useQuery({
+    queryKey: ["fm-products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, commission_dkk, revenue_dkk");
+      if (error) throw error;
+      return data;
+    },
   });
 
   // Fetch all sales
@@ -254,6 +282,93 @@ export default function EditSalesRegistrations() {
     return matchesSearch && matchesSeller && matchesClient;
   });
 
+  // Create product name to commission/revenue map
+  const productPriceMap = useMemo(() => {
+    const map = new Map<string, { commission: number; revenue: number }>();
+    products?.forEach(p => {
+      if (p.name) {
+        map.set(p.name.toLowerCase(), { 
+          commission: p.commission_dkk || 0, 
+          revenue: p.revenue_dkk || 0 
+        });
+      }
+    });
+    return map;
+  }, [products]);
+
+  // Enrich sales with commission/revenue
+  const enrichedSales = useMemo(() => {
+    return filteredSales?.map(sale => {
+      const prices = sale.product_name 
+        ? productPriceMap.get(sale.product_name.toLowerCase()) 
+        : null;
+      return {
+        ...sale,
+        commission_dkk: prices?.commission || 0,
+        revenue_dkk: prices?.revenue || 0,
+      };
+    });
+  }, [filteredSales, productPriceMap]);
+
+  // Group sales by seller + date + location + client
+  const groupedSales = useMemo(() => {
+    if (!enrichedSales) return [];
+    
+    const groups = new Map<string, GroupedSales>();
+    
+    enrichedSales.forEach(sale => {
+      const dateStr = sale.registered_at 
+        ? format(parseISO(sale.registered_at), "yyyy-MM-dd")
+        : "unknown";
+      const sellerName = sale.seller 
+        ? `${sale.seller.first_name} ${sale.seller.last_name}` 
+        : "Ukendt";
+      const locationName = sale.location?.name || "Ukendt";
+      const clientName = sale.client?.name || "Ukendt";
+      
+      const key = `${sale.seller_id}-${dateStr}-${sale.location_id}-${sale.client_id}`;
+      
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          sellerName,
+          clientName,
+          locationName,
+          date: dateStr,
+          salesCount: 0,
+          totalCommission: 0,
+          totalRevenue: 0,
+          sales: [],
+        });
+      }
+      
+      const group = groups.get(key)!;
+      group.salesCount += 1;
+      group.totalCommission += sale.commission_dkk;
+      group.totalRevenue += sale.revenue_dkk;
+      group.sales.push(sale);
+    });
+    
+    // Sort groups by date descending, then by seller name
+    return Array.from(groups.values()).sort((a, b) => {
+      const dateCompare = b.date.localeCompare(a.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.sellerName.localeCompare(b.sellerName);
+    });
+  }, [enrichedSales]);
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
   return (
     <VagtFlowLayout>
       <div className="space-y-6">
@@ -341,76 +456,143 @@ export default function EditSalesRegistrations() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Salgsregistreringer</CardTitle>
-            <Badge variant="outline">{filteredSales?.length ?? 0} registreringer</Badge>
+            <div className="flex items-center gap-3">
+              <Badge variant="secondary">{groupedSales.length} grupper</Badge>
+              <Badge variant="outline">{enrichedSales?.length ?? 0} registreringer</Badge>
+            </div>
           </CardHeader>
           <CardContent>
             {loadingSales ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : !filteredSales || filteredSales.length === 0 ? (
+            ) : groupedSales.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
                 Ingen salgsregistreringer fundet i den valgte periode
               </p>
             ) : (
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Dato</TableHead>
-                      <TableHead>Sælger</TableHead>
-                      <TableHead>Kunde</TableHead>
-                      <TableHead>Lokation</TableHead>
-                      <TableHead>Produkt</TableHead>
-                      <TableHead>Telefon</TableHead>
-                      <TableHead>Kommentar</TableHead>
-                      <TableHead className="text-right">Handlinger</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredSales.map((sale) => (
-                      <TableRow key={sale.id}>
-                        <TableCell className="whitespace-nowrap">
-                          {sale.registered_at
-                            ? format(parseISO(sale.registered_at), "dd/MM/yyyy HH:mm", { locale: da })
-                            : "-"}
-                        </TableCell>
-                        <TableCell>
-                          {sale.seller
-                            ? `${sale.seller.first_name} ${sale.seller.last_name}`
-                            : "-"}
-                        </TableCell>
-                        <TableCell>{sale.client?.name || "-"}</TableCell>
-                        <TableCell>{sale.location?.name || "-"}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{sale.product_name || "-"}</TableCell>
-                        <TableCell className="font-mono text-xs">{sale.phone_number || "-"}</TableCell>
-                        <TableCell className="max-w-[150px] truncate text-muted-foreground">
-                          {sale.comment || "-"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEditDialog(sale)}
-                              className="h-8 w-8"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(sale.id, sale.product_name || "salg")}
-                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+              <div className="space-y-3">
+                {groupedSales.map((group) => (
+                  <Collapsible
+                    key={group.key}
+                    open={expandedGroups.has(group.key)}
+                    onOpenChange={() => toggleGroup(group.key)}
+                  >
+                    <div className="rounded-lg border bg-card">
+                      <CollapsibleTrigger asChild>
+                        <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center gap-4">
+                            {expandedGroups.has(group.key) ? (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                              <span className="font-medium">{group.sellerName}</span>
+                              <span className="text-sm text-muted-foreground">
+                                {format(parseISO(group.date), "dd/MM/yyyy", { locale: da })}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                {group.locationName}
+                              </span>
+                            </div>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                          <div className="flex items-center gap-4 text-sm">
+                            <div className="flex items-center gap-6">
+                              <div className="text-center">
+                                <div className="text-xs text-muted-foreground">Salg</div>
+                                <Badge variant="default" className="mt-1">
+                                  {group.salesCount}
+                                </Badge>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-xs text-muted-foreground">Provi</div>
+                                <div className="font-medium text-green-600">
+                                  {group.totalCommission.toLocaleString("da-DK")} kr
+                                </div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-xs text-muted-foreground">Oms</div>
+                                <div className="font-medium text-blue-600">
+                                  {group.totalRevenue.toLocaleString("da-DK")} kr
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="border-t">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="pl-12">Tidspunkt</TableHead>
+                                <TableHead>Produkt</TableHead>
+                                <TableHead>Telefon</TableHead>
+                                <TableHead className="text-right">Provi</TableHead>
+                                <TableHead className="text-right">Oms</TableHead>
+                                <TableHead>Kommentar</TableHead>
+                                <TableHead className="text-right">Handlinger</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {group.sales.map((sale) => (
+                                <TableRow key={sale.id}>
+                                  <TableCell className="pl-12 whitespace-nowrap">
+                                    {sale.registered_at
+                                      ? format(parseISO(sale.registered_at), "HH:mm", { locale: da })
+                                      : "-"}
+                                  </TableCell>
+                                  <TableCell className="max-w-[200px] truncate">
+                                    {sale.product_name || "-"}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-xs">
+                                    {sale.phone_number || "-"}
+                                  </TableCell>
+                                  <TableCell className="text-right text-green-600">
+                                    {sale.commission_dkk?.toLocaleString("da-DK")} kr
+                                  </TableCell>
+                                  <TableCell className="text-right text-blue-600">
+                                    {sale.revenue_dkk?.toLocaleString("da-DK")} kr
+                                  </TableCell>
+                                  <TableCell className="max-w-[150px] truncate text-muted-foreground">
+                                    {sale.comment || "-"}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openEditDialog(sale);
+                                        }}
+                                        className="h-8 w-8"
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDelete(sale.id, sale.product_name || "salg");
+                                        }}
+                                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
+                ))}
               </div>
             )}
           </CardContent>
