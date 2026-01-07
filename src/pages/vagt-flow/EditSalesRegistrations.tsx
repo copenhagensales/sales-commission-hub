@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Pencil, Trash2, Search, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, Pencil, Trash2, Search, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { da } from "date-fns/locale";
@@ -68,6 +68,14 @@ interface GroupEditFormData {
   client_id: string;
 }
 
+interface GroupSaleItem {
+  id: string | null; // null for new items
+  product_name: string;
+  phone_number: string;
+  comment: string;
+  toDelete?: boolean;
+}
+
 export default function EditSalesRegistrations() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
@@ -102,6 +110,7 @@ export default function EditSalesRegistrations() {
     location_id: "",
     client_id: "",
   });
+  const [groupSaleItems, setGroupSaleItems] = useState<GroupSaleItem[]>([]);
 
   // Fetch products for commission/revenue lookup
   const { data: products } = useQuery({
@@ -261,20 +270,69 @@ export default function EditSalesRegistrations() {
 
   // Update group mutation - updates all sales in a group
   const updateGroup = useMutation({
-    mutationFn: async ({ saleIds, updates }: { saleIds: string[]; updates: GroupEditFormData }) => {
-      const updateData: Record<string, unknown> = {};
-      if (updates.seller_id) updateData.seller_id = updates.seller_id;
-      if (updates.location_id) updateData.location_id = updates.location_id;
-      if (updates.client_id) updateData.client_id = updates.client_id;
+    mutationFn: async ({ 
+      updates, 
+      items, 
+      originalGroup 
+    }: { 
+      updates: GroupEditFormData; 
+      items: GroupSaleItem[];
+      originalGroup: GroupedSales;
+    }) => {
+      const firstSale = originalGroup.sales[0];
+      const baseDate = firstSale?.registered_at ? parseISO(firstSale.registered_at) : new Date();
       
-      const { error } = await supabase
-        .from("fieldmarketing_sales")
-        .update(updateData)
-        .in("id", saleIds);
-      if (error) throw error;
+      // Items to delete
+      const toDelete = items.filter(item => item.toDelete && item.id);
+      // Items to update (existing items not marked for deletion)
+      const toUpdate = items.filter(item => item.id && !item.toDelete);
+      // Items to create (new items)
+      const toCreate = items.filter(item => !item.id && !item.toDelete);
+      
+      // Delete marked items
+      if (toDelete.length > 0) {
+        const { error } = await supabase
+          .from("fieldmarketing_sales")
+          .delete()
+          .in("id", toDelete.map(i => i.id!));
+        if (error) throw error;
+      }
+      
+      // Update existing items (product, phone, comment) + group fields
+      for (const item of toUpdate) {
+        const { error } = await supabase
+          .from("fieldmarketing_sales")
+          .update({
+            product_name: item.product_name,
+            phone_number: item.phone_number || null,
+            comment: item.comment || null,
+            seller_id: updates.seller_id || undefined,
+            location_id: updates.location_id || undefined,
+            client_id: updates.client_id || undefined,
+          })
+          .eq("id", item.id!);
+        if (error) throw error;
+      }
+      
+      // Create new items
+      if (toCreate.length > 0) {
+        const newSales = toCreate.map(item => ({
+          seller_id: updates.seller_id || firstSale?.seller_id,
+          location_id: updates.location_id || firstSale?.location_id,
+          client_id: updates.client_id || firstSale?.client_id,
+          product_name: item.product_name,
+          phone_number: item.phone_number || null,
+          comment: item.comment || null,
+          registered_at: baseDate.toISOString(),
+        }));
+        const { error } = await supabase
+          .from("fieldmarketing_sales")
+          .insert(newSales);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
-      toast.success("Alle salg i gruppen opdateret");
+      toast.success("Salgsgruppe opdateret");
       queryClient.invalidateQueries({ queryKey: ["fm-sales-edit"] });
       setGroupEditDialog({ open: false, group: null });
     },
@@ -302,6 +360,15 @@ export default function EditSalesRegistrations() {
       location_id: firstSale?.location_id || "",
       client_id: firstSale?.client_id || "",
     });
+    // Initialize sale items from group
+    setGroupSaleItems(
+      group.sales.map(sale => ({
+        id: sale.id,
+        product_name: sale.product_name || "",
+        phone_number: sale.phone_number || "",
+        comment: sale.comment || "",
+      }))
+    );
     setGroupEditDialog({ open: true, group });
   };
 
@@ -315,11 +382,34 @@ export default function EditSalesRegistrations() {
 
   const handleGroupSave = () => {
     if (!groupEditDialog.group) return;
-    const saleIds = groupEditDialog.group.sales.map(s => s.id);
     updateGroup.mutate({
-      saleIds,
       updates: groupEditForm,
+      items: groupSaleItems,
+      originalGroup: groupEditDialog.group,
     });
+  };
+
+  const addGroupSaleItem = () => {
+    setGroupSaleItems(prev => [
+      ...prev,
+      { id: null, product_name: "", phone_number: "", comment: "" }
+    ]);
+  };
+
+  const updateGroupSaleItem = (index: number, field: keyof GroupSaleItem, value: string | boolean) => {
+    setGroupSaleItems(prev => prev.map((item, i) => 
+      i === index ? { ...item, [field]: value } : item
+    ));
+  };
+
+  const toggleDeleteGroupSaleItem = (index: number) => {
+    setGroupSaleItems(prev => prev.map((item, i) => 
+      i === index ? { ...item, toDelete: !item.toDelete } : item
+    ));
+  };
+
+  const removeNewGroupSaleItem = (index: number) => {
+    setGroupSaleItems(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleDelete = (id: string, productName: string) => {
@@ -766,7 +856,7 @@ export default function EditSalesRegistrations() {
 
       {/* Group Edit Dialog */}
       <Dialog open={groupEditDialog.open} onOpenChange={(open) => setGroupEditDialog({ open, group: open ? groupEditDialog.group : null })}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Rediger hele salgsgruppen</DialogTitle>
           </DialogHeader>
@@ -774,69 +864,155 @@ export default function EditSalesRegistrations() {
           {groupEditDialog.group && (
             <div className="space-y-4">
               <div className="p-3 bg-muted/50 rounded-lg">
-                <div className="text-sm text-muted-foreground mb-2">
-                  Ændringer vil blive anvendt på alle <span className="font-medium text-foreground">{groupEditDialog.group.salesCount}</span> salg i denne gruppe
-                </div>
                 <div className="text-sm">
                   <span className="text-muted-foreground">Dato:</span> {format(parseISO(groupEditDialog.group.date), "dd/MM/yyyy", { locale: da })}
                 </div>
               </div>
 
-              <div>
-                <Label>Sælger</Label>
-                <Select
-                  value={groupEditForm.seller_id}
-                  onValueChange={(value) => setGroupEditForm((prev) => ({ ...prev, seller_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg sælger" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sellers?.map((seller) => (
-                      <SelectItem key={seller.id} value={seller.id}>
-                        {seller.first_name} {seller.last_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Group fields */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label>Sælger</Label>
+                  <Select
+                    value={groupEditForm.seller_id}
+                    onValueChange={(value) => setGroupEditForm((prev) => ({ ...prev, seller_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vælg sælger" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sellers?.map((seller) => (
+                        <SelectItem key={seller.id} value={seller.id}>
+                          {seller.first_name} {seller.last_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Lokation</Label>
+                  <Select
+                    value={groupEditForm.location_id}
+                    onValueChange={(value) => setGroupEditForm((prev) => ({ ...prev, location_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vælg lokation" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations?.map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>
+                          {loc.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Kunde</Label>
+                  <Select
+                    value={groupEditForm.client_id}
+                    onValueChange={(value) => setGroupEditForm((prev) => ({ ...prev, client_id: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vælg kunde" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients?.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <div>
-                <Label>Lokation</Label>
-                <Select
-                  value={groupEditForm.location_id}
-                  onValueChange={(value) => setGroupEditForm((prev) => ({ ...prev, location_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg lokation" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations?.map((loc) => (
-                      <SelectItem key={loc.id} value={loc.id}>
-                        {loc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>Kunde</Label>
-                <Select
-                  value={groupEditForm.client_id}
-                  onValueChange={(value) => setGroupEditForm((prev) => ({ ...prev, client_id: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Vælg kunde" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients?.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Sale items */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Salg ({groupSaleItems.filter(i => !i.toDelete).length})</Label>
+                  <Button variant="outline" size="sm" onClick={addGroupSaleItem}>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Tilføj salg
+                  </Button>
+                </div>
+                
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {groupSaleItems.map((item, index) => (
+                    <div 
+                      key={item.id || `new-${index}`} 
+                      className={`p-3 border rounded-lg space-y-2 ${item.toDelete ? 'opacity-50 bg-destructive/10' : ''}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          {item.id ? `Salg #${index + 1}` : 'Nyt salg'}
+                        </span>
+                        {item.id ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleDeleteGroupSaleItem(index)}
+                            className={item.toDelete ? "text-green-600" : "text-destructive"}
+                          >
+                            {item.toDelete ? "Fortryd slet" : <><Trash2 className="h-3 w-3 mr-1" /> Slet</>}
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeNewGroupSaleItem(index)}
+                            className="text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                      
+                      {!item.toDelete && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                          <div>
+                            <Label className="text-xs">Produkt</Label>
+                            <Select
+                              value={item.product_name}
+                              onValueChange={(value) => updateGroupSaleItem(index, 'product_name', value)}
+                            >
+                              <SelectTrigger className="h-8">
+                                <SelectValue placeholder="Vælg produkt" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {products?.map((product) => (
+                                  <SelectItem key={product.id} value={product.name || ""}>
+                                    {product.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Telefon</Label>
+                            <Input
+                              className="h-8"
+                              value={item.phone_number}
+                              onChange={(e) => updateGroupSaleItem(index, 'phone_number', e.target.value)}
+                              placeholder="Telefonnummer"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Kommentar</Label>
+                            <Input
+                              className="h-8"
+                              value={item.comment}
+                              onChange={(e) => updateGroupSaleItem(index, 'comment', e.target.value)}
+                              placeholder="Kommentar"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -847,7 +1023,7 @@ export default function EditSalesRegistrations() {
             </Button>
             <Button onClick={handleGroupSave} disabled={updateGroup.isPending}>
               {updateGroup.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Gem ændringer ({groupEditDialog.group?.salesCount} salg)
+              Gem ændringer
             </Button>
           </DialogFooter>
         </DialogContent>
