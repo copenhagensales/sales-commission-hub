@@ -119,6 +119,22 @@ export default function UpcomingStarts() {
     },
   });
 
+  // Fetch hired candidates without cohort assignment
+  const { data: unassignedCandidates = [] } = useQuery({
+    queryKey: ["unassigned-hired-candidates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("candidates")
+        .select("id, first_name, last_name, applied_position, available_from, cohort_assignment_status, updated_at")
+        .eq("status", "hired")
+        .or("cohort_assignment_status.is.null,cohort_assignment_status.eq.pending")
+        .order("updated_at", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   const updateStatusMutation = useMutation({
     mutationFn: async ({ cohortId, status }: { cohortId: string; status: string }) => {
       const { error } = await supabase
@@ -341,7 +357,51 @@ export default function UpcomingStarts() {
           )}
         </div>
 
-        {cohorts.length === 0 ? (
+        {/* Unassigned hired candidates section */}
+        {unassignedCandidates.length > 0 && (
+          <Card className="border-amber-200 dark:border-amber-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <UserPlus className="h-5 w-5 text-amber-600" />
+                Nyansatte uden hold
+                <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                  {unassignedCandidates.length}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {unassignedCandidates.map((candidate) => (
+                  <div
+                    key={candidate.id}
+                    className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-lg"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">
+                        {candidate.first_name} {candidate.last_name}
+                      </p>
+                      {candidate.applied_position && (
+                        <p className="text-sm text-muted-foreground truncate">
+                          {candidate.applied_position}
+                        </p>
+                      )}
+                      {candidate.available_from && (
+                        <p className="text-xs text-muted-foreground">
+                          Kan starte: {format(new Date(candidate.available_from), "d. MMM", { locale: da })}
+                        </p>
+                      )}
+                    </div>
+                    <Badge variant="outline" className="ml-2 text-xs shrink-0 bg-amber-50 text-amber-700 border-amber-300">
+                      Afventer
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {cohorts.length === 0 && unassignedCandidates.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
               <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -356,7 +416,7 @@ export default function UpcomingStarts() {
               )}
             </CardContent>
           </Card>
-        ) : (
+        ) : cohorts.length > 0 && (
           <div className="space-y-8">
             {renderSection("I dag", today, true)}
             {renderSection("I morgen", tomorrow)}
