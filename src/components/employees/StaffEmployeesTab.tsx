@@ -171,42 +171,48 @@ export function StaffEmployeesTab() {
       if (error) throw error;
 
       // If deactivating, send deactivation reminder
-      if (!is_active && employee?.team_id) {
-        // Get config for this team (manually configured recipients)
-        const { data: config } = await supabase
-          .from("deactivation_reminder_config")
-          .select("recipients")
-          .eq("team_id", employee.team_id)
-          .single();
+      if (!is_active) {
+        // Get team membership from team_members (authoritative source)
+        const { data: teamMembership } = await supabase
+          .from("team_members")
+          .select("team_id, teams(id, name, team_leader_id, assistant_team_leader_id)")
+          .eq("employee_id", id)
+          .maybeSingle();
 
-        const manualRecipients = config?.recipients 
-          ? config.recipients.split(",").map((r: string) => r.trim()).filter((r: string) => r)
-          : [];
+        const teamId = teamMembership?.team_id;
+        const team = teamMembership?.teams as { id: string; name: string; team_leader_id: string | null; assistant_team_leader_id: string | null } | null;
 
-        // Get team with team leader and assistant team leader
-        const { data: team } = await supabase
-          .from("teams")
-          .select("name, team_leader_id, assistant_team_leader_id")
-          .eq("id", employee.team_id)
-          .single();
-
-        // Collect automatic recipients
+        let manualRecipients: string[] = [];
         const autoRecipientEmails: string[] = [];
 
-        // Get team leader and assistant team leader work emails (only work_email, no fallback)
-        const leaderIds = [team?.team_leader_id, team?.assistant_team_leader_id].filter(Boolean) as string[];
-        if (leaderIds.length > 0) {
-          const { data: leaders } = await supabase
-            .from("employee_master_data")
-            .select("work_email")
-            .in("id", leaderIds);
-          
-          (leaders || []).forEach(l => {
-            if (l.work_email) autoRecipientEmails.push(l.work_email);
-          });
+        // Only fetch team-specific config and leaders if employee has a team
+        if (teamId) {
+          // Get config for this team (manually configured recipients)
+          const { data: config } = await supabase
+            .from("deactivation_reminder_config")
+            .select("recipients")
+            .eq("team_id", teamId)
+            .single();
+
+          manualRecipients = config?.recipients 
+            ? config.recipients.split(",").map((r: string) => r.trim()).filter((r: string) => r)
+            : [];
+
+          // Get team leader and assistant team leader work emails
+          const leaderIds = [team?.team_leader_id, team?.assistant_team_leader_id].filter(Boolean) as string[];
+          if (leaderIds.length > 0) {
+            const { data: leaders } = await supabase
+              .from("employee_master_data")
+              .select("work_email")
+              .in("id", leaderIds);
+            
+            (leaders || []).forEach(l => {
+              if (l.work_email) autoRecipientEmails.push(l.work_email);
+            });
+          }
         }
 
-        // Get all recruitment responsible employees (only work_email)
+        // Always get recruitment responsible employees (only work_email)
         const { data: recruiters } = await supabase
           .from("employee_master_data")
           .select("work_email")
@@ -217,7 +223,7 @@ export function StaffEmployeesTab() {
           if (r.work_email) autoRecipientEmails.push(r.work_email);
         });
 
-        // Get all owners (only work_email) - exclude Angel, owners only get initial email (no followup)
+        // Always get owners (only work_email) - exclude Angel
         const { data: owners } = await supabase
           .from("employee_master_data")
           .select("work_email")
@@ -230,17 +236,17 @@ export function StaffEmployeesTab() {
           if (o.work_email) ownerEmails.push(o.work_email);
         });
 
-        // Combine all recipients (manual + automatic) and remove duplicates
+        // Combine all recipients and remove duplicates
         const allRecipients = [...new Set([...manualRecipients, ...autoRecipientEmails, ...ownerEmails])];
 
         if (allRecipients.length > 0) {
           await supabase.functions.invoke("send-deactivation-reminder", {
             body: {
               employee_id: id,
-              employee_name: `${employee.first_name} ${employee.last_name}`,
-              employee_email: employee.work_email || "",
-              team_id: employee.team_id,
-              team_name: team?.name || "Ukendt team",
+              employee_name: `${employee?.first_name} ${employee?.last_name}`,
+              employee_email: employee?.work_email || "",
+              team_id: teamId || null,
+              team_name: team?.name || "Ingen team",
               recipients: allRecipients,
               is_followup: false,
             },
