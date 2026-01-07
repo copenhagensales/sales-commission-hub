@@ -1803,6 +1803,7 @@ export type Database = {
           candidate_id: string | null
           cohort_id: string
           created_at: string
+          daily_bonus_client_id: string | null
           employee_id: string | null
           id: string
           notes: string | null
@@ -1813,6 +1814,7 @@ export type Database = {
           candidate_id?: string | null
           cohort_id: string
           created_at?: string
+          daily_bonus_client_id?: string | null
           employee_id?: string | null
           id?: string
           notes?: string | null
@@ -1823,6 +1825,7 @@ export type Database = {
           candidate_id?: string | null
           cohort_id?: string
           created_at?: string
+          daily_bonus_client_id?: string | null
           employee_id?: string | null
           id?: string
           notes?: string | null
@@ -1842,6 +1845,13 @@ export type Database = {
             columns: ["cohort_id"]
             isOneToOne: false
             referencedRelation: "onboarding_cohorts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cohort_members_daily_bonus_client_id_fkey"
+            columns: ["daily_bonus_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
           {
@@ -3321,6 +3331,7 @@ export type Database = {
           contract_version: string | null
           cpr_number: string | null
           created_at: string | null
+          daily_bonus_client_id: string | null
           default_landing_page: string | null
           department: string | null
           employment_end_date: string | null
@@ -3379,6 +3390,7 @@ export type Database = {
           contract_version?: string | null
           cpr_number?: string | null
           created_at?: string | null
+          daily_bonus_client_id?: string | null
           default_landing_page?: string | null
           department?: string | null
           employment_end_date?: string | null
@@ -3437,6 +3449,7 @@ export type Database = {
           contract_version?: string | null
           cpr_number?: string | null
           created_at?: string | null
+          daily_bonus_client_id?: string | null
           default_landing_page?: string | null
           department?: string | null
           employment_end_date?: string | null
@@ -3482,6 +3495,13 @@ export type Database = {
           working_hours_model?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "employee_master_data_daily_bonus_client_id_fkey"
+            columns: ["daily_bonus_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "employee_master_data_manager_id_fkey"
             columns: ["manager_id"]

@@ -31,7 +31,7 @@ interface AssignCohortDialogProps {
   onOpenChange: (open: boolean) => void;
   candidateId: string;
   candidateName: string;
-  onConfirm: (cohortId: string | null, availableFrom: Date | null, teamId: string | null) => void;
+  onConfirm: (cohortId: string | null, availableFrom: Date | null, teamId: string | null, dailyBonusClientId: string | null) => void;
   onSkip: () => void;
 }
 
@@ -45,6 +45,7 @@ export function AssignCohortDialog({
 }: AssignCohortDialogProps) {
   const [selectedCohortId, setSelectedCohortId] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [availableFrom, setAvailableFrom] = useState<Date | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -72,10 +73,36 @@ export function AssignCohortDialog({
     },
   });
 
+  // Fetch clients for the selected team (for daily bonus)
+  const { data: teamClients = [] } = useQuery({
+    queryKey: ["team-clients-for-bonus", selectedTeamId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_clients")
+        .select("client_id, client:clients(id, name)")
+        .eq("team_id", selectedTeamId!);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedTeamId,
+  });
+
+  // Auto-select client if only one is available
+  const availableClients = teamClients.filter(tc => tc.client?.id);
+  if (availableClients.length === 1 && !selectedClientId && selectedTeamId) {
+    setSelectedClientId(availableClients[0].client_id);
+  }
+
+  // Reset client selection when team changes
+  const handleTeamChange = (teamId: string) => {
+    setSelectedTeamId(teamId);
+    setSelectedClientId(null);
+  };
+
   const handleConfirm = async () => {
     setIsSubmitting(true);
     try {
-      onConfirm(selectedCohortId, availableFrom || null, selectedTeamId);
+      onConfirm(selectedCohortId, availableFrom || null, selectedTeamId, selectedClientId);
     } finally {
       setIsSubmitting(false);
     }
@@ -113,7 +140,7 @@ export function AssignCohortDialog({
                 <Label htmlFor="team">Team</Label>
                 <Select
                   value={selectedTeamId || ""}
-                  onValueChange={setSelectedTeamId}
+                  onValueChange={handleTeamChange}
                 >
                   <SelectTrigger id="team">
                     <SelectValue placeholder="Vælg team..." />
@@ -127,6 +154,33 @@ export function AssignCohortDialog({
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Client selector for daily bonus (only shown when team is selected and has clients) */}
+              {selectedTeamId && availableClients.length > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="daily-bonus-client">
+                    Kunde (til dagsbonus)
+                  </Label>
+                  <Select
+                    value={selectedClientId || ""}
+                    onValueChange={setSelectedClientId}
+                  >
+                    <SelectTrigger id="daily-bonus-client">
+                      <SelectValue placeholder="Vælg kunde..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableClients.map((tc) => (
+                        <SelectItem key={tc.client_id} value={tc.client_id}>
+                          {tc.client?.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Bruges kun til at beregne dagsbonus
+                  </p>
+                </div>
+              )}
 
               {/* Cohort selector - now optional */}
               <div className="space-y-2">

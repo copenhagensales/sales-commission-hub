@@ -719,7 +719,7 @@ export default function CandidateDetail() {
         onOpenChange={setShowAssignCohortDialog}
         candidateId={id || ""}
         candidateName={candidate ? `${candidate.first_name} ${candidate.last_name}` : ""}
-        onConfirm={async (cohortId, availableFrom, teamId) => {
+        onConfirm={async (cohortId, availableFrom, teamId, dailyBonusClientId) => {
           try {
             // Update candidate status, available_from, and team_id
             // cohort_assignment_status valid values: 'assigned', 'not_yet_assigned', 'available_from'
@@ -736,12 +736,13 @@ export default function CandidateDetail() {
             
             await supabase.from("candidates").update(updateData).eq("id", id);
             
-            // If cohort selected, add to cohort_members
+            // If cohort selected, add to cohort_members with daily_bonus_client_id
             if (cohortId) {
               await supabase.from("cohort_members").insert({
                 cohort_id: cohortId,
                 candidate_id: id,
-                status: "pending"
+                status: "pending",
+                daily_bonus_client_id: dailyBonusClientId,
               });
             }
             
