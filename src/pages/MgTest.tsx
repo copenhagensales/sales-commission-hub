@@ -398,6 +398,34 @@ export default function MgTest() {
     },
   });
 
+  // Hent produkt-IDs der har kampagne-specifikke overrides (for at vise checkmark)
+  const { data: productsWithOverrides } = useQuery({
+    queryKey: ["mg-products-with-overrides"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("product_campaign_overrides")
+        .select("product_id");
+      if (error) throw error;
+      // Return unique product IDs
+      return new Set((data ?? []).map((row) => row.product_id as string));
+    },
+  });
+
+  // Initialize productOverridesEnabled from database when data loads
+  useEffect(() => {
+    if (productsWithOverrides && productsWithOverrides.size > 0) {
+      setProductOverridesEnabled(prev => {
+        const updated = { ...prev };
+        productsWithOverrides.forEach(productId => {
+          if (updated[productId] === undefined) {
+            updated[productId] = true;
+          }
+        });
+        return updated;
+      });
+    }
+  }, [productsWithOverrides]);
+
   // Medarbejderkilder og master-profiler
   const { data: agents, isLoading: loadingAgents } = useQuery<AgentRow[]>({
     queryKey: ["mg-agents"],
