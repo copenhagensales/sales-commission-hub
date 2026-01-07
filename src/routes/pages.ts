@@ -141,3 +141,6 @@ export const ReportsManagement = lazyPage(() => import("@/pages/reports/ReportsM
 export const ReportsEmployee = lazyPage(() => import("@/pages/reports/ReportsEmployee"));
 export const DailyReports = lazyPage(() => import("@/pages/reports/DailyReports"));
 
+// Salary Schemes
+export const SalarySchemes = lazyPage(() => import("@/pages/SalarySchemes"));
+

@@ -106,6 +106,7 @@ import {
   DailyReports,
   SecurityDashboard,
   UpcomingStarts,
+  SalarySchemes,
 } from "./pages";
 import { SmartRedirect } from "./guards";
 
@@ -394,6 +395,9 @@ export const routes: RouteConfig[] = [
 
   // Security Dashboard
   { path: "/admin/security", component: SecurityDashboard, access: "role", positionPermission: "menu_security_dashboard" },
+
+  // Salary Schemes
+  { path: "/1234", component: SalarySchemes, access: "role", positionPermission: "menu_mg_test" },
 
   { path: "*", component: NotFound, access: "public" },
 ];
