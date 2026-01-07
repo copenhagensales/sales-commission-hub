@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Search, ChevronDown, ChevronRight, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal, DollarSign, Building2 } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, Calendar as CalendarIcon, Clock, Palmtree, Thermometer, TrendingUp, Coins, SlidersHorizontal, DollarSign, Building2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -109,6 +109,8 @@ export default function DailyReports() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const toggleColumn = (columnId: string) => {
     setSelectedColumns(prev => 
@@ -128,6 +130,24 @@ export default function DailyReports() {
       }
       return next;
     });
+  };
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
+    }
+    return sortDirection === "asc" 
+      ? <ArrowUp className="ml-1 h-3 w-3" /> 
+      : <ArrowDown className="ml-1 h-3 w-3" />;
   };
 
   // Calculate date range based on period
@@ -702,6 +722,54 @@ export default function DailyReports() {
     );
   }, [reportData]);
 
+  const sortedReportData = useMemo(() => {
+    if (!sortColumn) return reportData;
+    
+    return [...reportData].sort((a, b) => {
+      let aVal: number | string;
+      let bVal: number | string;
+      
+      switch (sortColumn) {
+        case "employee":
+          aVal = a.employee_name.toLowerCase();
+          bVal = b.employee_name.toLowerCase();
+          break;
+        case "team":
+          aVal = (a.team_name || "").toLowerCase();
+          bVal = (b.team_name || "").toLowerCase();
+          break;
+        case "hours":
+          aVal = a.total_hours;
+          bVal = b.total_hours;
+          break;
+        case "sales":
+          aVal = a.total_sales;
+          bVal = b.total_sales;
+          break;
+        case "commission":
+          aVal = a.total_commission;
+          bVal = b.total_commission;
+          break;
+        case "revenue":
+          aVal = a.total_revenue;
+          bVal = b.total_revenue;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return sortDirection === "asc" 
+          ? aVal.localeCompare(bVal, "da") 
+          : bVal.localeCompare(aVal, "da");
+      }
+      
+      return sortDirection === "asc" 
+        ? (aVal as number) - (bVal as number) 
+        : (bVal as number) - (aVal as number);
+    });
+  }, [reportData, sortColumn, sortDirection]);
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -948,19 +1016,75 @@ export default function DailyReports() {
                     <TableRow>
                       {isMultipleDays && <TableHead className="w-8"></TableHead>}
                       {!isMultipleDays && <TableHead>Dato</TableHead>}
-                      <TableHead>Medarbejder</TableHead>
-                      <TableHead>Team</TableHead>
-                      {selectedColumns.includes("hours") && <TableHead className="text-right">Timer</TableHead>}
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort("employee")}
+                      >
+                        <div className="flex items-center">
+                          Medarbejder
+                          <SortIcon column="employee" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleSort("team")}
+                      >
+                        <div className="flex items-center">
+                          Team
+                          <SortIcon column="team" />
+                        </div>
+                      </TableHead>
+                      {selectedColumns.includes("hours") && (
+                        <TableHead 
+                          className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleSort("hours")}
+                        >
+                          <div className="flex items-center justify-end">
+                            Timer
+                            <SortIcon column="hours" />
+                          </div>
+                        </TableHead>
+                      )}
                       {selectedColumns.includes("sick_days") && <TableHead className="text-center">Sygdom</TableHead>}
                       {selectedColumns.includes("vacation_days") && <TableHead className="text-center">Ferie</TableHead>}
-                      {selectedColumns.includes("sales") && <TableHead className="text-right text-foreground">Salg</TableHead>}
+                      {selectedColumns.includes("sales") && (
+                        <TableHead 
+                          className="text-right text-foreground cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleSort("sales")}
+                        >
+                          <div className="flex items-center justify-end">
+                            Salg
+                            <SortIcon column="sales" />
+                          </div>
+                        </TableHead>
+                      )}
                       {selectedColumns.includes("clients") && <TableHead className="text-foreground">Kunder</TableHead>}
-                      {selectedColumns.includes("commission") && <TableHead className="text-right text-foreground">Provision</TableHead>}
-                      {selectedColumns.includes("revenue") && <TableHead className="text-right text-foreground">Omsætning</TableHead>}
+                      {selectedColumns.includes("commission") && (
+                        <TableHead 
+                          className="text-right text-foreground cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleSort("commission")}
+                        >
+                          <div className="flex items-center justify-end">
+                            Provision
+                            <SortIcon column="commission" />
+                          </div>
+                        </TableHead>
+                      )}
+                      {selectedColumns.includes("revenue") && (
+                        <TableHead 
+                          className="text-right text-foreground cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleSort("revenue")}
+                        >
+                          <div className="flex items-center justify-end">
+                            Omsætning
+                            <SortIcon column="revenue" />
+                          </div>
+                        </TableHead>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {reportData.map((row) => (
+                    {sortedReportData.map((row) => (
                       <>
                         {/* Main row - aggregated or single day */}
                         <TableRow 
