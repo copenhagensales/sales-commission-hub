@@ -166,7 +166,7 @@ export default function SecurityDashboard() {
     },
   });
 
-  // Fetch employees with MFA enabled
+  // Fetch all active employees for MFA administration
   const { data: mfaEmployees = [], isLoading: loadingMfa } = useQuery({
     queryKey: ["mfa-employees"],
     queryFn: async () => {
@@ -174,13 +174,15 @@ export default function SecurityDashboard() {
         .from("employee_master_data")
         .select("id, first_name, last_name, work_email, private_email, mfa_enabled")
         .eq("is_active", true)
-        .eq("mfa_enabled", true)
         .order("first_name");
 
       if (error) throw error;
       return data as MfaEmployee[];
     },
   });
+
+  // Count employees with MFA enabled
+  const mfaEnabledCount = mfaEmployees.filter(emp => emp.mfa_enabled).length;
 
   // Reset MFA mutation
   const resetMfaMutation = useMutation({
@@ -639,7 +641,7 @@ export default function SecurityDashboard() {
             </div>
             <Badge variant="secondary" className="gap-1">
               <Smartphone className="h-3 w-3" />
-              {mfaEmployees.length} med MFA
+              {mfaEnabledCount} med MFA
             </Badge>
           </div>
 
@@ -670,7 +672,7 @@ export default function SecurityDashboard() {
                   ) : filteredMfaEmployees.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                        {mfaSearchTerm ? "Ingen medarbejdere matcher søgningen" : "Ingen medarbejdere har MFA aktiveret"}
+                        {mfaSearchTerm ? "Ingen medarbejdere matcher søgningen" : "Ingen aktive medarbejdere fundet"}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -683,10 +685,16 @@ export default function SecurityDashboard() {
                           </TableCell>
                           <TableCell>{email}</TableCell>
                           <TableCell>
-                            <Badge variant="default" className="gap-1">
-                              <Smartphone className="h-3 w-3" />
-                              MFA aktiv
-                            </Badge>
+                            {emp.mfa_enabled ? (
+                              <Badge variant="default" className="gap-1">
+                                <Smartphone className="h-3 w-3" />
+                                MFA aktiv
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="gap-1 text-muted-foreground">
+                                Ikke opsat
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell>
                             <AlertDialog open={resettingMfaFor === emp.id} onOpenChange={(open) => !open && setResettingMfaFor(null)}>
@@ -696,7 +704,7 @@ export default function SecurityDashboard() {
                                   size="sm"
                                   onClick={() => setResettingMfaFor(emp.id)}
                                 >
-                                  Nulstil MFA
+                                  {emp.mfa_enabled ? "Nulstil MFA" : "Ryd MFA-data"}
                                 </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
