@@ -11,7 +11,7 @@ interface DeactivationReminderRequest {
   employee_id: string;
   employee_name: string;
   employee_email: string;
-  team_id: string;
+  team_id: string | null;
   team_name: string;
   recipients: string[];
   is_followup?: boolean;
@@ -46,16 +46,39 @@ serve(async (req: Request) => {
       throw new Error("No recipients specified");
     }
 
-    // Get the email template for this team
-    const { data: config, error: configError } = await supabase
-      .from("deactivation_reminder_config")
-      .select("email_subject, email_body")
-      .eq("team_id", team_id)
-      .single();
+    // Get the email template - try team-specific first, fall back to default
+    let config: { email_subject: string; email_body: string } | null = null;
+    
+    if (team_id) {
+      const { data: teamConfig } = await supabase
+        .from("deactivation_reminder_config")
+        .select("email_subject, email_body")
+        .eq("team_id", team_id)
+        .single();
+      config = teamConfig;
+    }
+    
+    // If no team-specific config, use a default template
+    if (!config) {
+      config = {
+        email_subject: "Medarbejder deaktiveret - Handling påkrævet",
+        email_body: `Kære modtager,
 
-    if (configError) {
-      console.error("Failed to get config:", configError);
-      throw new Error("Could not find email template for team");
+En medarbejder er blevet deaktiveret i systemet.
+
+Medarbejder: {{employee_name}}
+Team: {{team_name}}
+Email: {{employee_email}}
+Dato: {{deactivation_date}}
+
+Venligst sørg for at følgende opgaver udføres:
+- Fjern adgange til systemer
+- Opdater relevante lister
+- Informer relevante parter
+
+Med venlig hilsen,
+CPH Sales System`,
+      };
     }
 
     const deactivationDate = new Date().toLocaleDateString("da-DK", {
