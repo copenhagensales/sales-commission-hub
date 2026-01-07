@@ -6461,6 +6461,51 @@ export type Database = {
         }
         Relationships: []
       }
+      team_client_daily_bonus: {
+        Row: {
+          bonus_amount: number
+          bonus_days: number
+          client_id: string
+          created_at: string
+          id: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          bonus_amount?: number
+          bonus_days?: number
+          client_id: string
+          created_at?: string
+          id?: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          bonus_amount?: number
+          bonus_days?: number
+          client_id?: string
+          created_at?: string
+          id?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_client_daily_bonus_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_client_daily_bonus_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_clients: {
         Row: {
           client_id: string

@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Users, Building2, UserCheck, UserX, GripVertical, UserPlus, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Building2, UserCheck, UserX, GripVertical, UserPlus, X, Coins } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TeamStandardShifts } from "./TeamStandardShifts";
 import {
@@ -203,6 +203,7 @@ export function TeamsTab() {
     assistant_team_leader_id: "",
     client_ids: [] as string[],
     employee_ids: [] as string[],
+    daily_bonus: {} as Record<string, { amount: number; days: number }>,
   });
 
   // Fetch teams
@@ -283,6 +284,29 @@ export function TeamsTab() {
       return data;
     },
   });
+
+  // Fetch team_client_daily_bonus mappings
+  const { data: teamDailyBonus = [] } = useQuery({
+    queryKey: ["team-client-daily-bonus"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_client_daily_bonus")
+        .select("team_id, client_id, bonus_amount, bonus_days");
+      if (error) throw error;
+      return data as { team_id: string; client_id: string; bonus_amount: number; bonus_days: number }[];
+    },
+  });
+
+  // Get daily bonus for a team
+  const getTeamDailyBonus = (teamId: string) => {
+    const bonuses: Record<string, { amount: number; days: number }> = {};
+    teamDailyBonus
+      .filter((b) => b.team_id === teamId)
+      .forEach((b) => {
+        bonuses[b.client_id] = { amount: Number(b.bonus_amount), days: b.bonus_days };
+      });
+    return bonuses;
+  };
 
   // Employee map for displaying names
   const employeeMap = employees.reduce((acc, emp) => {
@@ -377,11 +401,29 @@ export function TeamsTab() {
           .insert(data.employee_ids.map((employee_id) => ({ team_id: data.id, employee_id })));
         if (membersError) throw membersError;
       }
+
+      // Delete existing daily bonus and re-add
+      await supabase.from("team_client_daily_bonus").delete().eq("team_id", data.id);
+      const bonusEntries = Object.entries(data.daily_bonus)
+        .filter(([_, value]) => value.amount > 0 || value.days > 0)
+        .map(([client_id, value]) => ({
+          team_id: data.id,
+          client_id,
+          bonus_amount: value.amount,
+          bonus_days: value.days,
+        }));
+      if (bonusEntries.length > 0) {
+        const { error: bonusError } = await supabase
+          .from("team_client_daily_bonus")
+          .insert(bonusEntries);
+        if (bonusError) throw bonusError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["teams-tab"] });
       queryClient.invalidateQueries({ queryKey: ["team-clients-mappings"] });
       queryClient.invalidateQueries({ queryKey: ["team-members-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["team-client-daily-bonus"] });
       setDialogOpen(false);
       setEditingTeam(null);
       resetForm();
@@ -466,6 +508,7 @@ export function TeamsTab() {
       assistant_team_leader_id: "",
       client_ids: [],
       employee_ids: [],
+      daily_bonus: {},
     });
     setClientSearch("");
     setEmployeeSearch("");
@@ -495,8 +538,25 @@ export function TeamsTab() {
       assistant_team_leader_id: team.assistant_team_leader_id || "",
       client_ids: getTeamClients(team.id),
       employee_ids: getTeamMembers(team.id),
+      daily_bonus: getTeamDailyBonus(team.id),
     });
     setDialogOpen(true);
+  };
+
+  // Update daily bonus for a client
+  const updateDailyBonus = (clientId: string, field: 'amount' | 'days', value: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      daily_bonus: {
+        ...prev.daily_bonus,
+        [clientId]: {
+          ...prev.daily_bonus[clientId],
+          amount: prev.daily_bonus[clientId]?.amount || 0,
+          days: prev.daily_bonus[clientId]?.days || 0,
+          [field]: value,
+        },
+      },
+    }));
   };
 
   const handleSave = () => {
@@ -714,6 +774,13 @@ export function TeamsTab() {
                     <path d="M16 2v4M8 2v4M3 10h18" />
                   </svg>
                   Vagtplan
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="daily-bonus"
+                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg px-4 py-2 text-sm font-medium"
+                >
+                  <Coins className="h-4 w-4 mr-2" />
+                  Dagsbonus
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -960,6 +1027,76 @@ export function TeamsTab() {
               {/* Schedule Tab */}
               <TabsContent value="schedule" className="mt-0 py-6">
                 <TeamStandardShifts teamId={editingTeam?.id || null} />
+              </TabsContent>
+
+              {/* Daily Bonus Tab */}
+              <TabsContent value="daily-bonus" className="mt-0 py-6">
+                <div className="space-y-4">
+                  {formData.client_ids.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <Building2 className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                      <p className="text-muted-foreground">Ingen kunder valgt på dette team</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Gå til "Kunder" fanen for at tilføje kunder først
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {clients
+                        .filter((client) => formData.client_ids.includes(client.id))
+                        .map((client) => {
+                          const bonus = formData.daily_bonus[client.id] || { amount: 0, days: 0 };
+                          return (
+                            <div 
+                              key={client.id}
+                              className="p-4 rounded-lg border bg-card"
+                            >
+                              <div className="flex items-center gap-3 mb-4">
+                                {client.logo_url ? (
+                                  <img
+                                    src={client.logo_url}
+                                    alt=""
+                                    className="h-8 w-8 object-contain rounded"
+                                  />
+                                ) : (
+                                  <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
+                                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                )}
+                                <span className="font-medium">{client.name}</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label className="text-sm text-muted-foreground">Beløb (DKK)</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="0"
+                                    value={bonus.amount || ""}
+                                    onChange={(e) => updateDailyBonus(client.id, 'amount', parseFloat(e.target.value) || 0)}
+                                    className="h-10"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-sm text-muted-foreground">Antal dage</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    placeholder="0"
+                                    value={bonus.days || ""}
+                                    onChange={(e) => updateDailyBonus(client.id, 'days', parseInt(e.target.value) || 0)}
+                                    className="h-10"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
               </TabsContent>
             </div>
           </Tabs>
