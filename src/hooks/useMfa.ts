@@ -121,30 +121,66 @@ export function useMfa(): UseMfaReturn {
 
   const verifyEnrollment = async (code: string): Promise<boolean> => {
     try {
+      console.log("[MFA] Starting enrollment verification with code length:", code.length);
+      
       // Get the current unverified factor
-      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
+      
+      if (listError) {
+        console.error("[MFA] Error listing factors:", listError);
+        return false;
+      }
+      
+      console.log("[MFA] Current factors:", factors?.totp?.map(f => ({ 
+        id: f.id, 
+        status: f.status, 
+        friendlyName: f.friendly_name 
+      })));
+      
       // Find factor that is not verified yet (could be unverified status)
       const unverifiedFactor = factors?.totp?.find(f => f.status !== "verified");
       
       if (!unverifiedFactor) {
-        console.error("No unverified factor found");
+        console.error("[MFA] No unverified factor found. All factors:", factors?.totp);
         return false;
       }
+      
+      console.log("[MFA] Found unverified factor:", unverifiedFactor.id, "status:", unverifiedFactor.status);
 
       // Create challenge and verify
+      console.log("[MFA] Creating challenge for factor:", unverifiedFactor.id);
       const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
         factorId: unverifiedFactor.id,
       });
 
-      if (challengeError) throw challengeError;
+      if (challengeError) {
+        console.error("[MFA] Challenge error:", {
+          message: challengeError.message,
+          status: challengeError.status,
+          code: challengeError.code
+        });
+        throw challengeError;
+      }
+      
+      console.log("[MFA] Challenge created:", challenge.id);
 
-      const { error: verifyError } = await supabase.auth.mfa.verify({
+      console.log("[MFA] Verifying code...");
+      const { data: verifyData, error: verifyError } = await supabase.auth.mfa.verify({
         factorId: unverifiedFactor.id,
         challengeId: challenge.id,
         code,
       });
 
-      if (verifyError) throw verifyError;
+      if (verifyError) {
+        console.error("[MFA] Verify error:", {
+          message: verifyError.message,
+          status: verifyError.status,
+          code: verifyError.code
+        });
+        throw verifyError;
+      }
+      
+      console.log("[MFA] Verification successful!");
 
       // Update employee_master_data
       const { data: { session } } = await supabase.auth.getSession();
@@ -154,12 +190,19 @@ export function useMfa(): UseMfaReturn {
           .from("employee_master_data")
           .update({ mfa_enabled: true })
           .or(`private_email.ilike.${lowerEmail},work_email.ilike.${lowerEmail}`);
+        console.log("[MFA] Updated employee_master_data");
       }
 
       setState(prev => ({ ...prev, isEnabled: true, isVerified: true }));
       return true;
-    } catch (error) {
-      console.error("Error verifying MFA enrollment:", error);
+    } catch (error: any) {
+      console.error("[MFA] Error verifying MFA enrollment:", {
+        message: error?.message,
+        status: error?.status,
+        code: error?.code,
+        name: error?.name,
+        full: error
+      });
       return false;
     }
   };
