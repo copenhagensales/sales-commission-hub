@@ -7,7 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveCont
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CombinedEmployee {
@@ -440,7 +440,23 @@ export function HistoricalTenureStats() {
                 <TableHead className="text-right">Gns. anciennitet</TableHead>
                 <TableHead className="text-right">30-dages churn</TableHead>
                 <TableHead className="text-right">60-dages churn</TableHead>
-                <TableHead className="text-right">Trend (60d)</TableHead>
+                <TableHead className="text-right">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center justify-end gap-1 cursor-help">
+                          Udvikling (3 mdr)
+                          <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p className="text-xs">
+                          Sammenligner andelen af tidlige opsigelser (inden 60 dage) i de sidste 3 måneder med de foregående 3 måneder.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -482,33 +498,65 @@ export function HistoricalTenureStats() {
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className={`flex items-center justify-end gap-1 text-sm cursor-help ${
+                            <div className={`flex flex-col items-end text-sm cursor-help ${
                               team.churnTrend < 0 ? 'text-green-600' : 
                               team.churnTrend > 0 ? 'text-red-600' : 
                               'text-muted-foreground'
                             }`}>
-                              {team.churnTrend < 0 ? (
-                                <TrendingDown className="h-4 w-4 shrink-0" />
-                              ) : team.churnTrend > 0 ? (
-                                <TrendingUp className="h-4 w-4 shrink-0" />
-                              ) : (
-                                <Minus className="h-4 w-4 shrink-0" />
+                              <div className="flex items-center gap-1">
+                                {team.churnTrend < 0 ? (
+                                  <>
+                                    <TrendingDown className="h-4 w-4 shrink-0" />
+                                    <span className="font-medium">Forbedret</span>
+                                  </>
+                                ) : team.churnTrend > 0 ? (
+                                  <>
+                                    <TrendingUp className="h-4 w-4 shrink-0" />
+                                    <span className="font-medium">Forværret</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Minus className="h-4 w-4 shrink-0" />
+                                    <span className="font-medium">Uændret</span>
+                                  </>
+                                )}
+                              </div>
+                              {team.churnTrend !== 0 && (
+                                <span className="text-xs opacity-75">
+                                  {team.churnTrend < 0 ? '' : '+'}{team.churnTrend} pp
+                                </span>
                               )}
-                              <span>
-                                {team.churnPrev90d}% → {team.churnLast90d}%
-                              </span>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent side="left" className="max-w-xs">
-                            <div className="space-y-1 text-xs">
-                              <p className="font-semibold">60-dages churn rate</p>
-                              <p><span className="text-muted-foreground">Forrige periode:</span> {team.churnPrev90d}%</p>
-                              <p className="text-muted-foreground text-[10px]">({format(subDays(new Date(), 180), "d. MMM", { locale: da })} - {format(subDays(new Date(), 91), "d. MMM", { locale: da })})</p>
-                              <p><span className="text-muted-foreground">Sidste 90 dage:</span> {team.churnLast90d}%</p>
-                              <p className="text-muted-foreground text-[10px]">({format(subDays(new Date(), 90), "d. MMM", { locale: da })} - {format(new Date(), "d. MMM", { locale: da })})</p>
-                              <p className="pt-1 border-t text-muted-foreground">
-                                % af stoppede der stoppede inden for 60 dage
-                              </p>
+                            <div className="space-y-2 text-xs">
+                              <p className="font-semibold">60-dages tidlig afgang</p>
+                              
+                              <div className="space-y-1 border-b pb-2">
+                                <p className="font-medium">Sidste 3 mdr:</p>
+                                <p className="text-muted-foreground text-[10px]">
+                                  {format(subDays(new Date(), 90), "d. MMM", { locale: da })} - {format(new Date(), "d. MMM", { locale: da })}
+                                </p>
+                                <p>
+                                  {team.exits60Last90d} af {team.leaversLast90d} stoppede inden 60 dage ({team.churnLast90d}%)
+                                </p>
+                              </div>
+                              
+                              <div className="space-y-1">
+                                <p className="font-medium">Foregående 3 mdr:</p>
+                                <p className="text-muted-foreground text-[10px]">
+                                  {format(subDays(new Date(), 180), "d. MMM", { locale: da })} - {format(subDays(new Date(), 91), "d. MMM", { locale: da })}
+                                </p>
+                                <p>
+                                  {team.exits60Prev90d} af {team.leaversPrev90d} stoppede inden 60 dage ({team.churnPrev90d}%)
+                                </p>
+                              </div>
+                              
+                              {team.churnTrend !== 0 && (
+                                <p className={`pt-2 border-t font-medium ${team.churnTrend < 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  Ændring: {team.churnTrend < 0 ? '' : '+'}{team.churnTrend} procentpoint
+                                </p>
+                              )}
                             </div>
                           </TooltipContent>
                         </Tooltip>
@@ -535,33 +583,65 @@ export function HistoricalTenureStats() {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className={`flex items-center justify-end gap-1 text-sm cursor-help ${
+                        <div className={`flex flex-col items-end text-sm cursor-help ${
                           overallChurnTrend < 0 ? 'text-green-600' : 
                           overallChurnTrend > 0 ? 'text-red-600' : 
                           'text-muted-foreground'
                         }`}>
-                          {overallChurnTrend < 0 ? (
-                            <TrendingDown className="h-4 w-4 shrink-0" />
-                          ) : overallChurnTrend > 0 ? (
-                            <TrendingUp className="h-4 w-4 shrink-0" />
-                          ) : (
-                            <Minus className="h-4 w-4 shrink-0" />
+                          <div className="flex items-center gap-1">
+                            {overallChurnTrend < 0 ? (
+                              <>
+                                <TrendingDown className="h-4 w-4 shrink-0" />
+                                <span className="font-medium">Forbedret</span>
+                              </>
+                            ) : overallChurnTrend > 0 ? (
+                              <>
+                                <TrendingUp className="h-4 w-4 shrink-0" />
+                                <span className="font-medium">Forværret</span>
+                              </>
+                            ) : (
+                              <>
+                                <Minus className="h-4 w-4 shrink-0" />
+                                <span className="font-medium">Uændret</span>
+                              </>
+                            )}
+                          </div>
+                          {overallChurnTrend !== 0 && (
+                            <span className="text-xs opacity-75">
+                              {overallChurnTrend < 0 ? '' : '+'}{overallChurnTrend} pp
+                            </span>
                           )}
-                          <span>
-                            {overallChurnPrev90dRounded}% → {overallChurnLast90dRounded}%
-                          </span>
                         </div>
                       </TooltipTrigger>
                       <TooltipContent side="left" className="max-w-xs">
-                        <div className="space-y-1 text-xs">
-                          <p className="font-semibold">60-dages churn rate (samlet)</p>
-                          <p><span className="text-muted-foreground">Forrige periode:</span> {overallChurnPrev90dRounded}%</p>
-                          <p className="text-muted-foreground text-[10px]">({format(subDays(new Date(), 180), "d. MMM", { locale: da })} - {format(subDays(new Date(), 91), "d. MMM", { locale: da })})</p>
-                          <p><span className="text-muted-foreground">Sidste 90 dage:</span> {overallChurnLast90dRounded}%</p>
-                          <p className="text-muted-foreground text-[10px]">({format(subDays(new Date(), 90), "d. MMM", { locale: da })} - {format(new Date(), "d. MMM", { locale: da })})</p>
-                          <p className="pt-1 border-t text-muted-foreground">
-                            % af stoppede der stoppede inden for 60 dage
-                          </p>
+                        <div className="space-y-2 text-xs">
+                          <p className="font-semibold">60-dages tidlig afgang (samlet)</p>
+                          
+                          <div className="space-y-1 border-b pb-2">
+                            <p className="font-medium">Sidste 3 mdr:</p>
+                            <p className="text-muted-foreground text-[10px]">
+                              {format(subDays(new Date(), 90), "d. MMM", { locale: da })} - {format(new Date(), "d. MMM", { locale: da })}
+                            </p>
+                            <p>
+                              {totalExits60Last90d} af {totalLeaversLast90d} stoppede inden 60 dage ({overallChurnLast90dRounded}%)
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <p className="font-medium">Foregående 3 mdr:</p>
+                            <p className="text-muted-foreground text-[10px]">
+                              {format(subDays(new Date(), 180), "d. MMM", { locale: da })} - {format(subDays(new Date(), 91), "d. MMM", { locale: da })}
+                            </p>
+                            <p>
+                              {totalExits60Prev90d} af {totalLeaversPrev90d} stoppede inden 60 dage ({overallChurnPrev90dRounded}%)
+                            </p>
+                          </div>
+                          
+                          {overallChurnTrend !== 0 && (
+                            <p className={`pt-2 border-t font-medium ${overallChurnTrend < 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              Ændring: {overallChurnTrend < 0 ? '' : '+'}{overallChurnTrend} procentpoint
+                            </p>
+                          )}
                         </div>
                       </TooltipContent>
                     </Tooltip>
