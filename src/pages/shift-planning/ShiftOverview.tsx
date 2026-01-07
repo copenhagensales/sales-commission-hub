@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -126,6 +126,42 @@ export default function ShiftOverview() {
         .select("employee_id, team_id");
       if (error) throw error;
       return data as { employee_id: string; team_id: string }[];
+    },
+  });
+
+  // Fetch daily bonus configurations for all teams via team_clients
+  const { data: dailyBonusConfigs } = useQuery({
+    queryKey: ["team-daily-bonus-configs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("team_client_daily_bonus")
+        .select("team_id, client_id, bonus_amount, bonus_days");
+      if (error) throw error;
+      return data as { team_id: string; client_id: string; bonus_amount: number; bonus_days: number }[];
+    },
+  });
+
+  // Fetch already paid out daily bonuses
+  const { data: paidBonuses } = useQuery({
+    queryKey: ["daily-bonus-payouts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("daily_bonus_payouts")
+        .select("employee_id, date, amount");
+      if (error) throw error;
+      return data as { employee_id: string; date: string; amount: number }[];
+    },
+  });
+
+  // Fetch employee start dates and team_id for bonus eligibility
+  const { data: employeeStartDates } = useQuery({
+    queryKey: ["employee-start-dates"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, employment_start_date, team_id");
+      if (error) throw error;
+      return data as { id: string; employment_start_date: string | null; team_id: string | null }[];
     },
   });
 
@@ -293,6 +329,47 @@ export default function ShiftOverview() {
     },
   });
 
+  // Mutation to create daily bonus payout
+  const createDailyBonus = useMutation({
+    mutationFn: async ({ employeeId, date, amount, timeStampId }: { employeeId: string; date: string; amount: number; timeStampId?: string }) => {
+      const { error } = await supabase
+        .from("daily_bonus_payouts")
+        .insert({
+          employee_id: employeeId,
+          date,
+          amount,
+          time_stamp_id: timeStampId || null,
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["daily-bonus-payouts"] });
+      toast.success("Dagsbonus udbetalt");
+    },
+    onError: (error: any) => {
+      toast.error("Kunne ikke udbetale dagsbonus: " + error.message);
+    },
+  });
+
+  // Mutation to delete daily bonus payout
+  const deleteDailyBonus = useMutation({
+    mutationFn: async ({ employeeId, date }: { employeeId: string; date: string }) => {
+      const { error } = await supabase
+        .from("daily_bonus_payouts")
+        .delete()
+        .eq("employee_id", employeeId)
+        .eq("date", date);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["daily-bonus-payouts"] });
+      toast.success("Dagsbonus fjernet");
+    },
+    onError: (error: any) => {
+      toast.error("Kunne ikke fjerne dagsbonus: " + error.message);
+    },
+  });
+
   const isHoliday = (date: Date) => {
     return holidays?.some(h => isSameDay(new Date(h.date), date));
   };
@@ -359,6 +436,74 @@ export default function ShiftOverview() {
     const dateStr = format(date, "yyyy-MM-dd");
     return latenessRecords?.find(r => r.employee_id === employeeId && r.date === dateStr) || null;
   };
+
+  // Check if daily bonus is already paid for employee on date
+  const getBonusPaidForDate = (employeeId: string, date: Date): { amount: number } | null => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    const paid = paidBonuses?.find(b => b.employee_id === employeeId && b.date === dateStr);
+    return paid ? { amount: paid.amount } : null;
+  };
+
+  // Get daily bonus eligibility for an employee on a given date
+  // Returns bonus amount if eligible, null if not
+  const getDailyBonusEligibility = useCallback((employeeId: string, date: Date, timeStamp: typeof timeStamps extends (infer T)[] | undefined ? T : never | null): { amount: number; reason?: string } | null => {
+    // 1. Check if employee has a team with daily bonus configured
+    const membership = teamMemberships?.find(m => m.employee_id === employeeId);
+    if (!membership) return null;
+
+    const bonusConfig = dailyBonusConfigs?.find(c => c.team_id === membership.team_id);
+    if (!bonusConfig || bonusConfig.bonus_amount <= 0 || bonusConfig.bonus_days <= 0) return null;
+
+    // 2. Check employee start date
+    const empData = employeeStartDates?.find(e => e.id === employeeId);
+    if (!empData?.employment_start_date) return null;
+
+    const startDate = parseISO(empData.employment_start_date);
+    if (date < startDate) return null;
+
+    // 3. Check how many bonuses have already been paid to this employee
+    const paidCount = paidBonuses?.filter(b => b.employee_id === employeeId).length || 0;
+    if (paidCount >= bonusConfig.bonus_days) return null;
+
+    // 4. Check if employee has absence on this date
+    const absence = isDateInAbsence(employeeId, date);
+    if (absence) return { amount: 0, reason: absence.type === "sick" ? "Syg" : "Ferie" };
+
+    // 5. Check if employee worked more than 5 hours
+    if (!timeStamp?.effective_hours && !timeStamp?.clock_out) {
+      return { amount: bonusConfig.bonus_amount, reason: "Afventer arbejdstimer" };
+    }
+
+    // Calculate hours from timestamp
+    let workedHours = timeStamp?.effective_hours || 0;
+    if (!workedHours && timeStamp?.clock_in && timeStamp?.clock_out) {
+      const clockIn = new Date(timeStamp.clock_in);
+      const clockOut = new Date(timeStamp.clock_out);
+      workedHours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+      // Subtract break
+      if (timeStamp.break_minutes) {
+        workedHours -= timeStamp.break_minutes / 60;
+      }
+    }
+
+    if (workedHours < 5) {
+      return { amount: 0, reason: `Kun ${workedHours.toFixed(1)}t (kræver 5t)` };
+    }
+
+    return { amount: bonusConfig.bonus_amount };
+  }, [teamMemberships, dailyBonusConfigs, employeeStartDates, paidBonuses]);
+
+  // Get count of remaining bonus days for employee
+  const getRemainingBonusDays = useCallback((employeeId: string): { remaining: number; total: number } | null => {
+    const membership = teamMemberships?.find(m => m.employee_id === employeeId);
+    if (!membership) return null;
+
+    const bonusConfig = dailyBonusConfigs?.find(c => c.team_id === membership.team_id);
+    if (!bonusConfig || bonusConfig.bonus_days <= 0) return null;
+
+    const paidCount = paidBonuses?.filter(b => b.employee_id === employeeId).length || 0;
+    return { remaining: Math.max(0, bonusConfig.bonus_days - paidCount), total: bonusConfig.bonus_days };
+  }, [teamMemberships, dailyBonusConfigs, paidBonuses]);
 
   const totalPlannedHours = useMemo(() => {
     return shifts?.reduce((sum, s) => sum + (s.planned_hours || 0), 0) || 0;
@@ -721,6 +866,12 @@ export default function ShiftOverview() {
                     const hasWorkTimes = !!(workTimes || hasShift);
                     const hasStatus = isVacation || isSick || isLate;
                     
+                    // Daily bonus data
+                    const bonusPaid = getBonusPaidForDate(employee.id, day);
+                    const bonusEligibility = !bonusPaid ? getDailyBonusEligibility(employee.id, day, timeStamp) : null;
+                    const remainingBonusDays = getRemainingBonusDays(employee.id);
+                    const hasBonusEligibility = bonusEligibility && bonusEligibility.amount > 0 && !bonusEligibility.reason;
+                    
                     return (
                       <Popover 
                         key={day.toISOString()} 
@@ -736,6 +887,15 @@ export default function ShiftOverview() {
                               !holiday && "hover:bg-muted/30"
                             )}
                           >
+                            {/* Daily bonus indicator */}
+                            {bonusPaid && (
+                              <div className="absolute top-1 right-1">
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/40">
+                                  <Coins className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                </span>
+                              </div>
+                            )}
+                            
                             <div className="flex flex-col items-center justify-center h-full gap-1.5">
                               {/* Shift cards */}
                               {hasShift && dayShifts.map(shift => (
@@ -871,6 +1031,53 @@ export default function ShiftOverview() {
                                 <Info className="h-4 w-4" />
                                 Se info
                               </Button>
+                              
+                              {/* Daily Bonus Section */}
+                              {(hasBonusEligibility || bonusPaid || (bonusEligibility && bonusEligibility.reason)) && remainingBonusDays && (
+                                <>
+                                  <div className="border-t my-1" />
+                                  <p className="text-[10px] text-muted-foreground px-2">
+                                    Dagsbonus ({remainingBonusDays.total - remainingBonusDays.remaining}/{remainingBonusDays.total} dage brugt)
+                                  </p>
+                                  {bonusPaid ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="justify-start gap-2 h-8 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                                      onClick={() => {
+                                        deleteDailyBonus.mutate({ employeeId: employee.id, date: dateKey });
+                                        setOpenPopoverKey(null);
+                                      }}
+                                    >
+                                      <Coins className="h-4 w-4" />
+                                      Fjern bonus ({bonusPaid.amount} kr)
+                                    </Button>
+                                  ) : hasBonusEligibility ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="justify-start gap-2 h-8 text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
+                                      onClick={() => {
+                                        createDailyBonus.mutate({ 
+                                          employeeId: employee.id, 
+                                          date: dateKey, 
+                                          amount: bonusEligibility.amount,
+                                          timeStampId: timeStamp?.id 
+                                        });
+                                        setOpenPopoverKey(null);
+                                      }}
+                                    >
+                                      <Coins className="h-4 w-4" />
+                                      Udbetal bonus ({bonusEligibility.amount} kr)
+                                    </Button>
+                                  ) : bonusEligibility?.reason ? (
+                                    <p className="text-[10px] text-muted-foreground px-2 py-1 italic">
+                                      Ikke berettiget: {bonusEligibility.reason}
+                                    </p>
+                                  ) : null}
+                                </>
+                              )}
+                              
                               {hasStatus && (
                                 <>
                                   <div className="border-t my-1" />

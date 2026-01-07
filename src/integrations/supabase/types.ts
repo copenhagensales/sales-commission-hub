@@ -2549,6 +2549,86 @@ export type Database = {
           },
         ]
       }
+      daily_bonus_payouts: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          date: string
+          employee_id: string
+          id: string
+          time_stamp_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          date: string
+          employee_id: string
+          id?: string
+          time_stamp_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          employee_id?: string
+          id?: string
+          time_stamp_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_bonus_payouts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_bonus_payouts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_bonus_payouts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_bonus_payouts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_basic_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_bonus_payouts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_master_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_bonus_payouts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_bonus_payouts_time_stamp_id_fkey"
+            columns: ["time_stamp_id"]
+            isOneToOne: false
+            referencedRelation: "time_stamps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       danish_holiday: {
         Row: {
           date: string
