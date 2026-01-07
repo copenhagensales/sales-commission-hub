@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Search, Plus, SlidersHorizontal, Phone, MessageSquare, PhoneIncoming, PhoneOutgoing, Trash2 } from "lucide-react";
+import { Search, Plus, SlidersHorizontal, Phone, MessageSquare, PhoneIncoming, PhoneOutgoing, Trash2, Users, Calendar } from "lucide-react";
 import { CandidateCard } from "@/components/recruitment/CandidateCard";
 import { NewCandidateDialog } from "@/components/recruitment/NewCandidateDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -160,6 +160,10 @@ export default function Candidates() {
     0
   );
 
+  // KPI counts
+  const newApplicationsCount = candidatesWithApps.filter(c => c.status === 'new' || c.status === 'ny_ansoegning').length;
+  const scheduledInterviewsCount = candidatesWithApps.filter(c => c.status === 'interview_scheduled').length;
+
   // Helper to find candidate name by phone
   const findCandidateByPhone = (phone: string | null) => {
     if (!phone) return null;
@@ -226,6 +230,38 @@ export default function Candidates() {
             <Plus className="mr-2 h-4 w-4" />
             Tilføj kandidat
           </Button>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 gap-4">
+          <Card 
+            className="cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => setStatusFilter('new')}
+          >
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                <Users className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{newApplicationsCount}</p>
+                <p className="text-sm text-muted-foreground">Nye ansøgninger</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card 
+            className="cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => setStatusFilter('interview_scheduled')}
+          >
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center shrink-0">
+                <Calendar className="h-5 w-5 text-purple-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{scheduledInterviewsCount}</p>
+                <p className="text-sm text-muted-foreground">Jobsamtaler planlagt</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <NewCandidateDialog
