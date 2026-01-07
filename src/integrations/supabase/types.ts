@@ -3685,6 +3685,51 @@ export type Database = {
           },
         ]
       }
+      employee_salary_schemes: {
+        Row: {
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          employee_id: string
+          id: string
+          salary_scheme_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          employee_id: string
+          id?: string
+          salary_scheme_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          employee_id?: string
+          id?: string
+          salary_scheme_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_salary_schemes_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employee"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_salary_schemes_salary_scheme_id_fkey"
+            columns: ["salary_scheme_id"]
+            isOneToOne: false
+            referencedRelation: "salary_schemes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_sales_achievements: {
         Row: {
           achievement_type: string
@@ -6072,6 +6117,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      salary_schemes: {
+        Row: {
+          created_at: string
+          description: string | null
+          fixed_amount: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          percentage_value: number | null
+          scheme_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          fixed_amount?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          percentage_value?: number | null
+          scheme_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          fixed_amount?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          percentage_value?: number | null
+          scheme_type?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       sale_items: {
         Row: {
