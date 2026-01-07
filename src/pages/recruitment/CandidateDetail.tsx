@@ -26,6 +26,7 @@ import { CallModal } from "@/components/calls/CallModal";
 import { useTwilioDeviceContext } from "@/contexts/TwilioDeviceContext";
 import { CandidateChatHistory } from "@/components/recruitment/CandidateChatHistory";
 import { CandidateCallLogs } from "@/components/recruitment/CandidateCallLogs";
+import { AssignCohortDialog } from "@/components/recruitment/AssignCohortDialog";
 const statusLabels: Record<string, string> = {
   ny_ansoegning: "Ny ansøgning",
   new: "Ny ansøgning",
@@ -86,6 +87,7 @@ export default function CandidateDetail() {
   const [activeCallSid, setActiveCallSid] = useState<string | null>(null);
   const [showCallModal, setShowCallModal] = useState(false);
   const [noteType, setNoteType] = useState("Generel observation");
+  const [showAssignCohortDialog, setShowAssignCohortDialog] = useState(false);
   const {
     data: candidate,
     isLoading
@@ -404,9 +406,13 @@ export default function CandidateDetail() {
                   {/* Status Selector */}
                   <div className="space-y-3">
                     <label className="text-sm font-medium">Nuværende status</label>
-                    <Select value={candidate.status} onValueChange={value => updateCandidateMutation.mutate({
-                    status: value
-                  })}>
+                    <Select value={candidate.status} onValueChange={value => {
+                      if (value === "hired") {
+                        setShowAssignCohortDialog(true);
+                      } else {
+                        updateCandidateMutation.mutate({ status: value });
+                      }
+                    }}>
                       <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
@@ -689,6 +695,48 @@ export default function CandidateDetail() {
         callSid={activeCallSid}
         phoneNumber={candidate?.phone || ''}
         contactName={candidate ? `${candidate.first_name} ${candidate.last_name}` : undefined}
+      />
+
+      {/* Assign Cohort Dialog */}
+      <AssignCohortDialog
+        open={showAssignCohortDialog}
+        onOpenChange={setShowAssignCohortDialog}
+        candidateId={id || ""}
+        candidateName={candidate ? `${candidate.first_name} ${candidate.last_name}` : ""}
+        onConfirm={async (cohortId, availableFrom) => {
+          try {
+            // Update candidate status and available_from
+            const updateData: any = { 
+              status: "hired",
+              cohort_assignment_status: cohortId ? "assigned" : "pending"
+            };
+            if (availableFrom) {
+              updateData.available_from = availableFrom.toISOString().split('T')[0];
+            }
+            
+            await supabase.from("candidates").update(updateData).eq("id", id);
+            
+            // If cohort selected, add to cohort_members
+            if (cohortId) {
+              await supabase.from("cohort_members").insert({
+                cohort_id: cohortId,
+                candidate_id: id,
+                status: "pending"
+              });
+            }
+            
+            queryClient.invalidateQueries({ queryKey: ["candidate", id] });
+            toast.success("Kandidat ansat!");
+            setShowAssignCohortDialog(false);
+          } catch (error) {
+            console.error("Error hiring candidate:", error);
+            toast.error("Kunne ikke ansætte kandidat");
+          }
+        }}
+        onSkip={() => {
+          updateCandidateMutation.mutate({ status: "hired" });
+          setShowAssignCohortDialog(false);
+        }}
       />
     </MainLayout>;
 }
