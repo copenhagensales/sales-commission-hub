@@ -432,7 +432,7 @@ export default function CandidateDetail() {
                     <label className="text-sm font-medium">Jobsamtale</label>
                     {candidate.interview_date ? <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
                         <Calendar className="h-5 w-5 text-primary" />
-                        <div>
+                        <div className="flex-1">
                           <p className="font-medium text-sm">
                             {format(new Date(candidate.interview_date), "EEEE d. MMMM", {
                           locale: da
@@ -444,6 +444,19 @@ export default function CandidateDetail() {
                         })}
                           </p>
                         </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 shrink-0" 
+                          onClick={() => {
+                            const existingDate = new Date(candidate.interview_date);
+                            setInterviewDate(existingDate);
+                            setInterviewTime(format(existingDate, "HH:mm"));
+                            setShowInterviewDialog(true);
+                          }}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
                       </div> : <Button variant="outline" className="w-full justify-start" onClick={() => setShowInterviewDialog(true)}>
                         <Calendar className="h-4 w-4 mr-2" />
                         Planlæg samtale
