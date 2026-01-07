@@ -41,7 +41,9 @@ Deno.serve(async (req) => {
     }
 
     // Verify the caller is a manager or above
-    const { data: isManager, error: managerError } = await supabaseUser.rpc("is_manager_or_above");
+    const { data: isManager, error: managerError } = await supabaseUser.rpc("is_manager_or_above", {
+      _user_id: callingUser.id,
+    });
     if (managerError || !isManager) {
       console.error("Manager check failed:", managerError);
       return new Response(
