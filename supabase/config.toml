@@ -197,3 +197,6 @@ verify_jwt = true
 
 [functions.client-sales-overview]
 verify_jwt = false
+
+[functions.reset-user-mfa]
+verify_jwt = false

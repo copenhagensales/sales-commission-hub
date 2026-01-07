@@ -26,6 +26,7 @@ import {
   Globe,
   Plus,
   Trash2,
+  Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -62,13 +63,24 @@ interface TrustedIpRange {
   created_at: string;
 }
 
+interface MfaEmployee {
+  id: string;
+  first_name: string;
+  last_name: string;
+  work_email: string | null;
+  private_email: string | null;
+  mfa_enabled: boolean;
+}
+
 export default function SecurityDashboard() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
+  const [mfaSearchTerm, setMfaSearchTerm] = useState("");
   const [selectedPositionId, setSelectedPositionId] = useState<string>("all");
   const [newIpName, setNewIpName] = useState("");
   const [newIpRange, setNewIpRange] = useState("");
   const [newIpDescription, setNewIpDescription] = useState("");
+  const [resettingMfaFor, setResettingMfaFor] = useState<string | null>(null);
 
   // Fetch positions for dropdown
   const { data: positions = [] } = useQuery({
@@ -154,6 +166,43 @@ export default function SecurityDashboard() {
     },
   });
 
+  // Fetch employees with MFA enabled
+  const { data: mfaEmployees = [], isLoading: loadingMfa } = useQuery({
+    queryKey: ["mfa-employees"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, work_email, private_email, mfa_enabled")
+        .eq("is_active", true)
+        .eq("mfa_enabled", true)
+        .order("first_name");
+
+      if (error) throw error;
+      return data as MfaEmployee[];
+    },
+  });
+
+  // Reset MFA mutation
+  const resetMfaMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const { data, error } = await supabase.functions.invoke("reset-user-mfa", {
+        body: { email },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["mfa-employees"] });
+      setResettingMfaFor(null);
+      toast.success(data.message || "MFA er nulstillet");
+    },
+    onError: (error: Error) => {
+      toast.error("Kunne ikke nulstille MFA: " + error.message);
+    },
+  });
+
   // Unlock account mutation
   const unlockMutation = useMutation({
     mutationFn: async (employeeId: string) => {
@@ -181,6 +230,13 @@ export default function SecurityDashboard() {
   const filteredAttempts = failedAttempts.filter((attempt) =>
     attempt.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     attempt.ip_address?.includes(searchTerm)
+  );
+
+  // Filter MFA employees by search
+  const filteredMfaEmployees = mfaEmployees.filter((emp) =>
+    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(mfaSearchTerm.toLowerCase()) ||
+    emp.work_email?.toLowerCase().includes(mfaSearchTerm.toLowerCase()) ||
+    emp.private_email?.toLowerCase().includes(mfaSearchTerm.toLowerCase())
   );
 
   // Group attempts by email for statistics
@@ -387,6 +443,10 @@ export default function SecurityDashboard() {
             <Lock className="h-4 w-4" />
             Låste konti
           </TabsTrigger>
+          <TabsTrigger value="mfa" className="gap-2">
+            <Smartphone className="h-4 w-4" />
+            MFA
+          </TabsTrigger>
           <TabsTrigger value="top" className="gap-2">
             <AlertTriangle className="h-4 w-4" />
             Top mistænkelige
@@ -562,6 +622,109 @@ export default function SecurityDashboard() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="mfa" className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Søg efter navn eller email..."
+                value={mfaSearchTerm}
+                onChange={(e) => setMfaSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Badge variant="secondary" className="gap-1">
+              <Smartphone className="h-3 w-3" />
+              {mfaEmployees.length} med MFA
+            </Badge>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>MFA Administration</CardTitle>
+              <CardDescription>
+                Nulstil MFA for medarbejdere der har problemer med deres authenticator-app
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Medarbejder</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-[120px]">Handling</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingMfa ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                        Indlæser...
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredMfaEmployees.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                        {mfaSearchTerm ? "Ingen medarbejdere matcher søgningen" : "Ingen medarbejdere har MFA aktiveret"}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredMfaEmployees.map((emp) => {
+                      const email = emp.work_email || emp.private_email || "";
+                      return (
+                        <TableRow key={emp.id}>
+                          <TableCell className="font-medium">
+                            {emp.first_name} {emp.last_name}
+                          </TableCell>
+                          <TableCell>{email}</TableCell>
+                          <TableCell>
+                            <Badge variant="default" className="gap-1">
+                              <Smartphone className="h-3 w-3" />
+                              MFA aktiv
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <AlertDialog open={resettingMfaFor === emp.id} onOpenChange={(open) => !open && setResettingMfaFor(null)}>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setResettingMfaFor(emp.id)}
+                                >
+                                  Nulstil MFA
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Nulstil MFA for {emp.first_name}?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Dette vil fjerne alle MFA-faktorer for {emp.first_name} {emp.last_name}. 
+                                    De vil blive bedt om at opsætte MFA igen ved næste login.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Annuller</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => resetMfaMutation.mutate(email)}
+                                    disabled={resetMfaMutation.isPending}
+                                  >
+                                    {resetMfaMutation.isPending ? "Nulstiller..." : "Nulstil MFA"}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
