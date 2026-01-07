@@ -536,16 +536,31 @@ export default function ShiftOverview() {
   }, [teamMemberships, dailyBonusConfigs, employeeStartDates, paidBonuses, getPlannedHoursFromWorkTimes, getHoursSourceForEmployee]);
 
   // Get count of remaining bonus days for employee
-  const getRemainingBonusDays = useCallback((employeeId: string): { remaining: number; total: number } | null => {
+  const getRemainingBonusDays = useCallback((employeeId: string): { remaining: number; total: number; used: number } | null => {
     const membership = teamMemberships?.find(m => m.employee_id === employeeId);
     if (!membership) return null;
 
     const bonusConfig = dailyBonusConfigs?.find(c => c.team_id === membership.team_id);
     if (!bonusConfig || bonusConfig.bonus_days <= 0) return null;
 
-    const paidCount = paidBonuses?.filter(b => b.employee_id === employeeId).length || 0;
-    return { remaining: Math.max(0, bonusConfig.bonus_days - paidCount), total: bonusConfig.bonus_days };
-  }, [teamMemberships, dailyBonusConfigs, paidBonuses]);
+    // Get employee start date to calculate bonus period
+    const empData = employeeStartDates?.find(e => e.id === employeeId);
+    if (!empData?.employment_start_date) return null;
+
+    const startDate = parseISO(empData.employment_start_date);
+    const startDateStr = format(startDate, "yyyy-MM-dd");
+
+    // Count paid bonuses only from the employee's start date onwards
+    const paidCount = paidBonuses?.filter(b => 
+      b.employee_id === employeeId && b.date >= startDateStr
+    ).length || 0;
+    
+    return { 
+      remaining: Math.max(0, bonusConfig.bonus_days - paidCount), 
+      total: bonusConfig.bonus_days,
+      used: paidCount
+    };
+  }, [teamMemberships, dailyBonusConfigs, paidBonuses, employeeStartDates]);
 
   // Check if employee has started on or before a given date
   const isEmployeeActiveOnDate = useCallback((employeeId: string, date: Date): boolean => {
@@ -1136,7 +1151,7 @@ export default function ShiftOverview() {
                                 <>
                                   <div className="border-t my-1" />
                                   <p className="text-[10px] text-muted-foreground px-2">
-                                    Dagsbonus ({remainingBonusDays.total - remainingBonusDays.remaining}/{remainingBonusDays.total} dage brugt)
+                                    Dagsbonus ({remainingBonusDays.used}/{remainingBonusDays.total} dage brugt)
                                   </p>
                                   {bonusPaid ? (
                                     <Button
