@@ -472,9 +472,9 @@ export function useDanishHolidays(year?: number) {
 
 // Get employee by current user
 export function useCurrentEmployee() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   
-  return useQuery({
+  const query = useQuery({
     queryKey: ["current-employee", user?.email],
     queryFn: async () => {
       if (!user?.email) return null;
@@ -490,6 +490,12 @@ export function useCurrentEmployee() {
     },
     enabled: !!user?.email,
   });
+  
+  // Include auth loading state in isLoading
+  return {
+    ...query,
+    isLoading: authLoading || query.isLoading,
+  };
 }
 
 // Get employees for manager view - filter by team membership when team is selected
