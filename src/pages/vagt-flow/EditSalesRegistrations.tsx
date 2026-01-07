@@ -527,48 +527,50 @@ export default function EditSalesRegistrations() {
           <p className="text-muted-foreground">Rediger eller slet fieldmarketing salgsregistreringer</p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Filtre</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap items-end gap-4">
               {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Søg produkt, telefon, sælger..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
+              <div className="flex-1 min-w-[200px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Søg produkt, telefon, sælger..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 h-10"
+                  />
+                </div>
               </div>
 
-              {/* Date From */}
-              <div>
-                <Label className="text-xs text-muted-foreground">Fra dato</Label>
-                <Input
-                  type="date"
-                  value={dateRange.from}
-                  onChange={(e) => setDateRange((prev) => ({ ...prev, from: e.target.value }))}
-                />
-              </div>
-
-              {/* Date To */}
-              <div>
-                <Label className="text-xs text-muted-foreground">Til dato</Label>
-                <Input
-                  type="date"
-                  value={dateRange.to}
-                  onChange={(e) => setDateRange((prev) => ({ ...prev, to: e.target.value }))}
-                />
+              {/* Date Range */}
+              <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Fra</Label>
+                  <Input
+                    type="date"
+                    value={dateRange.from}
+                    onChange={(e) => setDateRange((prev) => ({ ...prev, from: e.target.value }))}
+                    className="h-10 w-[140px]"
+                  />
+                </div>
+                <span className="text-muted-foreground mt-5">–</span>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs text-muted-foreground">Til</Label>
+                  <Input
+                    type="date"
+                    value={dateRange.to}
+                    onChange={(e) => setDateRange((prev) => ({ ...prev, to: e.target.value }))}
+                    className="h-10 w-[140px]"
+                  />
+                </div>
               </div>
 
               {/* Seller filter */}
-              <div>
+              <div className="flex flex-col gap-1 min-w-[180px]">
                 <Label className="text-xs text-muted-foreground">Sælger</Label>
                 <Select value={selectedSellerId} onValueChange={setSelectedSellerId}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue placeholder="Alle sælgere" />
                   </SelectTrigger>
                   <SelectContent>
@@ -583,10 +585,10 @@ export default function EditSalesRegistrations() {
               </div>
 
               {/* Client filter */}
-              <div>
+              <div className="flex flex-col gap-1 min-w-[180px]">
                 <Label className="text-xs text-muted-foreground">Kunde</Label>
                 <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue placeholder="Alle kunder" />
                   </SelectTrigger>
                   <SelectContent>
