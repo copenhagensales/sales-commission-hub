@@ -226,6 +226,8 @@ export function usePermissions() {
     canViewTeams: canView("menu_teams"),
     canEditTeams: canEdit("menu_teams"),
     canViewLoginLog: canView("menu_login_log"),
+    canViewUpcomingStarts: canView("menu_upcoming_starts"),
+    canEditUpcomingStarts: canEdit("menu_upcoming_starts"),
     // Management menu
     canViewContracts: canView("menu_contracts"),
     canEditContracts: canEdit("menu_contracts"),
