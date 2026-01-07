@@ -29,6 +29,7 @@ import {
   Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
+import { MainLayout } from "@/components/layout/MainLayout";
 
 interface FailedLoginAttempt {
   id: string;
@@ -252,7 +253,8 @@ export default function SecurityDashboard() {
     .slice(0, 5);
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <MainLayout>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -738,6 +740,7 @@ export default function SecurityDashboard() {
         </TabsContent>
       </Tabs>
     </div>
+    </MainLayout>
   );
 }
 
