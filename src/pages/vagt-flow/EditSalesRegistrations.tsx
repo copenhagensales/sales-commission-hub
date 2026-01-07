@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Pencil, Trash2, Search, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
@@ -111,8 +112,11 @@ export default function EditSalesRegistrations() {
     client_id: "",
   });
   const [groupSaleItems, setGroupSaleItems] = useState<GroupSaleItem[]>([]);
+  const [deleteGroupDialog, setDeleteGroupDialog] = useState<{ open: boolean; group: GroupedSales | null }>({
+    open: false,
+    group: null,
+  });
 
-  // Fetch products for commission/revenue lookup
   const { data: products } = useQuery({
     queryKey: ["fm-products"],
     queryFn: async () => {
@@ -338,6 +342,26 @@ export default function EditSalesRegistrations() {
     },
     onError: (error: Error) => {
       toast.error(`Kunne ikke opdatere gruppe: ${error.message}`);
+    },
+  });
+
+  // Delete group mutation - deletes all sales in a group
+  const deleteGroup = useMutation({
+    mutationFn: async (group: GroupedSales) => {
+      const saleIds = group.sales.map(s => s.id);
+      const { error } = await supabase
+        .from("fieldmarketing_sales")
+        .delete()
+        .in("id", saleIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Salgsgruppe slettet");
+      queryClient.invalidateQueries({ queryKey: ["fm-sales-edit"] });
+      setDeleteGroupDialog({ open: false, group: null });
+    },
+    onError: (error: Error) => {
+      toast.error(`Kunne ikke slette gruppe: ${error.message}`);
     },
   });
 
@@ -670,18 +694,32 @@ export default function EditSalesRegistrations() {
                                 </div>
                               </div>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openGroupEditDialog(group);
-                              }}
-                              className="ml-2"
-                            >
-                              <Pencil className="h-3 w-3 mr-1" />
-                              Rediger gruppe
-                            </Button>
+                            <div className="flex items-center gap-2 ml-4">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openGroupEditDialog(group);
+                                }}
+                                className="text-primary hover:text-primary hover:bg-primary/10"
+                              >
+                                <Pencil className="h-4 w-4 mr-1.5" />
+                                Rediger
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteGroupDialog({ open: true, group });
+                                }}
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-4 w-4 mr-1.5" />
+                                Slet
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </CollapsibleTrigger>
@@ -1003,6 +1041,35 @@ export default function EditSalesRegistrations() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Group Confirmation */}
+      <AlertDialog 
+        open={deleteGroupDialog.open} 
+        onOpenChange={(open) => setDeleteGroupDialog({ open, group: open ? deleteGroupDialog.group : null })}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slet hele salgsgruppen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Du er ved at slette {deleteGroupDialog.group?.salesCount} salgsregistrering(er) for{" "}
+              <strong>{deleteGroupDialog.group?.sellerName}</strong> den{" "}
+              {deleteGroupDialog.group?.date && format(parseISO(deleteGroupDialog.group.date), "d. MMMM yyyy", { locale: da })}.
+              <br /><br />
+              Denne handling kan ikke fortrydes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuller</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteGroupDialog.group && deleteGroup.mutate(deleteGroupDialog.group)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteGroup.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Ja, slet gruppen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </VagtFlowLayout>
   );
 }
