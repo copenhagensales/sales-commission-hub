@@ -1081,6 +1081,15 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                     {t("sidebar.dataSourcesInfo")}
                   </NavLink>
                 )}
+                {p.canViewMgTest && (
+                  <NavLink to="/1234" onClick={handleNavClick} className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    location.pathname === "/1234" ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )}>
+                    <BarChart3 className="h-4 w-4" />
+                    1234
+                  </NavLink>
+                )}
               </CollapsibleContent>
             </Collapsible>
           )}
