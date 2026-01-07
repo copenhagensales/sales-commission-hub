@@ -181,27 +181,11 @@ export function HistoricalTenureStats() {
 
   const isLoading = loadingHistorical || loadingCurrent;
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Samlet anciennitetsdata</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-muted rounded w-1/4"></div>
-            <div className="h-64 bg-muted rounded"></div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   // Combine both datasets
-  const allEmployeesRaw: CombinedEmployee[] = [
+  const allEmployeesRaw: CombinedEmployee[] = useMemo(() => [
     ...(historicalData || []),
     ...(currentData || [])
-  ];
+  ], [historicalData, currentData]);
 
   // Filter employees based on date range (for the detailed table)
   // We filter historical employees by their end_date, current employees are always included
@@ -224,6 +208,22 @@ export function HistoricalTenureStats() {
       }
     });
   }, [allEmployeesRaw, dateRange]);
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Samlet anciennitetsdata</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-muted rounded w-1/4"></div>
+            <div className="h-64 bg-muted rounded"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (allEmployeesRaw.length === 0) {
     return null;
