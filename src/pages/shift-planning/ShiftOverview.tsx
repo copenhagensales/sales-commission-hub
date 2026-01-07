@@ -483,12 +483,20 @@ export default function ShiftOverview() {
     const bonusConfig = dailyBonusConfigs?.find(c => c.team_id === membership.team_id);
     if (!bonusConfig || bonusConfig.bonus_amount <= 0 || bonusConfig.bonus_days <= 0) return null;
 
-    // 2. Check employee start date
+    // 2. Check employee start date and bonus period
     const empData = employeeStartDates?.find(e => e.id === employeeId);
     if (!empData?.employment_start_date) return null;
 
     const startDate = parseISO(empData.employment_start_date);
     if (date < startDate) return null;
+
+    // Calculate bonus period end date (bonus_days * 2 + 7 calendar days to account for weekends)
+    const maxCalendarDays = bonusConfig.bonus_days * 2 + 7;
+    const bonusPeriodEnd = new Date(startDate);
+    bonusPeriodEnd.setDate(bonusPeriodEnd.getDate() + maxCalendarDays);
+    
+    // If the date is beyond the bonus period, no longer eligible
+    if (date > bonusPeriodEnd) return null;
 
     // 3. Check how many bonuses have already been paid to this employee (within bonus period)
     const startDateStr = format(startDate, "yyyy-MM-dd");
