@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { useIsFieldmarketingEmployee } from "@/hooks/useFieldmarketingEmployee";
+import { useEmployeeSmsUnreadCount } from "@/hooks/useEmployeeSmsConversations";
 import { useCarQuizCompletion } from "@/hooks/useCarQuiz";
 import { useIsSalgskonsulent, useCodeOfConductLock } from "@/hooks/useCodeOfConduct";
 import { useTranslation } from "react-i18next";
@@ -37,6 +38,7 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
   const { data: carQuizCompletion } = useCarQuizCompletion();
   const { data: isSalgskonsulent } = useIsSalgskonsulent();
   const { isRequired: codeOfConductRequired } = useCodeOfConductLock();
+  const { data: employeeSmsUnreadCount = 0 } = useEmployeeSmsUnreadCount();
   
   const [mitHjemOpen, setMitHjemOpen] = useState(
     ["/home", "/head-to-head", "/messages", "/my-schedule", "/my-profile", "/my-goals", "/my-contracts", "/career-wishes", "/my-feedback", "/refer-a-friend"].some(path => location.pathname === path || location.pathname.startsWith(path))
@@ -365,9 +367,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                 {t("sidebar.myHome", "Mit Hjem")}
               </div>
               <div className="flex items-center gap-1">
-                {(unreadMessagesCount > 0 || pendingContractsCount > 0 || pendingH2hCount > 0) && (
+                {(unreadMessagesCount > 0 || pendingContractsCount > 0 || pendingH2hCount > 0 || (p.canSendEmployeeSms && employeeSmsUnreadCount > 0)) && (
                   <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                    {(unreadMessagesCount + pendingContractsCount + pendingH2hCount) > 99 ? "99+" : (unreadMessagesCount + pendingContractsCount + pendingH2hCount)}
+                    {(unreadMessagesCount + pendingContractsCount + pendingH2hCount + (p.canSendEmployeeSms ? employeeSmsUnreadCount : 0)) > 99 ? "99+" : (unreadMessagesCount + pendingContractsCount + pendingH2hCount + (p.canSendEmployeeSms ? employeeSmsUnreadCount : 0))}
                   </Badge>
                 )}
                 {mitHjemOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -420,9 +422,9 @@ export function AppSidebar({ isMobile = false, onNavigate }: AppSidebarProps) {
                   <MessageSquare className="h-4 w-4" />
                   {t("sidebar.messages", "Beskeder")}
                 </div>
-                {unreadMessagesCount > 0 && (
+                {(unreadMessagesCount > 0 || (p.canSendEmployeeSms && employeeSmsUnreadCount > 0)) && (
                   <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs animate-pulse">
-                    {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
+                    {(unreadMessagesCount + (p.canSendEmployeeSms ? employeeSmsUnreadCount : 0)) > 99 ? "99+" : (unreadMessagesCount + (p.canSendEmployeeSms ? employeeSmsUnreadCount : 0))}
                   </Badge>
                 )}
               </NavLink>
