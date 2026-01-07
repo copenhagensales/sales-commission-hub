@@ -273,6 +273,12 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
         description: "Adgang til salgsregistrering",
         hasEditOption: true,
       },
+      {
+        key: "menu_fm_travel_expenses",
+        label: "Rejsekort og diæter",
+        description: "Adgang til rejsekort og diætregler",
+        hasEditOption: false,
+      },
     ],
   },
   {
