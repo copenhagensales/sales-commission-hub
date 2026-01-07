@@ -4,7 +4,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Users, Plus, Clock, MapPin, Building2, UserPlus, Mail, Loader2, Trash2 } from "lucide-react";
+import { Calendar, Users, Plus, Clock, MapPin, Building2, UserPlus, Mail, Loader2, Trash2, Pencil } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,11 +16,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, isToday, isTomorrow, isThisWeek, isPast, addDays } from "date-fns";
 import { da } from "date-fns/locale";
 import { useState } from "react";
 import { CreateCohortDialog } from "@/components/personnel/CreateCohortDialog";
 import { AddMemberDialog } from "@/components/personnel/AddMemberDialog";
+import { EditMemberClientDialog } from "@/components/personnel/EditMemberClientDialog";
 import { usePermissions } from "@/hooks/usePositionPermissions";
 import { useToast } from "@/hooks/use-toast";
 
@@ -90,6 +92,13 @@ export default function UpcomingStarts() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
   const [selectedCohortId, setSelectedCohortId] = useState<string | null>(null);
+  const [editMemberDialogOpen, setEditMemberDialogOpen] = useState(false);
+  const [selectedMemberForEdit, setSelectedMemberForEdit] = useState<{
+    id: string;
+    name: string;
+    teamId: string | null;
+    clientId: string | null;
+  } | null>(null);
   const p = usePermissions();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -467,6 +476,33 @@ export default function UpcomingStarts() {
                         <Badge variant="outline" className="text-xs shrink-0">
                           {memberStatusLabels[member.status]}
                         </Badge>
+                        {canEdit && cohort.status === "planned" && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                  onClick={() => {
+                                    setSelectedMemberForEdit({
+                                      id: member.id,
+                                      name,
+                                      teamId: cohort.team_id,
+                                      clientId: member.daily_bonus_client_id,
+                                    });
+                                    setEditMemberDialogOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Rediger dagsbonuskunde</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                         {canRemove && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -690,6 +726,17 @@ export default function UpcomingStarts() {
         onOpenChange={setAddMemberDialogOpen}
         cohortId={selectedCohortId}
       />
+
+      {selectedMemberForEdit && (
+        <EditMemberClientDialog
+          open={editMemberDialogOpen}
+          onOpenChange={setEditMemberDialogOpen}
+          memberId={selectedMemberForEdit.id}
+          memberName={selectedMemberForEdit.name}
+          teamId={selectedMemberForEdit.teamId}
+          currentClientId={selectedMemberForEdit.clientId}
+        />
+      )}
     </MainLayout>
   );
 }
