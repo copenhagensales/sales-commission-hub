@@ -137,11 +137,10 @@ export function HistoricalTenureStats() {
   const { data: currentData, isLoading: loadingCurrent } = useQuery({
     queryKey: ["current-employees-tenure"],
     queryFn: async () => {
-      // First get all active employees
+      // Get all employees (both active and inactive) from employee_master_data
       const { data: employees, error: empError } = await supabase
         .from("employee_master_data")
-        .select("id, first_name, last_name, employment_start_date")
-        .eq("is_active", true)
+        .select("id, first_name, last_name, employment_start_date, employment_end_date, is_active")
         .not("employment_start_date", "is", null);
       if (empError) throw empError;
       
@@ -165,15 +164,17 @@ export function HistoricalTenureStats() {
       const today = new Date();
       return (employees || []).map(emp => {
         const hireDate = emp.employment_start_date ? parseISO(emp.employment_start_date) : today;
-        const tenureDays = differenceInDays(today, hireDate);
+        // For inactive employees, calculate tenure until end_date; for active, until today
+        const endDate = emp.is_active ? today : (emp.employment_end_date ? parseISO(emp.employment_end_date) : today);
+        const tenureDays = differenceInDays(endDate, hireDate);
         return {
           id: emp.id,
           full_name: `${emp.first_name} ${emp.last_name}`.trim(),
           team_name: normalizeTeamName(employeeTeamMap.get(emp.id) || null),
           hire_date: emp.employment_start_date || "",
-          end_date: null,
+          end_date: emp.employment_end_date || null,
           tenure_days: Math.max(0, tenureDays),
-          is_current: true
+          is_current: emp.is_active === true
         };
       }) as CombinedEmployee[];
     },
