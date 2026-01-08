@@ -5379,6 +5379,7 @@ export type Database = {
           client_campaign: string | null
           created_at: string
           created_by: string | null
+          daily_bonus_client_id: string | null
           id: string
           location: string | null
           max_capacity: number | null
@@ -5394,6 +5395,7 @@ export type Database = {
           client_campaign?: string | null
           created_at?: string
           created_by?: string | null
+          daily_bonus_client_id?: string | null
           id?: string
           location?: string | null
           max_capacity?: number | null
@@ -5409,6 +5411,7 @@ export type Database = {
           client_campaign?: string | null
           created_at?: string
           created_by?: string | null
+          daily_bonus_client_id?: string | null
           id?: string
           location?: string | null
           max_capacity?: number | null
@@ -5440,6 +5443,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "employee_referral_lookup"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_cohorts_daily_bonus_client_id_fkey"
+            columns: ["daily_bonus_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
           {
