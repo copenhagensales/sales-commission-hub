@@ -141,7 +141,8 @@ export default function EmployeeMasterData() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
   const [smsEmployee, setSmsEmployee] = useState<EmployeeMasterDataRecord | null>(null);
-  const { canEditEmployees, hasPermission, canSendEmployeeSms } = usePermissions();
+  const { canEditEmployees, hasPermission, canSendEmployeeSms, position } = usePermissions();
+  const currentUserPosition = position?.name;
   const { makeCall, isDeviceReady } = useTwilioDevice();
   const hasOutboundSoftphone = hasPermission("softphone_outbound");
 
@@ -1212,7 +1213,15 @@ export default function EmployeeMasterData() {
                             <SelectValue placeholder="Vælg stilling" />
                           </SelectTrigger>
                           <SelectContent>
-                            {jobPositions.map((position) => (
+                            {jobPositions
+                              .filter((position) => {
+                                // Hide "Ejer" position unless current user is also "Ejer"
+                                if (position.name === "Ejer") {
+                                  return currentUserPosition === "Ejer";
+                                }
+                                return true;
+                              })
+                              .map((position) => (
                               <SelectItem key={position.id} value={position.name}>
                                 {position.name}
                               </SelectItem>

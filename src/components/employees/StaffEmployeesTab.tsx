@@ -40,7 +40,8 @@ export function StaffEmployeesTab() {
   const [deactivatingEmployee, setDeactivatingEmployee] = useState<StaffEmployee | null>(null);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
   const [smsEmployee, setSmsEmployee] = useState<StaffEmployee | null>(null);
-  const { canEditEmployees, canSendEmployeeSms, hasPermission } = usePermissions();
+  const { canEditEmployees, canSendEmployeeSms, hasPermission, position } = usePermissions();
+  const currentUserPosition = position?.name;
   const hasOutboundSoftphone = hasPermission("softphone_outbound");
   const { makeCall, isDeviceReady } = useTwilioDeviceContext();
   const searchInputRef = React.useRef<HTMLInputElement>(null);
@@ -587,7 +588,15 @@ export function StaffEmployeesTab() {
                         <SelectValue placeholder="Vælg stilling" />
                       </SelectTrigger>
                       <SelectContent>
-                        {jobPositions.map((position) => (
+                        {jobPositions
+                          .filter((position) => {
+                            // Hide "Ejer" position unless current user is also "Ejer"
+                            if (position.name === "Ejer") {
+                              return currentUserPosition === "Ejer";
+                            }
+                            return true;
+                          })
+                          .map((position) => (
                           <SelectItem key={position.id} value={position.name}>
                             {position.name}
                           </SelectItem>
