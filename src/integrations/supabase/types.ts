@@ -7434,38 +7434,65 @@ export type Database = {
         Row: {
           access_code: string
           access_count: number | null
+          auto_rotate: boolean | null
+          celebration_duration: number | null
+          celebration_effect: string | null
+          celebration_enabled: boolean | null
+          celebration_text: string | null
+          celebration_trigger_condition: string | null
+          celebration_trigger_value: number | null
           created_at: string | null
           created_by: string | null
           dashboard_slug: string
           dashboard_slugs: string[] | null
+          expires_at: string | null
           id: string
           is_active: boolean | null
           last_accessed_at: string | null
           name: string | null
+          rotate_interval_seconds: number | null
         }
         Insert: {
           access_code: string
           access_count?: number | null
+          auto_rotate?: boolean | null
+          celebration_duration?: number | null
+          celebration_effect?: string | null
+          celebration_enabled?: boolean | null
+          celebration_text?: string | null
+          celebration_trigger_condition?: string | null
+          celebration_trigger_value?: number | null
           created_at?: string | null
           created_by?: string | null
           dashboard_slug: string
           dashboard_slugs?: string[] | null
+          expires_at?: string | null
           id?: string
           is_active?: boolean | null
           last_accessed_at?: string | null
           name?: string | null
+          rotate_interval_seconds?: number | null
         }
         Update: {
           access_code?: string
           access_count?: number | null
+          auto_rotate?: boolean | null
+          celebration_duration?: number | null
+          celebration_effect?: string | null
+          celebration_enabled?: boolean | null
+          celebration_text?: string | null
+          celebration_trigger_condition?: string | null
+          celebration_trigger_value?: number | null
           created_at?: string | null
           created_by?: string | null
           dashboard_slug?: string
           dashboard_slugs?: string[] | null
+          expires_at?: string | null
           id?: string
           is_active?: boolean | null
           last_accessed_at?: string | null
           name?: string | null
+          rotate_interval_seconds?: number | null
         }
         Relationships: []
       }
