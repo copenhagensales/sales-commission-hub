@@ -7451,6 +7451,7 @@ export type Database = {
           last_accessed_at: string | null
           name: string | null
           rotate_interval_seconds: number | null
+          rotate_intervals_per_dashboard: Json | null
         }
         Insert: {
           access_code: string
@@ -7472,6 +7473,7 @@ export type Database = {
           last_accessed_at?: string | null
           name?: string | null
           rotate_interval_seconds?: number | null
+          rotate_intervals_per_dashboard?: Json | null
         }
         Update: {
           access_code?: string
@@ -7493,6 +7495,7 @@ export type Database = {
           last_accessed_at?: string | null
           name?: string | null
           rotate_interval_seconds?: number | null
+          rotate_intervals_per_dashboard?: Json | null
         }
         Relationships: []
       }
