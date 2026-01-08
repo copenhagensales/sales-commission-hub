@@ -6315,6 +6315,62 @@ export type Database = {
           },
         ]
       }
+      scheduled_emails: {
+        Row: {
+          candidate_id: string | null
+          content: string
+          created_at: string | null
+          employee_id: string | null
+          error_message: string | null
+          id: string
+          recipient_email: string
+          recipient_name: string | null
+          scheduled_at: string
+          sent_at: string | null
+          status: string | null
+          subject: string
+          template_key: string | null
+        }
+        Insert: {
+          candidate_id?: string | null
+          content: string
+          created_at?: string | null
+          employee_id?: string | null
+          error_message?: string | null
+          id?: string
+          recipient_email: string
+          recipient_name?: string | null
+          scheduled_at: string
+          sent_at?: string | null
+          status?: string | null
+          subject: string
+          template_key?: string | null
+        }
+        Update: {
+          candidate_id?: string | null
+          content?: string
+          created_at?: string | null
+          employee_id?: string | null
+          error_message?: string | null
+          id?: string
+          recipient_email?: string
+          recipient_name?: string | null
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string | null
+          subject?: string
+          template_key?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_emails_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shift: {
         Row: {
           break_minutes: number | null

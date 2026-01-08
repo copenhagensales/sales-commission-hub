@@ -18,8 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
-import { Loader2, Mail } from "lucide-react";
+import { Loader2, Mail, Clock } from "lucide-react";
+import { format, addHours } from "date-fns";
+import { da } from "date-fns/locale";
 
 interface Candidate {
   id: string;
@@ -35,10 +38,13 @@ interface SendEmailDialogProps {
   candidate: Candidate;
 }
 
+type DelayOption = "now" | "24h" | "48h";
+
 export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDialogProps) {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [delay, setDelay] = useState<DelayOption>("now");
   const queryClient = useQueryClient();
 
   const { data: templates = [] } = useQuery({
@@ -54,29 +60,69 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
     },
   });
 
+  const getScheduledTime = (delayOption: DelayOption): Date => {
+    const now = new Date();
+    switch (delayOption) {
+      case "24h":
+        return addHours(now, 24);
+      case "48h":
+        return addHours(now, 48);
+      default:
+        return now;
+    }
+  };
+
+  const formatScheduledTime = (delayOption: DelayOption): string => {
+    if (delayOption === "now") return "";
+    const scheduledAt = getScheduledTime(delayOption);
+    return format(scheduledAt, "d. MMM 'kl.' HH:mm", { locale: da });
+  };
+
   const sendEmailMutation = useMutation({
     mutationFn: async () => {
-      // Log the communication
-      const { error: logError } = await supabase
-        .from("communication_logs")
-        .insert({
-          type: "email",
-          direction: "outbound",
-          content: `Subject: ${subject}\n\n${message}`,
+      if (delay === "now") {
+        // Send immediately via edge function
+        const { error } = await supabase.functions.invoke("send-recruitment-email", {
+          body: {
+            candidateId: candidate.id,
+            email: candidate.email,
+            subject,
+            content: message,
+            templateKey: templates.find(t => t.id === selectedTemplate)?.template_key,
+          },
         });
-
-      if (logError) throw logError;
-
-      // In a real implementation, this would call an edge function to send email
-      console.log("Email would be sent to:", candidate.email, "Subject:", subject);
+        if (error) throw error;
+      } else {
+        // Schedule for later
+        const scheduledAt = getScheduledTime(delay);
+        const { error } = await supabase
+          .from("scheduled_emails")
+          .insert({
+            candidate_id: candidate.id,
+            recipient_email: candidate.email!,
+            recipient_name: `${candidate.first_name} ${candidate.last_name}`,
+            subject,
+            content: message,
+            template_key: templates.find(t => t.id === selectedTemplate)?.template_key,
+            scheduled_at: scheduledAt.toISOString(),
+            status: "pending",
+          });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["communication_logs"] });
-      toast.success("Email sendt (simuleret)");
+      queryClient.invalidateQueries({ queryKey: ["scheduled_emails"] });
+      if (delay === "now") {
+        toast.success("Email sendt");
+      } else {
+        toast.success(`Email planlagt til ${formatScheduledTime(delay)}`);
+      }
       onOpenChange(false);
       setSubject("");
       setMessage("");
       setSelectedTemplate("");
+      setDelay("now");
     },
     onError: () => {
       toast.error("Kunne ikke sende email");
@@ -99,6 +145,10 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
   const handleSend = () => {
     if (!subject.trim() || !message.trim()) {
       toast.error("Udfyld både emne og besked");
+      return;
+    }
+    if (!candidate.email) {
+      toast.error("Kandidaten har ingen email-adresse");
       return;
     }
     sendEmailMutation.mutate();
@@ -151,9 +201,34 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
             <Textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="bg-background border-border min-h-[200px]"
+              className="bg-background border-border min-h-[150px]"
               placeholder="Skriv din besked her..."
             />
+          </div>
+
+          <div className="space-y-3 p-3 rounded-lg bg-muted/30 border border-border">
+            <Label className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Hvornår skal emailen sendes?
+            </Label>
+            <RadioGroup value={delay} onValueChange={(v) => setDelay(v as DelayOption)}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="now" id="now" />
+                <Label htmlFor="now" className="font-normal cursor-pointer">Send nu</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="24h" id="24h" />
+                <Label htmlFor="24h" className="font-normal cursor-pointer">
+                  Om 24 timer {delay !== "24h" && <span className="text-muted-foreground">({formatScheduledTime("24h")})</span>}
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="48h" id="48h" />
+                <Label htmlFor="48h" className="font-normal cursor-pointer">
+                  Om 48 timer {delay !== "48h" && <span className="text-muted-foreground">({formatScheduledTime("48h")})</span>}
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
@@ -162,7 +237,7 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
             </Button>
             <Button onClick={handleSend} disabled={sendEmailMutation.isPending}>
               {sendEmailMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Send email
+              {delay === "now" ? "Send email" : "Planlæg email"}
             </Button>
           </div>
         </div>
