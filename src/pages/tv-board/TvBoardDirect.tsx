@@ -17,6 +17,12 @@ const dashboardComponents: Record<string, React.ComponentType> = {
   "cph-sales": CphSalesDashboard,
   "fieldmarketing": FieldmarketingDashboardFull,
   "team": TeamDashboard,
+  "eesy-tm": TeamDashboard,
+  "tdc-erhverv": TeamDashboard,
+  "relatel": TeamDashboard,
+  "tryg": TeamDashboard,
+  "ase": TeamDashboard,
+  "united": TeamDashboard,
   "tdc-erhverv-goals": TdcErhvervGoalsDashboard,
   "fieldmarketing-goals": FieldmarketingGoalsDashboard,
 };
