@@ -534,95 +534,118 @@ const Home = () => {
     return { currentAmount, targetAmount, progress, progressVsExpected };
   }, [teamGoal, workingDaysStats]);
 
-  // Fetch employee's personal sales stats via agent mapping
+  // Fetch employee's personal sales stats via agent mapping (same logic as DailyReports)
   const { data: personalStats } = useQuery({
-    queryKey: ["home-personal-stats", employee?.id],
+    queryKey: ["home-personal-stats", employee?.id, periodStartStr, periodEndStr],
     queryFn: async () => {
       if (!employee?.id) return null;
       
-      // Get agent mappings for this employee
+      // Get agent mappings for this employee with email and external_dialer_id
       const { data: mappings } = await supabase
         .from("employee_agent_mapping")
-        .select("agent_id, agents(name)")
+        .select("agent_id, agents(email, external_dialer_id)")
         .eq("employee_id", employee.id);
       
-      if (!mappings || mappings.length === 0) return null;
-      
-      const agentNames = mappings.map(m => (m.agents as { name: string } | null)?.name).filter(Boolean);
-      if (agentNames.length === 0) return null;
+      const agentEmails = mappings?.map(m => (m.agents as any)?.email).filter(Boolean) || [];
+      const externalIds = mappings?.map(m => (m.agents as any)?.external_dialer_id).filter(Boolean) || [];
       
       const now = new Date();
-      const currentDay = now.getDate();
+      const todayStr = format(now, "yyyy-MM-dd");
+      const todayStart = `${todayStr}T00:00:00`;
+      const todayEnd = `${todayStr}T23:59:59`;
       
-      // Calculate payroll period (15th-14th)
-      let periodStart: Date;
-      let periodEnd: Date;
+      let periodSales: any[] = [];
+      let todaySales: any[] = [];
       
-      if (currentDay >= 15) {
-        // Current period: 15th of this month to 14th of next month
-        periodStart = new Date(now.getFullYear(), now.getMonth(), 15);
-        periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 14, 23, 59, 59);
-      } else {
-        // Current period: 15th of last month to 14th of this month
-        periodStart = new Date(now.getFullYear(), now.getMonth() - 1, 15);
-        periodEnd = new Date(now.getFullYear(), now.getMonth(), 14, 23, 59, 59);
+      // Fetch dialer sales if we have agent identifiers
+      if (agentEmails.length > 0 || externalIds.length > 0) {
+        // Build query for period sales
+        let periodQuery = supabase
+          .from("sales")
+          .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
+          .gte("sale_datetime", `${periodStartStr}T00:00:00`)
+          .lte("sale_datetime", `${periodEndStr}T23:59:59`);
+        
+        if (agentEmails.length > 0 && externalIds.length > 0) {
+          periodQuery = periodQuery.or(`agent_email.in.(${agentEmails.join(",")}),agent_external_id.in.(${externalIds.join(",")})`);
+        } else if (agentEmails.length > 0) {
+          periodQuery = periodQuery.in("agent_email", agentEmails);
+        } else {
+          periodQuery = periodQuery.in("agent_external_id", externalIds);
+        }
+        
+        const { data } = await periodQuery;
+        periodSales = data || [];
+        
+        // Build query for today's sales
+        let todayQuery = supabase
+          .from("sales")
+          .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
+          .gte("sale_datetime", todayStart)
+          .lte("sale_datetime", todayEnd);
+        
+        if (agentEmails.length > 0 && externalIds.length > 0) {
+          todayQuery = todayQuery.or(`agent_email.in.(${agentEmails.join(",")}),agent_external_id.in.(${externalIds.join(",")})`);
+        } else if (agentEmails.length > 0) {
+          todayQuery = todayQuery.in("agent_email", agentEmails);
+        } else {
+          todayQuery = todayQuery.in("agent_external_id", externalIds);
+        }
+        
+        const { data: todayData } = await todayQuery;
+        todaySales = todayData || [];
       }
       
-      const periodStartIso = periodStart.toISOString();
-      const periodEndIso = periodEnd.toISOString();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+      // Fetch Fieldmarketing sales for this employee
+      const { data: fmPeriodSales } = await supabase
+        .from("fieldmarketing_sales")
+        .select("id, registered_at, product_name")
+        .eq("seller_id", employee.id)
+        .gte("registered_at", `${periodStartStr}T00:00:00`)
+        .lte("registered_at", `${periodEndStr}T23:59:59`);
       
-      // Fetch payroll period sales for this employee's agents
-      const { data: periodSales } = await supabase
-        .from("sales")
-        .select(`
-          id,
-          agent_name,
-          sale_datetime,
-          sale_items (
-            id,
-            mapped_commission,
-            quantity
-          )
-        `)
-        .in("agent_name", agentNames)
-        .gte("sale_datetime", periodStartIso)
-        .lte("sale_datetime", periodEndIso);
+      const { data: fmTodaySales } = await supabase
+        .from("fieldmarketing_sales")
+        .select("id, registered_at, product_name")
+        .eq("seller_id", employee.id)
+        .gte("registered_at", todayStart)
+        .lte("registered_at", todayEnd);
       
-      // Fetch today's sales
-      const { data: todaySales } = await supabase
-        .from("sales")
-        .select(`
-          id,
-          agent_name,
-          sale_datetime,
-          sale_items (
-            id,
-            mapped_commission,
-            quantity
-          )
-        `)
-        .in("agent_name", agentNames)
-        .gte("sale_datetime", todayStart)
-        .lte("sale_datetime", todayEnd);
+      // Fetch products for FM commission calculation
+      const { data: products } = await supabase
+        .from("products")
+        .select("name, commission_dkk");
       
-      // Calculate totals - mapped_commission already contains total (base × quantity)
-      const periodCommission = periodSales?.reduce((total, sale) => {
-        return total + (sale.sale_items?.reduce((sum, item) => {
-          return sum + (item.mapped_commission || 0);
-        }, 0) || 0);
+      const productCommissionMap = new Map<string, number>();
+      products?.forEach(p => {
+        if (p.name) productCommissionMap.set(p.name.toLowerCase(), p.commission_dkk || 0);
+      });
+      
+      // Calculate dialer commission
+      const dialerPeriodCommission = periodSales.reduce((total, sale) => {
+        return total + (sale.sale_items?.reduce((sum: number, item: any) => sum + (item.mapped_commission || 0), 0) || 0);
+      }, 0);
+      
+      const dialerTodayCommission = todaySales.reduce((total, sale) => {
+        return total + (sale.sale_items?.reduce((sum: number, item: any) => sum + (item.mapped_commission || 0), 0) || 0);
+      }, 0);
+      
+      // Calculate FM commission
+      const fmPeriodCommission = fmPeriodSales?.reduce((sum, sale) => {
+        const commission = productCommissionMap.get(sale.product_name?.toLowerCase() || "") || 0;
+        return sum + commission;
       }, 0) || 0;
       
-      const periodSalesCount = periodSales?.length || 0;
-      const todaySalesCount = todaySales?.length || 0;
-      
-      // mapped_commission already contains total (base × quantity)
-      const todayCommission = todaySales?.reduce((total, sale) => {
-        return total + (sale.sale_items?.reduce((sum, item) => {
-          return sum + (item.mapped_commission || 0);
-        }, 0) || 0);
+      const fmTodayCommission = fmTodaySales?.reduce((sum, sale) => {
+        const commission = productCommissionMap.get(sale.product_name?.toLowerCase() || "") || 0;
+        return sum + commission;
       }, 0) || 0;
+      
+      // Combine totals
+      const periodCommission = dialerPeriodCommission + fmPeriodCommission;
+      const todayCommission = dialerTodayCommission + fmTodayCommission;
+      const periodSalesCount = periodSales.length + (fmPeriodSales?.length || 0);
+      const todaySalesCount = todaySales.length + (fmTodaySales?.length || 0);
       
       return {
         periodCommission,
