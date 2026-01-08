@@ -32,15 +32,6 @@ interface CreateCohortDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const clientCampaigns = [
-  "TDC Erhverv",
-  "Codan",
-  "Tryg",
-  "Relatel",
-  "ASE",
-  "Fieldmarketing",
-  "Andet",
-];
 
 export function CreateCohortDialog({ open, onOpenChange }: CreateCohortDialogProps) {
   const { toast } = useToast();
@@ -52,7 +43,7 @@ export function CreateCohortDialog({ open, onOpenChange }: CreateCohortDialogPro
     start_date: "",
     start_time: "10:00",
     team_id: "",
-    client_campaign: "",
+    daily_bonus_client_id: "",
     location: "",
     notes: "",
     max_capacity: "",
@@ -86,14 +77,30 @@ export function CreateCohortDialog({ open, onOpenChange }: CreateCohortDialogPro
     },
   });
 
+  // Fetch clients for selected team
+  const { data: teamClients = [] } = useQuery({
+    queryKey: ["team-clients", formData.team_id],
+    queryFn: async () => {
+      if (!formData.team_id) return [];
+      const { data, error } = await supabase
+        .from("team_clients")
+        .select("client_id, clients(id, name)")
+        .eq("team_id", formData.team_id);
+      if (error) throw error;
+      return data?.map(tc => tc.clients).filter(Boolean) || [];
+    },
+    enabled: !!formData.team_id,
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       // Generate name if empty
       let name = data.name;
       if (!name && data.start_date) {
         const dateStr = format(new Date(data.start_date), "d. MMMM yyyy", { locale: da });
-        name = data.client_campaign 
-          ? `${data.client_campaign} - ${dateStr}`
+        const selectedClient = teamClients.find(c => c?.id === data.daily_bonus_client_id);
+        name = selectedClient 
+          ? `${selectedClient.name} - ${dateStr}`
           : `Opstart ${dateStr}`;
       }
 
@@ -102,7 +109,7 @@ export function CreateCohortDialog({ open, onOpenChange }: CreateCohortDialogPro
         start_date: data.start_date,
         start_time: data.start_time || null,
         team_id: data.team_id || null,
-        client_campaign: data.client_campaign || null,
+        daily_bonus_client_id: data.daily_bonus_client_id || null,
         location: data.location || null,
         notes: data.notes || null,
         max_capacity: data.max_capacity ? parseInt(data.max_capacity) : null,
@@ -120,7 +127,7 @@ export function CreateCohortDialog({ open, onOpenChange }: CreateCohortDialogPro
         start_date: "",
         start_time: "10:00",
         team_id: "",
-        client_campaign: "",
+        daily_bonus_client_id: "",
         location: "",
         notes: "",
         max_capacity: "",
@@ -210,29 +217,10 @@ export function CreateCohortDialog({ open, onOpenChange }: CreateCohortDialogPro
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="client_campaign">Klient/Kampagne</Label>
-            <Select
-              value={formData.client_campaign}
-              onValueChange={(value) => setFormData({ ...formData, client_campaign: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Vælg kampagne..." />
-              </SelectTrigger>
-              <SelectContent>
-                {clientCampaigns.map((campaign) => (
-                  <SelectItem key={campaign} value={campaign}>
-                    {campaign}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="team_id">Team</Label>
             <Select
               value={formData.team_id}
-              onValueChange={(value) => setFormData({ ...formData, team_id: value })}
+              onValueChange={(value) => setFormData({ ...formData, team_id: value, daily_bonus_client_id: "" })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Vælg team..." />
@@ -246,6 +234,27 @@ export function CreateCohortDialog({ open, onOpenChange }: CreateCohortDialogPro
               </SelectContent>
             </Select>
           </div>
+
+          {formData.team_id && teamClients.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="daily_bonus_client_id">Kunde (til opstartbonus)</Label>
+              <Select
+                value={formData.daily_bonus_client_id}
+                onValueChange={(value) => setFormData({ ...formData, daily_bonus_client_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Vælg kunde..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamClients.map((client) => client && (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="location">Lokation</Label>
