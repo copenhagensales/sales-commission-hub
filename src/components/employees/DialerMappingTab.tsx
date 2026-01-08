@@ -97,6 +97,7 @@ export function DialerMappingTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee-agent-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["agents-for-mapping"] });
       toast({ title: "Mapping tilføjet", description: "Agent er nu knyttet til medarbejderen." });
     },
     onError: (error: Error) => {
@@ -115,6 +116,7 @@ export function DialerMappingTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee-agent-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["agents-for-mapping"] });
       toast({ title: "Mapping fjernet", description: "Agent-tilknytning er fjernet." });
     },
     onError: (error: Error) => {
