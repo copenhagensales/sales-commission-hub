@@ -203,8 +203,8 @@ export function useCanAccess() {
       isTeamlederOrAbove: isTeamleder || isOwner,
       isRekrutteringOrAbove: isRekruttering || isTeamleder || isOwner,
       isMedarbejder,
+      // Legacy - use usePermissions().canSeeAllData and usePermissions().canSeeTeamData instead
       canManageTeam: isTeamleder || isOwner,
-      canSeeAllData: isOwner,
       canManageRoles: isOwner,
       canCreateEmployees: isRekruttering || isTeamleder || isOwner,
       canSendContracts: isRekruttering || isTeamleder || isOwner,
@@ -240,8 +240,8 @@ export function useCanAccess() {
     isTeamlederOrAbove: isTeamleder || isOwner,
     isRekrutteringOrAbove: isRekruttering || isTeamleder || isOwner,
     isMedarbejder,
+    // Legacy - use usePermissions().canSeeAllData and usePermissions().canSeeTeamData instead
     canManageTeam: isTeamleder || isOwner,
-    canSeeAllData: isOwner,
     canManageRoles: isOwner,
     canCreateEmployees: isRekruttering || isTeamleder || isOwner,
     canSendContracts: isRekruttering || isTeamleder || isOwner,
