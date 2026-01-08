@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, isToday, isSameDay, parseISO, isWithinInterval, getDay } from "date-fns";
 import { da } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Users, Clock, Palmtree, Thermometer, CalendarDays, AlarmClock, Pencil, X, ChevronDown, Info, Coins, UserX } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -236,7 +236,7 @@ export default function ShiftOverview() {
 
   // Mutation to create absence
   const createAbsence = useMutation({
-    mutationFn: async ({ employeeId, date, type }: { employeeId: string; date: string; type: "vacation" | "sick" }) => {
+    mutationFn: async ({ employeeId, date, type }: { employeeId: string; date: string; type: "vacation" | "sick" | "no_show" }) => {
       const { error } = await supabase
         .from("absence_request_v2")
         .insert({
@@ -259,7 +259,7 @@ export default function ShiftOverview() {
 
   // Mutation to update absence type
   const updateAbsence = useMutation({
-    mutationFn: async ({ id, type }: { id: string; type: "vacation" | "sick" }) => {
+    mutationFn: async ({ id, type }: { id: string; type: "vacation" | "sick" | "no_show" }) => {
       const { error } = await supabase
         .from("absence_request_v2")
         .update({ type })
@@ -694,6 +694,18 @@ export default function ShiftOverview() {
     setOpenPopoverKey(null);
   };
 
+  const handleSetNoShow = (employeeId: string, date: Date, currentAbsence: AbsenceRequest | null) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    if (currentAbsence) {
+      if (currentAbsence.type !== "no_show") {
+        updateAbsence.mutate({ id: currentAbsence.id, type: "no_show" });
+      }
+    } else {
+      createAbsence.mutate({ employeeId, date: dateStr, type: "no_show" });
+    }
+    setOpenPopoverKey(null);
+  };
+
   const handleEditTimeStamp = (employee: { id: string; first_name: string; last_name: string }, date: Date, timeStamp: TimeStampData | null) => {
     setSelectedTimeStamp(timeStamp);
     setSelectedTimeStampEmployee({
@@ -1009,6 +1021,7 @@ export default function ShiftOverview() {
                     const hasShift = dayShifts.length > 0;
                     const isVacation = absenceDisplay?.type === "vacation";
                     const isSick = absenceDisplay?.type === "sick";
+                    const isNoShow = absenceDisplay?.type === "no_show";
                     const isLate = !!lateness;
                     const isWorking = !absenceDisplay && !lateness && !holiday;
                     const isActive = isEmployeeActiveOnDate(employee.id, day);
@@ -1079,6 +1092,13 @@ export default function ShiftOverview() {
                                 </span>
                               )}
 
+                              {!hasShift && !isLate && isNoShow && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full bg-gray-200 text-gray-700 dark:bg-gray-800/60 dark:text-gray-300">
+                                  <UserX className="h-3 w-3" />
+                                  Udeblivelse
+                                </span>
+                              )}
+
                               {/* Working state */}
                               {!hasShift && !isLate && isWorking && !holiday && (
                                 <div className="flex flex-col items-center gap-1">
@@ -1139,6 +1159,18 @@ export default function ShiftOverview() {
                               >
                                 <AlarmClock className="h-4 w-4" />
                                 Forsinket
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  "justify-start gap-2 h-8",
+                                  isNoShow && "bg-gray-200 text-gray-700 dark:bg-gray-800/60 dark:text-gray-300"
+                                )}
+                                onClick={() => handleSetNoShow(employee.id, day, absence)}
+                              >
+                                <UserX className="h-4 w-4" />
+                                Udeblivelse
                               </Button>
                               {hasWorkTimes && (
                                 <Button

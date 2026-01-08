@@ -8081,7 +8081,7 @@ export type Database = {
     Enums: {
       absence_request_status: "pending" | "approved" | "rejected"
       absence_type: "sick" | "vacation" | "other"
-      absence_type_v2: "vacation" | "sick"
+      absence_type_v2: "vacation" | "sick" | "no_show"
       app_role: "admin" | "payroll" | "manager" | "agent"
       booking_status: "Planlagt" | "Bekræftet" | "Aflyst" | "Afsluttet"
       commission_transaction_type: "earn" | "clawback" | "manual_adjustment"
@@ -8263,7 +8263,7 @@ export const Constants = {
     Enums: {
       absence_request_status: ["pending", "approved", "rejected"],
       absence_type: ["sick", "vacation", "other"],
-      absence_type_v2: ["vacation", "sick"],
+      absence_type_v2: ["vacation", "sick", "no_show"],
       app_role: ["admin", "payroll", "manager", "agent"],
       booking_status: ["Planlagt", "Bekræftet", "Aflyst", "Afsluttet"],
       commission_transaction_type: ["earn", "clawback", "manual_adjustment"],
