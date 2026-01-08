@@ -233,14 +233,12 @@ export default function ReferAFriend() {
                   <TableRow>
                     <TableHead>Navn</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Status</TableHead>
                     <TableHead>Dato</TableHead>
                     <TableHead>Bonus</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {referrals.map((referral) => {
-                    const statusInfo = statusLabels[referral.status] || statusLabels.pending;
                     const bonusReady = referral.bonus_eligible_date && new Date(referral.bonus_eligible_date) <= new Date();
                     
                     return (
@@ -250,9 +248,6 @@ export default function ReferAFriend() {
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {referral.candidate_email}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(new Date(referral.created_at), "d. MMM yyyy", { locale: da })}
