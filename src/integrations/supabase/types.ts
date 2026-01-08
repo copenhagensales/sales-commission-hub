@@ -4820,6 +4820,8 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean | null
+          is_manager: boolean
+          manager_data_access: Json | null
           max_session_hours: number | null
           name: string
           permissions: Json
@@ -4834,6 +4836,8 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_manager?: boolean
+          manager_data_access?: Json | null
           max_session_hours?: number | null
           name: string
           permissions?: Json
@@ -4848,6 +4852,8 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_manager?: boolean
+          manager_data_access?: Json | null
           max_session_hours?: number | null
           name?: string
           permissions?: Json
