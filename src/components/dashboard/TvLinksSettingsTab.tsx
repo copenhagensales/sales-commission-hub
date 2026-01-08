@@ -450,12 +450,38 @@ export function TvLinksSettingsTab() {
               </div>
 
               {/* Celebration Popup Section */}
-              <div className="border rounded-lg p-4 space-y-4 bg-gradient-to-br from-purple-500/5 to-pink-500/5">
+              <div className={cn(
+                "relative overflow-hidden border rounded-xl p-4 space-y-4 transition-all duration-500",
+                celebrationEnabled 
+                  ? "bg-gradient-to-br from-purple-600/15 via-pink-500/10 to-amber-500/10 border-purple-500/40 shadow-lg shadow-purple-500/10" 
+                  : "bg-gradient-to-br from-purple-500/5 to-pink-500/5 border-border"
+              )}>
+                {/* Animated background glow when enabled */}
+                {celebrationEnabled && (
+                  <div className="absolute inset-0 -z-10">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl animate-pulse" />
+                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-pink-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+                  </div>
+                )}
+                
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <PartyPopper className="h-5 w-5 text-purple-500" />
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "p-2 rounded-lg transition-all duration-300",
+                      celebrationEnabled 
+                        ? "bg-gradient-to-br from-purple-500 to-pink-500 shadow-lg shadow-purple-500/30" 
+                        : "bg-muted"
+                    )}>
+                      <PartyPopper className={cn(
+                        "h-5 w-5 transition-all duration-300",
+                        celebrationEnabled ? "text-white animate-bounce" : "text-muted-foreground"
+                      )} />
+                    </div>
                     <div>
-                      <p className="font-semibold text-sm">Fejrings-popup</p>
+                      <p className={cn(
+                        "font-semibold text-sm transition-colors",
+                        celebrationEnabled && "text-purple-600 dark:text-purple-400"
+                      )}>Fejrings-popup</p>
                       <p className="text-xs text-muted-foreground">Vis effekter når tal opdateres</p>
                     </div>
                   </div>
@@ -466,31 +492,51 @@ export function TvLinksSettingsTab() {
                 </div>
 
                 {celebrationEnabled && (
-                  <div className="space-y-3 pt-2 animate-fade-in">
+                  <div className="space-y-4 pt-2 animate-fade-in">
                     {/* Effect Selection */}
                     <div className="space-y-2">
-                      <Label className="text-sm">Visuel effekt</Label>
+                      <Label className="text-sm font-medium">Visuel effekt</Label>
                       <div className="grid grid-cols-3 gap-2">
-                        {CELEBRATION_EFFECTS.map((effect) => {
+                        {CELEBRATION_EFFECTS.map((effect, index) => {
                           const IconComponent = effect.icon;
+                          const isSelected = celebrationEffect === effect.value;
+                          const colorClass = {
+                            fireworks: "from-orange-500 to-red-500",
+                            confetti: "from-blue-500 to-purple-500",
+                            stars: "from-yellow-400 to-amber-500",
+                            hearts: "from-pink-500 to-rose-500",
+                            flames: "from-orange-600 to-red-600",
+                            sparkles: "from-cyan-400 to-blue-500"
+                          }[effect.value] || "from-purple-500 to-pink-500";
+                          
                           return (
                             <div
                               key={effect.value}
                               className={cn(
-                                "p-2 border rounded-lg cursor-pointer transition-all text-center",
-                                celebrationEffect === effect.value
-                                  ? "border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/50"
-                                  : "hover:border-muted-foreground hover:bg-muted/50"
+                                "relative p-3 border rounded-xl cursor-pointer transition-all duration-300 text-center group",
+                                isSelected
+                                  ? `bg-gradient-to-br ${colorClass} border-transparent shadow-lg scale-105`
+                                  : "hover:border-purple-400 hover:bg-purple-500/5 hover:scale-102"
                               )}
                               onClick={() => setCelebrationEffect(effect.value)}
+                              style={{ animationDelay: `${index * 50}ms` }}
                             >
+                              <div className={cn(
+                                "absolute inset-0 rounded-xl transition-opacity duration-300",
+                                isSelected ? "opacity-100" : "opacity-0"
+                              )}>
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-xl" />
+                              </div>
                               <IconComponent className={cn(
-                                "h-4 w-4 mx-auto mb-1",
-                                celebrationEffect === effect.value 
-                                  ? "text-purple-500" 
-                                  : "text-muted-foreground"
+                                "h-5 w-5 mx-auto mb-1.5 transition-all duration-300 relative z-10",
+                                isSelected 
+                                  ? "text-white drop-shadow-lg" 
+                                  : "text-muted-foreground group-hover:text-purple-500 group-hover:scale-110"
                               )} />
-                              <p className="text-xs font-medium">{effect.label}</p>
+                              <p className={cn(
+                                "text-xs font-medium relative z-10 transition-colors",
+                                isSelected ? "text-white" : ""
+                              )}>{effect.label}</p>
                             </div>
                           );
                         })}
@@ -499,12 +545,12 @@ export function TvLinksSettingsTab() {
 
                     {/* Trigger Condition */}
                     <div className="space-y-2">
-                      <Label className="text-sm">Betingelse</Label>
+                      <Label className="text-sm font-medium">Betingelse</Label>
                       <Select
                         value={celebrationTriggerCondition}
                         onValueChange={setCelebrationTriggerCondition}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="bg-background/80 backdrop-blur-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -519,17 +565,17 @@ export function TvLinksSettingsTab() {
 
                     {/* Duration Selection */}
                     <div className="space-y-2">
-                      <Label className="text-sm">Varighed</Label>
+                      <Label className="text-sm font-medium">Varighed</Label>
                       <div className="flex gap-2">
                         {DURATION_OPTIONS.map((duration) => (
                           <button
                             key={duration.value}
                             type="button"
                             className={cn(
-                              "flex-1 px-3 py-2 text-xs border rounded-md transition-all",
+                              "flex-1 px-3 py-2.5 text-xs font-medium border rounded-lg transition-all duration-200",
                               celebrationDuration === duration.value
-                                ? "border-purple-500 bg-purple-500/10 text-purple-600"
-                                : "hover:bg-muted"
+                                ? "bg-gradient-to-r from-purple-500 to-pink-500 border-transparent text-white shadow-lg shadow-purple-500/25"
+                                : "bg-background/80 hover:bg-purple-500/10 hover:border-purple-400"
                             )}
                             onClick={() => setCelebrationDuration(duration.value)}
                           >
@@ -541,12 +587,13 @@ export function TvLinksSettingsTab() {
 
                     {/* Celebration Text */}
                     <div className="space-y-2">
-                      <Label className="text-sm">Fejringstekst (valgfrit)</Label>
+                      <Label className="text-sm font-medium">Fejringstekst (valgfrit)</Label>
                       <Textarea
                         value={celebrationText}
                         onChange={(e) => setCelebrationText(e.target.value)}
                         placeholder="F.eks. 🎉 Nyt salg!"
                         rows={2}
+                        className="bg-background/80 backdrop-blur-sm resize-none"
                       />
                     </div>
                   </div>
