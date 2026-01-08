@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Monitor, Copy, Trash2, Plus, Loader2, ExternalLink, CalendarIcon, PartyPopper, Sparkles, Star, Heart, Flame, Zap } from "lucide-react";
+import { Monitor, Copy, Trash2, Plus, Loader2, ExternalLink, CalendarIcon, PartyPopper, Sparkles, Star, Heart, Flame, Zap, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CelebrationOverlay } from "./CelebrationOverlay";
 
 interface TvBoardAccess {
   id: string;
@@ -108,6 +109,7 @@ export function TvLinksSettingsTab() {
   const [celebrationDuration, setCelebrationDuration] = useState(3);
   const [celebrationTriggerCondition, setCelebrationTriggerCondition] = useState("any_update");
   const [celebrationText, setCelebrationText] = useState("");
+  const [showTestCelebration, setShowTestCelebration] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: accessCodes = [], isLoading } = useQuery({
@@ -596,6 +598,17 @@ export function TvLinksSettingsTab() {
                         className="bg-background/80 backdrop-blur-sm resize-none"
                       />
                     </div>
+
+                    {/* Test Button */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-400/50 hover:from-purple-500/20 hover:to-pink-500/20 hover:border-purple-400"
+                      onClick={() => setShowTestCelebration(true)}
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      Test effekt
+                    </Button>
                   </div>
                 )}
               </div>
@@ -619,6 +632,15 @@ export function TvLinksSettingsTab() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Celebration Test Overlay */}
+        <CelebrationOverlay
+          isOpen={showTestCelebration}
+          onClose={() => setShowTestCelebration(false)}
+          effect={celebrationEffect as "fireworks" | "confetti" | "stars" | "hearts" | "flames" | "sparkles"}
+          duration={celebrationDuration}
+          text={celebrationText || "🎉 Test fejring!"}
+        />
 
         {/* Existing codes */}
         <div>
