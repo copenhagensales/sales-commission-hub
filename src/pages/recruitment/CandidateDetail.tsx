@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp, X, Loader2, PhoneCall, Trash2, Check } from "lucide-react";
+import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp, X, Loader2, PhoneCall, Trash2, Check, UserX } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,7 @@ import { useTwilioDeviceContext } from "@/contexts/TwilioDeviceContext";
 import { CandidateChatHistory } from "@/components/recruitment/CandidateChatHistory";
 import { CandidateCallLogs } from "@/components/recruitment/CandidateCallLogs";
 import { AssignCohortDialog } from "@/components/recruitment/AssignCohortDialog";
+import { AddToWinbackDialog } from "@/components/recruitment/AddToWinbackDialog";
 import { combineDateAndDanishTime } from "@/lib/danish-time-utils";
 
 const statusLabels: Record<string, string> = {
@@ -94,6 +95,7 @@ export default function CandidateDetail() {
   const [showAssignCohortDialog, setShowAssignCohortDialog] = useState(false);
   const [editingNoteIndex, setEditingNoteIndex] = useState<number | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState("");
+  const [showWinbackDialog, setShowWinbackDialog] = useState(false);
   const {
     data: candidate,
     isLoading
@@ -303,6 +305,27 @@ export default function CandidateDetail() {
       toast.error(error.message || "Kunne ikke planlægge samtale");
     }
   });
+
+  const addToWinbackMutation = useMutation({
+    mutationFn: async ({ category, contactDate }: { category: string; contactDate: Date }) => {
+      const { error } = await supabase
+        .from("candidates")
+        .update({ 
+          status: category,
+          winback_contact_date: format(contactDate, "yyyy-MM-dd")
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["candidate", id] });
+      setShowWinbackDialog(false);
+      toast.success("Kandidat tilføjet til Winback");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Kunne ikke tilføje til Winback");
+    }
+  });
   if (isLoading) {
     return <MainLayout>
         <div className="flex items-center justify-center h-64">
@@ -402,6 +425,10 @@ export default function CandidateDetail() {
                 <Button size="sm" variant="outline" onClick={() => navigate(`/recruitment/candidates/${id}/edit`)} className="bg-background/80">
                   <Edit2 className="h-4 w-4 mr-1.5" />
                   Rediger
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setShowWinbackDialog(true)} className="bg-background/80 col-span-2 sm:col-span-1">
+                  <UserX className="h-4 w-4 mr-1.5" />
+                  Winback
                 </Button>
               </div>
             </div>
@@ -870,6 +897,13 @@ export default function CandidateDetail() {
           updateCandidateMutation.mutate({ status: "hired" });
           setShowAssignCohortDialog(false);
         }}
+      />
+
+      <AddToWinbackDialog
+        open={showWinbackDialog}
+        onOpenChange={setShowWinbackDialog}
+        onSave={(category, contactDate) => addToWinbackMutation.mutate({ category, contactDate })}
+        isLoading={addToWinbackMutation.isPending}
       />
     </MainLayout>;
 }

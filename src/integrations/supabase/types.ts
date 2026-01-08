@@ -746,6 +746,7 @@ export type Database = {
           status: string
           team_id: string | null
           updated_at: string
+          winback_contact_date: string | null
         }
         Insert: {
           applied_position?: string | null
@@ -766,6 +767,7 @@ export type Database = {
           status?: string
           team_id?: string | null
           updated_at?: string
+          winback_contact_date?: string | null
         }
         Update: {
           applied_position?: string | null
@@ -786,6 +788,7 @@ export type Database = {
           status?: string
           team_id?: string | null
           updated_at?: string
+          winback_contact_date?: string | null
         }
         Relationships: [
           {
