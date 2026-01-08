@@ -4708,6 +4708,35 @@ export type Database = {
           },
         ]
       }
+      hidden_unmapped_agents: {
+        Row: {
+          agent_id: string
+          hidden_at: string
+          hidden_by: string | null
+          id: string
+        }
+        Insert: {
+          agent_id: string
+          hidden_at?: string
+          hidden_by?: string | null
+          id?: string
+        }
+        Update: {
+          agent_id?: string
+          hidden_at?: string
+          hidden_by?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hidden_unmapped_agents_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: true
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       historical_employment: {
         Row: {
           created_at: string | null
