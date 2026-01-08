@@ -38,7 +38,8 @@ const statusLabels: Record<string, string> = {
   hired: "Ansat",
   rejected: "Afvist",
   ghostet: "Ghostet",
-  takket_nej: "Takket nej"
+  takket_nej: "Takket nej",
+  ikke_kvalificeret: "Ikke kvalificeret"
 };
 const statusColors: Record<string, string> = {
   ny_ansoegning: "bg-blue-500/10 text-blue-600 border-blue-500/30",
@@ -49,7 +50,8 @@ const statusColors: Record<string, string> = {
   hired: "bg-green-500/10 text-green-600 border-green-500/30",
   rejected: "bg-red-500/10 text-red-600 border-red-500/30",
   ghostet: "bg-amber-500/10 text-amber-600 border-amber-500/30",
-  takket_nej: "bg-purple-500/10 text-purple-600 border-purple-500/30"
+  takket_nej: "bg-purple-500/10 text-purple-600 border-purple-500/30",
+  ikke_kvalificeret: "bg-orange-500/10 text-orange-600 border-orange-500/30"
 };
 const roleLabels: Record<string, string> = {
   fieldmarketing: "Fieldmarketing",

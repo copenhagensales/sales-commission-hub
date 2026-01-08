@@ -271,6 +271,7 @@ export function CandidateCard({ candidate, applications = [], onUpdate }: Candid
                           <SelectItem value="rejected">Afvist</SelectItem>
                           <SelectItem value="ghostet">Ghostet</SelectItem>
                           <SelectItem value="takket_nej">Takket nej</SelectItem>
+                          <SelectItem value="ikke_kvalificeret">Ikke kvalificeret</SelectItem>
                         </SelectContent>
                       </Select>
                       <Badge variant="secondary" className="text-xs">
