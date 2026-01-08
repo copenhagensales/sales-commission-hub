@@ -558,41 +558,30 @@ const Home = () => {
       let todaySales: any[] = [];
       
       // Fetch dialer sales if we have agent identifiers
-      if (agentEmails.length > 0 || externalIds.length > 0) {
+      // Use ilike for emails (same approach as DailyReports.tsx)
+      const emailFilters = agentEmails.map(e => `agent_email.ilike.${e.toLowerCase()}`);
+      const idFilters = externalIds.map(id => `agent_external_id.eq.${id}`);
+      const allFilters = [...emailFilters, ...idFilters].join(",");
+      
+      if (allFilters) {
         // Build query for period sales
-        let periodQuery = supabase
+        const { data } = await supabase
           .from("sales")
           .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
           .gte("sale_datetime", `${periodStartStr}T00:00:00`)
-          .lte("sale_datetime", `${periodEndStr}T23:59:59`);
+          .lte("sale_datetime", `${periodEndStr}T23:59:59`)
+          .or(allFilters);
         
-        if (agentEmails.length > 0 && externalIds.length > 0) {
-          periodQuery = periodQuery.or(`agent_email.in.(${agentEmails.join(",")}),agent_external_id.in.(${externalIds.join(",")})`);
-        } else if (agentEmails.length > 0) {
-          periodQuery = periodQuery.in("agent_email", agentEmails);
-        } else {
-          periodQuery = periodQuery.in("agent_external_id", externalIds);
-        }
-        
-        const { data } = await periodQuery;
         periodSales = data || [];
         
         // Build query for today's sales
-        let todayQuery = supabase
+        const { data: todayData } = await supabase
           .from("sales")
           .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
           .gte("sale_datetime", todayStart)
-          .lte("sale_datetime", todayEnd);
+          .lte("sale_datetime", todayEnd)
+          .or(allFilters);
         
-        if (agentEmails.length > 0 && externalIds.length > 0) {
-          todayQuery = todayQuery.or(`agent_email.in.(${agentEmails.join(",")}),agent_external_id.in.(${externalIds.join(",")})`);
-        } else if (agentEmails.length > 0) {
-          todayQuery = todayQuery.in("agent_email", agentEmails);
-        } else {
-          todayQuery = todayQuery.in("agent_external_id", externalIds);
-        }
-        
-        const { data: todayData } = await todayQuery;
         todaySales = todayData || [];
       }
       
