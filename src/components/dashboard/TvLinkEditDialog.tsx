@@ -298,10 +298,28 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
                     <Textarea
                       value={celebrationText}
                       onChange={(e) => setCelebrationText(e.target.value)}
-                      placeholder="F.eks. 🎉 Nyt salg!"
+                      placeholder="F.eks. 🎉 {employee_name} har lavet salg!"
                       rows={2}
                       className="bg-background/80 backdrop-blur-sm resize-none"
                     />
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="text-xs text-muted-foreground mr-1">Indsæt:</span>
+                      {[
+                        { var: "{employee_name}", label: "Navn" },
+                        { var: "{sales_count}", label: "Antal salg" },
+                        { var: "{commission}", label: "Provision" },
+                        { var: "{metric_value}", label: "Valgt tal" },
+                      ].map((v) => (
+                        <button
+                          key={v.var}
+                          type="button"
+                          className="px-2 py-0.5 text-xs bg-purple-500/20 hover:bg-purple-500/30 border border-purple-400/40 rounded-md transition-colors"
+                          onClick={() => setCelebrationText((prev) => prev + v.var)}
+                        >
+                          {v.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Test Button */}
