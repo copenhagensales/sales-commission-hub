@@ -864,11 +864,23 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
   },
 ];
 
+// Permission keys to exclude from owner (Ejer) position
+export const OWNER_EXCLUDED_PERMISSIONS = [
+  'softphone_outbound',
+  'softphone_inbound',
+  'employee_sms',
+];
+
 // Generate all permissions with full access
-export const generateAllPermissions = (): Record<string, boolean | { view: boolean; edit: boolean } | DataScope> => {
+// excludeKeys: optional array of permission keys to exclude
+export const generateAllPermissions = (excludeKeys: string[] = []): Record<string, boolean | { view: boolean; edit: boolean } | DataScope> => {
   const allPermissions: Record<string, boolean | { view: boolean; edit: boolean } | DataScope> = {};
   PERMISSION_CATEGORIES.forEach((category) => {
     category.permissions.forEach((permission) => {
+      // Skip excluded permissions
+      if (excludeKeys.includes(permission.key)) {
+        return;
+      }
       if (permission.hasEditOption) {
         allPermissions[permission.key] = { view: true, edit: true };
       } else {

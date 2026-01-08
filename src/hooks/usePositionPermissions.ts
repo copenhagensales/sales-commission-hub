@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRolePreview } from "@/contexts/RolePreviewContext";
 import { 
   generateAllPermissions as generateAllPermissionsFromConfig,
+  OWNER_EXCLUDED_PERMISSIONS,
   type DataScope,
 } from "@/config/permissions";
 
@@ -23,12 +24,16 @@ interface JobPosition {
   manager_data_scope?: ManagerDataScope;
 }
 
-// Owner position always has full access
+// Owner position always has full access (except excluded permissions like softphone)
 const OWNER_POSITION_NAME = "Ejer";
 
 // Use the shared generateAllPermissions from config
+// For owner, exclude softphone permissions
 const generateAllPermissions = (): PositionPermissions => 
   generateAllPermissionsFromConfig() as PositionPermissions;
+
+const generateOwnerPermissions = (): PositionPermissions => 
+  generateAllPermissionsFromConfig(OWNER_EXCLUDED_PERMISSIONS) as PositionPermissions;
 
 export function usePositionPermissions() {
   const { user, loading: authLoading } = useAuth();
@@ -87,17 +92,17 @@ export function usePositionPermissions() {
       });
       
       if (employee.job_title.toLowerCase() === OWNER_POSITION_NAME.toLowerCase()) {
-        const allPermissions = generateAllPermissions();
-        console.log("usePositionPermissions: Owner detected, returning full permissions", allPermissions);
+        const ownerPermissions = generateOwnerPermissions();
+        console.log("usePositionPermissions: Owner detected, returning permissions (without softphone)", ownerPermissions);
         return {
           position: { 
             id: "owner", 
             name: OWNER_POSITION_NAME, 
-            permissions: allPermissions,
+            permissions: ownerPermissions,
             is_manager: true,
             manager_data_scope: 'all' as ManagerDataScope,
           },
-          permissions: allPermissions,
+          permissions: ownerPermissions,
         };
       }
 
