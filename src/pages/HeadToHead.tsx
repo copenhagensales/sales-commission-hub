@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { HeadToHeadComparison } from "@/components/home/HeadToHeadComparison";
+import { H2HPerformanceDashboard } from "@/components/h2h/H2HPerformanceDashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function HeadToHead() {
@@ -40,6 +41,7 @@ export default function HeadToHead() {
     return (
       <MainLayout>
         <div className="container mx-auto p-6 max-w-4xl">
+          <Skeleton className="h-48 w-full rounded-xl mb-6" />
           <Skeleton className="h-[600px] w-full rounded-xl" />
         </div>
       </MainLayout>
@@ -49,6 +51,7 @@ export default function HeadToHead() {
   return (
     <MainLayout>
       <div className="container mx-auto p-6 max-w-4xl">
+        <H2HPerformanceDashboard employeeId={currentEmployee?.id} />
         <HeadToHeadComparison
           currentEmployeeId={currentEmployee?.id}
           currentEmployeeName={currentEmployee ? `${currentEmployee.first_name} ${currentEmployee.last_name}` : undefined}
