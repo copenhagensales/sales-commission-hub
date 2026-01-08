@@ -14,14 +14,24 @@ export default function HeadToHead() {
       if (!user?.email) return null;
       
       const lowerEmail = user.email.toLowerCase();
-      // Use secure view that only exposes non-sensitive columns
-      const { data } = await supabase
+      // Try work_email first, then private_email
+      const { data: byWorkEmail } = await supabase
         .from("employee_basic_info")
         .select("id, first_name, last_name, work_email")
         .eq("work_email", lowerEmail)
         .maybeSingle();
       
-      return data;
+      if (byWorkEmail) return byWorkEmail;
+      
+      // Fallback to private_email via employee_master_data
+      const { data: byPrivateEmail } = await supabase
+        .from("employee_master_data")
+        .select("id, first_name, last_name, work_email")
+        .ilike("private_email", lowerEmail)
+        .eq("is_active", true)
+        .maybeSingle();
+      
+      return byPrivateEmail;
     },
     enabled: !!user?.email,
   });
