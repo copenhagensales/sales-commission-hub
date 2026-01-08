@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Users } from "lucide-react";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
+import { Link } from "react-router-dom";
 
 interface UpcomingHire {
   id: string;
@@ -131,9 +132,12 @@ export default function UpcomingHires() {
                         className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
                       >
                         <div className="flex-1">
-                          <p className="font-medium">
+                          <Link 
+                            to={`/recruitment/candidates/${hire.id}`}
+                            className="font-medium hover:text-primary hover:underline transition-colors"
+                          >
                             {hire.first_name} {hire.last_name}
-                          </p>
+                          </Link>
                           {hire.applied_position && (
                             <p className="text-sm text-muted-foreground">
                               {hire.applied_position}
