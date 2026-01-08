@@ -1,0 +1,1 @@
+ALTER TYPE absence_type_v2 ADD VALUE 'no_show';
