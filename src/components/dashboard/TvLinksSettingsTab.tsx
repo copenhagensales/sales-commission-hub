@@ -59,6 +59,7 @@ interface TvBoardAccess {
   celebration_trigger_value?: number | null;
   celebration_text?: string | null;
   celebration_metric?: string | null;
+  celebration_source_dashboard?: string | null;
 }
 
 interface DashboardRotateTime {
@@ -164,6 +165,7 @@ export function TvLinksSettingsTab() {
       celebrationTriggerCondition,
       celebrationText,
       celebrationMetric,
+      celebrationSourceDashboard,
     }: {
       name: string; 
       dashboardSlugs: string[]; 
@@ -177,6 +179,7 @@ export function TvLinksSettingsTab() {
       celebrationTriggerCondition: string;
       celebrationText: string;
       celebrationMetric: string;
+      celebrationSourceDashboard: string | null;
     }) => {
       const code = generateCode();
       const { error } = await supabase.from("tv_board_access").insert({
@@ -195,6 +198,7 @@ export function TvLinksSettingsTab() {
         celebration_trigger_condition: celebrationTriggerCondition,
         celebration_text: celebrationText || null,
         celebration_metric: celebrationMetric,
+        celebration_source_dashboard: celebrationSourceDashboard || null,
       });
       if (error) throw error;
       return code;
@@ -309,6 +313,7 @@ export function TvLinksSettingsTab() {
       celebrationTriggerCondition,
       celebrationText,
       celebrationMetric,
+      celebrationSourceDashboard: selectedDashboards.length > 1 ? celebrationSourceDashboard : null,
     });
   };
 
