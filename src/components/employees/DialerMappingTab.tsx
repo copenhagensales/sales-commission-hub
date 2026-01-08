@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Plus, X, Loader2, AlertTriangle, Check, UserPlus } from "lucide-react";
+import { Search, Plus, X, Loader2, AlertTriangle, Check, UserPlus, EyeOff, Eye } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { filterExcludedEmails } from "@/lib/excluded-domains";
 
@@ -40,6 +40,7 @@ export function DialerMappingTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAgents, setSelectedAgents] = useState<Record<string, string>>({});
   const [unmappedSelections, setUnmappedSelections] = useState<Record<string, string>>({});
+  const [showHiddenAgents, setShowHiddenAgents] = useState(false);
 
   // Fetch active employees
   const { data: employees = [], isLoading: loadingEmployees } = useQuery({
@@ -84,6 +85,53 @@ export function DialerMappingTab() {
         `);
       if (error) throw error;
       return data as Mapping[];
+    },
+  });
+
+  // Fetch hidden agents
+  const { data: hiddenAgentIds = [] } = useQuery({
+    queryKey: ["hidden-unmapped-agents"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("hidden_unmapped_agents")
+        .select("agent_id");
+      if (error) throw error;
+      return data.map((h) => h.agent_id);
+    },
+  });
+
+  // Hide agent mutation
+  const hideAgentMutation = useMutation({
+    mutationFn: async (agentId: string) => {
+      const { error } = await supabase
+        .from("hidden_unmapped_agents")
+        .insert({ agent_id: agentId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hidden-unmapped-agents"] });
+      toast({ title: "Agent skjult", description: "Agenten vises ikke længere i listen" });
+    },
+    onError: (error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Unhide agent mutation
+  const unhideAgentMutation = useMutation({
+    mutationFn: async (agentId: string) => {
+      const { error } = await supabase
+        .from("hidden_unmapped_agents")
+        .delete()
+        .eq("agent_id", agentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hidden-unmapped-agents"] });
+      toast({ title: "Agent synlig", description: "Agenten vises nu i listen igen" });
+    },
+    onError: (error) => {
+      toast({ title: "Fejl", description: error.message, variant: "destructive" });
     },
   });
 
@@ -150,10 +198,15 @@ export function DialerMappingTab() {
   const INTERNAL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk"];
   const mappedAgentIds = mappings.map((m) => m.agent_id);
   const nonExcludedAgents = filterExcludedEmails(agents);
-  const unmappedAgents = nonExcludedAgents.filter(
+  const allUnmappedAgents = nonExcludedAgents.filter(
     (a) => !mappedAgentIds.includes(a.id) && 
       INTERNAL_DOMAINS.some(domain => a.email?.toLowerCase().endsWith(domain))
   );
+  
+  // Separate visible and hidden unmapped agents
+  const visibleUnmappedAgents = allUnmappedAgents.filter(a => !hiddenAgentIds.includes(a.id));
+  const hiddenUnmappedAgents = allUnmappedAgents.filter(a => hiddenAgentIds.includes(a.id));
+  const unmappedAgents = showHiddenAgents ? hiddenUnmappedAgents : visibleUnmappedAgents;
 
   // Normalize name for comparison (remove accents, lowercase, trim)
   const normalizeName = (name: string): string => {
@@ -277,20 +330,53 @@ export function DialerMappingTab() {
       </div>
 
       {/* Unmapped agents resolution section */}
-      {unmappedAgentsWithSuggestions.length > 0 && (
-        <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 mb-4 space-y-4">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-            <span className="text-destructive font-medium">
-              {unmappedAgentsWithSuggestions.length} agenter mangler mapping
-            </span>
+      {(visibleUnmappedAgents.length > 0 || hiddenUnmappedAgents.length > 0) && (
+        <div className={`rounded-lg ${showHiddenAgents ? 'bg-muted/50 border-border' : 'bg-destructive/10 border-destructive/20'} border p-4 mb-4 space-y-4`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {showHiddenAgents ? (
+                <EyeOff className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              )}
+              <span className={showHiddenAgents ? "font-medium" : "text-destructive font-medium"}>
+                {showHiddenAgents 
+                  ? `${hiddenUnmappedAgents.length} skjulte agenter` 
+                  : `${visibleUnmappedAgents.length} agenter mangler mapping`
+                }
+              </span>
+            </div>
+            
+            {/* Toggle hidden/visible button */}
+            {hiddenUnmappedAgents.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowHiddenAgents(!showHiddenAgents)}
+                className="gap-1.5"
+              >
+                {showHiddenAgents ? (
+                  <>
+                    <Eye className="h-4 w-4" />
+                    Vis aktive ({visibleUnmappedAgents.length})
+                  </>
+                ) : (
+                  <>
+                    <EyeOff className="h-4 w-4" />
+                    Vis skjulte ({hiddenUnmappedAgents.length})
+                  </>
+                )}
+              </Button>
+            )}
           </div>
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              Disse agenter har ingen medarbejder-tilknytning og kan ikke bruges i systemet. 
-              Tilknyt dem herunder for at aktivere dem.
+              {showHiddenAgents 
+                ? "Disse agenter er skjult fra listen. Klik på øje-ikonet for at vise dem igen."
+                : "Disse agenter har ingen medarbejder-tilknytning og kan ikke bruges i systemet. Tilknyt dem herunder for at aktivere dem."
+              }
             </p>
-            {unmappedAgentsWithSuggestions.filter(a => a.suggestedEmployee).length > 0 && (
+            {!showHiddenAgents && unmappedAgentsWithSuggestions.filter(a => a.suggestedEmployee).length > 0 && (
               <Button
                 size="sm"
                 variant="outline"
@@ -343,49 +429,77 @@ export function DialerMappingTab() {
                         </div>
                       )}
 
-                      {/* Employee selection */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Select
-                          value={currentSelection}
-                          onValueChange={(value) =>
-                            setUnmappedSelections((prev) => ({ ...prev, [agent.id]: value }))
-                          }
-                        >
-                          <SelectTrigger className="w-[220px] h-9 bg-background border-border">
-                            <SelectValue placeholder="Vælg medarbejder..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {employees.map((emp) => (
-                              <SelectItem key={emp.id} value={emp.id}>
-                                <div className="flex items-center gap-2">
-                                  <span>{emp.first_name} {emp.last_name}</span>
-                                  {emp.id === agent.suggestedEmployee?.id && (
-                                    <Badge variant="secondary" className="text-[10px] px-1 py-0">
-                                      {agent.matchType === "email" ? "Email" : "Name"}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      {/* Employee selection - only show for visible agents */}
+                      {!showHiddenAgents && (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Select
+                            value={currentSelection}
+                            onValueChange={(value) =>
+                              setUnmappedSelections((prev) => ({ ...prev, [agent.id]: value }))
+                            }
+                          >
+                            <SelectTrigger className="w-[220px] h-9 bg-background border-border">
+                              <SelectValue placeholder="Vælg medarbejder..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {employees.map((emp) => (
+                                <SelectItem key={emp.id} value={emp.id}>
+                                  <div className="flex items-center gap-2">
+                                    <span>{emp.first_name} {emp.last_name}</span>
+                                    {emp.id === agent.suggestedEmployee?.id && (
+                                      <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                                        {agent.matchType === "email" ? "Email" : "Name"}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
 
+                          <Button
+                            size="sm"
+                            onClick={() => handleMapUnmappedAgent(agent.id, currentSelection)}
+                            disabled={!currentSelection || addMappingMutation.isPending}
+                            className="h-9 gap-1.5"
+                          >
+                            {addMappingMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <UserPlus className="h-4 w-4" />
+                                <span className="hidden sm:inline">Tilknyt</span>
+                              </>
+                            )}
+                          </Button>
+
+                          {/* Hide button */}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => hideAgentMutation.mutate(agent.id)}
+                            disabled={hideAgentMutation.isPending}
+                            className="h-9 px-2 text-muted-foreground hover:text-foreground"
+                            title="Skjul agent"
+                          >
+                            <EyeOff className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Unhide button - only show for hidden agents */}
+                      {showHiddenAgents && (
                         <Button
                           size="sm"
-                          onClick={() => handleMapUnmappedAgent(agent.id, currentSelection)}
-                          disabled={!currentSelection || addMappingMutation.isPending}
+                          variant="outline"
+                          onClick={() => unhideAgentMutation.mutate(agent.id)}
+                          disabled={unhideAgentMutation.isPending}
                           className="h-9 gap-1.5"
                         >
-                          {addMappingMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <UserPlus className="h-4 w-4" />
-                              <span className="hidden sm:inline">Tilknyt</span>
-                            </>
-                          )}
+                          <Eye className="h-4 w-4" />
+                          <span>Vis igen</span>
                         </Button>
-                      </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
