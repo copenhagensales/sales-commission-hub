@@ -339,27 +339,32 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       // Use secure view that only exposes non-sensitive columns
       const { data: employeesData } = await supabase
         .from("employee_basic_info")
-        .select(`
-          id, 
-          first_name, 
-          last_name,
-          team_id
-        `)
+        .select(`id, first_name, last_name`)
+        .eq("is_active", true)
         .order("first_name");
       
-      // Get team names separately
-      const teamIds = [...new Set((employeesData || []).map(e => e.team_id).filter(Boolean))];
-      const { data: teams } = teamIds.length > 0 
-        ? await supabase.from("teams").select("id, name").in("id", teamIds)
-        : { data: [] };
+      if (!employeesData || employeesData.length === 0) return [];
       
-      const teamMap = new Map((teams || []).map(t => [t.id, t.name]));
+      const employeeIds = employeesData.map(e => e.id);
       
-      return (employeesData || [])
+      // Fetch team memberships from junction table (correct source of truth)
+      const { data: teamMemberships } = await supabase
+        .from("team_members")
+        .select("employee_id, team_id, teams(id, name)")
+        .in("employee_id", employeeIds);
+      
+      // Create a map: employee_id -> team name
+      const employeeTeamMap = new Map<string, string | null>();
+      (teamMemberships || []).forEach(tm => {
+        const teamName = (tm.teams as any)?.name || null;
+        employeeTeamMap.set(tm.employee_id, teamName);
+      });
+      
+      return employeesData
         .map(emp => ({
           id: emp.id,
           name: `${emp.first_name} ${emp.last_name}`,
-          teamName: emp.team_id ? teamMap.get(emp.team_id) || null : null
+          teamName: employeeTeamMap.get(emp.id) || null
         }))
         // Exclude Stab employees from duel opponents
         .filter(emp => emp.teamName !== "Stab");
