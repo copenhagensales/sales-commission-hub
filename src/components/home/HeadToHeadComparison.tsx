@@ -1016,18 +1016,6 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
               </div>
             )}
             
-            {/* Pending challenges notification */}
-            {pendingChallenges.length > 0 && (
-              <button
-                onClick={() => setShowPendingChallenges(!showPendingChallenges)}
-                className="relative flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/20 border border-amber-500/30 hover:bg-amber-500/30 transition-colors"
-              >
-                <Bell className="w-4 h-4 text-amber-400" />
-                <Badge className="bg-amber-500 text-white text-[10px] px-1.5 py-0 h-5">
-                  {pendingChallenges.length}
-                </Badge>
-              </button>
-            )}
 
             {/* Forfeit button - only when match is ongoing */}
             {isMatchOngoing && activeChallengeId && (
@@ -1108,17 +1096,15 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
       </CardHeader>
       
       <CardContent className="relative space-y-5 z-10 text-white">
-        {/* Pending challenges dropdown */}
-        {showPendingChallenges && pendingChallenges.length > 0 && (
-          <div className="p-4 rounded-xl bg-slate-800/80 border border-amber-500/30 space-y-3 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-amber-400">Modtagne udfordringer</h4>
-              <button onClick={() => setShowPendingChallenges(false)} className="text-slate-400 hover:text-white">
-                <X className="w-4 h-4" />
-              </button>
+        {/* Pending challenges - always visible */}
+        {pendingChallenges.length > 0 && (
+          <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 space-y-3">
+            <div className="flex items-center gap-2">
+              <Bell className="w-4 h-4 text-amber-400" />
+              <h4 className="text-sm font-semibold text-amber-400">Modtagne udfordringer ({pendingChallenges.length})</h4>
             </div>
             {pendingChallenges.map((challenge: any) => (
-              <div key={challenge.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50 border border-slate-600/30">
+              <div key={challenge.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/60 border border-slate-600/30">
                 <div className="flex flex-col gap-1">
                   <span className="text-sm font-medium text-white">
                     {challenge.challenger?.first_name} {challenge.challenger?.last_name}
@@ -1140,7 +1126,6 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                         challenge: challenge 
                       });
                       toast.success("⚔️ Duel startet! Begge starter på 0-0");
-                      setShowPendingChallenges(false);
                     }}
                   >
                     <Check className="w-4 h-4" />
@@ -1152,7 +1137,6 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
                     onClick={() => {
                       respondChallengeMutation.mutate({ challengeId: challenge.id, accept: false });
                       toast.info("Udfordring afvist");
-                      setShowPendingChallenges(false);
                     }}
                   >
                     <XCircle className="w-4 h-4" />
