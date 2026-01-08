@@ -49,12 +49,18 @@ interface TvBoardAccess {
   expires_at?: string | null;
   auto_rotate?: boolean | null;
   rotate_interval_seconds?: number | null;
+  rotate_intervals_per_dashboard?: Record<string, number> | null;
   celebration_enabled?: boolean | null;
   celebration_effect?: string | null;
   celebration_duration?: number | null;
   celebration_trigger_condition?: string | null;
   celebration_trigger_value?: number | null;
   celebration_text?: string | null;
+}
+
+interface DashboardRotateTime {
+  minutes: number;
+  seconds: number;
 }
 
 const CELEBRATION_EFFECTS = [
@@ -95,8 +101,7 @@ export function TvLinksSettingsTab() {
   const [hasExpiry, setHasExpiry] = useState(false);
   const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined);
   const [autoRotate, setAutoRotate] = useState(false);
-  const [rotateMinutes, setRotateMinutes] = useState(1);
-  const [rotateSeconds, setRotateSeconds] = useState(0);
+  const [rotateTimes, setRotateTimes] = useState<Record<string, DashboardRotateTime>>({});
   // Celebration settings
   const [celebrationEnabled, setCelebrationEnabled] = useState(false);
   const [celebrationEffect, setCelebrationEffect] = useState("fireworks");
@@ -126,17 +131,19 @@ export function TvLinksSettingsTab() {
       expiresAt,
       autoRotate,
       rotateIntervalSeconds,
+      rotateIntervalsPerDashboard,
       celebrationEnabled,
       celebrationEffect,
       celebrationDuration,
       celebrationTriggerCondition,
       celebrationText,
-    }: { 
+    }: {
       name: string; 
       dashboardSlugs: string[]; 
       expiresAt: string | null;
       autoRotate: boolean;
       rotateIntervalSeconds: number | null;
+      rotateIntervalsPerDashboard: Record<string, number> | null;
       celebrationEnabled: boolean;
       celebrationEffect: string;
       celebrationDuration: number;
@@ -153,6 +160,7 @@ export function TvLinksSettingsTab() {
         expires_at: expiresAt,
         auto_rotate: autoRotate,
         rotate_interval_seconds: rotateIntervalSeconds,
+        rotate_intervals_per_dashboard: rotateIntervalsPerDashboard,
         celebration_enabled: celebrationEnabled,
         celebration_effect: celebrationEffect,
         celebration_duration: celebrationDuration,
@@ -196,13 +204,27 @@ export function TvLinksSettingsTab() {
     setHasExpiry(false);
     setExpiryDate(undefined);
     setAutoRotate(false);
-    setRotateMinutes(1);
-    setRotateSeconds(0);
+    setRotateTimes({});
     setCelebrationEnabled(false);
     setCelebrationEffect("fireworks");
     setCelebrationDuration(3);
     setCelebrationTriggerCondition("any_update");
     setCelebrationText("");
+  };
+
+  const updateRotateTime = (slug: string, field: 'minutes' | 'seconds', value: number) => {
+    setRotateTimes(prev => ({
+      ...prev,
+      [slug]: {
+        minutes: prev[slug]?.minutes ?? 1,
+        seconds: prev[slug]?.seconds ?? 0,
+        [field]: value
+      }
+    }));
+  };
+
+  const getRotateTime = (slug: string): DashboardRotateTime => {
+    return rotateTimes[slug] ?? { minutes: 1, seconds: 0 };
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -231,13 +253,25 @@ export function TvLinksSettingsTab() {
       toast.error("Vælg mindst ét dashboard");
       return;
     }
-    const totalSeconds = autoRotate ? (rotateMinutes * 60 + rotateSeconds) : null;
+    // Build per-dashboard intervals
+    const rotateIntervalsPerDashboard: Record<string, number> = {};
+    if (autoRotate && selectedDashboards.length > 1) {
+      selectedDashboards.forEach(slug => {
+        const time = getRotateTime(slug);
+        rotateIntervalsPerDashboard[slug] = time.minutes * 60 + time.seconds;
+      });
+    }
+    // Calculate total for backwards compatibility
+    const totalSeconds = autoRotate && selectedDashboards.length > 1
+      ? Object.values(rotateIntervalsPerDashboard).reduce((a, b) => a + b, 0) / selectedDashboards.length
+      : null;
     createMutation.mutate({ 
       name: newCodeName, 
       dashboardSlugs: selectedDashboards,
       expiresAt: hasExpiry && expiryDate ? expiryDate.toISOString() : null,
       autoRotate: autoRotate && selectedDashboards.length > 1,
-      rotateIntervalSeconds: totalSeconds,
+      rotateIntervalSeconds: totalSeconds ? Math.round(totalSeconds) : null,
+      rotateIntervalsPerDashboard: autoRotate && selectedDashboards.length > 1 ? rotateIntervalsPerDashboard : null,
       celebrationEnabled,
       celebrationEffect,
       celebrationDuration,
@@ -339,29 +373,38 @@ export function TvLinksSettingsTab() {
                     />
                   </div>
                   {autoRotate && (
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <Label htmlFor="rotate-minutes" className="text-xs text-muted-foreground">Minutter</Label>
-                        <Input
-                          id="rotate-minutes"
-                          type="number"
-                          min={0}
-                          max={60}
-                          value={rotateMinutes}
-                          onChange={(e) => setRotateMinutes(Math.max(0, parseInt(e.target.value) || 0))}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <Label htmlFor="rotate-seconds" className="text-xs text-muted-foreground">Sekunder</Label>
-                        <Input
-                          id="rotate-seconds"
-                          type="number"
-                          min={0}
-                          max={59}
-                          value={rotateSeconds}
-                          onChange={(e) => setRotateSeconds(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
-                        />
-                      </div>
+                    <div className="space-y-3">
+                      <p className="text-xs text-muted-foreground">Indstil tid for hvert board:</p>
+                      {selectedDashboards.map((slug) => {
+                        const time = getRotateTime(slug);
+                        return (
+                          <div key={slug} className="flex items-center gap-2 p-2 border rounded-md bg-muted/30">
+                            <span className="text-sm font-medium flex-1 truncate">{getDashboardName(slug)}</span>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                min={0}
+                                max={60}
+                                value={time.minutes}
+                                onChange={(e) => updateRotateTime(slug, 'minutes', Math.max(0, parseInt(e.target.value) || 0))}
+                                className="w-16 h-8 text-center"
+                              />
+                              <span className="text-xs text-muted-foreground">min</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                min={0}
+                                max={59}
+                                value={time.seconds}
+                                onChange={(e) => updateRotateTime(slug, 'seconds', Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                                className="w-16 h-8 text-center"
+                              />
+                              <span className="text-xs text-muted-foreground">sek</span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
