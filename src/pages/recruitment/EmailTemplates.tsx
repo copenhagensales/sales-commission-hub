@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Eye, Save, RotateCcw, Send, Loader2, CalendarCheck, XCircle, Gift } from "lucide-react";
+import { Eye, Save, RotateCcw, Send, Loader2, CalendarCheck, XCircle, Gift, Plus, Mail, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { CreateEmailTemplateDialog } from "@/components/recruitment/CreateEmailTemplateDialog";
 
 // CPH Sales official colors for HTML preview wrapper
 const wrapInHtmlTemplate = (title: string, content: string) => {
@@ -190,51 +191,72 @@ const TEMPLATE_CONFIGS: TemplateConfig[] = [
 
 export default function EmailTemplates() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<TemplateKey>("invitation_samtale");
+  const [activeTab, setActiveTab] = useState<string>("invitation_samtale");
   const [editingSubjects, setEditingSubjects] = useState<Record<string, string | null>>({});
   const [editingContents, setEditingContents] = useState<Record<string, string | null>>({});
   const [hasChanges, setHasChanges] = useState<Record<string, boolean>>({});
   const [testEmail, setTestEmail] = useState("");
   const [isSendingTest, setIsSendingTest] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
-  const { data: templates, isLoading } = useQuery({
+  // Fetch all templates (both system and custom)
+  const { data: allTemplates, isLoading } = useQuery({
     queryKey: ["recruitment-email-templates"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("email_templates")
         .select("*")
-        .in("template_key", TEMPLATE_CONFIGS.map(c => c.key));
+        .order("created_at", { ascending: true });
       
       if (error) throw error;
-      
-      const templateMap: Record<string, EmailTemplate> = {};
-      data?.forEach(t => {
-        templateMap[t.template_key] = t as EmailTemplate;
-      });
-      return templateMap;
+      return data as EmailTemplate[];
     },
   });
 
-  const getConfig = (key: TemplateKey) => TEMPLATE_CONFIGS.find(c => c.key === key)!;
-  const getTemplate = (key: TemplateKey) => templates?.[key];
+  // Separate system templates from custom ones
+  const systemTemplateKeys = TEMPLATE_CONFIGS.map(c => c.key);
+  const systemTemplatesFromDb = allTemplates?.filter(t => systemTemplateKeys.includes(t.template_key as TemplateKey)) || [];
+  const customTemplates = allTemplates?.filter(t => !systemTemplateKeys.includes(t.template_key as TemplateKey)) || [];
 
-  const getCurrentSubject = (key: TemplateKey) => {
-    const config = getConfig(key);
-    return editingSubjects[key] ?? getTemplate(key)?.subject ?? config.defaultSubject;
+  // Build template map for system templates
+  const templates: Record<string, EmailTemplate> = {};
+  systemTemplatesFromDb.forEach(t => {
+    templates[t.template_key] = t;
+  });
+
+  const getConfig = (key: TemplateKey) => TEMPLATE_CONFIGS.find(c => c.key === key)!;
+  const getTemplate = (key: TemplateKey) => templates[key];
+
+  const getCurrentSubject = (key: string) => {
+    const config = TEMPLATE_CONFIGS.find(c => c.key === key);
+    if (editingSubjects[key] !== undefined && editingSubjects[key] !== null) {
+      return editingSubjects[key]!;
+    }
+    if (config) {
+      return templates[key]?.subject ?? config.defaultSubject;
+    }
+    // Custom template
+    const customTemplate = customTemplates.find(t => t.template_key === key);
+    return customTemplate?.subject ?? "";
   };
 
-  const getCurrentContent = (key: TemplateKey) => {
-    const config = getConfig(key);
+  const getCurrentContent = (key: string) => {
+    const config = TEMPLATE_CONFIGS.find(c => c.key === key);
     if (editingContents[key] !== undefined && editingContents[key] !== null) {
-      return editingContents[key];
+      return editingContents[key]!;
     }
-    return getTemplate(key)?.content ?? config.defaultContent;
+    if (config) {
+      return templates[key]?.content ?? config.defaultContent;
+    }
+    // Custom template
+    const customTemplate = customTemplates.find(t => t.template_key === key);
+    return customTemplate?.content ?? "";
   };
 
   const saveMutation = useMutation({
-    mutationFn: async ({ key, subject, content }: { key: TemplateKey; subject: string; content: string }) => {
-      const template = getTemplate(key);
-      const config = getConfig(key);
+    mutationFn: async ({ key, subject, content }: { key: string; subject: string; content: string }) => {
+      const config = TEMPLATE_CONFIGS.find(c => c.key === key);
+      const template = config ? getTemplate(key as TemplateKey) : customTemplates.find(t => t.template_key === key);
       
       if (template) {
         const { error } = await supabase
@@ -242,7 +264,7 @@ export default function EmailTemplates() {
           .update({ subject, content, updated_at: new Date().toISOString() })
           .eq("id", template.id);
         if (error) throw error;
-      } else {
+      } else if (config) {
         const { error } = await supabase
           .from("email_templates")
           .insert({
@@ -266,7 +288,25 @@ export default function EmailTemplates() {
     },
   });
 
-  const handleSave = (key: TemplateKey) => {
+  const deleteMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      const { error } = await supabase
+        .from("email_templates")
+        .delete()
+        .eq("id", templateId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recruitment-email-templates"] });
+      toast.success("Skabelon slettet");
+      setActiveTab("invitation_samtale");
+    },
+    onError: (error) => {
+      toast.error("Kunne ikke slette skabelon: " + error.message);
+    },
+  });
+
+  const handleSave = (key: string) => {
     saveMutation.mutate({
       key,
       subject: getCurrentSubject(key),
@@ -274,7 +314,7 @@ export default function EmailTemplates() {
     });
   };
 
-  const handleReset = (key: TemplateKey) => {
+  const handleReset = (key: string) => {
     setEditingSubjects(prev => ({ ...prev, [key]: null }));
     setEditingContents(prev => ({ ...prev, [key]: null }));
     setHasChanges(prev => ({ ...prev, [key]: false }));
@@ -287,17 +327,17 @@ export default function EmailTemplates() {
     setHasChanges(prev => ({ ...prev, [key]: true }));
   };
 
-  const handleSubjectChange = (key: TemplateKey, value: string) => {
+  const handleSubjectChange = (key: string, value: string) => {
     setEditingSubjects(prev => ({ ...prev, [key]: value }));
     setHasChanges(prev => ({ ...prev, [key]: true }));
   };
 
-  const handleContentChange = (key: TemplateKey, value: string) => {
+  const handleContentChange = (key: string, value: string) => {
     setEditingContents(prev => ({ ...prev, [key]: value }));
     setHasChanges(prev => ({ ...prev, [key]: true }));
   };
 
-  const handleSendTestEmail = async (key: TemplateKey) => {
+  const handleSendTestEmail = async (key: string) => {
     if (!testEmail) {
       toast.error("Indtast en email-adresse");
       return;
@@ -311,11 +351,14 @@ export default function EmailTemplates() {
 
     setIsSendingTest(true);
     try {
-      const config = getConfig(key);
+      const config = TEMPLATE_CONFIGS.find(c => c.key === key);
+      const customTemplate = customTemplates.find(t => t.template_key === key);
+      const previewTitle = config?.previewTitle ?? customTemplate?.name ?? "Email";
+      
       // Use simple text template for rejection emails, full branding for others
       const htmlContent = key === "afslag" 
         ? wrapInSimpleTextTemplate(getCurrentContent(key))
-        : wrapInHtmlTemplate(config.previewTitle, getCurrentContent(key));
+        : wrapInHtmlTemplate(previewTitle, getCurrentContent(key));
       
       const { data, error } = await supabase.functions.invoke("send-test-email", {
         body: {
@@ -336,12 +379,14 @@ export default function EmailTemplates() {
     }
   };
 
-  const getPreviewHtml = (key: TemplateKey) => {
-    const config = getConfig(key);
+  const getPreviewHtml = (key: string) => {
+    const config = TEMPLATE_CONFIGS.find(c => c.key === key);
+    const customTemplate = customTemplates.find(t => t.template_key === key);
     let content = getCurrentContent(key);
     
     // Replace variables with preview values
-    Object.entries(config.previewReplacements).forEach(([placeholder, value]) => {
+    const replacements = config?.previewReplacements ?? { "{{fornavn}}": "Maria", "{{rolle}}": "Salgskonsulent" };
+    Object.entries(replacements).forEach(([placeholder, value]) => {
       content = content.replace(new RegExp(placeholder.replace(/[{}]/g, "\\$&"), "g"), value);
     });
     
@@ -349,7 +394,8 @@ export default function EmailTemplates() {
     if (key === "afslag") {
       return wrapInSimpleTextTemplate(content);
     }
-    return wrapInHtmlTemplate(config.previewTitle, content);
+    const previewTitle = config?.previewTitle ?? customTemplate?.name ?? "Email";
+    return wrapInHtmlTemplate(previewTitle, content);
   };
 
   if (isLoading) {
@@ -363,15 +409,21 @@ export default function EmailTemplates() {
   return (
     <MainLayout>
       <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Email-skabeloner</h1>
-          <p className="text-muted-foreground mt-1">
-            Rediger email-skabeloner til rekruttering
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Email-skabeloner</h1>
+            <p className="text-muted-foreground mt-1">
+              Rediger email-skabeloner til rekruttering
+            </p>
+          </div>
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Opret skabelon
+          </Button>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TemplateKey)} className="space-y-6">
-          <TabsList>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="space-y-6">
+          <TabsList className="flex-wrap h-auto gap-1">
             {TEMPLATE_CONFIGS.map((config) => {
               const Icon = config.icon;
               return (
@@ -381,6 +433,12 @@ export default function EmailTemplates() {
                 </TabsTrigger>
               );
             })}
+            {customTemplates.map((template) => (
+              <TabsTrigger key={template.template_key} value={template.template_key} className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                {template.name}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           {TEMPLATE_CONFIGS.map((config) => (
@@ -508,8 +566,148 @@ export default function EmailTemplates() {
               </div>
             </TabsContent>
           ))}
+
+          {/* Custom Templates */}
+          {customTemplates.map((template) => (
+            <TabsContent key={template.template_key} value={template.template_key} className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">Brugerdefineret</Badge>
+                  {hasChanges[template.template_key] && <Badge variant="secondary">Ændringer ikke gemt</Badge>}
+                </div>
+                <div className="flex items-center gap-2">
+                  {hasChanges[template.template_key] && (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={() => handleReset(template.template_key)}>
+                        Annuller
+                      </Button>
+                      <Button size="sm" onClick={() => handleSave(template.template_key)} disabled={saveMutation.isPending}>
+                        <Save className="h-4 w-4 mr-2" />
+                        Gem ændringer
+                      </Button>
+                    </>
+                  )}
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    onClick={() => {
+                      if (confirm(`Er du sikker på at du vil slette skabelonen "${template.name}"?`)) {
+                        deleteMutation.mutate(template.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Slet
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Editor */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Rediger skabelon</CardTitle>
+                    <CardDescription>
+                      Rediger din brugerdefinerede skabelon
+                      <br />
+                      <span className="text-xs mt-1 block">
+                        Variabler: {"{{fornavn}}"}, {"{{rolle}}"}
+                      </span>
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Emne</Label>
+                      <Input
+                        value={getCurrentSubject(template.template_key)}
+                        onChange={(e) => handleSubjectChange(template.template_key, e.target.value)}
+                        placeholder="Email emne..."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Besked</Label>
+                      <Textarea
+                        value={getCurrentContent(template.template_key)}
+                        onChange={(e) => handleContentChange(template.template_key, e.target.value)}
+                        placeholder="Email indhold..."
+                        rows={16}
+                        className="resize-none"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Preview */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Eye className="h-4 w-4" />
+                      Preview
+                    </CardTitle>
+                    <CardDescription>
+                      Sådan ser mailen ud med eksempel-data
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Test email section */}
+                    <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                      <Label className="text-sm font-medium">Send test-mail</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="email"
+                          placeholder="Indtast email-adresse..."
+                          value={testEmail}
+                          onChange={(e) => setTestEmail(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleSendTestEmail(template.template_key);
+                            }
+                          }}
+                        />
+                        <Button 
+                          onClick={() => handleSendTestEmail(template.template_key)} 
+                          disabled={isSendingTest || !testEmail}
+                          size="default"
+                        >
+                          {isSendingTest ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Send className="h-4 w-4 mr-2" />
+                              Send
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Test-mails får automatisk [TEST] i emnelinjen
+                      </p>
+                    </div>
+
+                    <div className="border rounded-lg overflow-hidden bg-white">
+                      <div className="p-2 bg-muted/50 border-b text-xs text-muted-foreground">
+                        <strong>Til:</strong> maria@example.dk<br />
+                        <strong>Emne:</strong> {getCurrentSubject(template.template_key)}
+                      </div>
+                      <iframe
+                        srcDoc={getPreviewHtml(template.template_key)}
+                        className="w-full h-[500px] border-0"
+                        title="Email preview"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          ))}
         </Tabs>
       </div>
+
+      <CreateEmailTemplateDialog 
+        open={createDialogOpen} 
+        onOpenChange={setCreateDialogOpen} 
+      />
     </MainLayout>
   );
 }
