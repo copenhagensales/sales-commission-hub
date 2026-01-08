@@ -94,6 +94,7 @@ import {
   TvBoardLogin,
   TvBoardView,
   TvBoardAdmin,
+  TvBoardDirect,
   LiveStats,
   HeadToHead,
   CoachingTemplates,
@@ -380,6 +381,7 @@ export const routes: RouteConfig[] = [
   { path: "/excel-field-matcher", component: ExcelFieldMatcher, access: "protected" },
 
   // TV Board routes
+  { path: "/t/:code", component: TvBoardDirect, access: "public" },
   { path: "/tv", component: TvBoardLogin, access: "public" },
   { path: "/tv/:slug", component: TvBoardView, access: "public" },
   { path: "/tv-board-admin", component: TvBoardAdmin, access: "role", positionPermission: "menu_settings" },
