@@ -35,6 +35,8 @@ interface CelebrationSettings {
   duration: number;
   triggerCondition: string;
   text: string;
+  metric: string;
+  sourceDashboard: string | null;
 }
 
 interface TvBoardData {
@@ -51,6 +53,8 @@ interface TvBoardData {
   celebration_duration: number | null;
   celebration_trigger_condition: string | null;
   celebration_text: string | null;
+  celebration_metric: string | null;
+  celebration_source_dashboard: string | null;
 }
 
 export default function TvBoardDirect() {
@@ -94,7 +98,9 @@ export default function TvBoardDirect() {
           celebration_effect,
           celebration_duration,
           celebration_trigger_condition,
-          celebration_text
+          celebration_text,
+          celebration_metric,
+          celebration_source_dashboard
         `)
         .eq("access_code", code.toUpperCase())
         .eq("is_active", true)
@@ -155,6 +161,8 @@ export default function TvBoardDirect() {
           duration: tvData.celebration_duration || 3,
           triggerCondition: tvData.celebration_trigger_condition || 'any_update',
           text: tvData.celebration_text || '🎉 Tillykke!',
+          metric: tvData.celebration_metric || 'sales_today',
+          sourceDashboard: tvData.celebration_source_dashboard || null,
         });
       }
       
