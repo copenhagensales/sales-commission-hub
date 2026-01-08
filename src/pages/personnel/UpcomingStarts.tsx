@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, Users, Plus, Clock, MapPin, Building2, UserPlus, Mail, Loader2, Trash2, Pencil } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -467,7 +468,23 @@ export default function UpcomingStarts() {
                       className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-lg"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{name}</p>
+                        {member.employee_id ? (
+                          <Link 
+                            to={`/employees/${member.employee_id}`}
+                            className="font-medium truncate hover:text-primary hover:underline transition-colors"
+                          >
+                            {name}
+                          </Link>
+                        ) : member.candidate_id ? (
+                          <Link 
+                            to={`/recruitment/candidates/${member.candidate_id}`}
+                            className="font-medium truncate hover:text-primary hover:underline transition-colors"
+                          >
+                            {name}
+                          </Link>
+                        ) : (
+                          <p className="font-medium truncate">{name}</p>
+                        )}
                         {position && (
                           <p className="text-sm text-muted-foreground truncate">{position}</p>
                         )}
@@ -634,9 +651,12 @@ export default function UpcomingStarts() {
                     className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-lg"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">
+                      <Link 
+                        to={`/recruitment/candidates/${candidate.id}`}
+                        className="font-medium truncate hover:text-primary hover:underline transition-colors block"
+                      >
                         {candidate.first_name} {candidate.last_name}
-                      </p>
+                      </Link>
                       {candidate.applied_position && (
                         <p className="text-sm text-muted-foreground truncate">
                           {candidate.applied_position}
