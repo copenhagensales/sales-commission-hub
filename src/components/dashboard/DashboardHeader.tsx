@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Menu, LayoutGrid, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScreenResolutionIndicator } from "./ScreenResolutionIndicator";
+import { TvBoardQuickGenerator } from "./TvBoardQuickGenerator";
 import { DASHBOARD_LIST } from "@/config/dashboards";
 import cphSalesLogo from "@/assets/cph-sales-logo.png";
 
@@ -24,6 +25,11 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
   const location = useLocation();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+
+  const currentDashboardSlug = useMemo(() => {
+    const dashboard = DASHBOARD_LIST.find(d => d.path === location.pathname);
+    return dashboard?.slug || null;
+  }, [location.pathname]);
 
   const handleFullscreenChange = useCallback(() => {
     const isCurrentlyFullscreen = !!document.fullscreenElement;
@@ -135,6 +141,11 @@ export function DashboardHeader({ title, subtitle, rightContent, onFullscreenCha
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* TV Link Generator */}
+        {currentDashboardSlug && (
+          <TvBoardQuickGenerator dashboardSlug={currentDashboardSlug} />
+        )}
 
         {/* Fullscreen button */}
         <Button
