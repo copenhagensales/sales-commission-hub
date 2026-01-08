@@ -313,15 +313,15 @@ export function TvLinksSettingsTab() {
               Opret nyt TV-link
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>Opret nyt TV-link</DialogTitle>
               <DialogDescription>
                 Vælg dashboards og indstillinger for dit nye TV-link
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-4 overflow-y-auto flex-1">
               {/* Name input */}
               <div className="space-y-2">
                 <Label htmlFor="link-name">Navn (valgfrit)</Label>
