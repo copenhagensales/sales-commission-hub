@@ -25,6 +25,24 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { DASHBOARD_LIST } from "@/config/dashboards";
+import { replaceCelebrationVariables, CelebrationTriggerData } from "@/hooks/useCelebrationData";
+
+// Demo data for test preview
+const DEMO_CELEBRATION_DATA: CelebrationTriggerData = {
+  employeeName: "Martin Jensen",
+  salesCount: 5,
+  commission: 2500,
+  metricValue: 5,
+  salesToday: 5,
+  salesMonth: 42,
+  salesWeek: 12,
+  totalSales: 42,
+  commissionToday: 2500,
+  commissionMonth: 21000,
+  goalProgress: 78,
+  goalTarget: 30000,
+  goalRemaining: 9000,
+};
 
 interface TvBoardAccess {
   id: string;
@@ -429,7 +447,7 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
         onClose={() => setShowTestCelebration(false)}
         effect={celebrationEffect as "fireworks" | "confetti" | "stars" | "hearts" | "flames" | "sparkles"}
         duration={celebrationDuration}
-        text={celebrationText || "🎉 Test fejring!"}
+        text={replaceCelebrationVariables(celebrationText || "🎉 Test fejring!", DEMO_CELEBRATION_DATA)}
       />
     </>
   );
