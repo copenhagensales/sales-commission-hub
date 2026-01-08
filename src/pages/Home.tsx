@@ -561,22 +561,18 @@ const Home = () => {
       // Use direct in() for emails - Supabase handles the encoding
       const normalizedEmails = agentEmails.map(e => e.toLowerCase());
       
-      console.log("[Home] Personal stats query - agent emails:", normalizedEmails, "external IDs:", externalIds);
-      
       if (normalizedEmails.length > 0 || externalIds.length > 0) {
         // Build query for period sales - use separate queries and merge results
         let periodSalesFromEmail: any[] = [];
         let periodSalesFromId: any[] = [];
         
         if (normalizedEmails.length > 0) {
-          console.log("[Home] Fetching period sales by email:", normalizedEmails);
-          const { data, error } = await supabase
+          const { data } = await supabase
             .from("sales")
             .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
             .gte("sale_datetime", `${periodStartStr}T00:00:00`)
             .lte("sale_datetime", `${periodEndStr}T23:59:59`)
             .in("agent_email", normalizedEmails);
-          console.log("[Home] Period sales by email result:", data?.length, error);
           periodSalesFromEmail = data || [];
         }
         
