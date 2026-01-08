@@ -231,6 +231,37 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
     },
   });
 
+  // Sync active challenge from database to local state on mount
+  useEffect(() => {
+    if (!currentEmployeeId) return;
+    
+    // If we have active challenges in DB but no local activeChallengeId, sync from DB
+    if (activeChallenges.length > 0 && !activeChallengeId) {
+      const activeChallenge = activeChallenges[0];
+      const isChallenger = activeChallenge.challenger_employee_id === currentEmployeeId;
+      const opponentId = isChallenger 
+        ? activeChallenge.opponent_employee_id 
+        : activeChallenge.challenger_employee_id;
+      
+      setActiveChallengeId(activeChallenge.id);
+      setOpponentTeam([opponentId]);
+      setMatchStartTime(activeChallenge.accepted_at);
+      setPeriod(activeChallenge.period as PeriodType);
+      setBattleMode(activeChallenge.battle_mode as BattleMode);
+      setMatchComment(activeChallenge.comment || "");
+      setMatchStarted(true);
+    }
+    
+    // Validate: If localStorage says match is active but no active challenge in DB, clear stale state
+    if (matchStarted && activeChallenges.length === 0 && activeChallengeId) {
+      setMatchStarted(false);
+      setActiveChallengeId(null);
+      setMatchStartTime(null);
+      setOpponentTeam([]);
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [activeChallenges, currentEmployeeId, activeChallengeId, matchStarted]);
+
   // Persist state to localStorage
   useEffect(() => {
     const state: StoredBattleState = {
@@ -345,7 +376,21 @@ export const HeadToHeadComparison = ({ currentEmployeeId, currentEmployeeName, o
     return names;
   }, [currentEmployeeName, myTeam, employees]);
 
-  const opponentTeamNames = useMemo(() => getTeamNames(opponentTeam), [opponentTeam, employees]);
+  // Fix: Use challenge data for opponent name when match is active
+  const opponentTeamNames = useMemo(() => {
+    // If we have an active challenge, use its opponent data for correct name
+    if (activeChallengeId && activeChallenges.length > 0) {
+      const challenge = activeChallenges.find(c => c.id === activeChallengeId);
+      if (challenge) {
+        const isChallenger = challenge.challenger_employee_id === currentEmployeeId;
+        const opponent = isChallenger ? (challenge as any).opponent : (challenge as any).challenger;
+        if (opponent) {
+          return [`${opponent.first_name} ${opponent.last_name}`];
+        }
+      }
+    }
+    return getTeamNames(opponentTeam);
+  }, [opponentTeam, employees, activeChallengeId, activeChallenges, currentEmployeeId]);
 
   // Fetch stats for teams
   const { data: stats, dataUpdatedAt } = useQuery({
