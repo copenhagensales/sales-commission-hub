@@ -66,13 +66,17 @@ const DURATION_OPTIONS = [
   { value: 8, label: "8 sek" },
 ];
 
-// Available metrics based on dashboard type
+// Available metrics based on dashboard type - used for both trigger and text variables
 const CELEBRATION_METRICS = [
   { value: "sales_today", label: "Salg i dag", dashboards: ["all"] },
   { value: "sales_month", label: "Salg denne måned", dashboards: ["all"] },
   { value: "sales_week", label: "Salg denne uge", dashboards: ["all"] },
   { value: "total_sales", label: "Samlet antal salg", dashboards: ["all"] },
+  { value: "commission_today", label: "Provision i dag", dashboards: ["all"] },
+  { value: "commission_month", label: "Provision denne måned", dashboards: ["all"] },
   { value: "goal_progress", label: "Mål-fremskridt (%)", dashboards: ["tdc-erhverv-goals", "fieldmarketing-goals"] },
+  { value: "goal_target", label: "Mål (DKK)", dashboards: ["tdc-erhverv-goals", "fieldmarketing-goals"] },
+  { value: "goal_remaining", label: "Mangler (DKK)", dashboards: ["tdc-erhverv-goals", "fieldmarketing-goals"] },
 ];
 
 export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialogProps) {
@@ -302,29 +306,49 @@ export function TvLinkEditDialog({ open, onOpenChange, tvLink }: TvLinkEditDialo
                       rows={2}
                       className="bg-background/80 backdrop-blur-sm resize-none"
                     />
-                    <div className="flex flex-wrap gap-1.5 items-center">
-                      <span className="text-xs text-muted-foreground">Indsæt:</span>
-                      {[
-                        { var: "{employee_name}", label: "Navn" },
-                        { var: "{sales_count}", label: "Antal salg" },
-                        { var: "{commission}", label: "Provision" },
-                        { var: "{metric_value}", label: "Valgt tal" },
-                      ].map((v) => (
-                        <Button
-                          key={v.var}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-6 px-2 text-xs bg-purple-500/20 hover:bg-purple-500/30 border-purple-400/40"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setCelebrationText((prev) => prev + v.var);
-                          }}
-                        >
-                          {v.label}
-                        </Button>
-                      ))}
+                    <div className="space-y-2">
+                      <span className="text-xs text-muted-foreground">Indsæt variable:</span>
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        {[
+                          { var: "{employee_name}", label: "Navn" },
+                          { var: "{sales_count}", label: "Antal salg" },
+                          { var: "{commission}", label: "Provision" },
+                        ].map((v) => (
+                          <Button
+                            key={v.var}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-xs bg-purple-500/20 hover:bg-purple-500/30 border-purple-400/40"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setCelebrationText((prev) => prev + v.var);
+                            }}
+                          >
+                            {v.label}
+                          </Button>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className="text-xs text-muted-foreground">Medarbejder-tal:</span>
+                        {availableMetrics.map((metric) => (
+                          <Button
+                            key={metric.value}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-xs bg-amber-500/20 hover:bg-amber-500/30 border-amber-400/40"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setCelebrationText((prev) => prev + `{${metric.value}}`);
+                            }}
+                          >
+                            {metric.label}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
