@@ -19,10 +19,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Loader2, Mail, Clock } from "lucide-react";
-import { format, addHours } from "date-fns";
+import { Loader2, Mail, Clock, CalendarIcon } from "lucide-react";
+import { format, setHours, setMinutes } from "date-fns";
 import { da } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface Candidate {
   id: string;
@@ -38,13 +45,16 @@ interface SendEmailDialogProps {
   candidate: Candidate;
 }
 
-type DelayOption = "now" | "24h" | "48h";
+type SendOption = "now" | "scheduled";
 
 export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDialogProps) {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
-  const [delay, setDelay] = useState<DelayOption>("now");
+  const [sendOption, setSendOption] = useState<SendOption>("now");
+  const [scheduledDate, setScheduledDate] = useState<Date | undefined>(undefined);
+  const [scheduledHour, setScheduledHour] = useState("09");
+  const [scheduledMinute, setScheduledMinute] = useState("00");
   const queryClient = useQueryClient();
 
   const { data: templates = [] } = useQuery({
@@ -60,27 +70,21 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
     },
   });
 
-  const getScheduledTime = (delayOption: DelayOption): Date => {
-    const now = new Date();
-    switch (delayOption) {
-      case "24h":
-        return addHours(now, 24);
-      case "48h":
-        return addHours(now, 48);
-      default:
-        return now;
-    }
+  const getScheduledDateTime = (): Date | null => {
+    if (sendOption === "now" || !scheduledDate) return null;
+    const date = new Date(scheduledDate);
+    return setMinutes(setHours(date, parseInt(scheduledHour)), parseInt(scheduledMinute));
   };
 
-  const formatScheduledTime = (delayOption: DelayOption): string => {
-    if (delayOption === "now") return "";
-    const scheduledAt = getScheduledTime(delayOption);
-    return format(scheduledAt, "d. MMM 'kl.' HH:mm", { locale: da });
+  const formatScheduledDateTime = (): string => {
+    const dateTime = getScheduledDateTime();
+    if (!dateTime) return "";
+    return format(dateTime, "d. MMM yyyy 'kl.' HH:mm", { locale: da });
   };
 
   const sendEmailMutation = useMutation({
     mutationFn: async () => {
-      if (delay === "now") {
+      if (sendOption === "now") {
         // Send immediately via edge function
         const { error } = await supabase.functions.invoke("send-recruitment-email", {
           body: {
@@ -94,7 +98,10 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
         if (error) throw error;
       } else {
         // Schedule for later
-        const scheduledAt = getScheduledTime(delay);
+        const scheduledAt = getScheduledDateTime();
+        if (!scheduledAt) {
+          throw new Error("Vælg venligst dato og tid");
+        }
         const { error } = await supabase
           .from("scheduled_emails")
           .insert({
@@ -113,19 +120,22 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["communication_logs"] });
       queryClient.invalidateQueries({ queryKey: ["scheduled_emails"] });
-      if (delay === "now") {
+      if (sendOption === "now") {
         toast.success("Email sendt");
       } else {
-        toast.success(`Email planlagt til ${formatScheduledTime(delay)}`);
+        toast.success(`Email planlagt til ${formatScheduledDateTime()}`);
       }
       onOpenChange(false);
       setSubject("");
       setMessage("");
       setSelectedTemplate("");
-      setDelay("now");
+      setSendOption("now");
+      setScheduledDate(undefined);
+      setScheduledHour("09");
+      setScheduledMinute("00");
     },
-    onError: () => {
-      toast.error("Kunne ikke sende email");
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Kunne ikke sende email");
     },
   });
 
@@ -151,8 +161,17 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
       toast.error("Kandidaten har ingen email-adresse");
       return;
     }
+    if (sendOption === "scheduled" && !scheduledDate) {
+      toast.error("Vælg venligst en dato for planlagt afsendelse");
+      return;
+    }
     sendEmailMutation.mutate();
   };
+
+  // Generate hour options (00-23)
+  const hourOptions = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, "0"));
+  // Generate minute options (00, 15, 30, 45)
+  const minuteOptions = ["00", "15", "30", "45"];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -211,24 +230,77 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
               <Clock className="h-4 w-4" />
               Hvornår skal emailen sendes?
             </Label>
-            <RadioGroup value={delay} onValueChange={(v) => setDelay(v as DelayOption)}>
+            <RadioGroup value={sendOption} onValueChange={(v) => setSendOption(v as SendOption)}>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="now" id="now" />
                 <Label htmlFor="now" className="font-normal cursor-pointer">Send nu</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="24h" id="24h" />
-                <Label htmlFor="24h" className="font-normal cursor-pointer">
-                  Om 24 timer {delay !== "24h" && <span className="text-muted-foreground">({formatScheduledTime("24h")})</span>}
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="48h" id="48h" />
-                <Label htmlFor="48h" className="font-normal cursor-pointer">
-                  Om 48 timer {delay !== "48h" && <span className="text-muted-foreground">({formatScheduledTime("48h")})</span>}
-                </Label>
+                <RadioGroupItem value="scheduled" id="scheduled" />
+                <Label htmlFor="scheduled" className="font-normal cursor-pointer">Planlæg afsendelse</Label>
               </div>
             </RadioGroup>
+
+            {sendOption === "scheduled" && (
+              <div className="mt-3 space-y-3 pl-6">
+                <div className="flex flex-wrap gap-3">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-[200px] justify-start text-left font-normal",
+                          !scheduledDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {scheduledDate ? format(scheduledDate, "d. MMM yyyy", { locale: da }) : "Vælg dato"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={scheduledDate}
+                        onSelect={setScheduledDate}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <div className="flex items-center gap-1">
+                    <Select value={scheduledHour} onValueChange={setScheduledHour}>
+                      <SelectTrigger className="w-[70px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {hourOptions.map(hour => (
+                          <SelectItem key={hour} value={hour}>{hour}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span className="text-muted-foreground">:</span>
+                    <Select value={scheduledMinute} onValueChange={setScheduledMinute}>
+                      <SelectTrigger className="w-[70px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {minuteOptions.map(minute => (
+                          <SelectItem key={minute} value={minute}>{minute}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {scheduledDate && (
+                  <p className="text-sm text-muted-foreground">
+                    Sendes: {formatScheduledDateTime()}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
@@ -237,7 +309,7 @@ export function SendEmailDialog({ open, onOpenChange, candidate }: SendEmailDial
             </Button>
             <Button onClick={handleSend} disabled={sendEmailMutation.isPending}>
               {sendEmailMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {delay === "now" ? "Send email" : "Planlæg email"}
+              {sendOption === "now" ? "Send email" : "Planlæg email"}
             </Button>
           </div>
         </div>
