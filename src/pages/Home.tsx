@@ -558,31 +558,66 @@ const Home = () => {
       let todaySales: any[] = [];
       
       // Fetch dialer sales if we have agent identifiers
-      // Use ilike for emails (same approach as DailyReports.tsx)
-      const emailFilters = agentEmails.map(e => `agent_email.ilike.${e.toLowerCase()}`);
-      const idFilters = externalIds.map(id => `agent_external_id.eq.${id}`);
-      const allFilters = [...emailFilters, ...idFilters].join(",");
+      // Use direct in() for emails - Supabase handles the encoding
+      const normalizedEmails = agentEmails.map(e => e.toLowerCase());
       
-      if (allFilters) {
-        // Build query for period sales
-        const { data } = await supabase
-          .from("sales")
-          .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
-          .gte("sale_datetime", `${periodStartStr}T00:00:00`)
-          .lte("sale_datetime", `${periodEndStr}T23:59:59`)
-          .or(allFilters);
+      if (normalizedEmails.length > 0 || externalIds.length > 0) {
+        // Build query for period sales - use separate queries and merge results
+        let periodSalesFromEmail: any[] = [];
+        let periodSalesFromId: any[] = [];
         
-        periodSales = data || [];
+        if (normalizedEmails.length > 0) {
+          const { data } = await supabase
+            .from("sales")
+            .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
+            .gte("sale_datetime", `${periodStartStr}T00:00:00`)
+            .lte("sale_datetime", `${periodEndStr}T23:59:59`)
+            .in("agent_email", normalizedEmails);
+          periodSalesFromEmail = data || [];
+        }
         
-        // Build query for today's sales
-        const { data: todayData } = await supabase
-          .from("sales")
-          .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
-          .gte("sale_datetime", todayStart)
-          .lte("sale_datetime", todayEnd)
-          .or(allFilters);
+        if (externalIds.length > 0) {
+          const { data } = await supabase
+            .from("sales")
+            .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
+            .gte("sale_datetime", `${periodStartStr}T00:00:00`)
+            .lte("sale_datetime", `${periodEndStr}T23:59:59`)
+            .in("agent_external_id", externalIds);
+          periodSalesFromId = data || [];
+        }
         
-        todaySales = todayData || [];
+        // Merge and dedupe by sale id
+        const periodSalesMap = new Map<string, any>();
+        [...periodSalesFromEmail, ...periodSalesFromId].forEach(s => periodSalesMap.set(s.id, s));
+        periodSales = Array.from(periodSalesMap.values());
+        
+        // Same for today's sales
+        let todaySalesFromEmail: any[] = [];
+        let todaySalesFromId: any[] = [];
+        
+        if (normalizedEmails.length > 0) {
+          const { data } = await supabase
+            .from("sales")
+            .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
+            .gte("sale_datetime", todayStart)
+            .lte("sale_datetime", todayEnd)
+            .in("agent_email", normalizedEmails);
+          todaySalesFromEmail = data || [];
+        }
+        
+        if (externalIds.length > 0) {
+          const { data } = await supabase
+            .from("sales")
+            .select(`id, agent_email, agent_external_id, sale_datetime, sale_items(mapped_commission)`)
+            .gte("sale_datetime", todayStart)
+            .lte("sale_datetime", todayEnd)
+            .in("agent_external_id", externalIds);
+          todaySalesFromId = data || [];
+        }
+        
+        const todaySalesMap = new Map<string, any>();
+        [...todaySalesFromEmail, ...todaySalesFromId].forEach(s => todaySalesMap.set(s.id, s));
+        todaySales = Array.from(todaySalesMap.values());
       }
       
       // Fetch Fieldmarketing sales for this employee
