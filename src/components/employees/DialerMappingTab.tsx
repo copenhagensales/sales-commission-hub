@@ -145,12 +145,14 @@ export function DialerMappingTab() {
   };
 
   // Get unmapped agents (agents without any employee mapping)
-  // Only show agents with @copenhagensales.dk emails - external client agents are ignored
+  // Only show agents with internal company emails - external client agents are ignored
   // Also filter out excluded email domains
+  const INTERNAL_DOMAINS = ["@copenhagensales.dk", "@cph-relatel.dk"];
   const mappedAgentIds = mappings.map((m) => m.agent_id);
   const nonExcludedAgents = filterExcludedEmails(agents);
   const unmappedAgents = nonExcludedAgents.filter(
-    (a) => !mappedAgentIds.includes(a.id) && a.email?.toLowerCase().endsWith("@copenhagensales.dk")
+    (a) => !mappedAgentIds.includes(a.id) && 
+      INTERNAL_DOMAINS.some(domain => a.email?.toLowerCase().endsWith(domain))
   );
 
   // Normalize name for comparison (remove accents, lowercase, trim)
