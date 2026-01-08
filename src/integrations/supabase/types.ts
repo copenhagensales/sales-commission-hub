@@ -3635,6 +3635,7 @@ export type Database = {
           candidate_first_name: string
           candidate_last_name: string
           candidate_phone: string | null
+          converted_to_candidate_id: string | null
           created_at: string
           hired_date: string | null
           id: string
@@ -3654,6 +3655,7 @@ export type Database = {
           candidate_first_name: string
           candidate_last_name: string
           candidate_phone?: string | null
+          converted_to_candidate_id?: string | null
           created_at?: string
           hired_date?: string | null
           id?: string
@@ -3673,6 +3675,7 @@ export type Database = {
           candidate_first_name?: string
           candidate_last_name?: string
           candidate_phone?: string | null
+          converted_to_candidate_id?: string | null
           created_at?: string
           hired_date?: string | null
           id?: string
@@ -3685,6 +3688,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "employee_referrals_converted_to_candidate_id_fkey"
+            columns: ["converted_to_candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "employee_referrals_referrer_employee_id_fkey"
             columns: ["referrer_employee_id"]
