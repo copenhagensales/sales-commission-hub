@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp, X, Loader2, PhoneCall } from "lucide-react";
+import { ArrowLeft, Edit2, Mail, MessageSquare, Phone, Plus, Calendar, FileText, Clock, User, Briefcase, MapPin, Star, Send, History, TrendingUp, X, Loader2, PhoneCall, Trash2, Check } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -92,6 +92,8 @@ export default function CandidateDetail() {
   const [showCallModal, setShowCallModal] = useState(false);
   const [noteType, setNoteType] = useState("Generel observation");
   const [showAssignCohortDialog, setShowAssignCohortDialog] = useState(false);
+  const [editingNoteIndex, setEditingNoteIndex] = useState<number | null>(null);
+  const [editingNoteContent, setEditingNoteContent] = useState("");
   const {
     data: candidate,
     isLoading
@@ -225,6 +227,51 @@ export default function CandidateDetail() {
     },
     onError: () => {
       toast.error("Kunne ikke tilføje note");
+    }
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (noteIndex: number) => {
+      const notesArr = candidate?.notes?.split('\n\n').filter(Boolean) || [];
+      const updatedNotes = notesArr.filter((_, i) => i !== noteIndex).join('\n\n');
+      const { error } = await supabase
+        .from("candidates")
+        .update({ notes: updatedNotes || null })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["candidate", id] });
+      toast.success("Note slettet");
+    },
+    onError: () => {
+      toast.error("Kunne ikke slette note");
+    }
+  });
+
+  const updateNoteMutation = useMutation({
+    mutationFn: async ({ noteIndex, newContent }: { noteIndex: number; newContent: string }) => {
+      const notesArr = candidate?.notes?.split('\n\n').filter(Boolean) || [];
+      const originalNote = notesArr[noteIndex];
+      const match = originalNote.match(/^\[(.*?)\]\s*(.*?):\s*(.*)$/s);
+      const date = match?.[1] || "";
+      const type = match?.[2] || "";
+      const updatedNote = `[${date}] ${type}: ${newContent}`;
+      notesArr[noteIndex] = updatedNote;
+      const { error } = await supabase
+        .from("candidates")
+        .update({ notes: notesArr.join('\n\n') })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["candidate", id] });
+      setEditingNoteIndex(null);
+      setEditingNoteContent("");
+      toast.success("Note opdateret");
+    },
+    onError: () => {
+      toast.error("Kunne ikke opdatere note");
     }
   });
 
@@ -626,19 +673,82 @@ export default function CandidateDetail() {
                     <p className="text-sm text-muted-foreground">Ingen noter endnu</p>
                   </div> : <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
                     {notesArray.map((note, index) => {
-                  // Parse note format: [date] type: content
-                  const match = note.match(/^\[(.*?)\]\s*(.*?):\s*(.*)$/s);
-                  const date = match?.[1] || "";
-                  const type = match?.[2] || "";
-                  const content = match?.[3] || note;
-                  return <div key={index} className="p-3 bg-muted/40 rounded-lg border-l-2 border-primary/30">
-                          {date && <div className="flex items-center gap-2 mb-1">
+                      // Parse note format: [date] type: content
+                      const match = note.match(/^\[(.*?)\]\s*(.*?):\s*(.*)$/s);
+                      const date = match?.[1] || "";
+                      const type = match?.[2] || "";
+                      const content = match?.[3] || note;
+                      const isEditing = editingNoteIndex === index;
+                      
+                      return <div key={index} className="p-3 bg-muted/40 rounded-lg border-l-2 border-primary/30 group">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            {date && <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs text-muted-foreground">{date}</span>
                               {type && <Badge variant="secondary" className="text-xs">{type}</Badge>}
                             </div>}
-                          <p className="text-sm whitespace-pre-wrap">{content}</p>
-                        </div>;
-                })}
+                            {isEditing ? (
+                              <div className="space-y-2">
+                                <Textarea
+                                  value={editingNoteContent}
+                                  onChange={e => setEditingNoteContent(e.target.value)}
+                                  rows={3}
+                                  className="resize-none text-sm"
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => updateNoteMutation.mutate({ noteIndex: index, newContent: editingNoteContent })}
+                                    disabled={!editingNoteContent.trim() || updateNoteMutation.isPending}
+                                  >
+                                    <Check className="h-3 w-3 mr-1" />
+                                    Gem
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setEditingNoteIndex(null);
+                                      setEditingNoteContent("");
+                                    }}
+                                  >
+                                    Annuller
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm whitespace-pre-wrap">{content}</p>
+                            )}
+                          </div>
+                          {!isEditing && (
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  setEditingNoteIndex(index);
+                                  setEditingNoteContent(content);
+                                }}
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-destructive hover:text-destructive"
+                                onClick={() => deleteNoteMutation.mutate(index)}
+                                disabled={deleteNoteMutation.isPending}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>;
+                    })}
                   </div>}
               </CardContent>
             </Card>
