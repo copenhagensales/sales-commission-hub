@@ -114,6 +114,7 @@ export const ExcelFieldMatcher = lazyPage(() => import("@/pages/ExcelFieldMatche
 export const TvBoardLogin = lazyPage(() => import("@/pages/tv-board/TvBoardLogin"));
 export const TvBoardView = lazyPage(() => import("@/pages/tv-board/TvBoardView"));
 export const TvBoardAdmin = lazyPage(() => import("@/pages/tv-board/TvBoardAdmin"));
+export const TvBoardDirect = lazyPage(() => import("@/pages/tv-board/TvBoardDirect"));
 
 // Live Stats
 export const LiveStats = lazyPage(() => import("@/pages/LiveStats"));

@@ -94,7 +94,7 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
     toast.success(`${label} kopieret`);
   };
 
-  const tvUrl = `${window.location.origin}/tv/${dashboardSlug}`;
+  const getTvUrl = (code: string) => `${window.location.origin}/t/${code}`;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -142,7 +142,8 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => copyToClipboard(code.access_code, "Kode")}
+                        onClick={() => copyToClipboard(getTvUrl(code.access_code), "Link")}
+                        title="Kopier link"
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -186,19 +187,11 @@ export function TvBoardQuickGenerator({ dashboardSlug }: TvBoardQuickGeneratorPr
             </div>
           </div>
 
-          {/* TV URL */}
+          {/* Info */}
           <div className="border-t pt-4">
-            <p className="text-sm font-medium mb-2">TV URL:</p>
-            <div className="flex gap-2">
-              <Input value={tvUrl} readOnly className="flex-1 text-xs font-mono" />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyToClipboard(tvUrl, "URL")}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Klik på kopier-ikonet ved en kode for at kopiere det fulde TV-link.
+            </p>
           </div>
         </div>
       </DialogContent>
