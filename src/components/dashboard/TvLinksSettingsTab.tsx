@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Monitor, Copy, Trash2, Plus, Loader2, ExternalLink, CalendarIcon } from "lucide-react";
+import { Monitor, Copy, Trash2, Plus, Loader2, ExternalLink, CalendarIcon, PartyPopper, Sparkles, Star, Heart, Flame, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +29,14 @@ import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { da } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface TvBoardAccess {
   id: string;
@@ -38,10 +46,38 @@ interface TvBoardAccess {
   name: string | null;
   is_active: boolean;
   created_at: string;
-  expires_at: string | null;
-  auto_rotate: boolean | null;
-  rotate_interval_seconds: number | null;
+  expires_at?: string | null;
+  auto_rotate?: boolean | null;
+  rotate_interval_seconds?: number | null;
+  celebration_enabled?: boolean | null;
+  celebration_effect?: string | null;
+  celebration_duration?: number | null;
+  celebration_trigger_condition?: string | null;
+  celebration_trigger_value?: number | null;
+  celebration_text?: string | null;
 }
+
+const CELEBRATION_EFFECTS = [
+  { value: "fireworks", label: "Fyrværkeri", icon: PartyPopper },
+  { value: "confetti", label: "Konfetti", icon: Sparkles },
+  { value: "stars", label: "Stjerner", icon: Star },
+  { value: "hearts", label: "Hjerter", icon: Heart },
+  { value: "flames", label: "Flammer", icon: Flame },
+  { value: "sparkles", label: "Gnister", icon: Zap },
+];
+
+const CELEBRATION_TRIGGER_CONDITIONS = [
+  { value: "any_update", label: "Ved enhver opdatering" },
+  { value: "increase", label: "Ved stigning" },
+  { value: "reaches_goal", label: "Når mål nås" },
+];
+
+const DURATION_OPTIONS = [
+  { value: 2, label: "2 sek" },
+  { value: 3, label: "3 sek" },
+  { value: 5, label: "5 sek" },
+  { value: 8, label: "8 sek" },
+];
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -61,6 +97,12 @@ export function TvLinksSettingsTab() {
   const [autoRotate, setAutoRotate] = useState(false);
   const [rotateMinutes, setRotateMinutes] = useState(1);
   const [rotateSeconds, setRotateSeconds] = useState(0);
+  // Celebration settings
+  const [celebrationEnabled, setCelebrationEnabled] = useState(false);
+  const [celebrationEffect, setCelebrationEffect] = useState("fireworks");
+  const [celebrationDuration, setCelebrationDuration] = useState(3);
+  const [celebrationTriggerCondition, setCelebrationTriggerCondition] = useState("any_update");
+  const [celebrationText, setCelebrationText] = useState("");
   const queryClient = useQueryClient();
 
   const { data: accessCodes = [], isLoading } = useQuery({
@@ -84,12 +126,22 @@ export function TvLinksSettingsTab() {
       expiresAt,
       autoRotate,
       rotateIntervalSeconds,
+      celebrationEnabled,
+      celebrationEffect,
+      celebrationDuration,
+      celebrationTriggerCondition,
+      celebrationText,
     }: { 
       name: string; 
       dashboardSlugs: string[]; 
       expiresAt: string | null;
       autoRotate: boolean;
       rotateIntervalSeconds: number | null;
+      celebrationEnabled: boolean;
+      celebrationEffect: string;
+      celebrationDuration: number;
+      celebrationTriggerCondition: string;
+      celebrationText: string;
     }) => {
       const code = generateCode();
       const { error } = await supabase.from("tv_board_access").insert({
@@ -101,6 +153,11 @@ export function TvLinksSettingsTab() {
         expires_at: expiresAt,
         auto_rotate: autoRotate,
         rotate_interval_seconds: rotateIntervalSeconds,
+        celebration_enabled: celebrationEnabled,
+        celebration_effect: celebrationEffect,
+        celebration_duration: celebrationDuration,
+        celebration_trigger_condition: celebrationTriggerCondition,
+        celebration_text: celebrationText || null,
       });
       if (error) throw error;
       return code;
@@ -141,6 +198,11 @@ export function TvLinksSettingsTab() {
     setAutoRotate(false);
     setRotateMinutes(1);
     setRotateSeconds(0);
+    setCelebrationEnabled(false);
+    setCelebrationEffect("fireworks");
+    setCelebrationDuration(3);
+    setCelebrationTriggerCondition("any_update");
+    setCelebrationText("");
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -176,6 +238,11 @@ export function TvLinksSettingsTab() {
       expiresAt: hasExpiry && expiryDate ? expiryDate.toISOString() : null,
       autoRotate: autoRotate && selectedDashboards.length > 1,
       rotateIntervalSeconds: totalSeconds,
+      celebrationEnabled,
+      celebrationEffect,
+      celebrationDuration,
+      celebrationTriggerCondition,
+      celebrationText,
     });
   };
 
@@ -338,6 +405,110 @@ export function TvLinksSettingsTab() {
                   </Popover>
                 )}
               </div>
+
+              {/* Celebration Popup Section */}
+              <div className="border rounded-lg p-4 space-y-4 bg-gradient-to-br from-purple-500/5 to-pink-500/5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <PartyPopper className="h-5 w-5 text-purple-500" />
+                    <div>
+                      <p className="font-semibold text-sm">Fejrings-popup</p>
+                      <p className="text-xs text-muted-foreground">Vis effekter når tal opdateres</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={celebrationEnabled}
+                    onCheckedChange={setCelebrationEnabled}
+                  />
+                </div>
+
+                {celebrationEnabled && (
+                  <div className="space-y-3 pt-2 animate-fade-in">
+                    {/* Effect Selection */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">Visuel effekt</Label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {CELEBRATION_EFFECTS.map((effect) => {
+                          const IconComponent = effect.icon;
+                          return (
+                            <div
+                              key={effect.value}
+                              className={cn(
+                                "p-2 border rounded-lg cursor-pointer transition-all text-center",
+                                celebrationEffect === effect.value
+                                  ? "border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/50"
+                                  : "hover:border-muted-foreground hover:bg-muted/50"
+                              )}
+                              onClick={() => setCelebrationEffect(effect.value)}
+                            >
+                              <IconComponent className={cn(
+                                "h-4 w-4 mx-auto mb-1",
+                                celebrationEffect === effect.value 
+                                  ? "text-purple-500" 
+                                  : "text-muted-foreground"
+                              )} />
+                              <p className="text-xs font-medium">{effect.label}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Trigger Condition */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">Betingelse</Label>
+                      <Select
+                        value={celebrationTriggerCondition}
+                        onValueChange={setCelebrationTriggerCondition}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CELEBRATION_TRIGGER_CONDITIONS.map((condition) => (
+                            <SelectItem key={condition.value} value={condition.value}>
+                              {condition.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Duration Selection */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">Varighed</Label>
+                      <div className="flex gap-2">
+                        {DURATION_OPTIONS.map((duration) => (
+                          <button
+                            key={duration.value}
+                            type="button"
+                            className={cn(
+                              "flex-1 px-3 py-2 text-xs border rounded-md transition-all",
+                              celebrationDuration === duration.value
+                                ? "border-purple-500 bg-purple-500/10 text-purple-600"
+                                : "hover:bg-muted"
+                            )}
+                            onClick={() => setCelebrationDuration(duration.value)}
+                          >
+                            {duration.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Celebration Text */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">Fejringstekst (valgfrit)</Label>
+                      <Textarea
+                        value={celebrationText}
+                        onChange={(e) => setCelebrationText(e.target.value)}
+                        placeholder="F.eks. 🎉 Nyt salg!"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <DialogFooter>
@@ -411,6 +582,12 @@ export function TvLinksSettingsTab() {
                         {code.auto_rotate && code.rotate_interval_seconds && (
                           <Badge variant="outline" className="text-xs">
                             Skifter hver {formatRotateInterval(code.rotate_interval_seconds)}
+                          </Badge>
+                        )}
+                        {code.celebration_enabled && (
+                          <Badge className="text-xs bg-purple-500/20 text-purple-600 border-purple-500/30">
+                            <PartyPopper className="h-3 w-3 mr-1" />
+                            Fejring
                           </Badge>
                         )}
                       </div>
